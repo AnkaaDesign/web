@@ -31,10 +31,9 @@ playwright/.cache/
 *.trace.zip
 test-results.json
 
-# Environment files
-.env
-.env.local
-.env.e2e
+# Environment files - prevent ALL env files except examples
+.env*
+!.env.example
 
 # Coverage
 coverage/
