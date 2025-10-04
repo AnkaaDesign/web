@@ -1385,6 +1385,12 @@ export const NAVIGATION_MENU: MenuItem[] = [
         path: "/servidor/usuarios",
         children: [{ id: "servidor-usuarios-cadastrar", title: "Criar Usuário", icon: "plus", path: "/servidor/usuarios/cadastrar" }],
       },
+      {
+        id: "servidor-rate-limiting",
+        title: "Rate Limiting",
+        icon: "shield",
+        path: "/servidor/rate-limiting",
+      },
     ],
   },
 ];

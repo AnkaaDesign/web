@@ -1936,6 +1936,12 @@ export enum DEPLOYMENT_ENVIRONMENT {
   PRODUCTION = "PRODUCTION",
 }
 
+export enum DEPLOYMENT_APPLICATION {
+  API = "API",
+  WEB = "WEB",
+  MOBILE = "MOBILE",
+}
+
 export enum DEPLOYMENT_STATUS {
   PENDING = "PENDING",
   IN_PROGRESS = "IN_PROGRESS",
@@ -1962,5 +1968,6 @@ export enum DEPLOYMENT_TRIGGER {
 
 // Aliases for Prisma compatibility
 export { DEPLOYMENT_ENVIRONMENT as DeploymentEnvironment };
+export { DEPLOYMENT_APPLICATION as DeploymentApplication };
 export { DEPLOYMENT_STATUS as DeploymentStatus };
 export { DEPLOYMENT_TRIGGER as DeploymentTrigger };

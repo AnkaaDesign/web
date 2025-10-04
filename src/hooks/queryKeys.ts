@@ -789,7 +789,7 @@ export const deploymentKeys = {
 
   // New deployment workflow queries
   commits: (limit?: number) => (limit ? (["deployments", "commits", limit] as const) : (["deployments", "commits"] as const)),
-  current: (environment: string) => ["deployments", "current", environment] as const,
+  current: (application: string, environment: string) => ["deployments", "current", application, environment] as const,
   logs: (deploymentId: string) => ["deployments", "logs", deploymentId] as const,
 };
 

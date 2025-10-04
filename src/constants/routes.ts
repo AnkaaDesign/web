@@ -529,6 +529,9 @@ export const routes = {
       edit: (id: string) => `/servidor/implantacoes/editar/${id}`,
       root: "/servidor/implantacoes",
     },
+    throttler: {
+      root: "/servidor/rate-limiting",
+    },
     logs: "/servidor/logs",
     metrics: "/servidor/metricas",
     root: "/servidor",

@@ -95,7 +95,33 @@ const baseHooks = createEntityHooks<
 export const useDeploymentsInfinite = baseHooks.useInfiniteList;
 export const useDeployments = baseHooks.useList;
 export const useDeploymentDetail = baseHooks.useDetail;
-export const useDeploymentMutations = baseHooks.useMutations;
+
+// Extended mutations with deployment workflow operations
+export const useDeploymentMutations = () => {
+  const baseMutations = baseHooks.useMutations();
+  const queryClient = useQueryClient();
+
+  const deploy = useMutation({
+    mutationFn: deploymentService.deploy,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: deploymentKeys.all });
+    },
+  });
+
+  const rollback = useMutation({
+    mutationFn: deploymentService.rollback,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: deploymentKeys.all });
+    },
+  });
+
+  return {
+    ...baseMutations,
+    deploy,
+    rollback,
+  };
+};
+
 export const useDeploymentBatchMutations = baseHooks.useBatchMutations;
 
 // =====================================================
@@ -122,15 +148,16 @@ export function useAvailableCommits(
 }
 
 /**
- * Hook to get current deployment for an environment
+ * Hook to get current deployment for an application and environment
  */
 export function useCurrentDeployment(
+  application: string,
   environment: DEPLOYMENT_ENVIRONMENT,
   options?: Omit<UseQueryOptions<DeploymentGetUniqueResponse>, 'queryKey' | 'queryFn'>,
 ) {
   return useQuery({
-    queryKey: deploymentKeys.current(environment),
-    queryFn: () => deploymentService.getCurrentDeployment(environment).then(res => res.data),
+    queryKey: deploymentKeys.current(application, environment),
+    queryFn: () => deploymentService.getCurrentDeployment(application, environment).then(res => res.data),
     staleTime: 1000 * 30, // 30 seconds
     refetchInterval: 1000 * 30, // Refetch every 30 seconds
     ...options,

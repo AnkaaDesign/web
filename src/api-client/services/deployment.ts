@@ -23,7 +23,7 @@ import type {
   DeploymentBatchDeleteFormData,
 } from '../../schemas';
 
-import { DEPLOYMENT_ENVIRONMENT } from '../../constants';
+import { DEPLOYMENT_ENVIRONMENT, DEPLOYMENT_APPLICATION } from '../../constants';
 
 export const deploymentService = {
   // Standard CRUD operations
@@ -53,16 +53,21 @@ export const deploymentService = {
     apiClient.delete<DeploymentBatchResponse>('/deployments/batch', { data }),
 
   // New deployment workflow operations
-  createDeployment: (commitHash: string, environment: DEPLOYMENT_ENVIRONMENT) =>
-    apiClient.post<DeploymentCreateResponse>(`/deployments/deploy/${commitHash}`, { environment }),
-
-  getCurrentDeployment: (environment: DEPLOYMENT_ENVIRONMENT, params?: DeploymentGetByIdParams) =>
-    apiClient.get<DeploymentGetUniqueResponse>(`/deployments/current/${environment}`, { params }),
-
-  getAvailableCommits: (limit?: number) =>
+  getCommits: (limit?: number) =>
     apiClient.get<{ success: boolean; message: string; data: GitCommitInfo[] }>('/deployments/commits/list', {
       params: { limit },
     }),
+
+  getCurrentDeployment: (application: string, environment: string) =>
+    apiClient.get<DeploymentGetUniqueResponse>(`/deployments/current/${application}/${environment}`),
+
+  getDeploymentHistory: (application: string, environment: string, limit?: number) =>
+    apiClient.get<DeploymentGetManyResponse>('/deployments', {
+      params: { application, environment, limit },
+    }),
+
+  deploy: (application: DEPLOYMENT_APPLICATION, commitHash: string, environment: DEPLOYMENT_ENVIRONMENT) =>
+    apiClient.post<DeploymentCreateResponse>(`/deployments/deploy/${application}/${environment}/${commitHash}`),
 
   cancelDeployment: (id: string) =>
     apiClient.post<DeploymentUpdateResponse>(`/deployments/${id}/cancel`),
