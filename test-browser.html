@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ankaa Build Test - Error Detection</title>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+        h1 { margin: 0; color: white; }
+        .info { opacity: 0.9; margin-top: 10px; }
+        .section {
+            background: #1e293b;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            margin-top: 0;
+            color: #60a5fa;
+            border-bottom: 2px solid #334155;
+            padding-bottom: 10px;
+        }
+        .error {
+            background: #7f1d1d;
+            border-left: 4px solid #dc2626;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background: #14532d;
+            border-left: 4px solid #16a34a;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .warning {
+            background: #78350f;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .code {
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .log-entry {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .log-error { background: #7f1d1d; }
+        .log-warn { background: #78350f; }
+        .log-info { background: #1e3a8a; }
+        .log-debug { background: #334155; }
+        #consoleLog {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .metric {
+            display: inline-block;
+            background: #334155;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin: 5px;
+        }
+        .metric-label {
+            font-size: 12px;
+            opacity: 0.7;
+            display: block;
+        }
+        .metric-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #60a5fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Ankaa Build Test Suite</h1>
+        <div class="info">Browser-based error detection and performance monitoring</div>
+    </div>
+
+    <div class="section">
+        <h2>📊 System Information</h2>
+        <div id="systemInfo"></div>
+    </div>
+
+    <div class="section">
+        <h2>🔧 Build Configuration</h2>
+        <div id="buildConfig"></div>
+    </div>
+
+    <div class="section">
+        <h2>⚠️ Console Errors</h2>
+        <div>
+            <button onclick="clearLog()">Clear Log</button>
+            <button onclick="exportLog()">Export Log</button>
+        </div>
+        <div id="consoleLog"></div>
+    </div>
+
+    <div class="section">
+        <h2>📈 Performance Metrics</h2>
+        <div id="performanceMetrics"></div>
+    </div>
+
+    <div class="section">
+        <h2>🧪 Runtime Tests</h2>
+        <div id="runtimeTests"></div>
+    </div>
+
+    <script>
+        // Global error tracking
+        const errors = [];
+        const warnings = [];
+        const logs = [];
+
+        // Capture console methods
+        const originalConsole = {
+            error: console.error,
+            warn: console.warn,
+            log: console.log,
+            info: console.info
+        };
+
+        function addLogEntry(type, args) {
+            const message = args.map(arg => {
+                if (typeof arg === 'object') {
+                    return JSON.stringify(arg, null, 2);
+                }
+                return String(arg);
+            }).join(' ');
+
+            const entry = {
+                type,
+                message,
+                timestamp: new Date().toISOString(),
+                stack: new Error().stack
+            };
+
+            if (type === 'error') errors.push(entry);
+            if (type === 'warn') warnings.push(entry);
+            logs.push(entry);
+
+            updateConsoleLog();
+        }
+
+        console.error = function(...args) {
+            addLogEntry('error', args);
+            originalConsole.error.apply(console, args);
+        };
+
+        console.warn = function(...args) {
+            addLogEntry('warn', args);
+            originalConsole.warn.apply(console, args);
+        };
+
+        console.log = function(...args) {
+            addLogEntry('info', args);
+            originalConsole.log.apply(console, args);
+        };
+
+        console.info = function(...args) {
+            addLogEntry('info', args);
+            originalConsole.info.apply(console, args);
+        };
+
+        // Capture global errors
+        window.addEventListener('error', (event) => {
+            const entry = {
+                type: 'error',
+                message: event.message,
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno,
+                error: event.error?.stack,
+                timestamp: new Date().toISOString()
+            };
+            errors.push(entry);
+            logs.push(entry);
+            updateConsoleLog();
+        });
+
+        // Capture unhandled promise rejections
+        window.addEventListener('unhandledrejection', (event) => {
+            const entry = {
+                type: 'error',
+                message: 'Unhandled Promise Rejection: ' + event.reason,
+                timestamp: new Date().toISOString()
+            };
+            errors.push(entry);
+            logs.push(entry);
+            updateConsoleLog();
+        });
+
+        // Update console log display
+        function updateConsoleLog() {
+            const logDiv = document.getElementById('consoleLog');
+            logDiv.innerHTML = logs.map(entry => {
+                const className = `log-entry log-${entry.type}`;
+                const time = new Date(entry.timestamp).toLocaleTimeString();
+                return `<div class="${className}">
+                    <strong>[${time}] ${entry.type.toUpperCase()}</strong>: ${entry.message}
+                    ${entry.stack ? `<div class="code">${entry.stack}</div>` : ''}
+                </div>`;
+            }).join('');
+
+            // Auto-scroll to bottom
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            logs.length = 0;
+            errors.length = 0;
+            warnings.length = 0;
+            updateConsoleLog();
+        }
+
+        function exportLog() {
+            const data = {
+                timestamp: new Date().toISOString(),
+                errors,
+                warnings,
+                logs,
+                systemInfo: getSystemInfo(),
+                buildConfig: getBuildConfig()
+            };
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ankaa-test-log-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // System information
+        function getSystemInfo() {
+            return {
+                userAgent: navigator.userAgent,
+                platform: navigator.platform,
+                language: navigator.language,
+                cookiesEnabled: navigator.cookieEnabled,
+                onLine: navigator.onLine,
+                screenResolution: `${screen.width}x${screen.height}`,
+                windowSize: `${window.innerWidth}x${window.innerHeight}`,
+                colorDepth: screen.colorDepth,
+                pixelRatio: window.devicePixelRatio,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                memory: performance.memory ? {
+                    usedJSHeapSize: (performance.memory.usedJSHeapSize / 1048576).toFixed(2) + ' MB',
+                    totalJSHeapSize: (performance.memory.totalJSHeapSize / 1048576).toFixed(2) + ' MB',
+                    jsHeapSizeLimit: (performance.memory.jsHeapSizeLimit / 1048576).toFixed(2) + ' MB'
+                } : 'Not available'
+            };
+        }
+
+        function displaySystemInfo() {
+            const info = getSystemInfo();
+            const infoDiv = document.getElementById('systemInfo');
+
+            infoDiv.innerHTML = `
+                <div class="metric">
+                    <span class="metric-label">Browser</span>
+                    <span class="metric-value">${navigator.userAgent.split(' ').pop()}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Platform</span>
+                    <span class="metric-value">${info.platform}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Screen</span>
+                    <span class="metric-value">${info.screenResolution}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Pixel Ratio</span>
+                    <span class="metric-value">${info.pixelRatio}x</span>
+                </div>
+                <div class="code">${JSON.stringify(info, null, 2)}</div>
+            `;
+        }
+
+        // Build configuration
+        function getBuildConfig() {
+            return {
+                apiUrl: window.__ANKAA_API_URL__ || 'NOT SET',
+                timestamp: new Date().toISOString(),
+                location: window.location.href
+            };
+        }
+
+        function displayBuildConfig() {
+            const config = getBuildConfig();
+            const configDiv = document.getElementById('buildConfig');
+
+            const apiUrlClass = config.apiUrl !== 'NOT SET' ? 'success' : 'error';
+
+            configDiv.innerHTML = `
+                <div class="${apiUrlClass}">
+                    <strong>API URL:</strong> ${config.apiUrl}
+                </div>
+                <div class="code">${JSON.stringify(config, null, 2)}</div>
+            `;
+        }
+
+        // Performance metrics
+        function displayPerformanceMetrics() {
+            const metricsDiv = document.getElementById('performanceMetrics');
+
+            if (window.performance && window.performance.timing) {
+                const timing = performance.timing;
+                const metrics = {
+                    'DNS Lookup': timing.domainLookupEnd - timing.domainLookupStart,
+                    'TCP Connection': timing.connectEnd - timing.connectStart,
+                    'Request Time': timing.responseStart - timing.requestStart,
+                    'Response Time': timing.responseEnd - timing.responseStart,
+                    'DOM Processing': timing.domComplete - timing.domLoading,
+                    'Total Load Time': timing.loadEventEnd - timing.navigationStart
+                };
+
+                metricsDiv.innerHTML = Object.entries(metrics).map(([label, value]) => `
+                    <div class="metric">
+                        <span class="metric-label">${label}</span>
+                        <span class="metric-value">${value}ms</span>
+                    </div>
+                `).join('');
+            } else {
+                metricsDiv.innerHTML = '<div class="warning">Performance metrics not available</div>';
+            }
+
+            // Add resource timing if available
+            if (window.performance && window.performance.getEntriesByType) {
+                const resources = performance.getEntriesByType('resource');
+                const totalSize = resources.reduce((sum, r) => sum + (r.transferSize || 0), 0);
+
+                metricsDiv.innerHTML += `
+                    <div class="metric">
+                        <span class="metric-label">Resources Loaded</span>
+                        <span class="metric-value">${resources.length}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Total Transfer Size</span>
+                        <span class="metric-value">${(totalSize / 1048576).toFixed(2)} MB</span>
+                    </div>
+                `;
+            }
+        }
+
+        // Runtime tests
+        function runRuntimeTests() {
+            const testsDiv = document.getElementById('runtimeTests');
+            const tests = [];
+
+            // Test 1: Check if API URL is set
+            tests.push({
+                name: 'API URL Configuration',
+                passed: window.__ANKAA_API_URL__ && window.__ANKAA_API_URL__ !== '%VITE_API_URL%',
+                message: window.__ANKAA_API_URL__ || 'Not set'
+            });
+
+            // Test 2: Check for React
+            tests.push({
+                name: 'React Loaded',
+                passed: typeof React !== 'undefined',
+                message: typeof React !== 'undefined' ? 'React is available' : 'React not found'
+            });
+
+            // Test 3: Check for critical errors
+            tests.push({
+                name: 'No Critical Errors',
+                passed: errors.length === 0,
+                message: errors.length === 0 ? 'No errors detected' : `${errors.length} error(s) found`
+            });
+
+            // Test 4: Check localStorage
+            tests.push({
+                name: 'localStorage Available',
+                passed: typeof Storage !== 'undefined',
+                message: typeof Storage !== 'undefined' ? 'localStorage works' : 'localStorage not available'
+            });
+
+            // Test 5: Check fetch API
+            tests.push({
+                name: 'Fetch API Available',
+                passed: typeof fetch !== 'undefined',
+                message: typeof fetch !== 'undefined' ? 'Fetch API works' : 'Fetch API not available'
+            });
+
+            testsDiv.innerHTML = tests.map(test => {
+                const className = test.passed ? 'success' : 'error';
+                const icon = test.passed ? '✅' : '❌';
+                return `<div class="${className}">
+                    ${icon} <strong>${test.name}</strong>: ${test.message}
+                </div>`;
+            }).join('');
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            displaySystemInfo();
+            displayBuildConfig();
+            displayPerformanceMetrics();
+            runRuntimeTests();
+
+            // Check for React errors after a delay
+            setTimeout(() => {
+                if (errors.length > 0) {
+                    console.warn('⚠️ Errors detected during initialization');
+                } else {
+                    console.log('✅ No errors detected during initialization');
+                }
+            }, 2000);
+        });
+
+        // Log initial state
+        console.log('🧪 Ankaa Build Test Suite Initialized');
+        console.log('API URL:', window.__ANKAA_API_URL__);
+        console.log('Build Config:', getBuildConfig());
+    </script>
+</body>
+</html>

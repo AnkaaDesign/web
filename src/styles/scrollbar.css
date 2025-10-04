@@ -1,0 +1,198 @@
+/* Modern scrollbar detection and styling utilities */
+
+/* Detect overlay scrollbar support using CSS */
+@supports (overflow: overlay) {
+  .supports-overlay-scrollbar {
+    --scrollbar-type: overlay;
+  }
+}
+
+/* Modern media query for scrollbar type detection */
+@media (overflow-inline: overlay) {
+  :root {
+    --scrollbar-type: overlay;
+    --scrollbar-width: 0;
+  }
+}
+
+@media (overflow-inline: scroll) {
+  :root {
+    --scrollbar-type: classic;
+    --scrollbar-width: env(scrollbar-inline-size, 17px);
+  }
+}
+
+/* Scrollbar gutter utilities with feature detection */
+.scrollbar-gutter-auto {
+  scrollbar-gutter: auto;
+}
+
+.scrollbar-gutter-stable {
+  scrollbar-gutter: stable;
+}
+
+.scrollbar-gutter-stable-both {
+  scrollbar-gutter: stable both-edges;
+}
+
+/* Fallback for browsers without scrollbar-gutter support */
+@supports not (scrollbar-gutter: stable) {
+  .scrollbar-gutter-stable {
+    /* Force scrollbar to always show */
+    overflow-y: scroll;
+  }
+
+  .scrollbar-gutter-stable-both {
+    /* Add padding to simulate both-edges */
+    padding-left: var(--scrollbar-width, 17px);
+    padding-right: var(--scrollbar-width, 17px);
+    overflow-y: scroll;
+  }
+}
+
+/* Platform-specific scrollbar styling */
+.custom-scrollbar {
+  /* Firefox */
+  scrollbar-width: auto;
+  scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: var(--scrollbar-width, 12px);
+  height: var(--scrollbar-width, 12px);
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Dark mode scrollbar */
+.dark .custom-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Thin scrollbar variant */
+.thin-scrollbar {
+  scrollbar-width: thin;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+/* Hide scrollbar but keep functionality */
+.invisible-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.invisible-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Overlay scrollbar simulation for classic scrollbars */
+@media not (overflow-inline: overlay) {
+  .overlay-scrollbar-fallback {
+    overflow: hidden;
+    position: relative;
+  }
+
+  .overlay-scrollbar-fallback > * {
+    overflow-y: auto;
+    margin-right: calc(var(--scrollbar-width, 17px) * -1);
+    padding-right: var(--scrollbar-width, 17px);
+  }
+}
+
+/* Combobox horizontal scrollbar */
+.combobox-badges {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+
+  /* Add padding for macOS to prevent text cutoff */
+  padding-right: 4px;
+}
+
+/* Webkit browsers (Chrome, Safari, Edge) - especially for macOS */
+.combobox-badges::-webkit-scrollbar {
+  height: 6px;
+  /* Position below content on macOS */
+  margin-top: 4px;
+}
+
+.combobox-badges::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+  margin: 0 4px; /* Add margin to prevent edge cutoff */
+}
+
+.combobox-badges::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+  /* Add border for better visibility without blocking content */
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+.combobox-badges::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(107, 114, 128, 0.7);
+}
+
+/* Auto-hide scrollbar when not scrolling (macOS-like behavior) */
+.combobox-badges:not(:hover)::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+.combobox-badges:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+}
+
+/* Dark mode support */
+.dark .combobox-badges {
+  scrollbar-color: rgba(107, 114, 128, 0.5) transparent;
+}
+
+.dark .combobox-badges::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dark .combobox-badges::-webkit-scrollbar-thumb {
+  background-color: rgba(107, 114, 128, 0.5);
+}
+
+.dark .combobox-badges:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(107, 114, 128, 0.7);
+}
+
+.dark .combobox-badges::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.7);
+}
+
+/* Ensure scrollbar doesn't overlap content on macOS */
+@supports (-webkit-appearance: none) {
+  .combobox-badges {
+    /* Add extra padding on macOS Safari/Chrome */
+    padding-bottom: 10px !important;
+  }
+}

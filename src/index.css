@@ -1,0 +1,628 @@
+/* Import enhanced scrollbar utilities */
+@import "./styles/scrollbar.css";
+
+/* Import paint finish effects */
+@import "./components/paint/effects/paint-finish-effects.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Hide browser default date/time picker icons */
+.hide-date-picker::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  display: none !important;
+  -webkit-appearance: none !important;
+  background: transparent !important;
+  color: transparent !important;
+  cursor: pointer !important;
+  height: 0 !important;
+  width: 0 !important;
+  border: none !important;
+  outline: none !important;
+  position: absolute !important;
+  right: -9999px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.hide-date-picker::-webkit-inner-spin-button,
+input[type="date"]::-webkit-inner-spin-button,
+input[type="datetime-local"]::-webkit-inner-spin-button,
+input[type="time"]::-webkit-inner-spin-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+}
+
+.hide-date-picker::-webkit-outer-spin-button,
+input[type="date"]::-webkit-outer-spin-button,
+input[type="datetime-local"]::-webkit-outer-spin-button,
+input[type="time"]::-webkit-outer-spin-button {
+  display: none !important;
+  -webkit-appearance: none !important;
+}
+
+.hide-date-picker,
+input[type="date"].hide-date-picker,
+input[type="datetime-local"].hide-date-picker,
+input[type="time"].hide-date-picker {
+  -webkit-appearance: none !important;
+  -moz-appearance: textfield !important;
+  appearance: none !important;
+}
+
+/* Fix for select item text color on hover/highlight */
+[data-radix-select-item][data-highlighted] *,
+[data-radix-select-item]:hover * {
+  color: hsl(var(--accent-foreground)) !important;
+}
+
+/* Fix for Radix UI Popover scroll inside Modal/Dialog */
+[data-radix-popper-content-wrapper] {
+  pointer-events: auto !important;
+  position: fixed !important;
+}
+
+/* Ensure popover content can receive wheel events */
+[role="dialog"] [data-radix-popper-content-wrapper] {
+  isolation: isolate;
+}
+
+/* Fix scrolling in combobox dropdowns inside modals */
+[role="dialog"] [data-radix-popper-content-wrapper] [data-radix-scroll-area-viewport],
+[role="dialog"] [data-radix-popper-content-wrapper] .overflow-y-auto {
+  pointer-events: auto !important;
+  overscroll-behavior: contain;
+}
+
+/* Prevent dialog from blocking popover events */
+[data-state="open"][role="dialog"] {
+  pointer-events: auto;
+}
+
+[data-state="open"][role="dialog"] > * {
+  pointer-events: auto;
+}
+
+@layer base {
+  /* Global font configuration for better Unicode support */
+  :root {
+    /* Primary font stack with excellent Unicode coverage */
+    --font-sans:
+      "Inter", "Segoe UI", "system-ui", "-apple-system", "BlinkMacSystemFont", "Roboto", "Helvetica Neue", "Arial", "Noto Sans", "sans-serif", "Apple Color Emoji",
+      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+    /* Monospace font stack with symbol support */
+    --font-mono:
+      "SF Mono", "Monaco", "Inconsolata", "Fira Code", "Consolas", "Roboto Mono", "Ubuntu Mono", "Courier New", "monospace", "Apple Color Emoji", "Segoe UI Emoji",
+      "Segoe UI Symbol";
+  }
+
+  /* Apply enhanced font family to all elements */
+  * {
+    font-family: var(--font-sans);
+    @apply transition-colors duration-300;
+  }
+
+  /* Apply monospace font to appropriate elements */
+  code,
+  kbd,
+  pre,
+  samp,
+  var {
+    font-family: var(--font-mono);
+  }
+
+  /* Prevent transition on page load */
+  .no-transitions * {
+    @apply !transition-none;
+  }
+
+  :root {
+    /* Light Theme Colors - Minimal palette with low contrast */
+    --background: 0 0% 91%; /* neutral-200 - slightly darker background */
+    --foreground: 0 0% 25%; /* neutral-700 - softer text */
+    --card: 0 0% 98%; /* neutral-50 - subtle card background */
+    --card-foreground: 0 0% 25%; /* neutral-700 - consistent with foreground */
+    --card-nested: 0 0% 96%; /* neutral-100 - for nested cards */
+    --popover: 0 0% 98%; /* neutral-50 - same as card */
+    --popover-foreground: 0 0% 25%; /* neutral-700 */
+    --primary: 142 72% 29%; /* green-700 - matching logo */
+    --primary-foreground: 0 0% 98%; /* neutral-50 */
+    --secondary: 0 0% 91%; /* neutral-150 */
+    --secondary-foreground: 0 0% 30%; /* neutral-600 */
+    --muted: 0 0% 89%; /* neutral-200 - subtle backgrounds */
+    --muted-foreground: 0 0% 45%; /* neutral-550 - softer muted text */
+    --accent: 142 72% 29%; /* green-700 - matching primary */
+    --accent-foreground: 0 0% 98%; /* neutral-50 */
+    --destructive: 0 50% 50%; /* red but less saturated */
+    --destructive-foreground: 0 0% 98%; /* neutral-50 */
+    --border: 0 0% 89%; /* neutral-200 - very subtle borders */
+    --input: 0 0% 100%; /* white - but with subtle border */
+    --ring: 142 72% 29%; /* green-700 for focus */
+
+    /* Semantic colors with low saturation */
+    --success: 142 72% 29%; /* green-700 */
+    --warning: 45 40% 50%; /* muted amber */
+    --error: 0 40% 50%; /* muted red */
+    --info: 210 30% 50%; /* muted blue */
+
+    --radius: 0.5rem;
+
+    /* Hover and interaction states */
+    --hover-opacity: 0.9;
+    --focus-opacity: 0.3;
+    --disabled-opacity: 0.5;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 30%;
+    --sidebar-primary: 142 30% 45%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 0 0% 95%;
+    --sidebar-accent-foreground: 0 0% 30%;
+    --sidebar-border: 0 0% 91%;
+    --sidebar-ring: 142 30% 50%;
+  }
+
+  .dark {
+    /* Dark Theme Colors - Minimal palette with low contrast */
+    --background: 0 0% 11%; /* neutral-875 - softer dark background */
+    --foreground: 0 0% 85%; /* neutral-250 - softer light text */
+    --card: 0 0% 15%; /* neutral-825 - subtle card background */
+    --card-foreground: 0 0% 85%; /* neutral-250 - consistent with foreground */
+    --card-nested: 0 0% 18%; /* neutral-800 - for nested cards */
+    --popover: 0 0% 15%; /* neutral-825 - same as card */
+    --popover-foreground: 0 0% 85%; /* neutral-250 */
+    --primary: 142 72% 29%; /* green-700 - matching logo */
+    --primary-foreground: 0 0% 98%; /* neutral-50 */
+    --secondary: 0 0% 20%; /* neutral-800 */
+    --secondary-foreground: 0 0% 80%; /* neutral-300 */
+    --muted: 0 0% 23%; /* neutral-750 - subtle backgrounds */
+    --muted-foreground: 0 0% 55%; /* neutral-450 - softer muted text */
+    --accent: 142 72% 29%; /* green-700 - matching primary */
+    --accent-foreground: 0 0% 98%; /* neutral-50 */
+    --destructive: 0 40% 45%; /* less saturated red */
+    --destructive-foreground: 0 0% 98%; /* neutral-50 */
+    --border: 0 0% 23%; /* neutral-750 - very subtle borders */
+    --input: 0 0% 13%; /* slightly darker than card */
+    --ring: 142 72% 29%; /* green-700 for focus */
+
+    /* Semantic colors with low saturation */
+    --success: 142 72% 29%; /* green-700 */
+    --warning: 45 30% 45%; /* muted amber */
+    --error: 0 35% 45%; /* muted red */
+    --info: 210 25% 45%; /* muted blue */
+
+    /* Hover and interaction states (same as light) */
+    --hover-opacity: 0.9;
+    --focus-opacity: 0.3;
+    --disabled-opacity: 0.5;
+
+    --sidebar-background: 0 0% 13%;
+    --sidebar-foreground: 0 0% 80%;
+    --sidebar-primary: 142 25% 40%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 0 0% 18%;
+    --sidebar-accent-foreground: 0 0% 80%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 142 25% 45%;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  /* Loading spinner animation */
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Skeleton pulse animation */
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  /* Upload progress shimmer animation */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  @keyframes shimmer-progress {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .animate-shimmer-progress {
+    animation: shimmer-progress 2s ease-in-out infinite;
+  }
+
+  /* Success bounce animation */
+  @keyframes success-bounce {
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-4px);
+    }
+    60% {
+      transform: translateY(-2px);
+    }
+  }
+
+  .animate-success-bounce {
+    animation: success-bounce 0.6s ease-out;
+  }
+
+  /* Error shake animation */
+  @keyframes error-shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+      transform: translateX(-2px);
+    }
+    20%,
+    40%,
+    60%,
+    80% {
+      transform: translateX(2px);
+    }
+  }
+
+  .animate-error-shake {
+    animation: error-shake 0.5s ease-in-out;
+  }
+
+  /* Ensure focus-visible works across browsers */
+  input:focus-visible,
+  button:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible,
+  [role="combobox"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: none;
+    ring-color: hsl(var(--ring));
+  }
+
+  /* Global scrollbar styling for webkit browsers */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Dark mode scrollbar adjustments */
+  .dark ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.4);
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.6);
+  }
+
+  /* Firefox scrollbar styling */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+
+  .dark * {
+    scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
+  }
+
+  /* Custom hover states using opacity */
+  .custom-primary {
+    background-color: hsl(var(--primary));
+  }
+
+  .custom-primary:hover:not(:disabled) {
+    opacity: var(--hover-opacity);
+  }
+
+  /* Override shadcn primary button hover */
+  [data-primary-button]:hover:not(:disabled) {
+    opacity: var(--hover-opacity);
+  }
+
+  /* Destructive button hover */
+  .destructive-hover:hover:not(:disabled) {
+    opacity: var(--hover-opacity);
+  }
+
+  /* Input cursor color for better visibility */
+  input,
+  textarea {
+    caret-color: hsl(var(--foreground));
+  }
+
+  /* Dark mode cursor fix - ensure white cursor */
+  .dark input,
+  .dark textarea {
+    caret-color: hsl(0 0% 96%); /* white cursor for dark mode */
+  }
+
+  /* Override browser autofill colors */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px hsl(var(--input)) inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  /* Dark mode autofill override */
+  .dark input:-webkit-autofill,
+  .dark input:-webkit-autofill:hover,
+  .dark input:-webkit-autofill:focus,
+  .dark input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px hsl(var(--input)) inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+  }
+
+  /* Switch border fix */
+  [role="switch"] {
+    border: 1px solid hsl(var(--border));
+  }
+
+  /* Card shadow for dark mode */
+  .dark .shadow-sm {
+    box-shadow: 0 1px 2px 0 hsl(0 0% 9% / 0.05); /* Using neutral-800 */
+  }
+
+  .dark .shadow {
+    box-shadow:
+      0 1px 3px 0 hsl(0 0% 9% / 0.1),
+      0 1px 2px -1px hsl(0 0% 9% / 0.1);
+  }
+
+  .dark .shadow-md {
+    box-shadow:
+      0 4px 6px -1px hsl(0 0% 9% / 0.1),
+      0 2px 4px -2px hsl(0 0% 9% / 0.1);
+  }
+
+  .dark .shadow-lg {
+    box-shadow:
+      0 10px 15px -3px hsl(0 0% 9% / 0.1),
+      0 4px 6px -4px hsl(0 0% 9% / 0.1);
+  }
+
+  /* Select dropdown content in dark mode */
+  .dark [data-radix-popper-content-wrapper] [role="listbox"] {
+    background-color: hsl(0 0% 15%) !important; /* very dark neutral */
+  }
+
+  /* Select items in dark mode */
+  .dark [role="option"] {
+    background-color: hsl(0 0% 15%) !important; /* darker neutral */
+    color: hsl(0 0% 96%) !important;
+  }
+
+  .dark [role="option"]:hover,
+  .dark [role="option"]:focus,
+  .dark [role="option"][data-highlighted] {
+    background-color: hsl(0 0% 25%) !important; /* lighter on hover */
+    outline: none !important;
+  }
+
+  /* Select content background */
+  .dark .select-content {
+    background-color: hsl(0 0% 15%) !important;
+    border: 1px solid hsl(0 0% 30%) !important;
+  }
+
+  /* Table checkbox column standardization */
+  /* Ensure consistent width for checkbox columns across all tables */
+  table th:has([role="checkbox"]),
+  table td:has([role="checkbox"]) {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* Center checkbox content */
+  table th:has([role="checkbox"]) > *,
+  table td:has([role="checkbox"]) > * {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Override any inline styles for checkbox columns */
+  .w-12:has([role="checkbox"]),
+  .w-\[48px\]:has([role="checkbox"]) {
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
+  }
+}
+
+/* Print styles for borrow receipts and general printing */
+@media print {
+  /* Page setup */
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+
+  /* Hide non-printable elements */
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Show print-only elements */
+  .print\:block {
+    display: block !important;
+  }
+
+  /* Reset colors for better printing */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Ensure text is black for printing */
+  body,
+  .print\:text-black {
+    color: #000000 !important;
+  }
+
+  /* Background colors for important elements */
+  .bg-gray-50 {
+    background-color: #f9fafb !important;
+  }
+
+  .bg-gray-100 {
+    background-color: #f3f4f6 !important;
+  }
+
+  /* Border styles for printing */
+  .border {
+    border-color: #d1d5db !important;
+  }
+
+  .border-gray-300 {
+    border-color: #d1d5db !important;
+  }
+
+  .border-gray-800 {
+    border-color: #1f2937 !important;
+  }
+
+  /* Text colors for printing */
+  .text-gray-600 {
+    color: #4b5563 !important;
+  }
+
+  .text-gray-700 {
+    color: #374151 !important;
+  }
+
+  .text-green-600 {
+    color: #059669 !important;
+  }
+
+  .text-blue-600 {
+    color: #2563eb !important;
+  }
+
+  /* Page break utilities */
+  .break-before-page {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+
+  .break-after-page {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+
+  .break-inside-avoid {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Remove shadows and unnecessary effects */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Ensure links are visible */
+  a {
+    text-decoration: underline !important;
+  }
+
+  /* Table styles for printing */
+  table {
+    border-collapse: collapse !important;
+  }
+
+  td,
+  th {
+    border: 1px solid #d1d5db !important;
+    padding: 8px !important;
+  }
+
+  /* Remove backgrounds from buttons */
+  button {
+    background: transparent !important;
+    border: 1px solid #000 !important;
+  }
+
+  /* Ensure images print */
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Headers and footers */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Keep related content together */
+  .print-no-break {
+    page-break-inside: avoid !important;
+  }
+}

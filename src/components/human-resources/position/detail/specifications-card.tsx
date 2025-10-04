@@ -1,0 +1,86 @@
+import { IconInfoCircle, IconCalendar, IconHash } from "@tabler/icons-react";
+
+import type { Position } from "../../../../types";
+import { formatDateTime, formatCurrency } from "../../../../utils";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
+interface SpecificationsCardProps {
+  position: Position;
+}
+
+export function SpecificationsCard({ position }: SpecificationsCardProps) {
+  const currentRemuneration = position.remunerations && position.remunerations.length > 0 ? position.remunerations[0].value : null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <IconInfoCircle className="h-5 w-5" />
+          Especificações
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Basic Information */}
+        <div>
+          <h3 className="text-sm font-medium text-muted-foreground mb-3">Informações Básicas</h3>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between py-1">
+              <span className="text-sm text-muted-foreground">Nome</span>
+              <span className="text-sm font-medium">{position.name}</span>
+            </div>
+            <div className="flex items-center justify-between py-1">
+              <span className="text-sm text-muted-foreground">Remuneração Atual</span>
+              {currentRemuneration ? <span className="text-sm font-medium">{formatCurrency(currentRemuneration)}</span> : <span className="text-sm text-muted-foreground">-</span>}
+            </div>
+            <div className="flex items-center justify-between py-1">
+              <span className="text-sm text-muted-foreground">Funcionários</span>
+              <Badge variant="secondary" className="font-normal">
+                {position._count?.users || 0} funcionário{(position._count?.users || 0) !== 1 ? "s" : ""}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between py-1">
+              <span className="text-sm text-muted-foreground">Histórico de Remunerações</span>
+              <span className="text-sm font-medium">
+                {position._count?.remunerations || 0} registro{(position._count?.remunerations || 0) !== 1 ? "s" : ""}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Identification */}
+        <div>
+          <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+            <IconHash className="h-4 w-4" />
+            Identificação
+          </h3>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between py-1">
+              <span className="text-sm text-muted-foreground">ID do Cargo</span>
+              <code className="text-xs bg-muted px-2 py-1 rounded font-mono">{position.id}</code>
+            </div>
+          </div>
+        </div>
+
+        {/* System Dates */}
+        <div>
+          <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+            <IconCalendar className="h-4 w-4" />
+            Datas do Sistema
+          </h3>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between py-1">
+              <span className="text-sm text-muted-foreground">Criado em</span>
+              <span className="text-sm">{position.createdAt ? formatDateTime(position.createdAt) : "-"}</span>
+            </div>
+            <div className="flex items-center justify-between py-1">
+              <span className="text-sm text-muted-foreground">Atualizado em</span>
+              <span className="text-sm">{position.updatedAt ? formatDateTime(position.updatedAt) : "-"}</span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

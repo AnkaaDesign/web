@@ -1,0 +1,6 @@
+export { BasicInfoCard } from "./basic-info-card";
+export { ContactDetailsCard } from "./contact-details-card";
+export { AddressInfoCard } from "./address-info-card";
+export { RelatedServiceOrdersCard } from "./related-service-orders-card";
+export { CustomerActivityCard } from "./customer-activity-card";
+export { RelatedInvoicesCard } from "./related-invoices-card";

@@ -1,0 +1,227 @@
+/* Time Clock Entry UI Utilities */
+
+/* Table Highlighting Animations */
+@keyframes highlight-flash {
+  0% {
+    background-color: rgb(254 240 138 / 0.5);
+  }
+  50% {
+    background-color: rgb(254 240 138 / 1);
+  }
+  100% {
+    background-color: rgb(254 240 138 / 0.5);
+  }
+}
+
+@keyframes error-flash {
+  0% {
+    background-color: rgb(254 226 226 / 0.5);
+  }
+  50% {
+    background-color: rgb(254 226 226 / 1);
+  }
+  100% {
+    background-color: rgb(254 226 226 / 0.5);
+  }
+}
+
+@keyframes success-flash {
+  0% {
+    background-color: rgb(220 252 231 / 0.5);
+  }
+  50% {
+    background-color: rgb(220 252 231 / 1);
+  }
+  100% {
+    background-color: rgb(220 252 231 / 0.5);
+  }
+}
+
+/* Animation classes */
+.highlight-flash {
+  animation: highlight-flash 0.8s ease-in-out;
+}
+
+.error-flash {
+  animation: error-flash 0.8s ease-in-out;
+}
+
+.success-flash {
+  animation: success-flash 0.8s ease-in-out;
+}
+
+/* Table Utilities */
+.time-clock-table {
+  /* Ensure proper scrolling behavior */
+  scroll-behavior: smooth;
+}
+
+.time-clock-table th,
+.time-clock-table td {
+  /* Prevent text selection on table structure elements */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.time-clock-table input {
+  /* Allow text selection in inputs */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Modified row highlighting with subtle gradient */
+.row-modified {
+  background: linear-gradient(90deg, rgb(254 240 138 / 0.1) 0%, rgb(254 240 138 / 0.2) 50%, rgb(254 240 138 / 0.1) 100%);
+}
+
+.dark .row-modified {
+  background: linear-gradient(90deg, rgb(161 98 7 / 0.1) 0%, rgb(161 98 7 / 0.2) 50%, rgb(161 98 7 / 0.1) 100%);
+}
+
+/* Weekend row highlighting */
+.row-weekend {
+  background: linear-gradient(90deg, rgb(254 226 226 / 0.1) 0%, rgb(254 226 226 / 0.15) 50%, rgb(254 226 226 / 0.1) 100%);
+}
+
+.dark .row-weekend {
+  background: linear-gradient(90deg, rgb(127 29 29 / 0.1) 0%, rgb(127 29 29 / 0.15) 50%, rgb(127 29 29 / 0.1) 100%);
+}
+
+/* Cell modification indicator */
+.cell-modified::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  background-color: rgb(251 191 36);
+  border-radius: 50%;
+  z-index: 10;
+}
+
+.dark .cell-modified::before {
+  background-color: rgb(245 158 11);
+}
+
+/* Loading shimmer effect */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.loading-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background-size: 200px 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.dark .loading-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+}
+
+/* Sticky column shadow for better visual separation */
+.sticky-column::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -1px;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.05) 50%, rgba(0, 0, 0, 0.1) 100%);
+  pointer-events: none;
+}
+
+.dark .sticky-column::after {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.1) 100%);
+}
+
+/* Responsive helpers */
+@media (max-width: 640px) {
+  .mobile-hide {
+    display: none;
+  }
+
+  .mobile-stack {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .tablet-hide {
+    display: none;
+  }
+
+  .time-clock-table {
+    font-size: 0.875rem;
+  }
+
+  .time-clock-table th,
+  .time-clock-table td {
+    padding: 0.25rem;
+  }
+}
+
+/* Focus indicators */
+.focus-ring {
+  @apply focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500/50;
+}
+
+.dark .focus-ring {
+  @apply focus-within:ring-blue-400/20 focus-within:border-blue-400/50;
+}
+
+/* Status indicator dots */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+.status-dot-success {
+  background-color: rgb(34 197 94);
+}
+
+.status-dot-error {
+  background-color: rgb(239 68 68);
+}
+
+.status-dot-warning {
+  background-color: rgb(245 158 11);
+}
+
+.status-dot-info {
+  background-color: rgb(59 130 246);
+}
+
+.status-dot-neutral {
+  background-color: rgb(107 114 128);
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .time-clock-table {
+    break-inside: avoid;
+  }
+
+  .time-clock-table th,
+  .time-clock-table td {
+    border: 1px solid #000 !important;
+    padding: 4px !important;
+  }
+}
