@@ -16,6 +16,26 @@ import type { User, UserIncludes, UserOrderBy } from "./user";
 // Git Commit Interface
 // =====================
 
+export interface GitCommit {
+  id: string;
+  repositoryId: string;
+  hash: string;
+  shortHash: string;
+  message: string;
+  body: string | null;
+  author: string;
+  authorEmail: string;
+  committedAt: Date;
+  branch: string;
+  tags: string[];
+  filesChanged: number;
+  insertions: number;
+  deletions: number;
+  createdAt: Date;
+  updatedAt: Date;
+  repository?: Repository;
+}
+
 export interface GitCommitInfo {
   hash: string;
   shortHash: string;
@@ -28,28 +48,99 @@ export interface GitCommitInfo {
 }
 
 // =====================
+// Repository Interface
+// =====================
+
+export interface Repository {
+  id: string;
+  name: string;
+  gitUrl: string;
+  branch: string;
+  isActive: boolean;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// =====================
+// App Interface
+// =====================
+
+export interface App {
+  id: string;
+  repositoryId: string;
+  name: string;
+  displayName: string;
+  appType: 'API' | 'WEB' | 'MOBILE' | 'WORKER' | 'CRON';
+  version: string | null;
+  buildCommand: string | null;
+  deployCommand: string | null;
+  healthCheckUrl: string | null;
+  environmentVars: any | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  repository?: Repository;
+}
+
+// =====================
 // Main Entity Interface
 // =====================
 
 export interface Deployment extends BaseEntity {
+  // Foreign Keys
+  appId: string;
+  gitCommitId: string;
+
+  // Core Fields
   environment: DEPLOYMENT_ENVIRONMENT;
-  commitSha: string;
-  branch: string;
   status: DEPLOYMENT_STATUS;
   statusOrder: number;
+  triggeredBy: string;
   deployedBy: string | null;
+
+  // Version Info
   version: string | null;
-  previousCommit: string | null;
+  buildNumber: number | null;
+
+  // Rollback
+  previousDeploymentId: string | null;
   rollbackData: any | null;
-  deploymentLog: string | null;
-  healthCheckUrl: string | null;
-  healthCheckStatus: string | null;
-  startedAt: Date;
+  canRollback: boolean;
+  rollbackReason: string | null;
+
+  // Workflow
+  workflowRunId: string | null;
+  workflowUrl: string | null;
+
+  // Timing
+  duration: number | null;
+  startedAt: Date | null;
   completedAt: Date | null;
   rolledBackAt: Date | null;
 
+  // Logs
+  deploymentLog: string | null;
+  buildLog: string | null;
+  errorMessage: string | null;
+  errorStack: string | null;
+  healthCheckUrl: string | null;
+  healthCheckStatus: string | null;
+  healthCheckLog: string | null;
+
+  // Legacy fields (deprecated, use gitCommit relation instead)
+  commitSha?: string;
+  branch?: string;
+  commitMessage?: string;
+  commitAuthor?: string;
+  previousCommit?: string | null;
+  application?: string;
+
   // Relations
+  app?: App;
+  gitCommit?: GitCommit;
   user?: User;
+  previousDeployment?: Deployment;
 }
 
 // =====================

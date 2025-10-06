@@ -148,12 +148,12 @@ export function useAvailableCommits(
 }
 
 /**
- * Hook to get current deployment for an application and environment
+ * Hook to get current deployment for an environment and application
  */
 export function useCurrentDeployment(
-  application: string,
   environment: DEPLOYMENT_ENVIRONMENT,
   options?: Omit<UseQueryOptions<DeploymentGetUniqueResponse>, 'queryKey' | 'queryFn'>,
+  application: string = 'WEB',
 ) {
   return useQuery({
     queryKey: deploymentKeys.current(application, environment),
@@ -171,8 +171,8 @@ export function useCreateDeployment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ commitHash, environment }: { commitHash: string; environment: DEPLOYMENT_ENVIRONMENT }) =>
-      deploymentService.createDeployment(commitHash, environment).then(res => res.data),
+    mutationFn: ({ commitHash, environment, application = 'WEB' }: { commitHash: string; environment: DEPLOYMENT_ENVIRONMENT; application?: string }) =>
+      deploymentService.createDeployment(commitHash, environment, application).then(res => res.data),
     onSuccess: () => {
       // Invalidate all deployment queries
       queryClient.invalidateQueries({ queryKey: deploymentKeys.all });

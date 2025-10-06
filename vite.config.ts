@@ -60,6 +60,10 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       target: "es2022",
+      // Enable source maps for production debugging
+      sourcemap: mode === "production" ? "hidden" : true,
+      // Minification settings
+      minify: mode === "production" ? "esbuild" : false,
       commonjsOptions: {
         transformMixedEsModules: true,
         strictRequires: false,

@@ -284,6 +284,7 @@ const ServerMetrics = lazy(() => import("@/pages/server/metrics").then((module) 
 const ServerServices = lazy(() => import("@/pages/server/services").then((module) => ({ default: module.ServerServicesPage })));
 const ServerSharedFolders = lazy(() => import("@/pages/server/shared-folders").then((module) => ({ default: module.ServerSharedFoldersPage })));
 const ServerUsers = lazy(() => import("@/pages/server/users").then((module) => ({ default: module.ServerUsersPage })));
+const ServerRateLimiting = lazy(() => import("@/pages/server/rate-limiting").then((module) => ({ default: module.RateLimitingPage })));
 
 function App() {
   // Initialize web notifications
@@ -2070,6 +2071,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ServerUsers />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.server.throttler.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ServerRateLimiting />
                     </Suspense>
                   }
                 />

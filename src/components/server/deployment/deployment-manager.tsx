@@ -25,10 +25,14 @@ export function DeploymentManager({ className }: DeploymentManagerProps) {
   // Fetch current deployments
   const { data: testDeployment, isLoading: isLoadingTest } = useCurrentDeployment(
     DEPLOYMENT_ENVIRONMENT.STAGING,
+    undefined,
+    'WEB'
   );
 
   const { data: prodDeployment, isLoading: isLoadingProd } = useCurrentDeployment(
     DEPLOYMENT_ENVIRONMENT.PRODUCTION,
+    undefined,
+    'WEB'
   );
 
   // Deploy mutation
@@ -38,7 +42,7 @@ export function DeploymentManager({ className }: DeploymentManagerProps) {
     if (!selectedCommit) return;
 
     deploy(
-      { commitHash: selectedCommit, environment },
+      { commitHash: selectedCommit, environment, application: 'WEB' },
       {
         onSuccess: () => {
           setSelectedCommit(null);
@@ -103,12 +107,12 @@ export function DeploymentManager({ className }: DeploymentManagerProps) {
                     <div className="flex items-center gap-2 text-sm">
                       <GitCommit className="h-4 w-4 text-muted-foreground" />
                       <code className="rounded bg-muted px-2 py-1">
-                        {testDeployment.data.commitSha?.substring(0, 7)}
+                        {testDeployment.data.gitCommit?.shortHash || testDeployment.data.gitCommit?.hash?.substring(0, 7) || 'N/A'}
                       </code>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <GitBranch className="h-4 w-4 text-muted-foreground" />
-                      <span>{testDeployment.data.branch}</span>
+                      <span>{testDeployment.data.gitCommit?.branch || 'N/A'}</span>
                     </div>
                     {testDeployment.data.completedAt && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -147,12 +151,12 @@ export function DeploymentManager({ className }: DeploymentManagerProps) {
                     <div className="flex items-center gap-2 text-sm">
                       <GitCommit className="h-4 w-4 text-muted-foreground" />
                       <code className="rounded bg-muted px-2 py-1">
-                        {prodDeployment.data.commitSha?.substring(0, 7)}
+                        {prodDeployment.data.gitCommit?.shortHash || prodDeployment.data.gitCommit?.hash?.substring(0, 7) || 'N/A'}
                       </code>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <GitBranch className="h-4 w-4 text-muted-foreground" />
-                      <span>{prodDeployment.data.branch}</span>
+                      <span>{prodDeployment.data.gitCommit?.branch || 'N/A'}</span>
                     </div>
                     {prodDeployment.data.completedAt && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">

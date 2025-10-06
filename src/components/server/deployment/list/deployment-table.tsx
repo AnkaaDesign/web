@@ -162,19 +162,21 @@ export function DeploymentTable({ filters = {}, className }: DeploymentTableProp
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
-                      <span className="font-mono text-xs">{deployment.commitSha.substring(0, 8)}</span>
-                      {deployment.commitMessage && (
-                        <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={deployment.commitMessage}>
-                          {deployment.commitMessage}
+                      <span className="font-mono text-xs">
+                        {deployment.gitCommit?.shortHash || deployment.gitCommit?.hash?.substring(0, 8) || 'N/A'}
+                      </span>
+                      {deployment.gitCommit?.message && (
+                        <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={deployment.gitCommit.message}>
+                          {deployment.gitCommit.message}
                         </span>
                       )}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
-                      <span>{deployment.branch}</span>
-                      {deployment.commitAuthor && (
-                        <span className="text-xs text-muted-foreground">by {deployment.commitAuthor}</span>
+                      <span>{deployment.gitCommit?.branch || 'N/A'}</span>
+                      {deployment.gitCommit?.author && (
+                        <span className="text-xs text-muted-foreground">by {deployment.gitCommit.author}</span>
                       )}
                     </div>
                   </TableCell>

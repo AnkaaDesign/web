@@ -194,12 +194,12 @@ export function DeploymentHistory() {
                         <div className="flex items-center gap-2">
                           <GitCommit className="h-4 w-4 text-muted-foreground" />
                           <code className="rounded bg-muted px-2 py-1 text-xs">
-                            {deployment.commitSha?.substring(0, 7)}
+                            {deployment.gitCommit?.shortHash || deployment.gitCommit?.hash?.substring(0, 7) || 'N/A'}
                           </code>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <code className="text-sm">{deployment.branch}</code>
+                        <code className="text-sm">{deployment.gitCommit?.branch || 'N/A'}</code>
                       </TableCell>
                       <TableCell>{getStatusBadge(deployment.status)}</TableCell>
                       <TableCell>

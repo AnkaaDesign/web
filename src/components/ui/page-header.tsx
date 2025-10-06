@@ -352,7 +352,7 @@ function ListControls({
               className="gap-2"
             >
               <Badge variant="secondary" className="px-1.5 py-0.5 text-xs">
-                {viewControls.selectedToggle.count}
+                <span>{viewControls.selectedToggle.count}</span>
               </Badge>
               Selecionados
             </Button>
@@ -400,7 +400,7 @@ function ListControls({
               <span className="text-foreground">Filtros</span>
               {(filters.count || filters.active.length) > 0 && (
                 <Badge variant="default" className="ml-1">
-                  {filters.count || filters.active.length}
+                  <span>{filters.count || filters.active.length}</span>
                 </Badge>
               )}
             </Button>
@@ -475,7 +475,7 @@ function BatchSelectionInfo({ selection, progress }: { selection?: BatchPageHead
   return (
     <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
       <Badge variant="default">
-        {selection.count} selecionado{selection.count !== 1 ? "s" : ""}
+        <span>{selection.count} selecionado{selection.count !== 1 ? "s" : ""}</span>
       </Badge>
       <span className="text-sm text-muted-foreground">{selection.entityName} selecionados</span>
 
@@ -626,7 +626,9 @@ export function PageHeader<T extends BaseEntity = BaseEntity>(props: PageHeaderP
 
                     {/* Status Badge for Detail Pages */}
                     {variant === "detail" && (variantProps as EntityPageHeaderProps<T>).status && (
-                      <Badge variant={(variantProps as EntityPageHeaderProps<T>).status!.variant || "default"}>{(variantProps as EntityPageHeaderProps<T>).status!.label}</Badge>
+                      <Badge variant={(variantProps as EntityPageHeaderProps<T>).status!.variant || "default"}>
+                        <span>{(variantProps as EntityPageHeaderProps<T>).status!.label}</span>
+                      </Badge>
                     )}
                   </div>
 

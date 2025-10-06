@@ -53,7 +53,7 @@ export const deploymentService = {
     apiClient.delete<DeploymentBatchResponse>('/deployments/batch', { data }),
 
   // New deployment workflow operations
-  getCommits: (limit?: number) =>
+  getAvailableCommits: (limit?: number) =>
     apiClient.get<{ success: boolean; message: string; data: GitCommitInfo[] }>('/deployments/commits/list', {
       params: { limit },
     }),
@@ -66,7 +66,7 @@ export const deploymentService = {
       params: { application, environment, limit },
     }),
 
-  deploy: (application: DEPLOYMENT_APPLICATION, commitHash: string, environment: DEPLOYMENT_ENVIRONMENT) =>
+  createDeployment: (commitHash: string, environment: DEPLOYMENT_ENVIRONMENT, application: string = 'WEB') =>
     apiClient.post<DeploymentCreateResponse>(`/deployments/deploy/${application}/${environment}/${commitHash}`),
 
   cancelDeployment: (id: string) =>
