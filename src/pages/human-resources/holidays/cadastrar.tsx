@@ -29,7 +29,6 @@ export const HolidayCreatePage = () => {
     try {
       create(data, {
         onSuccess: () => {
-          toast.success("Feriado criado com sucesso!");
           navigate("/recursos-humanos/feriados");
         },
       });

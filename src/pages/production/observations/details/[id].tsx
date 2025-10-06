@@ -85,7 +85,6 @@ export const ObservationDetailsPage = () => {
 
   const handleRefresh = () => {
     refetch();
-    toast.success("Dados atualizados com sucesso");
   };
 
   return (

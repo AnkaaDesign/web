@@ -54,12 +54,7 @@ export const useLayoutMutations = () => {
     mutationFn: layoutService.create,
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: layoutQueryKeys.all });
-      toast.success("Layout criado com sucesso");
       return response;
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message || "Erro ao criar layout";
-      toast.error(message);
     },
   });
 
@@ -70,12 +65,7 @@ export const useLayoutMutations = () => {
       queryClient.invalidateQueries({
         queryKey: layoutQueryKeys.detail(variables.id),
       });
-      toast.success("Layout atualizado com sucesso");
       return response;
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message || "Erro ao atualizar layout";
-      toast.error(message);
     },
   });
 
@@ -105,13 +95,7 @@ export const useLayoutMutations = () => {
       queryClient.invalidateQueries({
         queryKey: ["trucks", "detail", variables.truckId],
       });
-      const sideLabel = variables.side === "left" ? "esquerdo" : variables.side === "right" ? "direito" : "traseiro";
-      toast.success(`Layout ${sideLabel} salvo com sucesso`);
       return response;
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message || "Erro ao salvar layout do caminhão";
-      toast.error(message);
     },
   });
 

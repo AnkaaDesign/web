@@ -22,7 +22,7 @@ import {
   IconLoader2,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { SelectionStats } from "@/hooks/use-advanced-table-selection";
+import type { SelectionStats } from "@/hooks/use-advanced-table-selection";
 
 export interface BulkAction {
   id: string;

@@ -705,7 +705,7 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
             {/* Show return option only for active items */}
             {contextMenu &&
               (contextMenu.isBulk ? contextMenu.items.some((item) => item.status === BORROW_STATUS.ACTIVE) : contextMenu.items[0].status === BORROW_STATUS.ACTIVE) && (
-                <DropdownMenuItem onClick={handleReturn}>
+                <DropdownMenuItem onClick={handleReturn} className="text-green-700 focus:text-white focus:bg-green-700 hover:text-white hover:bg-green-700">
                   <IconPackageImport className="mr-2 h-4 w-4" />
                   {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Devolver selecionados" : "Devolver"}
                 </DropdownMenuItem>

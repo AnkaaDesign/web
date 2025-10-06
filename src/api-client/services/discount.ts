@@ -1,7 +1,5 @@
 import { apiClient } from "../axiosClient";
 import type { Discount } from "../../types";
-
-// Import schemas for form data types
 import type {
   DiscountCreateFormData as DiscountCreateSchema,
   DiscountUpdateFormData as DiscountUpdateSchema,

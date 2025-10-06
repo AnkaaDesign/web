@@ -27,6 +27,10 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
 
   const { createAsync: createService } = useServiceMutations();
 
+  // Memoize callbacks to prevent infinite loop
+  const getOptionLabel = useCallback((service: Service) => service.description, []);
+  const getOptionValue = useCallback((service: Service) => service.description, []);
+
   // Extract existing service descriptions for initial display
   const existingServiceDescriptions = fields
     .map((field: any) => field.description)
@@ -167,8 +171,8 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
                       isCreating={isCreating}
                       queryKey={["services", "search", index]}
                       queryFn={searchServices}
-                      getOptionLabel={(service) => service.description}
-                      getOptionValue={(service) => service.description}
+                      getOptionLabel={getOptionLabel}
+                      getOptionValue={getOptionValue}
                       renderOption={(service) => <span>{service.description}</span>}
                       loadMoreText="Carregar mais serviços"
                       loadingMoreText="Carregando..."

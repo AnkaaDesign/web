@@ -49,7 +49,7 @@ export function BarcodeCell({ control, index, disabled }: BarcodeCellProps) {
                     <div className="flex gap-2">
                       <Input
                         value={newBarcode}
-                        onChange={(e) => setNewBarcode(e.target.value)}
+                        onChange={(value) => setNewBarcode(value as string)}
                         placeholder="Código de barras"
                         className="h-10"
                         onKeyDown={(e) => {

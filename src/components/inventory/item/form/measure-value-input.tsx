@@ -16,7 +16,7 @@ export function MeasureValueInput({ control, disabled }: MeasureValueInputProps)
         <FormItem>
           <FormLabel>Valor de Medida</FormLabel>
           <FormControl>
-            <Input type="decimal" min={0} decimals={2} placeholder="0" disabled={disabled} value={field.value} onChange={(value) => field.onChange(value)} />
+            <Input type="decimal" min={0} decimals={2} placeholder="0" disabled={disabled} value={field.value} onChange={(value) => field.onChange(value)} transparent={true} />
           </FormControl>
           <FormMessage />
         </FormItem>

@@ -63,7 +63,7 @@ export function BarcodeManager({ disabled }: BarcodeManagerProps) {
 
             <div className="space-y-2">
               <div className="flex gap-2">
-                <Input value={newBarcode} onChange={(e) => setNewBarcode(e.target.value)} onKeyPress={handleKeyPress} placeholder="Digite o código de barras" disabled={disabled} transparent={false} />
+                <Input value={newBarcode} onChange={(value) => setNewBarcode(value as string)} onKeyPress={handleKeyPress} placeholder="Digite o código de barras" disabled={disabled} transparent={true} />
                 <Button type="button" onClick={handleAddBarcode} disabled={disabled || !newBarcode.trim()} size="icon">
                   <IconPlus className="h-4 w-4" />
                 </Button>
@@ -73,7 +73,7 @@ export function BarcodeManager({ disabled }: BarcodeManagerProps) {
                 <div className="space-y-2 mt-4">
                   {barcodes.map((barcode: string, index: number) => (
                     <div key={`barcode-${index}`} className="flex items-center gap-2">
-                      <Input value={barcode} disabled className="flex-1" />
+                      <Input value={barcode} disabled className="flex-1" transparent={true} />
                       <Button type="button" onClick={() => remove(index)} disabled={disabled} size="icon" variant="destructive">
                         <IconTrash className="h-4 w-4" />
                       </Button>

@@ -262,7 +262,6 @@ export function ObservationList({ className }: ObservationListProps) {
           </div>
           <div className="flex gap-2">
             {selectionCount > 0 && <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />}
-            <ColumnVisibilityManager columns={columnsForVisibility} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button variant="outline" onClick={() => setShowFilterModal(true)} className="relative">
               <IconFilter className="h-4 w-4 mr-2" />
               Filtros
@@ -272,6 +271,7 @@ export function ObservationList({ className }: ObservationListProps) {
                 </Badge>
               )}
             </Button>
+            <ColumnVisibilityManager columns={columnsForVisibility} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
           </div>
         </div>
 

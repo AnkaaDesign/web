@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { getCustomers, quickCreateCustomer } from "../../../../api-client";
@@ -15,6 +15,13 @@ interface CustomerSelectorProps {
 
 export function CustomerSelector({ control, disabled, required, initialCustomer }: CustomerSelectorProps) {
   const [isCreating, setIsCreating] = useState(false);
+
+  // Memoize initialOptions to prevent infinite loop
+  const initialOptions = useMemo(() => initialCustomer ? [initialCustomer] : [], [initialCustomer?.id]);
+
+  // Memoize callbacks to prevent infinite loop
+  const getOptionLabel = useCallback((customer: Customer) => customer.fantasyName, []);
+  const getOptionValue = useCallback((customer: Customer) => customer.id, []);
 
   // Search function for Combobox - let the combobox handle state internally
   const searchCustomers = async (
@@ -111,9 +118,9 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
               isCreating={isCreating}
               queryKey={["customers", "search"]}
               queryFn={searchCustomers}
-              initialOptions={initialCustomer ? [initialCustomer] : []}
-              getOptionLabel={(customer) => customer.fantasyName}
-              getOptionValue={(customer) => customer.id}
+              initialOptions={initialOptions}
+              getOptionLabel={getOptionLabel}
+              getOptionValue={getOptionValue}
               renderOption={(customer, isSelected) => (
                 <div className="flex flex-col gap-1">
                   <div className="font-medium">{customer.fantasyName}</div>

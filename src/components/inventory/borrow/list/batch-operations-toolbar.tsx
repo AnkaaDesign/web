@@ -57,7 +57,7 @@ export function BatchOperationsToolbar({
           Editar
         </Button>
 
-        <Button variant="outline" size="sm" onClick={onBatchReturn} disabled={!canReturn || isLoading} className="h-8">
+        <Button variant="outline" size="sm" onClick={onBatchReturn} disabled={!canReturn || isLoading} className="h-8 text-green-700 hover:text-white hover:bg-green-700 border-green-700">
           <IconArrowBack className="h-4 w-4 mr-2" />
           Devolver
         </Button>

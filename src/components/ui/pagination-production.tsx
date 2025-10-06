@@ -5,7 +5,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
-import { usePaginationState, type PaginationMeta } from "@/hooks/use-pagination-state";
+import { usePaginationState } from "@/hooks/use-pagination-state";
+import type { PaginationMeta } from "@/hooks/use-pagination-state";
 
 export interface ProductionPaginationProps {
   // Data
@@ -207,10 +208,10 @@ export function ProductionPagination({
                 min="1"
                 max={pagination.totalPages}
                 value={pageInput}
-                onChange={(e) => setPageInput(e.target.value)}
+                onChange={(value) => setPageInput(value as string)}
                 onFocus={() => setIsPageInputFocused(true)}
                 onBlur={() => setIsPageInputFocused(false)}
-                className={cn(styles.input, "px-3 py-2")}
+                className={cn(styles.input, "px-3 py-2 bg-transparent")}
                 placeholder="..."
                 disabled={pagination.isLoading}
               />

@@ -359,10 +359,10 @@ export function TablePagination({
                 min="1"
                 max={meta.totalPages}
                 value={pageInput}
-                onChange={(e) => setPageInput(e.target.value)}
+                onChange={(value) => setPageInput(value as string)}
                 onFocus={() => setIsPageInputFocused(true)}
                 onBlur={() => setIsPageInputFocused(false)}
-                className={cn(styles.input, "px-3 py-2")}
+                className={cn(styles.input, "px-3 py-2 bg-transparent")}
                 placeholder="..."
                 disabled={isLoading || isPageChanging}
                 aria-label={`Ir para página (1-${meta.totalPages})`}

@@ -83,10 +83,10 @@ export function ActivitySpecificationsCard({ activity, className }: ActivitySpec
                     </p>
                     <p className="text-base font-semibold text-foreground">{activity.user.name}</p>
                   </div>
-                  {activity.user.position && (
+                  {activity.user.sector && (
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">Cargo</p>
-                      <p className="text-sm text-foreground">{activity.user.position.name}</p>
+                      <p className="text-sm font-medium text-muted-foreground mb-1">Setor</p>
+                      <p className="text-sm text-foreground">{activity.user.sector.name}</p>
                     </div>
                   )}
                 </div>

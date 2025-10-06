@@ -90,9 +90,7 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
     // Check components
     const validComponents = currentFormula.components?.filter((c) => c.itemId && c.ratio > 0) || [];
 
-    if (validComponents.length === 0) {
-      warnings.push("Nenhum componente foi adicionado à fórmula");
-    } else {
+    if (validComponents.length > 0) {
       // Check if ratios sum to 100%
       const totalRatio = validComponents.reduce((sum, c) => sum + c.ratio, 0);
       if (Math.abs(totalRatio - 100) > 0.01) {
@@ -129,54 +127,9 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
             id="description"
             placeholder="Ex: Fórmula Principal, Variação Clara, etc."
             {...form.register("description")}
-            className={form.formState.errors.description ? "border-destructive" : ""}
+            className={form.formState.errors.description ? "border-destructive bg-transparent" : "bg-transparent"}
           />
           {form.formState.errors.description && <p className="text-sm text-destructive">{form.formState.errors.description.message}</p>}
-        </div>
-
-        {/* Formula Status */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Label>Status da Fórmula</Label>
-            {formulaValidation.isValid ? (
-              <Badge variant="default" className="text-green-700 bg-green-100">
-                <IconCircleCheck className="h-3 w-3 mr-1" />
-                Válida
-              </Badge>
-            ) : (
-              <Badge variant="destructive">
-                <IconAlertCircle className="h-3 w-3 mr-1" />
-                Incompleta
-              </Badge>
-            )}
-          </div>
-
-          {/* Validation Messages */}
-          {formulaValidation.errors.length > 0 && (
-            <Alert variant="destructive">
-              <IconAlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                <ul className="list-disc list-inside space-y-1">
-                  {formulaValidation.errors.map((error, index) => (
-                    <li key={index}>{error}</li>
-                  ))}
-                </ul>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {formulaValidation.warnings.length > 0 && (
-            <Alert>
-              <IconInfoCircle className="h-4 w-4" />
-              <AlertDescription>
-                <ul className="list-disc list-inside space-y-1">
-                  {formulaValidation.warnings.map((warning, index) => (
-                    <li key={index}>{warning}</li>
-                  ))}
-                </ul>
-              </AlertDescription>
-            </Alert>
-          )}
         </div>
 
         {/* Components Editor */}

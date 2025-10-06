@@ -271,6 +271,28 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
           }),
         ])
         .optional(),
+      cuts: z
+        .union([
+          z.boolean(),
+          z.object({
+            include: z
+              .object({
+                file: z.boolean().optional(),
+                task: z.boolean().optional(),
+                parentCut: z.boolean().optional(),
+                childCuts: z.boolean().optional(),
+              })
+              .optional(),
+            orderBy: z
+              .object({
+                createdAt: orderByDirectionSchema.optional(),
+                updatedAt: orderByDirectionSchema.optional(),
+                status: orderByDirectionSchema.optional(),
+              })
+              .optional(),
+          }),
+        ])
+        .optional(),
       cutRequest: z.boolean().optional(),
       cutPlan: z.boolean().optional(),
       relatedTasks: z

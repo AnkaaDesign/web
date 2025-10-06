@@ -32,7 +32,7 @@ import {
   IconKeyboard,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { SelectionStats } from "@/hooks/use-advanced-table-selection";
+import type { SelectionStats } from "@/hooks/use-advanced-table-selection";
 
 interface AdvancedSelectionControlsProps {
   selectionStats: SelectionStats;

@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEditForm } from "../../../../hooks/useEditForm";
 import {
   IconLoader2,
   IconArrowLeft,
@@ -14,11 +15,14 @@ import {
   IconSparkles,
   IconScissors,
   IconPlus,
+  IconCurrencyReal,
+  IconReceipt,
+  IconFileInvoice,
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
-import { useTaskMutations, useObservationMutations, useCutMutations } from "../../../../hooks";
-import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN } from "../../../../constants";
+import { useTaskMutations, useObservationMutations, useCutsByTask } from "../../../../hooks";
+import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -44,28 +48,83 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { LayoutForm } from "@/components/production/layout/layout-form";
 import { useLayoutsByTruck, useLayoutMutations } from "../../../../hooks";
+import { FormMoneyInput } from "@/components/ui/form-money-input";
 
 interface TaskEditFormProps {
   task: Task;
 }
 
+// Helper function to convert File entity to FileWithPreview
+const convertToFileWithPreview = (file: any | undefined | null): FileWithPreview[] => {
+  if (!file) return [];
+  return [{
+    id: file.id,
+    name: file.filename || file.name || 'file',
+    size: file.size || 0,
+    type: file.mimetype || file.type || 'application/octet-stream',
+    lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+    uploaded: true,
+    uploadProgress: 100,
+    uploadedFileId: file.id,
+    thumbnailUrl: file.thumbnailUrl,
+  } as FileWithPreview];
+};
+
 export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   const { updateAsync } = useTaskMutations();
-  const { create: createCut } = useCutMutations();
   const { create: createObservation } = useObservationMutations();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>([]);
+
+  // Fetch cuts separately using useCutsByTask hook (same approach as detail page)
+  const { data: cutsData } = useCutsByTask({
+    taskId: task.id,
+    filters: {
+      include: {
+        file: true,
+      },
+    },
+  });
+
+  // Initialize artwork files from existing task data
+  const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>(
+    (task.artworks || []).map(file => ({
+      id: file.id,
+      name: file.filename || file.name || 'artwork',
+      size: file.size || 0,
+      type: file.mimetype || file.type || 'application/octet-stream',
+      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+      uploaded: true,
+      uploadProgress: 100,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl,
+    } as FileWithPreview))
+  );
   const [uploadedFileIds, setUploadedFileIds] = useState<string[]>(task.artworks?.map((f) => f.id) || []);
+
+  // Initialize document files from existing task data
+  const [budgetFile, setBudgetFile] = useState<FileWithPreview[]>(convertToFileWithPreview(task.budget));
+  const [nfeFile, setNfeFile] = useState<FileWithPreview[]>(convertToFileWithPreview(task.nfe));
+  const [receiptFile, setReceiptFile] = useState<FileWithPreview[]>(convertToFileWithPreview(task.receipt));
+
   const multiCutSelectorRef = useRef<MultiCutSelectorRef>(null);
   const [cutsCount, setCutsCount] = useState(0);
   const multiAirbrushingSelectorRef = useRef<MultiAirbrushingSelectorRef>(null);
   const [airbrushingsCount, setAirbrushingsCount] = useState(0);
   const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
+  const [isLayoutOpen, setIsLayoutOpen] = useState(false);
+  const [hasLayoutChanges, setHasLayoutChanges] = useState(false);
 
   // Get truck ID from task - assuming task has truck relation
   const truckId = task.truck?.id || task.truckId;
   const { data: layoutsData } = useLayoutsByTruck(truckId || "", !!truckId);
   const { createOrUpdateTruckLayout } = useLayoutMutations();
+
+  // Check if any layout exists and open the section automatically
+  useEffect(() => {
+    if (layoutsData && (layoutsData.leftSideLayout || layoutsData.rightSideLayout || layoutsData.backSideLayout)) {
+      setIsLayoutOpen(true);
+    }
+  }, [layoutsData]);
 
   // Observation creation state
   const [isObservationOpen, setIsObservationOpen] = useState(false);
@@ -74,95 +133,334 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   const [observationFileIds, setObservationFileIds] = useState<string[]>([]);
   const [isCreatingObservation, setIsCreatingObservation] = useState(false);
 
-  // Group cuts by fileId and type to get proper quantities
-  const groupedCuts = (() => {
-    if (!task.cuts || task.cuts.length === 0) return [];
+  // Map task data to form values
+  const mapDataToForm = useCallback((taskData: Task): TaskUpdateFormData => {
+    console.log('[TaskEditForm] mapDataToForm called with task:', taskData);
+    console.log('[TaskEditForm] Fetched cuts data:', cutsData);
 
-    // Create a map to group cuts: key = "fileId|type", value = { fileId, type, quantity, file }
-    const cutMap = new Map<string, { fileId: string; type: string; quantity: number; file?: any }>();
+    // Group cuts by fileId and type to get proper quantities
+    // Use cutsData from separate query instead of taskData.cuts
+    const cuts = cutsData?.data || [];
+    const groupedCuts = (() => {
+      if (cuts.length === 0) {
+        console.log('[TaskEditForm] No cuts found in fetched data');
+        return [];
+      }
 
-    for (const cut of task.cuts) {
-      const fileId = cut.file?.id || cut.fileId || "";
-      const type = cut.type;
-      // Use a unique key that handles empty fileIds (cuts without files)
-      const key = `${fileId || 'no-file'}|${type}`;
+      console.log('[TaskEditForm] Processing', cuts.length, 'cuts from separate query');
+      const cutMap = new Map<string, { fileId: string; type: string; quantity: number; file?: any }>();
 
-      if (cutMap.has(key)) {
-        // Increment quantity for existing group
-        const existing = cutMap.get(key)!;
-        existing.quantity += 1;
-      } else {
-        // Create new group with file metadata for display
-        cutMap.set(key, {
-          fileId: fileId || "", // Ensure empty string for cuts without files
-          type,
-          quantity: 1,
-          file: cut.file, // Include file object for display in MultiCutSelector
+      for (const cut of cuts) {
+        const fileId = cut.file?.id || cut.fileId || "";
+        const type = cut.type;
+        const key = `${fileId || 'no-file'}|${type}`;
+
+        if (cutMap.has(key)) {
+          const existing = cutMap.get(key)!;
+          existing.quantity += 1;
+        } else {
+          cutMap.set(key, {
+            fileId: fileId || "",
+            type,
+            quantity: 1,
+            file: cut.file,
+          });
+        }
+      }
+
+      const grouped = Array.from(cutMap.values());
+      console.log('[TaskEditForm] Grouped cuts:', grouped);
+      return grouped;
+    })();
+
+    console.log('[TaskEditForm] Returning form data with cuts:', groupedCuts);
+
+    return {
+      name: taskData.name || "",
+      status: taskData.status || TASK_STATUS.PENDING,
+      serialNumber: taskData.serialNumber || null,
+      plate: taskData.plate || null,
+      details: taskData.details || null,
+      entryDate: taskData.entryDate ? new Date(taskData.entryDate) : null,
+      term: taskData.term ? new Date(taskData.term) : null,
+      startedAt: taskData.startedAt ? new Date(taskData.startedAt) : null,
+      finishedAt: taskData.finishedAt ? new Date(taskData.finishedAt) : null,
+      customerId: taskData.customerId || null,
+      sectorId: taskData.sectorId || null,
+      generalPaintingId: taskData.paintId || null,
+      price: taskData.price || null,
+      budgetId: taskData.budgetId || null,
+      nfeId: taskData.nfeId || null,
+      receiptId: taskData.receiptId || null,
+      services:
+        taskData.services?.map((so) => ({
+          description: so.description || "",
+          status: so.status,
+          statusOrder: so.statusOrder,
+          startedAt: so.startedAt ? new Date(so.startedAt) : null,
+          finishedAt: so.finishedAt ? new Date(so.finishedAt) : null,
+        })) || [],
+      artworkIds: taskData.artworks?.map((f) => f.id) || [],
+      truck: {
+        xPosition: taskData.truck?.xPosition || null,
+        yPosition: taskData.truck?.yPosition || null,
+        garageId: taskData.truck?.garageId || null,
+      },
+      cuts: groupedCuts,
+      paintIds: taskData.logoPaints?.map((lp) => lp.id) || [],
+      airbrushings:
+        taskData.airbrushings?.map((a) => ({
+          startDate: a.startDate ? new Date(a.startDate) : null,
+          finishDate: a.finishDate ? new Date(a.finishDate) : null,
+          price: a.price,
+          status: a.status,
+          receiptIds: a.receipts?.map((r) => r.id) || [],
+          nfeIds: a.nfes?.map((n) => n.id) || [],
+          artworkIds: a.artworks?.map((art) => art.id) || [],
+          receipts: a.receipts || [],
+          nfes: a.nfes || [],
+          artworks: a.artworks || [],
+        })) || [],
+    } as TaskUpdateFormData;
+  }, [cutsData]); // Depend on cutsData to re-run when cuts are fetched
+
+  // Handle form submission with only changed fields
+  const handleFormSubmit = useCallback(
+    async (changedData: Partial<TaskUpdateFormData>) => {
+      try {
+        setIsSubmitting(true);
+
+        // Validate that we have changes (either form changes or layout changes)
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges) {
+          toast.info("Nenhuma alteração detectada");
+          return;
+        }
+
+        // If only layout changes exist (no form changes), just reload the page
+        if (Object.keys(changedData).length === 0 && hasLayoutChanges) {
+          setHasLayoutChanges(false);
+          window.location.href = `/producao/cronograma/detalhes/${task.id}`;
+          return;
+        }
+
+        // Merge uploaded file IDs if artworkIds changed or if files were uploaded
+        const submitData = { ...changedData };
+        if (changedData.artworkIds || uploadedFileIds.length !== (task.artworks?.length || 0)) {
+          submitData.artworkIds = uploadedFileIds;
+        }
+
+        console.log("Submitting only changed fields:", submitData);
+
+        const result = await updateAsync({
+          id: task.id,
+          data: submitData,
         });
+
+        if (result.success) {
+          setHasLayoutChanges(false);
+          // Backend automatically creates changelog entries for changed fields
+          // Navigate to the task detail page
+          window.location.href = `/producao/cronograma/detalhes/${task.id}`;
+        }
+      } catch (error) {
+        console.error("🔴 Error updating task:", error);
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [updateAsync, task.id, uploadedFileIds, task.artworks, hasLayoutChanges]
+  );
+
+  // Use the edit form hook with change detection
+  const { handleSubmitChanges, getChangedFields, ...form } = useEditForm<TaskUpdateFormData, any, Task>({
+    resolver: zodResolver(taskUpdateSchema),
+    originalData: task,
+    onSubmit: handleFormSubmit,
+    mapDataToForm,
+    formOptions: {
+      mode: "onChange",
+      reValidateMode: "onChange",
+      criteriaMode: "all",
+    },
+    fieldsToOmitIfUnchanged: ["cuts"], // Don't send cuts array if unchanged
+  });
+
+  // Debug: Log form values after initialization
+  useEffect(() => {
+    console.log('[TaskEditForm] Form initialized. Cuts value:', form.getValues('cuts'));
+  }, []);
+
+  // Debug: Watch cuts field
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'cuts') {
+        console.log('[TaskEditForm] Cuts field changed to:', value.cuts);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
+  // Helper to update file in list
+  const updateFileInList = (files: FileWithPreview[], fileId: string, updates: Partial<FileWithPreview>) => {
+    return files.map((f) => {
+      if (f.id === fileId) {
+        const updated: FileWithPreview = {
+          ...f,
+          ...updates,
+          name: f.name,
+          size: f.size,
+          type: f.type,
+          lastModified: f.lastModified,
+        } as FileWithPreview;
+        return updated;
+      }
+      return f;
+    });
+  };
+
+  // Handle budget file upload
+  const handleBudgetFileChange = async (files: FileWithPreview[]) => {
+    setBudgetFile(files);
+
+    const newFiles = files.filter((file) => !file.uploaded && !file.uploadProgress && !file.error);
+
+    for (const file of newFiles) {
+      try {
+        setBudgetFile((prev) => updateFileInList(prev, file.id, { uploadProgress: 0, uploaded: false }));
+
+        const result = await uploadSingleFile(file, {
+          onProgress: (progress) => {
+            setBudgetFile((prev) => updateFileInList(prev, file.id, { uploadProgress: progress.percentage }));
+          },
+        });
+
+        if (result.success && result.data) {
+          const uploadedFile = result.data;
+          setBudgetFile((prev) =>
+            updateFileInList(prev, file.id, {
+              uploadedFileId: uploadedFile.id,
+              uploaded: true,
+              uploadProgress: 100,
+              thumbnailUrl: uploadedFile.thumbnailUrl || undefined,
+              error: undefined,
+            })
+          );
+          form.setValue("budgetId", uploadedFile.id);
+        } else {
+          throw new Error(result.message || "Upload failed");
+        }
+      } catch (error) {
+        console.error("Budget file upload error:", error);
+        setBudgetFile((prev) =>
+          updateFileInList(prev, file.id, {
+            error: "Erro ao enviar arquivo",
+            uploadProgress: 0,
+            uploaded: false,
+          })
+        );
       }
     }
 
-    // Convert map to array
-    return Array.from(cutMap.values());
-  })();
-
-  // Default values for the form
-  const defaultValues: Partial<TaskUpdateFormData> = {
-    name: task.name || "",
-    status: task.status || TASK_STATUS.PENDING,
-    serialNumber: task.serialNumber || null,
-    plate: task.plate || null,
-    details: task.details || null,
-    entryDate: task.entryDate ? new Date(task.entryDate) : null,
-    term: task.term ? new Date(task.term) : null,
-    startedAt: task.startedAt ? new Date(task.startedAt) : null,
-    finishedAt: task.finishedAt ? new Date(task.finishedAt) : null,
-    customerId: task.customerId || null,
-    sectorId: task.sectorId || null,
-    paintId: task.paintId || null,
-    // Services MUST be in defaultValues for proper form initialization
-    services:
-      task.services?.map((so) => ({
-        description: so.description || "",
-        status: so.status,
-        statusOrder: so.statusOrder,
-        startedAt: so.startedAt ? new Date(so.startedAt) : null,
-        finishedAt: so.finishedAt ? new Date(so.finishedAt) : null,
-      })) || [],
-    artworkIds: task.artworks?.map((f) => f.id) || [],
-    truck: {
-      xPosition: task.truck?.xPosition || null,
-      yPosition: task.truck?.yPosition || null,
-      garageId: task.truck?.garageId || null,
-    },
-    // Use grouped cuts with proper quantities
-    cuts: groupedCuts,
-    // Map logo paints to paintIds (array of strings)
-    paintIds: task.logoPaints?.map((lp) => lp.id) || [],
-    // Initialize airbrushings array for multi-airbrushing selector
-    airbrushings:
-      task.airbrushings?.map((a) => ({
-        startDate: a.startDate ? new Date(a.startDate) : null,
-        finishDate: a.finishDate ? new Date(a.finishDate) : null,
-        price: a.price,
-        status: a.status,
-        receiptIds: a.receipts?.map((r) => r.id) || [],
-        nfeIds: a.nfes?.map((n) => n.id) || [],
-        artworkIds: a.artworks?.map((art) => art.id) || [],
-        // Pass full file objects for UI display
-        receipts: a.receipts || [],
-        nfes: a.nfes || [],
-        artworks: a.artworks || [],
-      })) || [],
+    if (files.length === 0) {
+      form.setValue("budgetId", null);
+    }
   };
 
-  const form = useForm<TaskUpdateFormData>({
-    resolver: zodResolver(taskUpdateSchema),
-    mode: "onChange", // Enable real-time validation
-    reValidateMode: "onChange", // Re-validate on every change
-    criteriaMode: "all", // Show all errors
-    defaultValues,
-  });
+  // Handle NFe file upload
+  const handleNfeFileChange = async (files: FileWithPreview[]) => {
+    setNfeFile(files);
+
+    const newFiles = files.filter((file) => !file.uploaded && !file.uploadProgress && !file.error);
+
+    for (const file of newFiles) {
+      try {
+        setNfeFile((prev) => updateFileInList(prev, file.id, { uploadProgress: 0, uploaded: false }));
+
+        const result = await uploadSingleFile(file, {
+          onProgress: (progress) => {
+            setNfeFile((prev) => updateFileInList(prev, file.id, { uploadProgress: progress.percentage }));
+          },
+        });
+
+        if (result.success && result.data) {
+          const uploadedFile = result.data;
+          setNfeFile((prev) =>
+            updateFileInList(prev, file.id, {
+              uploadedFileId: uploadedFile.id,
+              uploaded: true,
+              uploadProgress: 100,
+              thumbnailUrl: uploadedFile.thumbnailUrl || undefined,
+              error: undefined,
+            })
+          );
+          form.setValue("nfeId", uploadedFile.id);
+        } else {
+          throw new Error(result.message || "Upload failed");
+        }
+      } catch (error) {
+        console.error("NFe file upload error:", error);
+        setNfeFile((prev) =>
+          updateFileInList(prev, file.id, {
+            error: "Erro ao enviar arquivo",
+            uploadProgress: 0,
+            uploaded: false,
+          })
+        );
+      }
+    }
+
+    if (files.length === 0) {
+      form.setValue("nfeId", null);
+    }
+  };
+
+  // Handle receipt file upload
+  const handleReceiptFileChange = async (files: FileWithPreview[]) => {
+    setReceiptFile(files);
+
+    const newFiles = files.filter((file) => !file.uploaded && !file.uploadProgress && !file.error);
+
+    for (const file of newFiles) {
+      try {
+        setReceiptFile((prev) => updateFileInList(prev, file.id, { uploadProgress: 0, uploaded: false }));
+
+        const result = await uploadSingleFile(file, {
+          onProgress: (progress) => {
+            setReceiptFile((prev) => updateFileInList(prev, file.id, { uploadProgress: progress.percentage }));
+          },
+        });
+
+        if (result.success && result.data) {
+          const uploadedFile = result.data;
+          setReceiptFile((prev) =>
+            updateFileInList(prev, file.id, {
+              uploadedFileId: uploadedFile.id,
+              uploaded: true,
+              uploadProgress: 100,
+              thumbnailUrl: uploadedFile.thumbnailUrl || undefined,
+              error: undefined,
+            })
+          );
+          form.setValue("receiptId", uploadedFile.id);
+        } else {
+          throw new Error(result.message || "Upload failed");
+        }
+      } catch (error) {
+        console.error("Receipt file upload error:", error);
+        setReceiptFile((prev) =>
+          updateFileInList(prev, file.id, {
+            error: "Erro ao enviar arquivo",
+            uploadProgress: 0,
+            uploaded: false,
+          })
+        );
+      }
+    }
+
+    if (files.length === 0) {
+      form.setValue("receiptId", null);
+    }
+  };
 
   // Handle file changes and upload
   const handleFilesChange = async (files: FileWithPreview[]) => {
@@ -301,91 +599,15 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     }
   };
 
-  // Handle form submission
-  const handleSubmit = useCallback(
-    async (data: TaskUpdateFormData) => {
-      try {
-        setIsSubmitting(true);
-
-        // Additional validation for update (since schema makes fields optional)
-        if (!data.name || data.name.trim() === "") {
-          form.setError("name", { message: "Nome da tarefa é obrigatório" });
-          toast.error("Nome da tarefa é obrigatório");
-          setIsSubmitting(false);
-          return;
-        }
-
-        if (!data.customerId || data.customerId.trim() === "") {
-          form.setError("customerId", { message: "Cliente é obrigatório" });
-          toast.error("Cliente é obrigatório");
-          setIsSubmitting(false);
-          return;
-        }
-
-        if (!data.services || data.services.length === 0 || data.services.every((s) => !s.description || s.description.trim() === "")) {
-          form.setError("services", { message: "Pelo menos um serviço é obrigatório" });
-          toast.error("Pelo menos um serviço é obrigatório");
-          setIsSubmitting(false);
-          return;
-        }
-
-        // Use the uploaded file IDs
-        const submitData: TaskUpdateFormData = {
-          ...data,
-          artworkIds: uploadedFileIds,
-        };
-
-        const result = await updateAsync({
-          id: task.id,
-          data: submitData,
-        });
-
-        // If there are new cuts, create them for this task
-        if (result?.success && data.cuts && data.cuts.length > 0) {
-          for (const cutData of data.cuts) {
-            if (cutData.fileId && cutData.type) {
-              const quantity = cutData.quantity || 1;
-              // Create multiple cut records based on quantity
-              for (let i = 0; i < quantity; i++) {
-                try {
-                  await createCut({
-                    fileId: cutData.fileId,
-                    type: cutData.type as CUT_TYPE,
-                    taskId: task.id,
-                    origin: CUT_ORIGIN.PLAN, // Cuts created from task form are PLAN
-                    status: undefined, // Will use default
-                  });
-                } catch (error) {
-                  console.error(`Error creating cut ${i + 1}:`, error);
-                }
-              }
-            }
-          }
-        }
-
-        if (result.success) {
-          // Navigate to the task detail page
-          window.location.href = `/producao/cronograma/detalhes/${task.id}`;
-        } else {
-          // Log if the result is not successful
-          console.error("Task update result:", result);
-        }
-      } catch (error) {
-        console.error("🔴 Error updating task:", error);
-        // Error is handled by the mutation hook
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [updateAsync, task.id, uploadedFileIds],
-  );
-
   const handleCancel = useCallback(() => {
     window.location.href = `/producao/cronograma/detalhes/${task.id}`;
   }, [task.id]);
 
   // Get form state
   const { formState } = form;
+
+  // Check if there are changes
+  const hasChanges = Object.keys(getChangedFields()).length > 0 || hasLayoutChanges;
 
   // Navigation actions
   const navigationActions = [
@@ -401,11 +623,9 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       key: "submit",
       label: "Salvar Alterações",
       icon: isSubmitting ? IconLoader2 : IconCheck,
-      onClick: () => {
-        form.handleSubmit(handleSubmit)();
-      },
+      onClick: handleSubmitChanges(),
       variant: "default" as const,
-      disabled: isSubmitting || !form.formState.isDirty,
+      disabled: isSubmitting || !hasChanges,
       loading: isSubmitting,
     },
   ];
@@ -556,7 +776,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                         <FormItem>
                           <FormLabel>Detalhes</FormLabel>
                           <FormControl>
-                            <Textarea {...field} value={field.value || ""} placeholder="Detalhes adicionais sobre a tarefa..." rows={4} disabled={isSubmitting} />
+                            <Textarea {...field} value={field.value || ""} placeholder="Detalhes adicionais sobre a tarefa..." rows={4} disabled={isSubmitting} className="bg-transparent" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -761,6 +981,81 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                   </CardContent>
                 </Card>
 
+                {/* Financial Information Card */}
+                <Card className="bg-transparent">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <IconCurrencyReal className="h-5 w-5" />
+                      Informações Financeiras
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Price */}
+                    <FormMoneyInput
+                      name="price"
+                      label="Valor Total"
+                      placeholder="R$ 0,00"
+                      disabled={isSubmitting}
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Budget File */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
+                          Orçamento
+                        </label>
+                        <FileUploadField
+                          onFilesChange={handleBudgetFileChange}
+                          maxFiles={1}
+                          disabled={isSubmitting}
+                          showPreview={false}
+                          existingFiles={budgetFile}
+                          variant="compact"
+                          placeholder="Adicionar orçamento"
+                          label=""
+                        />
+                      </div>
+
+                      {/* NFe File */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <IconFile className="h-4 w-4 text-muted-foreground" />
+                          Nota Fiscal
+                        </label>
+                        <FileUploadField
+                          onFilesChange={handleNfeFileChange}
+                          maxFiles={1}
+                          disabled={isSubmitting}
+                          showPreview={false}
+                          existingFiles={nfeFile}
+                          variant="compact"
+                          placeholder="Adicionar NFe"
+                          label=""
+                        />
+                      </div>
+
+                      {/* Receipt File */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <IconReceipt className="h-4 w-4 text-muted-foreground" />
+                          Recibo
+                        </label>
+                        <FileUploadField
+                          onFilesChange={handleReceiptFileChange}
+                          maxFiles={1}
+                          disabled={isSubmitting}
+                          showPreview={false}
+                          existingFiles={receiptFile}
+                          variant="compact"
+                          placeholder="Adicionar recibo"
+                          label=""
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Services Card */}
                 <Card className="bg-transparent">
                   <CardHeader>
@@ -784,20 +1079,34 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                 </Card>
 
                 {/* Layout Section */}
-                {truckId ? (
-                  <Card className="bg-transparent">
-                    <CardHeader>
+                <Card className="bg-transparent">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <IconRuler className="h-5 w-5" />
                         Layout do Caminhão
                       </CardTitle>
-                    </CardHeader>
-                    <CardContent>
+                      {!isLayoutOpen && (
+                        <Button
+                          type="button"
+                          onClick={() => setIsLayoutOpen(true)}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Adicionar Layout
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {isLayoutOpen ? (
                       <div className="space-y-4">
                         {/* Layout Side Selector */}
                         <div className="flex gap-2">
                           <Button type="button" variant={selectedLayoutSide === "left" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("left")}>
-                            Lateral Esquerda
+                            Motorista
                             {layoutsData?.leftSideLayout && (
                               <Badge variant="success" className="ml-2">
                                 Configurado
@@ -805,7 +1114,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                             )}
                           </Button>
                           <Button type="button" variant={selectedLayoutSide === "right" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("right")}>
-                            Lateral Direita
+                            Sapo
                             {layoutsData?.rightSideLayout && (
                               <Badge variant="success" className="ml-2">
                                 Configurado
@@ -832,12 +1141,15 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                                 : layoutsData?.backSideLayout
                           }
                           onSave={async (layoutData) => {
-                            if (truckId && layoutData) {
+                            if (layoutData) {
+                              // If no truckId exists, the backend will create one
+                              const effectiveTruckId = truckId || task.id; // Use task ID as fallback
                               await createOrUpdateTruckLayout({
-                                truckId,
+                                truckId: effectiveTruckId,
                                 side: selectedLayoutSide,
                                 data: layoutData,
                               });
+                              setHasLayoutChanges(true);
                               // Layout dimensions are now managed by the Layout system
                             }
                           }}
@@ -845,31 +1157,21 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                           disabled={isSubmitting}
                         />
 
-                        <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-                          <p className="text-sm text-blue-800 dark:text-blue-200">
-                            <strong>Dica:</strong> As alterações no layout são salvas automaticamente e atualizam as dimensões do caminhão.
-                          </p>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsLayoutOpen(false)}
+                            disabled={isSubmitting}
+                          >
+                            Remover
+                          </Button>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <Card className="bg-transparent">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <IconRuler className="h-5 w-5" />
-                        Layout do Caminhão
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <Alert>
-                        <IconAlertCircle className="h-4 w-4" />
-                        <AlertTitle>Caminhão não definido</AlertTitle>
-                        <AlertDescription>Para configurar o layout, primeiro é necessário associar um caminhão à tarefa.</AlertDescription>
-                      </Alert>
-                    </CardContent>
-                  </Card>
-                )}
+                    ) : null}
+                  </CardContent>
+                </Card>
 
                 {/* Cut Plans Section - Multiple Cuts Support */}
                 <Card className="bg-transparent">
@@ -939,10 +1241,18 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {/* General Painting Selector */}
-                    <GeneralPaintingSelector control={form.control} disabled={isSubmitting} />
+                    <GeneralPaintingSelector
+                      control={form.control}
+                      disabled={isSubmitting}
+                      initialPaint={task.generalPainting}
+                    />
 
                     {/* Logo Paints Multi-selector */}
-                    <LogoPaintsSelector control={form.control} disabled={isSubmitting} />
+                    <LogoPaintsSelector
+                      control={form.control}
+                      disabled={isSubmitting}
+                      initialPaints={task.logoPaints}
+                    />
                   </CardContent>
                 </Card>
 

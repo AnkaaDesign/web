@@ -22,10 +22,8 @@
     "noFallthroughCasesInSwitch": false,
     "noUncheckedSideEffectImports": false,
     "noImplicitAny": false,
-    "skipLibCheck": true,
 
     /* Path mapping */
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "@components/*": ["./src/components/*"],
@@ -44,5 +42,12 @@
       "@api-client/*": ["./src/api-client/*"]
     }
   },
-  "include": ["src", "src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "src/types/**/*.d.ts", "vite-env.d.ts"]
+  "include": [
+    "src",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.d.ts",
+    "src/types/**/*.d.ts",
+    "vite-env.d.ts"
+  ]
 }

@@ -6,12 +6,12 @@ import type { LayoutCreateFormData, LayoutUpdateFormData } from "../schemas";
 import { safeFileDownload } from "./platform-utils";
 
 // Response Types
-export type LayoutGetUniqueResponse = BaseGetUniqueResponse<Layout>;
-export type LayoutCreateResponse = BaseCreateResponse<Layout>;
-export type LayoutUpdateResponse = BaseUpdateResponse<Layout>;
-export type LayoutDeleteResponse = BaseDeleteResponse;
+type LayoutGetUniqueResponse = BaseGetUniqueResponse<Layout>;
+type LayoutCreateResponse = BaseCreateResponse<Layout>;
+type LayoutUpdateResponse = BaseUpdateResponse<Layout>;
+type LayoutDeleteResponse = BaseDeleteResponse;
 
-export interface LayoutsByTruckResponse {
+interface LayoutsByTruckResponse {
   success: boolean;
   message: string;
   data: {
@@ -55,4 +55,13 @@ export const layoutService = {
     // Return the blob for React Native or other environments to handle
     return success ? undefined : blob;
   },
+};
+
+// Export types
+export type {
+  LayoutGetUniqueResponse,
+  LayoutCreateResponse,
+  LayoutUpdateResponse,
+  LayoutDeleteResponse,
+  LayoutsByTruckResponse,
 };

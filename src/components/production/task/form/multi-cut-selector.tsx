@@ -42,38 +42,16 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
     control,
   });
 
-  // Initialize cuts from form field value
-  const [cuts, setCuts] = useState<CutItem[]>(() => {
-    if (field.value && Array.isArray(field.value) && field.value.length > 0) {
-      return field.value.map((cut: any, index: number) => {
-        // Convert existing file to FileWithPreview format if available
-        const existingFile = cut.file ? {
-          id: cut.file.id,
-          name: cut.file.filename || 'Arquivo anexado',
-          size: cut.file.size || 0,
-          type: cut.file.mimetype || 'application/octet-stream',
-          uploaded: true,
-          uploadProgress: 100,
-          uploadedFileId: cut.file.id,
-          thumbnailUrl: cut.file.thumbnailUrl || `/api/files/thumbnail/${cut.file.id}`,
-        } as FileWithPreview : undefined;
-
-        return {
-          id: `cut-${Date.now()}-${index}`,
-          type: cut.type || CUT_TYPE.VINYL,
-          quantity: cut.quantity || 1,
-          fileId: cut.fileId,
-          file: existingFile,
-        };
-      });
-    }
-    return [];
-  });
+  // Start with empty state - let sync effect handle initialization
+  const [cuts, setCuts] = useState<CutItem[]>([]);
 
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
   // Track last synced value to prevent infinite loops
   const lastFieldValueRef = useRef<string>("");
+
+  // Flag to prevent Form→Local sync while Local→Form is syncing
+  const isSyncingToForm = useRef<boolean>(false);
 
   // Add new cut
   const addCut = useCallback(() => {
@@ -180,22 +158,107 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
   // Calculate total cuts
   const totalCuts = cuts.reduce((sum, cut) => sum + cut.quantity, 0);
 
-  // Sync with form whenever cuts change (one-way: local → form)
+  // Sync FROM form field TO local state when form resets (form → local)
   useEffect(() => {
-    const formCuts = cuts.map((cut) => ({
+    // Skip if we're currently syncing TO the form (prevents race conditions)
+    if (isSyncingToForm.current) {
+      console.log('[MultiCutSelector] Skipping Form→Local sync (currently syncing to form)');
+      return;
+    }
+
+    console.log('[MultiCutSelector] Field value changed:', field.value);
+
+    if (field.value && Array.isArray(field.value) && field.value.length > 0) {
+      // Compare only essential data (exclude file objects which have different formats)
+      const essentialData = field.value.map((cut: any) => ({
+        type: cut.type,
+        quantity: cut.quantity,
+        fileId: cut.fileId,
+      }));
+      const fieldValueString = JSON.stringify(essentialData);
+
+      console.log('[MultiCutSelector] Checking if should update. Last:', lastFieldValueRef.current, 'New:', fieldValueString);
+
+      // Only update local state if field value is different from what we last sent
+      if (fieldValueString !== lastFieldValueRef.current) {
+        console.log('[MultiCutSelector] Updating local state with', field.value.length, 'cuts');
+
+        const newCuts = field.value.map((cut: any, index: number) => {
+          // Convert existing file to FileWithPreview format if available
+          const existingFile = cut.file ? {
+            id: cut.file.id,
+            name: cut.file.filename || cut.file.name || 'Arquivo anexado',
+            size: cut.file.size || 0,
+            type: cut.file.mimetype || cut.file.type || 'application/octet-stream',
+            uploaded: true,
+            uploadProgress: 100,
+            uploadedFileId: cut.file.id,
+            thumbnailUrl: cut.file.thumbnailUrl || `/api/files/thumbnail/${cut.file.id}`,
+          } as FileWithPreview : undefined;
+
+          return {
+            id: `cut-${Date.now()}-${index}`,
+            type: cut.type || CUT_TYPE.VINYL,
+            quantity: cut.quantity || 1,
+            fileId: cut.fileId,
+            file: existingFile,
+          };
+        });
+
+        console.log('[MultiCutSelector] New cuts state:', newCuts);
+        setCuts(newCuts);
+        lastFieldValueRef.current = fieldValueString;
+      }
+    } else if (!field.value || (Array.isArray(field.value) && field.value.length === 0)) {
+      console.log('[MultiCutSelector] Field value is empty, clearing cuts');
+      // Clear cuts if field value is empty
+      if (cuts.length > 0) {
+        setCuts([]);
+        lastFieldValueRef.current = "";
+      }
+    }
+  }, [field.value]);
+
+  // Sync FROM local state TO form field when cuts change (local → form)
+  useEffect(() => {
+    const formCuts = cuts.map((cut) => {
+      const formCut: any = {
+        type: cut.type,
+        quantity: cut.quantity,
+        fileId: cut.fileId || "",
+        origin: CUT_ORIGIN.PLAN,
+      };
+
+      // Preserve file object if it exists to prevent sync loops
+      if (cut.file) {
+        formCut.file = cut.file;
+      }
+
+      return formCut;
+    });
+
+    // Compare only essential data (exclude file objects)
+    const essentialData = formCuts.map((cut) => ({
       type: cut.type,
       quantity: cut.quantity,
-      fileId: cut.fileId || "",
-      origin: CUT_ORIGIN.PLAN,
+      fileId: cut.fileId,
     }));
+    const formCutsString = JSON.stringify(essentialData);
 
-    const formCutsString = JSON.stringify(formCuts);
-    const currentFieldValue = JSON.stringify(field.value);
-
-    // Only update if different from both last sync AND current field value
-    if (formCutsString !== lastFieldValueRef.current && formCutsString !== currentFieldValue) {
+    // Only update field if local cuts changed (user interaction)
+    if (formCutsString !== lastFieldValueRef.current) {
+      console.log('[MultiCutSelector] Local→Form sync: updating field with', formCuts.length, 'cuts');
       lastFieldValueRef.current = formCutsString;
+
+      // Set flag to prevent Form→Local from reacting to our change
+      isSyncingToForm.current = true;
       field.onChange(formCuts);
+
+      // Reset flag after React finishes batching updates
+      setTimeout(() => {
+        isSyncingToForm.current = false;
+        console.log('[MultiCutSelector] Sync lock released');
+      }, 0);
     }
   }, [cuts, field]);
 

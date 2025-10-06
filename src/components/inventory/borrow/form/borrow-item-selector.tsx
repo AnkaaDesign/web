@@ -456,7 +456,7 @@ export const BorrowItemSelector = ({
                 const value = e?.target?.value ?? e ?? '';
                 handleSearch(value);
               }}
-              className="pl-10"
+              className="pl-10 bg-transparent"
             />
           </div>
 

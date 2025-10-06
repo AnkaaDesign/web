@@ -4,6 +4,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { FilePreviewCard } from "@/components/file";
+import { CUT_TYPE_LABELS, CUT_STATUS_LABELS, CUT_ORIGIN_LABELS, AIRBRUSHING_STATUS_LABELS } from "@/constants/enum-labels";
+import { ENTITY_BADGE_CONFIG } from "@/constants";
 import {
   IconHistory,
   IconEdit,
@@ -28,7 +32,8 @@ import { formatRelativeTime, getFieldLabel, formatFieldValue, getActionLabel } f
 import { useChangeLogs } from "../../hooks";
 import { cn } from "@/lib/utils";
 import { useEntityDetails } from "@/hooks/use-entity-details";
-// import { rollbackFieldChange } from "../../api-client/task";
+import { rollbackFieldChange } from "@/api-client/task";
+import { toast } from "sonner";
 
 interface ChangelogHistoryProps {
   entityType: CHANGE_LOG_ENTITY_TYPE;
@@ -160,6 +165,128 @@ const EmptyState = ({ entityType }: { entityType: CHANGE_LOG_ENTITY_TYPE }) => (
   </div>
 );
 
+// Render cuts as cards (matching task detail page design)
+const renderCutsCards = (cuts: any[]) => {
+  if (!Array.isArray(cuts) || cuts.length === 0) {
+    return <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>;
+  }
+
+  return (
+    <div className="space-y-2 mt-2">
+      {cuts.map((cut: any, index: number) => (
+        <div key={index} className="border rounded-lg px-2.5 py-1.5 flex items-center gap-2.5 bg-card">
+          {/* Cut Info */}
+          <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <h4 className="text-xs font-semibold truncate min-w-0 flex-1">
+                {cut.file?.filename || cut.file?.name || "Arquivo de recorte"}
+              </h4>
+              {cut.status && (
+                <Badge variant={ENTITY_BADGE_CONFIG.CUT?.[cut.status] || "default"} className="text-[10px] h-4 px-1.5 flex-shrink-0">
+                  {CUT_STATUS_LABELS[cut.status] || cut.status}
+                </Badge>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+              {cut.type && (
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Tipo:</span>
+                  <span>{CUT_TYPE_LABELS[cut.type] || cut.type}</span>
+                </div>
+              )}
+              {cut.quantity && (
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Qtd:</span>
+                  <span>{cut.quantity}</span>
+                </div>
+              )}
+              {cut.origin && (
+                <div className="flex items-center gap-1">
+                  <span className="font-medium">Origem:</span>
+                  <span>{CUT_ORIGIN_LABELS[cut.origin] || cut.origin}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* File Preview on Right */}
+          {(cut.file || cut.fileId) && (
+            <div className="flex-shrink-0">
+              {cut.file ? (
+                <FilePreviewCard file={cut.file} size="sm" className="w-12 h-12" />
+              ) : (
+                <div className="w-12 h-12 border rounded-md bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
+                  Arquivo
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Render services as cards
+const renderServicesCards = (services: any[]) => {
+  if (!Array.isArray(services) || services.length === 0) {
+    return <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>;
+  }
+
+  const statusLabels: Record<string, string> = {
+    PENDING: "Pendente",
+    IN_PROGRESS: "Em Progresso",
+    COMPLETED: "Concluído",
+    CANCELLED: "Cancelado",
+  };
+
+  return (
+    <div className="space-y-2 mt-2">
+      {services.map((service: any, index: number) => (
+        <div key={index} className="border rounded-lg px-2.5 py-1.5 bg-card">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-xs font-semibold truncate flex-1">
+              {service.description || "Serviço"}
+            </h4>
+            {service.status && (
+              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 flex-shrink-0">
+                {statusLabels[service.status] || service.status}
+              </Badge>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Render airbrushings as cards
+const renderAirbrushingsCards = (airbrushings: any[]) => {
+  if (!Array.isArray(airbrushings) || airbrushings.length === 0) {
+    return <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>;
+  }
+
+  return (
+    <div className="space-y-2 mt-2">
+      {airbrushings.map((airbrushing: any, index: number) => (
+        <div key={index} className="border rounded-lg px-2.5 py-1.5 bg-card">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-xs font-semibold truncate flex-1">
+              {airbrushing.description || "Aerografia"}
+            </h4>
+            {airbrushing.status && (
+              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 flex-shrink-0">
+                {AIRBRUSHING_STATUS_LABELS[airbrushing.status] || airbrushing.status}
+              </Badge>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // Timeline item component
 const ChangelogTimelineItem = ({
   changelogGroup,
@@ -204,16 +331,30 @@ const ChangelogTimelineItem = ({
     // Handle null/undefined values
     if (value === null || value === undefined) return "—";
 
+    // Parse JSON strings if needed (backend stores as Json type which may come as strings)
+    let parsedValue = value;
+    if (typeof value === "string") {
+      try {
+        // Try to parse if it looks like JSON (starts with [ or {)
+        if (value.trim().startsWith("[") || value.trim().startsWith("{")) {
+          parsedValue = JSON.parse(value);
+        }
+      } catch (e) {
+        // If parsing fails, use the original string value
+        parsedValue = value;
+      }
+    }
+
     // Check if it's a UUID
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (typeof value === "string" && uuidRegex.test(value)) {
+    if (typeof parsedValue === "string" && uuidRegex.test(parsedValue)) {
       // Try to get entity name from fetched details
       if (entityDetails) {
-        if (field === "categoryId" && entityDetails.categories.has(value)) {
-          return entityDetails.categories.get(value) || "Categoria";
+        if (field === "categoryId" && entityDetails.categories.has(parsedValue)) {
+          return entityDetails.categories.get(parsedValue) || "Categoria";
         }
-        if (field === "brandId" && entityDetails.brands.has(value)) {
-          return entityDetails.brands.get(value) || "Marca";
+        if (field === "brandId" && entityDetails.brands.has(parsedValue)) {
+          return entityDetails.brands.get(parsedValue) || "Marca";
         }
         if (field === "supplierId" && entityDetails.suppliers.has(value)) {
           return entityDetails.suppliers.get(value) || "Fornecedor";
@@ -280,7 +421,8 @@ const ChangelogTimelineItem = ({
       }
     }
 
-    const result = formatFieldValue(value, field, entityType, metadata);
+    // Use parsedValue to ensure arrays/objects are properly formatted
+    const result = formatFieldValue(parsedValue, field, entityType, metadata);
     return result;
   };
 
@@ -389,9 +531,102 @@ const ChangelogTimelineItem = ({
                   <div className="space-y-1">
                     {changelog.oldValue !== undefined || changelog.newValue !== undefined ? (
                       <>
-                        {/* Handle different cases: removed field, or updated field */}
-                        {changelog.oldValue !== null && changelog.newValue === null ? (
-                          // Field removed
+                        {/* Handle different cases: check special fields first, then generic cases */}
+                        {changelog.field === "cuts" || changelog.field === "cutRequest" || changelog.field === "cutPlan" ? (
+                          // Special handling for cuts - render as cards (handles all cases: add, remove, update)
+                          (() => {
+                            const parseValue = (val: any) => {
+                              if (!val) return val;
+                              if (typeof val === "string" && (val.trim().startsWith("[") || val.trim().startsWith("{"))) {
+                                try {
+                                  return JSON.parse(val);
+                                } catch (e) {
+                                  return val;
+                                }
+                              }
+                              return val;
+                            };
+
+                            const oldParsed = parseValue(changelog.oldValue);
+                            const newParsed = parseValue(changelog.newValue);
+
+                            return (
+                              <>
+                                <div>
+                                  <span className="text-sm text-muted-foreground">Antes:</span>
+                                  {renderCutsCards(oldParsed)}
+                                </div>
+                                <div className="mt-3">
+                                  <span className="text-sm text-muted-foreground">Depois:</span>
+                                  {renderCutsCards(newParsed)}
+                                </div>
+                              </>
+                            );
+                          })()
+                        ) : changelog.field === "services" ? (
+                          // Special handling for services - render as cards (handles all cases: add, remove, update)
+                          (() => {
+                            const parseValue = (val: any) => {
+                              if (!val) return val;
+                              if (typeof val === "string" && (val.trim().startsWith("[") || val.trim().startsWith("{"))) {
+                                try {
+                                  return JSON.parse(val);
+                                } catch (e) {
+                                  return val;
+                                }
+                              }
+                              return val;
+                            };
+
+                            const oldParsed = parseValue(changelog.oldValue);
+                            const newParsed = parseValue(changelog.newValue);
+
+                            return (
+                              <>
+                                <div>
+                                  <span className="text-sm text-muted-foreground">Antes:</span>
+                                  {renderServicesCards(oldParsed)}
+                                </div>
+                                <div className="mt-3">
+                                  <span className="text-sm text-muted-foreground">Depois:</span>
+                                  {renderServicesCards(newParsed)}
+                                </div>
+                              </>
+                            );
+                          })()
+                        ) : changelog.field === "airbrushings" ? (
+                          // Special handling for airbrushings - render as cards (handles all cases: add, remove, update)
+                          (() => {
+                            const parseValue = (val: any) => {
+                              if (!val) return val;
+                              if (typeof val === "string" && (val.trim().startsWith("[") || val.trim().startsWith("{"))) {
+                                try {
+                                  return JSON.parse(val);
+                                } catch (e) {
+                                  return val;
+                                }
+                              }
+                              return val;
+                            };
+
+                            const oldParsed = parseValue(changelog.oldValue);
+                            const newParsed = parseValue(changelog.newValue);
+
+                            return (
+                              <>
+                                <div>
+                                  <span className="text-sm text-muted-foreground">Antes:</span>
+                                  {renderAirbrushingsCards(oldParsed)}
+                                </div>
+                                <div className="mt-3">
+                                  <span className="text-sm text-muted-foreground">Depois:</span>
+                                  {renderAirbrushingsCards(newParsed)}
+                                </div>
+                              </>
+                            );
+                          })()
+                        ) : changelog.oldValue !== null && changelog.newValue === null ? (
+                          // Field removed (generic case for non-special fields)
                           <div className="text-sm">
                             <span className="text-muted-foreground">Removido: </span>
                             <span className="text-red-600 dark:text-red-400 font-medium line-through">
@@ -510,6 +745,7 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
     data: changelogsResponse,
     isLoading,
     error,
+    refetch,
   } = useChangeLogs({
     where: {
       entityType,
@@ -525,7 +761,7 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
   });
 
   // Handle rollback action
-  const handleRollback = async (changeLogId: string, _fieldName: string) => {
+  const handleRollback = async (changeLogId: string, fieldName: string) => {
     // Only allow rollback for task entities
     if (entityType !== CHANGE_LOG_ENTITY_TYPE.TASK) {
       return;
@@ -534,10 +770,19 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
     setRollbackLoading(changeLogId);
 
     try {
-      // await rollbackFieldChange({ changeLogId });
+      await rollbackFieldChange({ changeLogId });
+
+      // Show success message
+      toast.success(`Campo "${fieldName}" revertido com sucesso`);
+
       // Refresh changelog data
-      // await refetch();} catch (error: any) {
+      await refetch();
+    } catch (error: any) {
       console.error("Rollback error:", error);
+
+      // Show error message
+      const errorMessage = error?.response?.data?.message || error?.message || "Erro ao reverter campo";
+      toast.error(errorMessage);
     } finally {
       setRollbackLoading(null);
     }

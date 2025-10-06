@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/ui/page-header";
-import { FileUploadField, type FileWithPreview } from "@/components/file";
+import { FileUploadField } from "@/components/file";
+import type { FileWithPreview } from "@/components/file";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Combobox } from "@/components/ui/combobox";
+import type { ComboboxOption } from "@/components/ui/combobox";
 import { Label } from "@/components/ui/label";
 import { IconFileText, IconUpload, IconCheck, IconX, IconFolder } from "@tabler/icons-react";
 import { toast } from "sonner";

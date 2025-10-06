@@ -1,15 +1,31 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { useAirbrushings, useAirbrushingMutations } from "../../../../hooks";
-import type { Airbrushing } from "../../../../types";
-import type { AirbrushingGetManyFormData } from "../../../../schemas";
-import { StandardizedTable } from "@/components/ui/standardized-table";
-import { cn } from "@/lib/utils";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
-import { toast } from "sonner";
-import { routes } from "../../../../constants";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconSpray } from "@tabler/icons-react";
-import { getAirbrushingTableColumns } from "./airbrushing-table-columns";
+import type { Airbrushing } from "../../../../types";
+import { routes } from "../../../../constants";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  IconChevronUp,
+  IconChevronDown,
+  IconAlertTriangle,
+  IconEdit,
+  IconTrash,
+  IconSelector,
+  IconSpray,
+  IconEye,
+} from "@tabler/icons-react";
+import { cn } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { useAirbrushingMutations, useAirbrushings } from "../../../../hooks";
+import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
+import type { AirbrushingGetManyFormData } from "../../../../schemas";
+import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { TABLE_LAYOUT } from "@/components/ui/table-constants";
+import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
+import { createAirbrushingColumns } from "./airbrushing-table-columns";
+import type { AirbrushingColumn } from "./airbrushing-table-columns";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,24 +36,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 interface AirbrushingTableProps {
+  visibleColumns: Set<string>;
   className?: string;
-  onRowClick?: (airbrushing: Airbrushing) => void;
-  showSelectedOnly?: boolean;
-  visibleColumns?: Set<string>;
   filters?: Partial<AirbrushingGetManyFormData>;
   onDataChange?: (data: { items: Airbrushing[]; totalRecords: number }) => void;
 }
 
-export function AirbrushingTable({ className, onRowClick, showSelectedOnly = false, visibleColumns = new Set(), filters = {}, onDataChange }: AirbrushingTableProps) {
+export function AirbrushingTable({ visibleColumns, className, filters = {}, onDataChange }: AirbrushingTableProps) {
   const navigate = useNavigate();
+  const { delete: deleteAirbrushing } = useAirbrushingMutations();
 
-  // Delete confirmation dialog state
-  const [deleteDialog, setDeleteDialog] = useState<{
-    items: Airbrushing[];
-    isBulk: boolean;
-  } | null>(null);
+  // Get scrollbar width info
+  const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
 
   // Use URL state management for pagination and selection
   const {
@@ -45,7 +58,7 @@ export function AirbrushingTable({ className, onRowClick, showSelectedOnly = fal
     pageSize,
     selectedIds,
     sortConfigs,
-    showSelectedOnly: showSelectedOnlyFromHook,
+    showSelectedOnly,
     setPage,
     setPageSize,
     toggleSelection,
@@ -65,7 +78,7 @@ export function AirbrushingTable({ className, onRowClick, showSelectedOnly = fal
   });
 
   // Memoize include configuration to prevent re-renders
-  const includeConfig = useMemo(
+  const includeConfig = React.useMemo(
     () => ({
       task: {
         include: {
@@ -76,12 +89,13 @@ export function AirbrushingTable({ className, onRowClick, showSelectedOnly = fal
       },
       receipts: true,
       nfes: true,
+      artworks: true,
     }),
     [],
   );
 
   // Memoize query parameters to prevent infinite re-renders
-  const queryParams = useMemo(() => {
+  const queryParams = React.useMemo(() => {
     const params = {
       // When showSelectedOnly is true, don't apply filters
       ...(showSelectedOnly ? {} : filters),
@@ -111,11 +125,7 @@ export function AirbrushingTable({ className, onRowClick, showSelectedOnly = fal
   const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;
   const totalRecords = response?.meta?.totalRecords || 0;
 
-  // Mutations
-  const { deleteAsync: deleteAirbrushing } = useAirbrushingMutations();
-
   // Notify parent component of data changes
-  // Use a ref to track if we've already notified for this exact data
   const lastNotifiedDataRef = React.useRef<string>("");
   const isMountedRef = React.useRef(true);
 
@@ -127,10 +137,8 @@ export function AirbrushingTable({ className, onRowClick, showSelectedOnly = fal
 
   React.useEffect(() => {
     if (onDataChange && isMountedRef.current) {
-      // Create a unique key for the current data to detect real changes
-      const dataKey = airbrushings.length > 0 ? `${totalRecords}-${airbrushings.map((airbrushing) => airbrushing.id).join(",")}` : `empty-${totalRecords}`;
+      const dataKey = airbrushings.length > 0 ? `${totalRecords}-${airbrushings.map((item) => item.id).join(",")}` : `empty-${totalRecords}`;
 
-      // Only notify if this exact data hasn't been notified yet
       if (dataKey !== lastNotifiedDataRef.current) {
         lastNotifiedDataRef.current = dataKey;
         onDataChange({ items: airbrushings, totalRecords });
@@ -138,12 +146,29 @@ export function AirbrushingTable({ className, onRowClick, showSelectedOnly = fal
     }
   }, [airbrushings, totalRecords, onDataChange]);
 
-  // Use prop if provided, otherwise use hook state
-  const effectiveShowSelectedOnly = showSelectedOnly ?? showSelectedOnlyFromHook;
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    items: Airbrushing[];
+    isBulk: boolean;
+  } | null>(null);
+
+  // Delete confirmation dialog state
+  const [deleteDialog, setDeleteDialog] = useState<{
+    items: Airbrushing[];
+    isBulk: boolean;
+  } | null>(null);
+
+  // Define all available columns
+  const allColumns: AirbrushingColumn[] = createAirbrushingColumns();
+
+  // Filter columns based on visibility
+  const columns = allColumns.filter((col) => visibleColumns.has(col.key));
 
   // Get current page item IDs for selection
-  const currentPageItemIds = useMemo(() => {
-    return airbrushings.map((airbrushing) => airbrushing.id);
+  const currentPageItemIds = React.useMemo(() => {
+    return airbrushings.map((item) => item.id);
   }, [airbrushings]);
 
   // Selection handlers
@@ -154,24 +179,76 @@ export function AirbrushingTable({ className, onRowClick, showSelectedOnly = fal
     toggleSelectAll(currentPageItemIds);
   };
 
-  const handleSelectItem = (airbrushingId: string) => {
-    toggleSelection(airbrushingId);
+  const handleSelectItem = (itemId: string) => {
+    toggleSelection(itemId);
   };
 
-  // Handle delete
-  const handleDelete = useCallback(
-    (airbrushing: Airbrushing, event?: React.MouseEvent) => {
-      if (event) {
-        event.stopPropagation();
-      }
+  const renderSortIndicator = (columnKey: string) => {
+    const sortDirection = getSortDirection(columnKey);
+    const sortOrder = getSortOrder(columnKey);
 
-      setDeleteDialog({
+    return (
+      <div className="inline-flex items-center ml-1">
+        {sortDirection === null && <IconSelector className="h-4 w-4 text-muted-foreground" />}
+        {sortDirection === "asc" && <IconChevronUp className="h-4 w-4 text-foreground" />}
+        {sortDirection === "desc" && <IconChevronDown className="h-4 w-4 text-foreground" />}
+        {sortOrder !== null && sortConfigs.length > 1 && <span className="text-xs ml-0.5">{sortOrder + 1}</span>}
+      </div>
+    );
+  };
+
+  // Context menu handlers
+  const handleContextMenu = (e: React.MouseEvent, airbrushing: Airbrushing) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Check if clicked item is part of selection
+    const isItemSelected = isSelected(airbrushing.id);
+    const hasSelection = selectionCount > 0;
+
+    if (hasSelection && isItemSelected) {
+      // Show bulk actions for all selected items
+      const selectedItemsList = airbrushings.filter((i) => isSelected(i.id));
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: selectedItemsList,
+        isBulk: true,
+      });
+    } else {
+      // Show actions for just the clicked item
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
         items: [airbrushing],
         isBulk: false,
       });
-    },
-    [],
-  );
+    }
+  };
+
+  const handleView = () => {
+    if (contextMenu && contextMenu.items.length === 1) {
+      navigate(routes.production.airbrushings.details(contextMenu.items[0].id));
+      setContextMenu(null);
+    }
+  };
+
+  const handleEdit = () => {
+    if (contextMenu && contextMenu.items.length === 1) {
+      navigate(routes.production.airbrushings.edit(contextMenu.items[0].id));
+      setContextMenu(null);
+    }
+  };
+
+  const handleDelete = () => {
+    if (contextMenu) {
+      setDeleteDialog({
+        items: contextMenu.items,
+        isBulk: contextMenu.isBulk && contextMenu.items.length > 1,
+      });
+      setContextMenu(null);
+    }
+  };
 
   // Confirm delete
   const confirmDelete = async () => {
@@ -179,10 +256,11 @@ export function AirbrushingTable({ className, onRowClick, showSelectedOnly = fal
       try {
         for (const item of deleteDialog.items) {
           await deleteAirbrushing(item.id);
-          // Remove deleted ID from selection
           removeFromSelection([item.id]);
         }
-        toast.success(deleteDialog.isBulk ? `${deleteDialog.items.length} airbrushings excluídos com sucesso` : "Airbrushing excluído com sucesso");
+        toast.success(
+          deleteDialog.isBulk ? `${deleteDialog.items.length} airbrushings excluídos com sucesso` : "Airbrushing excluído com sucesso",
+        );
       } catch (error) {
         toast.error("Erro ao excluir airbrushing");
       } finally {
@@ -191,63 +269,219 @@ export function AirbrushingTable({ className, onRowClick, showSelectedOnly = fal
     }
   };
 
-  // Handle edit
-  const handleEdit = useCallback(
-    (airbrushing: Airbrushing, event?: React.MouseEvent) => {
-      if (event) {
-        event.stopPropagation();
-      }
-      navigate(routes.production.airbrushings.edit(airbrushing.id));
-    },
-    [navigate],
-  );
+  // Close context menu when clicking outside
+  React.useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
 
-  // Handle view details
-  const handleView = useCallback(
-    (airbrushing: Airbrushing, event?: React.MouseEvent) => {
-      if (event) {
-        event.stopPropagation();
-      }
-      navigate(routes.production.airbrushings.details(airbrushing.id));
-    },
-    [navigate],
-  );
-
-  // Get table columns with proper selection handlers
-  const columns = getAirbrushingTableColumns({
-    selection: {},
-    onRowSelection: handleSelectItem,
-    onView: handleView,
-    onEdit: handleEdit,
-    onDelete: handleDelete,
-  });
-
-  // Filter columns based on visibility, but always show select and actions columns
-  const visibleColumnsArray = columns.filter((col) => col.key === "select" || col.key === "actions" || visibleColumns.size === 0 || visibleColumns.has(col.key));
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-muted-foreground">Carregando...</div>
+      </div>
+    );
+  }
 
   return (
     <>
-      <StandardizedTable
-        columns={visibleColumnsArray}
-        data={airbrushings}
-        getItemKey={(airbrushing) => airbrushing.id}
-        onRowClick={onRowClick}
-        currentPage={page}
-        totalPages={totalPages}
-        onPageChange={setPage}
-        pageSize={pageSize}
-        totalRecords={totalRecords}
-        onPageSizeChange={(size) => setPageSize(size)}
-        isLoading={isLoading}
-        error={error ? "Erro ao carregar airbrushings" : undefined}
-        emptyMessage="Nenhum airbrushing encontrado"
-        emptyIcon={IconSpray}
-        onSelectAll={handleSelectAll}
-        itemTestIdPrefix="airbrushing"
-        allSelected={allSelected}
-        partiallySelected={partiallySelected}
-        className={cn("h-full", className)}
-      />
+      <div className={cn("rounded-lg flex flex-col overflow-hidden", className)}>
+        {/* Fixed Header Table */}
+        <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden">
+          <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
+            <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
+              <TableRow className="bg-muted hover:bg-muted even:bg-muted">
+                {/* Selection column */}
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={partiallySelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all items"
+                      disabled={isLoading || airbrushings.length === 0}
+                    />
+                  </div>
+                </TableHead>
+
+                {/* Data columns */}
+                {columns.map((column) => (
+                  <TableHead key={column.key} className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0", column.className)}>
+                    {column.sortable ? (
+                      <button
+                        onClick={() => toggleSort(column.key)}
+                        className={cn(
+                          "flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent",
+                          column.align === "center" && "justify-center",
+                          column.align === "right" && "justify-end",
+                          !column.align && "justify-start",
+                        )}
+                        disabled={isLoading || airbrushings.length === 0}
+                      >
+                        <TruncatedTextWithTooltip text={column.header} />
+                        {renderSortIndicator(column.key)}
+                      </button>
+                    ) : (
+                      <div
+                        className={cn(
+                          "flex items-center h-full min-h-[2.5rem] px-4 py-2",
+                          column.align === "center" && "justify-center text-center",
+                          column.align === "right" && "justify-end text-right",
+                          !column.align && "justify-start text-left",
+                        )}
+                      >
+                        <TruncatedTextWithTooltip text={column.header} />
+                      </div>
+                    )}
+                  </TableHead>
+                ))}
+
+                {/* Scrollbar spacer - only show if not overlay scrollbar */}
+                {!isOverlay && (
+                  <TableHead style={{ width: `${scrollbarWidth}px`, minWidth: `${scrollbarWidth}px` }} className="bg-muted p-0 border-0 !border-r-0 shrink-0"></TableHead>
+                )}
+              </TableRow>
+            </TableHeader>
+          </Table>
+        </div>
+
+        {/* Scrollable Body Table */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden border-l border-r border-border">
+          <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
+            <TableBody>
+              {error ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length + 1} className="p-0">
+                    <div className="flex flex-col items-center justify-center p-8 text-center text-destructive">
+                      <IconAlertTriangle className="h-8 w-8 mb-4" />
+                      <div className="text-lg font-medium mb-2">Não foi possível carregar os airbrushings</div>
+                      <div className="text-sm text-muted-foreground">Tente novamente mais tarde.</div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : airbrushings.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length + 1} className="p-0">
+                    <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                      <IconSpray className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                      <div className="text-lg font-medium mb-2">Nenhum airbrushing encontrado</div>
+                      {filters && Object.keys(filters).length > 1 ? (
+                        <div className="text-sm">Ajuste os filtros para ver mais resultados.</div>
+                      ) : (
+                        <div className="text-sm mb-4">Comece cadastrando seu primeiro airbrushing.</div>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                airbrushings.map((airbrushing, index) => {
+                  const itemIsSelected = isSelected(airbrushing.id);
+
+                  return (
+                    <TableRow
+                      key={airbrushing.id}
+                      data-state={itemIsSelected ? "selected" : undefined}
+                      className={cn(
+                        "cursor-pointer transition-colors border-b border-border",
+                        // Alternating row colors
+                        index % 2 === 1 && "bg-muted/10",
+                        // Hover state that works with alternating colors
+                        "hover:bg-muted/20",
+                        // Selected state overrides alternating colors
+                        itemIsSelected && "bg-muted/30 hover:bg-muted/40",
+                      )}
+                      onClick={() => navigate(routes.production.airbrushings.details(airbrushing.id))}
+                      onContextMenu={(e) => handleContextMenu(e, airbrushing)}
+                    >
+                      {/* Selection checkbox */}
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={itemIsSelected}
+                            onCheckedChange={() => handleSelectItem(airbrushing.id)}
+                            aria-label={`Select ${airbrushing.task?.name || airbrushing.id}`}
+                            data-checkbox
+                          />
+                        </div>
+                      </TableCell>
+
+                      {/* Data columns */}
+                      {columns.map((column) => (
+                        <TableCell
+                          key={column.key}
+                          className={cn(
+                            column.className,
+                            "p-0 !border-r-0",
+                            column.align === "center" && "text-center",
+                            column.align === "right" && "text-right",
+                            column.align === "left" && "text-left",
+                            !column.align && "text-left",
+                          )}
+                        >
+                          <div className="px-4 py-2">{column.accessor(airbrushing)}</div>
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Pagination Footer */}
+        <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50">
+          <SimplePaginationAdvanced
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            totalItems={totalRecords}
+            pageSizeOptions={[20, 40, 60, 100]}
+            onPageSizeChange={setPageSize}
+            showPageSizeSelector={true}
+            showGoToPage={true}
+            showPageInfo={true}
+          />
+        </div>
+
+        {/* Context Menu */}
+        <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
+          <DropdownMenuContent
+            style={{
+              position: "fixed",
+              left: contextMenu?.x,
+              top: contextMenu?.y,
+            }}
+            className="w-56"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
+            {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.items.length} itens selecionados</div>}
+
+            {!contextMenu?.isBulk && (
+              <DropdownMenuItem onClick={handleView}>
+                <IconEye className="mr-2 h-4 w-4" />
+                Ver detalhes
+              </DropdownMenuItem>
+            )}
+
+            {!contextMenu?.isBulk && (
+              <DropdownMenuItem onClick={handleEdit}>
+                <IconEdit className="mr-2 h-4 w-4" />
+                Editar
+              </DropdownMenuItem>
+            )}
+
+            {!contextMenu?.isBulk && <DropdownMenuSeparator />}
+
+            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Deletar selecionados" : "Deletar"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>

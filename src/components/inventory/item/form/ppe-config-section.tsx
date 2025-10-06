@@ -3,7 +3,7 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { IconShieldCheck } from "@tabler/icons-react";
+import { IconShieldCheck, IconCertificate, IconRuler } from "@tabler/icons-react";
 import { PpeTypeSelector } from "./ppe-type-selector";
 import { PpeSizeSelector } from "./ppe-size-selector";
 import { PpeDeliveryModeSelector } from "./ppe-delivery-mode-selector";
@@ -117,7 +117,10 @@ export function PpeConfigSection({ disabled, required }: PpeConfigSectionProps) 
             name="ppeCA"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Certificado de Aprovação (CA)</FormLabel>
+                <FormLabel className="flex items-center gap-2">
+                  <IconCertificate className="h-4 w-4" />
+                  Certificado de Aprovação (CA)
+                </FormLabel>
                 <FormControl>
                   <Input
                     value={field.value || ""}
@@ -129,6 +132,7 @@ export function PpeConfigSection({ disabled, required }: PpeConfigSectionProps) 
                     ref={field.ref}
                     placeholder="Digite o número do CA"
                     disabled={disabled}
+                    transparent={true}
                   />
                 </FormControl>
                 <FormMessage />
@@ -141,7 +145,10 @@ export function PpeConfigSection({ disabled, required }: PpeConfigSectionProps) 
             <PpeTypeSelector name="ppeType" disabled={disabled} required={required} />
             {/* PPE Size Selector - integrated with measures */}
             <FormItem>
-              <FormLabel>Tamanho {required && "*"}</FormLabel>
+              <FormLabel className="flex items-center gap-2">
+                <IconRuler className="h-4 w-4" />
+                Tamanho {required && "*"}
+              </FormLabel>
               <PpeSizeSelector
                 name="__ppeSize" // Virtual field name
                 ppeType={ppeType}

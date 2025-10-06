@@ -1,6 +1,6 @@
 import { apiClient } from "./axiosClient";
 
-export interface BackupMetadata {
+interface BackupMetadata {
   id: string;
   name: string;
   type: "database" | "files" | "full";
@@ -17,7 +17,7 @@ export interface BackupMetadata {
   progress?: number; // Progress percentage (0-100)
 }
 
-export interface CreateBackupRequest {
+interface CreateBackupRequest {
   name: string;
   type: "database" | "files" | "full";
   description?: string;
@@ -28,12 +28,12 @@ export interface CreateBackupRequest {
   encrypted?: boolean;
 }
 
-export interface ScheduleBackupRequest extends CreateBackupRequest {
+interface ScheduleBackupRequest extends CreateBackupRequest {
   enabled: boolean;
   cron: string;
 }
 
-export interface BackupSystemHealth {
+interface BackupSystemHealth {
   totalBackups: number;
   completedBackups: number;
   failedBackups: number;
@@ -54,7 +54,7 @@ export interface BackupSystemHealth {
   nextScheduledBackup: string | null;
 }
 
-export interface BackupVerification {
+interface BackupVerification {
   backupId: string;
   fileExists: boolean;
   archiveIntegrity: boolean;
@@ -63,7 +63,7 @@ export interface BackupVerification {
   details: string;
 }
 
-export interface ScheduledBackupJob {
+interface ScheduledBackupJob {
   id: string;
   name: string;
   cron: string;
@@ -72,13 +72,13 @@ export interface ScheduledBackupJob {
   key?: string; // Job key for deletion
 }
 
-export interface BackupQueryParams {
+interface BackupQueryParams {
   type?: "database" | "files" | "full";
   status?: "pending" | "in_progress" | "completed" | "failed";
   limit?: number;
 }
 
-export interface SystemHealthSummary {
+interface SystemHealthSummary {
   raidStatus: { healthy: boolean; details: string; degraded: boolean };
   diskSpace: { available: string; used: string; total: string; usagePercent: number; availableBytes: number };
   backupStats: { total: number; completed: number; failed: number; inProgress: number; totalSize: number };
@@ -238,3 +238,15 @@ class BackupApiClient {
 }
 
 export const backupApi = new BackupApiClient();
+
+// Export types
+export type {
+  BackupMetadata,
+  CreateBackupRequest,
+  ScheduleBackupRequest,
+  BackupSystemHealth,
+  BackupVerification,
+  ScheduledBackupJob,
+  BackupQueryParams,
+  SystemHealthSummary,
+};

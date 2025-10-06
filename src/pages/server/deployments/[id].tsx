@@ -1,7 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import {
   IconRocket,
-  IconArrowLeft,
   IconGitBranch,
   IconGitCommit,
   IconUser,
@@ -13,6 +12,10 @@ import {
   IconHeartbeat,
   IconDatabase,
   IconWorldWww,
+  IconAlertCircle,
+  IconActivity,
+  IconServer,
+  IconRefresh,
 } from "@tabler/icons-react";
 
 import {
@@ -24,70 +27,53 @@ import {
 } from "../../../constants";
 import { formatDateTime } from "../../../utils";
 
-// Format duration in seconds to human readable format
-const formatDuration = (seconds: number): string => {
+import { useDeploymentDetail } from "../../../hooks";
+import { PrivilegeRoute } from "@/components/navigation/privilege-route";
+import { PageHeader } from "@/components/ui/page-header";
+import { usePageTracker } from "@/hooks/use-page-tracker";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// Format duration in milliseconds to human readable format
+const formatDuration = (milliseconds: number | null | undefined): string => {
+  if (!milliseconds) return "N/A";
+
   try {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
 
     if (hours > 0) {
-      return `${hours}h ${minutes}m ${secs}s`;
+      return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
     }
     if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
+      return `${minutes}m ${seconds % 60}s`;
     }
-    return `${secs}s`;
+    return `${seconds}s`;
   } catch (error) {
-    console.error("[DeploymentDetail] Error formatting duration:", error, seconds);
+    console.error("[DeploymentDetail] Error formatting duration:", error, milliseconds);
     return "N/A";
   }
 };
 
-// Safely stringify JSON data
-const safeStringify = (data: any): string => {
-  try {
-    if (data === null || data === undefined) {
-      console.log("[DeploymentDetail] safeStringify: data is null/undefined");
-      return "null";
-    }
-    if (typeof data === "string") {
-      console.log("[DeploymentDetail] safeStringify: data is already a string");
-      return data;
-    }
-    const result = JSON.stringify(data, null, 2);
-    console.log("[DeploymentDetail] safeStringify: successfully stringified", typeof data);
-    return result;
-  } catch (error) {
-    console.error("[DeploymentDetail] Error stringifying data:", error, data);
-    return `Error serializing data: ${error instanceof Error ? error.message : "Unknown error"}`;
-  }
-};
-import { useDeploymentDetail } from "../../../hooks";
-
-import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
-import { usePageTracker } from "@/hooks/use-page-tracker";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-
 const getStatusIcon = (status: string) => {
   switch (status) {
     case DEPLOYMENT_STATUS.COMPLETED:
-      return <IconCheck className="h-4 w-4" />;
+      return IconCheck;
     case DEPLOYMENT_STATUS.FAILED:
-      return <IconX className="h-4 w-4" />;
+      return IconX;
     case DEPLOYMENT_STATUS.IN_PROGRESS:
     case DEPLOYMENT_STATUS.BUILDING:
     case DEPLOYMENT_STATUS.TESTING:
     case DEPLOYMENT_STATUS.DEPLOYING:
-      return <IconClock className="h-4 w-4 animate-pulse" />;
+      return IconClock;
     case DEPLOYMENT_STATUS.ROLLED_BACK:
-      return <IconRotateClockwise className="h-4 w-4" />;
+      return IconRotateClockwise;
     default:
-      return <IconRocket className="h-4 w-4" />;
+      return IconRocket;
   }
 };
 
@@ -115,15 +101,20 @@ const getEnvironmentColor = (environment: string): "default" | "destructive" | "
   return environment === "PRODUCTION" ? "destructive" : "warning";
 };
 
-const InfoRow = ({ icon: Icon, label, value, valueClassName }: { icon: any; label: string; value: React.ReactNode; valueClassName?: string }) => (
-  <div className="flex items-start gap-3">
-    <div className="mt-0.5">
+interface InfoRowProps {
+  icon: any;
+  label: string;
+  value: React.ReactNode;
+  valueClassName?: string;
+}
+
+const InfoRow = ({ icon: Icon, label, value, valueClassName }: InfoRowProps) => (
+  <div className="space-y-1">
+    <div className="flex items-center gap-2">
       <Icon className="h-4 w-4 text-muted-foreground" />
-    </div>
-    <div className="flex-1 space-y-1">
       <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <div className={valueClassName || "text-sm"}>{value}</div>
     </div>
+    <div className={valueClassName || "text-sm pl-6"}>{value}</div>
   </div>
 );
 
@@ -131,15 +122,19 @@ export const DeploymentDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  console.log("[DeploymentDetail] Component mounted with id:", id);
-
   usePageTracker({
     title: "Detalhes da Implantação",
     icon: "rocket",
   });
 
-  const { data: response, isLoading } = useDeploymentDetail(id!, {
+  const { data: response, isLoading, refetch } = useDeploymentDetail(id!, {
     include: {
+      app: true,
+      gitCommit: {
+        include: {
+          repository: true,
+        },
+      },
       user: {
         include: {
           position: true,
@@ -150,45 +145,39 @@ export const DeploymentDetailPage = () => {
 
   const deployment = response?.data;
 
-  console.log("[DeploymentDetail] Response data:", {
-    hasResponse: !!response,
-    hasDeployment: !!deployment,
-    isLoading,
-    deploymentKeys: deployment ? Object.keys(deployment) : [],
-  });
+  const handleRefresh = () => {
+    refetch();
+  };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-muted-foreground">Carregando...</div>
-      </div>
+      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
+        <div className="flex items-center justify-center p-8">
+          <Skeleton className="h-32 w-full max-w-lg" />
+        </div>
+      </PrivilegeRoute>
     );
   }
 
   if (!deployment) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-muted-foreground">Implantação não encontrada</div>
-      </div>
+      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
+        <Alert variant="destructive">
+          <IconAlertCircle className="h-4 w-4" />
+          <AlertDescription>Implantação não encontrada</AlertDescription>
+        </Alert>
+      </PrivilegeRoute>
     );
   }
 
-  // Calculate duration if we have both timestamps
-  const duration =
-    deployment.startedAt && deployment.completedAt
-      ? Math.floor((new Date(deployment.completedAt).getTime() - new Date(deployment.startedAt).getTime()) / 1000)
-      : null;
-
-  console.log("[DeploymentDetail] Calculated duration:", duration, {
-    startedAt: deployment.startedAt,
-    completedAt: deployment.completedAt,
-  });
+  const StatusIcon = deployment.status ? getStatusIcon(deployment.status) : IconRocket;
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="flex flex-col h-full overflow-hidden">
-        <PageHeaderWithFavorite
-          title="Detalhes da Implantação"
+      <div className="flex flex-col h-full space-y-6">
+        <PageHeader
+          variant="detail"
+          title={deployment.app?.displayName || "Implantação"}
           icon={IconRocket}
           breadcrumbs={[
             { label: "Início", href: routes.home },
@@ -198,68 +187,81 @@ export const DeploymentDetailPage = () => {
           ]}
           actions={[
             {
-              key: "back",
-              label: "Voltar",
-              onClick: () => navigate(routes.server.deployments.root),
-              variant: "outline" as const,
-              icon: <IconArrowLeft className="h-4 w-4" />,
+              key: "refresh",
+              label: "Atualizar",
+              icon: IconRefresh,
+              onClick: handleRefresh,
             },
           ]}
         />
 
-        <div className="flex-1 overflow-auto px-4 pb-4">
-          <div className="space-y-4">
-            {/* Overview Section */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <span>Visão Geral</span>
-                      {deployment.status ? getStatusIcon(deployment.status) : null}
-                    </CardTitle>
-                    <CardDescription>Informações principais da implantação</CardDescription>
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-6">
+            {/* Status and Environment Overview */}
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Status Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <StatusIcon className="h-5 w-5" />
+                    Status da Implantação
+                  </CardTitle>
+                  <CardDescription>Estado atual do processo</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Status</span>
+                      <Badge variant={deployment.status ? getStatusColor(deployment.status) : "default"} className="gap-1">
+                        <StatusIcon className="h-3 w-3" />
+                        <span>{deployment.status ? String(DEPLOYMENT_STATUS_LABELS[deployment.status] || deployment.status) : "N/A"}</span>
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Ambiente</span>
+                      <Badge variant={deployment.environment ? getEnvironmentColor(deployment.environment) : "default"}>
+                        {deployment.environment ? String(DEPLOYMENT_ENVIRONMENT_LABELS[deployment.environment] || deployment.environment) : "N/A"}
+                      </Badge>
+                    </div>
+                    {deployment.triggeredBy && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Tipo de Trigger</span>
+                        <Badge variant="outline">{String(deployment.triggeredBy)}</Badge>
+                      </div>
+                    )}
+                    {deployment.buildNumber && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Build Number</span>
+                        <span className="text-sm font-medium">#{deployment.buildNumber}</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex gap-2">
-                    <Badge variant={deployment.environment ? getEnvironmentColor(deployment.environment) : "default"}>
-                      <span>{deployment.environment ? String(DEPLOYMENT_ENVIRONMENT_LABELS[deployment.environment] || deployment.environment) : "N/A"}</span>
-                    </Badge>
-                    <Badge variant={deployment.status ? getStatusColor(deployment.status) : "default"} className="gap-1">
-                      {deployment.status ? getStatusIcon(deployment.status) : null}
-                      <span>{deployment.status ? String(DEPLOYMENT_STATUS_LABELS[deployment.status] || deployment.status) : "N/A"}</span>
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6 md:grid-cols-2">
+                </CardContent>
+              </Card>
+
+              {/* Application Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <IconServer className="h-5 w-5" />
+                    Informações da Aplicação
+                  </CardTitle>
+                  <CardDescription>Detalhes do sistema implantado</CardDescription>
+                </CardHeader>
+                <CardContent>
                   <div className="space-y-4">
                     <InfoRow
-                      icon={IconGitCommit}
-                      label="Commit SHA"
-                      value={
-                        <div className="space-y-1">
-                          <code className="rounded bg-muted px-2 py-1 text-xs font-mono">{String(deployment.commitSha || "N/A")}</code>
-                          {deployment.commitMessage && (
-                            <p className="text-xs text-muted-foreground">{String(deployment.commitMessage)}</p>
-                          )}
-                        </div>
-                      }
+                      icon={IconWorldWww}
+                      label="Aplicação"
+                      value={<span className="font-medium">{deployment.app?.displayName || "N/A"}</span>}
                     />
-
-                    <InfoRow
-                      icon={IconGitBranch}
-                      label="Branch"
-                      value={
-                        <div className="space-y-1">
-                          <p>{String(deployment.branch || "N/A")}</p>
-                          {deployment.commitAuthor && (
-                            <p className="text-xs text-muted-foreground">Author: {String(deployment.commitAuthor)}</p>
-                          )}
-                        </div>
-                      }
-                    />
-
+                    {deployment.app?.appType && (
+                      <InfoRow
+                        icon={IconServer}
+                        label="Tipo"
+                        value={<Badge variant="outline">{String(deployment.app.appType)}</Badge>}
+                      />
+                    )}
                     {deployment.version && (
                       <InfoRow
                         icon={IconFileCode}
@@ -267,99 +269,172 @@ export const DeploymentDetailPage = () => {
                         value={<code className="rounded bg-muted px-2 py-1 text-xs font-mono">{String(deployment.version)}</code>}
                       />
                     )}
-
-                    {deployment.application && (
-                      <InfoRow
-                        icon={IconWorldWww}
-                        label="Aplicação"
-                        value={<Badge variant="outline">{String(deployment.application)}</Badge>}
-                      />
-                    )}
                   </div>
+                </CardContent>
+              </Card>
+            </div>
 
-                  <div className="space-y-4">
+            {/* Git Commit Information */}
+            {deployment.gitCommit && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <IconGitCommit className="h-5 w-5" />
+                    Informações do Commit
+                  </CardTitle>
+                  <CardDescription>Código-fonte implantado</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <div className="space-y-4">
+                      <InfoRow
+                        icon={IconGitCommit}
+                        label="Hash"
+                        value={
+                          <code className="rounded bg-muted px-2 py-1 text-xs font-mono">
+                            {String(deployment.gitCommit.shortHash || deployment.gitCommit.hash)}
+                          </code>
+                        }
+                      />
+                      <InfoRow
+                        icon={IconGitBranch}
+                        label="Branch"
+                        value={<Badge variant="outline">{String(deployment.gitCommit.branch || "N/A")}</Badge>}
+                      />
+                      {deployment.gitCommit.tags && deployment.gitCommit.tags.length > 0 && (
+                        <InfoRow
+                          icon={IconFileCode}
+                          label="Tags"
+                          value={
+                            <div className="flex gap-1 flex-wrap">
+                              {deployment.gitCommit.tags.map((tag: string) => (
+                                <Badge key={tag} variant="secondary" className="text-xs">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
+                          }
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-4">
+                      <InfoRow
+                        icon={IconUser}
+                        label="Autor"
+                        value={
+                          <div className="space-y-1">
+                            <p className="font-medium">{String(deployment.gitCommit.author || "N/A")}</p>
+                            {deployment.gitCommit.authorEmail && (
+                              <p className="text-xs text-muted-foreground">{String(deployment.gitCommit.authorEmail)}</p>
+                            )}
+                          </div>
+                        }
+                      />
+                      {deployment.gitCommit.message && (
+                        <InfoRow
+                          icon={IconFileCode}
+                          label="Mensagem"
+                          value={<p className="text-sm">{String(deployment.gitCommit.message)}</p>}
+                        />
+                      )}
+                      {(deployment.gitCommit.filesChanged || deployment.gitCommit.insertions || deployment.gitCommit.deletions) && (
+                        <InfoRow
+                          icon={IconActivity}
+                          label="Alterações"
+                          value={
+                            <div className="text-xs space-y-1">
+                              {deployment.gitCommit.filesChanged && (
+                                <p>{deployment.gitCommit.filesChanged} arquivo(s) alterado(s)</p>
+                              )}
+                              <p className="space-x-2">
+                                {deployment.gitCommit.insertions !== undefined && (
+                                  <span className="text-green-600">+{deployment.gitCommit.insertions}</span>
+                                )}
+                                {deployment.gitCommit.deletions !== undefined && (
+                                  <span className="text-red-600">-{deployment.gitCommit.deletions}</span>
+                                )}
+                              </p>
+                            </div>
+                          }
+                        />
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Timeline and Execution Details */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <IconClock className="h-5 w-5" />
+                  Timeline de Execução
+                </CardTitle>
+                <CardDescription>Histórico temporal da implantação</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-3">
+                  <InfoRow
+                    icon={IconClock}
+                    label="Iniciado em"
+                    value={deployment.startedAt ? formatDateTime(deployment.startedAt) : "-"}
+                  />
+                  <InfoRow
+                    icon={deployment.status === DEPLOYMENT_STATUS.COMPLETED ? IconCheck : IconClock}
+                    label="Concluído em"
+                    value={deployment.completedAt ? formatDateTime(deployment.completedAt) : "-"}
+                  />
+                  {deployment.duration && (
+                    <InfoRow
+                      icon={IconClock}
+                      label="Duração"
+                      value={
+                        <Badge variant="outline" className="gap-1">
+                          <IconClock className="h-3 w-3" />
+                          {formatDuration(deployment.duration)}
+                        </Badge>
+                      }
+                    />
+                  )}
+                </div>
+
+                {deployment.rolledBackAt && (
+                  <>
+                    <Separator className="my-4" />
+                    <InfoRow
+                      icon={IconRotateClockwise}
+                      label="Revertido em"
+                      value={formatDateTime(deployment.rolledBackAt)}
+                    />
+                  </>
+                )}
+
+                {deployment.user && (
+                  <>
+                    <Separator className="my-4" />
                     <InfoRow
                       icon={IconUser}
                       label="Implantado por"
                       value={
                         <div className="space-y-1">
-                          <p>{String(deployment.user?.name || deployment.deployedBy || "Sistema")}</p>
-                          {deployment.user?.position?.name && (
+                          <p className="font-medium">{String(deployment.user.name)}</p>
+                          {deployment.user.position?.name && (
                             <p className="text-xs text-muted-foreground">{String(deployment.user.position.name)}</p>
                           )}
-                          {deployment.user?.email && (
+                          {deployment.user.email && (
                             <p className="text-xs text-muted-foreground">{String(deployment.user.email)}</p>
                           )}
                         </div>
                       }
                     />
-
-                    {deployment.previousCommit && (
-                      <InfoRow
-                        icon={IconGitCommit}
-                        label="Commit Anterior"
-                        value={<code className="rounded bg-muted px-2 py-1 text-xs font-mono">{String(deployment.previousCommit)}</code>}
-                      />
-                    )}
-                  </div>
-                </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 
-            {/* Timeline Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconClock className="h-5 w-5" />
-                  Timeline
-                </CardTitle>
-                <CardDescription>Histórico de eventos da implantação</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid gap-6 md:grid-cols-3">
-                    <InfoRow
-                      icon={IconClock}
-                      label="Iniciado em"
-                      value={deployment.startedAt ? formatDateTime(deployment.startedAt) : "-"}
-                    />
-
-                    <InfoRow
-                      icon={deployment.status === DEPLOYMENT_STATUS.COMPLETED ? IconCheck : IconClock}
-                      label="Concluído em"
-                      value={deployment.completedAt ? formatDateTime(deployment.completedAt) : "-"}
-                    />
-
-                    {deployment.rolledBackAt && (
-                      <InfoRow
-                        icon={IconRotateClockwise}
-                        label="Revertido em"
-                        value={formatDateTime(deployment.rolledBackAt)}
-                      />
-                    )}
-                  </div>
-
-                  {duration !== null && duration !== undefined ? (
-                    <>
-                      <Separator />
-                      <InfoRow
-                        icon={IconClock}
-                        label="Duração Total"
-                        value={
-                          <Badge variant="outline" className="gap-1">
-                            <IconClock className="h-3 w-3" />
-                            <span>{formatDuration(duration)}</span>
-                          </Badge>
-                        }
-                      />
-                    </>
-                  ) : null}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Health Check Section */}
-            {deployment.healthCheckUrl && (
+            {/* Health Check */}
+            {(deployment.healthCheckUrl || deployment.healthCheckStatus) && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -370,21 +445,22 @@ export const DeploymentDetailPage = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-6 md:grid-cols-2">
-                    <InfoRow
-                      icon={IconWorldWww}
-                      label="URL"
-                      value={
-                        <a
-                          href={String(deployment.healthCheckUrl || "")}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline break-all"
-                        >
-                          {String(deployment.healthCheckUrl)}
-                        </a>
-                      }
-                    />
-
+                    {deployment.healthCheckUrl && (
+                      <InfoRow
+                        icon={IconWorldWww}
+                        label="URL"
+                        value={
+                          <a
+                            href={String(deployment.healthCheckUrl)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline break-all text-sm"
+                          >
+                            {String(deployment.healthCheckUrl)}
+                          </a>
+                        }
+                      />
+                    )}
                     {deployment.healthCheckStatus && (
                       <InfoRow
                         icon={deployment.healthCheckStatus === "healthy" ? IconCheck : IconX}
@@ -401,50 +477,77 @@ export const DeploymentDetailPage = () => {
               </Card>
             )}
 
-            {/* Deployment Log Section */}
-            {deployment.deploymentLog && (
+            {/* Error Information */}
+            {deployment.errorMessage && (
+              <Card className="border-destructive">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-destructive">
+                    <IconAlertCircle className="h-5 w-5" />
+                    Erro
+                  </CardTitle>
+                  <CardDescription>Informações sobre a falha na implantação</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="rounded-md border border-destructive bg-destructive/10 p-4">
+                      <p className="text-sm text-destructive font-medium">{String(deployment.errorMessage)}</p>
+                    </div>
+                    {deployment.errorStack && (
+                      <div className="rounded-md border bg-muted/50">
+                        <pre className="p-4 overflow-x-auto text-xs font-mono max-h-64 overflow-y-auto">
+                          {String(deployment.errorStack)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Deployment Logs */}
+            {(deployment.deploymentLog || deployment.buildLog) && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <IconFileCode className="h-5 w-5" />
-                    Log da Implantação
+                    Logs
                   </CardTitle>
                   <CardDescription>Saída do processo de implantação</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="rounded-md border bg-muted/50">
-                    <pre className="p-4 overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto">
-                      {String(deployment.deploymentLog)}
-                    </pre>
+                  <div className="space-y-4">
+                    {deployment.buildLog && (
+                      <div>
+                        <p className="text-sm font-medium mb-2">Build Log</p>
+                        <div className="rounded-md border bg-muted/50">
+                          <pre className="p-4 overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto">
+                            {String(deployment.buildLog)}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                    {deployment.deploymentLog && (
+                      <div>
+                        <p className="text-sm font-medium mb-2">Deployment Log</p>
+                        <div className="rounded-md border bg-muted/50">
+                          <pre className="p-4 overflow-x-auto text-xs font-mono max-h-96 overflow-y-auto">
+                            {String(deployment.deploymentLog)}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            {/* Rollback Data Section */}
-            {deployment.rollbackData && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <IconDatabase className="h-5 w-5" />
-                    Dados de Rollback
-                  </CardTitle>
-                  <CardDescription>Informações para reversão da implantação</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border bg-muted/50">
-                    <pre className="p-4 overflow-x-auto text-xs font-mono">
-                      {safeStringify(deployment.rollbackData)}
-                    </pre>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Metadata Section */}
+            {/* Metadata */}
             <Card>
               <CardHeader>
-                <CardTitle>Metadados</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <IconDatabase className="h-5 w-5" />
+                  Metadados
+                </CardTitle>
                 <CardDescription>Informações do sistema</CardDescription>
               </CardHeader>
               <CardContent>
@@ -454,14 +557,16 @@ export const DeploymentDetailPage = () => {
                     label="Criado em"
                     value={deployment.createdAt ? formatDateTime(deployment.createdAt) : "-"}
                   />
-
                   <InfoRow
                     icon={IconClock}
                     label="Atualizado em"
                     value={deployment.updatedAt ? formatDateTime(deployment.updatedAt) : "-"}
                   />
-
-                  <InfoRow icon={IconDatabase} label="ID" value={<code className="text-xs">{deployment.id}</code>} />
+                  <InfoRow
+                    icon={IconDatabase}
+                    label="ID"
+                    value={<code className="text-xs break-all">{deployment.id}</code>}
+                  />
                 </div>
               </CardContent>
             </Card>

@@ -2,6 +2,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas";
 import { usePaintTypes } from "../../../hooks";
+import { IconPaint } from "@tabler/icons-react";
 
 interface PaintTypeSelectorProps {
   control: any;
@@ -27,7 +28,8 @@ export function PaintTypeSelector({ control, disabled, required }: PaintTypeSele
       name="paintTypeId"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconPaint className="h-4 w-4" />
             Tipo de Tinta
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>
@@ -40,6 +42,7 @@ export function PaintTypeSelector({ control, disabled, required }: PaintTypeSele
               disabled={disabled || isLoading}
               loading={isLoading}
               searchable={true}
+              className="bg-transparent"
             />
           </FormControl>
           <FormMessage />

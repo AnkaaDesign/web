@@ -281,7 +281,7 @@ export function SearchFiltersPanel<TFilters extends Record<string, any> = Record
                           <Input
                             placeholder="Nome do filtro..."
                             value={presetName}
-                            onChange={(e) => setPresetName(e.target.value)}
+                            onChange={(value) => setPresetName(value as string)}
                             className="h-7 text-xs flex-1"
                             onKeyDown={(e) => {
                               if (e.key === "Enter") {
@@ -394,7 +394,7 @@ function DefaultFilterRenderer({ field, value, onChange }: DefaultFilterRenderer
       return (
         <div className="space-y-1">
           <Label className="text-xs">{field.label}</Label>
-          <Input type="text" placeholder={`Filtrar por ${field.label.toLowerCase()}...`} value={value || ""} onChange={(e) => onChange(e.target.value)} className="h-8 text-xs" />
+          <Input type="text" placeholder={`Filtrar por ${field.label.toLowerCase()}...`} value={value || ""} onChange={(value) => onChange(value as string)} className="h-8 text-xs" />
         </div>
       );
 

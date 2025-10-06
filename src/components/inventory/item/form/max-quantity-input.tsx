@@ -5,5 +5,5 @@ interface MaxQuantityInputProps {
 }
 
 export function MaxQuantityInput({ disabled }: MaxQuantityInputProps) {
-  return <FormQuantityInput name="maxQuantity" label="Quantidade Máxima" placeholder="Quantidade máxima" disabled={disabled} min={0} integer={true} transparent={false} />;
+  return <FormQuantityInput name="maxQuantity" label="Quantidade Máxima" placeholder="Quantidade máxima" disabled={disabled} min={0} integer={true} transparent={true} />;
 }

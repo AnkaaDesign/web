@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-export interface FavoriteItem {
+export type { FavoriteItem };
+
+interface FavoriteItem {
   id: string;
   path: string;
   title: string;

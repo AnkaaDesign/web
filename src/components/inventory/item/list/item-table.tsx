@@ -5,7 +5,7 @@ import { routes } from "../../../../constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { IconChevronUp, IconChevronDown, IconCheck, IconX, IconAlertTriangle, IconEdit, IconTrash, IconSelector, IconPercentage, IconPackage, IconPlus, IconGitMerge } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconCheck, IconX, IconAlertTriangle, IconEdit, IconTrash, IconSelector, IconPercentage, IconPackage, IconPlus, IconGitMerge, IconClipboardCheck } from "@tabler/icons-react";
 import { ItemListSkeleton } from "./item-list-skeleton";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -28,11 +28,12 @@ interface ItemTableProps {
   onDeactivate?: (items: Item[]) => void;
   onDelete?: (items: Item[]) => void;
   onMerge?: (items: Item[]) => void;
+  onStockBalance?: (items: Item[]) => void;
   filters?: Partial<ItemGetManyFormData>;
   onDataChange?: (data: { items: Item[]; totalRecords: number }) => void;
 }
 
-export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDeactivate, onDelete, onMerge, filters = {}, onDataChange }: ItemTableProps) {
+export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDeactivate, onDelete, onMerge, onStockBalance, filters = {}, onDataChange }: ItemTableProps) {
   const navigate = useNavigate();
   const { delete: deleteItem } = useItemMutations();
   const { batchDelete } = useItemBatchMutations();
@@ -558,6 +559,13 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
     }
   };
 
+  const handleStockBalance = () => {
+    if (contextMenu && onStockBalance) {
+      onStockBalance(contextMenu.items);
+      setContextMenu(null);
+    }
+  };
+
   // Close context menu when clicking outside
   React.useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -751,6 +759,13 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
             {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Editar em lote" : "Editar"}
           </DropdownMenuItem>
 
+          {contextMenu?.isBulk && contextMenu.items.length >= 1 && (
+            <DropdownMenuItem onClick={handleStockBalance}>
+              <IconClipboardCheck className="mr-2 h-4 w-4" />
+              Balanço de estoque
+            </DropdownMenuItem>
+          )}
+
           <DropdownMenuItem onClick={handlePriceAdjustment}>
             <IconPercentage className="mr-2 h-4 w-4" />
             Aplicar Ajuste
@@ -763,15 +778,19 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuItem onClick={handleActivate}>
-            <IconCheck className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Ativar selecionados" : "Ativar"}
-          </DropdownMenuItem>
+          {contextMenu?.items.some((item) => !item.isActive) && (
+            <DropdownMenuItem onClick={handleActivate} className="text-green-700">
+              <IconCheck className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Ativar selecionados" : "Ativar"}
+            </DropdownMenuItem>
+          )}
 
-          <DropdownMenuItem onClick={handleDeactivate}>
-            <IconX className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Desativar selecionados" : "Desativar"}
-          </DropdownMenuItem>
+          {contextMenu?.items.some((item) => item.isActive) && (
+            <DropdownMenuItem onClick={handleDeactivate} className="text-destructive">
+              <IconX className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Desativar selecionados" : "Desativar"}
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuSeparator />
 

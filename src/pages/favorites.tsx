@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
-import { useFavorites, type FavoriteItem } from "@/contexts/favorites-context";
+import { useFavorites } from "@/contexts/favorites-context";
+import type { FavoriteItem } from "@/contexts/favorites-context";
 import { FAVORITE_PAGES_LABELS } from "../constants";
 import { getPageIconInfo, isPageCadastrar, getPageIconName } from "../utils";
 import { getTablerIcon } from "../utils";

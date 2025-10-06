@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { PaintForm, type PaintFormRef } from "@/components/paint/form/paint-form";
+import { PaintForm } from "@/components/paint/form/paint-form";
+import type { PaintFormRef } from "@/components/paint/form/paint-form";
 import { usePaint, usePaintMutations, usePaintFormulaMutations, usePaintType } from "../../../../hooks";
 import { routes } from "../../../../constants";
 import { mapPaintToFormData } from "../../../../schemas";

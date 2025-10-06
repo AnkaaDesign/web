@@ -29,6 +29,7 @@ import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { PaintProductionExport } from "./paint-production-export";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -382,6 +383,9 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
             isPending={displaySearchText !== searchingFor}
           />
 
+          {/* Show Selected Toggle */}
+          {selectionCount > 0 && <ShowSelectedToggle selectionCount={selectionCount} showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} />}
+
           {/* Filter Button */}
           <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)}>
             <IconFilter className="h-4 w-4 mr-2" />
@@ -396,8 +400,8 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
           {/* Column Visibility Manager */}
           <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
 
-          {/* Show Selected Toggle */}
-          {selectionCount > 0 && <ShowSelectedToggle selectionCount={selectionCount} showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} />}
+          {/* Export Button */}
+          <PaintProductionExport filters={queryFilters} currentItems={productions} totalRecords={totalRecords} visibleColumns={visibleColumns} />
         </div>
 
         {/* Active Filter Indicators */}

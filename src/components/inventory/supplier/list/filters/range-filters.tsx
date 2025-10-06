@@ -70,7 +70,7 @@ export function RangeFilters({ itemCount, onItemCountChange, orderCount, onOrder
               min="0"
               placeholder="Valor mínimo"
               value={itemCount?.min?.toString() || ""}
-              onChange={(e) => handleItemCountMinChange(e.target.value)}
+              onChange={(value) => handleItemCountMinChange(value as string)}
             />
           </div>
           <div>
@@ -83,7 +83,7 @@ export function RangeFilters({ itemCount, onItemCountChange, orderCount, onOrder
               min="0"
               placeholder="Sem limite"
               value={itemCount?.max?.toString() || ""}
-              onChange={(e) => handleItemCountMaxChange(e.target.value)}
+              onChange={(value) => handleItemCountMaxChange(value as string)}
             />
           </div>
         </div>
@@ -117,7 +117,7 @@ export function RangeFilters({ itemCount, onItemCountChange, orderCount, onOrder
               min="0"
               placeholder="Valor mínimo"
               value={orderCount?.min?.toString() || ""}
-              onChange={(e) => handleOrderCountMinChange(e.target.value)}
+              onChange={(value) => handleOrderCountMinChange(value as string)}
             />
           </div>
           <div>
@@ -130,7 +130,7 @@ export function RangeFilters({ itemCount, onItemCountChange, orderCount, onOrder
               min="0"
               placeholder="Sem limite"
               value={orderCount?.max?.toString() || ""}
-              onChange={(e) => handleOrderCountMaxChange(e.target.value)}
+              onChange={(value) => handleOrderCountMaxChange(value as string)}
             />
           </div>
         </div>

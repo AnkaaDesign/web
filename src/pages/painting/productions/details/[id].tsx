@@ -65,7 +65,6 @@ export function ProductionDetailsPage() {
 
   const handleRefresh = () => {
     refetch();
-    toast.success("Dados atualizados");
   };
 
   // Create a production entity that matches BaseEntity interface

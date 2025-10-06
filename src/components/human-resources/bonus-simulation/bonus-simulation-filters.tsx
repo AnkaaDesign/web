@@ -200,7 +200,7 @@ export function BonusSimulationFilters({
                   min="0"
                   placeholder="1200"
                   value={localFilters.taskQuantity || ''}
-                  onChange={(e) => handleTaskQuantityChange(e.target.value)}
+                  onChange={(value) => handleTaskQuantityChange(value as string)}
                   className="mt-1"
                 />
                 <p className="text-xs text-muted-foreground mt-1">

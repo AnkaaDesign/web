@@ -127,7 +127,6 @@ export const LoanDetailsPage = () => {
 
   const handleRefresh = () => {
     refetch();
-    toast.success("Dados atualizados com sucesso");
   };
 
   const handleDelete = async () => {

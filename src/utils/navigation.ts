@@ -1,7 +1,8 @@
 // packages/utils/src/navigation.ts
 // Navigation utility functions moved from constants package
 
-import { SECTOR_PRIVILEGES, TABLER_ICONS, type MenuItem } from "../constants";
+import { SECTOR_PRIVILEGES, TABLER_ICONS } from "../constants";
+import type { MenuItem } from "../constants";
 
 // Define minimal user interface for navigation
 interface NavigationUser {

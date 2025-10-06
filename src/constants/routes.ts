@@ -3,11 +3,6 @@
 export const routes = {
   // Administration - Administração - Administration
   administration: {
-    changeLogs: {
-      details: (id: string) => `/administracao/registros-de-alteracoes/detalhes/${id}`,
-      entity: (entityType: string, entityId: string) => `/administracao/registros-de-alteracoes/entidade/${entityType}/${entityId}`,
-      root: "/administracao/registros-de-alteracoes",
-    },
     customers: {
       batchEdit: "/administracao/clientes/editar-em-lote",
       create: "/administracao/clientes/cadastrar",
@@ -286,6 +281,7 @@ export const routes = {
     },
     products: {
       batchEdit: "/estoque/produtos/editar-em-lote",
+      stockBalance: "/estoque/produtos/balanco-estoque",
       brands: {
         batchEdit: "/estoque/produtos/marcas/editar-em-lote",
         create: "/estoque/produtos/marcas/cadastrar",
@@ -523,6 +519,10 @@ export const routes = {
   // Server - Servidor - Server Management
   server: {
     backup: "/servidor/backup",
+    changeLogs: {
+      details: (id: string) => `/servidor/registros-de-alteracoes/detalhes/${id}`,
+      root: "/servidor/registros-de-alteracoes",
+    },
     deployments: {
       create: "/servidor/implantacoes/cadastrar",
       details: (id: string) => `/servidor/implantacoes/detalhes/${id}`,
@@ -583,4 +583,5 @@ export const routes = {
 } as const;
 
 // Export types for type safety
-export type Routes = typeof routes;
+export type { Routes };
+type Routes = typeof routes;

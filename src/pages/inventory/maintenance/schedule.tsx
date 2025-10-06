@@ -30,7 +30,8 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { useDebounce } from "@/hooks/use-debounce";
-import { ContextMenuProvider, useContextMenu, type ContextMenuItem } from "@/components/ui/context-menu";
+import { ContextMenuProvider, useContextMenu } from "@/components/ui/context-menu";
+import type { ContextMenuItem } from "@/components/ui/context-menu";
 
 interface MaintenanceScheduleListProps {
   className?: string;
@@ -262,7 +263,7 @@ function MaintenanceScheduleList({ className }: MaintenanceScheduleListProps) {
             type="text"
             placeholder="Buscar agendamentos..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(value) => setSearchTerm(value as string)}
             className="pl-10 w-full"
             disabled={isLoading}
           />

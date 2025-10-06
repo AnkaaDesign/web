@@ -98,7 +98,6 @@ const MaintenanceDetailsPage = () => {
 
   const handleRefresh = () => {
     refetch();
-    toast.success("Dados atualizados com sucesso");
   };
 
   const handleMaintenanceUpdate = () => {

@@ -2,6 +2,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas";
 import { TRUCK_MANUFACTURER, TRUCK_MANUFACTURER_LABELS } from "../../../constants";
+import { IconTruck } from "@tabler/icons-react";
 
 interface ManufacturerSelectorProps {
   control: any;
@@ -24,7 +25,8 @@ export function ManufacturerSelector({ control, disabled, required }: Manufactur
       name="manufacturer"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconTruck className="h-4 w-4" />
             Montadora
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>
@@ -36,6 +38,7 @@ export function ManufacturerSelector({ control, disabled, required }: Manufactur
               placeholder="Selecione a montadora (opcional)"
               disabled={disabled}
               searchable={false}
+              className="bg-transparent"
             />
           </FormControl>
           <FormMessage />

@@ -1,6 +1,7 @@
 import type { CustomerGetManyFormData } from "../../../../schemas";
 import { formatDate } from "../../../../utils";
-import { BRAZILIAN_STATE_NAMES, type BrazilianState } from "../../../../constants";
+import { BRAZILIAN_STATE_NAMES } from "../../../../constants";
+import type { BrazilianState } from "../../../../constants";
 
 function isBrazilianState(value: any): value is BrazilianState {
   return typeof value === "string" && value in BRAZILIAN_STATE_NAMES;

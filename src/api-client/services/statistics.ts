@@ -4,7 +4,7 @@ import { apiClient } from '../axiosClient';
 // Statistics Interface Types
 // =====================
 
-export interface StatisticsFilters {
+interface StatisticsFilters {
   dateRange: {
     from: Date;
     to: Date;
@@ -17,7 +17,7 @@ export interface StatisticsFilters {
   sectorId?: string;
 }
 
-export interface InventoryStatistics {
+interface InventoryStatistics {
   totalItems: number;
   totalValue: number;
   lowStockItems: number;
@@ -44,7 +44,7 @@ export interface InventoryStatistics {
   }>;
 }
 
-export interface StockTrends {
+interface StockTrends {
   dailyValues: Array<{
     date: string;
     totalValue: number;
@@ -63,7 +63,7 @@ export interface StockTrends {
   };
 }
 
-export interface ActivityAnalytics {
+interface ActivityAnalytics {
   totalActivities: number;
   activityTypes: Array<{
     type: string;
@@ -90,7 +90,7 @@ export interface ActivityAnalytics {
   }>;
 }
 
-export interface StockMetrics {
+interface StockMetrics {
   stockLevels: {
     total: number;
     available: number;
@@ -124,7 +124,7 @@ export interface StockMetrics {
   };
 }
 
-export interface ForecastingMetrics {
+interface ForecastingMetrics {
   demandForecast: Array<{
     itemId: string;
     itemName: string;
@@ -150,7 +150,7 @@ export interface ForecastingMetrics {
   }>;
 }
 
-export interface PerformanceMetrics {
+interface PerformanceMetrics {
   efficiency: {
     inventoryTurnover: number;
     daysSalesInventory: number;
@@ -171,7 +171,7 @@ export interface PerformanceMetrics {
   };
 }
 
-export interface ConsumptionStatistics {
+interface ConsumptionStatistics {
   overview: InventoryStatistics;
   trends: StockTrends;
   activities: ActivityAnalytics;
@@ -375,4 +375,14 @@ export const statisticsService = {
 // Export Types for Hooks
 // =====================
 
-export type { StatisticsResponse };
+export type {
+  StatisticsResponse,
+  StatisticsFilters,
+  InventoryStatistics,
+  StockTrends,
+  ActivityAnalytics,
+  StockMetrics,
+  ForecastingMetrics,
+  PerformanceMetrics,
+  ConsumptionStatistics
+};

@@ -1,18 +1,27 @@
 // packages/api-client/src/services/layoutSection.ts
 
 import { apiClient } from "../axiosClient";
-import type { LayoutSection, BaseGetManyResponse, BaseGetUniqueResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BatchOperationResult } from "../../types";
-import type { LayoutSectionCreateInput, LayoutSectionUpdateInput } from "../../types";
+import type {
+  LayoutSection,
+  BaseGetManyResponse,
+  BaseGetUniqueResponse,
+  BaseCreateResponse,
+  BaseUpdateResponse,
+  BaseDeleteResponse,
+  BatchOperationResult,
+  LayoutSectionCreateInput,
+  LayoutSectionUpdateInput
+} from "../../types";
 
 // Response Types
-export type LayoutSectionGetManyResponse = BaseGetManyResponse<LayoutSection>;
-export type LayoutSectionGetUniqueResponse = BaseGetUniqueResponse<LayoutSection>;
-export type LayoutSectionCreateResponse = BaseCreateResponse<LayoutSection>;
-export type LayoutSectionUpdateResponse = BaseUpdateResponse<LayoutSection>;
-export type LayoutSectionDeleteResponse = BaseDeleteResponse;
+type LayoutSectionGetManyResponse = BaseGetManyResponse<LayoutSection>;
+type LayoutSectionGetUniqueResponse = BaseGetUniqueResponse<LayoutSection>;
+type LayoutSectionCreateResponse = BaseCreateResponse<LayoutSection>;
+type LayoutSectionUpdateResponse = BaseUpdateResponse<LayoutSection>;
+type LayoutSectionDeleteResponse = BaseDeleteResponse;
 
 // Request Parameters
-export interface LayoutSectionGetManyParams {
+interface LayoutSectionGetManyParams {
   page?: number;
   limit?: number;
   layoutId?: string;
@@ -22,7 +31,7 @@ export interface LayoutSectionGetManyParams {
   include?: any;
 }
 
-export interface LayoutSectionGetByIdParams {
+interface LayoutSectionGetByIdParams {
   include?: any;
 }
 
@@ -57,4 +66,15 @@ export const layoutSectionService = {
 
   batchDelete: (ids: string[]) =>
     apiClient.delete<BatchOperationResult<LayoutSection>>("/layout-section/batch", { data: { ids } }),
+};
+
+// Export types
+export type {
+  LayoutSectionGetManyResponse,
+  LayoutSectionGetUniqueResponse,
+  LayoutSectionCreateResponse,
+  LayoutSectionUpdateResponse,
+  LayoutSectionDeleteResponse,
+  LayoutSectionGetManyParams,
+  LayoutSectionGetByIdParams,
 };

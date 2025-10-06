@@ -1,6 +1,4 @@
 import { apiClient } from '../axiosClient';
-
-// Import proper types from packages
 import type {
   Deployment,
   DeploymentIncludes,
@@ -14,7 +12,6 @@ import type {
   GitCommitInfo,
   DeploymentGetUniqueResponse,
 } from '../../types';
-
 import type {
   DeploymentCreateFormData,
   DeploymentUpdateFormData,
@@ -22,7 +19,6 @@ import type {
   DeploymentBatchUpdateFormData,
   DeploymentBatchDeleteFormData,
 } from '../../schemas';
-
 import { DEPLOYMENT_ENVIRONMENT, DEPLOYMENT_APPLICATION } from '../../constants';
 
 export const deploymentService = {

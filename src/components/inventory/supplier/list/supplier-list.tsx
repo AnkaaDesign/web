@@ -415,8 +415,8 @@ export function SupplierList({ className }: SupplierListProps) {
                 </Badge>
               )}
             </Button>
-            <SupplierExport filters={queryFilters} currentSuppliers={tableData.suppliers} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
             <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
+            <SupplierExport filters={queryFilters} currentSuppliers={tableData.suppliers} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
           </div>
         </div>
 

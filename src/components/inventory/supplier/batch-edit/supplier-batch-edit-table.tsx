@@ -167,16 +167,8 @@ export function SupplierBatchEditTable({ suppliers, onCancel, onSubmit }: Suppli
         // Show the detailed result dialog
         setBatchResult(result.data);
         setShowResultDialog(true);
-
-        const { totalSuccess, totalFailed } = result.data;
-
-        // Only show simple toast for complete success
-        if (totalFailed === 0 && totalSuccess > 0) {
-          toast.success(`${totalSuccess} ${totalSuccess === 1 ? "fornecedor atualizado" : "fornecedores atualizados"} com sucesso`);
-        }
       } else {
         // Even if we don't have detailed results, navigate back on apparent success
-        toast.success("Fornecedores atualizados com sucesso");
         navigate(routes.inventory.suppliers.root);
       }
     } catch (error) {
@@ -187,7 +179,6 @@ export function SupplierBatchEditTable({ suppliers, onCancel, onSubmit }: Suppli
         status: (error as any).response?.status,
         stack: (error as Error).stack,
       });
-      toast.error("Erro ao atualizar fornecedores em lote");
     } finally {
       setIsSubmitting(false);
     }

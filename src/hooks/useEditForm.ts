@@ -99,15 +99,21 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
 
   // Update original values when data changes - only on initial mount or when data actually changes
   useEffect(() => {
+    console.log('[useEditForm] Effect running. Has originalData:', !!originalData);
     if (originalData) {
+      console.log('[useEditForm] Calling mapDataToForm with:', originalData);
       const formData = mapDataToForm ? mapDataToForm(originalData) : (originalData as unknown as TFieldValues);
+      console.log('[useEditForm] Mapped form data:', formData);
 
       // Only reset if the data has actually changed (deep comparison)
       if (!_.isEqual(originalRef.current, formData)) {
+        console.log('[useEditForm] Data changed, resetting form');
         // Reset form with new data
         originalRef.current = formData;
         lastResetData.current = formData;
         form.reset(formData as DefaultValues<TFieldValues>);
+      } else {
+        console.log('[useEditForm] Data unchanged, skipping reset');
       }
     }
   }, [originalData, mapDataToForm]); // Removed 'form' from dependencies to avoid circular updates

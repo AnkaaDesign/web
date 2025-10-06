@@ -139,7 +139,7 @@ input[type="time"].hide-date-picker {
     --accent-foreground: 0 0% 98%; /* neutral-50 */
     --destructive: 0 50% 50%; /* red but less saturated */
     --destructive-foreground: 0 0% 98%; /* neutral-50 */
-    --border: 0 0% 89%; /* neutral-200 - very subtle borders */
+    --border: 0 0% 83%; /* neutral-250 - slightly darker borders */
     --input: 0 0% 100%; /* white - but with subtle border */
     --ring: 142 72% 29%; /* green-700 for focus */
 
@@ -185,7 +185,7 @@ input[type="time"].hide-date-picker {
     --accent-foreground: 0 0% 98%; /* neutral-50 */
     --destructive: 0 40% 45%; /* less saturated red */
     --destructive-foreground: 0 0% 98%; /* neutral-50 */
-    --border: 0 0% 23%; /* neutral-750 - very subtle borders */
+    --border: 0 0% 27%; /* neutral-725 - slightly darker borders */
     --input: 0 0% 13%; /* slightly darker than card */
     --ring: 142 72% 29%; /* green-700 for focus */
 

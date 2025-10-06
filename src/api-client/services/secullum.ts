@@ -1,11 +1,11 @@
 import { apiClient } from "../axiosClient";
 
-export interface SecullumAuthCredentials {
+interface SecullumAuthCredentials {
   email: string;
   password: string;
 }
 
-export interface SecullumAuthResponse {
+interface SecullumAuthResponse {
   success: boolean;
   message: string;
   data: {
@@ -16,7 +16,7 @@ export interface SecullumAuthResponse {
   };
 }
 
-export interface SecullumEmployee {
+interface SecullumEmployee {
   Id: number;
   Nome: string;
   NumeroFolha: string;
@@ -30,7 +30,7 @@ export interface SecullumEmployee {
   HorarioId: number;
 }
 
-export interface SecullumDailySummary {
+interface SecullumDailySummary {
   resumoDiario: {
     Funcionarios: Array<{
       Id: number;
@@ -255,4 +255,12 @@ export const secullumService = {
 
   // User mapping sync
   syncUserMapping: (params?: { dryRun?: boolean }) => apiClient.post<{ success: boolean; summary: any; details: any }>("/integrations/secullum/sync-user-mapping", params),
+};
+
+// Export types
+export type {
+  SecullumAuthCredentials,
+  SecullumAuthResponse,
+  SecullumEmployee,
+  SecullumDailySummary,
 };

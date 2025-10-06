@@ -1,6 +1,6 @@
 // packages/types/src/common.ts
 
-import { EXPORT_FORMAT } from "../constants";
+import type { EXPORT_FORMAT } from "../constants";
 
 // =====================
 // Base Entity Type (not interface)

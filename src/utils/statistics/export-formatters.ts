@@ -18,6 +18,8 @@ interface ChartExportData {
   metadata?: Record<string, any>;
 }
 
+export type { ExportConfig, ChartExportData };
+
 // CSV Export Functions
 export const exportToCSV = (
   data: any[],

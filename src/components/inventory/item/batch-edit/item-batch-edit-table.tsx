@@ -117,21 +117,12 @@ export function ItemBatchEditTable({ items, onCancel, onSubmit }: ItemBatchEditT
         // Show the detailed result dialog
         setBatchResult(result.data);
         setShowResultDialog(true);
-
-        const { totalSuccess, totalFailed } = result.data;
-
-        // Only show simple toast for complete success
-        if (totalFailed === 0 && totalSuccess > 0) {
-          toast.success(`${totalSuccess} ${totalSuccess === 1 ? "produto atualizado" : "produtos atualizados"} com sucesso`);
-        }
       } else {
         // Even if we don't have detailed results, navigate back on apparent success
-        toast.success("Produtos atualizados com sucesso");
         navigate(routes.inventory.products.list);
       }
     } catch (error) {
       console.error("Error during batch update:", error);
-      toast.error("Erro ao atualizar produtos em lote");
     } finally {
       setIsSubmitting(false);
     }

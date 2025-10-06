@@ -1,6 +1,7 @@
 import { SECTOR_PRIVILEGES } from "./enums";
 
-export interface MenuItem {
+export type { MenuItem };
+interface MenuItem {
   id: string;
   title: string;
   icon: string; // Icon name (generic, will be mapped to platform-specific icons)
@@ -487,18 +488,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "notificacoes-admin-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/notificacoes/detalhes/:id", isDynamic: true },
           { id: "notificacoes-admin-editar", title: "Editar", icon: "edit", path: "/administracao/notificacoes/editar/:id", isDynamic: true },
         ],
-      },
-
-      {
-        id: "registros-de-alteracoes",
-        title: "Registros de Alterações",
-        icon: "auditLog",
-        path: "/administracao/registros-de-alteracoes",
-        children: [
-          { id: "registros-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/registros-de-alteracoes/detalhes/:id", isDynamic: true },
-          { id: "registros-entidade", title: "Por Entidade", icon: "entity", path: "/administracao/registros-de-alteracoes/entidade", isDynamic: false },
-        ],
-        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
       },
 
       {
@@ -1390,6 +1379,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Rate Limiting",
         icon: "shield",
         path: "/servidor/rate-limiting",
+      },
+      {
+        id: "registros-de-alteracoes",
+        title: "Registros de Alterações",
+        icon: "auditLog",
+        path: "/servidor/registros-de-alteracoes",
+        children: [
+          { id: "registros-detalhes", title: "Detalhes", icon: "eye", path: "/servidor/registros-de-alteracoes/detalhes/:id", isDynamic: true },
+        ],
       },
     ],
   },

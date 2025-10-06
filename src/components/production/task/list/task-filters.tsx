@@ -630,11 +630,11 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Mínimo</Label>
-                      <Input type="number" placeholder="0,00" value={priceMin} onChange={(e) => setPriceMin(e.target.value)} onBlur={handlePriceRangeChange} step="0.01" min="0" />
+                      <Input type="number" placeholder="0,00" value={priceMin} onChange={(value) => setPriceMin(value as string)} onBlur={handlePriceRangeChange} step="0.01" min="0" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Máximo</Label>
-                      <Input type="number" placeholder="0,00" value={priceMax} onChange={(e) => setPriceMax(e.target.value)} onBlur={handlePriceRangeChange} step="0.01" min="0" />
+                      <Input type="number" placeholder="0,00" value={priceMax} onChange={(value) => setPriceMax(value as string)} onBlur={handlePriceRangeChange} step="0.01" min="0" />
                     </div>
                   </div>
                 </div>

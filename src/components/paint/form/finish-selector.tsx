@@ -2,6 +2,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas";
 import { PAINT_FINISH, PAINT_FINISH_LABELS } from "../../../constants";
+import { IconSparkles } from "@tabler/icons-react";
 
 interface FinishSelectorProps {
   control: any;
@@ -21,7 +22,8 @@ export function FinishSelector({ control, disabled, required }: FinishSelectorPr
       name="finish"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconSparkles className="h-4 w-4" />
             Acabamento
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>
@@ -34,6 +36,7 @@ export function FinishSelector({ control, disabled, required }: FinishSelectorPr
               disabled={disabled}
               searchable={false}
               clearable={!required}
+              className="bg-transparent"
             />
           </FormControl>
           <FormMessage />

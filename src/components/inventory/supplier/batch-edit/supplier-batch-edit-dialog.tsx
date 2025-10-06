@@ -98,25 +98,10 @@ export function SupplierBatchEditDialog({ isOpen, onClose, selectedSuppliers, on
       clearInterval(progressInterval);
       setProgress(100);
 
-      if (result?.data) {
-        const { totalSuccess, totalFailed } = result.data;
-
-        if (totalSuccess > 0) {
-          toast.success(`${totalSuccess} ${totalSuccess === 1 ? "fornecedor atualizado" : "fornecedores atualizados"} com sucesso`);
-        }
-
-        if (totalFailed > 0) {
-          toast.error(`${totalFailed} ${totalFailed === 1 ? "fornecedor falhou" : "fornecedores falharam"} ao atualizar`);
-        }
-      } else {
-        toast.success("Fornecedores atualizados com sucesso");
-      }
-
       onSuccess?.();
       handleClose();
     } catch (error) {
       console.error("Error during batch update:", error);
-      toast.error("Erro ao atualizar fornecedores em lote");
     } finally {
       setIsProcessing(false);
       setCurrentOperation(null);
@@ -142,25 +127,10 @@ export function SupplierBatchEditDialog({ isOpen, onClose, selectedSuppliers, on
       clearInterval(progressInterval);
       setProgress(100);
 
-      if (result?.data) {
-        const { totalSuccess, totalFailed } = result.data;
-
-        if (totalSuccess > 0) {
-          toast.success(`${totalSuccess} ${totalSuccess === 1 ? "fornecedor excluído" : "fornecedores excluídos"} com sucesso`);
-        }
-
-        if (totalFailed > 0) {
-          toast.error(`${totalFailed} ${totalFailed === 1 ? "fornecedor falhou" : "fornecedores falharam"} ao excluir`);
-        }
-      } else {
-        toast.success("Fornecedores excluídos com sucesso");
-      }
-
       onSuccess?.();
       handleClose();
     } catch (error) {
       console.error("Error during batch delete:", error);
-      toast.error("Erro ao excluir fornecedores em lote");
     } finally {
       setIsProcessing(false);
       setCurrentOperation(null);

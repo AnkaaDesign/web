@@ -161,8 +161,18 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     lastLoginAt: "Último Login",
     isExternal: "É Externo",
     password: "Senha",
+    address: "Endereço",
+    addressNumber: "Número",
+    addressComplement: "Complemento",
+    neighborhood: "Bairro",
+    city: "Cidade",
+    state: "Estado",
+    zipCode: "CEP",
+    site: "Site",
+    secullumId: "ID Secullum",
   },
   [CHANGE_LOG_ENTITY_TYPE.TASK]: {
+    name: "Nome",
     title: "Título",
     priority: "Prioridade",
     dueDate: "Data de Vencimento",
@@ -205,6 +215,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     commissions: "Comissões",
     services: "Serviços",
     airbrushings: "Aerografias",
+    cuts: "Recortes",
     cutRequest: "Solicitações de Corte",
     cutPlan: "Planos de Corte",
     relatedTasks: "Tarefas Relacionadas",
@@ -817,31 +828,136 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       return formattedMeasures.join(", ");
     }
 
-    // Task-specific array handling
+    // Task-specific array handling with detailed formatting
     if (entityType === CHANGE_LOG_ENTITY_TYPE.TASK) {
-      if (field === "artworks") {
-        return `${value.length} ${value.length === 1 ? "arte" : "artes"}`;
+      if (field === "cuts" || field === "cutRequest" || field === "cutPlan") {
+        // Format cuts with details: type, quantity, and file
+        const cutTypeLabels: Record<string, string> = {
+          VINYL: "Adesivo",
+          STENCIL: "Espovo",
+        };
+
+        const formattedCuts = value.map((cut: any) => {
+          const parts: string[] = [];
+
+          if (cut.type) {
+            parts.push(`Tipo: ${cutTypeLabels[cut.type] || cut.type}`);
+          }
+          if (cut.quantity) {
+            parts.push(`Quantidade: ${cut.quantity}`);
+          }
+          if (cut.fileId || cut.file?.filename || cut.file?.name) {
+            const filename = cut.file?.filename || cut.file?.name || cut.fileId;
+            parts.push(`Arquivo: ${filename}`);
+          }
+
+          return parts.join(", ");
+        });
+
+        return formattedCuts.join(" | ");
       }
-      if (field === "logoPaints" || field === "paints") {
-        return `${value.length} ${value.length === 1 ? "tinta" : "tintas"}`;
-      }
+
       if (field === "services") {
-        return `${value.length} ${value.length === 1 ? "serviço" : "serviços"}`;
+        // Format services with description and status
+        const formattedServices = value.map((service: any) => {
+          const parts: string[] = [];
+
+          if (service.description) {
+            parts.push(`Descrição: ${service.description}`);
+          }
+          if (service.status) {
+            const statusLabels: Record<string, string> = {
+              PENDING: "Pendente",
+              IN_PROGRESS: "Em Progresso",
+              COMPLETED: "Concluído",
+              CANCELLED: "Cancelado",
+            };
+            parts.push(`Status: ${statusLabels[service.status] || service.status}`);
+          }
+
+          return parts.join(", ");
+        });
+
+        return formattedServices.join(" | ");
       }
+
+      if (field === "airbrushings") {
+        // Format airbrushings with description and status
+        const formattedAirbrushings = value.map((airbrushing: any) => {
+          const parts: string[] = [];
+
+          if (airbrushing.description) {
+            parts.push(`Descrição: ${airbrushing.description}`);
+          }
+          if (airbrushing.status) {
+            const statusLabels: Record<string, string> = {
+              PENDING: "Pendente",
+              IN_PRODUCTION: "Em Produção",
+              COMPLETED: "Concluído",
+              CANCELLED: "Cancelado",
+            };
+            parts.push(`Status: ${statusLabels[airbrushing.status] || airbrushing.status}`);
+          }
+
+          return parts.join(", ");
+        });
+
+        return formattedAirbrushings.join(" | ");
+      }
+
+      if (field === "artworks") {
+        // Format artworks with file information
+        const formattedArtworks = value.map((artwork: any) => {
+          if (artwork.filename || artwork.name) {
+            return `Arquivo: ${artwork.filename || artwork.name}`;
+          }
+          if (artwork.id) {
+            return `Arquivo ID: ${artwork.id}`;
+          }
+          return "Arquivo";
+        });
+
+        return formattedArtworks.join(" | ");
+      }
+
+      if (field === "logoPaints" || field === "paints") {
+        // Format logo paints with paint information
+        const formattedPaints = value.map((paint: any) => {
+          const parts: string[] = [];
+
+          if (paint.name) {
+            parts.push(`Tinta: ${paint.name}`);
+          }
+          if (paint.hex) {
+            parts.push(`Cor: ${paint.hex}`);
+          }
+          if (paint.id && !paint.name) {
+            parts.push(`ID: ${paint.id}`);
+          }
+
+          return parts.join(", ");
+        });
+
+        return formattedPaints.join(" | ");
+      }
+
       if (field === "commissions") {
         return `${value.length} ${value.length === 1 ? "comissão" : "comissões"}`;
       }
-      if (field === "airbrushings") {
-        return `${value.length} ${value.length === 1 ? "aerografia" : "aerografias"}`;
-      }
-      if (field === "cutRequest") {
-        return `${value.length} ${value.length === 1 ? "solicitação de corte" : "solicitações de corte"}`;
-      }
-      if (field === "cutPlan") {
-        return `${value.length} ${value.length === 1 ? "plano de corte" : "planos de corte"}`;
-      }
+
       if (field === "relatedTasks" || field === "relatedTo") {
-        return `${value.length} ${value.length === 1 ? "tarefa relacionada" : "tarefas relacionadas"}`;
+        // Format related tasks with task names
+        const formattedTasks = value.map((task: any) => {
+          if (task.name) {
+            return `Tarefa: ${task.name}`;
+          }
+          if (task.id) {
+            return `Tarefa ID: ${task.id}`;
+          }
+          return "Tarefa";
+        });
+
+        return formattedTasks.join(" | ");
       }
     }
 

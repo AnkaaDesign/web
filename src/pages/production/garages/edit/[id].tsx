@@ -20,7 +20,6 @@ export const GarageEditPage = () => {
 
     try {
       await update({ id, data });
-      toast.success("Garagem atualizada com sucesso!");
       navigate(routes.production.garages.list);
     } catch (error) {
       // Error is handled by the API client

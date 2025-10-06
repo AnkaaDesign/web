@@ -275,17 +275,13 @@ export function useBorrowFormUrlState(options: UseBorrowFormUrlStateOptions = {}
 
       const newQuantities = { ...quantities, [itemId]: quantity };
 
-      // Include all related state to avoid race conditions
-      const currentUserIds = { ...userIds };
-
-      // Batch update to avoid race conditions - include all related state
+      // Batch update to avoid race conditions
       setFilters({
         selectedItems: Array.from(newSelected),
         quantities: Object.keys(newQuantities).length > 0 ? newQuantities : undefined,
-        userIds: Object.keys(currentUserIds).length > 0 ? currentUserIds : undefined,
       });
     },
-    [quantities, selectedItems, userIds, setFilters],
+    [quantities, selectedItems, setFilters],
   );
 
   // Get selected items with data

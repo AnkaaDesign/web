@@ -69,6 +69,8 @@ export interface CategoryData {
   color?: string;
 }
 
+export type { RawActivityData, RawStockData, RawOrderData, ChartDataPoint, TimeSeriesData, CategoryData };
+
 // Time series transformations
 export const transformToTimeSeries = (
   data: RawActivityData[],
@@ -552,6 +554,8 @@ export interface ExportTransformConfig {
   formatters?: Record<string, (value: any) => string>;
   maxRecords?: number;
 }
+
+export type { ExportTransformConfig };
 
 /**
  * Transform statistics data for export

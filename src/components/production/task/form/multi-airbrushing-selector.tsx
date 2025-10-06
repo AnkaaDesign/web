@@ -89,7 +89,38 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
 
     const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
-    // Sync airbrushings with form field
+    // Sync FROM form field TO local state when form resets (form → local)
+    useEffect(() => {
+      if (field.value && Array.isArray(field.value) && field.value.length > 0) {
+        // Check if field value is different from current local state
+        const currentStateIds = airbrushings.map(a => `${a.startDate}-${a.price}-${a.status}`).join(',');
+        const fieldValueIds = field.value.map((a: any) => `${a.startDate}-${a.price}-${a.status}`).join(',');
+
+        if (currentStateIds !== fieldValueIds) {
+          const newAirbrushings = field.value.map((airbrushing: any, index: number) => ({
+            id: `airbrushing-${Date.now()}-${index}`,
+            status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
+            price: airbrushing.price || null,
+            startDate: airbrushing.startDate || null,
+            finishDate: airbrushing.finishDate || null,
+            receiptFiles: convertFilesToFileWithPreview(airbrushing.receipts),
+            nfeFiles: convertFilesToFileWithPreview(airbrushing.nfes),
+            artworkFiles: convertFilesToFileWithPreview(airbrushing.artworks),
+            receiptIds: airbrushing.receiptIds || [],
+            nfeIds: airbrushing.nfeIds || [],
+            artworkIds: airbrushing.artworkIds || [],
+          }));
+          setAirbrushings(newAirbrushings);
+        }
+      } else if (!field.value || (Array.isArray(field.value) && field.value.length === 0)) {
+        // Clear airbrushings if field value is empty
+        if (airbrushings.length > 0) {
+          setAirbrushings([]);
+        }
+      }
+    }, [field.value]);
+
+    // Sync FROM local state TO form field when airbrushings change (local → form)
     useEffect(() => {
       const formValue = airbrushings.map((airbrushing) => ({
         status: airbrushing.status,

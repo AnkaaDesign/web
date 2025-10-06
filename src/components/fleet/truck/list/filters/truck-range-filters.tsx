@@ -37,11 +37,11 @@ function RangeInput({ label, unit, min, max, onChange, step = 0.1, placeholder }
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Mínimo ({unit})</Label>
-          <Input type="number" step={step} value={min ?? ""} onChange={(e) => handleMinChange(e.target.value)} placeholder={placeholder?.min || "0"} />
+          <Input type="number" step={step} value={min ?? ""} onChange={(value) => handleMinChange(value as string)} placeholder={placeholder?.min || "0"} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Máximo ({unit})</Label>
-          <Input type="number" step={step} value={max ?? ""} onChange={(e) => handleMaxChange(e.target.value)} placeholder={placeholder?.max || "100"} />
+          <Input type="number" step={step} value={max ?? ""} onChange={(value) => handleMaxChange(value as string)} placeholder={placeholder?.max || "100"} />
         </div>
       </div>
     </div>

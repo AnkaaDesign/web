@@ -81,20 +81,11 @@ export function BorrowBatchEditTable({ borrows, onCancel }: BorrowBatchEditTable
       if (result?.data) {
         const { totalSuccess, totalFailed } = result.data;
 
-        if (totalSuccess > 0) {
-          toast.success(`${totalSuccess} ${totalSuccess === 1 ? "empréstimo atualizado" : "empréstimos atualizados"} com sucesso`);
-        }
-
-        if (totalFailed > 0) {
-          toast.error(`${totalFailed} ${totalFailed === 1 ? "empréstimo falhou" : "empréstimos falharam"} ao atualizar`);
-        }
-
         if (totalFailed === 0) {
           navigate(routes.inventory.loans.root);
         }
       } else {
         // Even if we don't have detailed results, navigate back on apparent success
-        toast.success("Empréstimos atualizados com sucesso");
         navigate(routes.inventory.loans.root);
       }
     } catch (error: any) {
@@ -105,7 +96,6 @@ export function BorrowBatchEditTable({ borrows, onCancel }: BorrowBatchEditTable
         status: error?.response?.status,
         stack: error?.stack,
       });
-      toast.error("Erro ao atualizar empréstimos em lote");
     } finally {
       setIsSubmitting(false);
     }

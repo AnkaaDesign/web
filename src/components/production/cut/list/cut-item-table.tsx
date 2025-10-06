@@ -231,13 +231,6 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
         }
         break;
 
-      case "edit":
-        if (items.length === 1) {
-          // For now, just show a message as there's no edit route defined
-          toast.info("Edição de corte ainda não implementada");
-        }
-        break;
-
       case "start":
         // Update status to CUTTING for all selected items
         try {

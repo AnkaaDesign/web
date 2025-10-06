@@ -1,5 +1,6 @@
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
+import { IconShieldCheck } from "@tabler/icons-react";
 import { PPE_TYPE, PPE_TYPE_LABELS } from "../../../../constants";
 
 interface PpeTypeSelectorProps {
@@ -21,7 +22,10 @@ export function PpeTypeSelector({ control, name = "ppeType", disabled, required 
       name={name}
       render={({ field }) => (
         <FormItem>
-          <FormLabel>Tipo de EPI {required && <span className="text-destructive">*</span>}</FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconShieldCheck className="h-4 w-4" />
+            Tipo de EPI {required && <span className="text-destructive">*</span>}
+          </FormLabel>
           <FormControl>
             <Combobox
               options={options}

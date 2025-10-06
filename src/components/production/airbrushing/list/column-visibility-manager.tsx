@@ -100,7 +100,7 @@ export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityC
               type="text"
               placeholder="Buscar coluna..."
               value={searchQuery}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+              onChange={(value) => setSearchQuery(value as string)}
               className="pl-9 h-9"
             />
           </div>

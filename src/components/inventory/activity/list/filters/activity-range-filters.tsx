@@ -39,7 +39,7 @@ export const ActivityRangeFilters = ({ filters, updateFilter }: ActivityRangeFil
             step="0.01"
             placeholder="Quantidade mínima"
             value={filters.quantityRange?.min || ""}
-            onChange={(e) => handleQuantityRangeChange("min", e.target.value)}
+            onChange={(value) => handleQuantityRangeChange("min", value as string)}
           />
         </div>
         <div>
@@ -53,7 +53,7 @@ export const ActivityRangeFilters = ({ filters, updateFilter }: ActivityRangeFil
             step="0.01"
             placeholder="Quantidade máxima"
             value={filters.quantityRange?.max || ""}
-            onChange={(e) => handleQuantityRangeChange("max", e.target.value)}
+            onChange={(value) => handleQuantityRangeChange("max", value as string)}
           />
         </div>
       </div>

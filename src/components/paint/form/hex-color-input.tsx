@@ -5,6 +5,7 @@ import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas"
 import { AdvancedColorPicker } from "./advanced-color-picker";
 import { CanvasNormalMapRenderer } from "../effects/canvas-normal-map-renderer";
 import { PAINT_FINISH } from "../../../constants";
+import { IconColorPicker } from "@tabler/icons-react";
 import "./color-picker.css";
 
 interface HexColorInputProps {
@@ -26,7 +27,8 @@ export function HexColorInput({ control, disabled, required }: HexColorInputProp
       name="hex"
       render={({ field }) => (
         <FormItem className="flex flex-col h-full">
-          <FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconColorPicker className="h-4 w-4" />
             Cor da Tinta
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>

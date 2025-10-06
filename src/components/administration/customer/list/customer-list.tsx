@@ -20,6 +20,9 @@ import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/use-table-state";
 import { useTableFilters } from "@/hooks/use-table-filters";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { CustomerMergeDialog } from "../merge/customer-merge-dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { mergeCustomers } from "../../../../api-client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,12 +43,22 @@ const DEFAULT_PAGE_SIZE = 40;
 export function CustomerList({ className }: CustomerListProps) {
   const navigate = useNavigate();
   const { batchDeleteAsync: batchDeleteMutation } = useCustomerBatchMutations();
+  const queryClient = useQueryClient();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // State to hold current page customers and total count from the table
   const [tableData, setTableData] = useState<{ customers: Customer[]; totalRecords: number }>({ customers: [], totalRecords: 0 });
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{ items: Customer[]; isBulk: boolean } | null>(null);
+  const [mergeDialog, setMergeDialog] = useState<{ open: boolean; customers: Customer[] }>({ open: false, customers: [] });
+
+  // Merge mutation
+  const { mutate: mergeMutation, isPending: isMerging } = useMutation({
+    mutationFn: mergeCustomers,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+    },
+  });
 
   // Stable callback for table data updates
   const handleTableDataChange = useCallback((data: { customers: Customer[]; totalRecords: number }) => {
@@ -276,6 +289,35 @@ export function CustomerList({ className }: CustomerListProps) {
     }
   };
 
+  // Handle merge action
+  const handleMerge = useCallback((customers: Customer[]) => {
+    if (customers.length < 2) {
+      return;
+    }
+    setMergeDialog({ open: true, customers });
+  }, []);
+
+  const handleMergeConfirm = useCallback(
+    async (targetId: string, resolutions: Record<string, any>) => {
+      try {
+        // Calculate source IDs from the customers in the merge dialog
+        const sourceIds = mergeDialog.customers.map(customer => customer.id).filter(id => id !== targetId);
+
+        mergeMutation({
+          targetCustomerId: targetId,
+          sourceCustomerIds: sourceIds,
+          conflictResolutions: resolutions,
+        });
+
+        setMergeDialog({ open: false, customers: [] });
+      } catch (error) {
+        // Error is handled by the API client
+        console.error("Error merging customers:", error);
+      }
+    },
+    [mergeMutation, mergeDialog.customers]
+  );
+
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
       <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
@@ -323,6 +365,7 @@ export function CustomerList({ className }: CustomerListProps) {
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}
             onDelete={handleBulkDelete}
+            onMerge={handleMerge}
             filters={queryFilters}
             className="h-full"
             onDataChange={handleTableDataChange}
@@ -352,6 +395,14 @@ export function CustomerList({ className }: CustomerListProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Merge Dialog */}
+      <CustomerMergeDialog
+        open={mergeDialog.open}
+        onOpenChange={(open) => setMergeDialog({ open, customers: mergeDialog.customers })}
+        customers={mergeDialog.customers}
+        onMerge={handleMergeConfirm}
+      />
     </Card>
   );
 }

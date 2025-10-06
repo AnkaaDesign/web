@@ -24,7 +24,6 @@ import { TableSearchInput } from "@/components/ui/table-search-input";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useAuth } from "@/contexts/auth-context";
 import { usePageTracker } from "@/hooks/use-page-tracker";
-import { useToast } from "@/hooks/use-toast";
 import { hasPrivilege } from "@/utils/user";
 import { routes } from "@/constants/routes";
 import { SECTOR_PRIVILEGES } from "@/constants/enums";
@@ -35,7 +34,8 @@ import {
   useThrottlerMutations,
 } from "@/hooks/use-throttler";
 import { ThrottlerKeysTable } from "@/components/server/throttler/throttler-keys-table";
-import { ThrottlerFilters, ThrottlerFiltersData } from "@/components/server/throttler/throttler-filters";
+import { ThrottlerFilters } from "@/components/server/throttler/throttler-filters";
+import type { ThrottlerFiltersData } from "@/components/server/throttler/throttler-filters";
 import { useTableState } from "@/hooks/use-table-state";
 import type { ThrottlerKey, BlockedKey } from "@/api-client/throttler";
 import { debounce } from "lodash";
@@ -43,7 +43,6 @@ import { debounce } from "lodash";
 export function RateLimitingPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { success } = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Check admin privileges
@@ -195,22 +194,6 @@ export function RateLimitingPage() {
     resetSelectionOnPageChange: false,
   });
 
-  // State to hold current page items
-  const [tableData, setTableData] = useState<{
-    items: (ThrottlerKey | BlockedKey)[];
-    totalRecords: number;
-  }>({
-    items: [],
-    totalRecords: 0,
-  });
-
-  const handleTableDataChange = useCallback(
-    (data: { items: (ThrottlerKey | BlockedKey)[]; totalRecords: number }) => {
-      setTableData(data);
-    },
-    []
-  );
-
   // Handle clear actions
   const openClearDialog = (
     type: "all" | "blocked" | "selected",
@@ -239,28 +222,23 @@ export function RateLimitingPage() {
       switch (clearAction.type) {
         case "all":
           console.log("[RateLimiting] Calling clearKeys.mutateAsync()");
-          const allResult = await clearKeys.mutateAsync();
-          console.log("[RateLimiting] clearKeys result:", allResult);
-          success("Todas as chaves foram limpas");
+          await clearKeys.mutateAsync();
           break;
         case "blocked":
           console.log("[RateLimiting] Calling clearBlockedKeys.mutateAsync()");
-          const blockedResult = await clearBlockedKeys.mutateAsync();
-          console.log("[RateLimiting] clearBlockedKeys result:", blockedResult);
-          success("Todas as chaves bloqueadas foram removidas");
+          await clearBlockedKeys.mutateAsync();
           break;
         case "selected":
           console.log("[RateLimiting] Clearing selected keys, count:", clearAction.keys?.length);
           if (clearAction.keys && clearAction.keys.length > 0) {
-            // Clear keys one by one
-            const results = await Promise.all(
+            // Clear keys one by one (API client handles toasts)
+            await Promise.all(
               clearAction.keys.map((key) => {
                 console.log("[RateLimiting] Clearing specific key:", key.key);
                 return clearSpecificKey.mutateAsync(key.key);
               })
             );
-            console.log("[RateLimiting] Clear selected keys results:", results);
-            success(`${clearAction.keys.length} chave(s) removida(s)`);
+            console.log("[RateLimiting] All selected keys cleared");
           }
           break;
       }
@@ -271,11 +249,11 @@ export function RateLimitingPage() {
       await refetchKeys();
       await refetchBlocked();
       console.log("[RateLimiting] Data refreshed successfully");
-    } catch (error) {
-      console.error("[RateLimiting] Error clearing keys:", error);
+    } catch (err) {
+      console.error("[RateLimiting] Error clearing keys:", err);
       console.error("[RateLimiting] Error details:", {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
         clearAction,
       });
     } finally {
@@ -440,7 +418,6 @@ export function RateLimitingPage() {
                 throttlerNames: advancedFilters.throttlerNames,
               }}
               className="h-full"
-              onDataChange={handleTableDataChange}
             />
           </div>
         </CardContent>
@@ -459,41 +436,39 @@ export function RateLimitingPage() {
       />
 
       {/* Confirmation Dialog */}
-      {clearDialogOpen && clearAction && (
-        <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                {clearAction.type === "all"
-                  ? "Limpar todas as chaves"
-                  : clearAction.type === "blocked"
-                    ? "Desbloquear todas as chaves"
-                    : `Limpar ${clearAction.keys?.length || 0} chave(s)`}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {clearAction.type === "all"
-                  ? "Tem certeza que deseja limpar TODAS as chaves de throttler? Esta ação não pode ser desfeita."
-                  : clearAction.type === "blocked"
-                    ? "Tem certeza que deseja desbloquear todas as chaves bloqueadas? Isso permitirá novas requisições desses usuários/IPs."
-                    : `Tem certeza que deseja limpar ${clearAction.keys?.length || 0} chave(s) selecionada(s)? Esta ação não pode ser desfeita.`}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmClearAction}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {clearAction.type === "all"
-                  ? "Limpar Tudo"
-                  : clearAction.type === "blocked"
-                    ? "Desbloquear"
-                    : "Limpar"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+      <AlertDialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {clearAction?.type === "all"
+                ? "Limpar todas as chaves"
+                : clearAction?.type === "blocked"
+                  ? "Desbloquear todas as chaves"
+                  : `Limpar ${clearAction?.keys?.length || 0} chave(s)`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {clearAction?.type === "all"
+                ? "Tem certeza que deseja limpar TODAS as chaves de throttler? Esta ação não pode ser desfeita."
+                : clearAction?.type === "blocked"
+                  ? "Tem certeza que deseja desbloquear todas as chaves bloqueadas? Isso permitirá novas requisições desses usuários/IPs."
+                  : `Tem certeza que deseja limpar ${clearAction?.keys?.length || 0} chave(s) selecionada(s)? Esta ação não pode ser desfeita.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmClearAction}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {clearAction?.type === "all"
+                ? "Limpar Tudo"
+                : clearAction?.type === "blocked"
+                  ? "Desbloquear"
+                  : "Limpar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

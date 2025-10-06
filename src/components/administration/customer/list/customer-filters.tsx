@@ -194,7 +194,7 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
               <Input
                 placeholder="Digite tags separadas por vírgula..."
                 value={customTags}
-                onChange={(e) => setCustomTags(e.target.value)}
+                onChange={(value) => setCustomTags(value as string)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -237,8 +237,9 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
                   min="0"
                   placeholder="Valor mínimo"
                   value={localState.taskCount?.min?.toString() || ""}
-                  onChange={(e) => {
-                    const min = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                  onChange={(value) => {
+                    const strValue = value as string;
+                    const min = strValue ? parseInt(strValue, 10) : undefined;
                     if (min !== undefined && isNaN(min)) return;
                     setLocalState((prev) => ({
                       ...prev,
@@ -260,8 +261,9 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
                   min="0"
                   placeholder="Sem limite"
                   value={localState.taskCount?.max?.toString() || ""}
-                  onChange={(e) => {
-                    const max = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                  onChange={(value) => {
+                    const strValue = value as string;
+                    const max = strValue ? parseInt(strValue, 10) : undefined;
                     if (max !== undefined && isNaN(max)) return;
                     setLocalState((prev) => ({
                       ...prev,

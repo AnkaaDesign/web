@@ -425,7 +425,8 @@ export const TABLER_ICONS = {
 } as const;
 
 // Type for accessing Tabler icon names
-export type TablerIconName = (typeof TABLER_ICONS)[keyof typeof TABLER_ICONS];
+export type { TablerIconName };
+type TablerIconName = (typeof TABLER_ICONS)[keyof typeof TABLER_ICONS];
 
 // Helper function to get Tabler icon from iconoir key
 export function getTablerIcon(iconoirKey: keyof typeof TABLER_ICONS): TablerIconName {

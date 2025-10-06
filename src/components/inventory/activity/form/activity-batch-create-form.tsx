@@ -64,7 +64,7 @@ export const ActivityBatchCreateForm = () => {
     where: { status: { not: USER_STATUS.DISMISSED } },
     orderBy: { name: "asc" },
     take: 100,
-    include: { position: true },
+    include: { sector: true },
   });
 
   const users = usersResponse?.data || [];
@@ -221,7 +221,7 @@ export const ActivityBatchCreateForm = () => {
                   <Combobox
                     options={users.map((user) => ({
                       value: user.id,
-                      label: `${user.name}${user.position ? ` - ${user.position.name}` : ""}`,
+                      label: `${user.name}${user.sector ? ` - ${user.sector.name}` : ""}`,
                     }))}
                     value={globalUserId}
                     onValueChange={handleGlobalUserChange}

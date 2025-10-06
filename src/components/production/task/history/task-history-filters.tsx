@@ -209,11 +209,11 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">Mínimo</Label>
-                <Input type="number" placeholder="0,00" value={priceMin} onChange={(e) => setPriceMin(e.target.value)} min="0" step="0.01" />
+                <Input type="number" placeholder="0,00" value={priceMin} onChange={(value) => setPriceMin(value as string)} min="0" step="0.01" />
               </div>
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">Máximo</Label>
-                <Input type="number" placeholder="0,00" value={priceMax} onChange={(e) => setPriceMax(e.target.value)} min="0" step="0.01" />
+                <Input type="number" placeholder="0,00" value={priceMax} onChange={(value) => setPriceMax(value as string)} min="0" step="0.01" />
               </div>
             </div>
             {(priceMin || priceMax) && (

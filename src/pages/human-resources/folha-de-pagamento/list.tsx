@@ -29,7 +29,8 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePayrollBonuses } from "../../../hooks";
 import { isUserEligibleForBonus, getCurrentPayrollPeriod } from "../../../utils";
-import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
+import { StandardizedTable } from "@/components/ui/standardized-table";
+import type { StandardizedColumn } from "@/components/ui/standardized-table";
 
 // Extended filters interface with payroll-specific fields
 interface PayrollFiltersData {

@@ -5,7 +5,7 @@ import { routes, ORDER_STATUS } from "../../../../constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconShoppingCart, IconCheck, IconX, IconPlus } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconShoppingCart, IconCheck, IconChecks, IconX, IconPlus } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
@@ -566,15 +566,15 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
 
               {/* Order-specific actions */}
               {contextMenu?.orders[0] && contextMenu.orders[0].status === ORDER_STATUS.CREATED && (
-                <DropdownMenuItem onClick={handleMarkAsFulfilledFromMenu}>
+                <DropdownMenuItem onClick={handleMarkAsFulfilledFromMenu} className="text-amber-600 dark:text-amber-400">
                   <IconCheck className="mr-2 h-4 w-4" />
                   Marcar como pedido
                 </DropdownMenuItem>
               )}
 
               {contextMenu?.orders[0] && contextMenu.orders[0].status !== ORDER_STATUS.RECEIVED && contextMenu.orders[0].status !== ORDER_STATUS.CANCELLED && (
-                <DropdownMenuItem onClick={handleMarkAsReceivedFromMenu}>
-                  <IconCheck className="mr-2 h-4 w-4" />
+                <DropdownMenuItem onClick={handleMarkAsReceivedFromMenu} className="text-green-700 dark:text-green-400">
+                  <IconChecks className="mr-2 h-4 w-4" />
                   Marcar como recebido
                 </DropdownMenuItem>
               )}

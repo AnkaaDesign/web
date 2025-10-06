@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { IconChevronUp, IconChevronDown, IconSelector, IconTrash, IconUser, IconWorld, IconClock } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconSelector, IconTrash, IconUser, IconWorld, IconClock, IconAlertTriangle, IconPackage } from "@tabler/icons-react";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { cn } from "@/lib/utils";
@@ -9,8 +9,11 @@ import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import type { ThrottlerKey, BlockedKey } from "@/api-client/throttler";
 import { TtlCountdown } from "./ttl-countdown";
+import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
+import { UserNameCell } from "./user-name-cell";
 
 interface ThrottlerKeysTableProps {
   keys: (ThrottlerKey | BlockedKey)[];
@@ -24,7 +27,6 @@ interface ThrottlerKeysTableProps {
     throttlerNames?: string[];
   };
   className?: string;
-  onDataChange?: (data: { items: (ThrottlerKey | BlockedKey)[]; totalRecords: number }) => void;
 }
 
 export function ThrottlerKeysTable({
@@ -33,13 +35,12 @@ export function ThrottlerKeysTable({
   onClearKeys,
   filters = {},
   className,
-  onDataChange
 }: ThrottlerKeysTableProps) {
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
 
   // Use URL state management for pagination and sorting
-  const { page, pageSize, sortConfigs, setPage, setPageSize, toggleSort, getSortDirection } = useTableState({
+  const { page, pageSize, sortConfigs, setPage, setPageSize, toggleSort, getSortDirection, getSortOrder } = useTableState({
     defaultPageSize: 40,
     defaultSort: [{ column: "status", direction: "desc" }], // Blocked first
     resetSelectionOnPageChange: false,
@@ -184,41 +185,37 @@ export function ThrottlerKeysTable({
     });
   };
 
-  const closeContextMenu = () => setContextMenu(null);
 
-  // Update parent with data changes
-  useEffect(() => {
-    onDataChange?.({ items: paginatedKeys, totalRecords });
-  }, [paginatedKeys, totalRecords, onDataChange]);
+  // Get current page key IDs for selection
+  const currentPageKeyIds = useMemo(() => {
+    return paginatedKeys.map((key) => key.key);
+  }, [paginatedKeys]);
 
-  // Close context menu on outside click
-  useEffect(() => {
-    if (contextMenu) {
-      const handleClick = () => closeContextMenu();
-      document.addEventListener("click", handleClick);
-      return () => document.removeEventListener("click", handleClick);
-    }
-  }, [contextMenu]);
+  // Selection handlers
+  const allSelected = selectedIds.size === paginatedKeys.length && paginatedKeys.length > 0;
+  const partiallySelected = selectedIds.size > 0 && selectedIds.size < paginatedKeys.length;
+
+  const handleSelectAll = () => {
+    toggleSelectAll();
+  };
 
   // Define table columns
   const columns = [
     {
       id: "select",
-      header: () => (
-        <div className="flex items-center justify-center h-full w-full">
-          <Checkbox checked={selectedIds.size === paginatedKeys.length && paginatedKeys.length > 0} onCheckedChange={toggleSelectAll} aria-label="Selecionar todos" data-checkbox />
-        </div>
-      ),
+      header: "SELECT",
+      sortable: false,
       cell: (key: ThrottlerKey | BlockedKey) => (
         <div className="flex items-center justify-center h-full w-full" onClick={(e) => e.stopPropagation()}>
           <Checkbox checked={selectedIds.has(key.key)} onCheckedChange={() => toggleSelection(key.key)} aria-label={`Selecionar chave ${key.key}`} data-checkbox />
         </div>
       ),
       width: TABLE_LAYOUT.checkbox.className,
+      align: "center" as const,
     },
     {
       id: "status",
-      header: "Status",
+      header: "STATUS",
       sortable: true,
       cell: (key: ThrottlerKey | BlockedKey) => {
         const isBlocked = "isBlocked" in key ? key.isBlocked : true;
@@ -229,54 +226,72 @@ export function ThrottlerKeysTable({
         );
       },
       width: "w-28",
+      align: "left" as const,
     },
     {
-      id: "identifier",
-      header: "Usuário/IP",
+      id: "user",
+      header: "USUÁRIO",
       sortable: true,
       cell: (key: ThrottlerKey | BlockedKey) => {
-        const identifierType = "identifierType" in key ? key.identifierType : (key.identifier?.includes("user:") ? "user" : "ip");
-        const isUser = identifierType === "user";
+        // Parse identifier format: user:{userId}-ip:{ipAddress}
+        const identifier = key.identifier || "";
 
-        // Format identifier for display
-        let displayValue = key.identifier || "-";
+        // Extract user part - capture everything between "user:" and "-ip:"
+        const userMatch = identifier.match(/user:(.+?)-ip:/);
+        const userId = userMatch ? userMatch[1] : null;
 
-        // Remove 'ip::' prefix if present
-        if (displayValue.startsWith("ip::")) {
-          displayValue = displayValue.substring(4);
+        // Handle anonymous or missing user
+        if (!userId || userId === "anonymous" || userId === "undefined" || userId === "null") {
+          return <span className="text-muted-foreground">-</span>;
         }
 
-        // Remove 'user:' prefix if present
-        if (displayValue.startsWith("user:")) {
-          displayValue = displayValue.substring(5);
+        // Use the UserNameCell component to fetch and display user name
+        return <UserNameCell userId={userId} />;
+      },
+      width: "w-64",
+      align: "left" as const,
+    },
+    {
+      id: "ip",
+      header: "IP",
+      sortable: true,
+      cell: (key: ThrottlerKey | BlockedKey) => {
+        // Parse identifier format: user:{userId}-ip:{ipAddress}
+        const identifier = key.identifier || "";
+
+        // Extract IP part
+        const ipMatch = identifier.match(/ip:(.+?)(?:-|$)/);
+        let ipAddress = ipMatch ? ipMatch[1] : null;
+
+        // Handle undefined or empty IP
+        if (!ipAddress || ipAddress === "undefined" || ipAddress === "null" || ipAddress === "unknown") {
+          return <span className="text-muted-foreground">-</span>;
         }
 
-        // Format IPv6 addresses (remove extra colons)
-        if (!isUser && displayValue.includes(":")) {
-          // IPv6 addresses like ::1 or ::ffff:127.0.0.1
-          if (displayValue.startsWith("::ffff:")) {
-            displayValue = displayValue.substring(7); // Remove IPv6-to-IPv4 prefix
-          } else if (displayValue === "::1") {
-            displayValue = "localhost (::1)";
-          }
+        // Handle IPv6 localhost addresses
+        if (ipAddress === "::1") {
+          ipAddress = "localhost";
+        }
+        // Handle IPv4-mapped IPv6 addresses
+        else if (ipAddress.startsWith("::ffff:")) {
+          ipAddress = ipAddress.substring(7);
         }
 
         return (
           <div className="flex items-center gap-2">
-            {isUser ? (
-              <IconUser className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-            ) : (
-              <IconWorld className="h-4 w-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-            )}
-            <span className="font-mono text-sm truncate">{displayValue}</span>
+            <IconWorld className="h-4 w-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+            <span className="font-mono text-sm truncate" title={identifier}>
+              {ipAddress}
+            </span>
           </div>
         );
       },
-      width: "w-48",
+      width: "w-40",
+      align: "left" as const,
     },
     {
       id: "controller",
-      header: "Endpoint",
+      header: "ENDPOINT",
       sortable: true,
       cell: (key: ThrottlerKey | BlockedKey) => (
         <div className="font-mono text-sm truncate">
@@ -284,20 +299,24 @@ export function ThrottlerKeysTable({
         </div>
       ),
       width: "min-w-0 flex-1",
+      align: "left" as const,
     },
     {
       id: "throttlerName",
-      header: "Throttler",
+      header: "THROTTLER",
+      sortable: false,
       cell: (key: ThrottlerKey | BlockedKey) => (
         <Badge variant="outline" className="font-mono text-xs">
           {key.throttlerName || "-"}
         </Badge>
       ),
       width: "w-32",
+      align: "left" as const,
     },
     {
       id: "hits",
-      header: "Requisições",
+      header: "REQUISIÇÕES",
+      sortable: false,
       cell: (key: ThrottlerKey | BlockedKey) => {
         const hits = "hits" in key ? key.hits : null;
         return hits !== null ? (
@@ -306,36 +325,36 @@ export function ThrottlerKeysTable({
           <span className="text-muted-foreground">-</span>
         );
       },
-      width: "w-28 text-right",
+      width: "w-40",
+      align: "left" as const,
     },
     {
       id: "ttl",
-      header: "Expira em",
+      header: "EXPIRA EM",
       sortable: true,
-      cell: (key: ThrottlerKey | BlockedKey) => (
-        <TtlCountdown ttl={key.ttl} />
-      ),
+      cell: (key: ThrottlerKey | BlockedKey) => {
+        if (!key.ttl || key.ttl <= 0) {
+          return <span className="text-muted-foreground">-</span>;
+        }
+        return <TtlCountdown ttl={key.ttl} />;
+      },
       width: "w-32",
+      align: "left" as const,
     },
   ];
 
-  // Render sortable header
-  const renderSortableHeader = (column: { id: string; header: string; sortable?: boolean }) => {
-    if (!column.sortable) {
-      return <span className="text-xs font-semibold uppercase tracking-wider">{column.header}</span>;
-    }
+  // Render sort indicator
+  const renderSortIndicator = (columnId: string) => {
+    const sortDirection = getSortDirection(columnId);
+    const sortOrder = getSortOrder(columnId);
 
-    const direction = getSortDirection(column.id);
     return (
-      <button
-        onClick={() => toggleSort(column.id)}
-        className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider hover:text-foreground transition-colors"
-      >
-        <span>{column.header}</span>
-        {direction === "asc" && <IconChevronUp className="h-3 w-3" />}
-        {direction === "desc" && <IconChevronDown className="h-3 w-3" />}
-        {!direction && <IconSelector className="h-3 w-3 opacity-50" />}
-      </button>
+      <div className="inline-flex items-center ml-1">
+        {sortDirection === null && <IconSelector className="h-4 w-4 text-muted-foreground" />}
+        {sortDirection === "asc" && <IconChevronUp className="h-4 w-4 text-foreground" />}
+        {sortDirection === "desc" && <IconChevronDown className="h-4 w-4 text-foreground" />}
+        {sortOrder !== null && sortConfigs.length > 1 && <span className="text-xs ml-0.5">{sortOrder + 1}</span>}
+      </div>
     );
   };
 
@@ -350,119 +369,181 @@ export function ThrottlerKeysTable({
   }
 
   return (
-    <div className={cn("flex flex-col h-full", className)}>
-      <div className="flex-1 flex flex-col min-h-0 border rounded-lg overflow-hidden">
-        {sortedKeys.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <IconClock className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Nenhuma chave encontrada</h3>
-            <p className="text-sm text-muted-foreground">
-              {keys.length === 0
-                ? "Não há chaves de throttler registradas no momento."
-                : "Nenhuma chave corresponde aos filtros aplicados."}
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="border-b bg-background">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    {columns.map((column) => (
-                      <TableHead
-                        key={column.id}
-                        className={cn(
-                          TABLE_LAYOUT.CELL_PADDING,
-                          TABLE_LAYOUT.MIN_HEIGHT,
-                          column.width,
-                          "text-muted-foreground"
-                        )}
-                        style={
-                          column.id === columns[columns.length - 1].id && !isOverlay
-                            ? { paddingRight: `calc(${TABLE_LAYOUT.CELL_PADDING_X} + ${scrollbarWidth}px)` }
-                            : undefined
-                        }
-                      >
-                        {typeof column.header === "function" ? column.header() : renderSortableHeader(column as any)}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-              </Table>
-            </div>
-            <div className="flex-1 overflow-auto">
-              <Table>
-                <TableBody>
-                  {paginatedKeys.map((key) => {
-                    const isSelected = selectedIds.has(key.key);
-                    return (
-                      <TableRow
-                        key={key.key}
-                        className={cn(
-                          "cursor-pointer hover:bg-muted/50 transition-colors",
-                          isSelected && "bg-muted"
-                        )}
-                        onContextMenu={(e) => handleContextMenu(e, key)}
-                        onClick={(e) => {
-                          if (e.ctrlKey || e.metaKey) {
-                            toggleSelection(key.key);
-                          }
-                        }}
-                      >
-                        {columns.map((column) => (
-                          <TableCell
-                            key={column.id}
-                            className={cn(
-                              column.id === "select" ? "p-0 !border-r-0" : TABLE_LAYOUT.CELL_PADDING,
-                              TABLE_LAYOUT.MIN_HEIGHT,
-                              column.width
-                            )}
-                          >
-                            {column.cell(key)}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        )}
+    <div className={cn("rounded-lg flex flex-col overflow-hidden", className)}>
+      {/* Fixed Header Table */}
+      <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden">
+        <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
+          <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
+            <TableRow className="bg-muted hover:bg-muted even:bg-muted">
+              {/* Selection column */}
+              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                <div className="flex items-center justify-center h-full w-full px-2">
+                  <Checkbox
+                    checked={allSelected}
+                    indeterminate={partiallySelected}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Selecionar todos"
+                    disabled={isLoading || paginatedKeys.length === 0}
+                  />
+                </div>
+              </TableHead>
+
+              {/* Data columns */}
+              {columns.slice(1).map((column) => (
+                <TableHead key={column.id} className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0", column.width)}>
+                  {column.sortable ? (
+                    <button
+                      onClick={() => toggleSort(column.id)}
+                      className={cn(
+                        "flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer border-0 bg-transparent",
+                        column.align === "center" && "justify-center",
+                        column.align === "right" && "justify-end",
+                        !column.align && "justify-start",
+                      )}
+                      disabled={isLoading || paginatedKeys.length === 0}
+                    >
+                      <TruncatedTextWithTooltip text={column.header} />
+                      {renderSortIndicator(column.id)}
+                    </button>
+                  ) : (
+                    <div className={cn(
+                      "flex items-center h-full min-h-[2.5rem] px-4 py-2",
+                      column.align === "center" && "justify-center text-center",
+                      column.align === "right" && "justify-end text-right",
+                      !column.align && "justify-start text-left",
+                    )}>
+                      <TruncatedTextWithTooltip text={column.header} />
+                    </div>
+                  )}
+                </TableHead>
+              ))}
+
+              {/* Scrollbar spacer - only show if not overlay scrollbar */}
+              {!isOverlay && (
+                <TableHead style={{ width: `${scrollbarWidth}px`, minWidth: `${scrollbarWidth}px` }} className="bg-muted p-0 border-0 !border-r-0 shrink-0"></TableHead>
+              )}
+            </TableRow>
+          </TableHeader>
+        </Table>
       </div>
 
-      {/* Pagination */}
-      {sortedKeys.length > 0 && (
-      <div className="mt-4">
+      {/* Scrollable Body Table */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden border-l border-r border-border">
+        <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
+          <TableBody>
+            {sortedKeys.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length + 1} className="p-0">
+                  <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                    <IconClock className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                    <div className="text-lg font-medium mb-2">Nenhuma chave encontrada</div>
+                    <div className="text-sm">
+                      {keys.length === 0
+                        ? "Não há chaves de throttler registradas no momento."
+                        : "Nenhuma chave corresponde aos filtros aplicados."}
+                    </div>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              paginatedKeys.map((key, index) => {
+                const keyIsSelected = selectedIds.has(key.key);
+
+                return (
+                  <TableRow
+                    key={key.key}
+                    data-state={keyIsSelected ? "selected" : undefined}
+                    className={cn(
+                      "cursor-pointer transition-colors border-b border-border",
+                      // Alternating row colors
+                      index % 2 === 1 && "bg-muted/10",
+                      // Hover state that works with alternating colors
+                      "hover:bg-muted/20",
+                      // Selected state overrides alternating colors
+                      keyIsSelected && "bg-muted/30 hover:bg-muted/40",
+                    )}
+                    onContextMenu={(e) => handleContextMenu(e, key)}
+                    onClick={(e) => {
+                      if (e.ctrlKey || e.metaKey) {
+                        toggleSelection(key.key);
+                      }
+                    }}
+                  >
+                    {/* Selection checkbox */}
+                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox checked={keyIsSelected} onCheckedChange={() => toggleSelection(key.key)} aria-label={`Selecionar chave ${key.key}`} data-checkbox />
+                      </div>
+                    </TableCell>
+
+                    {/* Data columns */}
+                    {columns.slice(1).map((column) => (
+                      <TableCell
+                        key={column.id}
+                        className={cn(
+                          column.width,
+                          "p-0 !border-r-0"
+                        )}
+                      >
+                        <div className={cn(
+                          "flex items-center px-4 py-2",
+                          column.align === "center" && "justify-center",
+                          column.align === "right" && "justify-end",
+                          column.align === "left" && "justify-start",
+                          !column.align && "justify-start",
+                        )}>
+                          {column.cell(key)}
+                        </div>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination Footer */}
+      <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50">
         <SimplePaginationAdvanced
           currentPage={page}
           totalPages={totalPages}
           onPageChange={setPage}
           pageSize={pageSize}
+          totalItems={totalRecords}
+          pageSizeOptions={[20, 40, 60, 100]}
           onPageSizeChange={setPageSize}
-          totalRecords={totalRecords}
+          showPageSizeSelector={true}
+          showGoToPage={true}
+          showPageInfo={true}
         />
       </div>
-      )}
 
       {/* Context Menu */}
-      {contextMenu && (
-        <div
-          className="fixed z-50 min-w-[200px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+      <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
+        <DropdownMenuContent
+          style={{
+            position: "fixed",
+            left: contextMenu?.x,
+            top: contextMenu?.y,
+          }}
+          className="w-56"
+          onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          <button
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
-            onClick={() => {
+          {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.keys.length} chaves selecionadas</div>}
+
+          <DropdownMenuItem onClick={() => {
+            if (contextMenu) {
               onClearKeys?.(contextMenu.keys);
-              closeContextMenu();
-            }}
-          >
-            <IconTrash className="h-4 w-4" />
-            <span>Limpar {contextMenu.isBulk ? `${contextMenu.keys.length} chaves` : "chave"}</span>
-          </button>
-        </div>
-      )}
+              setContextMenu(null);
+            }
+          }}>
+            <IconTrash className="mr-2 h-4 w-4" />
+            {contextMenu?.isBulk && contextMenu.keys.length > 1 ? `Limpar ${contextMenu.keys.length} chaves` : "Limpar chave"}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

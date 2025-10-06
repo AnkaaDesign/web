@@ -409,9 +409,9 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
 
   return (
     <>
-      <div className="border border-border rounded-md overflow-hidden">
+      <div className="border border-neutral-400 dark:border-neutral-600 rounded-md overflow-hidden">
         <Table>
-          <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
+          <TableHeader className="[&_tr]:!border-b [&_tr]:border-neutral-400 dark:[&_tr]:border-neutral-600 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
               {columns.map((column) => {
                 const isSortable = column.sortable !== false;
@@ -451,10 +451,10 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
             </TableRow>
           </TableHeader>
           <TableBody>
-            {preparedTasks.map((task) => (
+            {preparedTasks.map((task, index) => (
               <tr
                 key={task.id}
-                className={cn("cursor-pointer transition-colors border-b border-border", getRowClassName(task))}
+                className={cn("cursor-pointer transition-colors", index < preparedTasks.length - 1 && "border-b border-neutral-400 dark:border-neutral-600", getRowClassName(task))}
                 onClick={(e) => handleRowClick(e, task.id)}
                 onContextMenu={(e) => handleContextMenu(e, task)}
               >

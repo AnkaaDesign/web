@@ -98,7 +98,7 @@ export const ColumnVisibilityManager = React.memo(function ColumnVisibilityManag
 
           <div className="relative">
             <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input type="text" placeholder="Buscar coluna..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9" />
+            <Input type="text" placeholder="Buscar coluna..." value={searchQuery} onChange={(value) => setSearchQuery(value as string)} className="pl-9 h-9" />
           </div>
 
           <div className="flex gap-2 mt-2">

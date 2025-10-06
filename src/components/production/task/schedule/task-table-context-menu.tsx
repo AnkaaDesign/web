@@ -52,21 +52,21 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
 
         {/* Status actions */}
         {(hasPendingTasks || hasOnHoldTasks) && (
-          <DropdownMenuItem onClick={() => handleAction("start")}>
+          <DropdownMenuItem onClick={() => handleAction("start")} className="text-green-700 hover:text-white">
             <IconPlayerPlay className="mr-2 h-4 w-4" />
             Iniciar
           </DropdownMenuItem>
         )}
 
         {(hasInProgressTasks || hasOnHoldTasks || hasPendingTasks) && (
-          <DropdownMenuItem onClick={() => handleAction("pause")}>
+          <DropdownMenuItem onClick={() => handleAction("pause")} className="text-blue-600 hover:text-white">
             <IconPlayerPause className="mr-2 h-4 w-4" />
             {hasPendingTasks && !hasInProgressTasks ? "Colocar em Espera" : "Pausar"}
           </DropdownMenuItem>
         )}
 
         {hasInProgressTasks && (
-          <DropdownMenuItem onClick={() => handleAction("finish")}>
+          <DropdownMenuItem onClick={() => handleAction("finish")} className="text-green-700 hover:text-white">
             <IconCheck className="mr-2 h-4 w-4" />
             Finalizar
           </DropdownMenuItem>

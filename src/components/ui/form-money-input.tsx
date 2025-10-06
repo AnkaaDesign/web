@@ -1,7 +1,4 @@
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { CurrencyInput } from "@/components/ui/currency-input";
-import { IconCurrencyReal } from "@tabler/icons-react";
-import { useFormContext } from "react-hook-form";
+import { FormInput } from "@/components/ui/form-input";
 
 interface FormMoneyInputProps {
   name: string;
@@ -20,31 +17,15 @@ export function FormMoneyInput({
   required = false,
   className,
 }: FormMoneyInputProps) {
-  const form = useFormContext();
-
   return (
-    <FormField
-      control={form.control}
+    <FormInput
       name={name}
-      render={({ field }) => (
-        <FormItem className={className}>
-          <FormLabel className="flex items-center gap-2">
-            <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
-            {label}
-            {required && <span className="text-destructive">*</span>}
-          </FormLabel>
-          <FormControl>
-            <CurrencyInput
-              value={field.value}
-              onChange={field.onChange}
-              placeholder={placeholder}
-              disabled={disabled}
-              className="transition-all duration-200 focus:ring-2 focus:ring-ring/20"
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
+      type="currency"
+      label={label}
+      placeholder={placeholder}
+      disabled={disabled}
+      required={required}
+      className={className}
     />
   );
 }

@@ -4,7 +4,16 @@
 // Core Utilities & Factories
 // =====================================================
 export * from "./queryKeys";
-export * from "./createEntityHooks";
+export {
+  createEntityHooks,
+  createSpecializedQueryHook,
+} from "./createEntityHooks";
+export type {
+  EntityService,
+  QueryKeys,
+  EntityHooksConfig,
+  SpecializedQueryConfig,
+} from "./createEntityHooks";
 export * from "./useEditForm";
 
 // =====================================================
@@ -16,7 +25,31 @@ export * from "./usePrivileges";
 // =====================================================
 // Statistics & Analytics Hooks
 // =====================================================
-export * from "./use-inventory-statistics";
+export {
+  inventoryStatisticsKeys,
+  useStatisticsFilters,
+  useInventoryStatistics,
+  useStockTrends,
+  useActivityAnalytics,
+  useStockMetrics,
+  useForecastingMetrics,
+  usePerformanceMetrics,
+  useConsumptionStatistics,
+  useComputedInventoryMetrics,
+  useRealTimeStatistics,
+  useStatisticsCache,
+} from "./use-inventory-statistics";
+export type {
+  StatisticsFilterState,
+  StatisticsFilters,
+  InventoryStatistics,
+  StockTrends,
+  ActivityAnalytics,
+  StockMetrics,
+  ForecastingMetrics,
+  PerformanceMetrics,
+  ConsumptionStatistics,
+} from "./use-inventory-statistics";
 // Re-export specific functions from other files to avoid conflicts
 export {
   useActivityAnalytics as useActivityAnalyticsDetailed,
@@ -37,7 +70,14 @@ export {
 // UI & Form Hooks
 // =====================================================
 export * from "./use-search-input";
-export * from "./use-advanced-search";
+export { useAdvancedSearch } from "./use-advanced-search";
+export type {
+  SearchField,
+  SearchSuggestion,
+  SearchEmptyState,
+  UseAdvancedSearchOptions,
+  UseAdvancedSearchReturn,
+} from "./use-advanced-search";
 
 // =====================================================
 // Work Module Hooks
@@ -74,7 +114,6 @@ export * from "./bonus";
 export * from "./payroll";
 export {
   payrollDetailsKeys,
-  PayrollComparison,
   usePayrollDetails,
   usePayrollLiveDetails,
   usePayrollUserStats,
@@ -82,6 +121,7 @@ export {
   useCalculatePayrollBonuses,
   usePayrollComparison
 } from "./payrollDetails";
+export type { PayrollComparison } from "./payrollDetails";
 export * from "./useHoliday";
 export * from "./useVacation";
 export * from "./useWarning";

@@ -1,5 +1,6 @@
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
+import { IconPackage } from "@tabler/icons-react";
 import { PPE_DELIVERY_MODE, DELIVERY_MODE_LABELS } from "../../../../constants";
 
 interface PpeDeliveryModeSelectorProps {
@@ -21,7 +22,8 @@ export function PpeDeliveryModeSelector({ control, name = "ppeConfig.deliveryMod
       name={name}
       render={({ field }) => (
         <FormItem>
-          <FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconPackage className="h-4 w-4" />
             Modo de Entrega do EPI
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>

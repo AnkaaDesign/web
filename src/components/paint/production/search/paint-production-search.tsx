@@ -248,7 +248,7 @@ export function PaintProductionSearch({ filters, onFilterChange, onClearFilters,
       <div className="flex gap-3">
         <div className="flex-1 relative">
           <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input type="text" placeholder={searchPlaceholder} value={displaySearchText} onChange={(e) => handleSearchChange(e.target.value)} className="pl-10" />
+          <Input type="text" placeholder={searchPlaceholder} value={displaySearchText} onChange={(value) => handleSearchChange(value as string)} className="pl-10" />
         </div>
         <Button
           variant="outline"

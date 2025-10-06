@@ -228,7 +228,7 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
               }));
             }}
             disabled={disabled}
-            transparent={false}
+            transparent={true}
             className="w-full md:w-32"
           />
 

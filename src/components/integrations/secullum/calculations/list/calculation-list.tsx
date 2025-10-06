@@ -72,17 +72,6 @@ const getPayrollPeriod = (selectedMonth: Date) => {
 export function CalculationList({ className }: CalculationListProps) {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // State to hold current page items and total count from the table
-  const [tableData, setTableData] = useState<{ items: CalculationRow[]; totalRecords: number }>({
-    items: [],
-    totalRecords: 0
-  });
-
-  // Stable callback for table data updates
-  const handleTableDataChange = useCallback((data: { items: CalculationRow[]; totalRecords: number }) => {
-    setTableData(data);
-  }, []);
-
   // Get selected month from URL or default to current month
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
     const monthParam = searchParams.get("month");
@@ -366,6 +355,12 @@ export function CalculationList({ className }: CalculationListProps) {
     }));
   }, [usersData]);
 
+  // Memoize export filters to prevent unnecessary re-renders
+  const exportFilters = useMemo(() => ({
+    selectedMonth,
+    userId: selectedUserId,
+  }), [selectedMonth, selectedUserId]);
+
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
       <CardContent className="flex-1 flex flex-col p-6 space-y-4 min-h-0">
@@ -434,9 +429,9 @@ export function CalculationList({ className }: CalculationListProps) {
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
             <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <CalculationExport
-              filters={{ selectedMonth, userId: selectedUserId }}
-              currentItems={tableData.items}
-              totalRecords={tableData.totalRecords}
+              filters={exportFilters}
+              currentItems={calculationRows}
+              totalRecords={calculationRows.length}
               visibleColumns={visibleColumns}
             />
           </div>
@@ -450,7 +445,6 @@ export function CalculationList({ className }: CalculationListProps) {
             totalsRow={totalsRow}
             isLoading={isLoading}
             className="h-full"
-            onDataChange={handleTableDataChange}
           />
         </div>
       </CardContent>

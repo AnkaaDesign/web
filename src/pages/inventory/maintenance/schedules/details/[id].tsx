@@ -165,7 +165,6 @@ export function MaintenanceScheduleDetailPage() {
 
   const handleRefresh = () => {
     refetch();
-    toast.success("Dados atualizados");
   };
 
   const handleDelete = async () => {

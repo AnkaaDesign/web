@@ -122,14 +122,14 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
               type="text"
               placeholder="Buscar por nome, cliente, número de série, placa, setor..."
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              onChange={setSearchText}
               transparent={true}
               className="pl-9"
             />
           </div>
           <div className="flex gap-2">
-            <TaskScheduleExport tasks={filteredTasks} visibleColumns={visibleColumns} />
             <ColumnVisibilityManager visibleColumns={visibleColumns} onColumnVisibilityChange={setVisibleColumns} />
+            <TaskScheduleExport tasks={filteredTasks} visibleColumns={visibleColumns} />
           </div>
         </div>
 

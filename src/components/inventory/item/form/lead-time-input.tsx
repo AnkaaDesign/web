@@ -1,5 +1,6 @@
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { IconClock } from "@tabler/icons-react";
 import { useFormContext } from "react-hook-form";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
 
@@ -18,10 +19,13 @@ export function LeadTimeInput({ disabled }: LeadTimeInputProps) {
       name="estimatedLeadTime"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>Prazo de Entrega Estimado</FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconClock className="h-4 w-4" />
+            Prazo de Entrega Estimado
+          </FormLabel>
           <FormControl>
             <div className="flex items-center gap-2">
-              <Input type="number" min={1} step={1} placeholder="30" disabled={disabled} value={field.value} onChange={(value) => field.onChange(value)} transparent={false} className="flex-1" />
+              <Input type="number" min={1} step={1} placeholder="30" disabled={disabled} value={field.value} onChange={(value) => field.onChange(value)} transparent={true} className="flex-1" />
               <span className="text-sm text-muted-foreground">dias</span>
             </div>
           </FormControl>

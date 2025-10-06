@@ -6,7 +6,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Combobox } from "@/components/ui/combobox";
+import type { ComboboxOption } from "@/components/ui/combobox";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -399,6 +400,25 @@ export const TaskDetailsPage = () => {
   // Get airbrushings directly from task (they're included in the task query)
   const airbrushings = task?.airbrushings || [];
 
+  // Fetch layouts for truck dimensions
+  const { data: layouts } = useLayoutsByTruck(task?.truck?.id || '', {
+    enabled: !!task?.truck?.id,
+  });
+
+  // Calculate truck dimensions from any available layout
+  const truckDimensions = useMemo(() => {
+    if (!layouts) return null;
+
+    const layout = layouts.leftSideLayout || layouts.rightSideLayout || layouts.backSideLayout;
+    if (!layout) return null;
+
+    const height = Math.round(layout.height * 100); // Convert to cm and round
+    const sections = layout.layoutSections || layout.sections;
+    const totalWidth = Math.round(sections.reduce((sum: number, s: any) => sum + s.width * 100, 0));
+
+    return { width: totalWidth, height };
+  }, [layouts]);
+
   // Filter service orders to show only PENDING, IN_PROGRESS, and COMPLETED
   const filteredServiceOrders = useMemo(() => {
     if (!task?.services) return [];
@@ -449,10 +469,8 @@ export const TaskDetailsPage = () => {
 
       await update(updateData);
       setStatusChangeDialogOpen(false);
-      toast.success("Status da tarefa atualizado com sucesso!");
     } catch (error) {
       console.error("Error updating task status:", error);
-      toast.error("Erro ao atualizar status da tarefa");
     } finally {
       setIsUpdating(false);
     }
@@ -486,15 +504,10 @@ export const TaskDetailsPage = () => {
           setPendingServiceOrder(serviceOrder);
           setNextServiceOrderToStart(nextServiceOrder);
           setServiceOrderCompletionDialogOpen(true);
-        } else {
-          toast.success("Ordem de serviço finalizada com sucesso!");
         }
-      } else {
-        toast.success("Status da ordem de serviço atualizado com sucesso!");
       }
     } catch (error) {
       console.error("Error updating service order status:", error);
-      toast.error("Erro ao atualizar status da ordem de serviço");
     }
   };
 
@@ -514,10 +527,8 @@ export const TaskDetailsPage = () => {
       setServiceOrderCompletionDialogOpen(false);
       setPendingServiceOrder(null);
       setNextServiceOrderToStart(null);
-      toast.success("Próxima ordem de serviço iniciada com sucesso!");
     } catch (error) {
       console.error("Error starting next service order:", error);
-      toast.error("Erro ao iniciar próxima ordem de serviço");
     }
   };
 
@@ -526,7 +537,6 @@ export const TaskDetailsPage = () => {
     setServiceOrderCompletionDialogOpen(false);
     setPendingServiceOrder(null);
     setNextServiceOrderToStart(null);
-    toast.success("Ordem de serviço finalizada com sucesso!");
   };
 
   // Loading state
@@ -683,12 +693,12 @@ export const TaskDetailsPage = () => {
                       )}
 
                       {/* Price */}
-                      {task.price && (
+                      {task.price != null && (
                         <div className="flex items-start gap-3">
                           <IconCurrencyReal className="h-5 w-5 text-muted-foreground mt-0.5" />
                           <div className="flex-1">
                             <p className="text-sm font-medium text-muted-foreground">Valor</p>
-                            <p className="text-sm font-semibold text-primary">{formatCurrency(task.price)}</p>
+                            <p className="text-sm font-semibold">{formatCurrency(task.price)}</p>
                           </div>
                         </div>
                       )}
@@ -718,13 +728,13 @@ export const TaskDetailsPage = () => {
                       )}
 
                       {/* Truck */}
-                      {task.truck && (
+                      {task.truck && truckDimensions && (
                         <div className="flex items-start gap-3">
                           <IconTruck className="h-5 w-5 text-muted-foreground mt-0.5" />
                           <div className="flex-1">
                             <p className="text-sm font-medium text-muted-foreground">Caminhão</p>
                             <p className="text-sm font-semibold">
-                              {task.truck.model} - {task.truck.plate}
+                              {truckDimensions.width}cm × {truckDimensions.height}cm
                             </p>
                           </div>
                         </div>
@@ -921,10 +931,10 @@ export const TaskDetailsPage = () => {
                           onClick={() => navigate(routes.production.cutting.details(cut.id))}
                         >
                           {/* Cut Info */}
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-sm font-semibold truncate">{cut.file?.filename || "Arquivo de recorte"}</h4>
-                              <Badge variant={ENTITY_BADGE_CONFIG.CUT[cut.status] || "default"} className="text-xs">
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <h4 className="text-sm font-semibold truncate min-w-0 flex-1">{cut.file?.filename || "Arquivo de recorte"}</h4>
+                              <Badge variant={ENTITY_BADGE_CONFIG.CUT[cut.status] || "default"} className="text-xs flex-shrink-0">
                                 {CUT_STATUS_LABELS[cut.status]}
                               </Badge>
                             </div>

@@ -4,7 +4,8 @@ import { routes, ORDER_STATUS, CHANGE_LOG_ENTITY_TYPE } from "../../../../consta
 import { Button } from "@/components/ui/button";
 import { IconAlertTriangle, IconShoppingCart, IconTrash, IconRefresh, IconEdit, IconLoader2, IconCheck } from "@tabler/icons-react";
 import { toast } from "sonner";
-import { PageHeader, type PageAction } from "@/components/ui/page-header";
+import { PageHeader } from "@/components/ui/page-header";
+import type { PageAction } from "@/components/ui/page-header";
 import { OrderInfoCard, OrderItemsCard } from "@/components/inventory/order/detail";
 import { OrderDetailSkeleton } from "@/components/inventory/order/detail/order-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
@@ -102,7 +103,6 @@ const OrderDetailsPage = () => {
 
   const handleRefresh = () => {
     refetch();
-    toast.success("Dados atualizados com sucesso");
   };
 
   const handleDelete = async () => {

@@ -120,16 +120,8 @@ export function UserBatchEditTable({ users, onCancel }: UserBatchEditTableProps)
         // Show the detailed result dialog
         setBatchResult(result.data);
         setShowResultDialog(true);
-
-        const { totalSuccess, totalFailed } = result.data;
-
-        // Only show simple toast for complete success
-        if (totalFailed === 0 && totalSuccess > 0) {
-          toast.success(`${totalSuccess} ${totalSuccess === 1 ? "usuário atualizado" : "usuários atualizados"} com sucesso`);
-        }
       } else {
         // Even if we don't have detailed results, navigate back on apparent success
-        toast.success("Usuários atualizados com sucesso");
         navigate(routes.administration.collaborators.root);
       }
     } catch (error) {
@@ -140,7 +132,6 @@ export function UserBatchEditTable({ users, onCancel }: UserBatchEditTableProps)
         status: error && typeof error === "object" && "response" in error ? (error as any).response?.status : undefined,
         stack: error instanceof Error ? error.stack : undefined,
       });
-      toast.error("Erro ao atualizar usuários em lote");
     } finally {
       setIsSubmitting(false);
     }

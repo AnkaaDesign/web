@@ -11,7 +11,7 @@ import type {
   BatchUpdateResponse,
   BatchDeleteResponse,
 } from "./common";
-import { HOLIDAY_TYPE } from "../constants";
+import type { HOLIDAY_TYPE } from "../constants";
 
 export interface Holiday extends BaseEntity {
   name: string;

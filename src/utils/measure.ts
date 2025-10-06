@@ -41,6 +41,17 @@ export interface DensityCalculationSuccess extends DensityCalculation {
 
 export type DensityCalculationResult = DensityCalculationSuccess | DensityCalculationError;
 
+export type {
+  MeasureValue,
+  MeasureConversionError,
+  MeasureConversionSuccess,
+  MeasureConversionResult,
+  DensityCalculation,
+  DensityCalculationError,
+  DensityCalculationSuccess,
+  DensityCalculationResult
+};
+
 // =====================
 // Unit Categories
 // =====================
@@ -56,6 +67,8 @@ export type VolumeUnit = (typeof VOLUME_UNITS)[number];
 export type LengthUnit = (typeof LENGTH_UNITS)[number];
 export type CountUnit = (typeof COUNT_UNITS)[number];
 export type PackagingUnit = (typeof PACKAGING_UNITS)[number];
+
+export type { WeightUnit, VolumeUnit, LengthUnit, CountUnit, PackagingUnit };
 
 // =====================
 // Unit Conversion Constants

@@ -289,7 +289,6 @@ const TruckDetailsPage = () => {
   const handleRefresh = () => {
     refetch();
     refetchLayouts();
-    toast.success("Dados atualizados com sucesso");
   };
 
   return (

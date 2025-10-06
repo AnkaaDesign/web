@@ -148,13 +148,7 @@ export function ChangelogTable({ visibleColumns, className, filters = {}, onData
 
   const handleViewDetails = () => {
     if (contextMenu.changelog) {
-      navigate(routes.administration.changeLogs.details(contextMenu.changelog.id));
-    }
-  };
-
-  const handleViewEntityChangelog = () => {
-    if (contextMenu.changelog) {
-      navigate(routes.administration.changeLogs.entity(contextMenu.changelog.entityType, contextMenu.changelog.entityId));
+      navigate(routes.server.changeLogs.details(contextMenu.changelog.id));
     }
   };
 
@@ -249,7 +243,7 @@ export function ChangelogTable({ visibleColumns, className, filters = {}, onData
                       // Selected state overrides alternating colors
                       changelogIsSelected && "bg-muted/30 hover:bg-muted/40",
                     )}
-                    onClick={() => navigate(routes.administration.changeLogs.details(changelog.id))}
+                    onClick={() => navigate(routes.server.changeLogs.details(changelog.id))}
                     onContextMenu={(e) => handleContextMenu(e, changelog)}
                   >
                     {/* Selection checkbox */}
@@ -305,11 +299,6 @@ export function ChangelogTable({ visibleColumns, className, filters = {}, onData
           <DropdownMenuItem onSelect={handleViewDetails}>
             <IconEye className="mr-2 h-4 w-4" />
             Ver Detalhes
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={handleViewEntityChangelog}>
-            <IconHistory className="mr-2 h-4 w-4" />
-            Ver Histórico da Entidade
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

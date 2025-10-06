@@ -148,7 +148,7 @@ export function SimplePaginationAdvanced({
               value={pageInput}
               onChange={(e) => setPageInput(e.target.value)}
               onKeyPress={handleKeyPress}
-              className="h-9 w-16 px-3 py-2 text-sm"
+              className="h-9 w-16 px-3 py-2 text-sm bg-transparent"
               placeholder="..."
             />
           </div>

@@ -593,7 +593,7 @@ export function AdvancedFilterDialog({
       switch (field.dataType) {
         case "string":
           return (
-            <Input value={condition.value || ""} onChange={(e) => updateValue(e.target.value)} placeholder="Digite o valor..." className={cn(hasError && "border-destructive")} />
+            <Input value={condition.value || ""} onChange={(value) => updateValue(value as string)} placeholder="Digite o valor..." className={cn(hasError && "border-destructive")} />
           );
 
         case "number":
@@ -681,7 +681,7 @@ export function AdvancedFilterDialog({
           }
 
           return (
-            <Input value={condition.value || ""} onChange={(e) => updateValue(e.target.value)} placeholder="Digite o valor..." className={cn(hasError && "border-destructive")} />
+            <Input value={condition.value || ""} onChange={(value) => updateValue(value as string)} placeholder="Digite o valor..." className={cn(hasError && "border-destructive")} />
           );
 
         case "date":
@@ -720,7 +720,7 @@ export function AdvancedFilterDialog({
 
         default:
           return (
-            <Input value={condition.value || ""} onChange={(e) => updateValue(e.target.value)} placeholder="Digite o valor..." className={cn(hasError && "border-destructive")} />
+            <Input value={condition.value || ""} onChange={(value) => updateValue(value as string)} placeholder="Digite o valor..." className={cn(hasError && "border-destructive")} />
           );
       }
     },
@@ -931,7 +931,7 @@ export function AdvancedFilterDialog({
                             <Input
                               placeholder="Nome do preset..."
                               value={presetName}
-                              onChange={(e) => setPresetName(e.target.value)}
+                              onChange={(value) => setPresetName(value as string)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   handleSavePreset();

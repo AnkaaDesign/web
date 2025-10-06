@@ -5,7 +5,7 @@ import { routes } from "../../../../constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconUsers, IconPlus } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconUsers, IconPlus, IconGitMerge } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { useCustomers, useCustomerMutations, useCustomerBatchMutations } from "../../../../hooks";
@@ -25,11 +25,12 @@ interface CustomerTableProps {
   className?: string;
   onEdit?: (customers: Customer[]) => void;
   onDelete?: (customers: Customer[]) => void;
+  onMerge?: (customers: Customer[]) => void;
   filters?: Partial<CustomerGetManyFormData>;
   onDataChange?: (data: { customers: Customer[]; totalRecords: number }) => void;
 }
 
-export function CustomerTable({ visibleColumns, className, onEdit, onDelete, filters = {}, onDataChange }: CustomerTableProps) {
+export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onMerge, filters = {}, onDataChange }: CustomerTableProps) {
   const navigate = useNavigate();
   const { delete: deleteCustomer } = useCustomerMutations();
   const { batchDelete } = useCustomerBatchMutations();
@@ -465,6 +466,18 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, fil
             <IconEdit className="mr-2 h-4 w-4" />
             {contextMenu?.isBulk && contextMenu.customers.length > 1 ? "Editar em lote" : "Editar"}
           </DropdownMenuItem>
+
+          {contextMenu?.isBulk && contextMenu.customers.length > 1 && onMerge && (
+            <DropdownMenuItem onClick={() => {
+              if (contextMenu) {
+                onMerge(contextMenu.customers);
+                setContextMenu(null);
+              }
+            }}>
+              <IconGitMerge className="mr-2 h-4 w-4" />
+              Mesclar clientes
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuSeparator />
 

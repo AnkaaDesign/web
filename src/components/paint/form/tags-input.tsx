@@ -59,7 +59,7 @@ export function TagsInput({ control, disabled, required }: TagsInputProps) {
                     onKeyDown={handleKeyDown}
                     placeholder="Digite uma tag e pressione Enter ou clique em +"
                     disabled={disabled}
-                    className="flex-1"
+                    className="flex-1 bg-transparent"
                   />
                   <TooltipProvider>
                     <Tooltip>

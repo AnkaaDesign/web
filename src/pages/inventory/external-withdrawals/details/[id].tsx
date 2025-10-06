@@ -115,7 +115,6 @@ const ExternalWithdrawalDetailsPage = () => {
 
   const handleRefresh = () => {
     refetch();
-    toast.success("Dados atualizados com sucesso");
   };
 
   const handleDelete = async () => {

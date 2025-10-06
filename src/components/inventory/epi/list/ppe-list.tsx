@@ -19,6 +19,7 @@ import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/use-table-state";
 import { Badge } from "@/components/ui/badge";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { PpeExport } from "./ppe-export";
 
 interface PpeListProps {
   className?: string;
@@ -316,7 +317,6 @@ export function PpeList({ className }: PpeListProps) {
           </div>
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)} className="group">
               <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
               <span className="text-foreground">Filtros</span>
@@ -326,6 +326,8 @@ export function PpeList({ className }: PpeListProps) {
                 </Badge>
               )}
             </Button>
+            <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
+            <PpeExport filters={queryFilters} currentItems={tableData.items} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
           </div>
         </div>
 

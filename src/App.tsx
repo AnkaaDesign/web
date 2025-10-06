@@ -66,10 +66,6 @@ const AdministrationNotificationsSend = lazy(() => import("@/pages/administratio
 
 const AdministrationChangeLogs = lazy(() => import("@/pages/administration/change-logs/list").then((module) => ({ default: module.default })));
 const AdministrationChangeLogsDetails = lazy(() => import("@/pages/administration/change-logs/details/[id]").then((module) => ({ default: module.ChangeLogDetails })));
-const AdministrationChangeLogsEntitySelector = lazy(() => import("@/pages/administration/change-logs/entity"));
-const AdministrationChangeLogsEntity = lazy(() =>
-  import("@/pages/administration/change-logs/entity/[entityType]/[entityId]").then((module) => ({ default: module.ChangeLogEntityDetails })),
-);
 
 // Statistics Pages
 const StatisticsRoot = lazy(() => import("@/pages/inventory/statistics"));
@@ -143,6 +139,7 @@ const InventoryProductsCreate = lazy(() => import("@/pages/inventory/products/cr
 const InventoryProductsEdit = lazy(() => import("@/pages/inventory/products/edit/[id]").then((module) => ({ default: module.EditProductPage })));
 const InventoryProductsDetails = lazy(() => import("@/pages/inventory/products/details/[id]").then((module) => ({ default: module.default })));
 const InventoryProductsBatchEdit = lazy(() => import("@/pages/inventory/products/batch-edit").then((module) => ({ default: module.default })));
+const InventoryProductsStockBalance = lazy(() => import("@/pages/inventory/products/stock-balance").then((module) => ({ default: module.default })));
 const InventoryProductsCategories = lazy(() => import("@/pages/inventory/products/categories/list").then((module) => ({ default: module.default })));
 const InventoryProductsCategoriesCreate = lazy(() => import("@/pages/inventory/products/categories/create").then((module) => ({ default: module.default })));
 const InventoryProductsCategoriesEdit = lazy(() => import("@/pages/inventory/products/categories/edit/[id]").then((module) => ({ default: module.default })));
@@ -750,7 +747,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.administration.changeLogs.root}
+                  path={routes.server.changeLogs.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <AdministrationChangeLogs />
@@ -758,26 +755,10 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.administration.changeLogs.details(":id")}
+                  path={routes.server.changeLogs.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <AdministrationChangeLogsDetails />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path="/administracao/registros-de-alteracoes/entidade"
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <AdministrationChangeLogsEntitySelector />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.administration.changeLogs.entity(":entityType", ":entityId")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <AdministrationChangeLogsEntity />
                     </Suspense>
                   }
                 />
@@ -1249,6 +1230,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <InventoryProductsBatchEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.inventory.products.stockBalance}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <InventoryProductsStockBalance />
                     </Suspense>
                   }
                 />

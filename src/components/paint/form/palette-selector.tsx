@@ -2,6 +2,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Combobox } from "@/components/ui/combobox";
 import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas";
 import { COLOR_PALETTE, COLOR_PALETTE_LABELS, COLOR_PALETTE_ORDER } from "../../../constants";
+import { IconPalette } from "@tabler/icons-react";
 
 interface PaletteSelectorProps {
   control: any;
@@ -43,7 +44,8 @@ export function PaletteSelector({ control, disabled, required }: PaletteSelector
       name="palette"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconPalette className="h-4 w-4" />
             Paleta de Cores
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>
@@ -59,6 +61,7 @@ export function PaletteSelector({ control, disabled, required }: PaletteSelector
               clearable={true}
               emptyText="Nenhuma paleta encontrada"
               searchPlaceholder="Pesquisar paleta..."
+              className="bg-transparent"
               renderOption={(option, isSelected) => (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 rounded border border-border" style={{ backgroundColor: option.metadata?.color }} />

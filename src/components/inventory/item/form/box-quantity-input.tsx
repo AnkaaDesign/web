@@ -5,5 +5,5 @@ interface BoxQuantityInputProps {
 }
 
 export function BoxQuantityInput({ disabled }: BoxQuantityInputProps) {
-  return <FormQuantityInput name="boxQuantity" label="Quantidade por Caixa" placeholder="1" disabled={disabled} min={1} integer={true} transparent={false} />;
+  return <FormQuantityInput name="boxQuantity" label="Quantidade por Caixa" placeholder="1" disabled={disabled} min={1} integer={true} transparent={true} />;
 }

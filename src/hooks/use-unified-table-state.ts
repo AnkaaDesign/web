@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useUrlStateCoordinator, UrlUpdateAction } from "./use-url-state-coordinator";
+import { useUrlStateCoordinator } from "./use-url-state-coordinator";
+import type { UrlUpdateAction } from "./use-url-state-coordinator";
 import {
   extractActiveFilters,
-  FilterIndicator,
   hasActiveFilters as utilsHasActiveFilters,
   countActiveFilters,
   convertFiltersToApiFormat,
-  ExtractFilterOptions,
 } from "../utils/table-filter-utils";
+import type { FilterIndicator, ExtractFilterOptions } from "../utils/table-filter-utils";
 
 // ============================
 // Core Type Definitions

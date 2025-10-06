@@ -715,7 +715,7 @@ const BackupManagementPage = () => {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="backup-name">Nome do Backup</Label>
-                <Input id="backup-name" value={newBackup.name} onChange={(e) => setNewBackup({ ...newBackup, name: e.target.value })} placeholder="Ex: backup_sistema_2024-09-12" />
+                <Input id="backup-name" value={newBackup.name} onChange={(value) => setNewBackup({ ...newBackup, name: value as string })} placeholder="Ex: backup_sistema_2024-09-12" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="backup-type">Tipo de Backup</Label>
@@ -736,7 +736,7 @@ const BackupManagementPage = () => {
                 <Input
                   id="backup-description"
                   value={newBackup.description}
-                  onChange={(e) => setNewBackup({ ...newBackup, description: e.target.value })}
+                  onChange={(value) => setNewBackup({ ...newBackup, description: value as string })}
                   placeholder="Descrição do backup..."
                 />
               </div>
@@ -811,7 +811,7 @@ const BackupManagementPage = () => {
                     <div className="space-y-3">
                       <Label>Pastas Personalizadas</Label>
                       <div className="flex gap-2">
-                        <Input value={customPathInput} onChange={(e) => setCustomPathInput(e.target.value)} placeholder="/caminho/para/pasta" />
+                        <Input value={customPathInput} onChange={(value) => setCustomPathInput(value as string)} placeholder="/caminho/para/pasta" />
                         <Button
                           type="button"
                           variant="outline"
@@ -944,7 +944,7 @@ const BackupManagementPage = () => {
                 <Input
                   id="schedule-name"
                   value={newSchedule.name}
-                  onChange={(e) => setNewSchedule({ ...newSchedule, name: e.target.value })}
+                  onChange={(value) => setNewSchedule({ ...newSchedule, name: value as string })}
                   placeholder="Ex: Backup Diário do Sistema"
                 />
               </div>

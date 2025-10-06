@@ -65,12 +65,7 @@ export const useLayoutSectionMutations = () => {
       queryClient.invalidateQueries({
         queryKey: ["layouts", "detail", variables.layoutId],
       });
-      toast.success("Seção criada com sucesso");
       return response;
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message || "Erro ao criar seção";
-      toast.error(message);
     },
   });
 
@@ -91,12 +86,7 @@ export const useLayoutSectionMutations = () => {
           queryKey: ["layouts", "detail", sectionData.layoutId],
         });
       }
-      toast.success("Seção atualizada com sucesso");
       return response;
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message || "Erro ao atualizar seção";
-      toast.error(message);
     },
   });
 
@@ -141,12 +131,7 @@ export const useLayoutSectionMutations = () => {
         });
       });
 
-      toast.success(`${response.data.totalSuccess} seções criadas com sucesso`);
       return response;
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message || "Erro ao criar seções em lote";
-      toast.error(message);
     },
   });
 

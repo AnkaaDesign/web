@@ -1,49 +1,46 @@
 import React from "react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { IconDotsVertical, IconEdit, IconTrash, IconEye, IconPhoto } from "@tabler/icons-react";
+import { IconPhoto } from "@tabler/icons-react";
 import { formatDate, formatRelativeTime, formatCurrency } from "../../../../utils";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
+import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import type { Airbrushing } from "../../../../types";
-import type { StandardizedColumn } from "@/components/ui/standardized-table";
 
-interface AirbrushingTableColumnsProps {
-  selection: Record<string, boolean>;
-  onRowSelection: (airbrushingId: string, selected: boolean) => void;
-  onView: (airbrushing: Airbrushing, event?: React.MouseEvent) => void;
-  onEdit: (airbrushing: Airbrushing, event?: React.MouseEvent) => void;
-  onDelete: (airbrushing: Airbrushing, event?: React.MouseEvent) => void;
+export interface AirbrushingColumn {
+  key: string;
+  header: string;
+  accessor: (airbrushing: Airbrushing) => React.ReactNode;
+  sortable: boolean;
+  className?: string;
+  align?: "left" | "center" | "right";
 }
 
 export function getDefaultVisibleColumns(): Set<string> {
   return new Set(["task.name", "task.customer.fantasyName", "status", "price", "startDate", "finishDate", "artworksCount"]);
 }
 
-export function getAirbrushingTableColumns({ selection, onRowSelection, onView, onEdit, onDelete }: AirbrushingTableColumnsProps): StandardizedColumn<Airbrushing>[] {
+export function createAirbrushingColumns(): AirbrushingColumn[] {
   return [
     {
-      key: "select",
-      header: "",
-      accessor: (airbrushing) => <Checkbox checked={!!selection[airbrushing.id]} onCheckedChange={(checked) => onRowSelection(airbrushing.id, !!checked)} />,
-      className: "w-12",
-    },
-    {
       key: "task.name",
-      header: "Tarefa",
+      header: "TAREFA",
       accessor: (airbrushing) => (
         <div className="space-y-1">
-          {airbrushing.task ? <TruncatedTextWithTooltip text={airbrushing.task.name} className="font-medium" /> : <span className="text-muted-foreground">-</span>}
+          {airbrushing.task ? (
+            <TruncatedTextWithTooltip text={airbrushing.task.name} className="font-medium" />
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
         </div>
       ),
       sortable: true,
-      className: "min-w-[200px]",
+      className: TABLE_LAYOUT.firstDataColumn.className,
+      align: "left",
     },
     {
       key: "task.customer.fantasyName",
-      header: "Cliente",
+      header: "CLIENTE",
       accessor: (airbrushing) => (
         <div className="space-y-1">
           {airbrushing.task?.customer ? (
@@ -53,15 +50,23 @@ export function getAirbrushingTableColumns({ selection, onRowSelection, onView, 
           )}
         </div>
       ),
-      className: "min-w-[180px]",
+      sortable: true,
+      className: "w-48",
+      align: "left",
     },
     {
       key: "status",
-      header: "Status",
+      header: "STATUS",
       accessor: (airbrushing) => (
         <Badge
           variant={
-            airbrushing.status === "PENDING" ? "secondary" : airbrushing.status === "IN_PRODUCTION" ? "default" : airbrushing.status === "COMPLETED" ? "success" : "destructive"
+            airbrushing.status === "PENDING"
+              ? "secondary"
+              : airbrushing.status === "IN_PRODUCTION"
+                ? "default"
+                : airbrushing.status === "COMPLETED"
+                  ? "success"
+                  : "destructive"
           }
           className="whitespace-nowrap"
         >
@@ -70,19 +75,23 @@ export function getAirbrushingTableColumns({ selection, onRowSelection, onView, 
       ),
       sortable: true,
       className: "w-32",
+      align: "left",
     },
     {
       key: "price",
-      header: "Preço",
+      header: "PREÇO",
       accessor: (airbrushing) => (
-        <div className="text-sm font-medium">{airbrushing.price !== null ? formatCurrency(airbrushing.price) : <span className="text-muted-foreground">-</span>}</div>
+        <div className="font-medium truncate">
+          {airbrushing.price !== null ? formatCurrency(airbrushing.price) : <span className="text-muted-foreground">-</span>}
+        </div>
       ),
       sortable: true,
-      className: "w-28 text-right",
+      className: "w-28",
+      align: "left",
     },
     {
       key: "startDate",
-      header: "Data Início",
+      header: "DATA INÍCIO",
       accessor: (airbrushing) => (
         <div className="space-y-1">
           {airbrushing.startDate ? (
@@ -96,11 +105,12 @@ export function getAirbrushingTableColumns({ selection, onRowSelection, onView, 
         </div>
       ),
       sortable: true,
-      className: "w-32",
+      className: "w-40",
+      align: "left",
     },
     {
       key: "finishDate",
-      header: "Data Finalização",
+      header: "DATA FINALIZAÇÃO",
       accessor: (airbrushing) => (
         <div className="space-y-1">
           {airbrushing.finishDate ? (
@@ -114,46 +124,48 @@ export function getAirbrushingTableColumns({ selection, onRowSelection, onView, 
         </div>
       ),
       sortable: true,
-      className: "w-32",
+      className: "w-40",
+      align: "left",
     },
     {
       key: "artworksCount",
-      header: "Artes",
+      header: "ARTES",
       accessor: (airbrushing) => (
         <div className="flex items-center gap-1.5">
           <IconPhoto className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium">{airbrushing.artworks?.length || 0}</span>
         </div>
       ),
-      className: "w-20 text-center",
+      sortable: false,
+      className: "w-24",
+      align: "left",
     },
     {
-      key: "actions",
-      header: "",
+      key: "createdAt",
+      header: "CRIADO EM",
       accessor: (airbrushing) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-              <IconDotsVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={(e: React.MouseEvent) => onView(airbrushing, e)}>
-              <IconEye className="h-4 w-4 mr-2" />
-              Ver detalhes
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e: React.MouseEvent) => onEdit(airbrushing, e)}>
-              <IconEdit className="h-4 w-4 mr-2" />
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e: React.MouseEvent) => onDelete(airbrushing, e)} className="text-destructive">
-              <IconTrash className="h-4 w-4 mr-2" />
-              Excluir
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="text-sm text-muted-foreground">
+          {new Date(airbrushing.createdAt).toLocaleDateString("pt-BR")}
+        </div>
       ),
-      className: "w-12",
+      sortable: true,
+      className: "w-32",
+      align: "left",
+    },
+    {
+      key: "updatedAt",
+      header: "ATUALIZADO EM",
+      accessor: (airbrushing) => (
+        <div className="text-sm text-muted-foreground">
+          {new Date(airbrushing.updatedAt).toLocaleDateString("pt-BR")}
+        </div>
+      ),
+      sortable: true,
+      className: "w-32",
+      align: "left",
     },
   ];
 }
+
+// Export alias for backwards compatibility
+export const getAirbrushingTableColumns = createAirbrushingColumns;

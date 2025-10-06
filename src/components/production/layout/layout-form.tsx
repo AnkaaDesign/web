@@ -381,6 +381,45 @@ export const LayoutForm = ({
     return initialStates;
   });
 
+  // Sync layout prop changes with internal state
+  useEffect(() => {
+    if (layout) {
+      const state: SideState = {
+        height: (layout.height || 2.4) * 100,
+        totalWidth: 800,
+        doors: []
+      };
+
+      if (layout.sections && layout.sections.length > 0) {
+        const total = layout.sections.reduce((sum, s) => sum + s.width * 100, 0);
+        state.totalWidth = total || 800;
+
+        // Extract doors from sections
+        const extractedDoors: Door[] = [];
+        let currentPos = 0;
+
+        layout.sections.forEach((section, idx) => {
+          if (section.isDoor) {
+            extractedDoors.push({
+              id: `door-${selectedSide}-${idx}-${Date.now()}-${Math.random()}`,
+              position: currentPos,
+              width: section.width * 100,
+              offsetTop: (section.doorOffset || 0.5) * 100
+            });
+          }
+          currentPos += section.width * 100;
+        });
+
+        state.doors = extractedDoors;
+      }
+
+      setSideStates(prev => ({
+        ...prev,
+        [selectedSide]: state
+      }));
+    }
+  }, [layout, selectedSide]);
+
   // Get current side's state
   const currentState = sideStates[selectedSide];
   const shouldShowPhoto = showPhoto ?? selectedSide === 'back';

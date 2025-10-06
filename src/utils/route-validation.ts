@@ -80,9 +80,6 @@ const VALID_ROUTES = [
   routes.administration.notifications.create,
   routes.administration.notifications.edit(":id"),
   routes.administration.notifications.details(":id"),
-  routes.administration.changeLogs.root,
-  routes.administration.changeLogs.details(":id"),
-  routes.administration.changeLogs.entity(":entityType", ":entityId"),
 
   // Statistics routes
   routes.statistics.root,
@@ -266,7 +263,8 @@ export const ROUTE_FIXES: Record<string, string> = {
   // Administration route mappings
   "/administracao/clientes/listar": "/administracao/clientes",
   "/administracao/colaboradores/listar": "/administracao/colaboradores",
-  "/administracao/registros-de-alteracoes/listar": "/administracao/registros-de-alteracoes",
+  "/administracao/registros-de-alteracoes/listar": "/servidor/registros-de-alteracoes",
+  "/administracao/registros-de-alteracoes": "/servidor/registros-de-alteracoes",
   "/administracao/arquivos/listar": "/administracao/arquivos",
   "/administracao/setores/listar": "/administracao/setores",
   "/administracao/notificacoes/listar": "/administracao/notificacoes",

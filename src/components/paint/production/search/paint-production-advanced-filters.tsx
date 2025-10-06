@@ -157,7 +157,7 @@ export function PaintProductionAdvancedFilters({ filters, onFilterChange, classN
               <Input
                 placeholder="Buscar fórmulas por nome da tinta ou descrição..."
                 value={formulaSearchTerm}
-                onChange={(e) => setFormulaSearchTerm(e.target.value)}
+                onChange={(value) => setFormulaSearchTerm(value as string)}
                 onFocus={() => setShowFormulaSearch(true)}
               />
             </div>

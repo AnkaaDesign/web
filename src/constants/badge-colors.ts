@@ -58,7 +58,8 @@ import {
  * Badge Variant Types
  * These are the available badge variants in the UI components
  */
-export type BadgeVariant =
+export type { BadgeVariant };
+type BadgeVariant =
   | "default"
   | "primary"
   | "secondary"
@@ -198,7 +199,7 @@ export const ENTITY_BADGE_CONFIG = {
   ORDER: {
     [ORDER_STATUS.CREATED]: "primary" as BadgeVariant,
     [ORDER_STATUS.PARTIALLY_FULFILLED]: "warning" as BadgeVariant,
-    [ORDER_STATUS.FULFILLED]: "success" as BadgeVariant,
+    [ORDER_STATUS.FULFILLED]: "pending" as BadgeVariant, // Yellow - Feito
     [ORDER_STATUS.OVERDUE]: "warning" as BadgeVariant, // Changed from error to warning (orange)
     [ORDER_STATUS.PARTIALLY_RECEIVED]: "warning" as BadgeVariant,
     [ORDER_STATUS.RECEIVED]: "success" as BadgeVariant,

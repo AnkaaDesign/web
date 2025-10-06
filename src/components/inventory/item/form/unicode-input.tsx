@@ -1,5 +1,6 @@
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { IconHash } from "@tabler/icons-react";
 import { useFormContext } from "react-hook-form";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
 
@@ -18,7 +19,10 @@ export function UnicodeInput({ disabled }: UnicodeInputProps) {
       name="uniCode"
       render={({ field: { value, ...field } }) => (
         <FormItem>
-          <FormLabel>Código Universal</FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconHash className="h-4 w-4" />
+            Código Universal
+          </FormLabel>
           <FormControl>
             <Input
               {...field}

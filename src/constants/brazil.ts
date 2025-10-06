@@ -30,7 +30,8 @@ export const BRAZILIAN_STATES = [
   "TO", // Tocantins
 ] as const;
 
-export type BrazilianState = (typeof BRAZILIAN_STATES)[number];
+export type { BrazilianState };
+type BrazilianState = (typeof BRAZILIAN_STATES)[number];
 
 export const BRAZILIAN_STATE_NAMES: Record<BrazilianState, string> = {
   AC: "Acre",

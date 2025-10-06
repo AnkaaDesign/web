@@ -117,8 +117,6 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
               <Combobox mode="multiple" options={statusOptions} value={selectedStatuses} onValueChange={handleStatusChange} placeholder="Selecione os status" />
             </div>
 
-            <Separator />
-
             <div>
               <Label className="flex items-center gap-2 mb-2">
                 <IconBriefcase className="h-4 w-4" />
@@ -141,8 +139,6 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
               />
             </div>
 
-            <Separator />
-
             <div className="space-y-4">
               <DateTimeInput
                 mode="date-range"
@@ -164,7 +160,7 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                   }
                 }}
                 label={
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mb-2">
                     <IconCalendar className="h-4 w-4" />
                     Data de Nascimento
                   </div>
@@ -195,7 +191,7 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                   }
                 }}
                 label={
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mb-2">
                     <IconCalendar className="h-4 w-4" />
                     Data de Admissão
                   </div>
@@ -209,16 +205,16 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
               <DateTimeInput
                 mode="date-range"
                 value={{
-                  from: localFilters.updatedAt?.gte,
-                  to: localFilters.updatedAt?.lte,
+                  from: localFilters.dismissedAt?.gte,
+                  to: localFilters.dismissedAt?.lte,
                 }}
                 onChange={(dateRange: DateRange | null) => {
                   if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                    setLocalFilters({ ...localFilters, updatedAt: undefined });
+                    setLocalFilters({ ...localFilters, dismissedAt: undefined });
                   } else {
                     setLocalFilters({
                       ...localFilters,
-                      updatedAt: {
+                      dismissedAt: {
                         ...(dateRange.from && { gte: dateRange.from }),
                         ...(dateRange.to && { lte: dateRange.to }),
                       },
@@ -226,13 +222,13 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                   }
                 }}
                 label={
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mb-2">
                     <IconCalendar className="h-4 w-4" />
-                    Data de Atualização
+                    Data de Demissão
                   </div>
                 }
                 placeholder="Selecionar período..."
-                description="Filtra por período de atualização do usuário"
+                description="Filtra por período de demissão do usuário"
                 numberOfMonths={2}
               />
             </div>

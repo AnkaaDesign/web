@@ -56,7 +56,7 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
               id="search"
               placeholder="Nome, número de série..."
               value={localFilters.searchingFor || ""}
-              onChange={(e) => setLocalFilters({ ...localFilters, searchingFor: e.target.value })}
+              onChange={(value) => setLocalFilters({ ...localFilters, searchingFor: value as string })}
             />
           </div>
 

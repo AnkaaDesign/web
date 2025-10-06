@@ -61,7 +61,7 @@ export function WebsiteInput({ disabled }: WebsiteInputProps) {
               }}
               placeholder="https://www.exemplo.com.br"
               disabled={disabled}
-              transparent={false}
+              transparent={true}
               className="transition-all duration-200"
             />
           </FormControl>

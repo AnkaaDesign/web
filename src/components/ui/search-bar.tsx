@@ -27,7 +27,7 @@ export function SearchBar({ value, onChange, placeholder = "Buscar...", classNam
         type="text"
         placeholder={placeholder}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(value) => onChange(value as string)}
         className="pl-10 pr-10"
         naturalTyping={enableNaturalTyping}
         typewriterPlaceholder={enableNaturalTyping}

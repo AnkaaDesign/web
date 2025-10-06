@@ -332,6 +332,8 @@ export interface BonusDiscount {
   order: number;
 }
 
+export type { BonusDiscount };
+
 /**
  * Apply percentage discount to a bonus value
  * @param value The original bonus value
@@ -569,6 +571,8 @@ export interface PayrollDiscount {
   fixedValue?: number;
   calculationOrder: number;
 }
+
+export type { PayrollDiscount };
 
 /**
  * Calculate payroll discounts applied to base remuneration

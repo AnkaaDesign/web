@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
+import { IconCertificate } from "@tabler/icons-react";
 import { useFormContext } from "react-hook-form";
 import { useItemBrands, useItemBrandMutations } from "../../../../hooks";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
@@ -65,7 +66,10 @@ export function ItemBrandSelector({ disabled, required }: BrandSelectorProps) {
       name="brandId"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>Marca {required && <span className="text-destructive">*</span>}</FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconCertificate className="h-4 w-4" />
+            Marca {required && <span className="text-destructive">*</span>}
+          </FormLabel>
           <FormControl>
             <Combobox
               value={field.value || undefined}

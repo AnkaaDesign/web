@@ -108,7 +108,7 @@ export const BorrowBatchCreateForm = () => {
     ],
     orderBy: { name: "asc" },
     take: 100,
-    include: { position: true },
+    include: { sector: true },
   });
 
   const users = usersResponse?.data || [];
@@ -308,7 +308,7 @@ export const BorrowBatchCreateForm = () => {
                             <Combobox
                               options={users.map((user) => ({
                                 value: user.id,
-                                label: `${user.name}${user.position ? ` - ${user.position.name}` : ""}`,
+                                label: `${user.name}${user.sector ? ` - ${user.sector.name}` : ""}`,
                               }))}
                               value={field.value}
                               onValueChange={(value) => {

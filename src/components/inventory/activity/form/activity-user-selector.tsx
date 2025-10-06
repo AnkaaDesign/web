@@ -50,9 +50,9 @@ export const ActivityUserSelector = ({
     return sortedUsers.map((user) => {
       const parts = [user.name];
 
-      // Add position if available
-      if (user.position?.name) {
-        parts.push(user.position.name);
+      // Add sector if available
+      if (user.sector?.name) {
+        parts.push(user.sector.name);
       }
 
       // Add status indicator for dismissed users

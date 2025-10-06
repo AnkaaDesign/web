@@ -1,6 +1,7 @@
 import React, { useEffect, useCallback } from "react";
 import { ProductionPagination } from "./pagination-production";
-import { usePaginationState, type PaginationMeta } from "@/hooks/use-pagination-state";
+import { usePaginationState } from "@/hooks/use-pagination-state";
+import type { PaginationMeta } from "@/hooks/use-pagination-state";
 
 export interface DataTablePaginationProps {
   // Required data

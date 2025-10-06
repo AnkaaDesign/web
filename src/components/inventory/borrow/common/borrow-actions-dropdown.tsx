@@ -76,7 +76,7 @@ export function BorrowActionsDropdown({ borrow, onEdit, onDelete, className }: B
         </DropdownMenuItem>
 
         {canEdit && (
-          <DropdownMenuItem onClick={handleEdit}>
+          <DropdownMenuItem onClick={handleEdit} className={isReturnable ? "text-green-700 focus:text-white focus:bg-green-700 hover:text-white hover:bg-green-700" : ""}>
             {isReturnable ? (
               <>
                 <IconPackage className="mr-2 h-4 w-4" />

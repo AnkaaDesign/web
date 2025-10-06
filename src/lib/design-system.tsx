@@ -1,7 +1,8 @@
 // Web Design System Utilities
 // Consistent styling patterns using the unified design system
 
-import { cva, type VariantProps } from "class-variance-authority";
+import { cva } from "class-variance-authority";
+import type { VariantProps } from "class-variance-authority";
 
 // Enhanced Button Variants using design system
 export const buttonVariants = cva(
@@ -260,12 +261,14 @@ export function formatTableCellContent(value: any, type?: "text" | "number" | "c
 }
 
 // Type exports for better TypeScript support
-export type ButtonVariants = VariantProps<typeof buttonVariants>;
-export type InputVariants = VariantProps<typeof inputVariants>;
-export type CardVariants = VariantProps<typeof cardVariants>;
-export type AuthLayoutVariants = VariantProps<typeof authLayoutVariants>;
-export type AuthCardVariants = VariantProps<typeof authCardVariants>;
-export type VerificationCodeInputVariants = VariantProps<typeof verificationCodeInputVariants>;
-export type LoadingSpinnerVariants = VariantProps<typeof loadingSpinnerVariants>;
-export type TableHeaderVariants = VariantProps<typeof tableHeaderVariants>;
-export type TableCellVariants = VariantProps<typeof tableCellVariants>;
+export type { ButtonVariants, InputVariants, CardVariants, AuthLayoutVariants, AuthCardVariants, VerificationCodeInputVariants, LoadingSpinnerVariants, TableHeaderVariants, TableCellVariants };
+
+type ButtonVariants = VariantProps<typeof buttonVariants>;
+type InputVariants = VariantProps<typeof inputVariants>;
+type CardVariants = VariantProps<typeof cardVariants>;
+type AuthLayoutVariants = VariantProps<typeof authLayoutVariants>;
+type AuthCardVariants = VariantProps<typeof authCardVariants>;
+type VerificationCodeInputVariants = VariantProps<typeof verificationCodeInputVariants>;
+type LoadingSpinnerVariants = VariantProps<typeof loadingSpinnerVariants>;
+type TableHeaderVariants = VariantProps<typeof tableHeaderVariants>;
+type TableCellVariants = VariantProps<typeof tableCellVariants>;

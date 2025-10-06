@@ -31,13 +31,13 @@ import type {
 // File Upload Types
 // =====================
 
-export interface FileUploadProgress {
+interface FileUploadProgress {
   loaded: number;
   total: number;
   percentage: number;
 }
 
-export interface FileUploadOptions {
+interface FileUploadOptions {
   onProgress?: (progress: FileUploadProgress) => void;
   signal?: AbortSignal;
   timeout?: number;
@@ -47,14 +47,14 @@ export interface FileUploadOptions {
   entityType?: string;
 }
 
-export interface FileUploadResponse {
+interface FileUploadResponse {
   success: boolean;
   message: string;
   data?: File;
   errors?: string[];
 }
 
-export interface BatchFileUploadResponse {
+interface BatchFileUploadResponse {
   success: boolean;
   message: string;
   data?: {
@@ -66,7 +66,7 @@ export interface BatchFileUploadResponse {
   errors?: string[];
 }
 
-export interface FileThumbnailResponse {
+interface FileThumbnailResponse {
   success: boolean;
   data?: {
     url: string;
@@ -75,7 +75,7 @@ export interface FileThumbnailResponse {
   message?: string;
 }
 
-export interface FileDownloadOptions {
+interface FileDownloadOptions {
   signal?: AbortSignal;
   onProgress?: (progress: FileUploadProgress) => void;
 }
@@ -624,3 +624,16 @@ export const getUploadErrorMessage = (error: any) => fileService.getUploadErrorM
 export const batchCreateFiles = (data: FileBatchCreateFormData, query?: FileQueryFormData) => fileService.batchCreateFiles(data, query);
 export const batchUpdateFiles = (data: FileBatchUpdateFormData, query?: FileQueryFormData) => fileService.batchUpdateFiles(data, query);
 export const batchDeleteFiles = (data: FileBatchDeleteFormData) => fileService.batchDeleteFiles(data);
+
+// =====================
+// Type Exports
+// =====================
+
+export type {
+  FileUploadProgress,
+  FileUploadOptions,
+  FileUploadResponse,
+  BatchFileUploadResponse,
+  FileThumbnailResponse,
+  FileDownloadOptions,
+};

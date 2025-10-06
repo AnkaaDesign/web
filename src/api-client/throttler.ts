@@ -1,6 +1,6 @@
 import { apiClient } from "./axiosClient";
 
-export interface ThrottlerStats {
+interface ThrottlerStats {
   totalKeys: number;
   activeKeys: number;
   blockedKeys: number;
@@ -13,7 +13,7 @@ export interface ThrottlerStats {
   }>;
 }
 
-export interface ThrottlerKey {
+interface ThrottlerKey {
   key: string;
   controller: string;
   method: string;
@@ -25,7 +25,7 @@ export interface ThrottlerKey {
   expiresIn: string;
 }
 
-export interface BlockedKey {
+interface BlockedKey {
   key: string;
   controller: string;
   method: string;
@@ -36,25 +36,25 @@ export interface BlockedKey {
   expiresIn: string;
 }
 
-export interface ThrottlerStatsResponse {
+interface ThrottlerStatsResponse {
   success: boolean;
   message: string;
   data: ThrottlerStats;
 }
 
-export interface ThrottlerKeysResponse {
+interface ThrottlerKeysResponse {
   success: boolean;
   message: string;
   data: ThrottlerKey[];
 }
 
-export interface BlockedKeysResponse {
+interface BlockedKeysResponse {
   success: boolean;
   message: string;
   data: BlockedKey[];
 }
 
-export interface DeleteResponse {
+interface DeleteResponse {
   success: boolean;
   message: string;
   data: {
@@ -155,4 +155,15 @@ export const throttlerService = {
       throw error;
     });
   },
+};
+
+// Export types
+export type {
+  ThrottlerStats,
+  ThrottlerKey,
+  BlockedKey,
+  ThrottlerStatsResponse,
+  ThrottlerKeysResponse,
+  BlockedKeysResponse,
+  DeleteResponse,
 };

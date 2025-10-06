@@ -91,13 +91,13 @@ export function RangeFilters({
             <Label htmlFor="quantityMin" className="text-xs text-muted-foreground">
               Mínimo
             </Label>
-            <Input id="quantityMin" type="number" min="0" step="0.01" placeholder="0" value={quantityRange?.min || ""} onChange={(e) => handleQuantityMinChange(e.target.value)} />
+            <Input id="quantityMin" type="number" min="0" step="0.01" placeholder="0" value={quantityRange?.min || ""} onChange={(value) => handleQuantityMinChange(value as string)} />
           </div>
           <div>
             <Label htmlFor="quantityMax" className="text-xs text-muted-foreground">
               Máximo
             </Label>
-            <Input id="quantityMax" type="number" min="0" step="0.01" placeholder="∞" value={quantityRange?.max || ""} onChange={(e) => handleQuantityMaxChange(e.target.value)} />
+            <Input id="quantityMax" type="number" min="0" step="0.01" placeholder="∞" value={quantityRange?.max || ""} onChange={(value) => handleQuantityMaxChange(value as string)} />
           </div>
         </div>
       </div>
@@ -170,7 +170,7 @@ export function RangeFilters({
               step="1"
               placeholder="0"
               value={monthlyConsumptionRange?.min || ""}
-              onChange={(e) => handleMonthlyConsumptionMinChange(e.target.value)}
+              onChange={(value) => handleMonthlyConsumptionMinChange(value as string)}
             />
           </div>
           <div>
@@ -184,7 +184,7 @@ export function RangeFilters({
               step="1"
               placeholder="∞"
               value={monthlyConsumptionRange?.max || ""}
-              onChange={(e) => handleMonthlyConsumptionMaxChange(e.target.value)}
+              onChange={(value) => handleMonthlyConsumptionMaxChange(value as string)}
             />
           </div>
         </div>
@@ -210,7 +210,7 @@ export function RangeFilters({
               step="0.01"
               placeholder="0"
               value={measureValueRange?.min || ""}
-              onChange={(e) => handleMeasureValueMinChange(e.target.value)}
+              onChange={(value) => handleMeasureValueMinChange(value as string)}
             />
           </div>
           <div>
@@ -224,7 +224,7 @@ export function RangeFilters({
               step="0.01"
               placeholder="∞"
               value={measureValueRange?.max || ""}
-              onChange={(e) => handleMeasureValueMaxChange(e.target.value)}
+              onChange={(value) => handleMeasureValueMaxChange(value as string)}
             />
           </div>
         </div>

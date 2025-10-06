@@ -117,7 +117,6 @@ export const GarageLaneDetailPage = () => {
 
   const handleRefresh = () => {
     refetch();
-    toast.success("Dados atualizados com sucesso");
   };
 
   return (

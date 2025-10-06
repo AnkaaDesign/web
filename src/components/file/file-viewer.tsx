@@ -1,6 +1,7 @@
 import * as React from "react";
 import type { File as AnkaaFile } from "../../types";
-import { fileViewerService, type FileViewerConfig } from "../../utils/file-viewer";
+import { fileViewerService } from "../../utils/file-viewer";
+import type { FileViewerConfig } from "../../utils/file-viewer";
 import { FilePreview } from "./file-preview";
 import { VideoPlayer } from "./video-player";
 import { toast } from "sonner";

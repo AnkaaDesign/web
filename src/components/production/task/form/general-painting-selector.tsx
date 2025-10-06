@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -29,12 +29,27 @@ const paletteColors: Record<string, string> = {
 interface GeneralPaintingSelectorProps {
   control: any;
   disabled?: boolean;
+  initialPaint?: Paint;
 }
 
-export function GeneralPaintingSelector({ control, disabled }: GeneralPaintingSelectorProps) {
+export function GeneralPaintingSelector({ control, disabled, initialPaint }: GeneralPaintingSelectorProps) {
   // Cache of selected paint to display details
-  const [selectedPaint, setSelectedPaint] = useState<Paint | null>(null);
+  const [selectedPaint, setSelectedPaint] = useState<Paint | null>(initialPaint || null);
   const paintsCache = useRef<Map<string, Paint>>(new Map());
+
+  // Memoize initialOptions to prevent infinite loop
+  const initialOptions = useMemo(() => initialPaint ? [initialPaint] : [], [initialPaint?.id]);
+
+  // Memoize callbacks to prevent infinite loop
+  const getOptionLabel = useCallback((paint: Paint) => paint.name, []);
+  const getOptionValue = useCallback((paint: Paint) => paint.id, []);
+
+  // Initialize cache with initial paint
+  useEffect(() => {
+    if (initialPaint) {
+      paintsCache.current.set(initialPaint.id, initialPaint);
+    }
+  }, [initialPaint]);
 
   // Search function for Combobox
   const searchPaints = async (
@@ -167,11 +182,12 @@ export function GeneralPaintingSelector({ control, disabled }: GeneralPaintingSe
                   async={true}
                   queryKey={["paints", "general-selector"]}
                   queryFn={searchPaints}
-                  getOptionLabel={(paint) => paint.name}
-                  getOptionValue={(paint) => paint.id}
+                  getOptionLabel={getOptionLabel}
+                  getOptionValue={getOptionValue}
                   renderOption={(paint, isSelected) => renderPaintItem(paint, isSelected)}
                   minSearchLength={0}
                   clearable={true}
+                  initialOptions={initialOptions}
                 />
 
                 {/* Selected paint display with improved design */}

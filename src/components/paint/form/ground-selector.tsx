@@ -4,6 +4,7 @@ import { Combobox } from "@/components/ui/combobox";
 import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas";
 import { getPaints } from "../../../api-client";
 import { PAINT_BRAND_LABELS, PAINT_FINISH_LABELS } from "../../../constants";
+import { IconLayersIntersect } from "@tabler/icons-react";
 
 interface GroundSelectorProps {
   control: any;
@@ -69,7 +70,8 @@ export function GroundSelector({ control, disabled, required }: GroundSelectorPr
       name="groundIds"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconLayersIntersect className="h-4 w-4" />
             Fundo da Tinta
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>
@@ -82,7 +84,7 @@ export function GroundSelector({ control, disabled, required }: GroundSelectorPr
               onValueChange={field.onChange}
               placeholder="Selecione os fundos"
               disabled={disabled}
-              className="w-full"
+              className="w-full bg-transparent"
               mode="multiple"
               searchable={true}
               clearable={true}

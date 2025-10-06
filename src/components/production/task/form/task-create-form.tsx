@@ -13,6 +13,9 @@ import {
   IconSparkles,
   IconScissors,
   IconPlus,
+  IconCurrencyReal,
+  IconReceipt,
+  IconFileInvoice,
 } from "@tabler/icons-react";
 import type { TaskCreateFormData } from "../../../../schemas";
 import { taskCreateSchema } from "../../../../schemas";
@@ -38,15 +41,20 @@ import { Badge } from "@/components/ui/badge";
 import { uploadSingleFile } from "../../../../api-client";
 import { toast } from "sonner";
 import { LayoutForm } from "@/components/production/layout/layout-form";
+import { FormMoneyInput } from "@/components/ui/form-money-input";
 
 export const TaskCreateForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>([]);
+  const [budgetFile, setBudgetFile] = useState<FileWithPreview[]>([]);
+  const [nfeFile, setNfeFile] = useState<FileWithPreview[]>([]);
+  const [receiptFile, setReceiptFile] = useState<FileWithPreview[]>([]);
   const multiCutSelectorRef = useRef<MultiCutSelectorRef>(null);
   const multiAirbrushingSelectorRef = useRef<MultiAirbrushingSelectorRef>(null);
   const [cutsCount, setCutsCount] = useState(0);
   const [airbrushingsCount, setAirbrushingsCount] = useState(0);
   const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
+  const [isLayoutOpen, setIsLayoutOpen] = useState(false);
   const [layouts, setLayouts] = useState<{
     left?: any;
     right?: any;
@@ -122,6 +130,10 @@ export const TaskCreateForm = () => {
       paintIds: urlState.logoPaintIds,
       truck: urlState.truck,
       artworkIds: urlState.artworkIds,
+      price: null,
+      budgetId: null,
+      nfeId: null,
+      receiptId: null,
     },
   });
 
@@ -131,6 +143,165 @@ export const TaskCreateForm = () => {
   // Mutations
   const { createAsync } = useTaskMutations();
   const { createOrUpdateTruckLayout } = useLayoutMutations();
+
+  // Handle budget file upload
+  const handleBudgetFileChange = async (files: FileWithPreview[]) => {
+    setBudgetFile(files);
+
+    const newFiles = files.filter((file) => !file.uploaded && !file.uploadProgress && !file.error);
+
+    for (const file of newFiles) {
+      try {
+        setBudgetFile((prev) =>
+          updateFileInList(prev, file.id, { uploadProgress: 0, uploaded: false })
+        );
+
+        const result = await uploadSingleFile(file, {
+          onProgress: (progress) => {
+            setBudgetFile((prev) =>
+              updateFileInList(prev, file.id, { uploadProgress: progress.percentage })
+            );
+          },
+        });
+
+        if (result.success && result.data) {
+          const uploadedFile = result.data;
+          setBudgetFile((prev) =>
+            updateFileInList(prev, file.id, {
+              uploadedFileId: uploadedFile.id,
+              uploaded: true,
+              uploadProgress: 100,
+              thumbnailUrl: uploadedFile.thumbnailUrl || undefined,
+              error: undefined,
+            })
+          );
+          form.setValue("budgetId", uploadedFile.id);
+        } else {
+          throw new Error(result.message || "Upload failed");
+        }
+      } catch (error) {
+        console.error("Budget file upload error:", error);
+        setBudgetFile((prev) =>
+          updateFileInList(prev, file.id, {
+            error: "Erro ao enviar arquivo",
+            uploadProgress: 0,
+            uploaded: false,
+          })
+        );
+      }
+    }
+
+    // Clear budgetId if no files
+    if (files.length === 0) {
+      form.setValue("budgetId", null);
+    }
+  };
+
+  // Handle NFe file upload
+  const handleNfeFileChange = async (files: FileWithPreview[]) => {
+    setNfeFile(files);
+
+    const newFiles = files.filter((file) => !file.uploaded && !file.uploadProgress && !file.error);
+
+    for (const file of newFiles) {
+      try {
+        setNfeFile((prev) =>
+          updateFileInList(prev, file.id, { uploadProgress: 0, uploaded: false })
+        );
+
+        const result = await uploadSingleFile(file, {
+          onProgress: (progress) => {
+            setNfeFile((prev) =>
+              updateFileInList(prev, file.id, { uploadProgress: progress.percentage })
+            );
+          },
+        });
+
+        if (result.success && result.data) {
+          const uploadedFile = result.data;
+          setNfeFile((prev) =>
+            updateFileInList(prev, file.id, {
+              uploadedFileId: uploadedFile.id,
+              uploaded: true,
+              uploadProgress: 100,
+              thumbnailUrl: uploadedFile.thumbnailUrl || undefined,
+              error: undefined,
+            })
+          );
+          form.setValue("nfeId", uploadedFile.id);
+        } else {
+          throw new Error(result.message || "Upload failed");
+        }
+      } catch (error) {
+        console.error("NFe file upload error:", error);
+        setNfeFile((prev) =>
+          updateFileInList(prev, file.id, {
+            error: "Erro ao enviar arquivo",
+            uploadProgress: 0,
+            uploaded: false,
+          })
+        );
+      }
+    }
+
+    // Clear nfeId if no files
+    if (files.length === 0) {
+      form.setValue("nfeId", null);
+    }
+  };
+
+  // Handle receipt file upload
+  const handleReceiptFileChange = async (files: FileWithPreview[]) => {
+    setReceiptFile(files);
+
+    const newFiles = files.filter((file) => !file.uploaded && !file.uploadProgress && !file.error);
+
+    for (const file of newFiles) {
+      try {
+        setReceiptFile((prev) =>
+          updateFileInList(prev, file.id, { uploadProgress: 0, uploaded: false })
+        );
+
+        const result = await uploadSingleFile(file, {
+          onProgress: (progress) => {
+            setReceiptFile((prev) =>
+              updateFileInList(prev, file.id, { uploadProgress: progress.percentage })
+            );
+          },
+        });
+
+        if (result.success && result.data) {
+          const uploadedFile = result.data;
+          setReceiptFile((prev) =>
+            updateFileInList(prev, file.id, {
+              uploadedFileId: uploadedFile.id,
+              uploaded: true,
+              uploadProgress: 100,
+              thumbnailUrl: uploadedFile.thumbnailUrl || undefined,
+              error: undefined,
+            })
+          );
+          form.setValue("receiptId", uploadedFile.id);
+        } else {
+          throw new Error(result.message || "Upload failed");
+        }
+      } catch (error) {
+        console.error("Receipt file upload error:", error);
+        setReceiptFile((prev) =>
+          updateFileInList(prev, file.id, {
+            error: "Erro ao enviar arquivo",
+            uploadProgress: 0,
+            uploaded: false,
+          })
+        );
+      }
+    }
+
+    // Clear receiptId if no files
+    if (files.length === 0) {
+      form.setValue("receiptId", null);
+    }
+  };
 
   // Handle file changes and upload
   const handleFilesChange = async (files: FileWithPreview[]) => {
@@ -475,6 +646,7 @@ export const TaskCreateForm = () => {
                                 ref={field.ref}
                                 placeholder="Ex: Pintura completa do caminhão"
                                 disabled={isSubmitting}
+                                className="bg-transparent"
                               />
                             </FormControl>
                             <FormMessage />
@@ -499,7 +671,7 @@ export const TaskCreateForm = () => {
                               <Input
                                 value={field.value || ""}
                                 placeholder="Ex: ABC-123456"
-                                className="uppercase"
+                                className="uppercase bg-transparent"
                                 onChange={(value) => {
                                   const upperValue = (value || "").toUpperCase();
                                   field.onChange(upperValue);
@@ -530,6 +702,7 @@ export const TaskCreateForm = () => {
                                   urlState.updatePlate(value ? String(value) : "");
                                 }}
                                 disabled={isSubmitting}
+                                className="bg-transparent"
                               />
                             </FormControl>
                             <FormMessage />
@@ -560,6 +733,7 @@ export const TaskCreateForm = () => {
                               placeholder="Detalhes adicionais sobre a tarefa..."
                               rows={4}
                               disabled={isSubmitting}
+                              className="bg-transparent"
                             />
                           </FormControl>
                           <FormMessage />
@@ -600,6 +774,81 @@ export const TaskCreateForm = () => {
                   </CardContent>
                 </Card>
 
+                {/* Financial Information Card */}
+                <Card className="bg-transparent">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <IconCurrencyReal className="h-5 w-5" />
+                      Informações Financeiras
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Price */}
+                    <FormMoneyInput
+                      name="price"
+                      label="Valor Total"
+                      placeholder="R$ 0,00"
+                      disabled={isSubmitting}
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Budget File */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
+                          Orçamento
+                        </label>
+                        <FileUploadField
+                          onFilesChange={handleBudgetFileChange}
+                          maxFiles={1}
+                          disabled={isSubmitting}
+                          showPreview={false}
+                          existingFiles={budgetFile}
+                          variant="compact"
+                          placeholder="Adicionar orçamento"
+                          label=""
+                        />
+                      </div>
+
+                      {/* NFe File */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <IconFile className="h-4 w-4 text-muted-foreground" />
+                          Nota Fiscal
+                        </label>
+                        <FileUploadField
+                          onFilesChange={handleNfeFileChange}
+                          maxFiles={1}
+                          disabled={isSubmitting}
+                          showPreview={false}
+                          existingFiles={nfeFile}
+                          variant="compact"
+                          placeholder="Adicionar NFe"
+                          label=""
+                        />
+                      </div>
+
+                      {/* Receipt File */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <IconReceipt className="h-4 w-4 text-muted-foreground" />
+                          Recibo
+                        </label>
+                        <FileUploadField
+                          onFilesChange={handleReceiptFileChange}
+                          maxFiles={1}
+                          disabled={isSubmitting}
+                          showPreview={false}
+                          existingFiles={receiptFile}
+                          variant="compact"
+                          placeholder="Adicionar recibo"
+                          label=""
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Services Card */}
                 <Card className="bg-transparent">
                   <CardHeader>
@@ -625,62 +874,91 @@ export const TaskCreateForm = () => {
                 {/* Layout Section */}
                 <Card className="bg-transparent">
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <IconRuler className="h-5 w-5" />
-                      Layout do Caminhão
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconRuler className="h-5 w-5" />
+                        Layout do Caminhão
+                      </CardTitle>
+                      {!isLayoutOpen && (
+                        <Button
+                          type="button"
+                          onClick={() => setIsLayoutOpen(true)}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Adicionar Layout
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {/* Layout Side Selector with Total Length */}
-                      <div className="flex justify-between items-center">
-                        <div className="flex gap-2">
-                          <Button type="button" variant={selectedLayoutSide === "left" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("left")}>
-                            Motorista
-                          </Button>
-                          <Button type="button" variant={selectedLayoutSide === "right" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("right")}>
-                            Sapo
-                          </Button>
-                          <Button type="button" variant={selectedLayoutSide === "back" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("back")}>
-                            Traseira
-                          </Button>
+                    {isLayoutOpen ? (
+                      <div className="space-y-4">
+                        {/* Layout Side Selector with Total Length */}
+                        <div className="flex justify-between items-center">
+                          <div className="flex gap-2">
+                            <Button type="button" variant={selectedLayoutSide === "left" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("left")}>
+                              Motorista
+                            </Button>
+                            <Button type="button" variant={selectedLayoutSide === "right" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("right")}>
+                              Sapo
+                            </Button>
+                            <Button type="button" variant={selectedLayoutSide === "back" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("back")}>
+                              Traseira
+                            </Button>
+                          </div>
+
+                          {/* Total Length Display */}
+                          <div className="px-3 py-1 bg-primary/10 rounded-md">
+                            <span className="text-sm text-muted-foreground">Comprimento Total: </span>
+                            <span className="text-sm font-semibold text-foreground">
+                              {(() => {
+                                const currentLayout = layouts[selectedLayoutSide];
+                                if (!currentLayout || !currentLayout.sections) return "0,00m";
+                                const totalWidth = currentLayout.sections.reduce((sum, s) => sum + (s.width || 0), 0);
+                                return totalWidth.toFixed(2).replace(".", ",") + "m";
+                              })()}
+                            </span>
+                          </div>
                         </div>
 
-                        {/* Total Length Display */}
-                        <div className="px-3 py-1 bg-primary/10 rounded-md">
-                          <span className="text-sm text-muted-foreground">Comprimento Total: </span>
-                          <span className="text-sm font-semibold text-foreground">
-                            {(() => {
-                              const currentLayout = layouts[selectedLayoutSide];
-                              if (!currentLayout || !currentLayout.sections) return "0,00m";
-                              const totalWidth = currentLayout.sections.reduce((sum, s) => sum + (s.width || 0), 0);
-                              return totalWidth.toFixed(2).replace(".", ",") + "m";
-                            })()}
-                          </span>
+                        {/* Layout Form */}
+                        <LayoutForm
+                          selectedSide={selectedLayoutSide}
+                          layouts={layouts}
+                          onChange={(side, layoutData) => {
+                            setLayouts((prev) => ({
+                              ...prev,
+                              [side]: layoutData,
+                            }));
+                          }}
+                          disabled={isSubmitting}
+                          taskName={form.watch('name')}
+                        />
+
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setIsLayoutOpen(false);
+                              // Reset layouts to default values
+                              setLayouts({
+                                left: { height: 2.4, sections: [{ width: 8, hasDoor: false }], photoId: null },
+                                right: { height: 2.4, sections: [{ width: 8, hasDoor: false }], photoId: null },
+                                back: { height: 2.42, sections: [{ width: 2.42, hasDoor: false }], photoId: null },
+                              });
+                            }}
+                            disabled={isSubmitting}
+                          >
+                            Remover
+                          </Button>
                         </div>
                       </div>
-
-                      {/* Layout Form */}
-                      <LayoutForm
-                        selectedSide={selectedLayoutSide}
-                        layouts={layouts}
-                        onChange={(side, layoutData) => {
-                          setLayouts((prev) => ({
-                            ...prev,
-                            [side]: layoutData,
-                          }));
-                        }}
-                        disabled={isSubmitting}
-                        taskName={form.watch('name')}
-                      />
-
-                      <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
-                        <p className="text-sm text-blue-800 dark:text-blue-200">
-                          <strong>Dica:</strong> Configure o layout preciso do caminhão para cada lateral. As dimensões serão calculadas automaticamente com base nas seções
-                          definidas.
-                        </p>
-                      </div>
-                    </div>
+                    ) : null}
                   </CardContent>
                 </Card>
 

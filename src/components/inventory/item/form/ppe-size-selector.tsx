@@ -1,5 +1,6 @@
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
+import { IconRuler } from "@tabler/icons-react";
 import { PPE_SIZE, PPE_SIZE_LABELS, PPE_TYPE } from "../../../../constants";
 
 interface PpeSizeSelectorProps {
@@ -71,7 +72,8 @@ export function PpeSizeSelector({
       name={name}
       render={({ field }) => (
         <FormItem>
-          <FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconRuler className="h-4 w-4" />
             {label}
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>

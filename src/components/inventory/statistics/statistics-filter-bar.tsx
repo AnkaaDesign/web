@@ -162,7 +162,7 @@ export function StatisticsFilterBar({
             </label>
             <select
               value={filters.groupBy}
-              onChange={(e) => handleGroupByChange(e.target.value)}
+              onChange={(value) => handleGroupByChange(value as string)}
               disabled={disabled}
               className="px-3 py-2 text-sm border border-input rounded-md bg-background focus:outline-none focus:ring-1 focus:ring-ring"
             >

@@ -61,7 +61,6 @@ interface CalculationTableProps {
   data: CalculationRow[];
   totalsRow?: CalculationRow | null;
   isLoading?: boolean;
-  onDataChange?: (data: { items: CalculationRow[]; totalRecords: number }) => void;
 }
 
 export function CalculationTable({
@@ -70,7 +69,6 @@ export function CalculationTable({
   data = [],
   totalsRow = null,
   isLoading = false,
-  onDataChange
 }: CalculationTableProps) {
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -148,13 +146,6 @@ export function CalculationTable({
   }, [data, sortConfigs, showSelectedOnly, selectedIds]);
 
   const { items, totalRecords } = sortedData;
-
-  // Notify parent component of data changes
-  React.useEffect(() => {
-    if (onDataChange) {
-      onDataChange({ items, totalRecords });
-    }
-  }, [items, totalRecords, onDataChange]);
 
   // Get current page item IDs for selection
   const currentPageItemIds = React.useMemo(() => {

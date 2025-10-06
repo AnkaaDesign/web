@@ -1,7 +1,5 @@
 import { apiClient } from '../axiosClient';
 import type { BatchOperationResult } from '../../types';
-
-// Import proper types from packages
 import type {
   Bonus,
   BonusIncludes,
@@ -9,7 +7,6 @@ import type {
   BonusGetManyResponse as BonusGetManyResponseType,
   BonusGetByIdParams
 } from '../../types';
-
 import type {
   BonusCreateFormData,
   BonusUpdateFormData
@@ -66,12 +63,12 @@ interface BonusDiscountCreateFormData {
 }
 
 // Interfaces for bonus calculation and batch operations
-export interface BonusCalculationParams {
+interface BonusCalculationParams {
   year: string;
   month: string;
 }
 
-export interface BonusCalculationResult {
+interface BonusCalculationResult {
   success: boolean;
   message: string;
   data: {
@@ -207,6 +204,8 @@ export type {
   BonusPayrollFilters,
   PayrollData,
   BonusDiscountCreateFormData,
+  BonusCalculationParams,
+  BonusCalculationResult,
 };
 
 // Re-export form data types from schemas package

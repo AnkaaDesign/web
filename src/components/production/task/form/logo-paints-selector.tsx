@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-norma
 interface LogoPaintsSelectorProps {
   control: any;
   disabled?: boolean;
+  initialPaints?: Paint[];
 }
 
 const paletteColors: Record<string, string> = {
@@ -32,10 +33,28 @@ const paletteColors: Record<string, string> = {
   BEIGE: "#F5F5DC",
 };
 
-export function LogoPaintsSelector({ control, disabled }: LogoPaintsSelectorProps) {
+export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPaintsSelectorProps) {
   // Cache of selected paints to display in badges
-  const [selectedPaints, setSelectedPaints] = useState<Map<string, Paint>>(new Map());
+  const [selectedPaints, setSelectedPaints] = useState<Map<string, Paint>>(
+    new Map((initialPaints || []).map(paint => [paint.id, paint]))
+  );
   const paintsCache = useRef<Map<string, Paint>>(new Map());
+
+  // Memoize initialOptions to prevent infinite loop
+  const initialOptions = useMemo(() => initialPaints || [], [initialPaints?.map(p => p.id).join(',')]);
+
+  // Memoize callbacks to prevent infinite loop
+  const getOptionLabel = useCallback((paint: Paint) => paint.name, []);
+  const getOptionValue = useCallback((paint: Paint) => paint.id, []);
+
+  // Initialize cache with initial paints
+  useEffect(() => {
+    if (initialPaints) {
+      initialPaints.forEach(paint => {
+        paintsCache.current.set(paint.id, paint);
+      });
+    }
+  }, [initialPaints]);
 
   // Search function for Combobox
   const searchPaints = async (
@@ -172,13 +191,14 @@ export function LogoPaintsSelector({ control, disabled }: LogoPaintsSelectorProp
                   async={true}
                   queryKey={["paints", "logo-selector"]}
                   queryFn={searchPaints}
-                  getOptionLabel={(paint) => paint.name}
-                  getOptionValue={(paint) => paint.id}
+                  getOptionLabel={getOptionLabel}
+                  getOptionValue={getOptionValue}
                   renderOption={(paint, isSelected) => renderPaintItem(paint, isSelected)}
                   minSearchLength={0}
                   showCount={true}
                   singleMode={false}
                   clearable={true}
+                  initialOptions={initialOptions}
                 />
 
                 {/* Selected paints display with improved design */}

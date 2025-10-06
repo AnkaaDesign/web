@@ -139,6 +139,22 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   const debouncedSearch = useDebouncedValue(search, debounceMs);
   const queryClient = useQueryClient();
 
+  // Use refs for getter functions and initialOptions to prevent infinite loops in useEffect dependencies
+  const getOptionValueRef = useRef(getOptionValue);
+  const getOptionLabelRef = useRef(getOptionLabel);
+  const getOptionDescriptionRef = useRef(getOptionDescription);
+  const isOptionDisabledRef = useRef(isOptionDisabled);
+  const initialOptionsRef = useRef(initialOptions);
+
+  // Update refs when props change (without triggering effects)
+  useEffect(() => {
+    getOptionValueRef.current = getOptionValue;
+    getOptionLabelRef.current = getOptionLabel;
+    getOptionDescriptionRef.current = getOptionDescription;
+    isOptionDisabledRef.current = isOptionDisabled;
+    initialOptionsRef.current = initialOptions;
+  }, [getOptionValue, getOptionLabel, getOptionDescription, isOptionDisabled, initialOptions]);
+
   const isMultiple = mode === "multiple";
   const selectedValues = useMemo(() => {
     if (!value) return [];
@@ -212,10 +228,11 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
 
   // Initialize with initialOptions on mount
   useEffect(() => {
-    if (async && initialOptions && initialOptions.length > 0 && allAsyncOptions.length === 0) {
-      setAllAsyncOptions(initialOptions);
+    const currentInitialOptions = initialOptionsRef.current;
+    if (async && currentInitialOptions && currentInitialOptions.length > 0 && allAsyncOptions.length === 0) {
+      setAllAsyncOptions(currentInitialOptions);
     }
-  }, [async, initialOptions]);
+  }, [async, allAsyncOptions.length]); // Using ref for initialOptions
 
   // Reset pagination when search changes
   useEffect(() => {
@@ -235,16 +252,17 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
       let newOptions = asyncResponse.data || [];
 
       // If we have initialOptions and a selected value, ensure the selected option is included
-      if (initialOptions && initialOptions.length > 0 && value) {
+      const currentInitialOptions = initialOptionsRef.current;
+      if (currentInitialOptions && currentInitialOptions.length > 0 && value) {
         const selectedValues = Array.isArray(value) ? value : [value];
-        const selectedInitialOptions = initialOptions.filter(opt =>
-          selectedValues.includes(getOptionValue(opt))
+        const selectedInitialOptions = currentInitialOptions.filter(opt =>
+          selectedValues.includes(getOptionValueRef.current(opt))
         );
 
         // Merge selected initial options with fetched data, avoiding duplicates
-        const fetchedValues = new Set(newOptions.map(item => getOptionValue(item)));
+        const fetchedValues = new Set(newOptions.map(item => getOptionValueRef.current(item)));
         selectedInitialOptions.forEach(opt => {
-          if (!fetchedValues.has(getOptionValue(opt))) {
+          if (!fetchedValues.has(getOptionValueRef.current(opt))) {
             newOptions = [opt, ...newOptions];
           }
         });
@@ -253,8 +271,8 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
       // Deduplicate items based on their value to prevent duplicate key warnings
       const deduplicatedData = newOptions.filter(
         (item, index, self) => {
-          const itemValue = getOptionValue(item);
-          return index === self.findIndex((t) => getOptionValue(t) === itemValue);
+          const itemValue = getOptionValueRef.current(item);
+          return index === self.findIndex((t) => getOptionValueRef.current(t) === itemValue);
         }
       );
 
@@ -268,7 +286,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
       setAllAsyncOptions([]);
       setHasMore(false);
     }
-  }, [asyncResponse, debouncedSearch, initialOptions, value, getOptionValue]); // Include debouncedSearch to ensure updates on search change
+  }, [asyncResponse, debouncedSearch, value]); // Removed getOptionValue and initialOptions - using refs instead
 
   // Load more function
   const loadMore = useCallback(async () => {

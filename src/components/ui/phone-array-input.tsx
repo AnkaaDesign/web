@@ -95,7 +95,7 @@ export function PhoneArrayInput<TFieldValues extends FieldValues = FieldValues>(
                     onKeyPress={handleKeyPress}
                     placeholder={placeholder}
                     disabled={disabled}
-                    transparent={false}
+                    transparent={true}
                     className="flex-1"
                   />
                   <Button

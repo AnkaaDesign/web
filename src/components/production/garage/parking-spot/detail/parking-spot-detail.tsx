@@ -102,7 +102,6 @@ export const ParkingSpotDetailPage = () => {
 
   const handleRefresh = () => {
     refetch();
-    toast.success("Dados atualizados com sucesso");
   };
 
   // TODO: Implement truck-parking spot relationship

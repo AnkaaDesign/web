@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { IconDownload, IconFileTypeCsv, IconFileTypeXls, IconFileTypePdf } from "@tabler/icons-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -48,8 +48,10 @@ export function BaseExportPopover<T extends { id: string }>({
   const [exportScope, setExportScope] = useState<ExportScope>("current");
   const [open, setOpen] = useState(false);
 
-  // Use provided visible columns or default
-  const columnsToExport = visibleColumns || defaultVisibleColumns || new Set(exportColumns.map((col) => col.id));
+  // Use provided visible columns or default (memoized to prevent creating new Set on every render)
+  const columnsToExport = useMemo(() => {
+    return visibleColumns || defaultVisibleColumns || new Set(exportColumns.map((col) => col.id));
+  }, [visibleColumns, defaultVisibleColumns, exportColumns]);
 
   const handleExport = async () => {
     try {

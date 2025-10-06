@@ -1,5 +1,5 @@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { IconPlayerPlay, IconCheck, IconScissors, IconEye, IconEdit, IconTrash } from "@tabler/icons-react";
+import { IconPlayerPlay, IconCheck, IconScissors, IconEye, IconTrash } from "@tabler/icons-react";
 import { CUT_STATUS } from "../../../../constants";
 import type { Cut } from "../../../../types";
 
@@ -14,7 +14,7 @@ interface CutTableContextMenuProps {
   onAction: (action: CutAction, items: Cut[]) => void;
 }
 
-export type CutAction = "start" | "finish" | "request" | "view" | "edit" | "delete";
+export type CutAction = "start" | "finish" | "request" | "view" | "delete";
 
 export function CutTableContextMenu({ contextMenu, onClose, onAction }: CutTableContextMenuProps) {
   if (!contextMenu) return null;
@@ -55,14 +55,14 @@ export function CutTableContextMenu({ contextMenu, onClose, onAction }: CutTable
 
         {/* Status actions */}
         {hasPendingCuts && (
-          <DropdownMenuItem onClick={() => handleAction("start")}>
+          <DropdownMenuItem onClick={() => handleAction("start")} className="text-blue-600 hover:text-white">
             <IconPlayerPlay className="mr-2 h-4 w-4" />
             Iniciar corte
           </DropdownMenuItem>
         )}
 
         {hasCuttingCuts && (
-          <DropdownMenuItem onClick={() => handleAction("finish")}>
+          <DropdownMenuItem onClick={() => handleAction("finish")} className="text-green-700 hover:text-white">
             <IconCheck className="mr-2 h-4 w-4" />
             Finalizar corte
           </DropdownMenuItem>
@@ -78,16 +78,6 @@ export function CutTableContextMenu({ contextMenu, onClose, onAction }: CutTable
 
         {/* Separator if we have status actions */}
         {(hasPendingCuts || hasCuttingCuts || (!isMultiSelection && !hasCompletedCuts)) && <DropdownMenuSeparator />}
-
-        {/* Edit actions */}
-        {!isMultiSelection && (
-          <DropdownMenuItem onClick={() => handleAction("edit")}>
-            <IconEdit className="mr-2 h-4 w-4" />
-            Editar
-          </DropdownMenuItem>
-        )}
-
-        <DropdownMenuSeparator />
 
         {/* Delete action */}
         <DropdownMenuItem onClick={() => handleAction("delete")} className="text-destructive">

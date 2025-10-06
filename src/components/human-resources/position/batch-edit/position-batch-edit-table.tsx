@@ -97,16 +97,8 @@ export function PositionBatchEditTable({ positions, onCancel, onSubmit }: Positi
         // Show the detailed result dialog
         setBatchResult(result.data);
         setShowResultDialog(true);
-
-        const { totalSuccess, totalFailed } = result.data;
-
-        // Only show simple toast for complete success
-        if (totalFailed === 0 && totalSuccess > 0) {
-          toast.success(`${totalSuccess} ${totalSuccess === 1 ? "cargo atualizado" : "cargos atualizados"} com sucesso`);
-        }
       } else {
         // Even if we don't have detailed results, navigate back on apparent success
-        toast.success("Cargos atualizados com sucesso");
         navigate(routes.humanResources.positions.root);
       }
     } catch (error) {
@@ -117,7 +109,6 @@ export function PositionBatchEditTable({ positions, onCancel, onSubmit }: Positi
         status: (error as any).response?.status,
         stack: (error as Error).stack,
       });
-      toast.error("Erro ao atualizar cargos em lote");
     } finally {
       setIsSubmitting(false);
     }

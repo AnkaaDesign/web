@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FormSteps, type FormStep } from "@/components/ui/form-steps";
 import { paintCreateSchema, paintUpdateSchema, type PaintCreateFormData, type PaintUpdateFormData } from "../../../schemas";
 import type { PaintFormula } from "../../../types";
-import { usePaintType, usePaintBrandsForComponents } from "../../../hooks";
+import { usePaintBrandsForComponents, usePaintType } from "../../../hooks";
 import { serializeFormToUrlParams, deserializeUrlParamsToForm, debounce } from "@/utils/url-form-state";
 
 // Import form field components

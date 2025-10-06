@@ -24,9 +24,11 @@ import {
   IconBulb,
   IconCode,
 } from "@tabler/icons-react";
-import { useAdvancedSearch, type SearchField, type SearchSuggestion } from "@/hooks/use-advanced-search";
+import { useAdvancedSearch } from "@/hooks/use-advanced-search";
+import type { SearchField, SearchSuggestion } from "@/hooks/use-advanced-search";
 import { createSearchContext, createSuggestionFetcher, suggestionBuilders } from "@/utils/search-suggestions";
-import { type FilterFieldDefinition, CommonFilterFields } from "@/utils/table-filter-utils";
+import { CommonFilterFields } from "@/utils/table-filter-utils";
+import type { FilterFieldDefinition } from "@/utils/table-filter-utils";
 
 // Mock data for demo
 const mockItems = [

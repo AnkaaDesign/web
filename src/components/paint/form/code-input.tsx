@@ -1,5 +1,6 @@
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { IconBarcode } from "@tabler/icons-react";
 
 interface CodeInputProps {
   control: any;
@@ -13,7 +14,8 @@ export function CodeInput({ control, required = false }: CodeInputProps) {
       name="code"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconBarcode className="h-4 w-4" />
             Código
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>
@@ -28,6 +30,7 @@ export function CodeInput({ control, required = false }: CodeInputProps) {
                 const value = e.target.value.toUpperCase();
                 field.onChange(value || null);
               }}
+              className="bg-transparent"
             />
           </FormControl>
           <FormMessage />

@@ -30,14 +30,14 @@ export const ChangelogDetailPage = () => {
   const changelog = response?.data;
 
   if (!id) {
-    return <Navigate to={routes.administration.changeLogs.root} replace />;
+    return <Navigate to={routes.server.changeLogs.root} replace />;
   }
 
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center h-full">
         <p className="text-destructive mb-4">Erro ao carregar histórico</p>
-        <Navigate to={routes.administration.changeLogs.root} replace />
+        <Navigate to={routes.server.changeLogs.root} replace />
       </div>
     );
   }
@@ -51,7 +51,7 @@ export const ChangelogDetailPage = () => {
   }
 
   if (!changelog) {
-    return <Navigate to={routes.administration.changeLogs.root} replace />;
+    return <Navigate to={routes.server.changeLogs.root} replace />;
   }
 
   return (
@@ -63,8 +63,8 @@ export const ChangelogDetailPage = () => {
           icon={IconHistory}
           breadcrumbs={[
             { label: "Início", href: "/" },
-            { label: "Administração" },
-            { label: "Histórico de Alterações", href: routes.administration.changeLogs.root },
+            { label: "Servidor", href: "/servidor" },
+            { label: "Registros de Alterações", href: routes.server.changeLogs.root },
             { label: `#${changelog.id.substring(0, 8)}` },
           ]}
           actions={[
@@ -79,7 +79,7 @@ export const ChangelogDetailPage = () => {
               key: "back",
               label: "Voltar",
               icon: IconArrowLeft,
-              onClick: () => navigate(routes.administration.changeLogs.root),
+              onClick: () => navigate(routes.server.changeLogs.root),
               variant: "outline",
             },
           ]}

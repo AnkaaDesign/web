@@ -120,7 +120,7 @@ export function FormulaSampler({ availableItems = [] }: FormulaSamplerProps) {
             min="0"
             max={currentTotal}
             step="0.01"
-            className="text-left font-mono"
+            className="text-left font-mono bg-transparent"
           />
           <div className="flex gap-1">
             <Button type="button" size="sm" onClick={handleApplyAdjustment} disabled={!isValidSample} className="whitespace-nowrap">

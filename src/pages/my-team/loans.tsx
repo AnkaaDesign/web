@@ -5,7 +5,8 @@ import { useBorrows, useUsers } from "../../hooks";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
+import { Combobox } from "@/components/ui/combobox";
+import type { ComboboxOption } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -252,7 +253,7 @@ export const TeamLoansPage = () => {
                 <Label htmlFor="search">Buscar item</Label>
                 <div className="relative">
                   <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input id="search" placeholder="Nome ou código do item..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+                  <Input id="search" placeholder="Nome ou código do item..." value={searchTerm} onChange={(value) => setSearchTerm(value as string)} className="pl-9" />
                 </div>
               </div>
 

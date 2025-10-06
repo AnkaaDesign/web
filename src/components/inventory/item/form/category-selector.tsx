@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
+import { IconCategory } from "@tabler/icons-react";
 import { useFormContext } from "react-hook-form";
 import { useItemCategories, useItemCategoryMutations } from "../../../../hooks";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
@@ -69,7 +70,10 @@ export function CategorySelector({ disabled, required, onCategoryChange }: Categ
       name="categoryId"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>Categoria {required && <span className="text-destructive">*</span>}</FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconCategory className="h-4 w-4" />
+            Categoria {required && <span className="text-destructive">*</span>}
+          </FormLabel>
           <FormControl>
             <Combobox
               value={field.value || undefined}

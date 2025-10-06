@@ -3,6 +3,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas";
 import { usePaintBrandsForSelection } from "../../../hooks";
+import { IconBrandApple } from "@tabler/icons-react";
 
 interface BrandSelectorProps {
   control: any;
@@ -30,7 +31,8 @@ export function PaintBrandSelector({ control, disabled, required }: BrandSelecto
       name="paintBrandId"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconBrandApple className="h-4 w-4" />
             Marca
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>
@@ -44,6 +46,7 @@ export function PaintBrandSelector({ control, disabled, required }: BrandSelecto
               searchable={true}
               clearable={!required}
               emptyMessage={isLoading ? "Carregando marcas..." : "Nenhuma marca encontrada"}
+              className="bg-transparent"
             />
           </FormControl>
           <FormMessage />

@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { throttlerService } from "@/api-client";
-import { useToast } from "@/hooks/use-toast";
 
 // Query keys
 export const throttlerKeys = {
@@ -49,73 +48,43 @@ export function useBlockedKeys() {
 
 /**
  * Hook for throttler mutation operations (clear operations)
+ * Note: Toasts are handled globally by the API client interceptor
  */
 export function useThrottlerMutations() {
   const queryClient = useQueryClient();
-  const { success, error } = useToast();
 
   const clearKeys = useMutation({
     mutationFn: (pattern?: string) => throttlerService.clearKeys(pattern),
-    onSuccess: (response) => {
-      if (response.data.success) {
-        success(response.data.message);
-        queryClient.invalidateQueries({ queryKey: throttlerKeys.all });
-      }
-    },
-    onError: (err: any) => {
-      error("Erro ao limpar chaves", err?.message || "Erro desconhecido");
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: throttlerKeys.all });
     },
   });
 
   const clearSpecificKey = useMutation({
     mutationFn: (key: string) => throttlerService.clearSpecificKey(key),
-    onSuccess: (response) => {
-      if (response.data.success) {
-        success(response.data.message);
-        queryClient.invalidateQueries({ queryKey: throttlerKeys.all });
-      }
-    },
-    onError: (err: any) => {
-      error("Erro ao limpar chave", err?.message || "Erro desconhecido");
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: throttlerKeys.all });
     },
   });
 
   const clearUserKeys = useMutation({
     mutationFn: (userId?: string) => throttlerService.clearUserKeys(userId),
-    onSuccess: (response) => {
-      if (response.data.success) {
-        success(response.data.message);
-        queryClient.invalidateQueries({ queryKey: throttlerKeys.all });
-      }
-    },
-    onError: (err: any) => {
-      error("Erro ao limpar chaves do usuário", err?.message || "Erro desconhecido");
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: throttlerKeys.all });
     },
   });
 
   const clearIpKeys = useMutation({
     mutationFn: (ip: string) => throttlerService.clearIpKeys(ip),
-    onSuccess: (response) => {
-      if (response.data.success) {
-        success(response.data.message);
-        queryClient.invalidateQueries({ queryKey: throttlerKeys.all });
-      }
-    },
-    onError: (err: any) => {
-      error("Erro ao limpar chaves do IP", err?.message || "Erro desconhecido");
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: throttlerKeys.all });
     },
   });
 
   const clearBlockedKeys = useMutation({
     mutationFn: () => throttlerService.clearBlockedKeys(),
-    onSuccess: (response) => {
-      if (response.data.success) {
-        success(response.data.message);
-        queryClient.invalidateQueries({ queryKey: throttlerKeys.all });
-      }
-    },
-    onError: (err: any) => {
-      error("Erro ao limpar chaves bloqueadas", err?.message || "Erro desconhecido");
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: throttlerKeys.all });
     },
   });
 

@@ -400,6 +400,16 @@ export function ItemList({ className }: ItemListProps) {
     setMergeDialog({ open: true, items });
   }, []);
 
+  // Handle stock balance action
+  const handleStockBalance = useCallback((items: Item[]) => {
+    if (items.length === 0) {
+      toast.error("Selecione pelo menos 1 item para balanço de estoque");
+      return;
+    }
+    const ids = items.map((item) => item.id).join(",");
+    navigate(`${routes.inventory.products.stockBalance}?ids=${ids}`);
+  }, [navigate]);
+
   const handleMergeConfirm = useCallback(
     async (targetId: string, resolutions: Record<string, any>) => {
       try {
@@ -460,6 +470,7 @@ export function ItemList({ className }: ItemListProps) {
             onDeactivate={handleDeactivate}
             onDelete={handleBulkDelete}
             onMerge={handleMerge}
+            onStockBalance={handleStockBalance}
             filters={queryFilters}
             className="h-full"
             onDataChange={handleTableDataChange}

@@ -15,7 +15,6 @@ export const GarageCreatePage = () => {
   const handleSubmit = async (data: GarageCreateFormData) => {
     try {
       await create(data);
-      toast.success("Garagem criada com sucesso!");
       navigate(routes.production.garages.list);
     } catch (error) {
       // Error is handled by the API client

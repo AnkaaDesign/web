@@ -130,7 +130,7 @@ export function FormulaComponentsEditor({ className, availableItems = [] }: Form
             placeholder="Selecione um componente"
             emptyText="Nenhum item disponível"
             searchable={true}
-            className="w-full"
+            className="w-full bg-transparent"
           />
 
           <Input
@@ -146,7 +146,7 @@ export function FormulaComponentsEditor({ className, availableItems = [] }: Form
               }
             }}
             onKeyDown={(e) => handleKeyDown(e, index, "input")}
-            className="text-right"
+            className="text-right bg-transparent"
             decimals={1}
           />
 

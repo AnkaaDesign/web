@@ -1,6 +1,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import { getFileTypeInfo, getFileTypeCategory, FileCategory, getCategoryLabel, type FileCategory as _FileCategoryType } from "../../utils";
+import { getFileTypeInfo, getFileTypeCategory, getCategoryLabel } from "../../utils";
+import type { FileCategory, FileCategory as _FileCategoryType } from "../../utils";
 
 // Tabler Icons imports - comprehensive set for file types
 import {

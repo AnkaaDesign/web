@@ -98,25 +98,10 @@ export function CustomerBatchEditDialog({ isOpen, onClose, selectedCustomers, on
       clearInterval(progressInterval);
       setProgress(100);
 
-      if (result?.data) {
-        const { totalSuccess, totalFailed } = result.data;
-
-        if (totalSuccess > 0) {
-          toast.success(`${totalSuccess} ${totalSuccess === 1 ? "cliente atualizado" : "clientes atualizados"} com sucesso`);
-        }
-
-        if (totalFailed > 0) {
-          toast.error(`${totalFailed} ${totalFailed === 1 ? "cliente falhou" : "clientes falharam"} ao atualizar`);
-        }
-      } else {
-        toast.success("Clientes atualizados com sucesso");
-      }
-
       onSuccess?.();
       handleClose();
     } catch (error) {
       console.error("Error during batch update:", error);
-      toast.error("Erro ao atualizar clientes em lote");
     } finally {
       setIsProcessing(false);
       setCurrentOperation(null);
@@ -142,25 +127,10 @@ export function CustomerBatchEditDialog({ isOpen, onClose, selectedCustomers, on
       clearInterval(progressInterval);
       setProgress(100);
 
-      if (result?.data) {
-        const { totalSuccess, totalFailed } = result.data;
-
-        if (totalSuccess > 0) {
-          toast.success(`${totalSuccess} ${totalSuccess === 1 ? "cliente excluído" : "clientes excluídos"} com sucesso`);
-        }
-
-        if (totalFailed > 0) {
-          toast.error(`${totalFailed} ${totalFailed === 1 ? "cliente falhou" : "clientes falharam"} ao excluir`);
-        }
-      } else {
-        toast.success("Clientes excluídos com sucesso");
-      }
-
       onSuccess?.();
       handleClose();
     } catch (error) {
       console.error("Error during batch delete:", error);
-      toast.error("Erro ao excluir clientes em lote");
     } finally {
       setIsProcessing(false);
       setCurrentOperation(null);

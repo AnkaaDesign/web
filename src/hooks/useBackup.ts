@@ -82,11 +82,7 @@ export function useBackupMutations() {
   const createBackup = useMutation({
     mutationFn: (data: CreateBackupRequest) => backupApi.createBackup(data),
     onSuccess: (result) => {
-      toast.success(`Backup "${result.message}" iniciado com sucesso!`);
       queryClient.invalidateQueries({ queryKey: backupQueryKeys.all });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Erro ao iniciar backup");
     },
   });
 
@@ -94,11 +90,7 @@ export function useBackupMutations() {
     mutationFn: ({ id, targetPath }: { id: string; targetPath?: string }) =>
       backupApi.restoreBackup(id, targetPath),
     onSuccess: (result) => {
-      toast.success(result.message || "Backup restaurado com sucesso!");
       queryClient.invalidateQueries({ queryKey: backupQueryKeys.all });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Erro ao restaurar backup");
     },
   });
 
@@ -116,11 +108,7 @@ export function useBackupMutations() {
   const scheduleBackup = useMutation({
     mutationFn: (data: ScheduleBackupRequest) => backupApi.scheduleBackup(data),
     onSuccess: (result) => {
-      toast.success(result.message || "Backup agendado com sucesso!");
       queryClient.invalidateQueries({ queryKey: backupQueryKeys.scheduled() });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Erro ao agendar backup");
     },
   });
 

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { passwordRecoverySchema, type PasswordRecoveryFormData } from "../../schemas";
+import { passwordRecoverySchema } from "../../schemas";
+import type { PasswordRecoveryFormData } from "../../schemas";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";

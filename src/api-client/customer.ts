@@ -12,6 +12,7 @@ import type {
   CustomerBatchDeleteFormData,
   CustomerGetByIdFormData,
   CustomerQueryFormData,
+  CustomerMergeFormData,
 } from "../schemas";
 import type {
   // Interface types (for responses)
@@ -23,6 +24,7 @@ import type {
   CustomerBatchCreateResponse,
   CustomerBatchUpdateResponse,
   CustomerBatchDeleteResponse,
+  CustomerMergeResponse,
 } from "../types";
 
 // =====================
@@ -105,6 +107,17 @@ export class CustomerService {
     });
     return response.data;
   }
+
+  // =====================
+  // Merge Operations
+  // =====================
+
+  async mergeCustomers(data: CustomerMergeFormData, query?: CustomerQueryFormData): Promise<CustomerMergeResponse> {
+    const response = await apiClient.post<CustomerMergeResponse>(`${this.basePath}/merge`, data, {
+      params: query,
+    });
+    return response.data;
+  }
 }
 
 // =====================
@@ -131,3 +144,6 @@ export const deleteCustomer = (id: string) => customerService.deleteCustomer(id)
 export const batchCreateCustomers = (data: CustomerBatchCreateFormData, query?: CustomerQueryFormData) => customerService.batchCreateCustomers(data, query);
 export const batchUpdateCustomers = (data: CustomerBatchUpdateFormData, query?: CustomerQueryFormData) => customerService.batchUpdateCustomers(data, query);
 export const batchDeleteCustomers = (data: CustomerBatchDeleteFormData, query?: CustomerQueryFormData) => customerService.batchDeleteCustomers(data, query);
+
+// Merge Operations
+export const mergeCustomers = (data: CustomerMergeFormData, query?: CustomerQueryFormData) => customerService.mergeCustomers(data, query);

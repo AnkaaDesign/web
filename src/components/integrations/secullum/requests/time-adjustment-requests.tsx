@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { IconCircleCheck, IconCircleX, IconRefresh, IconClock, IconUser, IconCalendar, IconClockEdit, IconFileDescription, IconArrowsExchange, IconDeviceMobile, IconFingerprint, IconQrcode, IconId, IconWifi, IconWifiOff } from "@tabler/icons-react";
@@ -250,18 +250,82 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
     refetch();
   }, [refetch]);
 
-  // Update parent with current actions
+  const handleApprove = useCallback(async () => {
+    if (!selectedRequest) return;
+
+    try {
+      await approveRequest.mutateAsync({
+        requestId: selectedRequest.Id.toString(),
+        data: {
+          Versao: selectedRequest.Versao,
+          AlteracoesFonteDados: selectedRequest.AlteracoesFonteDados,
+          TipoSolicitacao: selectedRequest.TipoSolicitacao || 0
+        }
+      });
+
+      // Refresh and select next request
+      await refetch();
+      const newSelectedRequest = null;
+      setSelectedRequest(newSelectedRequest);
+      onSelectedRequestChange?.(newSelectedRequest);
+    } catch (error) {
+      // Error handled by hook
+    }
+  }, [selectedRequest, approveRequest, refetch, onSelectedRequestChange]);
+
+  const handleReject = useCallback(async () => {
+    if (!selectedRequest || !rejectReason) return;
+
+    try {
+      await rejectRequest.mutateAsync({
+        requestId: selectedRequest.Id.toString(),
+        data: {
+          Versao: selectedRequest.Versao,
+          MotivoDescarte: rejectReason,
+          TipoSolicitacao: selectedRequest.TipoSolicitacao || 0
+        }
+      });
+
+      // Refresh and select next request
+      await refetch();
+      const newSelectedRequest = null;
+      setSelectedRequest(newSelectedRequest);
+      onSelectedRequestChange?.(newSelectedRequest);
+      setRejectDialogOpen(false);
+      setRejectReason("");
+    } catch (error) {
+      // Error handled by hook
+    }
+  }, [selectedRequest, rejectReason, rejectRequest, refetch, onSelectedRequestChange]);
+
+  // Store latest action handlers in refs
+  const handleApproveRef = useRef(handleApprove);
+  const openRejectDialogRef = useRef(openRejectDialog);
+  const handleRefreshRef = useRef(handleRefresh);
+
+  useEffect(() => {
+    handleApproveRef.current = handleApprove;
+    openRejectDialogRef.current = openRejectDialog;
+    handleRefreshRef.current = handleRefresh;
+  });
+
+  // Create stable wrapper functions
+  const stableHandleApprove = useCallback(() => handleApproveRef.current(), []);
+  const stableOpenRejectDialog = useCallback(() => openRejectDialogRef.current(), []);
+  const stableHandleRefresh = useCallback(() => handleRefreshRef.current(), []);
+
+  // Update parent with current actions (using stable wrappers)
   useEffect(() => {
     if (selectedRequest) {
       onActionsChange?.(
-        handleApprove,
-        openRejectDialog,
-        handleRefresh
+        stableHandleApprove,
+        stableOpenRejectDialog,
+        stableHandleRefresh
       );
     } else {
-      onActionsChange?.(null, null, handleRefresh);
+      onActionsChange?.(null, null, stableHandleRefresh);
     }
-  }, [selectedRequest, onActionsChange, handleApprove, openRejectDialog, handleRefresh]);
+  }, [selectedRequest, onActionsChange, stableHandleApprove, stableOpenRejectDialog, stableHandleRefresh]);
 
   // Handle context menu
   useEffect(() => {
@@ -325,54 +389,6 @@ export function TimeAdjustmentRequests({ className, onSelectedRequestChange, onA
 
     return entries;
   };
-
-  const handleApprove = useCallback(async () => {
-    if (!selectedRequest) return;
-
-    try {
-      await approveRequest.mutateAsync({
-        requestId: selectedRequest.Id.toString(),
-        data: {
-          Versao: selectedRequest.Versao,
-          AlteracoesFonteDados: selectedRequest.AlteracoesFonteDados,
-          TipoSolicitacao: selectedRequest.TipoSolicitacao || 0
-        }
-      });
-
-      // Refresh and select next request
-      await refetch();
-      const newSelectedRequest = null;
-      setSelectedRequest(newSelectedRequest);
-      onSelectedRequestChange?.(newSelectedRequest);
-    } catch (error) {
-      // Error handled by hook
-    }
-  }, [selectedRequest, approveRequest, refetch, onSelectedRequestChange]);
-
-  const handleReject = useCallback(async () => {
-    if (!selectedRequest || !rejectReason) return;
-
-    try {
-      await rejectRequest.mutateAsync({
-        requestId: selectedRequest.Id.toString(),
-        data: {
-          Versao: selectedRequest.Versao,
-          MotivoDescarte: rejectReason,
-          TipoSolicitacao: selectedRequest.TipoSolicitacao || 0
-        }
-      });
-
-      // Refresh and select next request
-      await refetch();
-      const newSelectedRequest = null;
-      setSelectedRequest(newSelectedRequest);
-      onSelectedRequestChange?.(newSelectedRequest);
-      setRejectDialogOpen(false);
-      setRejectReason("");
-    } catch (error) {
-      // Error handled by hook
-    }
-  }, [selectedRequest, rejectReason, rejectRequest, refetch, onSelectedRequestChange]);
 
   const handleContextMenu = (e: React.MouseEvent, request: TimeAdjustmentRequest) => {
     e.preventDefault();

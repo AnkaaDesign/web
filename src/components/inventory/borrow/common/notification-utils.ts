@@ -43,16 +43,18 @@ export function notifyOverdueBorrow(data: BorrowNotificationData): void {
 
 /**
  * Send a notification for successful borrow creation
+ * Note: This function is kept for backward compatibility but is no longer used
+ * as the API client now handles CREATE operation toasts automatically
  */
 export function notifyBorrowCreated(data: BorrowNotificationData): void {
-  const { borrow } = data;
-  const itemName = borrow.item?.name || "Item";
-  const returnDate = borrow.returnedAt ? formatDate(new Date(borrow.returnedAt)) : "data não definida";
-
-  toast.success("Empréstimo criado com sucesso!", {
-    description: `${itemName} foi emprestado. Devolução prevista: ${returnDate}`,
-    duration: 4000,
-  });
+  // Removed redundant toast - API client handles this
+  // const { borrow } = data;
+  // const itemName = borrow.item?.name || "Item";
+  // const returnDate = borrow.returnedAt ? formatDate(new Date(borrow.returnedAt)) : "data não definida";
+  // toast.success("Empréstimo criado com sucesso!", {
+  //   description: `${itemName} foi emprestado. Devolução prevista: ${returnDate}`,
+  //   duration: 4000,
+  // });
 }
 
 /**
