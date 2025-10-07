@@ -7,6 +7,7 @@ import { CardProgressOverlay } from "@/components/ui/upload-progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { IconUpload, IconX, IconAlertCircle } from "@tabler/icons-react";
 import { FileTypeAvatar } from "@/components/ui/file-type-icon";
+import { getApiBaseUrl } from "@/utils/file";
 
 export interface FileWithPreview extends File {
   id: string;
@@ -99,7 +100,8 @@ export function FileUploader({
         }
 
         try {
-          const response = await fetch(`http://localhost:3030/api/files/thumbnail/${fileId}`);
+          const apiBaseUrl = getApiBaseUrl();
+          const response = await fetch(`${apiBaseUrl}/files/thumbnail/${fileId}`);
           if (response.ok) {
             // Thumbnail is ready, update the file
             setFiles((prevFiles) =>
@@ -107,7 +109,7 @@ export function FileUploader({
                 if (f.uploadedFileId === fileId && !f.thumbnailUrl) {
                   return {
                     ...f,
-                    thumbnailUrl: `/api/files/thumbnail/${fileId}`,
+                    thumbnailUrl: `${apiBaseUrl}/files/thumbnail/${fileId}`,
                   };
                 }
                 return f;
@@ -346,7 +348,7 @@ export function FileUploader({
         if (file.uploadedFileId) {
           // Always use full URL for API endpoints
           // For PDFs and EPS files, always try thumbnail endpoint
-          return `${apiBaseUrl}/api/files/thumbnail/${file.uploadedFileId}`;
+          return `${apiBaseUrl}/files/thumbnail/${file.uploadedFileId}`;
         }
         return "";
       })();

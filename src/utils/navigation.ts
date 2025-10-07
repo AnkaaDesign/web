@@ -22,6 +22,9 @@ interface NavigationUser {
 export function getFilteredMenuForUser(menuItems: MenuItem[], user: NavigationUser, platform: "web" | "mobile"): MenuItem[] {
   let filteredMenu = filterMenuByPlatform(menuItems, platform);
 
+  // Apply environment filtering (staging vs production)
+  filteredMenu = filterMenuByEnvironment(filteredMenu);
+
   // Apply privilege filtering if user has sector/privileges
   const userPrivilege = user?.sector?.privileges || user?.position?.sector?.privileges;
   if (userPrivilege) {
@@ -112,6 +115,39 @@ export function filterMenuByPlatform(menuItems: MenuItem[], platform: "web" | "m
         };
       }
       return item;
+    });
+}
+
+/**
+ * Filter menu items by environment (staging vs production)
+ */
+export function filterMenuByEnvironment(menuItems: MenuItem[]): MenuItem[] {
+  // Check if we're in staging environment by looking at the API URL
+  const apiUrl = import.meta.env.VITE_API_URL || '';
+  const isStagingEnvironment = apiUrl.includes('staging.api');
+
+  return menuItems
+    .filter((item) => {
+      // If item is only for staging, filter it out in production
+      if (item.onlyInStaging && !isStagingEnvironment) {
+        return false;
+      }
+      return true;
+    })
+    .map((item) => {
+      // Recursively filter children
+      if (item.children) {
+        return {
+          ...item,
+          children: filterMenuByEnvironment(item.children),
+        };
+      }
+      return item;
+    })
+    .filter((item) => {
+      // Remove items with no children after filtering
+      if (item.children && item.children.length === 0) return false;
+      return true;
     });
 }
 

@@ -99,7 +99,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
     if (file.mimetype === "application/pdf") {
       // Open PDF in new tab
       const apiUrl = (window as any).__ANKAA_API_URL__ || process.env.VITE_API_URL || "http://192.168.0.123:3030";
-      window.open(`${apiUrl}/api/files/serve/${file.id}`, "_blank");
+      window.open(`${apiUrl}/files/serve/${file.id}`, "_blank");
     } else if (isImage || category === "video") {
       // Open image/video in preview modal if available
       if (onPreview) {
@@ -111,7 +111,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
     } else {
       // Default: try to open in new tab
       const apiUrl = (window as any).__ANKAA_API_URL__ || process.env.VITE_API_URL || "http://192.168.0.123:3030";
-      window.open(`${apiUrl}/api/files/${file.id}/download`, "_blank");
+      window.open(`${apiUrl}/files/${file.id}/download`, "_blank");
     }
   };
 
@@ -173,11 +173,11 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
                   }
                   // For images without thumbnails, use the direct file URL
                   else if (isImage) {
-                    thumbnailSrc = `${apiUrl}/api/files/serve/${file.id}`;
+                    thumbnailSrc = `${apiUrl}/files/serve/${file.id}`;
                   }
                   // For PDFs and EPS, try the thumbnail endpoint
                   else if (isPdf || isEps) {
-                    thumbnailSrc = `${apiUrl}/api/files/thumbnail/${file.id}`;
+                    thumbnailSrc = `${apiUrl}/files/thumbnail/${file.id}`;
                   } else {
                     thumbnailSrc = getFileUrl(file);
                   }

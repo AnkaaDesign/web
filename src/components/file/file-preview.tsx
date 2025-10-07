@@ -288,7 +288,7 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
                     isCurrentFileEps && currentFile.thumbnailUrl
                       ? currentFile.thumbnailUrl.startsWith("http")
                         ? currentFile.thumbnailUrl
-                        : `/api/files/thumbnail/${currentFile.id}?size=large`
+                        : `${baseUrl || (typeof window !== 'undefined' && (window as any).__ANKAA_API_URL__) || ''}/files/thumbnail/${currentFile.id}?size=large`
                       : getFileUrl(currentFile, baseUrl)
                   }
                   alt={currentFile.filename}

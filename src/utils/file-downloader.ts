@@ -115,7 +115,7 @@ const trackDownload = (file: AnkaaFile, config: DownloadConfig) => {
  */
 const generateDownloadUrl = (file: AnkaaFile, baseUrl?: string): string => {
   const apiUrl = baseUrl || getApiBaseUrl();
-  return `${apiUrl}/api/files/serve/${file.id}?download=true`;
+  return `${apiUrl}/files/serve/${file.id}?download=true`;
 };
 
 /**

@@ -3,6 +3,7 @@ import { IconBuilding, IconCertificate, IconUser } from "@tabler/icons-react";
 import type { Customer } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { maskCNPJ, maskCPF } from "../../../../utils";
+import { normalizeThumbnailUrl, getFileUrl } from "@/utils/file";
 
 interface BasicInfoCardProps {
   customer: Customer;
@@ -27,10 +28,7 @@ export function BasicInfoCard({ customer, className }: BasicInfoCardProps) {
             <div className="flex justify-center mb-6">
               <div className="w-32 h-32 rounded-lg border-2 border-muted overflow-hidden bg-muted/30 flex items-center justify-center">
                 <img
-                  src={
-                    customer.logo.thumbnailUrl ||
-                    `${(window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030"}/api/files/serve/${customer.logo.id}`
-                  }
+                  src={normalizeThumbnailUrl(customer.logo.thumbnailUrl) || getFileUrl(customer.logo)}
                   alt={`Logo de ${customer.fantasyName}`}
                   className="w-full h-full object-contain"
                 />

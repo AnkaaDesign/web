@@ -67,7 +67,7 @@ const LogoDisplay = ({ logoId, size = "w-12 h-12", className = "" }: { logoId?: 
 
   // Use the same API URL configuration as the API client
   const apiUrl = import.meta.env.VITE_API_URL || "http://192.168.0.13:3030";
-  const imageUrl = `${apiUrl}/api/files/serve/${logoId}`;
+  const imageUrl = `${apiUrl}/files/serve/${logoId}`;
   return (
     <div className={cn("relative", size, className)}>
       {imageLoading && (

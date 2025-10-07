@@ -3,6 +3,7 @@ import { IconBuilding, IconCertificate } from "@tabler/icons-react";
 import type { Supplier } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { maskCNPJ } from "../../../../utils";
+import { normalizeThumbnailUrl, getFileUrl } from "@/utils/file";
 
 interface BasicInfoCardProps {
   supplier: Supplier;
@@ -27,10 +28,7 @@ export function BasicInfoCard({ supplier, className }: BasicInfoCardProps) {
             <div className="flex justify-center mb-6">
               <div className="w-32 h-32 rounded-lg border-2 border-muted overflow-hidden bg-muted/30 flex items-center justify-center">
                 <img
-                  src={
-                    supplier.logo.thumbnailUrl ||
-                    `${(window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030"}/api/files/serve/${supplier.logo.id}`
-                  }
+                  src={normalizeThumbnailUrl(supplier.logo.thumbnailUrl) || getFileUrl(supplier.logo)}
                   alt={`Logo de ${supplier.fantasyName}`}
                   className="w-full h-full object-contain"
                 />

@@ -78,10 +78,10 @@ const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" = "small"): s
     if (file.thumbnailUrl.startsWith("http")) {
       return file.thumbnailUrl;
     }
-    return `${apiUrl}/api/files/thumbnail/${file.id}?size=${size}`;
+    return `${apiUrl}/files/thumbnail/${file.id}?size=${size}`;
   }
   if (isImageFile(file)) {
-    return `${apiUrl}/api/files/serve/${file.id}`;
+    return `${apiUrl}/files/serve/${file.id}`;
   }
   return "";
 };

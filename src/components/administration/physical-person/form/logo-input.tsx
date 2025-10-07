@@ -7,6 +7,7 @@ import { fileService } from "../../../../api-client";
 import { toast } from "sonner";
 import type { File as AnkaaFile } from "../../../../types";
 import { backendFileToFileWithPreview } from "@/lib/utils";
+import { normalizeThumbnailUrl, getFileUrl } from "@/utils/file";
 
 interface LogoInputProps {
   disabled?: boolean;
@@ -20,7 +21,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [previewFiles, setPreviewFiles] = useState<FileWithPreview[]>([]);
   const [showPreview, setShowPreview] = useState(false);
-  const [isNewUpload, setIsNewUpload] = useState(false);
+  const [isNewUpload, setIsNewUpload] = useState(false); // Track if this is a newly uploaded file
 
   // Track loaded logo ID to prevent duplicate API calls
   const [loadedLogoId, setLoadedLogoId] = useState<string | null>(null);
@@ -34,7 +35,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
       const logoIdFromUrl = searchParams.get("logoId");
       const logoIdToLoad = logoIdFromUrl || existingLogoId;
 
-      // Skip if we already loaded this logo ID to prevent infinite requests
+      // CRITICAL: Skip if we already loaded this logo ID to prevent infinite requests
       // Also skip if user explicitly deleted the logo
       if (!logoIdToLoad || logoIdToLoad === loadedLogoId || userDeletedLogo) {
         return;
@@ -60,7 +61,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
           // Create a preview file for the file uploader
           const previewFile = backendFileToFileWithPreview(file);
           // Override preview URL for direct serving
-          previewFile.preview = file.thumbnailUrl || `${(window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030"}/api/files/serve/${file.id}`;
+          previewFile.preview = normalizeThumbnailUrl(file.thumbnailUrl) || getFileUrl(file);
           setPreviewFiles([previewFile]);
         }
       } catch (error) {
@@ -102,14 +103,22 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
       // Upload the file
       setIsUploading(true);
       try {
-        // Upload the file with physical person context
+        // Create FormData
+        const formData = new FormData();
+        formData.append("file", file as Blob);
+        formData.append("filename", file.name);
+        formData.append("mimetype", file.type);
+        formData.append("size", file.size.toString());
+
+        // Upload the file with customer logo context
         const response = await fileService.uploadSingleFile(file as File, {
-          fileContext: "physicalPersonPhoto",
+          fileContext: "customerLogo",
           entityType: "customer",
         });
 
         if (response && response.data) {
           // Set the uploaded file ID in the form with dirty flag but preserve other form state
+          // CRITICAL: Only update logoId field, don't trigger full form revalidation
           form.setValue("logoId", response.data.id, {
             shouldDirty: true, // Mark as dirty to indicate changes
             shouldValidate: false, // Don't validate other fields
@@ -130,13 +139,12 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
             ...file,
             id: response.data.id,
             uploaded: true,
-            preview:
-              response.data.thumbnailUrl || `${(window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030"}/api/files/serve/${response.data.id}`,
+            preview: normalizeThumbnailUrl(response.data.thumbnailUrl) || getFileUrl(response.data),
           };
           setPreviewFiles([updatedFile]);
         }
       } catch (error) {
-        toast.error("Erro ao enviar a foto. Tente novamente.");
+        toast.error("Erro ao enviar o logo. Tente novamente.");
         // Remove the file from preview on error
         setPreviewFiles([]);
       } finally {
@@ -169,12 +177,16 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
     if (shouldDeleteFromServer && fileToDelete?.id) {
       try {
         await fileService.deleteFile(fileToDelete.id);
+        // Don't show any toast here - the API client will show "Excluído com sucesso"
+        // which is already confusing enough for users
       } catch (error) {
         // Don't show error toast as the UI state was already cleared
+        // The file will be orphaned but can be cleaned up later
       }
     } else {
-      // For existing photos, just remove the reference
-      toast.info("Foto removida");
+      // For existing logos, just remove the reference
+      // Use a more user-friendly message
+      toast.info("Logo desmarcado do cliente");
     }
   };
 
@@ -189,7 +201,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
         name="logoId"
         render={() => (
           <FormItem>
-            <FormLabel>Foto Pessoal</FormLabel>
+            <FormLabel>Logo do Cliente</FormLabel>
             <FormControl>
               <div className="space-y-4">
                 {previewFiles.length === 0 ? (
@@ -198,12 +210,12 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
                     maxFiles={1}
                     maxSize={5 * 1024 * 1024} // 5MB
                     acceptedFileTypes={{
-                      "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"],
+                      "image/*": [".jpeg", ".jpg", ".png", ".gif", ".svg", ".webp"],
                     }}
                     disabled={disabled || isUploading}
                     showPreview={true}
                     variant="compact"
-                    placeholder="Clique ou arraste uma foto pessoal"
+                    placeholder="Clique ou arraste o logo do cliente"
                   />
                 ) : (
                   <FileItem
@@ -224,7 +236,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
                     showActions={!disabled && !isUploading}
                   />
                 )}
-                {isUploading && <p className="text-sm text-muted-foreground">Enviando foto...</p>}
+                {isUploading && <p className="text-sm text-muted-foreground">Enviando logo...</p>}
               </div>
             </FormControl>
             <FormMessage />

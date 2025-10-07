@@ -46,7 +46,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
           // Convert backend file to FileWithPreview
           const fileWithPreview = backendFileToFileWithPreview(file);
           // Add download URL as preview for images
-          fileWithPreview.preview = `${import.meta.env.VITE_API_URL || "http://localhost:3030"}/api/files/${file.id}/download`;
+          fileWithPreview.preview = `${import.meta.env.VITE_API_URL || "http://localhost:3030"}/files/${file.id}/download`;
           // Preview is handled by the uploadedFile state
         }
       } catch (error) {

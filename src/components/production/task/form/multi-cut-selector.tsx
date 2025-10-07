@@ -14,6 +14,7 @@ import { FileUploadField } from "@/components/file";
 import type { FileWithPreview } from "@/components/file";
 import { uploadSingleFile } from "../../../../api-client";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { getApiBaseUrl } from "@/utils/file";
 
 interface MultiCutSelectorProps {
   control: any;
@@ -124,6 +125,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
         }
 
         const uploadedFile = result.data;
+        const apiBaseUrl = getApiBaseUrl();
         updateCut(cutId, {
           fileId: uploadedFile.id,
           file: {
@@ -134,7 +136,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
             id: uploadedFile.id,
             uploadProgress: 100,
             uploaded: true,
-            thumbnailUrl: uploadedFile.thumbnailUrl || `/api/files/thumbnail/${uploadedFile.id}`,
+            thumbnailUrl: uploadedFile.thumbnailUrl || `${apiBaseUrl}/files/thumbnail/${uploadedFile.id}`,
             uploadedFileId: uploadedFile.id,
           } as FileWithPreview,
           uploading: false,
@@ -183,6 +185,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
       if (fieldValueString !== lastFieldValueRef.current) {
         console.log('[MultiCutSelector] Updating local state with', field.value.length, 'cuts');
 
+        const apiBaseUrl = getApiBaseUrl();
         const newCuts = field.value.map((cut: any, index: number) => {
           // Convert existing file to FileWithPreview format if available
           const existingFile = cut.file ? {
@@ -193,7 +196,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
             uploaded: true,
             uploadProgress: 100,
             uploadedFileId: cut.file.id,
-            thumbnailUrl: cut.file.thumbnailUrl || `/api/files/thumbnail/${cut.file.id}`,
+            thumbnailUrl: cut.file.thumbnailUrl || `${apiBaseUrl}/files/thumbnail/${cut.file.id}`,
           } as FileWithPreview : undefined;
 
           return {

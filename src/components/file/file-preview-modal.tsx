@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../types";
-import { isImageFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension } from "../../utils";
+import { isImageFile, isVideoFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension } from "../../utils";
 
 // Types for touch gestures and zoom
 interface TouchState {
@@ -43,9 +43,9 @@ const isEpsFile = (file: AnkaaFile): boolean => {
   return epsMimeTypes.includes(file.mimetype.toLowerCase());
 };
 
-// Check if file can be previewed (images or EPS with thumbnails)
+// Check if file can be previewed (images, videos, or EPS with thumbnails)
 const isPreviewableFile = (file: AnkaaFile): boolean => {
-  return isImageFile(file) || (isEpsFile(file) && !!file.thumbnailUrl);
+  return isImageFile(file) || isVideoFile(file) || (isEpsFile(file) && !!file.thumbnailUrl);
 };
 
 export interface FilePreviewModalProps {
@@ -427,6 +427,7 @@ export function FilePreviewModal({
 
   const isPDF = getFileExtension(currentFile.filename).toLowerCase() === "pdf";
   const isEPS = isEpsFile(currentFile);
+  const isVideo = isVideoFile(currentFile);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -580,63 +581,85 @@ export function FilePreviewModal({
             onWheel={handleWheel}
           >
             {isCurrentFilePreviewable ? (
-              <>
-                {imageLoading && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm rounded-xl z-10">
-                    <div className="animate-spin rounded-full h-12 w-12 border-2 border-white border-t-transparent mb-4" />
-                    <span className="text-white text-sm">Carregando imagem...</span>
-                  </div>
-                )}
-
-                {imageError ? (
-                  <div className="flex flex-col items-center justify-center gap-4 bg-white/10 backdrop-blur-sm rounded-xl p-8 max-w-md">
-                    <div className="text-6xl">⚠️</div>
-                    <div className="text-center">
-                      <h3 className="text-white text-lg font-medium mb-2">Erro ao carregar imagem</h3>
-                      <p className="text-white/70 text-sm mb-4">Não foi possível carregar a imagem.</p>
-                      <Button variant="outline" onClick={handleDownload} className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                        <IconDownload className="h-4 w-4 mr-2" />
-                        Baixar arquivo
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <img
-                    ref={imageRef}
-                    src={
-                      isEPS && currentFile.thumbnailUrl
-                        ? currentFile.thumbnailUrl.startsWith("http")
-                          ? currentFile.thumbnailUrl
-                          : `/api/files/thumbnail/${currentFile.id}?size=large`
-                        : getFileUrl(currentFile, baseUrl)
-                    }
-                    alt={currentFile.filename}
-                    className={cn(
-                      "transition-all duration-200 rounded-lg shadow-2xl select-none",
-                      zoom > fitZoom ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
-                      isEPS && "ring-2 ring-indigo-400 ring-opacity-60",
-                    )}
+              isVideo ? (
+                <div className="w-full max-w-5xl mx-auto">
+                  <video
+                    key={currentFile.id}
+                    controls
+                    autoPlay={false}
+                    className="w-full rounded-lg shadow-2xl"
                     style={{
-                      transform: `
-                        scale(${zoom / fitZoom}) 
-                        rotate(${rotation}deg) 
-                        translate(${panX}px, ${panY}px)
-                      `,
-                      transformOrigin: "center center",
-                      maxWidth: "none",
-                      maxHeight: "none",
-                      width: `${100 * fitZoom}%`,
-                      height: "auto",
+                      maxHeight: "80vh",
                     }}
-                    onLoad={handleImageLoad}
-                    onError={handleImageError}
-                    onClick={zoom === fitZoom ? handleZoomIn : handleResetZoom}
-                    draggable={false}
-                    onMouseDown={() => setIsDragging(true)}
-                    onMouseUp={() => setIsDragging(false)}
-                  />
-                )}
-              </>
+                    onLoadStart={() => setImageLoading(false)}
+                    onError={() => {
+                      setImageError(true);
+                      setImageLoading(false);
+                    }}
+                  >
+                    <source src={getFileUrl(currentFile, baseUrl)} type={currentFile.mimetype} />
+                    Seu navegador não suporta a reprodução de vídeo.
+                  </video>
+                </div>
+              ) : (
+                <>
+                  {imageLoading && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 backdrop-blur-sm rounded-xl z-10">
+                      <div className="animate-spin rounded-full h-12 w-12 border-2 border-white border-t-transparent mb-4" />
+                      <span className="text-white text-sm">Carregando imagem...</span>
+                    </div>
+                  )}
+
+                  {imageError ? (
+                    <div className="flex flex-col items-center justify-center gap-4 bg-white/10 backdrop-blur-sm rounded-xl p-8 max-w-md">
+                      <div className="text-6xl">⚠️</div>
+                      <div className="text-center">
+                        <h3 className="text-white text-lg font-medium mb-2">Erro ao carregar imagem</h3>
+                        <p className="text-white/70 text-sm mb-4">Não foi possível carregar a imagem.</p>
+                        <Button variant="outline" onClick={handleDownload} className="bg-white/10 border-white/20 text-white hover:bg-white/20">
+                          <IconDownload className="h-4 w-4 mr-2" />
+                          Baixar arquivo
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <img
+                      ref={imageRef}
+                      src={
+                        isEPS && currentFile.thumbnailUrl
+                          ? currentFile.thumbnailUrl.startsWith("http")
+                            ? currentFile.thumbnailUrl
+                            : `${baseUrl || (typeof window !== 'undefined' && (window as any).__ANKAA_API_URL__) || ''}/files/thumbnail/${currentFile.id}?size=large`
+                          : getFileUrl(currentFile, baseUrl)
+                      }
+                      alt={currentFile.filename}
+                      className={cn(
+                        "transition-all duration-200 rounded-lg shadow-2xl select-none",
+                        zoom > fitZoom ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
+                        isEPS && "ring-2 ring-indigo-400 ring-opacity-60",
+                      )}
+                      style={{
+                        transform: `
+                          scale(${zoom / fitZoom})
+                          rotate(${rotation}deg)
+                          translate(${panX}px, ${panY}px)
+                        `,
+                        transformOrigin: "center center",
+                        maxWidth: "none",
+                        maxHeight: "none",
+                        width: `${100 * fitZoom}%`,
+                        height: "auto",
+                      }}
+                      onLoad={handleImageLoad}
+                      onError={handleImageError}
+                      onClick={zoom === fitZoom ? handleZoomIn : handleResetZoom}
+                      draggable={false}
+                      onMouseDown={() => setIsDragging(true)}
+                      onMouseUp={() => setIsDragging(false)}
+                    />
+                  )}
+                </>
+              )
             ) : isPDF ? (
               <div className="flex flex-col items-center justify-center gap-6 bg-white/10 backdrop-blur-sm rounded-xl p-8 max-w-md">
                 <div className="text-8xl">📄</div>

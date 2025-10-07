@@ -163,12 +163,12 @@ export const generateFileUrls = (file: AnkaaFile, baseUrl?: string) => {
   const apiUrl = baseUrl || getApiBaseUrl();
 
   return {
-    serve: `${apiUrl}/api/files/serve/${file.id}`,
-    download: `${apiUrl}/api/files/${file.id}/download`,
+    serve: `${apiUrl}/files/serve/${file.id}`,
+    download: `${apiUrl}/files/${file.id}/download`,
     thumbnail: file.thumbnailUrl ? (file.thumbnailUrl.startsWith("http") ? file.thumbnailUrl : `${apiUrl}${file.thumbnailUrl}`) : null,
-    thumbnailSmall: `${apiUrl}/api/files/thumbnail/${file.id}?size=small`,
-    thumbnailMedium: `${apiUrl}/api/files/thumbnail/${file.id}?size=medium`,
-    thumbnailLarge: `${apiUrl}/api/files/thumbnail/${file.id}?size=large`,
+    thumbnailSmall: `${apiUrl}/files/thumbnail/${file.id}?size=small`,
+    thumbnailMedium: `${apiUrl}/files/thumbnail/${file.id}?size=medium`,
+    thumbnailLarge: `${apiUrl}/files/thumbnail/${file.id}?size=large`,
   };
 };
 

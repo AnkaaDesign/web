@@ -38,11 +38,11 @@ const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" | "large" = "
       return file.thumbnailUrl;
     }
     // Otherwise build the URL with API base
-    return `${apiUrl}/api/files/thumbnail/${file.id}?size=${size}`;
+    return `${apiUrl}/files/thumbnail/${file.id}?size=${size}`;
   }
   // For images without thumbnails, use the file itself
   if (isImageFile(file)) {
-    return `${apiUrl}/api/files/serve/${file.id}`;
+    return `${apiUrl}/files/serve/${file.id}`;
   }
   return "";
 };

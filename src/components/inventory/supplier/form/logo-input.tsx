@@ -7,6 +7,7 @@ import { fileService } from "../../../../api-client";
 import { toast } from "sonner";
 import type { File as AnkaaFile } from "../../../../types";
 import { backendFileToFileWithPreview } from "@/lib/utils";
+import { normalizeThumbnailUrl, getFileUrl } from "@/utils/file";
 
 interface LogoInputProps {
   disabled?: boolean;
@@ -45,7 +46,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
         if (response.success && response.data) {
           const file = response.data;
           setUploadedFile(file);
-          setIsNewUpload(false); // This is an existing _file, not a new upload
+          setIsNewUpload(false); // This is an existing file, not a new upload
           setLoadedLogoId(logoIdToLoad); // Mark this logo as loaded
 
           // Update form with logoId from URL if it came from URL (but don't trigger re-render or validation)
@@ -60,7 +61,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
           // Create a preview file for the file uploader
           const previewFile = backendFileToFileWithPreview(file);
           // Override preview URL for direct serving
-          previewFile.preview = file.thumbnailUrl || `${(window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030"}/api/files/serve/${file.id}`;
+          previewFile.preview = normalizeThumbnailUrl(file.thumbnailUrl) || getFileUrl(file);
           setPreviewFiles([previewFile]);
         }
       } catch (error) {
@@ -102,15 +103,22 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
       // Upload the file
       setIsUploading(true);
       try {
-        // Upload the file with supplier logo context
-        const response = await fileService.uploadSingleFile(file as unknown as File, {
-          fileContext: "supplierLogo",
-          entityType: "supplier",
+        // Create FormData
+        const formData = new FormData();
+        formData.append("file", file as Blob);
+        formData.append("filename", file.name);
+        formData.append("mimetype", file.type);
+        formData.append("size", file.size.toString());
+
+        // Upload the file with customer logo context
+        const response = await fileService.uploadSingleFile(file as File, {
+          fileContext: "customerLogo",
+          entityType: "customer",
         });
 
         if (response && response.data) {
           // Set the uploaded file ID in the form with dirty flag but preserve other form state
-          // CRITICAL: Only update logoId _field, don't trigger full form revalidation
+          // CRITICAL: Only update logoId field, don't trigger full form revalidation
           form.setValue("logoId", response.data.id, {
             shouldDirty: true, // Mark as dirty to indicate changes
             shouldValidate: false, // Don't validate other fields
@@ -131,8 +139,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
             ...file,
             id: response.data.id,
             uploaded: true,
-            preview:
-              response.data.thumbnailUrl || `${(window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030"}/api/files/serve/${response.data.id}`,
+            preview: normalizeThumbnailUrl(response.data.thumbnailUrl) || getFileUrl(response.data),
           };
           setPreviewFiles([updatedFile]);
         }
@@ -179,7 +186,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
     } else {
       // For existing logos, just remove the reference
       // Use a more user-friendly message
-      toast.info("Logo desmarcado do fornecedor");
+      toast.info("Logo desmarcado do cliente");
     }
   };
 
@@ -194,7 +201,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
         name="logoId"
         render={() => (
           <FormItem>
-            <FormLabel>Logo do Fornecedor</FormLabel>
+            <FormLabel>Logo do Cliente</FormLabel>
             <FormControl>
               <div className="space-y-4">
                 {previewFiles.length === 0 ? (
@@ -208,7 +215,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
                     disabled={disabled || isUploading}
                     showPreview={true}
                     variant="compact"
-                    placeholder="Clique ou arraste o logo do fornecedor"
+                    placeholder="Clique ou arraste o logo do cliente"
                   />
                 ) : (
                   <FileItem

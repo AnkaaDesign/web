@@ -76,7 +76,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-normal-map-renderer";
-import { FilePreviewCard } from "@/components/file";
+import { FilePreviewCard, FilePreviewModal } from "@/components/file";
 
 // Component to display truck layout SVG preview
 const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?: string }) => {
@@ -334,6 +334,8 @@ export const TaskDetailsPage = () => {
   const [serviceOrderCompletionDialogOpen, setServiceOrderCompletionDialogOpen] = useState(false);
   const [pendingServiceOrder, setPendingServiceOrder] = useState<any>(null);
   const [nextServiceOrderToStart, setNextServiceOrderToStart] = useState<any>(null);
+  const [filePreviewModalOpen, setFilePreviewModalOpen] = useState(false);
+  const [filePreviewInitialIndex, setFilePreviewInitialIndex] = useState(0);
 
   // Fetch task details with all relations
   const {
@@ -349,7 +351,14 @@ export const TaskDetailsPage = () => {
       createdBy: true,
       services: true,
       artworks: true,
-      observation: true,
+      budgets: true,
+      nfe: true,
+      receipt: true,
+      observation: {
+        include: {
+          files: true,
+        },
+      },
       airbrushings: {
         include: {
           receipts: true,
@@ -985,7 +994,7 @@ export const TaskDetailsPage = () => {
                             for (let i = 0; i < (task.artworks?.length ?? 0); i++) {
                               const file = task.artworks?.[i];
                               if (file) {
-                                const downloadUrl = `${apiUrl}/api/files/${file.id}/download`;
+                                const downloadUrl = `${apiUrl}/files/${file.id}/download`;
                                 window.open(downloadUrl, "_blank");
                               }
                               if (i < (task.artworks?.length ?? 0) - 1) {
@@ -1006,6 +1015,58 @@ export const TaskDetailsPage = () => {
                       {task.artworks?.map((file) => (
                         <FilePreviewCard key={file.id} file={file} size="md" showMetadata={false} />
                       ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Documents Card - Budget, NFE, Receipt */}
+              {((task.budgets && task.budgets.length > 0) || task.nfe || task.receipt) && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-1050" level={1}>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="flex items-center gap-2 text-lg font-medium">
+                      <IconFileText className="h-5 w-5 text-muted-foreground" />
+                      Documentos
+                      <Badge variant="secondary" className="ml-2">
+                        {[...(task.budgets || []), task.nfe, task.receipt].filter(Boolean).length}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0 flex-1">
+                    <div className="space-y-6">
+                      {task.budgets && task.budgets.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
+                            <h4 className="text-sm font-semibold">Orçamentos</h4>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {task.budgets.map((budget: any) => (
+                              <FilePreviewCard key={budget.id} file={budget} size="md" showMetadata={true} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {task.nfe && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <IconFileText className="h-4 w-4 text-muted-foreground" />
+                            <h4 className="text-sm font-semibold">Nota Fiscal</h4>
+                          </div>
+                          <FilePreviewCard file={task.nfe} size="md" showMetadata={true} />
+                        </div>
+                      )}
+
+                      {task.receipt && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <IconFile className="h-4 w-4 text-muted-foreground" />
+                            <h4 className="text-sm font-semibold">Recibo</h4>
+                          </div>
+                          <FilePreviewCard file={task.receipt} size="md" showMetadata={true} />
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1177,10 +1238,42 @@ export const TaskDetailsPage = () => {
                     <CardTitle className="flex items-center gap-2 text-lg font-medium">
                       <IconAlertCircle className="h-5 w-5 text-yellow-500" />
                       Observação
+                      {task.observation.files && task.observation.files.length > 0 && (
+                        <Badge variant="secondary" className="ml-auto">
+                          {task.observation.files.length} arquivo{task.observation.files.length > 1 ? "s" : ""}
+                        </Badge>
+                      )}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-0 flex-1">
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">{task.observation.description}</p>
+                  <CardContent className="pt-0 flex-1 space-y-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
+                        {task.observation.description}
+                      </p>
+                    </div>
+
+                    {task.observation.files && task.observation.files.length > 0 && (
+                      <div className="pt-4 border-t">
+                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                          <IconFiles className="h-4 w-4" />
+                          Arquivos Anexados
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {task.observation.files.map((file: any, index: number) => (
+                            <FilePreviewCard
+                              key={file.id}
+                              file={file}
+                              size="md"
+                              showMetadata={false}
+                              onPreview={() => {
+                                setFilePreviewInitialIndex(index);
+                                setFilePreviewModalOpen(true);
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}
@@ -1332,6 +1425,16 @@ export const TaskDetailsPage = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* File Preview Modal for Observation Files */}
+        {task?.observation?.files && task.observation.files.length > 0 && (
+          <FilePreviewModal
+            files={task.observation.files}
+            initialFileIndex={filePreviewInitialIndex}
+            open={filePreviewModalOpen}
+            onOpenChange={setFilePreviewModalOpen}
+          />
+        )}
       </div>
     </PrivilegeRoute>
   );

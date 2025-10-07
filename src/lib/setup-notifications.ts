@@ -1,6 +1,14 @@
 import { notify } from "../api-client";
 import { toast } from "@/components/ui/sonner";
 
+// Track retry toasts by request to prevent duplicates
+const retryToasts = new Map<string, string | number>();
+
+// Generate unique key for a request
+function getRequestKey(url: string, method: string): string {
+  return `${method.toUpperCase()}:${url}`;
+}
+
 // Setup web notification handler using Sonner toast
 export function setupWebNotifications() {
   try {
@@ -36,15 +44,37 @@ export function setupWebNotifications() {
     });
 
     // Setup retry notification handler
-    notify.setRetryHandler((title, description, _url, _method, _attempt, _maxAttempts) => {
-      // For now, just show a warning toast for retries
-      toast.warning(title, description, { duration: 5000 });
+    notify.setRetryHandler((title, description, url, method, attempt, maxAttempts) => {
+      const requestKey = getRequestKey(url, method);
+      const existingToastId = retryToasts.get(requestKey);
+
+      // Dismiss existing retry toast for this request
+      if (existingToastId) {
+        toast.dismiss(existingToastId);
+      }
+
+      // Create new toast and track its ID
+      const toastId = toast.warning(
+        title,
+        `${description} (Tentativa ${attempt} de ${maxAttempts})`,
+        { duration: 5000 }
+      );
+
+      // Track the toast ID for this request
+      if (toastId) {
+        retryToasts.set(requestKey, toastId);
+      }
     });
 
     // Setup dismiss retry handler
-    notify.setDismissRetryHandler((_url, _method) => {
-      // For now, we can't dismiss specific toasts, so we'll just ignore this
-      // In the future, we could track toast IDs and dismiss them
+    notify.setDismissRetryHandler((url, method) => {
+      const requestKey = getRequestKey(url, method);
+      const toastId = retryToasts.get(requestKey);
+
+      if (toastId) {
+        toast.dismiss(toastId);
+        retryToasts.delete(requestKey);
+      }
     });
   } catch (error) {
     console.error("Failed to setup web notifications:", error);

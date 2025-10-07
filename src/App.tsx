@@ -274,6 +274,7 @@ const MyTeamLoans = lazy(() => import("@/pages/my-team/loans").then((module) => 
 // Server
 const Server = lazy(() => import("@/pages/server/root").then((module) => ({ default: module.ServerRootPage })));
 const ServerBackup = lazy(() => import("@/pages/admin/backup").then((module) => ({ default: module.BackupManagementPage })));
+const ServerDatabaseSync = lazy(() => import("@/pages/server/database-sync").then((module) => ({ default: module.DatabaseSyncPage })));
 const ServerDeployments = lazy(() => import("@/pages/server/deployments").then((module) => ({ default: module.DeploymentListPage })));
 const ServerDeploymentDetails = lazy(() => import("@/pages/server/deployments/[id]").then((module) => ({ default: module.DeploymentDetailPage })));
 const ServerLogs = lazy(() => import("@/pages/server/logs").then((module) => ({ default: module.ServerLogsPage })));
@@ -2020,6 +2021,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ServerBackup />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.server.databaseSync}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ServerDatabaseSync />
                     </Suspense>
                   }
                 />

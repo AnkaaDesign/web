@@ -14,7 +14,7 @@ export const createSupplierColumns = (): SupplierColumn[] => [
         {supplier.logo?.id ? (
           <img
             src={
-              supplier.logo.thumbnailUrl || `${(window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030"}/api/files/serve/${supplier.logo.id}`
+              supplier.logo.thumbnailUrl || `${(window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030"}/files/serve/${supplier.logo.id}`
             }
             alt={`${supplier.fantasyName} logo`}
             className="h-8 w-8 rounded-md object-cover flex-shrink-0 border border-border/50"

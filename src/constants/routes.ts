@@ -523,6 +523,7 @@ export const routes = {
       details: (id: string) => `/servidor/registros-de-alteracoes/detalhes/${id}`,
       root: "/servidor/registros-de-alteracoes",
     },
+    databaseSync: "/servidor/sincronizacao-bd",
     deployments: {
       create: "/servidor/implantacoes/cadastrar",
       details: (id: string) => `/servidor/implantacoes/detalhes/${id}`,

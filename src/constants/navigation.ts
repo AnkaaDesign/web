@@ -10,6 +10,7 @@ interface MenuItem {
   requiredPrivilege?: SECTOR_PRIVILEGES | SECTOR_PRIVILEGES[]; // Support single privilege or array
   isControlPanel?: boolean; // Indicates if this is a control panel/dashboard
   isDynamic?: boolean; // Indicates if this is a dynamic route
+  onlyInStaging?: boolean; // Only show in staging environment
 }
 
 // Comprehensive Tabler icon mapping for Brazilian manufacturing system
@@ -196,6 +197,7 @@ export const TABLER_ICONS = {
   database: "IconDatabase",
   sync: "IconRefresh",
   refresh: "IconRefresh",
+  repeat: "IconRepeat",
   calculator: "IconCalculator",
 
   // Notifications
@@ -1332,6 +1334,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Backup do Sistema",
         icon: "databaseImport",
         path: "/servidor/backup",
+      },
+      {
+        id: "servidor-sincronizacao-bd",
+        title: "Sincronização BD",
+        icon: "repeat",
+        path: "/servidor/sincronizacao-bd",
+        onlyInStaging: true,
       },
       {
         id: "servidor-implantacoes",

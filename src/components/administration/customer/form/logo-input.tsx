@@ -7,6 +7,7 @@ import { fileService } from "../../../../api-client";
 import { toast } from "sonner";
 import type { File as AnkaaFile } from "../../../../types";
 import { backendFileToFileWithPreview } from "@/lib/utils";
+import { normalizeThumbnailUrl, getFileUrl } from "@/utils/file";
 
 interface LogoInputProps {
   disabled?: boolean;
@@ -60,7 +61,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
           // Create a preview file for the file uploader
           const previewFile = backendFileToFileWithPreview(file);
           // Override preview URL for direct serving
-          previewFile.preview = file.thumbnailUrl || `${(window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030"}/api/files/serve/${file.id}`;
+          previewFile.preview = normalizeThumbnailUrl(file.thumbnailUrl) || getFileUrl(file);
           setPreviewFiles([previewFile]);
         }
       } catch (error) {
@@ -138,8 +139,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
             ...file,
             id: response.data.id,
             uploaded: true,
-            preview:
-              response.data.thumbnailUrl || `${(window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030"}/api/files/serve/${response.data.id}`,
+            preview: normalizeThumbnailUrl(response.data.thumbnailUrl) || getFileUrl(response.data),
           };
           setPreviewFiles([updatedFile]);
         }

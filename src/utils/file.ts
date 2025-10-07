@@ -176,7 +176,7 @@ export const sanitizeFilename = (filename: string): string => {
 // File URLs
 // =====================
 
-const getApiBaseUrl = (): string => {
+export const getApiBaseUrl = (): string => {
   // Check for browser window object first (web environment)
   if (typeof globalThis !== "undefined" && typeof globalThis.window !== "undefined" && typeof (globalThis.window as any).__ANKAA_API_URL__ !== "undefined") {
     return (globalThis.window as any).__ANKAA_API_URL__;
@@ -191,20 +191,46 @@ const getApiBaseUrl = (): string => {
   return "http://localhost:3030";
 };
 
+/**
+ * Normalizes a thumbnail URL to ensure it's a complete URL
+ * If the URL is relative (starts with /api/files or /files), it prepends the API base URL
+ * If it's already a complete URL (starts with http), it returns it as-is
+ */
+export const normalizeThumbnailUrl = (thumbnailUrl: string | undefined | null): string | undefined => {
+  if (!thumbnailUrl) return undefined;
+
+  // If already a complete URL, return as-is
+  if (thumbnailUrl.startsWith('http://') || thumbnailUrl.startsWith('https://')) {
+    return thumbnailUrl;
+  }
+
+  const apiBaseUrl = getApiBaseUrl();
+
+  // Remove leading /api if present (old format)
+  const cleanPath = thumbnailUrl.startsWith('/api/')
+    ? thumbnailUrl.substring(4) // Remove '/api'
+    : thumbnailUrl;
+
+  // Ensure path starts with /
+  const path = cleanPath.startsWith('/') ? cleanPath : `/${cleanPath}`;
+
+  return `${apiBaseUrl}${path}`;
+};
+
 export const getFileUrl = (file: File, baseUrl?: string): string => {
   const apiUrl = baseUrl || getApiBaseUrl();
-  return `${apiUrl}/api/files/serve/${file.id}`;
+  return `${apiUrl}/files/serve/${file.id}`;
 };
 
 export const getFileDownloadUrl = (file: File, baseUrl?: string): string => {
   const apiUrl = baseUrl || getApiBaseUrl();
-  return `${apiUrl}/api/files/${file.id}/download`;
+  return `${apiUrl}/files/${file.id}/download`;
 };
 
 export const getFileThumbnailUrl = (file: File, size: "small" | "medium" | "large" = "medium", baseUrl?: string): string => {
   if (!isImageFile(file)) return "";
   const apiUrl = baseUrl || getApiBaseUrl();
-  return `${apiUrl}/api/files/${file.id}/thumbnail/${size}`;
+  return `${apiUrl}/files/${file.id}/thumbnail/${size}`;
 };
 
 // =====================

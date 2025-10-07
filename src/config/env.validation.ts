@@ -7,7 +7,6 @@ import { z } from "zod";
 export const envSchema = z.object({
   // API Configuration
   VITE_API_URL: z.string().url("VITE_API_URL must be a valid URL"),
-  VITE_API_FILES_URL: z.string().url("VITE_API_FILES_URL must be a valid URL"),
 
   // Google Services
   VITE_GOOGLE_PLACES_API_KEY: z.string().optional(),
