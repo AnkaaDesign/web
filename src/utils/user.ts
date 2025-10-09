@@ -545,6 +545,62 @@ export function formatTimeSinceStatusChangeCompact(user: User): string | null {
 }
 
 /**
+ * Calculate days since experience period started
+ * For exp1: days since exp1StartAt
+ * For exp2: (exp1 duration) + (days into exp2)
+ *   - exp1 duration is calculated from exp1StartAt to exp1EndAt (or exp2StartAt if exp1EndAt not available)
+ *   - if neither is available, assumes standard 45 days for exp1
+ *   - days into exp2 is calculated from exp2StartAt (or exp1EndAt) to now
+ */
+export function getDaysSinceExperienceStart(user: User): number | null {
+  const now = new Date();
+
+  if (user.status === USER_STATUS.EXPERIENCE_PERIOD_1 && user.exp1StartAt) {
+    const startDate = new Date(user.exp1StartAt);
+    const diffTime = now.getTime() - startDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 ? diffDays : 0;
+  }
+
+  if (user.status === USER_STATUS.EXPERIENCE_PERIOD_2) {
+    let exp1Duration = 45; // Default to 45 days if we can't calculate
+    let exp2Start: Date | null = null;
+
+    // Calculate exp1 duration if we have the dates
+    if (user.exp1StartAt && user.exp1EndAt) {
+      const exp1StartDate = new Date(user.exp1StartAt);
+      const exp1EndDate = new Date(user.exp1EndAt);
+      exp1Duration = Math.floor((exp1EndDate.getTime() - exp1StartDate.getTime()) / (1000 * 60 * 60 * 24));
+      exp2Start = exp1EndDate;
+    } else if (user.exp1StartAt && user.exp2StartAt) {
+      // If exp1EndAt not available, use exp2StartAt
+      const exp1StartDate = new Date(user.exp1StartAt);
+      const exp2StartDate = new Date(user.exp2StartAt);
+      exp1Duration = Math.floor((exp2StartDate.getTime() - exp1StartDate.getTime()) / (1000 * 60 * 60 * 24));
+      exp2Start = exp2StartDate;
+    } else if (user.exp2StartAt) {
+      // Only exp2StartAt available, use it with default exp1 duration
+      exp2Start = new Date(user.exp2StartAt);
+    } else if (user.exp1EndAt) {
+      // Only exp1EndAt available, use it with default exp1 duration
+      exp2Start = new Date(user.exp1EndAt);
+    }
+
+    // Calculate days into exp2
+    let daysIntoExp2 = 0;
+    if (exp2Start) {
+      const diffTime = now.getTime() - exp2Start.getTime();
+      daysIntoExp2 = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      daysIntoExp2 = daysIntoExp2 >= 0 ? daysIntoExp2 : 0;
+    }
+
+    return exp1Duration + daysIntoExp2;
+  }
+
+  return null;
+}
+
+/**
  * Get status badge text with time information
  */
 export function getUserStatusBadgeText(user: User): string {
@@ -557,10 +613,10 @@ export function getUserStatusBadgeText(user: User): string {
 
   const baseLabel = statusLabels[user.status] || user.status;
 
-  // For experience periods, show days remaining (just the number)
-  const daysRemaining = getDaysRemainingInExperiencePeriod(user);
-  if (daysRemaining !== null) {
-    return `${baseLabel} - ${daysRemaining}`;
+  // For experience periods, show days since start (just the number)
+  const daysSinceStart = getDaysSinceExperienceStart(user);
+  if (daysSinceStart !== null) {
+    return `${baseLabel} - ${daysSinceStart}`;
   }
 
   // For contracted/dismissed, show time since status change in compact format

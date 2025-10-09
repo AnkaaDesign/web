@@ -43,7 +43,7 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
   );
 
   // Get table state for selected items functionality
-  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly } = useTableState({
+  const { selectionCount, selectedIds, showSelectedOnly, toggleShowSelectedOnly } = useTableState({
     defaultPageSize: DEFAULT_PAGE_SIZE,
     resetSelectionOnPageChange: false,
   });
@@ -274,7 +274,7 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
               filters={filters}
               currentPositions={tableData.positions}
               totalRecords={tableData.totalRecords}
-              selectedPositions={selectionCount > 0 ? new Set() : undefined}
+              selectedPositions={selectionCount > 0 ? new Set(selectedIds) : undefined}
             />
           </div>
         </div>

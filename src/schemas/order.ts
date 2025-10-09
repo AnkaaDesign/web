@@ -11,73 +11,14 @@ import { ORDER_STATUS, SCHEDULE_FREQUENCY, WEEK_DAY, MONTH, MONTH_OCCURRENCE } f
 
 export const orderIncludeSchema = z
   .object({
-    // Direct Order relations
-    budget: z
-      .union([
-        z.boolean(),
-        z.object({
-          include: z
-            .object({
-              tasksArtworks: z.boolean().optional(),
-              customerLogo: z.boolean().optional(),
-              taskBudget: z.boolean().optional(),
-              taskNfe: z.boolean().optional(),
-              supplierLogo: z.boolean().optional(),
-              orderNfe: z.boolean().optional(),
-              orderBudget: z.boolean().optional(),
-              observations: z.boolean().optional(),
-              warning: z.boolean().optional(),
-              airbrushingReceipts: z.boolean().optional(),
-              airbrushingNfes: z.boolean().optional(),
-            })
-            .optional(),
-        }),
-      ])
-      .optional(),
-    nfe: z
-      .union([
-        z.boolean(),
-        z.object({
-          include: z
-            .object({
-              tasksArtworks: z.boolean().optional(),
-              customerLogo: z.boolean().optional(),
-              taskBudget: z.boolean().optional(),
-              taskNfe: z.boolean().optional(),
-              supplierLogo: z.boolean().optional(),
-              orderNfe: z.boolean().optional(),
-              orderBudget: z.boolean().optional(),
-              observations: z.boolean().optional(),
-              warning: z.boolean().optional(),
-              airbrushingReceipts: z.boolean().optional(),
-              airbrushingNfes: z.boolean().optional(),
-            })
-            .optional(),
-        }),
-      ])
-      .optional(),
-    receipt: z
-      .union([
-        z.boolean(),
-        z.object({
-          include: z
-            .object({
-              tasksArtworks: z.boolean().optional(),
-              customerLogo: z.boolean().optional(),
-              taskBudget: z.boolean().optional(),
-              taskNfe: z.boolean().optional(),
-              supplierLogo: z.boolean().optional(),
-              orderNfe: z.boolean().optional(),
-              orderBudget: z.boolean().optional(),
-              observations: z.boolean().optional(),
-              warning: z.boolean().optional(),
-              airbrushingReceipts: z.boolean().optional(),
-              airbrushingNfes: z.boolean().optional(),
-            })
-            .optional(),
-        }),
-      ])
-      .optional(),
+    // Direct Order relations - Many-to-many file relations
+    budgets: z.boolean().optional(), // Many-to-many relation with File
+    nfes: z.boolean().optional(), // Many-to-many relation with File
+    receipts: z.boolean().optional(), // Many-to-many relation with File
+    // Legacy field names for backwards compatibility (mapped in repository)
+    budget: z.boolean().optional(), // @deprecated Use budgets instead
+    nfe: z.boolean().optional(), // @deprecated Use nfes instead
+    receipt: z.boolean().optional(), // @deprecated Use receipts instead
     supplier: z
       .union([
         z.boolean(),

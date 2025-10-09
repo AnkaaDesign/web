@@ -79,6 +79,38 @@ export function LoginInfoCard({ user, className }: LoginInfoCardProps) {
               </div>
             </div>
           )}
+
+          {/* System Information */}
+          <div className="pt-6 border-t border-border/50">
+            <h3 className="text-base font-semibold mb-4 text-foreground">Informações do Sistema</h3>
+            <div className="space-y-4">
+              {user.createdAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconClock className="h-4 w-4" />
+                    Data de Criação
+                  </span>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-foreground">{formatDateTime(user.createdAt)}</p>
+                    <p className="text-xs text-muted-foreground">{formatRelativeTime(user.createdAt)}</p>
+                  </div>
+                </div>
+              )}
+
+              {user.updatedAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconClock className="h-4 w-4" />
+                    Última Atualização
+                  </span>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-foreground">{formatDateTime(user.updatedAt)}</p>
+                    <p className="text-xs text-muted-foreground">{formatRelativeTime(user.updatedAt)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

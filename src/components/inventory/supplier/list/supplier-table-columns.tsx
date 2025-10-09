@@ -131,7 +131,7 @@ export const createSupplierColumns = (): SupplierColumn[] => [
     accessor: (supplier: Supplier) => (
       <div className="text-center">
         <Badge variant="secondary" className="text-xs">
-          {supplier._count?.items || 0}
+          {(supplier as any)._count?.items || 0}
         </Badge>
       </div>
     ),
@@ -145,7 +145,7 @@ export const createSupplierColumns = (): SupplierColumn[] => [
     accessor: (supplier: Supplier) => (
       <div className="text-center">
         <Badge variant="secondary" className="text-xs">
-          {supplier._count?.orders || 0}
+          {(supplier as any)._count?.orders || 0}
         </Badge>
       </div>
     ),
@@ -159,7 +159,7 @@ export const createSupplierColumns = (): SupplierColumn[] => [
     accessor: (supplier: Supplier) => (
       <div className="text-center">
         <Badge variant="secondary" className="text-xs">
-          {supplier._count?.orderRules || 0}
+          {(supplier as any)._count?.orderRules || 0}
         </Badge>
       </div>
     ),

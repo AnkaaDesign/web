@@ -182,7 +182,7 @@ export function PayrollSummary({ users }: PayrollSummaryProps) {
           isMinimized ? "max-h-0" : "max-h-[500px]"
         )}
       >
-        <div className="p-3 pt-2 space-y-3">
+        <div className="py-3 pt-1 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
           {/* Employees with Bonus */}
           <div className="flex flex-col h-full p-3 bg-card dark:bg-card rounded-lg border border-border/50">

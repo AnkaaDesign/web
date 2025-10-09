@@ -94,6 +94,66 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
                 </div>
               )}
 
+              {user.exp1StartAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCalendar className="h-4 w-4" />
+                    Início Experiência 1
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.exp1StartAt)}</span>
+                </div>
+              )}
+
+              {user.exp1EndAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCalendar className="h-4 w-4" />
+                    Fim Experiência 1
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.exp1EndAt)}</span>
+                </div>
+              )}
+
+              {user.exp2StartAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCalendar className="h-4 w-4" />
+                    Início Experiência 2
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.exp2StartAt)}</span>
+                </div>
+              )}
+
+              {user.exp2EndAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCalendar className="h-4 w-4" />
+                    Fim Experiência 2
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.exp2EndAt)}</span>
+                </div>
+              )}
+
+              {user.contractedAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCalendar className="h-4 w-4" />
+                    Data de Contratação
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.contractedAt)}</span>
+                </div>
+              )}
+
+              {user.dismissedAt && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCalendar className="h-4 w-4" />
+                    Data de Demissão (Efetiva)
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.dismissedAt)}</span>
+                </div>
+              )}
+
               {user.dismissal && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">

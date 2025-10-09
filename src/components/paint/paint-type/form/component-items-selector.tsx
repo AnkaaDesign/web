@@ -1,32 +1,48 @@
-import { useMemo, useEffect, useState } from "react";
+import { useMemo } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import type { PaintTypeCreateFormData, PaintTypeUpdateFormData } from "../../../../schemas";
-import { getItems, getItem } from "../../../../api-client";
-import { MEASURE_TYPE } from "../../../../constants";
+import { getItems } from "../../../../api-client";
+import type { Item } from "../../../../types";
 
 interface ComponentItemsSelectorProps {
   control: any;
   disabled?: boolean;
+  initialItems?: Item[];
 }
 
-export function ComponentItemsSelector({ control, disabled }: ComponentItemsSelectorProps) {
-  const [initialOptions, setInitialOptions] = useState<Array<{ label: string; value: string }>>([]);
+export function ComponentItemsSelector({ control, disabled, initialItems }: ComponentItemsSelectorProps) {
+  // Memoize initialOptions to prevent infinite loop - same as LogoPaintsSelector
+  const initialOptions = useMemo(() => {
+    if (!initialItems || initialItems.length === 0) return [];
+
+    return initialItems.map((item) => {
+      const unicode = item.uniCode || "";
+      const name = item.name || "";
+      const brand = item.brand?.name || "";
+      const label = `${unicode} - ${name} - ${brand}`.replace(/^\s*-\s*/, "").replace(/\s*-\s*$/, "");
+
+      return {
+        label,
+        value: item.id,
+      };
+    });
+  }, [initialItems?.map(i => i.id).join(',')]);
 
   // Async query function for the combobox
   const queryItems = useMemo(
     () => async (searchTerm: string, page = 1) => {
       try {
-        // Build query parameters
+        // Build query parameters - same structure as paint selector
         const queryParams: any = {
+          orderBy: { name: "asc" },
+          page: page,
+          take: 50,
           include: {
             measures: true,
             category: true,
             brand: true,
           },
-          take: 50, // Load 50 items at a time
-          skip: (page - 1) * 50,
-          orderBy: { name: "asc" },
         };
 
         // Only add searchingFor if there's a search term
@@ -35,19 +51,11 @@ export function ComponentItemsSelector({ control, disabled }: ComponentItemsSele
         }
 
         const response = await getItems(queryParams);
-        const items = response.data?.data || [];
+        const items = response.data || [];
+        const hasMore = response.meta?.hasNextPage || false;
 
-        // Filter items that have weight measures (volume not required for paint components)
-        const validComponentItems = items.filter((item) => {
-          if (!item.measures || item.measures.length === 0) return false;
-
-          // Only require weight measure for paint components
-          const hasWeightMeasure = item.measures.some((m) => m.measureType === MEASURE_TYPE.WEIGHT && m.value !== null && m.value > 0);
-          return hasWeightMeasure;
-        });
-
-        // Convert items to options format
-        const options = validComponentItems.map((item) => {
+        // Convert items to options format - NO client-side filtering
+        const options = items.map((item) => {
           // Format: unicode - name - brand
           const unicode = item.uniCode || "";
           const name = item.name || "";
@@ -60,73 +68,20 @@ export function ComponentItemsSelector({ control, disabled }: ComponentItemsSele
           };
         });
 
-        console.log(`Component Items Query - Page ${page}, Search: "${searchTerm}", Found: ${options.length} valid items`);
-
         return {
           data: options,
-          hasMore: response.data?.meta?.hasNextPage || false,
-          total: response.data?.meta?.totalRecords || 0,
+          hasMore: hasMore,
         };
       } catch (error) {
         console.error("Error fetching items:", error);
         return {
           data: [],
           hasMore: false,
-          total: 0,
         };
       }
     },
     []
   );
-
-  // Fetch selected items to populate initialOptions
-  useEffect(() => {
-    const fetchSelectedItems = async () => {
-      const selectedIds = control._formValues?.componentItemIds || [];
-      if (!selectedIds || selectedIds.length === 0) {
-        setInitialOptions([]);
-        return;
-      }
-
-      try {
-        const itemPromises = selectedIds.map(async (id: string) => {
-          try {
-            const response = await getItem(id, {
-              include: {
-                measures: true,
-                category: true,
-                brand: true,
-              },
-            });
-            const item = response.data;
-            if (!item) return null;
-
-            const unicode = item.uniCode || "";
-            const name = item.name || "";
-            const brand = item.brand?.name || "";
-            const label = `${unicode} - ${name} - ${brand}`.replace(/^\s*-\s*/, "").replace(/\s*-\s*$/, "");
-
-            return {
-              label,
-              value: item.id,
-            };
-          } catch (error) {
-            console.error(`Error fetching item ${id}:`, error);
-            return null;
-          }
-        });
-
-        const items = await Promise.all(itemPromises);
-        const validItems = items.filter((item): item is { label: string; value: string } => item !== null);
-        setInitialOptions(validItems);
-      } catch (error) {
-        console.error("Error fetching selected items:", error);
-        setInitialOptions([]);
-      }
-    };
-
-    fetchSelectedItems();
-  }, [control]);
 
   return (
     <FormField

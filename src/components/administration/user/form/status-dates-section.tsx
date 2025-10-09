@@ -5,7 +5,7 @@ import { FormField } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import type { UserCreateFormData, UserUpdateFormData } from "../../../../schemas";
 import { USER_STATUS } from "../../../../constants";
-import { addDays } from "date-fns";
+import { addDays, max as maxDate, startOfDay } from "date-fns";
 
 interface StatusDatesSectionProps {
   disabled?: boolean;
@@ -25,8 +25,13 @@ function calculateStatusDates(exp1StartAt: Date | null) {
   }
 
   const exp1EndAt = addDays(exp1StartAt, 45);
-  const exp2StartAt = addDays(exp1StartAt, 46); // Day after exp1 ends
-  const exp2EndAt = addDays(exp1StartAt, 90); // 45 days for exp2
+  const today = startOfDay(new Date());
+
+  // exp2StartAt should be at least today, but normally the day after exp1 ends
+  const calculatedExp2Start = addDays(exp1EndAt, 1);
+  const exp2StartAt = maxDate([calculatedExp2Start, today]);
+
+  const exp2EndAt = addDays(exp2StartAt, 45); // 45 days from actual exp2 start
 
   return {
     exp1EndAt,
@@ -58,6 +63,26 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
       }
     }
   }, [exp1StartAt, form]);
+
+  // Update dates when status changes
+  useEffect(() => {
+    if (status === USER_STATUS.EXPERIENCE_PERIOD_2 && exp1StartAt) {
+      // Recalculate exp2 dates to ensure exp2StartAt is at least today
+      const dates = calculateStatusDates(exp1StartAt);
+      form.setValue("exp2StartAt", dates.exp2StartAt, { shouldValidate: false });
+      form.setValue("exp2EndAt", dates.exp2EndAt, { shouldValidate: false });
+    }
+
+    if (status === USER_STATUS.CONTRACTED && !contractedAt) {
+      // Set contractedAt to today if transitioning to CONTRACTED
+      form.setValue("contractedAt", startOfDay(new Date()), { shouldValidate: false });
+    }
+
+    if (status === USER_STATUS.DISMISSED && !form.getValues("dismissedAt")) {
+      // Set dismissedAt to today if transitioning to DISMISSED
+      form.setValue("dismissedAt", startOfDay(new Date()), { shouldValidate: false });
+    }
+  }, [status, exp1StartAt, contractedAt, form]);
 
   // Don't show section if status is not set
   if (!status) {
@@ -148,7 +173,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                     label="Início da Experiência 2"
                     disabled={true}
                     mode="date"
-                    helperText="Calculado automaticamente (dia seguinte ao fim da Exp. 1)"
+                    helperText="Calculado automaticamente (dia seguinte ao fim da Exp. 1, ou hoje se já passou)"
                   />
                 )}
               />
@@ -162,7 +187,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                     label="Fim da Experiência 2"
                     disabled={true}
                     mode="date"
-                    helperText="Calculado automaticamente (45 dias após o início da Exp. 2)"
+                    helperText="Calculado automaticamente (45 dias após o início real da Exp. 2)"
                   />
                 )}
               />
@@ -193,7 +218,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                     disabled={disabled}
                     mode="date"
                     required
-                    helperText="Data em que o colaborador foi efetivado"
+                    helperText="Data em que o colaborador foi efetivado (padrão: hoje)"
                   />
                 )}
               />
@@ -224,7 +249,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                     disabled={disabled}
                     mode="date"
                     required
-                    helperText="Data em que o colaborador foi demitido"
+                    helperText="Data em que o colaborador foi demitido (padrão: hoje)"
                   />
                 )}
               />

@@ -8,8 +8,8 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
 } from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
@@ -22,16 +22,16 @@ import { CSS } from "@dnd-kit/utilities";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeaderWithFavorite } from "@/components/page-header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
 import { usePageTracker } from "@/hooks/use-page-tracker";
-import { usePositions, usePositionMutations } from "@/hooks";
+import { usePositions, usePositionBatchMutations } from "@/hooks";
 
 interface Position {
   id: string;
   name: string;
   hierarchy: number | null;
+  remuneration: number | null;
 }
 
 interface SortableRowProps {
@@ -48,19 +48,26 @@ function SortableRow({ position, index }: SortableRowProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const formatCurrency = (value: number | null) => {
+    if (value === null) return "N/A";
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-4 p-4 bg-card border rounded-lg hover:bg-muted/50 transition-colors"
+      {...attributes}
+      {...listeners}
+      className="flex items-center gap-3 p-2 bg-card border rounded-lg hover:bg-muted/50 transition-colors cursor-grab active:cursor-grabbing"
     >
-      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
-        <IconGripVertical className="h-5 w-5 text-muted-foreground" />
-      </div>
-      <div className="flex-1 flex items-center gap-4">
-        <span className="font-mono text-sm text-muted-foreground min-w-[3rem]">#{index + 1}</span>
-        <span className="font-medium">{position.name}</span>
-      </div>
+      <IconGripVertical className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+      <span className="font-mono text-xs text-muted-foreground min-w-[2.5rem]">#{index + 1}</span>
+      <span className="font-medium flex-1">{position.name}</span>
+      <span className="text-sm text-muted-foreground">{formatCurrency(position.remuneration)}</span>
     </div>
   );
 }
@@ -69,7 +76,7 @@ export const PositionHierarchyPage = () => {
   usePageTracker({ title: "Hierarquia de Cargos", icon: "briefcase" });
   const navigate = useNavigate();
   const { data: positionsData, isLoading } = usePositions({ orderBy: { hierarchy: "asc" } });
-  const { update } = usePositionMutations();
+  const { batchUpdateAsync } = usePositionBatchMutations();
 
   const [positions, setPositions] = useState<Position[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
@@ -114,14 +121,12 @@ export const PositionHierarchyPage = () => {
     setIsSaving(true);
     try {
       // Update ALL positions with their hierarchy value based on current order
-      const updatePromises = positions.map((position, index) =>
-        update({
+      await batchUpdateAsync({
+        positions: positions.map((position, index) => ({
           id: position.id,
           data: { hierarchy: index + 1 },
-        }),
-      );
-
-      await Promise.all(updatePromises);
+        })),
+      });
       setHasChanges(false);
     } catch (error) {
       console.error("Error updating hierarchy:", error);
@@ -173,17 +178,13 @@ export const PositionHierarchyPage = () => {
         />
 
         <Card className="flex-1 min-h-0 flex flex-col">
-          <CardHeader>
-            <CardTitle>Organizar Hierarquia</CardTitle>
-            <CardDescription>Arraste os cargos para reorganizar a hierarquia. O cargo no topo tem a maior prioridade.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col overflow-hidden">
+          <CardContent className="flex-1 flex flex-col overflow-hidden p-4">
             {isLoading ? (
               <div className="flex items-center justify-center flex-1">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
             ) : (
-              <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+              <div className="flex-1 overflow-y-auto space-y-1.5 pr-2">
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                   <SortableContext items={positions.map((p) => p.id)} strategy={verticalListSortingStrategy}>
                     {positions.map((position, index) => (

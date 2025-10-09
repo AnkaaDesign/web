@@ -352,14 +352,14 @@ export const TaskDetailsPage = () => {
       services: true,
       artworks: true,
       budgets: true,
-      nfe: true,
-      receipt: true,
+      nfes: true,
+      receipts: true,
       observation: {
         include: {
           files: true,
         },
       },
-      airbrushings: {
+      airbrushing: {
         include: {
           receipts: true,
           nfes: true,
@@ -407,7 +407,7 @@ export const TaskDetailsPage = () => {
   const cuts = cutsResponse?.data || [];
 
   // Get airbrushings directly from task (they're included in the task query)
-  const airbrushings = task?.airbrushings || [];
+  const airbrushings = task?.airbrushing || [];
 
   // Fetch layouts for truck dimensions
   const { data: layouts } = useLayoutsByTruck(task?.truck?.id || '', {
@@ -1021,14 +1021,14 @@ export const TaskDetailsPage = () => {
               )}
 
               {/* Documents Card - Budget, NFE, Receipt */}
-              {((task.budgets && task.budgets.length > 0) || task.nfe || task.receipt) && (
+              {((task.budgets && task.budgets.length > 0) || (task.nfes && task.nfes.length > 0) || (task.receipts && task.receipts.length > 0)) && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1050" level={1}>
                   <CardHeader className="pb-4">
                     <CardTitle className="flex items-center gap-2 text-lg font-medium">
                       <IconFileText className="h-5 w-5 text-muted-foreground" />
                       Documentos
                       <Badge variant="secondary" className="ml-2">
-                        {[...(task.budgets || []), task.nfe, task.receipt].filter(Boolean).length}
+                        {[...(task.budgets || []), ...(task.nfes || []), ...(task.receipts || [])].length}
                       </Badge>
                     </CardTitle>
                   </CardHeader>
@@ -1048,23 +1048,31 @@ export const TaskDetailsPage = () => {
                         </div>
                       )}
 
-                      {task.nfe && (
+                      {task.nfes && task.nfes.length > 0 && (
                         <div>
                           <div className="flex items-center gap-2 mb-3">
                             <IconFileText className="h-4 w-4 text-muted-foreground" />
-                            <h4 className="text-sm font-semibold">Nota Fiscal</h4>
+                            <h4 className="text-sm font-semibold">Notas Fiscais</h4>
                           </div>
-                          <FilePreviewCard file={task.nfe} size="md" showMetadata={true} />
+                          <div className="flex flex-wrap gap-2">
+                            {task.nfes.map((nfe: any) => (
+                              <FilePreviewCard key={nfe.id} file={nfe} size="md" showMetadata={true} />
+                            ))}
+                          </div>
                         </div>
                       )}
 
-                      {task.receipt && (
+                      {task.receipts && task.receipts.length > 0 && (
                         <div>
                           <div className="flex items-center gap-2 mb-3">
                             <IconFile className="h-4 w-4 text-muted-foreground" />
-                            <h4 className="text-sm font-semibold">Recibo</h4>
+                            <h4 className="text-sm font-semibold">Recibos</h4>
                           </div>
-                          <FilePreviewCard file={task.receipt} size="md" showMetadata={true} />
+                          <div className="flex flex-wrap gap-2">
+                            {task.receipts.map((receipt: any) => (
+                              <FilePreviewCard key={receipt.id} file={receipt} size="md" showMetadata={true} />
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>

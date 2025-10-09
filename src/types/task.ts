@@ -32,9 +32,6 @@ export interface Task extends BaseEntity {
   paintId: string | null;
   customerId: string | null;
   sectorId: string | null;
-  budgetId: string | null;
-  nfeId: string | null;
-  receiptId: string | null;
   price: number | null;
   createdById: string | null;
   priority?: string | null;
@@ -42,16 +39,18 @@ export interface Task extends BaseEntity {
   // Relations
   sector?: Sector;
   customer?: Customer;
-  budget?: File;
-  nfe?: File;
-  receipt?: File;
+  budgets?: File[]; // Many-to-many relation
+  nfes?: File[]; // Many-to-many relation
+  receipts?: File[]; // Many-to-many relation
+  reimbursements?: File[]; // Many-to-many relation
+  reimbursementInvoices?: File[]; // Many-to-many relation
   observation?: Observation;
   generalPainting?: Paint;
   createdBy?: User;
   artworks?: File[];
   logoPaints?: Paint[];
   services?: ServiceOrder[];
-  airbrushings?: Airbrushing[];
+  airbrushing?: Airbrushing[]; // Note: Field name is singular but value is array
   cuts?: Cut[];
   truck?: Truck;
   relatedTasks?: Task[];
@@ -73,21 +72,11 @@ export interface TaskIncludes {
     | {
         include?: CustomerIncludes;
       };
-  budget?:
-    | boolean
-    | {
-        include?: FileIncludes;
-      };
-  nfe?:
-    | boolean
-    | {
-        include?: FileIncludes;
-      };
-  receipt?:
-    | boolean
-    | {
-        include?: FileIncludes;
-      };
+  budgets?: boolean; // Many-to-many relation
+  nfes?: boolean; // Many-to-many relation
+  receipts?: boolean; // Many-to-many relation
+  reimbursements?: boolean; // Many-to-many relation
+  reimbursementInvoices?: boolean; // Many-to-many relation
   observation?:
     | boolean
     | {
@@ -118,10 +107,14 @@ export interface TaskIncludes {
     | {
         include?: ServiceOrderIncludes;
       };
-  airbrushings?:
+  airbrushing?:
     | boolean
     | {
         include?: AirbrushingIncludes;
+        orderBy?: {
+          createdAt?: "asc" | "desc";
+          updatedAt?: "asc" | "desc";
+        };
       };
   cuts?:
     | boolean
@@ -165,9 +158,6 @@ export interface TaskOrderBy {
   paintId?: ORDER_BY_DIRECTION;
   customerId?: ORDER_BY_DIRECTION;
   sectorId?: ORDER_BY_DIRECTION;
-  budgetId?: ORDER_BY_DIRECTION;
-  nfeId?: ORDER_BY_DIRECTION;
-  receiptId?: ORDER_BY_DIRECTION;
   price?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;

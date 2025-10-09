@@ -23,6 +23,7 @@ import { ORDER_STATUS } from "../../../../constants";
 import { useOrderItemBatchMutations, useOrderItemSpecializedBatchMutations } from "../../../../hooks";
 import { toast } from "sonner";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
+import { StockStatusIndicator } from "../../item/list/stock-status-indicator";
 
 interface OrderItemsCardProps {
   order: Order;
@@ -373,6 +374,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                   </div>
                 </TableHead>
                 <TableHead>Item</TableHead>
+                <TableHead className="text-center">Estoque</TableHead>
                 <TableHead className="text-center">Qtd. Pedida</TableHead>
                 <TableHead className="text-center">Qtd. Recebida</TableHead>
                 <TableHead className="text-right">Preço Unit.</TableHead>
@@ -400,7 +402,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                     )}
                   >
                     <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center h-full w-full px-2 py-1" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={isSelected}
                           onCheckedChange={(checked) => handleSelectItem(item.id, checked as boolean)}
@@ -410,20 +412,25 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                         />
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <TruncatedTextWithTooltip
-                            text={item.item ? (item.item.uniCode ? `${item.item.uniCode} - ${item.item.name}` : item.item.name) : "-"}
-                            className="font-medium text-sm"
-                          />
-                        </div>
+                    <TableCell className="py-2">
+                      <div className="flex items-center gap-2">
+                        <TruncatedTextWithTooltip
+                          text={item.item ? (item.item.uniCode ? `${item.item.uniCode} - ${item.item.name}` : item.item.name) : "-"}
+                          className="font-medium text-sm"
+                        />
                       </div>
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center py-2">
+                      {item.item ? (
+                        <StockStatusIndicator item={item.item} showQuantity={true} />
+                      ) : (
+                        <span className="text-sm text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center py-2">
                       <span className="text-sm">{item.orderedQuantity}</span>
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center py-2">
                       {canEditItems ? (
                         <div className="flex items-center justify-center">
                           <input
@@ -453,16 +460,16 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right py-2">
                       <span className="text-sm">{formatCurrency(item.price)}</span>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right py-2">
                       <span className="text-sm">{item.tax}%</span>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right py-2">
                       <span className="text-sm font-medium">{formatCurrency(itemTotal)}</span>
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center py-2">
                       {rowStatus === "pending" && (
                         <Badge variant="outline" className="text-xs">
                           Pendente

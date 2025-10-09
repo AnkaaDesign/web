@@ -10,9 +10,9 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "payrollNumber",
     header: "Nº FOLHA",
-    accessor: (user: User) => <div className="text-sm whitespace-nowrap">{user.payrollNumber || <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.payrollNumber || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
-    className: "w-24",
+    className: "w-32",
     align: "left",
   },
 
@@ -21,7 +21,7 @@ export const createUserColumns = (): UserColumn[] => [
     key: "name",
     header: "NOME",
     accessor: (user: User) => (
-      <span className="font-medium truncate max-w-[200px]">{user.name}</span>
+      <div className="font-medium truncate" title={user.name}>{user.name}</div>
     ),
     sortable: true,
     className: "min-w-[250px]",
@@ -33,12 +33,13 @@ export const createUserColumns = (): UserColumn[] => [
     key: "email",
     header: "EMAIL",
     accessor: (user: User) => (
-      <div className="text-sm">
+      <div className="text-sm truncate">
         {user.email ? (
           <a
             href={`mailto:${user.email}`}
-            className="text-green-600 dark:text-green-600 hover:text-green-700 dark:hover:text-green-500 hover:underline truncate block max-w-[200px]"
+            className="text-green-600 dark:text-green-600 hover:text-green-700 dark:hover:text-green-500 hover:underline truncate block"
             onClick={(e) => e.stopPropagation()}
+            title={user.email}
           >
             {user.email}
           </a>
@@ -56,7 +57,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "phone",
     header: "TELEFONE",
-    accessor: (user: User) => <div className="text-sm">{user.phone ? formatBrazilianPhone(user.phone) : <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.phone ? formatBrazilianPhone(user.phone) : <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[140px]",
     align: "left",
@@ -66,7 +67,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "cpf",
     header: "CPF",
-    accessor: (user: User) => <div className="text-sm">{user.cpf ? formatCPF(user.cpf) : <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.cpf ? formatCPF(user.cpf) : <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[140px]",
     align: "left",
@@ -76,7 +77,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "pis",
     header: "PIS",
-    accessor: (user: User) => <div className="text-sm">{user.pis || <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.pis || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[140px]",
     align: "left",
@@ -86,7 +87,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "position.hierarchy",
     header: "CARGO",
-    accessor: (user: User) => <div className="text-sm">{user.position?.name || <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate" title={user.position?.name}>{user.position?.name || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[150px]",
     align: "left",
@@ -96,7 +97,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "sector.name",
     header: "SETOR",
-    accessor: (user: User) => <div className="text-sm">{user.sector?.name || <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate" title={user.sector?.name}>{user.sector?.name || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[150px]",
     align: "left",
@@ -139,7 +140,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "admissional",
     header: "DATA DE ADMISSÃO",
-    accessor: (user: User) => <div className="text-sm">{user.admissional ? formatDate(new Date(user.admissional)) : <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.admissional ? formatDate(new Date(user.admissional)) : <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[150px]",
     align: "left",
@@ -149,7 +150,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "birthDate",
     header: "DATA DE NASCIMENTO",
-    accessor: (user: User) => <div className="text-sm">{user.birthDate ? formatDate(new Date(user.birthDate)) : <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.birthDate ? formatDate(new Date(user.birthDate)) : <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[150px]",
     align: "left",
@@ -159,7 +160,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "dismissal",
     header: "DATA DE DEMISSÃO",
-    accessor: (user: User) => <div className="text-sm">{user.dismissal ? formatDate(new Date(user.dismissal)) : <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.dismissal ? formatDate(new Date(user.dismissal)) : <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[150px]",
     align: "left",
@@ -225,7 +226,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "lastLoginAt",
     header: "ÚLTIMO LOGIN",
-    accessor: (user: User) => <div className="text-sm">{user.lastLoginAt ? formatDateTime(new Date(user.lastLoginAt)) : <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.lastLoginAt ? formatDateTime(new Date(user.lastLoginAt)) : <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[180px]",
     align: "left",
@@ -235,7 +236,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "managedSector.name",
     header: "SETOR GERENCIADO",
-    accessor: (user: User) => <div className="text-sm">{user.managedSector?.name || <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate" title={user.managedSector?.name}>{user.managedSector?.name || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[150px]",
     align: "left",
@@ -245,7 +246,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "city",
     header: "CIDADE",
-    accessor: (user: User) => <div className="text-sm">{user.city || <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate" title={user.city}>{user.city || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[150px]",
     align: "left",
@@ -255,7 +256,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "state",
     header: "ESTADO",
-    accessor: (user: User) => <div className="text-sm">{user.state || <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.state || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[100px]",
     align: "left",
@@ -265,7 +266,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "zipCode",
     header: "CEP",
-    accessor: (user: User) => <div className="text-sm">{user.zipCode || <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.zipCode || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[120px]",
     align: "left",
@@ -276,13 +277,13 @@ export const createUserColumns = (): UserColumn[] => [
     key: "address",
     header: "ENDEREÇO",
     accessor: (user: User) => (
-      <div className="text-sm">
+      <div className="text-sm truncate">
         {user.address ? (
-          <span className="truncate max-w-[200px] block" title={`${user.address}${user.addressNumber ? `, ${user.addressNumber}` : ""}${user.addressComplement ? ` - ${user.addressComplement}` : ""}`}>
+          <div className="truncate" title={`${user.address}${user.addressNumber ? `, ${user.addressNumber}` : ""}${user.addressComplement ? ` - ${user.addressComplement}` : ""}`}>
             {user.address}
             {user.addressNumber ? `, ${user.addressNumber}` : ""}
             {user.addressComplement ? ` - ${user.addressComplement}` : ""}
-          </span>
+          </div>
         ) : (
           <span className="text-muted-foreground">-</span>
         )}
@@ -297,7 +298,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "neighborhood",
     header: "BAIRRO",
-    accessor: (user: User) => <div className="text-sm">{user.neighborhood || <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate" title={user.neighborhood}>{user.neighborhood || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[150px]",
     align: "left",
@@ -329,7 +330,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "createdAt",
     header: "DATA DE CRIAÇÃO",
-    accessor: (user: User) => <div className="text-sm">{user.createdAt ? formatDateTime(new Date(user.createdAt)) : <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.createdAt ? formatDateTime(new Date(user.createdAt)) : <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[180px]",
     align: "left",
@@ -339,7 +340,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "updatedAt",
     header: "ÚLTIMA ATUALIZAÇÃO",
-    accessor: (user: User) => <div className="text-sm">{user.updatedAt ? formatDateTime(new Date(user.updatedAt)) : <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.updatedAt ? formatDateTime(new Date(user.updatedAt)) : <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[180px]",
     align: "left",

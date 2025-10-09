@@ -40,85 +40,17 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
           }),
         ])
         .optional(),
-      budget: z
-        .union([
-          z.boolean(),
-          z.object({
-            include: z
-              .object({
-                tasksArtworks: z.boolean().optional(),
-                customerLogo: z.boolean().optional(),
-                taskBudget: z.boolean().optional(),
-                taskNfe: z.boolean().optional(),
-                supplierLogo: z.boolean().optional(),
-                orderNfe: z.boolean().optional(),
-                orderBudget: z.boolean().optional(),
-                orderReceipt: z.boolean().optional(),
-                observations: z.boolean().optional(),
-                airbrushingReceipts: z.boolean().optional(),
-                airbrushingNfes: z.boolean().optional(),
-                vacation: z.boolean().optional(),
-                externalWithdrawalBudget: z.boolean().optional(),
-                externalWithdrawalNfe: z.boolean().optional(),
-                externalWithdrawalReceipt: z.boolean().optional(),
-              })
-              .optional(),
-          }),
-        ])
-        .optional(),
-      nfe: z
-        .union([
-          z.boolean(),
-          z.object({
-            include: z
-              .object({
-                tasksArtworks: z.boolean().optional(),
-                customerLogo: z.boolean().optional(),
-                taskBudget: z.boolean().optional(),
-                taskNfe: z.boolean().optional(),
-                supplierLogo: z.boolean().optional(),
-                orderNfe: z.boolean().optional(),
-                orderBudget: z.boolean().optional(),
-                orderReceipt: z.boolean().optional(),
-                observations: z.boolean().optional(),
-                airbrushingReceipts: z.boolean().optional(),
-                airbrushingNfes: z.boolean().optional(),
-                vacation: z.boolean().optional(),
-                externalWithdrawalBudget: z.boolean().optional(),
-                externalWithdrawalNfe: z.boolean().optional(),
-                externalWithdrawalReceipt: z.boolean().optional(),
-              })
-              .optional(),
-          }),
-        ])
-        .optional(),
-      receipt: z
-        .union([
-          z.boolean(),
-          z.object({
-            include: z
-              .object({
-                tasksArtworks: z.boolean().optional(),
-                customerLogo: z.boolean().optional(),
-                taskBudget: z.boolean().optional(),
-                taskNfe: z.boolean().optional(),
-                taskReceipt: z.boolean().optional(),
-                supplierLogo: z.boolean().optional(),
-                orderNfe: z.boolean().optional(),
-                orderBudget: z.boolean().optional(),
-                orderReceipt: z.boolean().optional(),
-                observations: z.boolean().optional(),
-                airbrushingReceipts: z.boolean().optional(),
-                airbrushingNfes: z.boolean().optional(),
-                vacation: z.boolean().optional(),
-                externalWithdrawalBudget: z.boolean().optional(),
-                externalWithdrawalNfe: z.boolean().optional(),
-                externalWithdrawalReceipt: z.boolean().optional(),
-              })
-              .optional(),
-          }),
-        ])
-        .optional(),
+      budgets: z.boolean().optional(), // Many-to-many relation with File
+      nfes: z.boolean().optional(), // Many-to-many relation with File
+      receipts: z.boolean().optional(), // Many-to-many relation with File
+      reimbursements: z.boolean().optional(), // Many-to-many relation with File
+      reimbursementInvoices: z.boolean().optional(), // Many-to-many relation with File
+      // Legacy field names for backwards compatibility (mapped in repository)
+      budget: z.boolean().optional(), // @deprecated Use budgets instead
+      nfe: z.boolean().optional(), // @deprecated Use nfes instead
+      receipt: z.boolean().optional(), // @deprecated Use receipts instead
+      reembolsos: z.boolean().optional(), // @deprecated Use reimbursements instead
+      nfeReembolsos: z.boolean().optional(), // @deprecated Use reimbursementInvoices instead
       observation: z
         .union([
           z.boolean(),
@@ -384,15 +316,44 @@ export const taskWhereSchema: z.ZodSchema<any> = z.lazy(() =>
       customerId: z.union([z.string(), z.object({ in: z.array(z.string()).optional() })]).optional(),
       sectorId: z.union([z.string(), z.object({ in: z.array(z.string()).optional() })]).optional(),
       paintId: z.union([z.string(), z.object({ in: z.array(z.string()).optional() })]).optional(),
-      budgetId: z.string().optional(),
-      nfeId: z.string().optional(),
-      receiptId: z.string().optional(),
       // Relations
       sector: z.any().optional(),
       customer: z.any().optional(),
-      budget: z.any().optional(),
-      nfe: z.any().optional(),
-      receipt: z.any().optional(),
+      budgets: z
+        .object({
+          some: z.any().optional(),
+          every: z.any().optional(),
+          none: z.any().optional(),
+        })
+        .optional(),
+      nfes: z
+        .object({
+          some: z.any().optional(),
+          every: z.any().optional(),
+          none: z.any().optional(),
+        })
+        .optional(),
+      receipts: z
+        .object({
+          some: z.any().optional(),
+          every: z.any().optional(),
+          none: z.any().optional(),
+        })
+        .optional(),
+      reimbursements: z
+        .object({
+          some: z.any().optional(),
+          every: z.any().optional(),
+          none: z.any().optional(),
+        })
+        .optional(),
+      reimbursementInvoices: z
+        .object({
+          some: z.any().optional(),
+          every: z.any().optional(),
+          none: z.any().optional(),
+        })
+        .optional(),
       observation: z.any().optional(),
       generalPainting: z.any().optional(),
       createdBy: z.any().optional(),
@@ -1184,14 +1145,18 @@ export const taskCreateSchema = z
     paintId: z.string().uuid("Tinta inválida").nullable().optional(),
     customerId: z.string().uuid("Cliente inválido").min(1, "Cliente é obrigatório"),
     sectorId: z.string().uuid("Setor inválido").nullable().optional(),
-    budgetId: z.string().uuid("Orçamento inválido").nullable().optional(),
-    nfeId: z.string().uuid("NFe inválida").nullable().optional(),
-    receiptId: z.string().uuid("Recibo inválido").nullable().optional(),
     price: moneySchema.nullable().optional(),
 
-    // Relations
-    artworkIds: z.array(z.string().uuid("Arquivo inválido")).optional(),
-    paintIds: z.array(z.string().uuid("Tinta inválida")).optional(),
+    // Relations - Many-to-many file relations (arrays)
+    budgetIds: z.array(z.string().uuid("Budget inválido")).optional(),
+    invoiceIds: z.array(z.string().uuid("Invoice inválida")).optional(), // Maps to nfes
+    receiptIds: z.array(z.string().uuid("Receipt inválido")).optional(),
+    reimbursementIds: z.array(z.string().uuid("Reimbursement inválido")).optional(),
+    reimbursementInvoiceIds: z.array(z.string().uuid("Reimbursement invoice inválida")).optional(),
+    fileIds: z.array(z.string().uuid("File inválido")).optional(), // Maps to artworks
+    paintIds: z.array(z.string().uuid("Paint inválida")).optional(), // Maps to logoPaints
+    // Legacy field names for backwards compatibility
+    artworkIds: z.array(z.string().uuid("Artwork inválido")).optional(), // @deprecated Use fileIds instead
     observation: taskObservationCreateSchema.nullable().optional(),
     services: z.array(taskServiceOrderCreateSchema).min(1, "Pelo menos um serviço é obrigatório"),
     truck: taskTruckCreateSchema.nullable().optional(),
@@ -1279,14 +1244,18 @@ export const taskUpdateSchema = z
     paintId: z.string().uuid("Tinta inválida").nullable().optional(),
     customerId: z.string().uuid("Cliente inválido").nullable().optional(),
     sectorId: z.string().uuid("Setor inválido").nullable().optional(),
-    budgetId: z.string().uuid("Orçamento inválido").nullable().optional(),
-    nfeId: z.string().uuid("NFe inválida").nullable().optional(),
-    receiptId: z.string().uuid("Recibo inválido").nullable().optional(),
     price: moneySchema.nullable().optional(),
 
-    // Relations
-    artworkIds: z.array(z.string().uuid("Arquivo inválido")).optional(),
-    paintIds: z.array(z.string().uuid("Tinta inválida")).optional(),
+    // Relations - Many-to-many file relations (arrays)
+    budgetIds: z.array(z.string().uuid("Budget inválido")).optional(),
+    invoiceIds: z.array(z.string().uuid("Invoice inválida")).optional(), // Maps to nfes
+    receiptIds: z.array(z.string().uuid("Receipt inválido")).optional(),
+    reimbursementIds: z.array(z.string().uuid("Reimbursement inválido")).optional(),
+    reimbursementInvoiceIds: z.array(z.string().uuid("Reimbursement invoice inválida")).optional(),
+    fileIds: z.array(z.string().uuid("File inválido")).optional(), // Maps to artworks
+    paintIds: z.array(z.string().uuid("Paint inválida")).optional(), // Maps to logoPaints
+    // Legacy field names for backwards compatibility
+    artworkIds: z.array(z.string().uuid("Artwork inválido")).optional(), // @deprecated Use fileIds instead
     observation: taskObservationCreateSchema.nullable().optional(),
     services: z.array(taskServiceOrderCreateSchema).optional(),
     truck: taskTruckCreateSchema.nullable().optional(),
@@ -1430,13 +1399,14 @@ export const mapTaskToFormData = createMapToFormDataHelper<Task, TaskUpdateFormD
   paintId: task.paintId,
   customerId: task.customerId,
   sectorId: task.sectorId,
-  budgetId: task.budgetId,
-  nfeId: task.nfeId,
-  receiptId: task.receiptId,
   price: task.price,
-  // Relations
-  artworkIds: task.artworks?.map((artwork) => artwork.id),
+  // Many-to-many relations (arrays)
+  budgetIds: task.budgets?.map((budget) => budget.id),
+  invoiceIds: task.nfes?.map((nfe) => nfe.id),
+  receiptIds: task.receipts?.map((receipt) => receipt.id),
+  reimbursementIds: task.reimbursements?.map((reimbursement) => reimbursement.id),
+  reimbursementInvoiceIds: task.reimbursementInvoices?.map((reimbursementInvoice) => reimbursementInvoice.id),
+  fileIds: task.artworks?.map((artwork) => artwork.id),
   paintIds: task.logoPaints?.map((paint) => paint.id),
-  generalPaintingId: task.generalPainting?.id,
   // Complex relations need to be handled separately
 }));

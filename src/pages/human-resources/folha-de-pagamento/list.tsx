@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { usePageTracker } from "@/hooks/use-page-tracker";
@@ -25,7 +25,6 @@ import { PayrollExport } from "@/components/human-resources/payroll/export/payro
 import { PayrollColumnVisibilityManager } from "@/components/human-resources/payroll/list/payroll-column-visibility-manager";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePayrollBonuses, useSectors } from "../../../hooks";
 import { isUserEligibleForBonus, getCurrentPayrollPeriod } from "../../../utils";
@@ -611,6 +610,29 @@ export default function PayrollListPage() {
 
   // State management
   const [filters, setFilters] = useState<PayrollFiltersData>(filtersWithDefaults);
+
+  // Update filters when default sectors become available
+  const hasInitializedSectorsRef = React.useRef(false);
+
+  useEffect(() => {
+    // Only set default sectors if:
+    // 1. We haven't initialized yet
+    // 2. Default sectors are available
+    // 3. No sector filters are currently set (including from URL)
+    // 4. No URL parameters exist for sectors
+    if (
+      !hasInitializedSectorsRef.current &&
+      defaultSectorIds.length > 0 &&
+      (!filters.sectorIds || filters.sectorIds.length === 0) &&
+      !searchParams.has('sectorIds')
+    ) {
+      setFilters(prev => ({
+        ...prev,
+        sectorIds: defaultSectorIds
+      }));
+      hasInitializedSectorsRef.current = true;
+    }
+  }, [defaultSectorIds, filters.sectorIds, searchParams]);
   const [showFilters, setShowFilters] = useState(false);
   const { visibleColumns: baseVisibleColumns, setVisibleColumns } = useColumnVisibility(
     "payroll-list-visible-columns",
@@ -998,20 +1020,9 @@ export default function PayrollListPage() {
     }, 300);
   };
 
-  // Handle refreshing data
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    // Invalidate all payroll queries to force refetch
-    activePayrollData.forEach(query => query.refetch());
-
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 500);
-  };
-
   // Handle navigation to bonus simulation
   const handleNavigateToSimulation = () => {
-    navigate(routes.administration.bonus.simulation);
+    navigate(routes.humanResources.bonus.simulation);
   };
 
 
@@ -1113,9 +1124,9 @@ export default function PayrollListPage() {
         <div className="flex-1 overflow-hidden">
           <Card className="h-full flex flex-col shadow-sm border border-border">
             {/* Actions Bar */}
-            <CardContent className="pt-6 pb-4">
+            <CardContent className="px-6 pt-6 pb-4">
               <div className="flex items-center justify-between gap-4">
-                {/* Left side - Filters and Controls */}
+                {/* Left side - Filters and Columns */}
                 <div className="flex items-center gap-2">
                   <Button
                     onClick={() => setShowFilters(!showFilters)}
@@ -1131,16 +1142,14 @@ export default function PayrollListPage() {
                     )}
                   </Button>
 
-                  <Button onClick={handleRefresh} variant="outline" size="default" disabled={isRefreshing}>
-                    <IconRefresh className={`h-4 w-4 mr-2 ${isRefreshing || isLoading ? "animate-spin" : ""}`} />
-                    {isRefreshing ? "Atualizando..." : "Atualizar"}
-                  </Button>
-
                   <PayrollColumnVisibilityManager
                     visibleColumns={visibleColumns}
                     onVisibilityChange={setVisibleColumns}
                   />
+                </div>
 
+                {/* Right side - Simulate and Export */}
+                <div className="flex items-center gap-2">
                   <Button onClick={handleNavigateToSimulation} variant="outline" size="default">
                     <IconCalculator className="h-4 w-4 mr-2" />
                     Simular
@@ -1157,8 +1166,8 @@ export default function PayrollListPage() {
             </CardContent>
 
             {/* Table Content */}
-            <CardContent className="flex-1 overflow-hidden p-0 relative">
-              <div className="h-full">
+            <CardContent className="flex-1 overflow-hidden p-6 pt-0 relative">
+              <div className="h-full flex flex-col overflow-hidden rounded-lg border border-border">
                 <PayrollTableComponent
                   data={processedPayrolls}
                   visibleColumns={visibleColumns}
@@ -1171,29 +1180,26 @@ export default function PayrollListPage() {
                   getSortOrder={getSortOrder}
                   sortConfigs={sortConfigs}
                 />
-              </div>
 
-              {/* Loading overlay */}
-              {(isRefreshing || isLoading) && (
-                <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <IconRefresh className="h-4 w-4 animate-spin" />
-                    <span className="text-sm font-medium">
-                      {isRefreshing ? "Aplicando filtros..." : "Carregando dados..."}
-                    </span>
+                {/* Loading overlay */}
+                {(isRefreshing || isLoading) && (
+                  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <IconRefresh className="h-4 w-4 animate-spin" />
+                      <span className="text-sm font-medium">
+                        {isRefreshing ? "Aplicando filtros..." : "Carregando dados..."}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </CardContent>
 
             {/* Summary - At bottom */}
             {processedPayrolls.length > 0 && (
-              <>
-                <Separator className="mx-6" />
-                <div className="px-6 pb-6 pt-6">
-                  <PayrollSummary users={processedPayrolls} />
-                </div>
-              </>
+              <div className="px-6 pb-6 pt-0">
+                <PayrollSummary users={processedPayrolls} />
+              </div>
             )}
           </Card>
         </div>

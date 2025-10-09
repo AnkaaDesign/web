@@ -142,13 +142,6 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
   const [selectedSectorIds, setSelectedSectorIds] = useState<string[]>([]);
   const [excludedUserIds, setExcludedUserIds] = useState<string[]>([]);
 
-  // Set default sectors when they become available
-  useEffect(() => {
-    if (defaultSectorIds.length > 0 && selectedSectorIds.length === 0) {
-      setSelectedSectorIds(defaultSectorIds);
-    }
-  }, [defaultSectorIds]);
-
   // Get current bonus period for task counting
   // Get current payroll period (26th-25th cycle) - centralized utility
   // If today is Sept 26th or later, this returns October
@@ -180,6 +173,17 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
       )
       .map(sector => sector.id);
   }, [sectorsData?.data]);
+
+  // Set default sectors when they become available
+  // Use a ref to track if we've initialized to avoid dependency issues
+  const hasInitializedSectorsRef = React.useRef(false);
+
+  useEffect(() => {
+    if (!hasInitializedSectorsRef.current && defaultSectorIds.length > 0) {
+      setSelectedSectorIds(defaultSectorIds);
+      hasInitializedSectorsRef.current = true;
+    }
+  }, [defaultSectorIds]);
 
   // Fetch tasks for current period to get actual count
   // Ensure dates are set to exact times: 26th at 00:00:00.000 and 25th at 23:59:59.999

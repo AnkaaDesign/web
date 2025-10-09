@@ -78,18 +78,49 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
       // Direct field: { name: "asc" }
       return { [fieldPath[0]]: config.direction };
     } else if (fieldPath.length === 2) {
-      // Nested field: { position: { name: "asc" } }
-      // Prisma handles null values automatically for nested relations
-      return { [fieldPath[0]]: { [fieldPath[1]]: config.direction } };
-    } else if (fieldPath.length === 3) {
-      // Deeply nested field: { user: { profile: { name: "asc" } } }
-      return {
-        [fieldPath[0]]: {
-          [fieldPath[1]]: {
-            [fieldPath[2]]: config.direction
+      // Nested field
+      // Only apply nulls handling for position relation to ensure users without positions appear at the end
+      if (fieldPath[0] === "position") {
+        return {
+          [fieldPath[0]]: {
+            [fieldPath[1]]: {
+              sort: config.direction,
+              nulls: "last" as const
+            }
           }
-        }
-      };
+        };
+      } else {
+        // For other relations (like sector), use simple direction format
+        return {
+          [fieldPath[0]]: {
+            [fieldPath[1]]: config.direction
+          }
+        };
+      }
+    } else if (fieldPath.length === 3) {
+      // Deeply nested field
+      // Only apply nulls handling if position is in the path
+      if (fieldPath[0] === "position" || fieldPath[1] === "position") {
+        return {
+          [fieldPath[0]]: {
+            [fieldPath[1]]: {
+              [fieldPath[2]]: {
+                sort: config.direction,
+                nulls: "last" as const
+              }
+            }
+          }
+        };
+      } else {
+        // For other relations, use simple direction format
+        return {
+          [fieldPath[0]]: {
+            [fieldPath[1]]: {
+              [fieldPath[2]]: config.direction
+            }
+          }
+        };
+      }
     } else {
       // Fallback for deeper nesting - treat as single field
       return { [config.column]: config.direction };

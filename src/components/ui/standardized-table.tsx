@@ -199,6 +199,7 @@ export function StandardizedTable<T>({
                 data.map((item, index) => {
                   const itemKey = getItemKey(item);
                   const itemIsSelected = isSelected?.(itemKey) ?? false;
+                  const isLastRow = index === data.length - 1;
 
                   return (
                     <TableRow
@@ -206,7 +207,9 @@ export function StandardizedTable<T>({
                       data-testid={`${itemTestIdPrefix || "table"}-row`}
                       data-state={itemIsSelected ? "selected" : undefined}
                       className={cn(
-                        "cursor-pointer transition-colors border-b border-border",
+                        "cursor-pointer transition-colors",
+                        // Border - hide on last row
+                        !isLastRow && "border-b border-border",
                         // Alternating row colors
                         index % 2 === 1 && "bg-muted/10",
                         // Hover state that works with alternating colors
@@ -232,14 +235,14 @@ export function StandardizedTable<T>({
                           key={column.key}
                           className={cn(
                             column.className,
-                            "p-0 !border-r-0",
+                            "p-0 !border-r-0 overflow-hidden",
                             column.align === "center" && "text-center",
                             column.align === "right" && "text-right",
                             column.align === "left" && "text-left",
                             !column.align && "text-left",
                           )}
                         >
-                          <div className="px-4 py-2">{(column.render || column.accessor)?.(item)}</div>
+                          <div className="px-4 py-2.5 overflow-hidden">{(column.render || column.accessor)?.(item)}</div>
                         </TableCell>
                       ))}
                     </TableRow>
