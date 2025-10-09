@@ -542,11 +542,11 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             </DropdownMenuItem>
           )}
 
-          {/* Show mark as dismissed option if any user is not dismissed */}
+          {/* Show dismiss option if any user is not dismissed */}
           {contextMenu?.users.some((user) => user.status !== USER_STATUS.DISMISSED) && (
             <DropdownMenuItem onClick={handleMarkAsDismissed}>
               <IconUserX className="mr-2 h-4 w-4" />
-              {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Marcar como desligados" : "Marcar como desligado"}
+              {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Demitir selecionados" : "Demitir"}
             </DropdownMenuItem>
           )}
 

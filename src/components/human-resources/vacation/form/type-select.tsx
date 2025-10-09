@@ -1,3 +1,5 @@
+import { IconTag } from "@tabler/icons-react";
+
 import type { VacationCreateFormData, VacationUpdateFormData } from "../../../../schemas";
 import { VACATION_TYPE, VACATION_TYPE_LABELS } from "../../../../constants";
 
@@ -32,7 +34,12 @@ export function TypeSelect({ control, disabled, allowEmpty, placeholder }: TypeS
       name="type"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>Tipo</FormLabel>
+          <FormLabel>
+            <div className="flex items-center gap-2">
+              <IconTag className="h-4 w-4" />
+              Tipo
+            </div>
+          </FormLabel>
           <FormControl>
             <Combobox
               value={field.value || (allowEmpty ? "__empty__" : VACATION_TYPE.ANNUAL)}

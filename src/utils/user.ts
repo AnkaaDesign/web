@@ -557,10 +557,10 @@ export function getUserStatusBadgeText(user: User): string {
 
   const baseLabel = statusLabels[user.status] || user.status;
 
-  // For experience periods, show days remaining
+  // For experience periods, show days remaining (just the number)
   const daysRemaining = getDaysRemainingInExperiencePeriod(user);
   if (daysRemaining !== null) {
-    return `${baseLabel} - ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}`;
+    return `${baseLabel} - ${daysRemaining}`;
   }
 
   // For contracted/dismissed, show time since status change in compact format

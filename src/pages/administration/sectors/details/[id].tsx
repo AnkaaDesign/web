@@ -7,7 +7,7 @@ import { useSector, useSectorMutations } from "../../../../hooks";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { SpecificationsCard, SectorUsersTable } from "@/components/administration/sector/detail";
+import { SpecificationsCard, SectorUsersTable, SectorTasksTable } from "@/components/administration/sector/detail";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
 import {
@@ -149,6 +149,9 @@ export const SectorDetailPage = () => {
 
             {/* Related Users */}
             <SectorUsersTable sector={sector} />
+
+            {/* Related Tasks */}
+            <SectorTasksTable sector={sector} />
           </div>
         </div>
 

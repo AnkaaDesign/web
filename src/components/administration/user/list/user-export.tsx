@@ -43,16 +43,13 @@ export function UserExport({ className, filters, currentUsers = [], totalRecords
           page,
           limit: 100,
           include: {
-            position: {
-              include: {
-                sector: true,
-              },
-            },
+            position: true,
+            sector: true,
             managedSector: true,
-            count: {
+            _count: {
               select: {
-                tasks: true,
-                activities: true,
+                createdTasks: true,
+                vacations: true,
               },
             },
           },

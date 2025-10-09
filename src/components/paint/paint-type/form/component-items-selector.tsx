@@ -1,8 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import type { PaintTypeCreateFormData, PaintTypeUpdateFormData } from "../../../../schemas";
-import { getItems } from "../../../../api-client";
+import { getItems, getItem } from "../../../../api-client";
 import { MEASURE_TYPE } from "../../../../constants";
 
 interface ComponentItemsSelectorProps {
@@ -11,6 +11,8 @@ interface ComponentItemsSelectorProps {
 }
 
 export function ComponentItemsSelector({ control, disabled }: ComponentItemsSelectorProps) {
+  const [initialOptions, setInitialOptions] = useState<Array<{ label: string; value: string }>>([]);
+
   // Async query function for the combobox
   const queryItems = useMemo(
     () => async (searchTerm: string, page = 1) => {
@@ -77,6 +79,55 @@ export function ComponentItemsSelector({ control, disabled }: ComponentItemsSele
     []
   );
 
+  // Fetch selected items to populate initialOptions
+  useEffect(() => {
+    const fetchSelectedItems = async () => {
+      const selectedIds = control._formValues?.componentItemIds || [];
+      if (!selectedIds || selectedIds.length === 0) {
+        setInitialOptions([]);
+        return;
+      }
+
+      try {
+        const itemPromises = selectedIds.map(async (id: string) => {
+          try {
+            const response = await getItem(id, {
+              include: {
+                measures: true,
+                category: true,
+                brand: true,
+              },
+            });
+            const item = response.data;
+            if (!item) return null;
+
+            const unicode = item.uniCode || "";
+            const name = item.name || "";
+            const brand = item.brand?.name || "";
+            const label = `${unicode} - ${name} - ${brand}`.replace(/^\s*-\s*/, "").replace(/\s*-\s*$/, "");
+
+            return {
+              label,
+              value: item.id,
+            };
+          } catch (error) {
+            console.error(`Error fetching item ${id}:`, error);
+            return null;
+          }
+        });
+
+        const items = await Promise.all(itemPromises);
+        const validItems = items.filter((item): item is { label: string; value: string } => item !== null);
+        setInitialOptions(validItems);
+      } catch (error) {
+        console.error("Error fetching selected items:", error);
+        setInitialOptions([]);
+      }
+    };
+
+    fetchSelectedItems();
+  }, [control]);
+
   return (
     <FormField
       control={control}
@@ -89,6 +140,7 @@ export function ComponentItemsSelector({ control, disabled }: ComponentItemsSele
               async={true}
               queryKey={["component-items"]}
               queryFn={queryItems}
+              initialOptions={initialOptions}
               value={field.value || []}
               onValueChange={field.onChange}
               placeholder="Selecione os componentes"

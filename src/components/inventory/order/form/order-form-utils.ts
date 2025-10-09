@@ -795,7 +795,6 @@ export function filterItems(
     brandIds?: string[];
     supplierIds?: string[];
     onlyAvailable?: boolean;
-    onlyCritical?: boolean;
   } = {},
 ): Item[] {
   let filtered = items;
@@ -830,11 +829,6 @@ export function filterItems(
   // Filter by availability
   if (filters.onlyAvailable) {
     filtered = filtered.filter((item: Item) => item.quantity > 0);
-  }
-
-  // Filter by critical status (if item has isCritical flag)
-  if (filters.onlyCritical) {
-    filtered = filtered.filter((item: Item) => (item as any).isCritical === true);
   }
 
   return filtered;
@@ -966,7 +960,7 @@ export function debugFormData(formData: OrderFormData, label?: string): void {
     return;
   }
 
-  console.group(`🔍 Order Form Data${label ? ` - ${label}` : ""}`););const totals = calculateOrderTotals(formData.selectedItems, formData.quantities, formData.prices, formData.taxes, formData.criticalItems);console.groupEnd();
+  console.group(`🔍 Order Form Data${label ? ` - ${label}` : ""}`););const totals = calculateOrderTotals(formData.selectedItems, formData.quantities, formData.prices, formData.taxes);console.groupEnd();
 }
 
 /**

@@ -168,7 +168,9 @@ export const CustomerDetailsPage = () => {
                     "finishedAt",
                   ])}
                   filters={{
-                    customerId: customer.id,
+                    where: {
+                      customerId: customer.id,
+                    },
                   }}
                   navigationRoute="schedule"
                   className="h-[600px]"

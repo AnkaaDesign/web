@@ -114,15 +114,12 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     [order.items],
   );
 
-  const initialCriticalItems = useMemo(() => new Set(order.items.filter((item) => item.isCritical).map((item) => item.itemId)), [order.items]);
-
   // URL state management for item selection (Stage 2) - initialized with existing data
   const {
     selectedItems,
     quantities,
     prices,
     taxes,
-    criticalItems,
     description,
     supplierId,
     forecast,
@@ -153,7 +150,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     setItemQuantity,
     setItemPrice,
     setItemTax,
-    toggleCriticalItem,
     selectionCount,
   } = useOrderFormUrlState({
     defaultQuantity: 1,
@@ -171,7 +167,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       quantities: initialQuantities,
       prices: initialPrices,
       taxes: initialTaxes,
-      criticalItems: initialCriticalItems,
     },
   });
 
@@ -339,7 +334,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       console.error("Error updating order:", error);
       // Error is handled by the mutation hook
     }
-  }, [validateCurrentStep, selectedItems, quantities, prices, taxes, criticalItems, description, supplierId, forecast, notes, updateAsync, order.id, navigate]);
+  }, [validateCurrentStep, selectedItems, quantities, prices, taxes, description, supplierId, forecast, notes, updateAsync, order.id, navigate]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === steps.length;
@@ -534,14 +529,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
             border-bottom: none;
           }
           
-          .critical-badge {
-            background: #fee2e2;
-            color: #dc2626;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: 500;
-          }
           
           .footer {
             margin-top: auto;
@@ -640,7 +627,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                 <th class="text-right">Subtotal</th>
                 <th class="text-right">Taxa</th>
                 <th class="text-right">Total</th>
-                <th>Crítico</th>
               </tr>
             </thead>
             <tbody>
@@ -649,7 +635,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                   const quantity = quantities[item.id] || 1;
                   const price = prices[item.id] || 0;
                   const tax = taxes[item.id] || 0;
-                  const isCritical = criticalItems.has(item.id);
                   const subtotal = quantity * price;
                   const taxAmount = subtotal * (tax / 100);
                   const itemTotal = subtotal + taxAmount;
@@ -666,7 +651,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                     <td class="text-right">${formatCurrency(subtotal)}</td>
                     <td class="text-right">${formatCurrency(taxAmount)}</td>
                     <td class="text-right font-medium">${formatCurrency(itemTotal)}</td>
-                    <td>${isCritical ? '<span class="critical-badge">SIM</span>' : "-"}</td>
                   </tr>
                 `;
                 })
@@ -676,7 +660,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
               <tr class="total-row">
                 <td colspan="9" class="text-right">Total Geral</td>
                 <td class="text-right">${formatCurrency(totalPrice)}</td>
-                <td></td>
               </tr>
             </tfoot>
           </table>
@@ -703,7 +686,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         };
       }
     },
-    [description, supplierId, forecast, notes, selectionCount, selectedItemsData, quantities, prices, taxes, criticalItems, totalPrice, order.id, suppliers],
+    [description, supplierId, forecast, notes, selectionCount, selectedItemsData, quantities, prices, taxes, totalPrice, order.id, suppliers],
   );
 
   // Generate navigation actions based on current step
@@ -879,11 +862,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                     onQuantityChange={setItemQuantity}
                     onPriceChange={setItemPrice}
                     onTaxChange={setItemTax}
-                    onToggleCritical={toggleCriticalItem}
                     quantities={quantities}
                     prices={prices}
                     taxes={taxes}
-                    criticalItems={criticalItems}
                     isSelected={(itemId) => selectedItems.has(itemId)}
                     showSelectedOnly={showSelectedOnly}
                     searchTerm={searchTerm}
@@ -987,7 +968,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 <TableHead className="text-right">Subtotal</TableHead>
                                 <TableHead className="text-right">Taxa</TableHead>
                                 <TableHead className="text-right">Total</TableHead>
-                                <TableHead className="text-center">Crítico</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -995,7 +975,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 const quantity = quantities[item.id] || 1;
                                 const price = prices[item.id] || 0;
                                 const tax = taxes[item.id] || 0;
-                                const isCritical = criticalItems.has(item.id);
                                 const subtotal = quantity * price;
                                 const taxAmount = subtotal * (tax / 100);
                                 const itemTotal = subtotal + taxAmount;
@@ -1014,13 +993,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                     <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(taxAmount)}</TableCell>
                                     <TableCell className="text-right font-medium">{formatCurrency(itemTotal)}</TableCell>
-                                    <TableCell className="text-center">
-                                      {isCritical && (
-                                        <Badge variant="destructive" className="text-xs">
-                                          SIM
-                                        </Badge>
-                                      )}
-                                    </TableCell>
                                   </TableRow>
                                 );
                               })}
@@ -1031,7 +1003,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   Total Geral
                                 </TableCell>
                                 <TableCell className="text-right font-bold text-base">{formatCurrency(totalPrice)}</TableCell>
-                                <TableCell />
                               </TableRow>
                             </TableFooter>
                           </Table>

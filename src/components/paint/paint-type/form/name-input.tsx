@@ -20,16 +20,12 @@ export function NameInput({ control, disabled, required }: NameInputProps) {
           </FormLabel>
           <FormControl>
             <Input
+              {...field}
               value={field.value || ""}
-              onChange={(value) => {
-                field.onChange(value);
-              }}
-              name={field.name}
-              onBlur={field.onBlur}
-              ref={field.ref}
               placeholder="Ex: Poliéster Premium"
               disabled={disabled}
               autoComplete="off"
+              transparent
             />
           </FormControl>
           <FormMessage />

@@ -1,28 +1,26 @@
-import { IconUsers } from "@tabler/icons-react";
+import { IconClipboardList } from "@tabler/icons-react";
 
 import type { Sector } from "../../../../types";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { UserTable } from "@/components/administration/user/list/user-table";
+import { CustomerTasksTable } from "@/components/administration/customer/detail/customer-tasks-table";
 
-interface SectorUsersTableProps {
+interface SectorTasksTableProps {
   sector: Sector;
 }
 
 // Define comprehensive visible columns for sector detail view
-const SECTOR_DETAIL_VISIBLE_COLUMNS = new Set([
-  "payrollNumber",
+const SECTOR_DETAIL_TASK_VISIBLE_COLUMNS = new Set([
   "name",
-  "email",
-  "phone",
-  "position.name",
+  "customer.fantasyName",
   "status",
-  "admissional",
+  "finishedAt",
+  "createdBy.name",
 ]);
 
-export function SectorUsersTable({ sector }: SectorUsersTableProps) {
-  // Filter to only show users from this sector
+export function SectorTasksTable({ sector }: SectorTasksTableProps) {
+  // Filter to only show tasks from this sector
   const filters = {
     where: {
       sectorId: sector.id,
@@ -34,19 +32,20 @@ export function SectorUsersTable({ sector }: SectorUsersTableProps) {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <IconUsers className="h-5 w-5" />
-            Usuários do Setor
+            <IconClipboardList className="h-5 w-5" />
+            Tarefas do Setor
           </div>
           <Badge variant="secondary">
-            {sector._count?.users || 0} usuário{(sector._count?.users || 0) !== 1 ? "s" : ""}
+            {sector._count?.tasks || 0} tarefa{(sector._count?.tasks || 0) !== 1 ? "s" : ""}
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <UserTable
-          visibleColumns={SECTOR_DETAIL_VISIBLE_COLUMNS}
+        <CustomerTasksTable
+          visibleColumns={SECTOR_DETAIL_TASK_VISIBLE_COLUMNS}
           filters={filters}
           className="border-0"
+          navigationRoute="history"
         />
       </CardContent>
     </Card>

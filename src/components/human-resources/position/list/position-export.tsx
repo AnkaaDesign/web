@@ -49,7 +49,7 @@ export function PositionExport({ className, filters, currentPositions = [], tota
           include: {
             // Fetch monetary values for accurate current remuneration
             monetaryValues: {
-              orderBy: [{ current: "desc" }, { createdAt: "desc" }],
+              orderBy: { createdAt: "desc" },
               take: 5,
             },
             // Also fetch deprecated remunerations for backwards compatibility

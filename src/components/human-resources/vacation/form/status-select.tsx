@@ -1,3 +1,5 @@
+import { IconInfoCircle } from "@tabler/icons-react";
+
 import type { VacationCreateFormData, VacationUpdateFormData } from "../../../../schemas";
 import { VACATION_STATUS, VACATION_STATUS_LABELS } from "../../../../constants";
 
@@ -30,9 +32,14 @@ export function StatusSelect({ control, disabled, allowEmpty, placeholder }: Sta
     <FormField
       control={control}
       name="status"
-      render={({ field }) => (
+      render={({ field, fieldState }) => (
         <FormItem>
-          <FormLabel>Status</FormLabel>
+          <FormLabel>
+            <div className="flex items-center gap-2">
+              <IconInfoCircle className="h-4 w-4" />
+              Status
+            </div>
+          </FormLabel>
           <FormControl>
             <Combobox
               value={field.value || (allowEmpty ? "__empty__" : VACATION_STATUS.PENDING)}
@@ -53,7 +60,9 @@ export function StatusSelect({ control, disabled, allowEmpty, placeholder }: Sta
               renderOption={(option) => <span className={option.value === "__empty__" ? "text-muted-foreground italic" : ""}>{option.label}</span>}
             />
           </FormControl>
-          <FormDescription>Status atual do período de férias</FormDescription>
+          <FormDescription>
+            Status atual do período de férias{fieldState.error && <span className="text-destructive"> (obrigatório)</span>}
+          </FormDescription>
           <FormMessage />
         </FormItem>
       )}

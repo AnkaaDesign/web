@@ -263,16 +263,18 @@ export function VacationForm(props: VacationFormProps) {
                 <CardTitle>Informações das Férias</CardTitle>
                 <CardDescription>Preencha as informações do período de férias</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-6">
                 <FormErrorDisplay errors={errors} />
 
                 <CollectiveSwitch control={form.control} disabled={finalIsSubmitting} />
 
                 {!isCollective && (
-                  <CollaboratorSelect control={form.control} disabled={finalIsSubmitting || mode === "update"} required={mode === "create" && !isCollective} />
+                  <div className="pt-2">
+                    <CollaboratorSelect control={form.control} disabled={finalIsSubmitting || mode === "update"} required={mode === "create" && !isCollective} />
+                  </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
                   <StartDatePicker control={form.control} disabled={finalIsSubmitting} required={mode === "create"} endDate={form.watch("endAt")} />
 
                   <EndDatePicker control={form.control} disabled={finalIsSubmitting} required={mode === "create"} startDate={form.watch("startAt")} />

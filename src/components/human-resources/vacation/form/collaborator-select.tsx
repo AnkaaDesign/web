@@ -19,7 +19,7 @@ export function CollaboratorSelect({ control, disabled, required }: Collaborator
     <FormField
       control={control}
       name="userId"
-      render={({ field }) => (
+      render={({ field, fieldState }) => (
         <FormItem className="flex flex-col">
           <FormLabel>
             <div className="flex items-center gap-2">
@@ -60,7 +60,9 @@ export function CollaboratorSelect({ control, disabled, required }: Collaborator
               )}
             />
           </FormControl>
-          <FormDescription>Selecione o colaborador que irá tirar férias{required && " (obrigatório)"}</FormDescription>
+          <FormDescription>
+            Selecione o colaborador que irá tirar férias{fieldState.error && required && <span className="text-destructive"> (obrigatório)</span>}
+          </FormDescription>
           <FormMessage />
         </FormItem>
       )}

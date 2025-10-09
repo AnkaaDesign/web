@@ -188,7 +188,6 @@ export const OrderBatchCreateForm = () => {
               orderedQuantity: quantities[itemId] || 1,
               price: prices[itemId] || 0,
               tax: taxes[itemId] || 0,
-              isCritical: false,
             },
           ],
         }));

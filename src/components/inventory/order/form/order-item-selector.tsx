@@ -23,6 +23,7 @@ import { extractActiveFilters } from "./filter-utils";
 import { FilterIndicators } from "./filter-indicator";
 import { useDirectFilterUpdate } from "./use-direct-filter-update";
 import { NaturalFloatInput } from "@/components/ui/natural-float-input";
+import { StockStatusIndicator } from "../../item/list/stock-status-indicator";
 
 interface OrderItemSelectorProps {
   selectedItems: Set<string>;
@@ -32,11 +33,9 @@ interface OrderItemSelectorProps {
   onQuantityChange?: (itemId: string, quantity: number) => void;
   onPriceChange?: (itemId: string, price: number) => void;
   onTaxChange?: (itemId: string, tax: number) => void;
-  onToggleCritical?: (itemId: string) => void;
   quantities?: Record<string, number>;
   prices?: Record<string, number>;
   taxes?: Record<string, number>;
-  criticalItems?: Set<string>;
   isSelected?: (itemId: string) => boolean;
   showQuantityInput?: boolean;
   showPriceInput?: boolean;
@@ -77,11 +76,9 @@ export const OrderItemSelector = ({
   onQuantityChange,
   onPriceChange,
   onTaxChange,
-  onToggleCritical,
   quantities = {},
   prices = {},
   taxes = {},
-  criticalItems = new Set(),
   isSelected = (itemId: string) => selectedItems.has(itemId),
   showQuantityInput = true,
   showPriceInput = true,
@@ -684,12 +681,6 @@ export const OrderItemSelector = ({
                     </div>
                   </TableHead>
                 )}
-                <TableHead className="w-24 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
-                  <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                    <TruncatedTextWithTooltip text="CRÍTICO" />
-                  </div>
-                </TableHead>
-
                 {/* Scrollbar spacer - only show if not overlay scrollbar */}
                 {!isOverlay && (
                   <TableHead style={{ width: `${scrollbarWidth}px`, minWidth: `${scrollbarWidth}px` }} className="bg-muted p-0 border-0 !border-r-0 shrink-0"></TableHead>
@@ -799,7 +790,7 @@ export const OrderItemSelector = ({
                       </TableCell>
                       <TableCell className="w-28 p-0 !border-r-0">
                         <div className="px-4 py-1">
-                          <span className="font-medium tabular-nums">{item.quantity}</span>
+                          <StockStatusIndicator item={item} showQuantity={true} />
                         </div>
                       </TableCell>
                       <TableCell className="w-24 p-0 !border-r-0">
@@ -873,19 +864,6 @@ export const OrderItemSelector = ({
                           </div>
                         </TableCell>
                       )}
-                      <TableCell className="w-24 p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
-                        <div className="px-4 py-1">
-                          {itemIsSelected ? (
-                            <div className="flex items-center justify-center">
-                              <Switch checked={criticalItems.has(item.id)} onCheckedChange={() => onToggleCritical?.(item.id)} className="h-5 w-9" />
-                            </div>
-                          ) : (
-                            <div className="h-8 flex items-center justify-center">
-                              <span className="text-muted-foreground">-</span>
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
                     </TableRow>
                   );
                 })}

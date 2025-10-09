@@ -16,7 +16,7 @@ export function NameInput({ control, disabled, required = false }: NameInputProp
         <FormItem>
           <FormLabel>Nome da Marca {required && <span className="text-destructive">*</span>}</FormLabel>
           <FormControl>
-            <Input {...field} placeholder="Ex: Suvinil, Coral, Lukscolor" disabled={disabled} autoComplete="off" />
+            <Input {...field} placeholder="Ex: Suvinil, Coral, Lukscolor" disabled={disabled} autoComplete="off" transparent />
           </FormControl>
           <FormMessage />
         </FormItem>

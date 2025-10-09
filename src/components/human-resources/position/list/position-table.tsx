@@ -72,6 +72,7 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
+    defaultSort: [{ column: 'hierarchy', direction: 'asc' }],
   });
 
   // Memoize query parameters to prevent unnecessary re-fetches
@@ -82,9 +83,9 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
       page: page + 1, // Convert 0-based to 1-based for API
       limit: pageSize,
       include: {
-        // Fetch monetary values (new approach) ordered by current=true first
+        // Fetch monetary values (new approach)
         monetaryValues: {
-          orderBy: [{ current: "desc" as const }, { createdAt: "desc" as const }],
+          orderBy: { createdAt: "desc" as const },
           take: 5,
         },
         // Also fetch deprecated remunerations for backwards compatibility

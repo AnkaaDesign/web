@@ -1,7 +1,8 @@
+import { IconCalendar } from "@tabler/icons-react";
 import { addDays } from "date-fns";
 import type { VacationCreateFormData, VacationUpdateFormData } from "../../../../schemas";
 
-import { FormField } from "@/components/ui/form";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 
 interface EndDatePickerProps {
@@ -21,20 +22,32 @@ export function EndDatePicker({ control, disabled, required, startDate }: EndDat
         const minDate = startDate ? addDays(startDate, 1) : addDays(new Date(), 1);
 
         return (
-          <DateTimeInput
-            field={field}
-            label="Data de Término"
-            mode="date"
-            context="vacation"
-            disabled={disabled}
-            required={required}
-            constraints={{
-              minDate,
-              onlyBusinessDays: true,
-              onlyFuture: true,
-            }}
-            description={hasError ? fieldState.error?.message : startDate ? "A data de término deve ser posterior à data de início" : "Selecione a data de término das férias"}
-          />
+          <FormItem>
+            <FormLabel>
+              <div className="flex items-center gap-2">
+                <IconCalendar className="h-4 w-4" />
+                Data de Término {required && <span className="text-destructive">*</span>}
+              </div>
+            </FormLabel>
+            <FormControl>
+              <DateTimeInput
+                field={field}
+                hideLabel={true}
+                mode="date"
+                context="vacation"
+                disabled={disabled}
+                constraints={{
+                  minDate,
+                  onlyBusinessDays: true,
+                  onlyFuture: true,
+                }}
+              />
+            </FormControl>
+            <FormDescription>
+              {startDate ? "A data de término deve ser posterior à data de início" : "Selecione a data de término das férias"}
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
         );
       }}
     />

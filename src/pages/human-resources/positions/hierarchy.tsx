@@ -113,7 +113,7 @@ export const PositionHierarchyPage = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Update each position with its new hierarchy value (index + 1)
+      // Update ALL positions with their hierarchy value based on current order
       const updatePromises = positions.map((position, index) =>
         update({
           id: position.id,
@@ -122,11 +122,9 @@ export const PositionHierarchyPage = () => {
       );
 
       await Promise.all(updatePromises);
-      toast.success("Hierarquia de cargos atualizada com sucesso");
       setHasChanges(false);
     } catch (error) {
       console.error("Error updating hierarchy:", error);
-      toast.error("Erro ao atualizar hierarquia de cargos");
     } finally {
       setIsSaving(false);
     }

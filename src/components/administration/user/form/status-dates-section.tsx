@@ -3,10 +3,9 @@ import { useFormContext } from "react-hook-form";
 import { IconCalendar } from "@tabler/icons-react";
 import { FormField } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { UserCreateFormData, UserUpdateFormData } from "../../../../schemas";
 import { USER_STATUS } from "../../../../constants";
-import { addDays, format } from "date-fns";
+import { addDays } from "date-fns";
 
 interface StatusDatesSectionProps {
   disabled?: boolean;
@@ -87,14 +86,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
   }
 
   return (
-    <Card className="bg-transparent">
-      <CardHeader>
-        <CardTitle>Datas de Acompanhamento de Status</CardTitle>
-        <CardDescription>
-          Defina as datas conforme o status selecionado. Os períodos de experiência são calculados automaticamente (45 dias cada).
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
+    <div className="space-y-6 border-t pt-6">
         {/* Experience Period 1 */}
         {showExp1Dates && (
           <div className="space-y-4">
@@ -239,7 +231,6 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 }

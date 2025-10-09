@@ -12,7 +12,7 @@ export const createUserColumns = (): UserColumn[] => [
     header: "Nº FOLHA",
     accessor: (user: User) => <div className="text-sm whitespace-nowrap">{user.payrollNumber || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
-    className: "w-32",
+    className: "w-24",
     align: "left",
   },
 
@@ -21,12 +21,7 @@ export const createUserColumns = (): UserColumn[] => [
     key: "name",
     header: "NOME",
     accessor: (user: User) => (
-      <div className="flex items-center gap-2">
-        <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0 border border-border/50">
-          <span className="text-xs font-semibold text-muted-foreground">{user.name?.charAt(0)?.toUpperCase() || "?"}</span>
-        </div>
-        <span className="font-medium truncate max-w-[200px]">{user.name}</span>
-      </div>
+      <span className="font-medium truncate max-w-[200px]">{user.name}</span>
     ),
     sortable: true,
     className: "min-w-[250px]",

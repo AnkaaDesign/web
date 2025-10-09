@@ -1,7 +1,8 @@
+import { IconCalendar } from "@tabler/icons-react";
 import type { VacationCreateFormData, VacationUpdateFormData } from "../../../../schemas";
 import { addDays } from "date-fns";
 
-import { FormField } from "@/components/ui/form";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 
 interface StartDatePickerProps {
@@ -17,19 +18,31 @@ export function StartDatePicker({ control, disabled, required, endDate }: StartD
       control={control}
       name="startAt"
       render={({ field }) => (
-        <DateTimeInput
-          field={field}
-          label="Data de Início"
-          mode="date"
-          context="vacation"
-          disabled={disabled}
-          required={required}
-          constraints={{
-            minDate: new Date(), // Can't select past dates
-            maxDate: endDate ? addDays(endDate, -1) : undefined,
-          }}
-          description={endDate ? "A data de início deve ser anterior à data de término" : "Selecione a data de início das férias"}
-        />
+        <FormItem>
+          <FormLabel>
+            <div className="flex items-center gap-2">
+              <IconCalendar className="h-4 w-4" />
+              Data de Início {required && <span className="text-destructive">*</span>}
+            </div>
+          </FormLabel>
+          <FormControl>
+            <DateTimeInput
+              field={field}
+              hideLabel={true}
+              mode="date"
+              context="vacation"
+              disabled={disabled}
+              constraints={{
+                minDate: new Date(), // Can't select past dates
+                maxDate: endDate ? addDays(endDate, -1) : undefined,
+              }}
+            />
+          </FormControl>
+          <FormDescription>
+            {endDate ? "A data de início deve ser anterior à data de término" : "Selecione a data de início das férias"}
+          </FormDescription>
+          <FormMessage />
+        </FormItem>
       )}
     />
   );

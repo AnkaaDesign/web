@@ -12,8 +12,6 @@ import {
   IconReload,
   IconBoxMultiple,
   IconCurrencyReal,
-  IconTag,
-  IconCategory,
   IconAlertCircle,
   IconShoppingCart,
   IconTruck,
@@ -128,7 +126,9 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
   // Handle quantity change
   const handleQuantityChange = useCallback(
     (itemId: string, value: string) => {
-      const numValue = parseFloat(value) || 0;
+      // Handle both comma and dot as decimal separator
+      const normalizedValue = value.replace(',', '.');
+      const numValue = parseFloat(normalizedValue) || 0;
       const item = order.items?.find((i) => i.id === itemId);
       if (!item) return;
 
@@ -417,44 +417,27 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                             text={item.item ? (item.item.uniCode ? `${item.item.uniCode} - ${item.item.name}` : item.item.name) : "-"}
                             className="font-medium text-sm"
                           />
-                          {item.isCritical && (
-                            <Badge variant="destructive" className="text-xs">
-                              Crítico
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          {item.item?.categoryId && (
-                            <span className="flex items-center gap-1">
-                              <IconCategory className="h-3 w-3" />
-                              {item.item?.category?.name || "Categoria"}
-                            </span>
-                          )}
-                          {item.item?.brandId && (
-                            <span className="flex items-center gap-1">
-                              <IconTag className="h-3 w-3" />
-                              {item.item?.brand?.name || "Marca"}
-                            </span>
-                          )}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className="font-mono text-sm">{item.orderedQuantity}</span>
+                      <span className="text-sm">{item.orderedQuantity}</span>
                     </TableCell>
                     <TableCell className="text-center">
                       {canEditItems ? (
                         <div className="flex items-center justify-center">
                           <input
                             type="number"
-                            value={currentValues.receivedQuantity}
+                            value={currentValues.receivedQuantity > 0 ? currentValues.receivedQuantity : ""}
+                            placeholder="0"
                             onChange={(e) => handleQuantityChange(item.id, e.target.value)}
                             disabled={isSaving}
                             min={0}
                             max={item.orderedQuantity}
                             step="0.01"
                             className={cn(
-                              "flex h-8 w-20 rounded-md border border-border bg-input px-2 py-2 text-sm text-center font-mono",
+                              "flex h-8 w-20 rounded-md border border-border bg-input px-2 py-2 text-sm text-center",
+                              "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                               "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
                               "disabled:cursor-not-allowed disabled:opacity-50",
                               "transition-all duration-200 ease-in-out",
@@ -465,19 +448,19 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                           />
                         </div>
                       ) : (
-                        <span className={cn("font-mono text-sm", item.receivedQuantity === item.orderedQuantity && "text-green-600 dark:text-green-400")}>
+                        <span className={cn("text-sm", item.receivedQuantity === item.orderedQuantity && "text-green-600 dark:text-green-400")}>
                           {item.receivedQuantity || 0}
                         </span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className="font-mono text-sm">{formatCurrency(item.price)}</span>
+                      <span className="text-sm">{formatCurrency(item.price)}</span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className="font-mono text-sm">{item.tax}%</span>
+                      <span className="text-sm">{item.tax}%</span>
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className="font-mono text-sm font-medium">{formatCurrency(itemTotal)}</span>
+                      <span className="text-sm font-medium">{formatCurrency(itemTotal)}</span>
                     </TableCell>
                     <TableCell className="text-center">
                       {rowStatus === "pending" && (

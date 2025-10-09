@@ -68,7 +68,6 @@ export const OrderCreateForm = () => {
     quantities,
     prices,
     taxes,
-    criticalItems,
     description,
     supplierId,
     forecast,
@@ -100,7 +99,6 @@ export const OrderCreateForm = () => {
     setItemQuantity,
     setItemPrice,
     setItemTax,
-    toggleCriticalItem,
     selectionCount,
     clearAllSelections,
   } = useOrderFormUrlState({
@@ -150,10 +148,9 @@ export const OrderCreateForm = () => {
       orderedQuantity: quantities[itemId] || 1,
       price: prices[itemId] || 0,
       tax: taxes[itemId] || 0,
-      isCritical: criticalItems.has(itemId),
     }));
     form.setValue("items", items, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
-  }, [selectedItems, quantities, prices, taxes, criticalItems, form]);
+  }, [selectedItems, quantities, prices, taxes, form]);
 
   // Mutations
   const { createAsync, isLoading: isSubmitting } = useOrderMutations();
@@ -336,7 +333,6 @@ export const OrderCreateForm = () => {
         orderedQuantity: Number(quantities[itemId]) || 1,
         price: Number(prices[itemId]) || 0,
         tax: Number(taxes[itemId]) || 0,
-        isCritical: criticalItems.has(itemId),
       }));
 
       // Get form values to ensure we have the latest data
@@ -401,7 +397,7 @@ export const OrderCreateForm = () => {
       console.error("Submission error:", error);
       // Error is handled by the mutation hook, but let's log it
     }
-  }, [validateCurrentStep, description, supplierId, forecast, notes, selectedItems, quantities, prices, taxes, criticalItems, createAsync, form, clearAllSelections, navigate]);
+  }, [validateCurrentStep, description, supplierId, forecast, notes, selectedItems, quantities, prices, taxes, createAsync, form, clearAllSelections, navigate]);
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.orders.root);
@@ -1109,11 +1105,9 @@ export const OrderCreateForm = () => {
                     onQuantityChange={handleQuantityChange}
                     onPriceChange={handlePriceChange}
                     onTaxChange={handleTaxChange}
-                    onToggleCritical={toggleCriticalItem}
                     quantities={quantities}
                     prices={prices}
                     taxes={taxes}
-                    criticalItems={criticalItems}
                     isSelected={(itemId) => selectedItems.has(itemId)}
                     showQuantityInput={true}
                     showPriceInput={true}
@@ -1195,14 +1189,6 @@ export const OrderCreateForm = () => {
 
                           <div>
                             <div className="flex items-center gap-2 mb-1">
-                              <IconAlertTriangle className="h-4 w-4 text-muted-foreground" />
-                              <p className="text-xs font-medium text-muted-foreground">CRÍTICOS</p>
-                            </div>
-                            <p className="text-2xl font-semibold text-foreground">{criticalItems.size}</p>
-                          </div>
-
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
                               <IconCalendar className="h-4 w-4 text-muted-foreground" />
                               <p className="text-xs font-medium text-muted-foreground">UNIDADES</p>
                             </div>
@@ -1250,7 +1236,6 @@ export const OrderCreateForm = () => {
                                 <TableHead className="font-semibold">Nome</TableHead>
                                 <TableHead className="font-semibold">Marca</TableHead>
                                 <TableHead className="font-semibold">Medida</TableHead>
-                                <TableHead className="text-center font-semibold">Crítico</TableHead>
                                 <TableHead className="text-right font-semibold">Quantidade</TableHead>
                                 <TableHead className="text-right font-semibold">Preço Unit.</TableHead>
                                 <TableHead className="text-right font-semibold">Total</TableHead>
@@ -1290,9 +1275,6 @@ export const OrderCreateForm = () => {
                                     <TableCell className="font-medium">{item.name}</TableCell>
                                     <TableCell>{item.brand?.name || "-"}</TableCell>
                                     <TableCell>{getMeasureDisplay()}</TableCell>
-                                    <TableCell className="text-center">
-                                      {criticalItems.has(item.id) ? <IconCheck className="h-4 w-4 text-green-600 inline" /> : <IconX className="h-4 w-4 text-gray-400 inline" />}
-                                    </TableCell>
                                     <TableCell className="text-right font-medium">{quantity.toLocaleString("pt-BR")}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(Number(price))}</TableCell>
                                     <TableCell className="text-right font-semibold">{formatCurrency(Number(total))}</TableCell>
@@ -1300,7 +1282,7 @@ export const OrderCreateForm = () => {
                                 );
                               })}
                               <TableRow className="bg-muted/30 font-semibold">
-                                <TableCell colSpan={7} className="text-right">
+                                <TableCell colSpan={6} className="text-right">
                                   Total Geral:
                                 </TableCell>
                                 <TableCell className="text-right">{formatCurrency(Number(totalPrice))}</TableCell>

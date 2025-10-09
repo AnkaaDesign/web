@@ -346,15 +346,15 @@ export function UserForm(props: UserFormProps) {
           <Card className="bg-transparent">
               <CardHeader>
                 <CardTitle>Status do Colaborador</CardTitle>
-                <CardDescription>Defina o status atual do colaborador</CardDescription>
+                <CardDescription>Defina o status atual do colaborador e as datas relacionadas</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-6">
                 <UserStatusSelector disabled={isSubmitting} required />
+
+                {/* Status-Specific Dates - Inline */}
+                <StatusDatesSection disabled={isSubmitting} />
               </CardContent>
             </Card>
-
-          {/* Status-Specific Dates */}
-          <StatusDatesSection disabled={isSubmitting} />
 
           {/* Manual Verification */}
           <Card className="bg-transparent">
