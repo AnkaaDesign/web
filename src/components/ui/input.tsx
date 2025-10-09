@@ -685,6 +685,35 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             }
           }, 0);
         }
+      } else if (type === "cep") {
+        e.preventDefault();
+        const pastedText = e.clipboardData.getData("text");
+
+        // Extract digits only - handles both "86204020" and "86204-020"
+        const digitsOnly = pastedText.replace(/\D/g, "");
+
+        if (digitsOnly) {
+          // Limit to 8 digits
+          const limitedDigits = digitsOnly.slice(0, 8);
+
+          // Format as XXXXX-XXX
+          let formatted = "";
+          for (let i = 0; i < limitedDigits.length; i++) {
+            if (i === 5) formatted += "-";
+            formatted += limitedDigits[i];
+          }
+
+          setInternalValue(formatted);
+          setDisplayValue(naturalTyping ? displayValue : formatted);
+          onChange?.(limitedDigits);
+
+          // Set cursor to end after paste
+          setTimeout(() => {
+            if (inputRef.current) {
+              inputRef.current.setSelectionRange(formatted.length, formatted.length);
+            }
+          }, 0);
+        }
       }
     };
 

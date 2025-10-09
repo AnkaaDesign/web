@@ -5,6 +5,7 @@ import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { userCreateSchema, userUpdateSchema, type UserCreateFormData, type UserUpdateFormData } from "../../../../schemas";
 import { USER_STATUS } from "../../../../constants";
+import { formatDateTime } from "../../../../utils/date";
 
 // Import all form components
 import { NameInput } from "./name-input";
@@ -17,6 +18,8 @@ import { PositionSelector } from "./position-selector";
 import { SectorSelector } from "./sector-selector";
 import { SectorLeaderSwitch } from "./sector-leader-switch";
 import { UserStatusSelector } from "./status-selector";
+import { VerifiedSwitch } from "./verified-switch";
+import { StatusDatesSection } from "./status-dates-section";
 import { AddressInput } from "@/components/ui/form-address-input";
 import { AddressNumberInput } from "@/components/ui/form-address-number-input";
 import { AddressComplementInput } from "@/components/ui/form-address-complement-input";
@@ -24,6 +27,7 @@ import { NeighborhoodInput } from "@/components/ui/form-neighborhood-input";
 import { CityInput } from "@/components/ui/form-city-input";
 import { StateSelector } from "@/components/ui/form-state-selector";
 import { PayrollNumberInput } from "./payroll-number-input";
+import { PpeSizesSection } from "./ppe-sizes-section";
 
 interface BaseUserFormProps {
   isSubmitting?: boolean;
@@ -82,11 +86,30 @@ export function UserForm(props: UserFormProps) {
 
     // Additional dates
     birth: null,
-    admissional: null,
+    admissional: new Date(), // Required field - default to today
     dismissal: null,
+
+    // Status tracking dates
+    exp1StartAt: null,
+    exp1EndAt: null,
+    exp2StartAt: null,
+    exp2EndAt: null,
+    contractedAt: null,
+    dismissedAt: null,
 
     // Payroll info
     payrollNumber: null,
+
+    // PPE Sizes
+    ppeSize: {
+      shirts: null,
+      boots: null,
+      pants: null,
+      sleeves: null,
+      mask: null,
+      gloves: null,
+      rainBoots: null,
+    },
 
     ...defaultValues,
   };
@@ -118,7 +141,22 @@ export function UserForm(props: UserFormProps) {
       birth: null,
       admissional: null,
       dismissal: null,
+      exp1StartAt: null,
+      exp1EndAt: null,
+      exp2StartAt: null,
+      exp2EndAt: null,
+      contractedAt: null,
+      dismissedAt: null,
       payrollNumber: null,
+      ppeSize: {
+        shirts: null,
+        boots: null,
+        pants: null,
+        sleeves: null,
+        mask: null,
+        gloves: null,
+        rainBoots: null,
+      },
     }),
     mode: "onTouched", // Validate only after field is touched to avoid premature validation
     reValidateMode: "onChange", // After first validation, check on every change
@@ -234,7 +272,7 @@ export function UserForm(props: UserFormProps) {
                     label="Telefone"
                     placeholder="Digite o telefone do colaborador"
                     disabled={isSubmitting}
-                    required={!form.watch("email")}
+                    required={false}
                   />
                   <BirthDateInput disabled={isSubmitting} />
                   <PayrollNumberInput disabled={isSubmitting} />
@@ -297,27 +335,119 @@ export function UserForm(props: UserFormProps) {
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <PositionSelector control={form.control} disabled={isSubmitting} />
-                  <SectorSelector disabled={isSubmitting} required />
+                  <SectorSelector disabled={isSubmitting} required={false} />
                 </div>
 
                 <SectorLeaderSwitch disabled={isSubmitting} />
               </CardContent>
             </Card>
 
-          {/* Employment Dates & Status */}
+          {/* Employment Status */}
           <Card className="bg-transparent">
               <CardHeader>
-                <CardTitle>Datas de Vínculo e Status</CardTitle>
-                <CardDescription>Informações sobre admissão, status e demissão</CardDescription>
+                <CardTitle>Status do Colaborador</CardTitle>
+                <CardDescription>Defina o status atual do colaborador</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent>
+                <UserStatusSelector disabled={isSubmitting} required />
+              </CardContent>
+            </Card>
+
+          {/* Status-Specific Dates */}
+          <StatusDatesSection disabled={isSubmitting} />
+
+          {/* Manual Verification */}
+          <Card className="bg-transparent">
+              <CardHeader>
+                <CardTitle>Verificação Manual</CardTitle>
+                <CardDescription>Controle de verificação manual do usuário</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <VerifiedSwitch disabled={isSubmitting} />
+              </CardContent>
+            </Card>
+
+          {/* Status Tracking Timeline - Read-only */}
+          {mode === "update" && defaultValues && (
+            <Card className="bg-transparent">
+              <CardHeader>
+                <CardTitle>Histórico de Status</CardTitle>
+                <CardDescription>Datas automáticas de mudança de status (somente leitura)</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <AdmissionalDateInput disabled={isSubmitting} />
-                  <UserStatusSelector disabled={isSubmitting} required />
-                  <DismissalDateInput disabled={isSubmitting} />
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Contratado em
+                    </label>
+                    <div className="text-sm p-3 bg-muted/50 rounded-md border">
+                      {(defaultValues as any).contractedAt
+                        ? formatDateTime((defaultValues as any).contractedAt)
+                        : "-"}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Experiência 1 - Início
+                    </label>
+                    <div className="text-sm p-3 bg-muted/50 rounded-md border">
+                      {(defaultValues as any).exp1StartAt
+                        ? formatDateTime((defaultValues as any).exp1StartAt)
+                        : "-"}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Experiência 1 - Fim
+                    </label>
+                    <div className="text-sm p-3 bg-muted/50 rounded-md border">
+                      {(defaultValues as any).exp1EndAt
+                        ? formatDateTime((defaultValues as any).exp1EndAt)
+                        : "-"}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Experiência 2 - Início
+                    </label>
+                    <div className="text-sm p-3 bg-muted/50 rounded-md border">
+                      {(defaultValues as any).exp2StartAt
+                        ? formatDateTime((defaultValues as any).exp2StartAt)
+                        : "-"}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Experiência 2 - Fim
+                    </label>
+                    <div className="text-sm p-3 bg-muted/50 rounded-md border">
+                      {(defaultValues as any).exp2EndAt
+                        ? formatDateTime((defaultValues as any).exp2EndAt)
+                        : "-"}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Demitido em
+                    </label>
+                    <div className="text-sm p-3 bg-muted/50 rounded-md border">
+                      {(defaultValues as any).dismissedAt
+                        ? formatDateTime((defaultValues as any).dismissedAt)
+                        : "-"}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {/* PPE Sizes */}
+          <PpeSizesSection disabled={isSubmitting} />
 
           {/* Hidden submit button that can be triggered by the header button */}
           <button id="user-form-submit" type="submit" className="hidden" disabled={isSubmitting}>

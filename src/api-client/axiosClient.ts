@@ -61,6 +61,8 @@ interface RequestMetadata {
   url: string;
   retryCount: number;
   isCached?: boolean;
+  isReactQueryRetry?: boolean; // Track if this is a React Query retry attempt
+  suppressToast?: boolean; // Suppress toast for this request
 }
 
 // Extend AxiosRequestConfig to include metadata
@@ -199,6 +201,95 @@ const shouldRetry = (error: AxiosError, attempt: number, maxAttempts: number): b
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 // =====================
+// Request Retry Tracking & Toast Deduplication
+// =====================
+//
+// This system prevents duplicate error toasts when React Query retries failed requests.
+//
+// Problem: React Query automatically retries failed requests (3x for queries, 1x for mutations).
+// Each retry attempt would trigger a new error toast from Axios, resulting in multiple toasts
+// for the same operation.
+//
+// Solution: Track recent errors and suppress duplicate toasts within a deduplication window (2s).
+// This ensures users only see ONE error toast for a failed operation, even if it's retried
+// multiple times by React Query.
+//
+// The tracker:
+// 1. Records each error by request key (method:url)
+// 2. Checks if a similar error occurred within the deduplication window
+// 3. Suppresses the toast if it's a duplicate
+// 4. Clears tracking when requests succeed
+// 5. Auto-cleans old entries every 30 seconds
+
+interface RetryTrackingEntry {
+  lastErrorTime: number;
+  errorCount: number;
+  lastErrorMessage: string;
+}
+
+class RequestRetryTracker {
+  private retryingRequests = new Map<string, RetryTrackingEntry>();
+  private readonly deduplicationWindow = 2000; // 2 seconds window for deduplication
+
+  private getRequestKey(url: string, method: string): string {
+    return `${method.toUpperCase()}:${url}`;
+  }
+
+  // Check if we should show a toast for this error
+  shouldShowToast(url: string, method: string, errorMessage: string): boolean {
+    const key = this.getRequestKey(url, method);
+    const now = Date.now();
+    const existing = this.retryingRequests.get(key);
+
+    if (!existing) {
+      // First time seeing this error
+      this.retryingRequests.set(key, {
+        lastErrorTime: now,
+        errorCount: 1,
+        lastErrorMessage: errorMessage,
+      });
+      return true;
+    }
+
+    // Check if this is within the deduplication window
+    const timeSinceLastError = now - existing.lastErrorTime;
+
+    if (timeSinceLastError < this.deduplicationWindow) {
+      // Same error within deduplication window - don't show toast
+      existing.errorCount++;
+      existing.lastErrorTime = now;
+      return false;
+    }
+
+    // Outside deduplication window - show toast and reset
+    this.retryingRequests.set(key, {
+      lastErrorTime: now,
+      errorCount: 1,
+      lastErrorMessage: errorMessage,
+    });
+    return true;
+  }
+
+  // Mark a request as completed successfully
+  clearRequest(url: string, method: string): void {
+    const key = this.getRequestKey(url, method);
+    this.retryingRequests.delete(key);
+  }
+
+  // Clean up old entries periodically
+  cleanup(): void {
+    const now = Date.now();
+    const maxAge = 60000; // 60 seconds
+
+    for (const [key, entry] of this.retryingRequests.entries()) {
+      if (now - entry.lastErrorTime > maxAge) {
+        this.retryingRequests.delete(key);
+      }
+    }
+  }
+}
+
+// =====================
 // Cache Management
 // =====================
 
@@ -268,6 +359,12 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
   const finalConfig = { ...DEFAULT_CONFIG, ...config };
   const cache = new RequestCache(finalConfig.cacheTimeout);
   const cancelTokens = new Map<string, CancelTokenSource>();
+  const retryTracker = new RequestRetryTracker();
+
+  // Periodic cleanup of retry tracking entries
+  const cleanupInterval = setInterval(() => {
+    retryTracker.cleanup();
+  }, 30000); // Clean up every 30 seconds
 
   const client = axios.create({
     baseURL: finalConfig.baseURL,
@@ -550,6 +647,8 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       // Dismiss any pending retry toasts for this request
       if (finalConfig.enableNotifications && metadata) {
         notify.dismissRetry?.(metadata.url, metadata.method);
+        // Clear retry tracking for successful requests
+        retryTracker.clearRequest(metadata.url, metadata.method);
       }
 
       // Show success notification for write operations
@@ -688,13 +787,18 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       }
 
       // Show error notification with detailed messages
-      if (finalConfig.enableNotifications) {
+      if (finalConfig.enableNotifications && metadata) {
         // Skip notifications for batch operations - they'll be handled by the dialog
         const isBatchOperation = config?.url?.includes("/batch");
         // Skip notifications for file uploads - they should be handled by upload components
         const isFileUpload = config?.url?.includes("/files/upload");
+        // Skip notifications if explicitly suppressed
+        const suppressToast = metadata.suppressToast;
 
-        if (!isBatchOperation && !isFileUpload) {
+        // Check if we should show this toast (deduplication check)
+        const shouldShow = retryTracker.shouldShowToast(metadata.url, metadata.method, errorInfo.message);
+
+        if (!isBatchOperation && !isFileUpload && !suppressToast && shouldShow) {
           // For rate limit errors, show specialized message
           if (errorInfo.category === ErrorCategory.RATE_LIMIT) {
             notify.error("Limite de Requisições", errorInfo.message, {
@@ -736,6 +840,13 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
 
   // Add method to clear cache
   extendedClient.clearCache = () => {
+    cache.clear();
+  };
+
+  // Add cleanup method for when the client is destroyed
+  (extendedClient as any).destroy = () => {
+    clearInterval(cleanupInterval);
+    cancelTokens.clear();
     cache.clear();
   };
 

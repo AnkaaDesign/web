@@ -242,6 +242,16 @@ export const createDescriptionSchema = (minLength = 3, maxLength = 1000, require
 
 export const orderByDirectionSchema = z.enum(["asc", "desc"]);
 
+// Schema for orderBy with nulls handling (Prisma 4+ format)
+// Supports both simple direction and object with sort + nulls
+export const orderByWithNullsSchema = z.union([
+  orderByDirectionSchema,
+  z.object({
+    sort: orderByDirectionSchema,
+    nulls: z.enum(["first", "last"]).optional(),
+  }),
+]);
+
 /**
  * Normalizes orderBy to Prisma format.
  * Converts objects with multiple fields into an array of single-field objects.

@@ -22,11 +22,13 @@ export function BirthDateInput({ disabled }: BirthDateInputProps) {
             <span className="flex items-center gap-1.5">
               <IconCake className="h-4 w-4" />
               Data de Nascimento
+              <span className="text-destructive ml-0.5">*</span>
             </span>
           }
           context="birth"
           disabled={disabled}
           mode="date"
+          required
         />
       )}
     />

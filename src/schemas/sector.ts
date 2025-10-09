@@ -22,6 +22,29 @@ export const sectorIncludeSchema = z
               preference: z.boolean().optional(),
               position: z.boolean().optional(),
               sector: z.boolean().optional(),
+              managedSector: z.boolean().optional(),
+              activities: z.boolean().optional(),
+              borrows: z.boolean().optional(),
+              notifications: z.boolean().optional(),
+              tasks: z.boolean().optional(),
+              vacations: z.boolean().optional(),
+              commissions: z.boolean().optional(),
+            })
+            .optional(),
+        }),
+      ])
+      .optional(),
+    managedByUsers: z
+      .union([
+        z.boolean(),
+        z.object({
+          include: z
+            .object({
+              ppeSize: z.boolean().optional(),
+              preference: z.boolean().optional(),
+              position: z.boolean().optional(),
+              sector: z.boolean().optional(),
+              managedSector: z.boolean().optional(),
               activities: z.boolean().optional(),
               borrows: z.boolean().optional(),
               notifications: z.boolean().optional(),
@@ -199,6 +222,14 @@ export const sectorWhereSchema: z.ZodSchema = z.lazy(() =>
 
       // Relation filters
       users: z
+        .object({
+          some: z.object({}).optional(),
+          every: z.object({}).optional(),
+          none: z.object({}).optional(),
+        })
+        .optional(),
+
+      managedByUsers: z
         .object({
           some: z.object({}).optional(),
           every: z.object({}).optional(),

@@ -9,7 +9,7 @@ import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { PerformanceLevelTable, type PerformanceLevelTableRef } from "./performance-level-table";
 import { PerformanceLevelExport } from "./performance-level-export";
 import { PerformanceLevelFilters } from "./performance-level-filters";
-import { useUsers } from "../../../hooks/useUser";
+import { useUsers, useSectors } from "../../../hooks";
 import { useTableFilters } from "@/hooks/use-table-filters";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -63,6 +63,25 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
   const [showFilterModal, setShowFilterModal] = useState(false);
   const tableRef = useRef<PerformanceLevelTableRef>(null);
 
+  // Load sectors to get default sector IDs
+  const { data: sectorsData } = useSectors({
+    orderBy: { name: "asc" },
+    limit: 100,
+  });
+
+  // Get default sector IDs (production, warehouse, leader privileges)
+  const defaultSectorIds = useMemo(() => {
+    if (!sectorsData?.data) return [];
+
+    return sectorsData.data
+      .filter(sector =>
+        sector.privilege === 'PRODUCTION' ||
+        sector.privilege === 'WAREHOUSE' ||
+        sector.privilege === 'LEADER'
+      )
+      .map(sector => sector.id);
+  }, [sectorsData?.data]);
+
   // Use table state hook for sorting
   const {
     sortConfigs,
@@ -87,7 +106,11 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
       where: {
-        status: { not: USER_STATUS.DISMISSED }  // By default, only show non-dismissed users
+        status: { not: USER_STATUS.DISMISSED },  // By default, only show non-dismissed users
+        // Set default sector filter
+        ...(defaultSectorIds.length > 0 && {
+          sectorId: { in: defaultSectorIds }
+        })
       }
     },
     searchDebounceMs: 500, // Increased debounce for better performance

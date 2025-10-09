@@ -14,11 +14,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { MaintenanceItemSelector } from "@/components/inventory/maintenance/form/item-selector";
 import { cn } from "@/lib/utils";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { IconCalendar } from "@tabler/icons-react";
+import { DateTimeInput } from "@/components/ui/date-time-input";
 
 interface BaseMaintenanceScheduleFormProps {
   isSubmitting?: boolean;
@@ -373,26 +369,16 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                             {watchFrequency === SCHEDULE_FREQUENCY.ONCE ? "Data da Manutenção" : "Próxima Execução"}
                             {isRequired && <span className="text-destructive">*</span>}
                           </FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
-                                  {field.value ? format(field.value, "dd/MM/yyyy", { locale: ptBR }) : <span>Selecione a data</span>}
-                                  <IconCalendar className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value || undefined}
-                                onSelect={field.onChange}
-                                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                                initialFocus
-                                locale={ptBR}
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <DateTimeInput
+                            field={field}
+                            hideLabel
+                            placeholder="Selecione a data"
+                            mode="date"
+                            disabled={isSubmitting}
+                            constraints={{
+                              minDate: new Date(),
+                            }}
+                          />
                           <FormMessage />
                         </FormItem>
                       )}
@@ -488,26 +474,16 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                           })}
                         >
                           <FormLabel>Primeira Execução</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button variant="outline" className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isSubmitting}>
-                                  {field.value ? format(field.value, "dd/MM/yyyy", { locale: ptBR }) : <span>Data de início</span>}
-                                  <IconCalendar className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value || undefined}
-                                onSelect={field.onChange}
-                                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                                initialFocus
-                                locale={ptBR}
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <DateTimeInput
+                            field={field}
+                            hideLabel
+                            placeholder="Data de início"
+                            mode="date"
+                            disabled={isSubmitting}
+                            constraints={{
+                              minDate: new Date(),
+                            }}
+                          />
                           <FormMessage />
                         </FormItem>
                       )}

@@ -600,6 +600,16 @@ export const vacationCreateSchema = z
   .refine((data) => data.endAt > data.startAt, {
     message: "Data de término deve ser posterior à data de início",
     path: ["endAt"],
+  })
+  .refine((data) => {
+    // If not collective, userId is required
+    if (!data.isCollective && !data.userId) {
+      return false;
+    }
+    return true;
+  }, {
+    message: "Colaborador é obrigatório quando não é férias coletivas",
+    path: ["userId"],
   });
 
 export const vacationUpdateSchema = z

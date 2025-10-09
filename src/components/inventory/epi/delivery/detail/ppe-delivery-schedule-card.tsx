@@ -93,7 +93,7 @@ export function PpeDeliveryScheduleCard({ schedule, className }: PpeDeliverySche
             <div className="flex flex-wrap gap-1">
               {schedule.ppeItems.map((ppeItem: PpeScheduleItem, index: number) => (
                 <Badge key={index} variant="secondary" className="text-xs">
-                  {PPE_TYPE_LABELS[ppeItem.ppeType]} ({ppeItem.quantity}x)
+                  {PPE_TYPE_LABELS[ppeItem.ppeType as keyof typeof PPE_TYPE_LABELS] || ppeItem.ppeType} ({ppeItem.quantity}x)
                 </Badge>
               ))}
             </div>

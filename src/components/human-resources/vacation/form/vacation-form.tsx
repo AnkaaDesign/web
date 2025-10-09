@@ -28,6 +28,8 @@ interface BaseVacationFormProps {
   isSubmitting?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
   onFormStateChange?: (formState: { isValid: boolean; isDirty: boolean }) => void;
+  onCancel?: () => void;
+  onFormSubmit?: (data: VacationCreateFormData | VacationUpdateFormData) => Promise<void>;
 }
 
 interface CreateModeProps extends BaseVacationFormProps {
@@ -49,7 +51,7 @@ export function VacationForm(props: VacationFormProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { createAsync, updateAsync } = useVacationMutations();
-  const { isSubmitting, defaultValues, mode, onDirtyChange, onFormStateChange } = props;
+  const { isSubmitting, defaultValues, mode, onDirtyChange, onFormStateChange, onCancel, onFormSubmit } = props;
 
   // Create a custom resolver based on mode
   const customResolver = useMemo(() => {
@@ -201,6 +203,13 @@ export function VacationForm(props: VacationFormProps) {
 
   const onSubmit = async (data: VacationCreateFormData | VacationUpdateFormData) => {
     try {
+      // Call parent's onFormSubmit if provided
+      if (onFormSubmit) {
+        await onFormSubmit(data);
+        return;
+      }
+
+      // Use specific onSubmit callback if provided
       if (props.onSubmit) {
         if (mode === "create") {
           await (props as CreateModeProps).onSubmit?.(data as VacationCreateFormData);
@@ -208,6 +217,7 @@ export function VacationForm(props: VacationFormProps) {
           await (props as UpdateModeProps).onSubmit?.(data as VacationUpdateFormData);
         }
       } else {
+        // Default behavior
         if (mode === "create") {
           const result = await createAsync(data as VacationCreateFormData);
           // Success toast is handled automatically by API client
@@ -228,6 +238,11 @@ export function VacationForm(props: VacationFormProps) {
   };
 
   const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
+      return;
+    }
+
     if (mode === "create") {
       navigate(routes.humanResources.vacations.root);
     } else {
@@ -235,11 +250,14 @@ export function VacationForm(props: VacationFormProps) {
     }
   };
 
+  // Watch isCollective field to conditionally show/hide user selector
+  const isCollective = form.watch("isCollective");
+
   return (
-    <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
+    <Card className="flex-1 flex flex-col shadow-sm border border-border h-full">
+      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-y-auto">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-y-auto space-y-6">
+          <form id="vacation-form" onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Informações das Férias</CardTitle>
@@ -248,7 +266,11 @@ export function VacationForm(props: VacationFormProps) {
               <CardContent className="space-y-4">
                 <FormErrorDisplay errors={errors} />
 
-                <CollaboratorSelect control={form.control} disabled={finalIsSubmitting || mode === "update"} required={mode === "create"} />
+                <CollectiveSwitch control={form.control} disabled={finalIsSubmitting} />
+
+                {!isCollective && (
+                  <CollaboratorSelect control={form.control} disabled={finalIsSubmitting || mode === "update"} required={mode === "create" && !isCollective} />
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <StartDatePicker control={form.control} disabled={finalIsSubmitting} required={mode === "create"} endDate={form.watch("endAt")} />
@@ -261,24 +283,8 @@ export function VacationForm(props: VacationFormProps) {
 
                   <StatusSelect control={form.control} disabled={finalIsSubmitting} />
                 </div>
-
-                <CollectiveSwitch control={form.control} disabled={finalIsSubmitting} />
               </CardContent>
             </Card>
-
-            <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={handleCancel} disabled={finalIsSubmitting}>
-                <IconX className="h-4 w-4 mr-2" />
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={finalIsSubmitting || !isValid || (mode === "update" && !isDirty)}
-              >
-                {finalIsSubmitting ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCheck className="h-4 w-4 mr-2" />}
-                {mode === "create" ? "Criar" : "Salvar"}
-              </Button>
-            </div>
           </form>
         </Form>
       </CardContent>

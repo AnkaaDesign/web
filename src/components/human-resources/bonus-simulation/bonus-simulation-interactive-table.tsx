@@ -24,13 +24,15 @@ import {
   IconFilter,
   IconX,
   IconBuilding,
-  IconDownload
+  IconDownload,
+  IconUserMinus
 } from "@tabler/icons-react";
 import { formatCurrency, getBonusPeriod, getCurrentPayrollPeriod } from "../../../utils";
 import { useUsers, useSectors, useTasks } from "../../../hooks";
 import { calculateBonusForPosition } from "../../../utils/bonus";
 import { cn } from "@/lib/utils";
 import { TASK_STATUS, COMMISSION_STATUS, USER_STATUS } from "../../../constants";
+import { FilterIndicators, FilterIndicator } from "@/components/ui/filter-indicator";
 
 // Position levels mapping
 const POSITIONS = [
@@ -136,9 +138,16 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
   const [simulatedUsers, setSimulatedUsers] = useState<SimulatedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Filter state
+  // Filter state - initialize with default sectors
   const [selectedSectorIds, setSelectedSectorIds] = useState<string[]>([]);
   const [excludedUserIds, setExcludedUserIds] = useState<string[]>([]);
+
+  // Set default sectors when they become available
+  useEffect(() => {
+    if (defaultSectorIds.length > 0 && selectedSectorIds.length === 0) {
+      setSelectedSectorIds(defaultSectorIds);
+    }
+  }, [defaultSectorIds]);
 
   // Get current bonus period for task counting
   // Get current payroll period (26th-25th cycle) - centralized utility
@@ -158,6 +167,19 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
     orderBy: { name: "asc" },
     limit: 100
   });
+
+  // Get default sector IDs (production, warehouse, leader privileges)
+  const defaultSectorIds = useMemo(() => {
+    if (!sectorsData?.data) return [];
+
+    return sectorsData.data
+      .filter(sector =>
+        sector.privilege === 'PRODUCTION' ||
+        sector.privilege === 'WAREHOUSE' ||
+        sector.privilege === 'LEADER'
+      )
+      .map(sector => sector.id);
+  }, [sectorsData?.data]);
 
   // Fetch tasks for current period to get actual count
   // Ensure dates are set to exact times: 26th at 00:00:00.000 and 25th at 23:59:59.999
@@ -488,6 +510,51 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
     setExcludedUserIds([]);
   };
 
+  // Create filter badges for display (like items table)
+  const activeFilters = useMemo(() => {
+    const filters: Array<{
+      key: string;
+      label: string;
+      value: string;
+      onRemove: () => void;
+      icon?: React.ReactNode;
+    }> = [];
+
+    // Add sector filters
+    if (selectedSectorIds.length > 0) {
+      const sectorNames = selectedSectorIds
+        .map(id => sectorsData?.data?.find(s => s.id === id)?.name)
+        .filter(Boolean)
+        .join(", ");
+
+      filters.push({
+        key: "sectors",
+        label: "Setores",
+        value: sectorNames,
+        onRemove: () => setSelectedSectorIds([]),
+        icon: <IconBuilding className="h-3 w-3" />
+      });
+    }
+
+    // Add excluded users filters
+    if (excludedUserIds.length > 0) {
+      const userNames = excludedUserIds
+        .map(id => simulatedUsers.find(u => u.id === id)?.name)
+        .filter(Boolean)
+        .join(", ");
+
+      filters.push({
+        key: "excludedUsers",
+        label: "Usuários Excluídos",
+        value: userNames,
+        onRemove: () => setExcludedUserIds([]),
+        icon: <IconUserMinus className="h-3 w-3" />
+      });
+    }
+
+    return filters;
+  }, [selectedSectorIds, excludedUserIds, sectorsData?.data, simulatedUsers]);
+
   const restoreCurrentPeriodTasks = () => {
     setTaskQuantity(originalTaskQuantity);
     setTaskInput(originalTaskQuantity.toFixed(1));
@@ -557,7 +624,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
       {/* Header with Task Input and Summary */}
-      <div className="p-4 border-b space-y-4">
+      <div className="p-4 border-b space-y-3">
         <div className="flex flex-col md:flex-row gap-4">
           {/* Sector Filter */}
           <div className="flex flex-col flex-[2]">
@@ -676,19 +743,6 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
                   Restaurar
                 </Button>
               )}
-              {hasActiveFilters && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="default"
-                  onClick={clearAllFilters}
-                  className="h-10"
-                  title="Limpar todos os filtros aplicados"
-                >
-                  <IconX className="h-4 w-4 mr-2" />
-                  Limpar Filtros
-                </Button>
-              )}
               <Button
                 type="button"
                 variant="outline"
@@ -704,6 +758,15 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
             </div>
           </div>
         </div>
+
+        {/* Active Filter Indicators */}
+        {activeFilters.length > 0 && (
+          <FilterIndicators
+            filters={activeFilters}
+            onClearAll={clearAllFilters}
+            className="px-1 py-1"
+          />
+        )}
 
         {/* Current Period Info - Only show when there's actual data and task quantity is not modified */}
         {!isTaskQuantityModified && currentPeriodTasks?.success && currentPeriodTasks.data && currentPeriodTasks.data.length > 0 && (() => {

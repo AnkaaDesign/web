@@ -1,7 +1,7 @@
 // packages/schemas/src/user.ts
 
 import { z } from "zod";
-import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, emailSchema, phoneSchema, cpfSchema, pisSchema, createNameSchema, nullableDate } from "./common";
+import { createMapToFormDataHelper, orderByDirectionSchema, orderByWithNullsSchema, normalizeOrderBy, emailSchema, phoneSchema, cpfSchema, pisSchema, createNameSchema, nullableDate } from "./common";
 import type { User } from "../types";
 import { USER_STATUS, VERIFICATION_TYPE } from "../constants";
 
@@ -198,6 +198,7 @@ export const userOrderBySchema = z.union([
       pis: orderByDirectionSchema.optional(),
       cpf: orderByDirectionSchema.optional(),
       verified: orderByDirectionSchema.optional(),
+      payrollNumber: orderByDirectionSchema.optional(),
       admissional: orderByDirectionSchema.optional(),
       birth: orderByDirectionSchema.optional(),
       dismissal: orderByDirectionSchema.optional(),
@@ -207,31 +208,39 @@ export const userOrderBySchema = z.union([
       createdAt: orderByDirectionSchema.optional(),
       updatedAt: orderByDirectionSchema.optional(),
 
+      // Status timestamps
+      contractedAt: orderByDirectionSchema.optional(),
+      exp1StartAt: orderByDirectionSchema.optional(),
+      exp1EndAt: orderByDirectionSchema.optional(),
+      exp2StartAt: orderByDirectionSchema.optional(),
+      exp2EndAt: orderByDirectionSchema.optional(),
+      dismissedAt: orderByDirectionSchema.optional(),
+
       // Nested relation ordering
       position: z
         .object({
-          id: orderByDirectionSchema.optional(),
-          name: orderByDirectionSchema.optional(),
-          createdAt: orderByDirectionSchema.optional(),
-          updatedAt: orderByDirectionSchema.optional(),
+          id: orderByWithNullsSchema.optional(),
+          name: orderByWithNullsSchema.optional(),
+          createdAt: orderByWithNullsSchema.optional(),
+          updatedAt: orderByWithNullsSchema.optional(),
         })
         .optional(),
 
       sector: z
         .object({
-          id: orderByDirectionSchema.optional(),
-          name: orderByDirectionSchema.optional(),
-          createdAt: orderByDirectionSchema.optional(),
-          updatedAt: orderByDirectionSchema.optional(),
+          id: orderByWithNullsSchema.optional(),
+          name: orderByWithNullsSchema.optional(),
+          createdAt: orderByWithNullsSchema.optional(),
+          updatedAt: orderByWithNullsSchema.optional(),
         })
         .optional(),
 
       managedSector: z
         .object({
-          id: orderByDirectionSchema.optional(),
-          name: orderByDirectionSchema.optional(),
-          createdAt: orderByDirectionSchema.optional(),
-          updatedAt: orderByDirectionSchema.optional(),
+          id: orderByWithNullsSchema.optional(),
+          name: orderByWithNullsSchema.optional(),
+          createdAt: orderByWithNullsSchema.optional(),
+          updatedAt: orderByWithNullsSchema.optional(),
         })
         .optional(),
     })
@@ -251,6 +260,7 @@ export const userOrderBySchema = z.union([
         pis: orderByDirectionSchema.optional(),
         cpf: orderByDirectionSchema.optional(),
         verified: orderByDirectionSchema.optional(),
+        payrollNumber: orderByDirectionSchema.optional(),
         admissional: orderByDirectionSchema.optional(),
         birth: orderByDirectionSchema.optional(),
         dismissal: orderByDirectionSchema.optional(),
@@ -259,6 +269,42 @@ export const userOrderBySchema = z.union([
         managedSectorId: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
+
+        // Status timestamps
+        contractedAt: orderByDirectionSchema.optional(),
+        exp1StartAt: orderByDirectionSchema.optional(),
+        exp1EndAt: orderByDirectionSchema.optional(),
+        exp2StartAt: orderByDirectionSchema.optional(),
+        exp2EndAt: orderByDirectionSchema.optional(),
+        dismissedAt: orderByDirectionSchema.optional(),
+
+        // Nested relation ordering
+        position: z
+          .object({
+            id: orderByWithNullsSchema.optional(),
+            name: orderByWithNullsSchema.optional(),
+            createdAt: orderByWithNullsSchema.optional(),
+            updatedAt: orderByWithNullsSchema.optional(),
+          })
+          .optional(),
+
+        sector: z
+          .object({
+            id: orderByWithNullsSchema.optional(),
+            name: orderByWithNullsSchema.optional(),
+            createdAt: orderByWithNullsSchema.optional(),
+            updatedAt: orderByWithNullsSchema.optional(),
+          })
+          .optional(),
+
+        managedSector: z
+          .object({
+            id: orderByWithNullsSchema.optional(),
+            name: orderByWithNullsSchema.optional(),
+            createdAt: orderByWithNullsSchema.optional(),
+            updatedAt: orderByWithNullsSchema.optional(),
+          })
+          .optional(),
       })
       .partial(),
   ),
@@ -863,11 +909,13 @@ export const userGetManySchema = z
 
 // PPE Size nested creation schema
 const ppeSizeCreateNestedSchema = z.object({
-  shirts: z.string().optional(),
-  boots: z.string().optional(),
-  pants: z.string().optional(),
-  sleeves: z.string().optional(),
-  mask: z.string().optional(),
+  shirts: z.string().nullable().optional(),
+  boots: z.string().nullable().optional(),
+  pants: z.string().nullable().optional(),
+  sleeves: z.string().nullable().optional(),
+  mask: z.string().nullable().optional(),
+  gloves: z.string().nullable().optional(),
+  rainBoots: z.string().nullable().optional(),
 });
 
 // Notification preferences nested creation schema
@@ -892,7 +940,10 @@ export const userCreateSchema = z
     pis: pisSchema.nullable().optional(),
     cpf: cpfSchema.nullable().optional(),
     verified: z.boolean().default(false),
-    admissional: nullableDate.optional(),
+    admissional: z.coerce.date({
+      required_error: "Data de admissão é obrigatória",
+      invalid_type_error: "Data de admissão inválida"
+    }),
     performanceLevel: z.number().int().min(0).max(5).default(0),
     sectorId: z.string().uuid("Setor inválido").nullable().optional(),
     managedSectorId: z.string().uuid("Setor gerenciado inválido").nullable().optional(),
@@ -923,6 +974,14 @@ export const userCreateSchema = z
 
     // Payroll info
     payrollNumber: z.number().int().positive("Número da folha deve ser positivo").nullable().optional(),
+
+    // Status timestamps (auto-managed by backend)
+    contractedAt: nullableDate.optional(),
+    exp1StartAt: nullableDate.optional(),
+    exp1EndAt: nullableDate.optional(),
+    exp2StartAt: nullableDate.optional(),
+    exp2EndAt: nullableDate.optional(),
+    dismissedAt: nullableDate.optional(),
 
     // Nested PPE size creation for new users
     ppeSize: ppeSizeCreateNestedSchema.optional(),
@@ -983,6 +1042,17 @@ export const userUpdateSchema = z
     // Payroll info
     payrollNumber: z.number().int().positive("Número da folha deve ser positivo").nullable().optional(),
     secullumId: z.string().nullable().optional(),
+
+    // Status timestamps (auto-managed by backend)
+    contractedAt: nullableDate.optional(),
+    exp1StartAt: nullableDate.optional(),
+    exp1EndAt: nullableDate.optional(),
+    exp2StartAt: nullableDate.optional(),
+    exp2EndAt: nullableDate.optional(),
+    dismissedAt: nullableDate.optional(),
+
+    // PPE size for update
+    ppeSize: ppeSizeCreateNestedSchema.optional(),
 
     verificationCode: z.string().nullable().optional(),
     verificationExpiresAt: z.date().nullable().optional(),

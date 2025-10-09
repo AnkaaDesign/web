@@ -38,6 +38,28 @@ export function ZipCodeInput({ value, onChange, onBlur, className, placeholder =
     [onChange],
   );
 
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent<HTMLInputElement>) => {
+      e.preventDefault();
+      const pastedText = e.clipboardData.getData("text");
+      const numbers = extractNumbers(pastedText);
+
+      if (numbers.length > 8) return;
+
+      const formatted = formatZipCode(numbers);
+      setDisplayValue(formatted);
+      onChange?.(numbers.length > 0 ? numbers : undefined);
+
+      // Set cursor to end of formatted value after paste
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.setSelectionRange(formatted.length, formatted.length);
+        }
+      }, 0);
+    },
+    [onChange],
+  );
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -91,6 +113,7 @@ export function ZipCodeInput({ value, onChange, onBlur, className, placeholder =
       inputMode="numeric"
       value={displayValue}
       onChange={handleChange}
+      onPaste={handlePaste}
       onKeyDown={handleKeyDown}
       onBlur={handleBlur}
       onFocus={handleFocus}

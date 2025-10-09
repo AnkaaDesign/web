@@ -106,15 +106,15 @@ export function BaseExportPopover<T extends { id: string }>({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="default" className={cn("gap-2", className)} disabled={isExporting}>
+        <Button variant="outline" size="default" className={className} disabled={isExporting}>
           {isExporting ? (
             <>
-              <IconDownload className="h-4 w-4 animate-pulse" />
+              <IconDownload className="h-4 w-4 mr-2 animate-pulse" />
               Exportando...
             </>
           ) : (
             <>
-              <IconDownload className="h-4 w-4" />
+              <IconDownload className="h-4 w-4 mr-2" />
               Exportar
             </>
           )}

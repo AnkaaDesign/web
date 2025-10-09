@@ -248,7 +248,7 @@ export function UserList({ className }: UserListProps) {
   // Visible columns state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility(
     "user-list-visible-columns",
-    new Set(["payrollNumber", "name", "position.name", "sector.name", "status"])
+    new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "status"])
   );
 
   // Get all available columns for column visibility manager
@@ -410,7 +410,10 @@ export function UserList({ className }: UserListProps) {
     try {
       const updateUsers = contractDialog.items.map((user) => ({
         id: user.id,
-        data: { status: USER_STATUS.CONTRACTED },
+        data: {
+          status: USER_STATUS.CONTRACTED,
+          contractedAt: new Date(),
+        },
       }));
 
       await batchUpdateAsync({ users: updateUsers });

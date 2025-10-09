@@ -345,11 +345,11 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-6">
-                    {/* Name field spanning full width */}
-                    <NameInput control={form.control} required />
-
-                    {/* Code field spanning full width */}
-                    <CodeInput control={form.control} />
+                    {/* Name and Code in the same row */}
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <NameInput control={form.control} required />
+                      <CodeInput control={form.control} />
+                    </div>
 
                     {/* Layout with 2/3 and 1/3 columns */}
                     <div className="grid gap-6 md:grid-cols-3">

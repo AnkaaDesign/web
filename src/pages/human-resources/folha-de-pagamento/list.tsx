@@ -27,7 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { usePayrollBonuses } from "../../../hooks";
+import { usePayrollBonuses, useSectors } from "../../../hooks";
 import { isUserEligibleForBonus, getCurrentPayrollPeriod } from "../../../utils";
 import { StandardizedTable } from "@/components/ui/standardized-table";
 import type { StandardizedColumn } from "@/components/ui/standardized-table";
@@ -579,8 +579,38 @@ export default function PayrollListPage() {
     return hasUrlFilters ? { ...defaultFilters, ...urlFilters } : defaultFilters;
   }, [defaultFilters, urlFilters, searchParams]);
 
+  // Load sectors to get default sector IDs
+  const { data: sectorsData } = useSectors({
+    orderBy: { name: "asc" },
+    limit: 100,
+  });
+
+  // Get default sector IDs (production, warehouse, leader privileges)
+  const defaultSectorIds = useMemo(() => {
+    if (!sectorsData?.data) return [];
+
+    return sectorsData.data
+      .filter(sector =>
+        sector.privilege === 'PRODUCTION' ||
+        sector.privilege === 'WAREHOUSE' ||
+        sector.privilege === 'LEADER'
+      )
+      .map(sector => sector.id);
+  }, [sectorsData?.data]);
+
+  // Apply default sector filters to initial filters if not already set
+  const filtersWithDefaults = useMemo(() => {
+    if (initialFilters.sectorIds && initialFilters.sectorIds.length > 0) {
+      return initialFilters;
+    }
+    return {
+      ...initialFilters,
+      sectorIds: defaultSectorIds
+    };
+  }, [initialFilters, defaultSectorIds]);
+
   // State management
-  const [filters, setFilters] = useState<PayrollFiltersData>(initialFilters);
+  const [filters, setFilters] = useState<PayrollFiltersData>(filtersWithDefaults);
   const [showFilters, setShowFilters] = useState(false);
   const { visibleColumns: baseVisibleColumns, setVisibleColumns } = useColumnVisibility(
     "payroll-list-visible-columns",
@@ -1086,47 +1116,34 @@ export default function PayrollListPage() {
             <CardContent className="pt-6 pb-4">
               <div className="flex items-center justify-between gap-4">
                 {/* Left side - Filters and Controls */}
-                <div className="flex items-center gap-2 h-9">
+                <div className="flex items-center gap-2">
                   <Button
                     onClick={() => setShowFilters(!showFilters)}
-                    variant={activeFiltersCount > 0 ? "secondary" : "outline"}
-                    size="sm"
-                    className="h-9"
+                    variant="outline"
+                    size="default"
                   >
-                    <IconFilter className="mr-2 h-4 w-4" />
+                    <IconFilter className="h-4 w-4 mr-2" />
                     Filtros
                     {activeFiltersCount > 0 && (
-                      <Badge variant="default" className="ml-2">
+                      <Badge variant="secondary" className="ml-2">
                         {activeFiltersCount}
                       </Badge>
                     )}
                   </Button>
 
-                  {activeFiltersCount > 0 && (
-                    <Button onClick={handleResetFilters} variant="outline" size="sm" className="h-9">
-                      <IconRefresh className="mr-2 h-4 w-4" />
-                      Resetar
-                    </Button>
-                  )}
-
-                  <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isRefreshing} className="h-9">
-                    <IconRefresh className={`mr-2 h-4 w-4 ${isRefreshing || isLoading ? "animate-spin" : ""}`} />
+                  <Button onClick={handleRefresh} variant="outline" size="default" disabled={isRefreshing}>
+                    <IconRefresh className={`h-4 w-4 mr-2 ${isRefreshing || isLoading ? "animate-spin" : ""}`} />
                     {isRefreshing ? "Atualizando..." : "Atualizar"}
                   </Button>
-
-                  <Separator orientation="vertical" className="h-6" />
 
                   <PayrollColumnVisibilityManager
                     visibleColumns={visibleColumns}
                     onVisibilityChange={setVisibleColumns}
                   />
-                </div>
 
-                {/* Right side - Actions */}
-                <div className="flex gap-2 h-9">
-                  <Button onClick={handleNavigateToSimulation} variant="outline" size="sm" className="h-9">
-                    <IconCalculator className="mr-2 h-4 w-4" />
-                    Simular Bônus
+                  <Button onClick={handleNavigateToSimulation} variant="outline" size="default">
+                    <IconCalculator className="h-4 w-4 mr-2" />
+                    Simular
                   </Button>
 
                   <PayrollExport
@@ -1140,7 +1157,7 @@ export default function PayrollListPage() {
             </CardContent>
 
             {/* Table Content */}
-            <CardContent className="flex-1 overflow-hidden px-6 py-0 relative">
+            <CardContent className="flex-1 overflow-hidden p-0 relative">
               <div className="h-full">
                 <PayrollTableComponent
                   data={processedPayrolls}
@@ -1171,9 +1188,12 @@ export default function PayrollListPage() {
 
             {/* Summary - At bottom */}
             {processedPayrolls.length > 0 && (
-              <div className="px-6 pb-6">
-                <PayrollSummary users={processedPayrolls} />
-              </div>
+              <>
+                <Separator className="mx-6" />
+                <div className="px-6 pb-6 pt-6">
+                  <PayrollSummary users={processedPayrolls} />
+                </div>
+              </>
             )}
           </Card>
         </div>

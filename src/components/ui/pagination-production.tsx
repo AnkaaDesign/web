@@ -208,7 +208,7 @@ export function ProductionPagination({
                 min="1"
                 max={pagination.totalPages}
                 value={pageInput}
-                onChange={(value) => setPageInput(value as string)}
+                onChange={(value) => setPageInput(String(value || ""))}
                 onFocus={() => setIsPageInputFocused(true)}
                 onBlur={() => setIsPageInputFocused(false)}
                 className={cn(styles.input, "px-3 py-2 bg-transparent")}

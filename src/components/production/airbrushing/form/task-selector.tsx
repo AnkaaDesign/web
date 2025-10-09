@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { IconSearch, IconFilter, IconRefresh } from "@tabler/icons-react";
+import { IconSearch, IconFilter } from "@tabler/icons-react";
 import { useTasks, useCustomers, useUsers, useSectors } from "../../../../hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,10 +46,10 @@ interface TaskSelectorProps {
   getSortDirection?: (column: string) => "asc" | "desc" | null;
   getSortOrder?: (column: string) => number | null;
   // Pagination props
-  page?: number; // 1-based from useTableState
+  page?: number; // 0-based from useTableState
   pageSize?: number;
   totalRecords?: number;
-  onPageChange?: (page: number) => void;
+  onPageChange?: (page: number) => void; // Expects 0-based
   onPageSizeChange?: (pageSize: number) => void;
   onTotalRecordsChange?: (total: number) => void;
 }
@@ -127,8 +127,8 @@ export const TaskSelector = ({
   const currentPageSize = pageSizeProp || 20;
 
   // Use props directly for pagination and sorting
-  // pageProp is already 1-based from useTableState
-  const page = pageProp !== undefined ? pageProp : 1;
+  // pageProp is 0-based from useTableState, convert to 1-based for internal use
+  const page = pageProp !== undefined ? pageProp + 1 : 1;
   const sortConfigs = sortConfigsProp || [{ column: "name", direction: "asc" as const }];
 
   // Debounce search term with longer delay
@@ -138,7 +138,7 @@ export const TaskSelector = ({
   const taskQuery = useMemo(() => {
     const query: any = {
       searchingFor: debouncedSearchTerm || undefined,
-      page: page, // Use 0-based pagination consistently
+      page: page - 1, // Convert from 1-based (UI) to 0-based (API)
       limit: currentPageSize,
       // Only show tasks that are not completed or cancelled
       status: [TASK_STATUS.PENDING, TASK_STATUS.IN_PRODUCTION, TASK_STATUS.ON_HOLD],
@@ -161,7 +161,7 @@ export const TaskSelector = ({
       query.customerIds = customerIds;
     }
     if (userIds.length > 0) {
-      query.userIds = userIds;
+      query.createdByIds = userIds;
     }
     if (sectorIds.length > 0) {
       query.sectorIds = sectorIds;
@@ -178,7 +178,7 @@ export const TaskSelector = ({
   }, [debouncedSearchTerm, page, currentPageSize, statusIds, customerIds, userIds, sectorIds, sortConfigs]);
 
   // Fetch tasks
-  const { data: taskResponse, isLoading, refetch } = useTasks(taskQuery);
+  const { data: taskResponse, isLoading } = useTasks(taskQuery);
   const tasks = taskResponse?.data || [];
   const totalRecords = taskResponse?.meta?.totalRecords || 0;
 
@@ -339,9 +339,6 @@ export const TaskSelector = ({
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button variant="outline" onClick={() => refetch()}>
-            <IconRefresh className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 
@@ -471,9 +468,14 @@ export const TaskSelector = ({
           {/* Pagination Footer */}
           <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50">
             <SimplePaginationAdvanced
-              currentPage={page} // SimplePaginationAdvanced expects 0-based, convert from 1-based
+              currentPage={page - 1} // SimplePaginationAdvanced expects 0-based, convert from internal 1-based
               totalPages={Math.ceil(totalRecords / currentPageSize)}
-              onPageChange={onPageChange || (() => {})}
+              onPageChange={(newPage) => {
+                // SimplePaginationAdvanced provides 0-based, onPageChange expects 0-based (useTableState.setPage)
+                if (onPageChange) {
+                  onPageChange(newPage);
+                }
+              }}
               pageSize={currentPageSize}
               totalItems={totalRecords}
               pageSizeOptions={[20, 40, 60, 100]}

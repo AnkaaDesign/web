@@ -38,6 +38,19 @@ export function PerformanceLevelFilters({
   const positions = positionsData?.data || [];
   const sectors = sectorsData?.data || [];
 
+  // Get default sector IDs (production, warehouse, leader privileges)
+  const defaultSectorIds = useMemo(() => {
+    if (!sectorsData?.data) return [];
+
+    return sectorsData.data
+      .filter(sector =>
+        sector.privilege === 'PRODUCTION' ||
+        sector.privilege === 'WAREHOUSE' ||
+        sector.privilege === 'LEADER'
+      )
+      .map(sector => sector.id);
+  }, [sectorsData?.data]);
+
   // Create options for comboboxes with memoization
   const positionOptions = useMemo(() =>
     positions.map((position) => ({
@@ -51,12 +64,12 @@ export function PerformanceLevelFilters({
       label: sector.name,
     })), [sectors]);
 
-  // Local filter state
+  // Local filter state - initialize with defaults
   const [localState, setLocalState] = useState<FilterState>({
     performanceMin: 0,
     performanceMax: 5,
     positionIds: [],
-    sectorIds: [],
+    sectorIds: defaultSectorIds, // Set default sectors on initialization
   });
 
   // Keep track of last filters to avoid unnecessary updates
@@ -103,13 +116,18 @@ export function PerformanceLevelFilters({
       }
     }
 
+    // Use defaults if no sectors are specified
+    if (secIds.length === 0) {
+      secIds = defaultSectorIds;
+    }
+
     setLocalState({
       performanceMin: perfMin,
       performanceMax: perfMax,
       positionIds: posIds,
       sectorIds: secIds,
     });
-  }, [open, filters.where]);
+  }, [open, filters.where, defaultSectorIds]);
 
   // Handle position selection change
   const handlePositionChange = useCallback((positions: string[]) => {

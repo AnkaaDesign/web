@@ -1,7 +1,7 @@
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
 import { toast } from "@/components/ui/sonner";
 import { userService } from "../../../../api-client";
-import { formatCPF, formatPhone, formatDate } from "../../../../utils";
+import { formatCPF, formatBrazilianPhone, formatDate } from "../../../../utils";
 import type { User } from "../../../../types";
 import type { UserGetManyFormData } from "../../../../schemas";
 
@@ -19,7 +19,7 @@ const EXPORT_COLUMNS: ExportColumn<User>[] = [
   { id: "payrollNumber", label: "Nº Folha", getValue: (user: User) => user.payrollNumber?.toString() || "" },
   { id: "name", label: "Nome", getValue: (user: User) => user.name },
   { id: "email", label: "Email", getValue: (user: User) => user.email || "" },
-  { id: "phone", label: "Telefone", getValue: (user: User) => (user.phone ? formatPhone(user.phone) : "") },
+  { id: "phone", label: "Telefone", getValue: (user: User) => (user.phone ? formatBrazilianPhone(user.phone) : "") },
   { id: "cpf", label: "CPF", getValue: (user: User) => (user.cpf ? formatCPF(user.cpf) : "") },
   { id: "pis", label: "PIS", getValue: (user: User) => user.pis || "" },
   { id: "position", label: "Cargo", getValue: (user: User) => user.position?.name || "" },

@@ -46,7 +46,7 @@ export const createOrderColumns = (): OrderColumn[] => [
     key: "itemCount",
     header: "ITENS",
     accessor: (order) => {
-      const itemCount = order.items?.length || 0;
+      const itemCount = order._count?.items ?? 0;
       return (
         <Badge variant="secondary" className="font-tabular-nums">
           {itemCount} {itemCount === 1 ? "item" : "itens"}

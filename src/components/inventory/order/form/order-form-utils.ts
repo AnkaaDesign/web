@@ -50,7 +50,6 @@ export interface OrderFormData {
   quantities: Record<string, number>;
   prices: Record<string, number>;
   taxes: Record<string, number>;
-  criticalItems: Set<string>;
   budgetId?: string | null;
   nfeId?: string | null;
   receiptId?: string | null;
@@ -78,7 +77,6 @@ export interface ItemCalculation {
   taxAmount: number;
   total: number;
   hasValidPrice: boolean;
-  isCritical: boolean;
 }
 
 export interface OrderTotals {
@@ -123,7 +121,7 @@ export function getBestItemPrice(item: OrderFormItem, manualPrice?: number | nul
 /**
  * Calculate individual item total with tax
  */
-export function calculateItemTotal(item: OrderFormItem, quantity: number, manualPrice?: number | null, taxRate: number = 0, isCritical: boolean = false): ItemCalculation {
+export function calculateItemTotal(item: OrderFormItem, quantity: number, manualPrice?: number | null, taxRate: number = 0): ItemCalculation {
   const price = getBestItemPrice(item, manualPrice);
   const subtotal = roundToDecimals(quantity * price, 2);
   const taxAmount = roundToDecimals(subtotal * (taxRate / 100), 2);
@@ -140,7 +138,6 @@ export function calculateItemTotal(item: OrderFormItem, quantity: number, manual
     taxAmount,
     total,
     hasValidPrice,
-    isCritical,
   };
 }
 
@@ -152,7 +149,6 @@ export function calculateOrderTotals(
   quantities: Record<string, number>,
   prices: Record<string, number>,
   taxes: Record<string, number>,
-  criticalItems: Set<string>,
 ): OrderTotals {
   const itemCalculations: ItemCalculation[] = [];
 
@@ -161,9 +157,8 @@ export function calculateOrderTotals(
     const quantity = quantities[itemId] || 1;
     const manualPrice = prices[itemId];
     const taxRate = taxes[itemId] || 0;
-    const isCritical = criticalItems.has(itemId);
 
-    const calculation = calculateItemTotal(item, quantity, manualPrice, taxRate, isCritical);
+    const calculation = calculateItemTotal(item, quantity, manualPrice, taxRate);
     itemCalculations.push(calculation);
   });
 
@@ -317,14 +312,12 @@ export function transformFormDataForAPI(formData: OrderFormData): OrderCreateFor
     const quantity = formData.quantities[itemId] || 1;
     const price = formData.prices[itemId] || getBestItemPrice(item);
     const tax = formData.taxes[itemId] || 0;
-    const isCritical = formData.criticalItems.has(itemId);
 
     items.push({
       itemId,
       orderedQuantity: quantity,
       price,
       tax,
-      isCritical,
     } as OrderItemCreateFormData);
   });
 
@@ -349,7 +342,6 @@ export function transformAPIDataToFormData(order: Order, items: Item[]): Partial
   const quantities: Record<string, number> = {};
   const prices: Record<string, number> = {};
   const taxes: Record<string, number> = {};
-  const criticalItems = new Set<string>();
 
   // Transform items if they exist
   if (order.items) {
@@ -380,10 +372,6 @@ export function transformAPIDataToFormData(order: Order, items: Item[]): Partial
         quantities[item.id] = orderItem.orderedQuantity;
         prices[item.id] = orderItem.price;
         taxes[item.id] = orderItem.tax;
-
-        if (orderItem.isCritical) {
-          criticalItems.add(item.id);
-        }
       }
     });
   }
@@ -400,7 +388,6 @@ export function transformAPIDataToFormData(order: Order, items: Item[]): Partial
     quantities,
     prices,
     taxes,
-    criticalItems,
   };
 }
 
@@ -420,7 +407,6 @@ export function cloneFormData(formData: OrderFormData): OrderFormData {
     quantities: { ...formData.quantities },
     prices: { ...formData.prices },
     taxes: { ...formData.taxes },
-    criticalItems: new Set(formData.criticalItems),
   };
 }
 
@@ -715,7 +701,7 @@ export function validateOrderForm(
   errors.push(...taxErrors);
 
   // Calculate totals for additional validations
-  const totals = calculateOrderTotals(formData.selectedItems, formData.quantities, formData.prices, formData.taxes, formData.criticalItems);
+  const totals = calculateOrderTotals(formData.selectedItems, formData.quantities, formData.prices, formData.taxes);
 
   // Validate total value if needed
   if (options.maxTotal && totals.grandTotal > options.maxTotal) {
@@ -927,10 +913,9 @@ export function formatItemsCount(count: number): string {
 /**
  * Generate summary text for selected items
  */
-export function generateSelectionSummary(selectedItems: Map<string, OrderFormItem>, quantities: Record<string, number>, criticalItems: Set<string>): string {
+export function generateSelectionSummary(selectedItems: Map<string, OrderFormItem>, quantities: Record<string, number>): string {
   const totalItems = selectedItems.size;
   const totalQuantity = Array.from(selectedItems.keys()).reduce((sum: number, itemId: string) => sum + (quantities[itemId] || 1), 0);
-  const criticalCount = criticalItems.size;
 
   if (totalItems === 0) {
     return "Nenhum item selecionado";
@@ -938,9 +923,8 @@ export function generateSelectionSummary(selectedItems: Map<string, OrderFormIte
 
   const itemText = formatItemsCount(totalItems);
   const quantityText = `${totalQuantity.toLocaleString("pt-BR")} unidades`;
-  const criticalText = criticalCount > 0 ? ` (${criticalCount} críticos)` : "";
 
-  return `${itemText} - ${quantityText}${criticalText}`;
+  return `${itemText} - ${quantityText}`;
 }
 
 /**

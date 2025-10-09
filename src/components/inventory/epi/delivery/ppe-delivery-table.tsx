@@ -228,7 +228,6 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
                     indeterminate={partiallySelected}
                     onCheckedChange={handleSelectAll}
                     aria-label="Select all deliveries"
-                    className={cn("border-2 bg-background", partiallySelected && "data-[state=checked]:bg-muted data-[state=checked]:text-muted-foreground")}
                     disabled={isLoading || deliveries.length === 0}
                     data-checkbox
                   />
@@ -339,7 +338,6 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
                           checked={deliveryIsSelected}
                           onCheckedChange={() => handleSelectDelivery(delivery.id)}
                           aria-label={`Select delivery ${delivery.id}`}
-                          className="border-2"
                           data-checkbox
                         />
                       </div>

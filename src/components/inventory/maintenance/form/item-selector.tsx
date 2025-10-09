@@ -1,8 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { type FieldValues, type FieldPath } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import { useItems } from "../../../../hooks";
+import { getItems } from "../../../../api-client";
 
 interface ItemSelectorProps<TFieldValues extends FieldValues = FieldValues> {
   control: any;
@@ -19,35 +19,44 @@ export function MaintenanceItemSelector<TFieldValues extends FieldValues = Field
   fieldName = "itemId" as FieldPath<TFieldValues>,
   label = "Item",
 }: ItemSelectorProps<TFieldValues>) {
-  const {
-    data: itemsResponse,
-    isLoading,
-    error,
-  } = useItems({
-    take: 50,
-    where: {
-      isActive: true,
-    },
-    orderBy: {
-      name: "asc",
-    },
-  });
+  // Async query function for Combobox with pagination
+  const queryFn = useCallback(async (searchTerm: string, page: number = 1) => {
+    const pageSize = 20;
+    const response = await getItems({
+      take: pageSize,
+      skip: (page - 1) * pageSize,
+      where: {
+        isActive: true,
+        ...(searchTerm ? {
+          OR: [
+            { name: { contains: searchTerm, mode: "insensitive" } },
+            { uniCode: { contains: searchTerm, mode: "insensitive" } },
+          ],
+        } : {}),
+      },
+      orderBy: {
+        name: "asc",
+      },
+      include: {
+        brand: true,
+        category: true,
+      },
+    });
 
-  const items = itemsResponse?.data || [];
+    const items = response.data || [];
+    const total = response.total || 0;
+    const hasMore = (page * pageSize) < total;
 
-  // Show error state if there's an error loading items
-  if (error) {
-    console.error("Error loading items for maintenance selector:", error);
-  }
-
-  // Create options for the combobox
-  const itemOptions = useMemo(() => {
-    return items.map((item) => ({
-      value: item.id,
-      label: item.name,
-      description: item.uniCode ? `Código: ${item.uniCode} • Estoque: ${item.quantity || 0}` : `Estoque: ${item.quantity || 0}`,
-    }));
-  }, [items]);
+    return {
+      data: items.map((item) => ({
+        value: item.id,
+        label: item.name,
+        description: item.uniCode ? `Código: ${item.uniCode} • Estoque: ${item.quantity || 0}` : `Estoque: ${item.quantity || 0}`,
+      })),
+      hasMore,
+      total,
+    };
+  }, []);
 
   return (
     <FormField
@@ -58,7 +67,11 @@ export function MaintenanceItemSelector<TFieldValues extends FieldValues = Field
           <FormLabel className={required ? "after:content-['*'] after:ml-0.5 after:text-destructive" : ""}>{label}</FormLabel>
           <FormControl>
             <Combobox
-              options={itemOptions}
+              async
+              queryKey={["items", "maintenance-selector"]}
+              queryFn={queryFn}
+              minSearchLength={0}
+              pageSize={20}
               value={field.value || ""}
               onValueChange={(value) => {
                 field.onChange(value);
@@ -67,10 +80,10 @@ export function MaintenanceItemSelector<TFieldValues extends FieldValues = Field
                   field.onBlur();
                 }
               }}
-              placeholder={isLoading ? "Carregando itens..." : "Selecione um item"}
+              placeholder="Selecione um item"
               searchable
-              disabled={disabled || isLoading}
-              emptyText={error ? "Erro ao carregar itens" : isLoading ? "Carregando..." : itemOptions.length === 0 ? "Nenhum item ativo encontrado" : "Nenhum item encontrado"}
+              disabled={disabled}
+              emptyText="Nenhum item encontrado"
               className="w-full"
             />
           </FormControl>

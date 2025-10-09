@@ -54,6 +54,14 @@ export interface User extends BaseEntity {
   admissional: Date; // Admission date (required)
   dismissal: Date | null; // Dismissal date (optional)
 
+  // Status timestamp tracking
+  contractedAt: Date | null;
+  exp1StartAt: Date | null;
+  exp1EndAt: Date | null;
+  exp2StartAt: Date | null;
+  exp2EndAt: Date | null;
+  dismissedAt: Date | null;
+
   // Relations
   ppeSize?: PpeSize;
   preference?: Preferences;
@@ -218,10 +226,17 @@ export interface UserOrderBy {
   pis?: ORDER_BY_DIRECTION;
   cpf?: ORDER_BY_DIRECTION;
   verified?: ORDER_BY_DIRECTION;
+  payrollNumber?: ORDER_BY_DIRECTION;
   hireDate?: ORDER_BY_DIRECTION;
   birth?: ORDER_BY_DIRECTION;
   admissional?: ORDER_BY_DIRECTION;
   dismissal?: ORDER_BY_DIRECTION;
+  contractedAt?: ORDER_BY_DIRECTION;
+  exp1StartAt?: ORDER_BY_DIRECTION;
+  exp1EndAt?: ORDER_BY_DIRECTION;
+  exp2StartAt?: ORDER_BY_DIRECTION;
+  exp2EndAt?: ORDER_BY_DIRECTION;
+  dismissedAt?: ORDER_BY_DIRECTION;
   performanceLevel?: ORDER_BY_DIRECTION;
   address?: ORDER_BY_DIRECTION;
   addressNumber?: ORDER_BY_DIRECTION;

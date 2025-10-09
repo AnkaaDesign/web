@@ -75,12 +75,12 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
       })
     : { fields: [], append: () => {}, remove: () => {} };
 
-  // Auto-add first item if array is empty (consistent with schedule form)
-  React.useEffect(() => {
-    if (mode === "create" && fields.length === 0) {
-      append({ itemId: "", quantity: 1 });
-    }
-  }, [mode, fields.length, append]);
+  // Don't auto-add items - allow empty items array for cleanup-only maintenance
+  // React.useEffect(() => {
+  //   if (mode === "create" && fields.length === 0) {
+  //     append({ itemId: "", quantity: 1 });
+  //   }
+  // }, [mode, fields.length, append]);
 
   // Track form state changes for submit button
   useEffect(() => {
@@ -101,8 +101,13 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
           ...createData,
           name: createData.name.trim(),
           description: createData.description?.trim() || undefined,
-          // Filter out empty items from itemsNeeded
-          itemsNeeded: (createData.itemsNeeded || []).filter((item: any) => item?.itemId && item?.quantity > 0),
+          // Filter out empty or invalid items from itemsNeeded
+          itemsNeeded: (createData.itemsNeeded || [])
+            .filter((item: any) => item?.itemId && item.itemId.trim() !== "" && item?.quantity > 0)
+            .map((item: any) => ({
+              itemId: item.itemId.trim(),
+              quantity: item.quantity,
+            })),
         };
         await (props as CreateMaintenanceFormProps).onSubmit(processedData);
       } else {
@@ -209,8 +214,8 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
             {/* Items Needed */}
             <Card>
               <CardHeader>
-                <CardTitle>Itens Necessários</CardTitle>
-                <CardDescription>Itens utilizados na manutenção</CardDescription>
+                <CardTitle>Itens Necessários (Opcional)</CardTitle>
+                <CardDescription>Itens utilizados na manutenção. Deixe vazio para manutenções de limpeza ou que não requerem materiais.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {fields.map((field, index) => (
@@ -250,10 +255,7 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
                         size="icon"
                         onClick={() => {
                           remove(index);
-                          // If removing the last item, add a new empty one (like schedule form)
-                          if (fields.length === 1) {
-                            append({ itemId: "", quantity: 1 });
-                          }
+                          // Don't auto-add new item - allow empty array for cleanup-only maintenance
                         }}
                         disabled={isSubmitting}
                         className="h-10 w-8"

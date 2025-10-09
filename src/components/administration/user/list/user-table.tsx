@@ -61,6 +61,7 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
+    defaultSort: [{ key: 'name', direction: 'asc' }],
   });
 
   // Memoize include configuration to prevent re-renders
@@ -69,7 +70,12 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
       position: true,
       sector: true,
       managedSector: true,
-      count: true,
+      _count: {
+        select: {
+          createdTasks: true,
+          vacations: true,
+        },
+      },
     }),
     [],
   );
@@ -528,11 +534,11 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
 
           <DropdownMenuSeparator />
 
-          {/* Show mark as contracted option if any user is in experience period */}
+          {/* Show efetivar option if any user is in experience period */}
           {contextMenu?.users.some((user) => user.status === USER_STATUS.EXPERIENCE_PERIOD_1 || user.status === USER_STATUS.EXPERIENCE_PERIOD_2) && (
             <DropdownMenuItem onClick={handleMarkAsContracted}>
               <IconUserCheck className="mr-2 h-4 w-4" />
-              {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Marcar como contratados" : "Marcar como contratado"}
+              {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Efetivar selecionados" : "Efetivar"}
             </DropdownMenuItem>
           )}
 

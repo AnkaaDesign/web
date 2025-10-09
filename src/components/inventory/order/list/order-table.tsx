@@ -96,7 +96,7 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
           item: true,
         },
       },
-      count: {
+      _count: {
         select: {
           items: true,
         },

@@ -1,9 +1,8 @@
-import { IconInfoCircle, IconCalendar, IconHash, IconUser } from "@tabler/icons-react";
+import { IconInfoCircle, IconCalendar } from "@tabler/icons-react";
 
 import type { Sector } from "../../../../types";
 import { formatDateTime } from "../../../../utils";
 import { SECTOR_PRIVILEGES_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
-import { useUsers } from "../../../../hooks";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,15 +35,8 @@ interface SpecificationsCardProps {
 }
 
 export function SpecificationsCard({ sector }: SpecificationsCardProps) {
-  // Get users for this sector to find potential managers
-  const { data: usersResponse } = useUsers({
-    where: { sectorId: sector.id },
-    include: { position: true },
-  });
-
-  // Find a manager or leader type user from the sector
-  const manager =
-    usersResponse?.data?.find((user) => user.position?.name?.toLowerCase().includes("gerente") || user.position?.name?.toLowerCase().includes("líder")) || usersResponse?.data?.[0]; // Fallback to first user if no manager found
+  // Get the manager from managedByUsers relation (first user if multiple)
+  const manager = sector.managedByUsers && sector.managedByUsers.length > 0 ? sector.managedByUsers[0] : null;
 
   return (
     <Card>
@@ -81,24 +73,12 @@ export function SpecificationsCard({ sector }: SpecificationsCardProps) {
                 {sector._count?.tasks || 0} tarefa{(sector._count?.tasks || 0) !== 1 ? "s" : ""}
               </span>
             </div>
-            <div className="flex items-center justify-between py-1">
-              <span className="text-sm text-muted-foreground">Gerente</span>
-              <span className="text-sm font-medium">{manager ? manager.name : "Não atribuído"}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Identification */}
-        <div>
-          <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-            <IconHash className="h-4 w-4" />
-            Identificação
-          </h3>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between py-1">
-              <span className="text-sm text-muted-foreground">ID do Setor</span>
-              <code className="text-xs bg-muted px-2 py-1 rounded font-mono">{sector.id}</code>
-            </div>
+            {manager && (
+              <div className="flex items-center justify-between py-1">
+                <span className="text-sm text-muted-foreground">Administrador</span>
+                <span className="text-sm font-medium">{manager.name}</span>
+              </div>
+            )}
           </div>
         </div>
 

@@ -477,10 +477,10 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
               {/* Step 2: Task Selection (only for create mode) */}
               {currentStep === 2 && mode === "create" && (
-                <div className="space-y-4">
+                <div className="flex flex-col h-full space-y-4">
                   {/* Task selection error message */}
                   {form.formState.errors.taskId && (
-                    <div className="bg-destructive/10 border border-destructive/20 rounded-md px-4 py-3">
+                    <div className="bg-destructive/10 border border-destructive/20 rounded-md px-4 py-3 flex-shrink-0">
                       <p className="text-sm text-destructive">{form.formState.errors.taskId.message}</p>
                     </div>
                   )}

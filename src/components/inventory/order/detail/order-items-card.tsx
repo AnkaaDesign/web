@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import {
@@ -445,17 +444,20 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                     </TableCell>
                     <TableCell className="text-center">
                       {canEditItems ? (
-                        <div className="flex justify-center">
-                          <Input
-                            type="decimal"
-                            decimals={2}
+                        <div className="flex items-center justify-center">
+                          <input
+                            type="number"
                             value={currentValues.receivedQuantity}
-                            onChange={(value) => handleQuantityChange(item.id, value?.toString() || "0")}
+                            onChange={(e) => handleQuantityChange(item.id, e.target.value)}
                             disabled={isSaving}
                             min={0}
                             max={item.orderedQuantity}
+                            step="0.01"
                             className={cn(
-                              "w-20 h-8 text-center font-mono text-sm",
+                              "flex h-8 w-20 rounded-md border border-border bg-input px-2 py-2 text-sm text-center font-mono",
+                              "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+                              "disabled:cursor-not-allowed disabled:opacity-50",
+                              "transition-all duration-200 ease-in-out",
                               currentValues.receivedQuantity > item.orderedQuantity && "text-blue-600 dark:text-blue-400",
                               currentValues.receivedQuantity === item.orderedQuantity && "text-green-600 dark:text-green-400",
                               currentValues.receivedQuantity > 0 && currentValues.receivedQuantity < item.orderedQuantity && "text-orange-600 dark:text-orange-400",

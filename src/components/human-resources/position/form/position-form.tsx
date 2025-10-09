@@ -146,10 +146,14 @@ export function PositionForm(props: PositionFormProps) {
                 <CardDescription>Preencha as informações básicas do cargo</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <NameInput control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                  <div className="lg:col-span-3">
+                    <NameInput control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
+                  </div>
 
-                  <RemunerationInput disabled={isSubmitting} required={props.mode === "create"} />
+                  <div className="lg:col-span-1">
+                    <RemunerationInput disabled={isSubmitting} required={props.mode === "create"} />
+                  </div>
                 </div>
 
                 <BonifiableToggle control={form.control} disabled={isSubmitting} />

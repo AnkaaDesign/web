@@ -7,7 +7,7 @@ import { useSector, useSectorMutations } from "../../../../hooks";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { SpecificationsCard, RelatedUsersCard } from "@/components/administration/sector/detail";
+import { SpecificationsCard, SectorUsersTable } from "@/components/administration/sector/detail";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,11 +40,14 @@ export const SectorDetailPage = () => {
       users: {
         include: {
           position: true,
+          sector: true,
+          managedSector: true,
         },
         orderBy: {
           name: "asc",
         },
       },
+      managedByUsers: true,
       changelogs: {
         include: {
           user: true,
@@ -53,6 +56,12 @@ export const SectorDetailPage = () => {
           createdAt: "desc",
         },
         take: 10,
+      },
+      _count: {
+        select: {
+          users: true,
+          tasks: true,
+        },
       },
     },
     enabled: !!id,
@@ -139,7 +148,7 @@ export const SectorDetailPage = () => {
             </div>
 
             {/* Related Users */}
-            <RelatedUsersCard sector={sector} />
+            <SectorUsersTable sector={sector} />
           </div>
         </div>
 

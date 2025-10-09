@@ -1,19 +1,14 @@
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Combobox } from "@/components/ui/combobox";
 import { MEASURE_UNIT, MEASURE_TYPE, MEASURE_UNIT_LABELS, MEASURE_TYPE_LABELS } from "../../../../../constants";
-import { IconRuler, IconRulerMeasure, IconScale, IconSettings } from "@tabler/icons-react";
+import { IconRuler, IconRulerMeasure, IconSettings } from "@tabler/icons-react";
 
 interface MeasureFiltersProps {
   measureUnits?: string[];
   onMeasureUnitsChange: (units: string[]) => void;
   measureTypes?: string[];
   onMeasureTypesChange: (types: string[]) => void;
-  hasMeasures?: boolean;
-  onHasMeasuresChange: (value: boolean | undefined) => void;
-  hasMultipleMeasures?: boolean;
-  onHasMultipleMeasuresChange: (value: boolean | undefined) => void;
 }
 
 export function MeasureFilters({
@@ -21,10 +16,6 @@ export function MeasureFilters({
   onMeasureUnitsChange,
   measureTypes = [],
   onMeasureTypesChange,
-  hasMeasures,
-  onHasMeasuresChange,
-  hasMultipleMeasures,
-  onHasMultipleMeasuresChange,
 }: MeasureFiltersProps) {
   // Group measure units by category for better organization
   const measureUnitsByCategory = {
@@ -101,34 +92,6 @@ export function MeasureFilters({
 
   return (
     <div className="space-y-4">
-      {/* Measure Status Switches */}
-      <div className="space-y-3">
-        <Label className="text-sm font-medium flex items-center gap-2">
-          <IconSettings className="h-4 w-4" />
-          Status de Medidas
-        </Label>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="hasMeasures" className="text-sm font-normal flex items-center gap-2">
-              <IconRuler className="h-4 w-4 text-muted-foreground" />
-              Possui medidas definidas
-            </Label>
-            <Switch id="hasMeasures" checked={hasMeasures ?? false} onCheckedChange={(checked) => onHasMeasuresChange(checked ? true : undefined)} />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <Label htmlFor="hasMultipleMeasures" className="text-sm font-normal flex items-center gap-2">
-              <IconScale className="h-4 w-4 text-muted-foreground" />
-              Possui múltiplas medidas
-            </Label>
-            <Switch id="hasMultipleMeasures" checked={hasMultipleMeasures ?? false} onCheckedChange={(checked) => onHasMultipleMeasuresChange(checked ? true : undefined)} />
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
       {/* Measure Types */}
       <div className="space-y-2">
         <Label className="flex items-center gap-2">

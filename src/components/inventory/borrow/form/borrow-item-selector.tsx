@@ -216,7 +216,6 @@ export const BorrowItemSelector = ({
       // When showSelectedOnly is true, don't apply search and other filters (but keep them in state)
       ...(!showSelectedOnlyProp && {
         searchingFor: debouncedSearchTerm,
-        showInactive,
       }),
       where: {
         // When showSelectedOnly is true, only filter by selected IDs
@@ -229,6 +228,8 @@ export const BorrowItemSelector = ({
           : {
               // Apply all filters when not showing selected only
               category: { type: "TOOL" },
+              // Filter by active status: only show inactive items when showInactive is true
+              ...(!showInactive && { isActive: true }),
               ...(categoryIds.length && { categoryId: { in: categoryIds } }),
               ...(brandIds.length && { brandId: { in: brandIds } }),
               ...(supplierIds.length && { supplierId: { in: supplierIds } }),

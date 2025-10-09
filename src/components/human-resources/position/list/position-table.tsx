@@ -82,6 +82,12 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
       page: page + 1, // Convert 0-based to 1-based for API
       limit: pageSize,
       include: {
+        // Fetch monetary values (new approach) ordered by current=true first
+        monetaryValues: {
+          orderBy: [{ current: "desc" as const }, { createdAt: "desc" as const }],
+          take: 5,
+        },
+        // Also fetch deprecated remunerations for backwards compatibility
         remunerations: {
           orderBy: { createdAt: "desc" as const },
           take: 1,
@@ -268,14 +274,32 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
         ),
       },
       {
+        key: "hierarchy",
+        header: "HIERARQUIA",
+        sortable: true,
+        className: "min-w-[120px]",
+        align: "center" as const,
+        accessor: (position: Position) => (
+          position.hierarchy !== null && position.hierarchy !== undefined ? (
+            <Badge variant="secondary" className="font-normal">
+              {position.hierarchy}
+            </Badge>
+          ) : (
+            <span className="text-sm text-muted-foreground">-</span>
+          )
+        ),
+      },
+      {
         key: "remuneration",
         header: "REMUNERAÇÃO",
         sortable: true,
         className: "min-w-[150px]",
         align: "left" as const,
         accessor: (position: Position) => {
-          const remuneration = position.remunerations && position.remunerations.length > 0 ? position.remunerations[0].value : null;
-          return remuneration ? (
+          // Use the virtual remuneration field (populated by backend from monetaryValues or remunerations)
+          // This ensures we always get the correct current remuneration value
+          const remuneration = position.remuneration ?? 0;
+          return remuneration > 0 ? (
             <Badge variant="primary" className="font-normal">
               {formatCurrency(remuneration)}
             </Badge>

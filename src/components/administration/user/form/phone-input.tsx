@@ -8,16 +8,14 @@ interface PhoneInputProps {
 
 export function PhoneInput({ disabled }: PhoneInputProps) {
   const form = useFormContext<UserCreateFormData | UserUpdateFormData>();
-  const emailValue = form.watch("email");
 
-  // Show as required if email is not provided
-  const isRequired = !emailValue;
-
+  // Note: Either phone OR email is required, but we don't show asterisk
+  // because the validation is handled at the form level via refinement
   return (
     <StandardizedPhoneInput
       control={form.control}
       name="phone"
-      label={isRequired ? "Telefone *" : "Telefone"}
+      label="Telefone"
       placeholder="Digite o telefone do colaborador"
       disabled={disabled}
       multiple={false}

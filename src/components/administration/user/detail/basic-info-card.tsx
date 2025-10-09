@@ -3,8 +3,7 @@ import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import { IconUser, IconMail, IconPhone, IconBrandWhatsapp } from "@tabler/icons-react";
 import type { User } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { formatBrazilianPhone } from "../../../../utils";
-import { USER_STATUS_LABELS } from "../../../../constants";
+import { formatBrazilianPhone, getUserStatusBadgeText } from "../../../../utils";
 
 interface BasicInfoCardProps {
   user: User;
@@ -72,7 +71,7 @@ export function BasicInfoCard({ user, className }: BasicInfoCardProps) {
 
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground">Status</span>
-                <Badge variant={statusVariant}>{USER_STATUS_LABELS[user.status]}</Badge>
+                <Badge variant={statusVariant}>{getUserStatusBadgeText(user)}</Badge>
               </div>
             </div>
           </div>

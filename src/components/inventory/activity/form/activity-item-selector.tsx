@@ -209,7 +209,6 @@ export const ActivityItemSelector = ({
       // When showSelectedOnly is true, don't apply search and other filters (but keep them in state)
       ...(!showSelectedOnly && {
         searchingFor: debouncedSearchTerm,
-        showInactive,
       }),
       where: {
         // When showSelectedOnly is true, only filter by selected IDs
@@ -217,6 +216,8 @@ export const ActivityItemSelector = ({
           ? { id: { in: Array.from(selectedItems) } }
           : {
               // Apply other filters only when not showing selected only
+              // Filter by active status: only show inactive items when showInactive is true
+              ...(!showInactive && { isActive: true }),
               ...(categoryIds.length && { categoryId: { in: categoryIds } }),
               ...(brandIds.length && { brandId: { in: brandIds } }),
               ...(supplierIds.length && { supplierId: { in: supplierIds } }),

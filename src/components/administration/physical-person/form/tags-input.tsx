@@ -76,15 +76,19 @@ export function TagsInput<TFieldValues extends FieldValues = FieldValues>({ cont
               {fieldValue.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {fieldValue.map((tag: string, index: number) => (
-                    <Badge key={`tag-${index}`} variant="secondary" className="pl-3 pr-1 py-1 flex items-center gap-1">
+                    <Badge
+                      key={`tag-${index}`}
+                      variant="secondary"
+                      className="flex items-center gap-1 text-xs pr-1"
+                    >
                       <span>{tag}</span>
                       <Button
                         type="button"
                         onClick={() => remove(index)}
                         disabled={disabled}
                         variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 ml-1 hover:bg-destructive hover:text-destructive-foreground"
+                        size="sm"
+                        className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground ml-1"
                       >
                         <IconX className="h-3 w-3" />
                       </Button>

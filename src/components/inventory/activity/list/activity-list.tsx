@@ -234,6 +234,7 @@ export function ActivityList({ className }: ActivityListProps) {
               filters={queryFilters}
               currentActivities={tableData.activities}
               totalRecords={tableData.totalRecords}
+              visibleColumns={visibleColumns}
               selectedActivities={selectionCount > 0 ? new Set(selectedIds.map(String)) : undefined}
             />
           </div>

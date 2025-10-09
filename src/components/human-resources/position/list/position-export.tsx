@@ -21,8 +21,9 @@ const EXPORT_COLUMNS: ExportColumn<Position>[] = [
     id: "remuneration",
     label: "Remuneração",
     getValue: (position: Position) => {
-      const remuneration = position.remunerations && position.remunerations.length > 0 ? position.remunerations[0].value : null;
-      return remuneration ? formatCurrency(remuneration) : "";
+      // Use the virtual remuneration field (populated by backend)
+      const remuneration = position.remuneration ?? 0;
+      return remuneration > 0 ? formatCurrency(remuneration) : "";
     },
   },
   { id: "_count.users", label: "Funcionários", getValue: (position: Position) => (position._count?.users || 0).toString() },
@@ -46,11 +47,17 @@ export function PositionExport({ className, filters, currentPositions = [], tota
           page,
           limit: 100,
           include: {
+            // Fetch monetary values for accurate current remuneration
+            monetaryValues: {
+              orderBy: [{ current: "desc" }, { createdAt: "desc" }],
+              take: 5,
+            },
+            // Also fetch deprecated remunerations for backwards compatibility
             remunerations: {
               orderBy: { createdAt: "desc" },
               take: 1,
             },
-            count: {
+            _count: {
               select: {
                 users: true,
               },

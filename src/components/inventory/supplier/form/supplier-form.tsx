@@ -235,7 +235,7 @@ export function SupplierForm(props: SupplierFormProps) {
                 <CorporateNameInput disabled={isSubmitting} />
               </div>
 
-              <FormInput<SupplierCreateFormData | SupplierUpdateFormData> name="cnpj" type="cnpj" label="CNPJ" disabled={isSubmitting} required />
+              <FormInput<SupplierCreateFormData | SupplierUpdateFormData> name="cnpj" type="cnpj" label="CNPJ" disabled={isSubmitting} />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormInput<SupplierCreateFormData | SupplierUpdateFormData> name="email" type="email" label="E-mail" placeholder="fornecedor@exemplo.com" disabled={isSubmitting} />

@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { IconNumber, IconPercentage, IconCurrencyDollar, IconChartLine, IconRuler } from "@tabler/icons-react";
+import { IconNumber, IconPercentage, IconCurrencyDollar, IconChartLine } from "@tabler/icons-react";
 
 interface RangeFiltersProps {
   quantityRange?: { min?: number; max?: number };
@@ -12,8 +12,6 @@ interface RangeFiltersProps {
   onTaxRangeChange: (range?: { min?: number; max?: number }) => void;
   monthlyConsumptionRange?: { min?: number; max?: number };
   onMonthlyConsumptionRangeChange: (range?: { min?: number; max?: number }) => void;
-  measureValueRange?: { min?: number; max?: number };
-  onMeasureValueRangeChange: (range?: { min?: number; max?: number }) => void;
 }
 
 export function RangeFilters({
@@ -25,8 +23,6 @@ export function RangeFilters({
   onTaxRangeChange,
   monthlyConsumptionRange,
   onMonthlyConsumptionRangeChange,
-  measureValueRange,
-  onMeasureValueRangeChange,
 }: RangeFiltersProps) {
   const handleQuantityMinChange = (value: string) => {
     const min = value ? parseFloat(value) : undefined;
@@ -66,16 +62,6 @@ export function RangeFilters({
   const handleTotalPriceMaxChange = (value: string | number | null) => {
     const max = typeof value === "number" ? value : undefined;
     onTotalPriceRangeChange({ ...totalPriceRange, max });
-  };
-
-  const handleMeasureValueMinChange = (value: string) => {
-    const min = value ? parseFloat(value) : undefined;
-    onMeasureValueRangeChange({ ...measureValueRange, min });
-  };
-
-  const handleMeasureValueMaxChange = (value: string) => {
-    const max = value ? parseFloat(value) : undefined;
-    onMeasureValueRangeChange({ ...measureValueRange, max });
   };
 
   return (
@@ -185,46 +171,6 @@ export function RangeFilters({
               placeholder="∞"
               value={monthlyConsumptionRange?.max || ""}
               onChange={(value) => handleMonthlyConsumptionMaxChange(value as string)}
-            />
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Measure Value Range */}
-      <div className="space-y-2">
-        <Label className="text-sm font-medium flex items-center gap-2">
-          <IconRuler className="h-4 w-4" />
-          Faixa de Valor de Medida
-        </Label>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <Label htmlFor="measureValueMin" className="text-xs text-muted-foreground">
-              Mínimo
-            </Label>
-            <Input
-              id="measureValueMin"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0"
-              value={measureValueRange?.min || ""}
-              onChange={(value) => handleMeasureValueMinChange(value as string)}
-            />
-          </div>
-          <div>
-            <Label htmlFor="measureValueMax" className="text-xs text-muted-foreground">
-              Máximo
-            </Label>
-            <Input
-              id="measureValueMax"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="∞"
-              value={measureValueRange?.max || ""}
-              onChange={(value) => handleMeasureValueMaxChange(value as string)}
             />
           </div>
         </div>

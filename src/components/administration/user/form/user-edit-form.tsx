@@ -39,6 +39,31 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
       city: user.city,
       state: user.state,
       zipCode: user.zipCode,
+      // PPE Sizes
+      ppeSize: user.ppeSize ? {
+        shirts: user.ppeSize.shirts,
+        boots: user.ppeSize.boots,
+        pants: user.ppeSize.pants,
+        sleeves: user.ppeSize.sleeves,
+        mask: user.ppeSize.mask,
+        gloves: user.ppeSize.gloves,
+        rainBoots: user.ppeSize.rainBoots,
+      } : {
+        shirts: null,
+        boots: null,
+        pants: null,
+        sleeves: null,
+        mask: null,
+        gloves: null,
+        rainBoots: null,
+      },
+      // Status tracking timestamps (read-only, auto-managed by backend)
+      contractedAt: user.contractedAt,
+      exp1StartAt: user.exp1StartAt,
+      exp1EndAt: user.exp1EndAt,
+      exp2StartAt: user.exp2StartAt,
+      exp2EndAt: user.exp2EndAt,
+      dismissedAt: user.dismissedAt,
       // Don't include password in default values
       password: undefined,
     }),
@@ -59,6 +84,18 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
 
       // Skip fields that don't exist in the form data
       if (!(typedKey in data)) return;
+
+      // Skip read-only status tracking fields (auto-managed by backend)
+      if (
+        typedKey === "contractedAt" ||
+        typedKey === "exp1StartAt" ||
+        typedKey === "exp1EndAt" ||
+        typedKey === "exp2StartAt" ||
+        typedKey === "exp2EndAt" ||
+        typedKey === "dismissedAt"
+      ) {
+        return;
+      }
 
       const newValue = data[typedKey];
       const oldValue = typedKey in original ? (original as any)[typedKey] : undefined;

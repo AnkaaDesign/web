@@ -29,13 +29,14 @@ export function CollaboratorSelect({ control, disabled, required }: Collaborator
           </FormLabel>
           <FormControl>
             <Combobox
-              value={field.value}
+              value={field.value || ""}
               onValueChange={field.onChange}
               disabled={disabled}
               placeholder="Selecione um colaborador"
               emptyText="Nenhum colaborador encontrado"
               searchPlaceholder="Buscar colaborador..."
               async={true}
+              minSearchLength={0}
               queryKey={["users", "vacation"]}
               queryFn={async (search: string) => {
                 const response = await userService.getUsers({
@@ -44,7 +45,7 @@ export function CollaboratorSelect({ control, disabled, required }: Collaborator
                   where: { status: { not: USER_STATUS.DISMISSED } },
                   include: { position: true },
                 });
-                return response.data || [];
+                return { data: response.data || [], hasMore: response.meta?.hasNextPage || false, total: response.meta?.totalRecords || 0 };
               }}
               getOptionLabel={(user: User) => user.name}
               getOptionValue={(user: User) => user.id}

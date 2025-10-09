@@ -217,8 +217,9 @@ export function ManualAddressForm({ value = {}, onChange, onSubmit, className, s
                 </Label>
                 <Input
                   id="postalCode"
+                  type="cep"
                   value={value.postalCode || ""}
-                  onChange={(e) => handleFieldChange("postalCode", e.target.value)}
+                  onChange={(val) => handleFieldChange("postalCode", val as string || "")}
                   placeholder="01234-567"
                   disabled={disabled}
                   className={errors.postalCode ? "border-red-500" : ""}

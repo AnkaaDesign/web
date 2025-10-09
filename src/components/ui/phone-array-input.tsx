@@ -4,7 +4,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { IconPhone, IconPlus, IconTrash } from "@tabler/icons-react";
-import { formatPhone } from "../../utils";
+import { formatBrazilianPhone } from "../../utils";
 
 interface PhoneArrayInputProps<TFieldValues extends FieldValues = FieldValues> {
   control: any;
@@ -119,7 +119,7 @@ export function PhoneArrayInput<TFieldValues extends FieldValues = FieldValues>(
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">{label} adicionados:</p>
                   {phones.map((phone: string, index: number) => {
-                    const formatted = formatPhone(phone);
+                    const formatted = formatBrazilianPhone(phone);
 
                     return (
                       <div key={`phone-${index}`} className="flex items-center gap-2 p-2 bg-muted rounded-lg">

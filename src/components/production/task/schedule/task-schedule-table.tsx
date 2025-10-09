@@ -19,6 +19,7 @@ import { useTaskMutations } from "../../../../hooks";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { TableSortUtils, createColumnConfigMap, type SortableColumnConfig, type SortConfig, type SortDirection } from "@/utils/table-sort-utils";
 
 interface TaskScheduleTableProps {
   tasks: Task[];
@@ -30,14 +31,9 @@ interface TaskRow extends Task {
   hoursRemaining: number | null;
 }
 
-interface SortConfig {
-  column: string;
-  direction: "asc" | "desc";
-}
-
 export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTableProps) {
   const navigate = useNavigate();
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+  const [sortConfigs, setSortConfigs] = useState<SortConfig[]>([]);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
@@ -55,7 +51,88 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
 
   const { updateAsync, createAsync, deleteAsync: deleteTaskAsync } = useTaskMutations();
 
-  // Define all columns in the specific order
+  // Custom sort function for serialNumberOrPlate (multi-field)
+  const sortSerialNumberOrPlate = useCallback((a: TaskRow, b: TaskRow, direction: SortDirection): number => {
+    const aValue = a.serialNumber || a.plate || "";
+    const bValue = b.serialNumber || b.plate || "";
+    return TableSortUtils.compareValues(aValue, bValue, direction);
+  }, []);
+
+  // Define all columns with enhanced sort configuration
+  const sortableColumns = useMemo<SortableColumnConfig[]>(
+    () => [
+      {
+        key: "name",
+        header: "LOGOMARCA",
+        sortable: true,
+        accessor: "name",
+        dataType: "string",
+      },
+      {
+        key: "customer.fantasyName",
+        header: "CLIENTE",
+        sortable: true,
+        accessor: "customer.fantasyName",
+        dataType: "string",
+      },
+      {
+        key: "generalPainting",
+        header: "PINTURA",
+        sortable: true,
+        accessor: (task: TaskRow) => task.generalPainting?.name || "",
+        dataType: "string",
+      },
+      {
+        key: "serialNumberOrPlate",
+        header: "Nº SÉRIE",
+        sortable: true,
+        accessor: (task: TaskRow) => task.serialNumber || task.plate || "",
+        customSortFunction: sortSerialNumberOrPlate,
+        dataType: "custom",
+      },
+      {
+        key: "sector.name",
+        header: "SETOR",
+        sortable: true,
+        accessor: "sector.name",
+        dataType: "string",
+      },
+      {
+        key: "entryDate",
+        header: "ENTRADA",
+        sortable: true,
+        accessor: "entryDate",
+        dataType: "date",
+      },
+      {
+        key: "startedAt",
+        header: "INICIADO EM",
+        sortable: true,
+        accessor: "startedAt",
+        dataType: "date",
+      },
+      {
+        key: "finishedAt",
+        header: "FINALIZADO EM",
+        sortable: true,
+        accessor: "finishedAt",
+        dataType: "date",
+      },
+      {
+        key: "term",
+        header: "PRAZO",
+        sortable: true,
+        accessor: "term",
+        dataType: "date",
+      },
+    ],
+    [sortSerialNumberOrPlate],
+  );
+
+  // Create column config map for sorting
+  const columnConfigMap = useMemo(() => createColumnConfigMap(sortableColumns), [sortableColumns]);
+
+  // Define display columns (includes select and non-sortable columns)
   const allColumns = useMemo(
     () => [
       { id: "select", header: "", width: TABLE_LAYOUT.checkbox.className, sortable: false },
@@ -84,7 +161,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
     return [...baseColumns, ...visibleDataColumns];
   }, [allColumns, visibleColumns]);
 
-  // Prepare tasks with deadline info
+  // Prepare tasks with deadline info and apply cumulative sorting
   const preparedTasks = useMemo<TaskRow[]>(() => {
     const tasksWithInfo = tasks.map((task) => {
       const isOverdue = task.term ? isDateInPast(task.term) : false;
@@ -97,35 +174,13 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
       };
     });
 
-    // Sort tasks if sort config is set
-    if (sortConfig) {
-      return [...tasksWithInfo].sort((a, b) => {
-        let aValue: any;
-        let bValue: any;
-
-        // Handle nested properties
-        if (sortConfig.column.includes(".")) {
-          const keys = sortConfig.column.split(".");
-          aValue = keys.reduce((obj, key) => obj?.[key], a as any);
-          bValue = keys.reduce((obj, key) => obj?.[key], b as any);
-        } else {
-          aValue = a[sortConfig.column as keyof Task];
-          bValue = b[sortConfig.column as keyof Task];
-        }
-
-        if (aValue == null) return 1;
-        if (bValue == null) return -1;
-
-        let comparison = 0;
-        if (aValue < bValue) comparison = -1;
-        if (aValue > bValue) comparison = 1;
-
-        return sortConfig.direction === "asc" ? comparison : -comparison;
-      });
+    // Apply multi-column cumulative sorting
+    if (sortConfigs.length > 0) {
+      return TableSortUtils.sortItems(tasksWithInfo, sortConfigs, columnConfigMap);
     }
 
     return tasksWithInfo;
-  }, [tasks, sortConfig]);
+  }, [tasks, sortConfigs, columnConfigMap]);
 
   const handleSelectAll = useCallback(
     (checked: boolean) => {
@@ -210,19 +265,19 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
     [selectedTaskIds, preparedTasks],
   );
 
-  const handleSort = (column: string) => {
-    if (!allColumns.find((col) => col.id === column)?.sortable) return;
+  const handleSort = useCallback(
+    (column: string, event?: React.MouseEvent) => {
+      if (!allColumns.find((col) => col.id === column)?.sortable) return;
 
-    setSortConfig((current) => {
-      if (!current || current.column !== column) {
-        return { column, direction: "asc" };
-      }
-      if (current.direction === "asc") {
-        return { column, direction: "desc" };
-      }
-      return null;
-    });
-  };
+      // Always use cumulative multi-sort mode
+      const multiSort = true;
+
+      setSortConfigs((currentConfigs) => {
+        return TableSortUtils.toggleColumnSort(currentConfigs, column, { multiSort });
+      });
+    },
+    [allColumns],
+  );
 
   const handleAction = useCallback(
     async (action: TaskAction, tasks: Task[]) => {
@@ -415,7 +470,10 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
               {columns.map((column) => {
                 const isSortable = column.sortable !== false;
-                const isSorted = sortConfig?.column === column.id;
+                const sortConfig = sortConfigs.find((config) => config.column === column.id);
+                const isSorted = !!sortConfig;
+                const sortOrder = sortConfig?.order;
+                const sortDirection = sortConfig?.direction;
 
                 return (
                   <TableHead key={column.id} className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0", column.width)}>
@@ -430,14 +488,27 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
                       </div>
                     ) : isSortable ? (
                       <button
-                        onClick={() => handleSort(column.id)}
+                        onClick={(e) => handleSort(column.id, e)}
                         className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
+                        title={isSorted ? `Ordenado: ${sortOrder! + 1}º (${sortDirection === "asc" ? "crescente" : "decrescente"}). Clique novamente para inverter direção` : "Clique para adicionar à ordenação"}
                       >
                         <span className="truncate">{column.header}</span>
-                        <div className="inline-flex items-center ml-1">
+                        <div className="inline-flex items-center ml-1 gap-0.5">
                           {!isSorted && <IconSelector className="h-4 w-4 text-muted-foreground" />}
-                          {isSorted && sortConfig?.direction === "asc" && <IconChevronUp className="h-4 w-4 text-foreground" />}
-                          {isSorted && sortConfig?.direction === "desc" && <IconChevronDown className="h-4 w-4 text-foreground" />}
+                          {isSorted && (
+                            <>
+                              {sortDirection === "asc" ? (
+                                <IconChevronUp className="h-4 w-4 text-foreground" />
+                              ) : (
+                                <IconChevronDown className="h-4 w-4 text-foreground" />
+                              )}
+                              {sortConfigs.length > 1 && (
+                                <span className="text-[10px] font-bold text-foreground bg-primary/20 rounded-full w-4 h-4 flex items-center justify-center">
+                                  {sortOrder! + 1}
+                                </span>
+                              )}
+                            </>
+                          )}
                         </div>
                       </button>
                     ) : (

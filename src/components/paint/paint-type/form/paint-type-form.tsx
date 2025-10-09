@@ -163,6 +163,19 @@ export function PaintTypeForm(props: PaintTypeFormProps) {
             </CardContent>
           </Card>
 
+          {/* Component Items Section */}
+          <Card className="bg-transparent">
+            <CardHeader>
+              <CardTitle>Componentes</CardTitle>
+              <CardDescription>
+                Selecione os itens que podem ser usados como componentes em fórmulas deste tipo de tinta
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ComponentItemsSelector control={form.control} disabled={isSubmitting} />
+            </CardContent>
+          </Card>
+
           {/* Ground Paint Configuration */}
           <Card className="bg-transparent">
             <CardHeader>
@@ -176,19 +189,6 @@ export function PaintTypeForm(props: PaintTypeFormProps) {
                   Tintas deste tipo exigirão a seleção de fundos apropriados durante o cadastro.
                 </p>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Component Items Section */}
-          <Card className="bg-transparent">
-            <CardHeader>
-              <CardTitle>Componentes</CardTitle>
-              <CardDescription>
-                Selecione os itens que podem ser usados como componentes em fórmulas deste tipo de tinta
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ComponentItemsSelector control={form.control} disabled={isSubmitting} />
             </CardContent>
           </Card>
 

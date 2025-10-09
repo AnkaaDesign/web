@@ -589,11 +589,6 @@ export const CuttingDetailsPage = () => {
                     <Badge variant={getStatusBadgeVariant(pendingStatus)}>{CUT_STATUS_LABELS[pendingStatus]}</Badge>
                   </div>
                 </div>
-                {pendingStatus === CUT_STATUS.CUTTING && (
-                  <div className="text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950 p-3 rounded-md">
-                    <IconInfoCircle className="h-4 w-4 inline mr-2 text-blue-500" />O horário de início será registrado automaticamente.
-                  </div>
-                )}
                 {pendingStatus === CUT_STATUS.COMPLETED && (
                   <div className="text-sm text-muted-foreground bg-green-50 dark:bg-green-950 p-3 rounded-md">
                     <IconInfoCircle className="h-4 w-4 inline mr-2 text-green-500" />O horário de conclusão será registrado automaticamente.

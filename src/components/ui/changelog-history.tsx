@@ -115,9 +115,31 @@ const actionConfig: Record<CHANGE_LOG_ACTION, { icon: React.ElementType; color: 
 
 // Group changelog fields by entity and time
 const groupChangelogsByEntity = (changelogs: ChangeLog[]) => {
-  // Don't group changes - each change should be displayed separately
-  // This ensures that "Status" and item changes are shown in separate cards
-  return changelogs.map((changelog) => [changelog]);
+  const groups: ChangeLog[][] = [];
+  let currentGroup: ChangeLog[] = [];
+  let currentTime: number | null = null;
+
+  changelogs.forEach((changelog) => {
+    const time = new Date(changelog.createdAt).getTime();
+
+    // Group changes that happened within 1 second of each other
+    if (!currentTime || Math.abs(time - currentTime) < 1000) {
+      currentGroup.push(changelog);
+      currentTime = time;
+    } else {
+      if (currentGroup.length > 0) {
+        groups.push(currentGroup);
+      }
+      currentGroup = [changelog];
+      currentTime = time;
+    }
+  });
+
+  if (currentGroup.length > 0) {
+    groups.push(currentGroup);
+  }
+
+  return groups;
 };
 
 // Loading skeleton

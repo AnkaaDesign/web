@@ -59,13 +59,6 @@ export function SimplePaginationAdvanced({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleGoToPage();
-    }
-  };
-
   // Calculate page range for display
   const getPageNumbers = () => {
     const delta = 2;
@@ -146,8 +139,13 @@ export function SimplePaginationAdvanced({
               min="1"
               max={totalPages}
               value={pageInput}
-              onChange={(e) => setPageInput(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onChange={(value) => setPageInput(String(value || ""))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleGoToPage();
+                }
+              }}
               className="h-9 w-16 px-3 py-2 text-sm bg-transparent"
               placeholder="..."
             />

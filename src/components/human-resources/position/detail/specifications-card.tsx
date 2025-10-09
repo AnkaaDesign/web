@@ -11,7 +11,8 @@ interface SpecificationsCardProps {
 }
 
 export function SpecificationsCard({ position }: SpecificationsCardProps) {
-  const currentRemuneration = position.remunerations && position.remunerations.length > 0 ? position.remunerations[0].value : null;
+  // Use the virtual remuneration field (populated by backend)
+  const currentRemuneration = position.remuneration ?? 0;
 
   return (
     <Card>
@@ -29,6 +30,10 @@ export function SpecificationsCard({ position }: SpecificationsCardProps) {
             <div className="flex items-center justify-between py-1">
               <span className="text-sm text-muted-foreground">Nome</span>
               <span className="text-sm font-medium">{position.name}</span>
+            </div>
+            <div className="flex items-center justify-between py-1">
+              <span className="text-sm text-muted-foreground">Hierarquia</span>
+              {position.hierarchy !== null && position.hierarchy !== undefined ? <span className="text-sm font-medium">{position.hierarchy}</span> : <span className="text-sm text-muted-foreground">-</span>}
             </div>
             <div className="flex items-center justify-between py-1">
               <span className="text-sm text-muted-foreground">Remuneração Atual</span>

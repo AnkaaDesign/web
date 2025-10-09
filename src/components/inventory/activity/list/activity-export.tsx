@@ -80,15 +80,236 @@ export function ActivityExport({ className, filters, currentActivities = [], tot
     }
   };
 
-  const handleExport = async (format: ExportFormat, items: Activity[], _columns: ExportColumn<Activity>[]) => {
+  const handleExport = async (format: ExportFormat, items: Activity[], columns: ExportColumn<Activity>[]) => {
     try {
-      // The BaseExportPopover component handles the actual export logic
-      // including CSV, Excel, and PDF generation// If you need custom export logic, you can implement it here
-      // For now, we'll let the BaseExportPopover handle it
+      // Generate export based on format
+      switch (format) {
+        case "csv":
+          await exportToCSV(items, columns);
+          break;
+        case "excel":
+          await exportToExcel(items, columns);
+          break;
+        case "pdf":
+          await exportToPDF(items, columns);
+          break;
+      }
+
+      toast.success(`Exportação ${format.toUpperCase()} concluída com sucesso!`);
     } catch (error) {
       console.error("Export error:", error);
       toast.error("Erro ao exportar dados");
       throw error;
+    }
+  };
+
+  const exportToCSV = async (items: Activity[], columns: ExportColumn<Activity>[]) => {
+    // CSV headers from visible columns
+    const headers = columns.map((col) => col.label);
+
+    // Convert items to CSV rows with only visible columns
+    const rows = items.map((item) => columns.map((col) => col.getValue(item)));
+
+    // Create CSV content
+    const csvContent = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n");
+
+    // Download CSV
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `atividades_${formatDateTime(new Date()).replace(/[\/:\s]/g, "-")}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToExcel = async (items: Activity[], columns: ExportColumn<Activity>[]) => {
+    // Headers from visible columns
+    const headers = columns.map((col) => col.label);
+
+    // Convert items to rows with only visible columns
+    const rows = items.map((item) => columns.map((col) => col.getValue(item)));
+
+    // Create tab-separated values for Excel
+    const excelContent = [headers.join("\t"), ...rows.map((row) => row.join("\t"))].join("\n");
+
+    // Download as .xls file
+    const blob = new Blob(["\ufeff" + excelContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `atividades_${formatDateTime(new Date()).replace(/[\/:\s]/g, "-")}.xls`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToPDF = async (items: Activity[], columns: ExportColumn<Activity>[]) => {
+    // Calculate responsive font sizes based on column count
+    const columnCount = columns.length;
+    const fontSize = columnCount <= 6 ? "11px" : columnCount <= 10 ? "9px" : "7px";
+    const headerFontSize = columnCount <= 6 ? "10px" : columnCount <= 10 ? "8px" : "6px";
+    const cellPadding = columnCount <= 6 ? "6px 4px" : columnCount <= 10 ? "4px 3px" : "3px 2px";
+    const headerPadding = columnCount <= 6 ? "8px 4px" : columnCount <= 10 ? "6px 3px" : "4px 2px";
+
+    // A4 optimized PDF with proper formatting
+    const pdfContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Atividades - ${formatDateTime(new Date())}</title>
+        <style>
+          @page {
+            size: A4 landscape;
+            margin: 12mm;
+          }
+
+          * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+          }
+
+          html, body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: white;
+            font-size: ${fontSize};
+            line-height: 1.3;
+          }
+
+          .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+          }
+
+          .logo {
+            width: ${columnCount <= 6 ? "80px" : "60px"};
+            height: auto;
+            margin-right: 15px;
+          }
+
+          .header-info {
+            flex: 1;
+          }
+
+          .info {
+            color: #6b7280;
+            font-size: ${columnCount <= 6 ? "10px" : "8px"};
+          }
+
+          .info p {
+            margin: 2px 0;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #e5e7eb;
+            font-size: ${fontSize};
+          }
+
+          th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+            padding: ${headerPadding};
+            border-bottom: 2px solid #e5e7eb;
+            border-right: 1px solid #e5e7eb;
+            font-size: ${headerFontSize};
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            white-space: nowrap;
+            text-align: left;
+          }
+
+          td {
+            padding: ${cellPadding};
+            border-bottom: 1px solid #f3f4f6;
+            border-right: 1px solid #f3f4f6;
+            vertical-align: top;
+          }
+
+          tbody tr:nth-child(even) {
+            background-color: #fafafa;
+          }
+
+          .footer {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: ${columnCount <= 6 ? "9px" : "7px"};
+          }
+
+          @media print {
+            .header { margin-bottom: 10px; padding-bottom: 8px; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            thead { display: table-header-group; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <div class="header-info">
+            <div class="info">
+              <p><strong>Data:</strong> ${formatDateTime(new Date())}</p>
+              <p><strong>Total de atividades:</strong> ${items.length}</p>
+            </div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              ${columns.map((col) => `<th>${col.label}</th>`).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${items
+              .map(
+                (item) => `
+              <tr>
+                ${columns.map((col) => `<td>${col.getValue(item) || "-"}</td>`).join("")}
+              </tr>
+            `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <div>Relatório gerado pelo sistema Ankaa</div>
+          <div><strong>Gerado em:</strong> ${formatDateTime(new Date())}</div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(pdfContent);
+      printWindow.document.close();
+      printWindow.focus();
+
+      printWindow.onload = () => {
+        printWindow.print();
+        printWindow.onafterprint = () => {
+          printWindow.close();
+        };
+      };
     }
   };
 

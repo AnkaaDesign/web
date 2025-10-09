@@ -18,7 +18,16 @@ export function NameInput({ control, disabled, required }: NameInputProps) {
         <FormItem>
           <FormLabel>Nome do Cargo {required && <span className="text-destructive">*</span>}</FormLabel>
           <FormControl>
-            <Input value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} placeholder="Ex: Gerente de Vendas" disabled={disabled} />
+            <Input
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              name={field.name}
+              ref={field.ref}
+              placeholder="Ex: Gerente de Vendas"
+              disabled={disabled}
+              className="bg-transparent"
+            />
           </FormControl>
           <FormMessage />
         </FormItem>

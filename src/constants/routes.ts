@@ -117,6 +117,7 @@ export const routes = {
       create: "/recursos-humanos/cargos/cadastrar",
       details: (id: string) => `/recursos-humanos/cargos/detalhes/${id}`,
       edit: (id: string) => `/recursos-humanos/cargos/editar/${id}`,
+      hierarchy: "/recursos-humanos/cargos/hierarquia",
       remunerations: (positionId: string) => `/recursos-humanos/cargos/${positionId}/remuneracoes`,
       root: "/recursos-humanos/cargos",
     },

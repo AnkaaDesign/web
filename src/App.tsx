@@ -227,6 +227,7 @@ const HumanResourcesPositions = lazy(() => import("@/pages/human-resources/posit
 const HumanResourcesPositionsCreate = lazy(() => import("@/pages/human-resources/positions/create").then((module) => ({ default: module.PositionCreatePage })));
 const HumanResourcesPositionsEdit = lazy(() => import("@/pages/human-resources/positions/edit/[id]").then((module) => ({ default: module.PositionEditPage })));
 const HumanResourcesPositionsDetails = lazy(() => import("@/pages/human-resources/positions/details/[id]").then((module) => ({ default: module.PositionDetailPage })));
+const HumanResourcesPositionsHierarchy = lazy(() => import("@/pages/human-resources/positions/hierarchy").then((module) => ({ default: module.PositionHierarchyPage })));
 const HumanResourcesPositionsBatchEdit = lazy(() => import("@/pages/human-resources/positions/batch-edit").then((module) => ({ default: module.PositionBatchEditPage })));
 // Note: Employees pages are managed under Administration section, not Human Resources
 const HumanResourcesPpe = lazy(() => import("@/pages/human-resources/ppe/list").then((module) => ({ default: module.PpeListPage })));
@@ -1652,6 +1653,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPositionsCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.humanResources.positions.hierarchy}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <HumanResourcesPositionsHierarchy />
                     </Suspense>
                   }
                 />

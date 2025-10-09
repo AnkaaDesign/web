@@ -1,8 +1,9 @@
-import { formatCNPJ } from "../../../../utils";
+import { formatCNPJ, formatBrazilianPhone } from "../../../../utils";
 import type { Supplier } from "../../../../types";
 import { Badge } from "../../../ui/badge";
 import { TABLE_LAYOUT } from "../../../ui/table-constants";
 import type { SupplierColumn } from "./types";
+import { getFileUrl } from "@/utils/file";
 
 export const createSupplierColumns = (): SupplierColumn[] => [
   // Basic Information (Primary columns - most commonly used)
@@ -13,9 +14,7 @@ export const createSupplierColumns = (): SupplierColumn[] => [
       <div className="flex items-center gap-2">
         {supplier.logo?.id ? (
           <img
-            src={
-              supplier.logo.thumbnailUrl || `${(window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030"}/files/serve/${supplier.logo.id}`
-            }
+            src={getFileUrl(supplier.logo)}
             alt={`${supplier.fantasyName} logo`}
             className="h-8 w-8 rounded-md object-cover flex-shrink-0 border border-border/50"
             onError={(e) => {
@@ -78,12 +77,24 @@ export const createSupplierColumns = (): SupplierColumn[] => [
   {
     key: "phones",
     header: "TELEFONES",
-    accessor: (supplier: Supplier) => (
-      <div className="text-xs truncate">
-        {supplier.phones?.length > 0 ? supplier.phones.slice(0, 2).join(", ") : "-"}
-        {supplier.phones?.length > 2 && <span className="text-muted-foreground ml-1">+{supplier.phones.length - 2}</span>}
-      </div>
-    ),
+    accessor: (supplier: Supplier) => {
+      if (supplier.phones && supplier.phones.length > 0) {
+        const mainPhone = formatBrazilianPhone(supplier.phones[0]);
+        const otherCount = supplier.phones.length - 1;
+
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm">{mainPhone}</span>
+            {otherCount > 0 && (
+              <Badge variant="secondary" className="text-xs px-1.5 h-5">
+                +{otherCount}
+              </Badge>
+            )}
+          </div>
+        );
+      }
+      return <span className="text-muted-foreground">-</span>;
+    },
     sortable: false,
     className: "w-44",
     align: "left",

@@ -86,8 +86,8 @@ export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityCha
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="default" className="gap-2">
-          <IconColumns className="h-4 w-4" />
+        <Button variant="outline" size="default">
+          <IconColumns className="h-4 w-4 mr-2" />
           Colunas ({visibleCount}/{totalCount})
         </Button>
       </PopoverTrigger>

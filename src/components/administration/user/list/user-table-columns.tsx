@@ -1,5 +1,6 @@
-import { formatCPF, formatPhone, formatDate, formatDateTime } from "../../../../utils";
+import { formatCPF, formatBrazilianPhone, formatDate, formatDateTime } from "../../../../utils";
 import { USER_STATUS_LABELS } from "../../../../constants";
+import { getUserStatusBadgeText } from "../../../../utils/user";
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
 import type { User } from "../../../../types";
 import type { UserColumn } from "./types";
@@ -60,7 +61,7 @@ export const createUserColumns = (): UserColumn[] => [
   {
     key: "phone",
     header: "TELEFONE",
-    accessor: (user: User) => <div className="text-sm">{user.phone ? formatPhone(user.phone) : <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm">{user.phone ? formatBrazilianPhone(user.phone) : <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[140px]",
     align: "left",
@@ -88,7 +89,7 @@ export const createUserColumns = (): UserColumn[] => [
 
   // Cargo (Position)
   {
-    key: "position.name",
+    key: "position.hierarchy",
     header: "CARGO",
     accessor: (user: User) => <div className="text-sm">{user.position?.name || <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
@@ -177,13 +178,13 @@ export const createUserColumns = (): UserColumn[] => [
       const variant = getBadgeVariantFromStatus(user.status, "USER");
 
       return (
-        <Badge variant={variant} className="text-xs">
-          {USER_STATUS_LABELS[user.status]}
+        <Badge variant={variant} className="text-xs whitespace-nowrap">
+          {getUserStatusBadgeText(user)}
         </Badge>
       );
     },
     sortable: true,
-    className: "min-w-[200px]",
+    className: "min-w-[250px]",
     align: "left",
   },
 
@@ -351,4 +352,4 @@ export const createUserColumns = (): UserColumn[] => [
 ];
 
 // Export the default visible columns
-export const DEFAULT_VISIBLE_COLUMNS = new Set(["payrollNumber", "name", "position.name", "sector.name", "status"]);
+export const DEFAULT_VISIBLE_COLUMNS = new Set(["payrollNumber", "name", "position.hierarchy", "sector.name", "status"]);

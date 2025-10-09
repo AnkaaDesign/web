@@ -3,7 +3,7 @@ import { IconUsers, IconUser, IconMail, IconPhone, IconChevronRight } from "@tab
 
 import type { Sector } from "../../../../types";
 import { routes, USER_STATUS_LABELS } from "../../../../constants";
-import { formatCPF, formatPhone } from "../../../../utils";
+import { formatCPF, formatBrazilianPhone } from "../../../../utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -84,7 +84,7 @@ export function RelatedUsersCard({ sector }: RelatedUsersCardProps) {
                   {user.phone && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <IconPhone className="h-3.5 w-3.5" />
-                      <span>{formatPhone(user.phone)}</span>
+                      <span>{formatBrazilianPhone(user.phone)}</span>
                     </div>
                   )}
                   {user.cpf && <div className="text-muted-foreground">CPF: {formatCPF(user.cpf)}</div>}

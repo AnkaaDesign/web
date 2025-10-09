@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,19 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
     limit: 100, // Max 100 due to API limit
   });
 
+  // Get default sector IDs (production, warehouse, leader privileges)
+  const defaultSectorIds = useMemo(() => {
+    if (!sectorsData?.data) return [];
+
+    return sectorsData.data
+      .filter(sector =>
+        sector.privilege === 'PRODUCTION' ||
+        sector.privilege === 'WAREHOUSE' ||
+        sector.privilege === 'LEADER'
+      )
+      .map(sector => sector.id);
+  }, [sectorsData?.data]);
+
   const { data: positionsData } = usePositions({
     orderBy: { name: "asc" },
     include: { remunerations: true },
@@ -71,13 +84,19 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
         setLocalFilters({
           ...filters,
           year: currentYear,
-          months: [String(currentMonth).padStart(2, '0')]
+          months: [String(currentMonth).padStart(2, '0')],
+          // Set default sectors if not already set
+          sectorIds: filters.sectorIds || defaultSectorIds
         });
       } else {
-        setLocalFilters(filters);
+        setLocalFilters({
+          ...filters,
+          // Set default sectors if not already set
+          sectorIds: filters.sectorIds || defaultSectorIds
+        });
       }
     }
-  }, [open, filters]);
+  }, [open, filters, defaultSectorIds]);
 
   // Count total active filters
   const totalActiveFilters =
