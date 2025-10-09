@@ -228,19 +228,14 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
         if (deleteDialog.isBulk) {
           const promises = deleteDialog.items.map((w: Warning) => deleteAsync(w.id));
           await Promise.all(promises);
-          toast.success(`${deleteDialog.items.length} advertências excluídas com sucesso!`);
           refetch();
           resetSelection();
         } else {
           await deleteAsync(deleteDialog.items[0].id);
-          toast.success("Advertência excluída com sucesso");
           refetch();
         }
       } catch (error) {
-        if (deleteDialog.isBulk) {
-          toast.error("Erro ao excluir algumas advertências");
-        }
-        // Error handled by mutation for single delete
+        // Error handled by API client
       }
       setDeleteDialog(null);
     }

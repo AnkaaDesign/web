@@ -241,19 +241,14 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
         if (deleteDialog.isBulk) {
           const promises = deleteDialog.items.map((p) => removeAsync(p.id));
           await Promise.all(promises);
-          toast.success(`${deleteDialog.items.length} cargos excluídos com sucesso!`);
           refetch();
           resetSelection();
         } else {
           await removeAsync(deleteDialog.items[0].id);
-          toast.success("Cargo excluído com sucesso");
           refetch();
         }
       } catch (error) {
-        if (deleteDialog.isBulk) {
-          toast.error("Erro ao excluir alguns cargos");
-        }
-        // Error handled by mutation for single delete
+        // Error handled by API client
       }
       setDeleteDialog(null);
     }
@@ -314,8 +309,15 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
         header: "FUNCIONÁRIOS",
         sortable: true,
         className: "min-w-[120px]",
-        align: "left" as const,
-        accessor: (position: Position) => <span className="text-sm">{position._count?.users || 0}</span>,
+        align: "center" as const,
+        accessor: (position: Position) => {
+          const count = position._count?.users || 0;
+          return (
+            <Badge variant={count > 0 ? "default" : "secondary"} className="min-w-[2rem] justify-center">
+              {count}
+            </Badge>
+          );
+        },
       },
       {
         key: "createdAt",

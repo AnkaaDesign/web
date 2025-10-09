@@ -258,11 +258,8 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
           await deleteAirbrushing(item.id);
           removeFromSelection([item.id]);
         }
-        toast.success(
-          deleteDialog.isBulk ? `${deleteDialog.items.length} airbrushings excluídos com sucesso` : "Airbrushing excluído com sucesso",
-        );
       } catch (error) {
-        toast.error("Erro ao excluir airbrushing");
+        // Error handled by API client
       } finally {
         setDeleteDialog(null);
       }

@@ -203,21 +203,19 @@ export const ActivityTable = ({ filters, visibleColumns, onDataChange, className
       if (activities.length === 1) {
         try {
           await deleteAsync(activities[0].id);
-          toast.success("Movimentação excluída com sucesso!");
           refetch();
         } catch (error) {
-          // Error handled by mutation
+          // Error handled by API client
         }
       } else {
         // Handle bulk delete
         try {
           const promises = activities.map((a) => deleteAsync(a.id));
           await Promise.all(promises);
-          toast.success(`${activities.length} movimentações excluídas com sucesso!`);
           refetch();
           resetSelection();
         } catch (error) {
-          toast.error("Erro ao excluir algumas movimentações");
+          // Error handled by API client
         }
       }
       setContextMenu(null);

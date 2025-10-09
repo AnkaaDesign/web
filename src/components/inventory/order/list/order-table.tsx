@@ -196,10 +196,9 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
 
       try {
         await updateOrder({ id: order.id, data: { status: ORDER_STATUS.FULFILLED } });
-        toast.success("Pedido marcado como feito");
         refetch();
       } catch (error) {
-        // Error handled by mutation hook
+        // Error handled by API client
       }
     },
     [updateOrder, refetch],
@@ -211,10 +210,9 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
 
       try {
         await updateOrder({ id: order.id, data: { status: ORDER_STATUS.RECEIVED } });
-        toast.success("Pedido marcado como recebido");
         refetch();
       } catch (error) {
-        // Error handled by mutation hook
+        // Error handled by API client
       }
     },
     [updateOrder, refetch],
@@ -233,10 +231,9 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
 
     try {
       await updateOrder({ id: cancelDialog.id, data: { status: ORDER_STATUS.CANCELLED } });
-      toast.success("Pedido cancelado com sucesso");
       refetch();
     } catch (error) {
-      // Error handled by mutation hook
+      // Error handled by API client
     } finally {
       setCancelDialog(null);
     }
@@ -264,16 +261,14 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
       if (deleteDialog.isBulk) {
         const orderIds = deleteDialog.items.map((order) => order.id);
         await batchDelete({ orderIds });
-        toast.success(`${orderIds.length} ${orderIds.length === 1 ? "pedido excluído" : "pedidos excluídos"} com sucesso`);
         resetSelection();
       } else {
         await deleteOrder(deleteDialog.items[0].id);
-        toast.success("Pedido excluído com sucesso");
         removeFromSelection([deleteDialog.items[0].id]);
       }
       refetch();
     } catch (error) {
-      // Error handled by mutation hook
+      // Error handled by API client
     } finally {
       setDeleteDialog(null);
     }

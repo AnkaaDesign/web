@@ -430,7 +430,6 @@ export function PpeTable({ visibleColumns, className, onEdit, filters = {}, onDa
             <AlertDialogAction
               onClick={() => {
                 // TODO: Implement delete functionality
-                toast.error("Funcionalidade de exclusão ainda não implementada");
                 setDeleteDialog(null);
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

@@ -1,1 +1,0 @@
-export { AbsenceDetail } from "./absence-detail";

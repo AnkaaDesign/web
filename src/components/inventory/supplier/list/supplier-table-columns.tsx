@@ -128,13 +128,14 @@ export const createSupplierColumns = (): SupplierColumn[] => [
   {
     key: "_count.items",
     header: "PRODUTOS",
-    accessor: (supplier: Supplier) => (
-      <div className="text-center">
-        <Badge variant="secondary" className="text-xs">
-          {(supplier as any)._count?.items || 0}
+    accessor: (supplier: Supplier) => {
+      const count = (supplier as any)._count?.items || 0;
+      return (
+        <Badge variant={count > 0 ? "default" : "secondary"} className="min-w-[2rem] justify-center">
+          {count}
         </Badge>
-      </div>
-    ),
+      );
+    },
     sortable: true,
     className: "w-20",
     align: "center",
@@ -142,13 +143,14 @@ export const createSupplierColumns = (): SupplierColumn[] => [
   {
     key: "_count.orders",
     header: "PEDIDOS",
-    accessor: (supplier: Supplier) => (
-      <div className="text-center">
-        <Badge variant="secondary" className="text-xs">
-          {(supplier as any)._count?.orders || 0}
+    accessor: (supplier: Supplier) => {
+      const count = (supplier as any)._count?.orders || 0;
+      return (
+        <Badge variant={count > 0 ? "default" : "secondary"} className="min-w-[2rem] justify-center">
+          {count}
         </Badge>
-      </div>
-    ),
+      );
+    },
     sortable: true,
     className: "w-24",
     align: "center",
@@ -156,13 +158,14 @@ export const createSupplierColumns = (): SupplierColumn[] => [
   {
     key: "_count.orderRules",
     header: "REGRAS DE PEDIDO",
-    accessor: (supplier: Supplier) => (
-      <div className="text-center">
-        <Badge variant="secondary" className="text-xs">
-          {(supplier as any)._count?.orderRules || 0}
+    accessor: (supplier: Supplier) => {
+      const count = (supplier as any)._count?.orderRules || 0;
+      return (
+        <Badge variant={count > 0 ? "default" : "secondary"} className="min-w-[2rem] justify-center">
+          {count}
         </Badge>
-      </div>
-    ),
+      );
+    },
     sortable: true,
     className: "w-32",
     align: "center",

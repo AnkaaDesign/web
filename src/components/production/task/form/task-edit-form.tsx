@@ -584,7 +584,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       await createObservation(observationData);
 
       // Success toast is handled automatically by API client
-      toast.success("As comissões da tarefa foram suspensas.");
 
       // Reset observation form
       setObservationDescription("");
@@ -593,7 +592,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       setIsObservationOpen(false);
     } catch (error) {
       console.error("Error creating observation:", error);
-      toast.error("Erro ao criar observação");
+      // Error handled by API client
     } finally {
       setIsCreatingObservation(false);
     }

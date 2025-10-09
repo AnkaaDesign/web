@@ -241,7 +241,6 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
             // Fallback to batch API
             const ids = contextMenu.customers.map((customer) => customer.id);
             await batchDelete({ customerIds: ids });
-            toast.success(`${contextMenu.customers.length} clientes deletados com sucesso`);
             // Remove deleted IDs from selection
             removeFromSelection(ids);
           }
@@ -253,7 +252,6 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
             removeFromSelection([contextMenu.customers[0].id]);
           } else {
             await deleteCustomer(contextMenu.customers[0].id);
-            toast.success("Cliente deletado com sucesso");
             // Remove deleted ID from selection
             removeFromSelection([contextMenu.customers[0].id]);
           }

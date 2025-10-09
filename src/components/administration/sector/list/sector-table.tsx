@@ -318,17 +318,31 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
         key: "_count.users",
         header: "USUÁRIOS",
         sortable: true,
-        className: "min-w-[100px]",
-        align: "left" as const,
-        accessor: (sector: Sector) => <span className="text-sm">{sector._count?.users || 0}</span>,
+        className: "min-w-[80px]",
+        align: "center" as const,
+        accessor: (sector: Sector) => {
+          const count = sector._count?.users || 0;
+          return (
+            <Badge variant={count > 0 ? "default" : "secondary"} className="min-w-[2rem] justify-center">
+              {count}
+            </Badge>
+          );
+        },
       },
       {
         key: "_count.tasks",
         header: "TAREFAS",
         sortable: true,
-        className: "min-w-[100px]",
-        align: "left" as const,
-        accessor: (sector: Sector) => <span className="text-sm">{sector._count?.tasks || 0}</span>,
+        className: "min-w-[80px]",
+        align: "center" as const,
+        accessor: (sector: Sector) => {
+          const count = sector._count?.tasks || 0;
+          return (
+            <Badge variant={count > 0 ? "default" : "secondary"} className="min-w-[2rem] justify-center">
+              {count}
+            </Badge>
+          );
+        },
       },
       {
         key: "createdAt",

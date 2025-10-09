@@ -382,10 +382,9 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
 
       try {
         await markAsFullyReturned.mutateAsync({ id: withdrawal.id });
-        toast.success("Retirada marcada como devolvida");
         refetch();
       } catch (error) {
-        // Error handled by mutation hook
+        // Error handled by API client
       }
     },
     [markAsFullyReturned, refetch],
@@ -403,11 +402,10 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
 
     try {
       deleteWithdrawal(deleteDialog.withdrawal.id);
-      toast.success("Retirada excluída com sucesso");
       setDeleteDialog(null);
       refetch();
     } catch (error) {
-      // Error handled by mutation hook
+      // Error handled by API client
     }
   }, [deleteDialog, deleteWithdrawal, refetch]);
 

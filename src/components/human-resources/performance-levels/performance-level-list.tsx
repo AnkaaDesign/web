@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, forwardRef, useImperativeHandle } from "react";
+import { useState, useMemo, useCallback, useRef, forwardRef, useImperativeHandle, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,7 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const tableRef = useRef<PerformanceLevelTableRef>(null);
+  const hasInitializedSectorsRef = useRef(false);
 
   // Load sectors to get default sector IDs
   const { data: sectorsData } = useSectors({
@@ -107,15 +108,25 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
       limit: DEFAULT_PAGE_SIZE,
       where: {
         status: { not: USER_STATUS.DISMISSED },  // By default, only show non-dismissed users
-        // Set default sector filter
-        ...(defaultSectorIds.length > 0 && {
-          sectorId: { in: defaultSectorIds }
-        })
       }
     },
     searchDebounceMs: 500, // Increased debounce for better performance
     searchParamName: "search",
   });
+
+  // Set default sector filters when they become available
+  useEffect(() => {
+    if (!hasInitializedSectorsRef.current && defaultSectorIds.length > 0) {
+      setFilters(prev => ({
+        ...prev,
+        where: {
+          ...prev.where,
+          sectorId: { in: defaultSectorIds }
+        }
+      }));
+      hasInitializedSectorsRef.current = true;
+    }
+  }, [defaultSectorIds, setFilters]);
 
   // Convert sort configs to orderBy format
   const orderBy = useMemo(() => {

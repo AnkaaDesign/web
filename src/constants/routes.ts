@@ -93,11 +93,6 @@ export const routes = {
   // Home - Página inicial
   home: "/",
 
-  // Financial - Financeiro - Financial Management
-  financial: {
-    root: "/financeiro",
-  },
-
   // Human Resources - Recursos Humanos - Human Resources
   humanResources: {
     calculations: {

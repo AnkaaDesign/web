@@ -27,12 +27,14 @@ import {
   IconDownload,
   IconUserMinus
 } from "@tabler/icons-react";
-import { formatCurrency, getBonusPeriod, getCurrentPayrollPeriod } from "../../../utils";
+import { formatCurrency, getBonusPeriod, getCurrentPayrollPeriod, formatDate } from "../../../utils";
 import { useUsers, useSectors, useTasks } from "../../../hooks";
 import { calculateBonusForPosition } from "../../../utils/bonus";
 import { cn } from "@/lib/utils";
 import { TASK_STATUS, COMMISSION_STATUS, USER_STATUS } from "../../../constants";
 import { FilterIndicators, FilterIndicator } from "@/components/ui/filter-indicator";
+import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
+import { toast } from "sonner";
 
 // Position levels mapping
 const POSITIONS = [
@@ -40,6 +42,18 @@ const POSITIONS = [
   "Pleno I", "Pleno II", "Pleno III", "Pleno IV",
   "Senior I", "Senior II", "Senior III", "Senior IV"
 ];
+
+// Export columns configuration
+const EXPORT_COLUMNS: ExportColumn<SimulatedUser>[] = [
+  { id: "name", label: "Nome", getValue: (user: SimulatedUser) => user.name },
+  { id: "sectorName", label: "Setor", getValue: (user: SimulatedUser) => user.sectorName || "-" },
+  { id: "position", label: "Cargo", getValue: (user: SimulatedUser) => user.position },
+  { id: "performanceLevel", label: "Nível de Performance", getValue: (user: SimulatedUser) => user.performanceLevel.toString() },
+  { id: "bonusAmount", label: "Bônus", getValue: (user: SimulatedUser) => formatCurrency(user.bonusAmount) },
+];
+
+// Default visible columns (all columns)
+const DEFAULT_VISIBLE_COLUMNS = new Set(["name", "sectorName", "position", "performanceLevel", "bonusAmount"]);
 
 // Performance level selector with chevron buttons
 interface PerformanceLevelSelectorProps {
@@ -515,6 +529,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
   };
 
   // Create filter badges for display (like items table)
+  // Each sector and user gets its own individual badge
   const activeFilters = useMemo(() => {
     const filters: Array<{
       key: string;
@@ -524,37 +539,33 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
       icon?: React.ReactNode;
     }> = [];
 
-    // Add sector filters
-    if (selectedSectorIds.length > 0) {
-      const sectorNames = selectedSectorIds
-        .map(id => sectorsData?.data?.find(s => s.id === id)?.name)
-        .filter(Boolean)
-        .join(", ");
+    // Add individual sector filter badges
+    selectedSectorIds.forEach(sectorId => {
+      const sector = sectorsData?.data?.find(s => s.id === sectorId);
+      if (sector) {
+        filters.push({
+          key: `sector-${sectorId}`,
+          label: "Setor",
+          value: sector.name,
+          onRemove: () => setSelectedSectorIds(prev => prev.filter(id => id !== sectorId)),
+          icon: <IconBuilding className="h-3 w-3" />
+        });
+      }
+    });
 
-      filters.push({
-        key: "sectors",
-        label: "Setores",
-        value: sectorNames,
-        onRemove: () => setSelectedSectorIds([]),
-        icon: <IconBuilding className="h-3 w-3" />
-      });
-    }
-
-    // Add excluded users filters
-    if (excludedUserIds.length > 0) {
-      const userNames = excludedUserIds
-        .map(id => simulatedUsers.find(u => u.id === id)?.name)
-        .filter(Boolean)
-        .join(", ");
-
-      filters.push({
-        key: "excludedUsers",
-        label: "Usuários Excluídos",
-        value: userNames,
-        onRemove: () => setExcludedUserIds([]),
-        icon: <IconUserMinus className="h-3 w-3" />
-      });
-    }
+    // Add individual excluded user filter badges
+    excludedUserIds.forEach(userId => {
+      const user = simulatedUsers.find(u => u.id === userId);
+      if (user) {
+        filters.push({
+          key: `user-${userId}`,
+          label: "Usuário Excluído",
+          value: user.name,
+          onRemove: () => setExcludedUserIds(prev => prev.filter(id => id !== userId)),
+          icon: <IconUserMinus className="h-3 w-3" />
+        });
+      }
+    });
 
     return filters;
   }, [selectedSectorIds, excludedUserIds, sectorsData?.data, simulatedUsers]);
@@ -565,51 +576,289 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
     setAverageInput((originalTaskQuantity / eligibleUserCount).toFixed(1));
   };
 
-  const handleExportToExcel = () => {
-    // Prepare data for export
-    const exportData = filteredUsers.map((user) => ({
-      Nome: user.name,
-      Setor: user.sectorName || '-',
-      Cargo: user.position,
-      'Nível de Performance': user.performanceLevel,
-      'Bônus': user.bonusAmount.toFixed(2)
-    }));
+  // Export handlers
+  const handleExport = async (format: ExportFormat, users: SimulatedUser[], columns: ExportColumn<SimulatedUser>[]) => {
+    // Add total row to users for export
+    const usersWithTotal = [...users];
 
-    // Add summary row
-    exportData.push({
-      Nome: 'TOTAL',
-      Setor: '',
-      Cargo: '',
-      'Nível de Performance': '',
-      'Bônus': totalBonusAmount.toFixed(2)
+    switch (format) {
+      case "csv":
+        await exportToCSV(usersWithTotal, columns);
+        break;
+      case "excel":
+        await exportToExcel(usersWithTotal, columns);
+        break;
+      case "pdf":
+        await exportToPDF(usersWithTotal, columns);
+        break;
+    }
+
+    toast.success(`Exportação ${format.toUpperCase()} concluída com sucesso!`);
+  };
+
+  const exportToCSV = async (users: SimulatedUser[], columns: ExportColumn<SimulatedUser>[]) => {
+    // CSV headers from columns
+    const headers = columns.map((col) => col.label);
+
+    // Convert users to CSV rows
+    const rows = users.map((user) => columns.map((col) => col.getValue(user)));
+
+    // Add total row
+    const totalRow = columns.map((col) => {
+      if (col.id === "name") return "TOTAL";
+      if (col.id === "bonusAmount") return formatCurrency(totalBonusAmount);
+      return "";
     });
+    rows.push(totalRow);
 
-    // Convert to CSV
-    const headers = Object.keys(exportData[0]);
-    const csvContent = [
-      headers.join(','),
-      ...exportData.map(row =>
-        headers.map(header => {
-          const value = row[header as keyof typeof row];
-          // Escape values containing commas or quotes
-          return typeof value === 'string' && (value.includes(',') || value.includes('"'))
-            ? `"${value.replace(/"/g, '""')}"`
-            : value;
-        }).join(',')
-      )
-    ].join('\n');
+    // Create CSV content
+    const csvContent = [headers.join(","), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))].join("\n");
 
-    // Add BOM for proper Excel encoding (UTF-8)
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
+    // Download CSV
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
-
-    link.setAttribute('href', url);
-    link.setAttribute('download', `simulacao-bonus-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
+    link.setAttribute("href", url);
+    link.setAttribute("download", `simulacao-bonus-${formatDate(new Date()).replace(/\//g, "-")}.csv`);
+    link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const exportToExcel = async (users: SimulatedUser[], columns: ExportColumn<SimulatedUser>[]) => {
+    // Headers from columns
+    const headers = columns.map((col) => col.label);
+
+    // Convert users to rows
+    const rows = users.map((user) => columns.map((col) => col.getValue(user)));
+
+    // Add total row
+    const totalRow = columns.map((col) => {
+      if (col.id === "name") return "TOTAL";
+      if (col.id === "bonusAmount") return formatCurrency(totalBonusAmount);
+      return "";
+    });
+    rows.push(totalRow);
+
+    // Create tab-separated values for Excel
+    const excelContent = [headers.join("\t"), ...rows.map((row) => row.join("\t"))].join("\n");
+
+    // Download as .xls file
+    const blob = new Blob(["\ufeff" + excelContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `simulacao-bonus-${formatDate(new Date()).replace(/\//g, "-")}.xls`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const exportToPDF = async (users: SimulatedUser[], columns: ExportColumn<SimulatedUser>[]) => {
+    // Calculate responsive font sizes
+    const columnCount = columns.length;
+    const fontSize = "12px";
+    const headerFontSize = "11px";
+    const cellPadding = "8px 6px";
+    const headerPadding = "10px 6px";
+
+    // A4 optimized PDF with proper formatting
+    const pdfContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Simulação de Bônus - ${formatDate(new Date())}</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 12mm;
+          }
+
+          * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+          }
+
+          html, body {
+            height: 100vh;
+            width: 100vw;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: white;
+            font-size: ${fontSize};
+            line-height: 1.3;
+          }
+
+          body {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            min-height: 100vh;
+            padding: 0;
+          }
+
+          .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e5e7eb;
+          }
+
+          .logo {
+            width: 100px;
+            height: auto;
+            margin-right: 15px;
+          }
+
+          .header-info {
+            flex: 1;
+          }
+
+          .info {
+            color: #6b7280;
+            font-size: 12px;
+          }
+
+          .info p {
+            margin: 2px 0;
+          }
+
+          .content-wrapper {
+            flex: 1;
+            overflow: auto;
+            min-height: 0;
+            padding-bottom: 40px;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #e5e7eb;
+            font-size: ${fontSize};
+          }
+
+          th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+            padding: ${headerPadding};
+            border-bottom: 2px solid #e5e7eb;
+            border-right: 1px solid #e5e7eb;
+            font-size: ${headerFontSize};
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+          }
+
+          td {
+            padding: ${cellPadding};
+            border-bottom: 1px solid #f3f4f6;
+            border-right: 1px solid #f3f4f6;
+            vertical-align: top;
+          }
+
+          tbody tr:nth-child(even) {
+            background-color: #fafafa;
+          }
+
+          tbody tr:last-child {
+            font-weight: 700;
+            background-color: #f0fdf4;
+          }
+
+          .text-left { text-align: left; }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+
+          .font-medium { font-weight: 500; }
+          .font-semibold { font-weight: 600; }
+
+          .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 10px;
+            background: white;
+          }
+
+          @media print {
+            .footer {
+              position: fixed;
+              bottom: 15px;
+              left: 12mm;
+              right: 12mm;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <img src="/logo.png" alt="Logo" class="logo" />
+          <div class="header-info">
+            <h1 style="font-size: 20px; margin-bottom: 8px;">Simulação de Bônus</h1>
+            <div class="info">
+              <p><strong>Data:</strong> ${formatDate(new Date())}</p>
+              <p><strong>Total de colaboradores:</strong> ${users.length}</p>
+              <p><strong>Tarefas:</strong> ${taskQuantity.toFixed(1)}</p>
+              <p><strong>Média por colaborador:</strong> ${averageTasksPerUser.toFixed(1)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="content-wrapper">
+          <table>
+            <thead>
+              <tr>
+                ${columns.map((col) => `<th class="text-left">${col.label}</th>`).join("")}
+              </tr>
+            </thead>
+            <tbody>
+              ${users.map((user) => `
+                <tr>
+                  ${columns.map((col) => `<td class="text-left">${col.getValue(user)}</td>`).join("")}
+                </tr>
+              `).join("")}
+              <tr>
+                ${columns.map((col) => {
+                  if (col.id === "name") return `<td class="text-left">TOTAL</td>`;
+                  if (col.id === "bonusAmount") return `<td class="text-left">${formatCurrency(totalBonusAmount)}</td>`;
+                  return `<td></td>`;
+                }).join("")}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="footer">
+          <div>
+            <p>Relatório gerado pelo sistema Ankaa</p>
+          </div>
+          <div>
+            <p><strong>Gerado em:</strong> ${formatDate(new Date())} ${new Date().toLocaleTimeString('pt-BR')}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(pdfContent);
+      printWindow.document.close();
+      printWindow.focus();
+
+      printWindow.onload = () => {
+        printWindow.print();
+        printWindow.onafterprint = () => {
+          printWindow.close();
+        };
+      };
+    }
   };
 
   const isTaskQuantityModified = taskQuantity !== originalTaskQuantity && originalTaskQuantity > 0;
@@ -747,18 +996,17 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
                   Restaurar
                 </Button>
               )}
-              <Button
-                type="button"
-                variant="outline"
-                size="default"
-                onClick={handleExportToExcel}
-                disabled={filteredUsers.length === 0}
+              <BaseExportPopover<SimulatedUser>
                 className="h-10"
-                title="Exportar simulação para CSV"
-              >
-                <IconDownload className="h-4 w-4 mr-2" />
-                Exportar
-              </Button>
+                currentItems={filteredUsers}
+                totalRecords={filteredUsers.length}
+                visibleColumns={DEFAULT_VISIBLE_COLUMNS}
+                exportColumns={EXPORT_COLUMNS}
+                defaultVisibleColumns={DEFAULT_VISIBLE_COLUMNS}
+                onExport={handleExport}
+                entityName="colaborador"
+                entityNamePlural="colaboradores"
+              />
             </div>
           </div>
         </div>

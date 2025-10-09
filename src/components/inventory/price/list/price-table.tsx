@@ -72,18 +72,10 @@ export function PriceTable({ itemId, filters = {}, onEditPrice, onDeletePrice, s
     setDeleteDialog(null);
 
     try {
-      const response = await deletePrice(price.id);
-
-      if (response.success) {
-        toast.success("Preço excluído com sucesso!");
-        onDeletePrice?.(price);
-      } else {
-        toast.error(response.message || "Erro ao excluir preço");
-      }
-    } catch (error: any) {
-      console.error("Error deleting price:", error);
-      const errorMessage = error.response?.data?.message || error.message || "Erro ao excluir preço";
-      toast.error(errorMessage);
+      await deletePrice(price.id);
+      onDeletePrice?.(price);
+    } catch (error) {
+      // Error handled by API client
     } finally {
       setDeletingId(null);
     }

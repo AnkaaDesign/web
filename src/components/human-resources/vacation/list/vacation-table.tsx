@@ -227,19 +227,14 @@ export function VacationTable({ filters, onDataChange, className }: VacationTabl
         if (deleteDialog.isBulk) {
           const promises = deleteDialog.items.map((v) => deleteAsync(v.id));
           await Promise.all(promises);
-          toast.success(`${deleteDialog.items.length} férias excluídas com sucesso!`);
           refetch();
           resetSelection();
         } else {
           await deleteAsync(deleteDialog.items[0].id);
-          toast.success("Férias excluída com sucesso");
           refetch();
         }
       } catch (error) {
-        if (deleteDialog.isBulk) {
-          toast.error("Erro ao excluir algumas férias");
-        }
-        // Error handled by mutation for single delete
+        // Error handled by API client
       }
       setDeleteDialog(null);
     }

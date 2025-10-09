@@ -1,16 +1,31 @@
-import React, { useCallback, useMemo, useState } from "react";
-import { useObservations, useObservationMutations } from "../../../../hooks";
-import type { Observation } from "../../../../types";
-import type { ObservationGetManyFormData } from "../../../../schemas";
-import { StandardizedTable } from "@/components/ui/standardized-table";
-import type { StandardizedColumn } from "@/components/ui/standardized-table";
-import { IconNotes } from "@tabler/icons-react";
-import { useTableState } from "@/hooks/use-table-state";
-import { toast } from "sonner";
-import { routes } from "../../../../constants";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { createObservationColumns } from "./observation-table-columns";
+import type { Observation } from "../../../../types";
+import { routes } from "../../../../constants";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  IconChevronUp,
+  IconChevronDown,
+  IconAlertTriangle,
+  IconEdit,
+  IconTrash,
+  IconSelector,
+  IconNotes,
+  IconEye,
+} from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { useObservations, useObservationMutations } from "../../../../hooks";
+import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
+import type { ObservationGetManyFormData } from "../../../../schemas";
+import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
+import { TABLE_LAYOUT } from "@/components/ui/table-constants";
+import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
+import { createObservationColumns } from "./observation-table-columns";
+import type { ObservationColumn } from "./observation-table-columns";
+import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,17 +36,123 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import { ObservationTableSkeleton } from "./observation-table-skeleton";
 
 interface ObservationTableProps {
+  visibleColumns: Set<string>;
   className?: string;
-  onRowClick?: (observation: Observation) => void;
-  showSelectedOnly?: boolean;
-  visibleColumns?: Set<string>;
-  query: ObservationGetManyFormData;
+  filters?: Partial<ObservationGetManyFormData>;
+  onDataChange?: (data: { items: Observation[]; totalRecords: number }) => void;
 }
 
-export function ObservationTable({ className, onRowClick, showSelectedOnly = false, visibleColumns = new Set(), query }: ObservationTableProps) {
+export function ObservationTable({ visibleColumns, className, filters = {}, onDataChange }: ObservationTableProps) {
   const navigate = useNavigate();
+  const { delete: deleteObservation } = useObservationMutations();
+
+  // Get scrollbar width info
+  const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
+
+  // Use URL state management for pagination and selection
+  const {
+    page,
+    pageSize,
+    selectedIds,
+    sortConfigs,
+    showSelectedOnly,
+    setPage,
+    setPageSize,
+    toggleSelection,
+    toggleSelectAll,
+    toggleSort,
+    getSortDirection,
+    getSortOrder,
+    isSelected,
+    isAllSelected,
+    isPartiallySelected,
+    selectionCount,
+    resetSelection,
+    removeFromSelection,
+  } = useTableState({
+    defaultPageSize: 40,
+    resetSelectionOnPageChange: false,
+  });
+
+  // Memoize include configuration to prevent re-renders
+  const includeConfig = React.useMemo(
+    () => ({
+      task: {
+        include: {
+          customer: true,
+          sector: true,
+          createdBy: true,
+        },
+      },
+      files: true,
+    }),
+    [],
+  );
+
+  // Memoize query parameters to prevent infinite re-renders
+  const queryParams = React.useMemo(() => {
+    const params = {
+      // When showSelectedOnly is true, don't apply filters
+      ...(showSelectedOnly ? {} : filters),
+      page: page + 1, // Convert 0-based to 1-based for API
+      limit: pageSize,
+      include: includeConfig,
+      // Convert sortConfigs to orderBy format for API
+      ...(sortConfigs.length > 0 && {
+        orderBy: convertSortConfigsToOrderBy(sortConfigs),
+      }),
+      // When showSelectedOnly is true, only show selected items
+      ...(showSelectedOnly &&
+        selectedIds.length > 0 && {
+          where: {
+            id: { in: selectedIds },
+          },
+        }),
+    };
+    return params;
+  }, [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds]);
+
+  // Use the observations hook with memoized parameters
+  const { data: response, isLoading, error } = useObservations(queryParams);
+
+  const items = response?.data || [];
+  const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;
+  const totalRecords = response?.meta?.totalRecords || 0;
+
+  // Notify parent component of data changes
+  const lastNotifiedDataRef = React.useRef<string>("");
+  const isMountedRef = React.useRef(true);
+
+  React.useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (onDataChange && isMountedRef.current) {
+      // Create a unique key for the current data to detect real changes
+      const dataKey = items.length > 0 ? `${totalRecords}-${items.map((item) => item.id).join(",")}` : `empty-${totalRecords}`;
+
+      // Only notify if this exact data hasn't been notified yet
+      if (dataKey !== lastNotifiedDataRef.current) {
+        lastNotifiedDataRef.current = dataKey;
+        onDataChange({ items, totalRecords });
+      }
+    }
+  }, [items, totalRecords, onDataChange]);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    items: Observation[];
+    isBulk: boolean;
+  } | null>(null);
 
   // Delete confirmation dialog state
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -39,195 +160,379 @@ export function ObservationTable({ className, onRowClick, showSelectedOnly = fal
     isBulk: boolean;
   } | null>(null);
 
-  // Get table state for selection and pagination
-  const {
-    page,
-    pageSize,
-    setPage,
-    setPageSize,
-    selectedIds,
-    setSelectedIds,
-    toggleSelection: _toggleSelection,
-    deselectAll,
-    selectionCount,
-    showSelectedOnly: showSelectedOnlyFromHook,
-  } = useTableState();
+  // Get column definitions
+  const columns = React.useMemo(() => createObservationColumns(), []);
 
-  // Build query with pagination
-  const paginatedQuery = useMemo(
-    () => ({
-      ...query,
-      page: page + 1, // Convert 0-based to 1-based for API
-      limit: pageSize,
-    }),
-    [query, page, pageSize],
-  );
+  // Filter visible columns
+  const displayColumns = React.useMemo(() => columns.filter((col) => visibleColumns.has(col.key)), [columns, visibleColumns]);
 
-  // Fetch observations
-  const { data: response, isLoading, error } = useObservations(paginatedQuery);
-  const observations = response?.data || [];
-  const totalRecords = response?.meta?.totalRecords || 0;
+  // Get current page item IDs for selection
+  const currentPageItemIds = React.useMemo(() => {
+    return items.map((item) => item.id);
+  }, [items]);
 
-  // Mutations
-  const { deleteAsync: deleteObservation } = useObservationMutations();
+  // Selection state
+  const allSelected = isAllSelected(currentPageItemIds);
+  const partiallySelected = isPartiallySelected(currentPageItemIds);
 
-  // Convert selectedIds array to selection object for compatibility
-  const selection = useMemo(() => {
-    const selectionObj: Record<string, boolean> = {};
-    selectedIds.forEach((id: string) => {
-      selectionObj[id] = true;
-    });
-    return selectionObj;
-  }, [selectedIds]);
+  // Render sort indicator function (matching item table)
+  const renderSortIndicator = (columnKey: string) => {
+    const sortDirection = getSortDirection(columnKey);
+    const sortOrder = getSortOrder(columnKey);
 
-  // Use prop if provided, otherwise use hook state
-  const effectiveShowSelectedOnly = showSelectedOnly ?? showSelectedOnlyFromHook;
+    return (
+      <div className="inline-flex items-center ml-1">
+        {sortDirection === null && <IconSelector className="h-4 w-4 text-muted-foreground" />}
+        {sortDirection === "asc" && <IconChevronUp className="h-4 w-4 text-foreground" />}
+        {sortDirection === "desc" && <IconChevronDown className="h-4 w-4 text-foreground" />}
+        {sortOrder !== null && sortConfigs.length > 1 && <span className="text-xs ml-0.5">{sortOrder + 1}</span>}
+      </div>
+    );
+  };
 
-  // Filter observations if showing selected only
-  const displayedObservations = useMemo(() => {
-    if (effectiveShowSelectedOnly && selectionCount > 0) {
-      return observations.filter((observation: Observation) => selection[observation.id]);
-    }
-    return observations;
-  }, [observations, effectiveShowSelectedOnly, selectionCount, selection]);
+  // Calculate if a column should be sortable
+  const isColumnSortable = (column: ObservationColumn) => {
+    return column.sortable !== false;
+  };
 
-  // Handle row selection
-  const handleRowSelection = useCallback(
-    (observationId: string, selected: boolean) => {
-      if (selected) {
-        const newSelectedIds = [...selectedIds, observationId];
-        setSelectedIds(newSelectedIds);
-      } else {
-        const newSelectedIds = selectedIds.filter((id: string) => id !== observationId);
-        setSelectedIds(newSelectedIds);
-      }
-    },
-    [selectedIds, setSelectedIds],
-  );
-
-  // Handle select all
-  const handleSelectAll = useCallback(
-    (selected: boolean) => {
-      if (selected) {
-        const newSelectedIds = displayedObservations.map((observation: Observation) => observation.id);
-        setSelectedIds(newSelectedIds);
-      } else {
-        deselectAll();
-      }
-    },
-    [displayedObservations, setSelectedIds, deselectAll],
-  );
-
-  // Handle delete
-  const handleDelete = useCallback(
-    (observation: Observation, event?: React.MouseEvent) => {
-      if (event) {
-        event.stopPropagation();
-      }
-
-      setDeleteDialog({
-        items: [observation],
-        isBulk: false,
-      });
-    },
-    [],
-  );
-
-  // Confirm delete
-  const confirmDelete = async () => {
-    if (deleteDialog) {
-      try {
-        for (const item of deleteDialog.items) {
-          await deleteObservation(item.id);
-        }
-        toast.success(deleteDialog.isBulk ? `${deleteDialog.items.length} observações excluídas com sucesso` : "Observação excluída com sucesso");
-      } catch (error) {
-        toast.error("Erro ao excluir observação");
-      } finally {
-        setDeleteDialog(null);
-      }
+  // Handle column sort
+  const handleSort = (column: ObservationColumn) => {
+    if (isColumnSortable(column)) {
+      toggleSort(column.key);
     }
   };
 
-  // Handle edit
-  const handleEdit = useCallback(
-    (observation: Observation, event?: React.MouseEvent) => {
-      if (event) {
-        event.stopPropagation();
+  // Handle row selection
+  const handleSelectItem = (itemId: string) => {
+    toggleSelection(itemId);
+  };
+
+  // Context menu handlers
+  const handleContextMenu = (e: React.MouseEvent, item: Observation) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Check if clicked item is part of selection
+    const isItemSelected = isSelected(item.id);
+    const hasSelection = selectionCount > 0;
+
+    if (hasSelection && isItemSelected) {
+      // Show bulk actions for all selected items
+      const selectedItemsList = items.filter((i) => isSelected(i.id));
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: selectedItemsList,
+        isBulk: true,
+      });
+    } else {
+      // Show actions for just the clicked item
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        items: [item],
+        isBulk: false,
+      });
+    }
+  };
+
+  const handleViewDetails = () => {
+    if (contextMenu && contextMenu.items.length === 1) {
+      navigate(routes.production.observations.details(contextMenu.items[0].id));
+      setContextMenu(null);
+    }
+  };
+
+  const handleEdit = () => {
+    if (contextMenu) {
+      if (contextMenu.items.length === 1) {
+        navigate(routes.production.observations.edit(contextMenu.items[0].id));
       }
-      navigate(routes.production.observations.edit(observation.id));
-    },
-    [navigate],
-  );
+      setContextMenu(null);
+    }
+  };
 
-  // Handle view details
-  const handleView = useCallback(
-    (observation: Observation, event?: React.MouseEvent) => {
-      if (event) {
-        event.stopPropagation();
+  const handleDelete = () => {
+    if (contextMenu) {
+      setDeleteDialog({
+        items: contextMenu.items,
+        isBulk: contextMenu.isBulk && contextMenu.items.length > 1,
+      });
+      setContextMenu(null);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteDialog) return;
+
+    try {
+      if (deleteDialog.isBulk && deleteDialog.items.length > 1) {
+        // Bulk delete
+        for (const item of deleteDialog.items) {
+          await deleteObservation(item.id);
+        }
+        // Remove deleted IDs from selection
+        removeFromSelection(deleteDialog.items.map((item) => item.id));
+        toast.success(`${deleteDialog.items.length} observações excluídas com sucesso`);
+      } else {
+        // Single delete
+        const deletedId = deleteDialog.items[0].id;
+        await deleteObservation(deletedId);
+        // Remove deleted ID from selection
+        removeFromSelection([deletedId]);
+        toast.success("Observação excluída com sucesso");
       }
-      navigate(routes.production.observations.details(observation.id));
-    },
-    [navigate],
-  );
+    } catch (error) {
+      // Error is handled by the API client with detailed message
+      console.error("Error deleting observation(s):", error);
+    } finally {
+      setDeleteDialog(null);
+    }
+  };
 
-  // Define table columns using the factory function
-  const columns: StandardizedColumn<Observation>[] = createObservationColumns({
-    selection,
-    onRowSelection: handleRowSelection,
-    onEdit: handleEdit,
-    onDelete: handleDelete,
-    onView: handleView,
-  });
+  // Close context menu when clicking outside
+  React.useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
 
-  // Filter columns based on visibility
-  const visibleColumnsArray = columns.filter((col: StandardizedColumn<Observation>) => visibleColumns.size === 0 || visibleColumns.has(col.key));
+  if (isLoading) {
+    return <ObservationTableSkeleton visibleColumns={visibleColumns} className={className} />;
+  }
 
-  // Check if all current page items are selected
-  const allCurrentPageSelected = displayedObservations.length > 0 && displayedObservations.every((observation: Observation) => selection[observation.id]);
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4">
+        <IconAlertTriangle className="h-12 w-12 text-destructive" />
+        <p className="text-destructive">Erro ao carregar observações</p>
+        <Button onClick={() => window.location.reload()} variant="outline" size="sm">
+          Tentar novamente
+        </Button>
+      </div>
+    );
+  }
 
   return (
-    <>
-      <StandardizedTable
-        columns={visibleColumnsArray}
-        data={displayedObservations}
-        getItemKey={(observation: Observation) => observation.id}
-        onRowClick={onRowClick}
-        currentPage={page} // Convert to 0-based for StandardizedTable
-        totalPages={Math.ceil(totalRecords / pageSize)}
-        onPageChange={setPage}
-        pageSize={pageSize}
-        totalRecords={totalRecords}
-        onPageSizeChange={(size: number) => setPageSize(size)}
-        isLoading={isLoading}
-        error={error ? "Erro ao carregar observações" : undefined}
-        emptyMessage="Nenhuma observação encontrada"
-        emptyIcon={IconNotes}
-        onSelectAll={() => handleSelectAll(!allCurrentPageSelected)}
-        allSelected={allCurrentPageSelected}
-        partiallySelected={false}
-        className={cn("h-full", className)}
-      />
+    <div className={cn("rounded-lg flex flex-col overflow-hidden", className)}>
+      {/* Fixed Header Table */}
+      <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden">
+        <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
+          <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
+            <TableRow className="bg-muted hover:bg-muted even:bg-muted">
+              {/* Selection column */}
+              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                <div className="flex items-center justify-center h-full w-full px-2">
+                  <Checkbox
+                    checked={allSelected}
+                    indeterminate={partiallySelected}
+                    onCheckedChange={() => toggleSelectAll(currentPageItemIds)}
+                    aria-label="Select all items"
+                    disabled={isLoading || items.length === 0}
+                    data-checkbox
+                  />
+                </div>
+              </TableHead>
+
+              {/* Data columns */}
+              {displayColumns.map((column) => {
+                const isSortable = isColumnSortable(column);
+
+                return (
+                  <TableHead
+                    key={column.key}
+                    className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0", column.className)}
+                  >
+                    {isSortable ? (
+                      <button
+                        onClick={() => handleSort(column)}
+                        className={cn(
+                          "flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent",
+                          column.align === "center" && "justify-center",
+                          column.align === "right" && "justify-end",
+                        )}
+                        disabled={isLoading || items.length === 0}
+                      >
+                        <TruncatedTextWithTooltip text={column.header} />
+                        {renderSortIndicator(column.key)}
+                      </button>
+                    ) : (
+                      <div
+                        className={cn(
+                          "flex items-center h-full min-h-[2.5rem] px-4 py-2",
+                          column.align === "center" && "justify-center text-center",
+                          column.align === "right" && "justify-end text-right",
+                          !column.align && "justify-start text-left",
+                        )}
+                      >
+                        <TruncatedTextWithTooltip text={column.header} />
+                      </div>
+                    )}
+                  </TableHead>
+                );
+              })}
+
+              {/* Scrollbar spacer - only show if not overlay scrollbar */}
+              {!isOverlay && (
+                <TableHead style={{ width: `${scrollbarWidth}px`, minWidth: `${scrollbarWidth}px` }} className="bg-muted p-0 border-0 !border-r-0 shrink-0"></TableHead>
+              )}
+            </TableRow>
+          </TableHeader>
+        </Table>
+      </div>
+
+      {/* Scrollable Body Table */}
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border-l border-r border-border">
+        <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
+          <TableBody>
+            {error ? (
+              <TableRow>
+                <TableCell colSpan={displayColumns.length + 1} className="p-0">
+                  <div className="flex flex-col items-center justify-center p-8 text-center text-destructive">
+                    <IconAlertTriangle className="h-8 w-8 mb-4" />
+                    <div className="text-lg font-medium mb-2">Erro ao carregar observações</div>
+                    <Button onClick={() => window.location.reload()} variant="outline" size="sm">
+                      Tentar novamente
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : items.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={displayColumns.length + 1} className="p-0">
+                  <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                    <IconNotes className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                    <div className="text-lg font-medium mb-2">Nenhuma observação encontrada</div>
+                    {filters && Object.keys(filters).length > 1 && <div className="text-sm">Ajuste os filtros para ver mais resultados.</div>}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              items.map((item, index) => {
+                const itemIsSelected = isSelected(item.id);
+
+                return (
+                  <tr
+                    key={item.id}
+                    data-state={itemIsSelected ? "selected" : undefined}
+                    className={cn(
+                      "cursor-pointer transition-colors border-b border-border",
+                      // Alternating row colors
+                      index % 2 === 1 && "bg-muted/10",
+                      // Hover state that works with alternating colors
+                      "hover:bg-muted/20",
+                      // Selected state overrides all
+                      itemIsSelected && "bg-muted/30 hover:bg-muted/40",
+                    )}
+                    onClick={(e) => {
+                      // Don't navigate if clicking checkbox
+                      if ((e.target as HTMLElement).closest("[data-checkbox]")) {
+                        return;
+                      }
+                      navigate(routes.production.observations.details(item.id));
+                    }}
+                    onContextMenu={(e) => handleContextMenu(e, item)}
+                  >
+                    {/* Selection checkbox */}
+                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0 relative z-20")}>
+                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select observation`} data-checkbox />
+                      </div>
+                    </TableCell>
+
+                    {/* Data columns */}
+                    {displayColumns.map((column) => (
+                      <TableCell
+                        key={column.key}
+                        className={cn(
+                          column.className,
+                          "p-0 !border-r-0",
+                          column.align === "center" && "text-center",
+                          column.align === "right" && "text-right",
+                          !column.align && "text-left",
+                        )}
+                      >
+                        <div className="px-4 py-2">{column.accessor(item)}</div>
+                      </TableCell>
+                    ))}
+                  </tr>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination Footer */}
+      <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50">
+        <SimplePaginationAdvanced
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          pageSize={pageSize}
+          totalItems={totalRecords}
+          pageSizeOptions={[20, 40, 60, 100]}
+          onPageSizeChange={setPageSize}
+          showPageSizeSelector={true}
+          showGoToPage={true}
+          showPageInfo={true}
+        />
+      </div>
+
+      {/* Context Menu */}
+      <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
+        <DropdownMenuContent
+          style={{
+            position: "fixed",
+            left: contextMenu?.x,
+            top: contextMenu?.y,
+          }}
+          className="w-56"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.items.length} observações selecionadas</div>}
+
+          {!contextMenu?.isBulk && (
+            <>
+              <DropdownMenuItem onClick={handleViewDetails}>
+                <IconEye className="h-4 w-4 mr-2" />
+                Ver detalhes
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
+
+          <DropdownMenuItem onClick={handleEdit}>
+            <IconEdit className="h-4 w-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+            <IconTrash className="h-4 w-4 mr-2" />
+            Deletar
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir observação</AlertDialogTitle>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteDialog?.isBulk && deleteDialog.items.length > 1
-                ? `Tem certeza que deseja excluir ${deleteDialog.items.length} observações? Esta ação não pode ser desfeita.`
-                : `Tem certeza que deseja excluir a observação "${deleteDialog?.items[0]?.description.substring(0, 50)}..."? Esta ação não pode ser desfeita.`}
+              Tem certeza que deseja deletar {deleteDialog?.items.length} observação{deleteDialog?.items.length !== 1 ? "ões" : ""}? Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Excluir
+              Deletar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

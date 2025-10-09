@@ -247,14 +247,12 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
               data: { status: USER_STATUS.CONTRACTED },
             }));
             await batchUpdate({ users });
-            toast.success(`${contextMenu.users.length} usuários marcados como contratados com sucesso`);
           } else {
             // Single mark as contracted
             await updateUser({
               id: contextMenu.users[0].id,
               data: { status: USER_STATUS.CONTRACTED },
             });
-            toast.success("Usuário marcado como contratado com sucesso");
           }
         }
         setContextMenu(null);
@@ -278,14 +276,12 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
               data: { status: USER_STATUS.DISMISSED, dismissal: new Date() },
             }));
             await batchUpdate({ users });
-            toast.success(`${contextMenu.users.length} usuários marcados como desligados com sucesso`);
           } else {
             // Single mark as dismissed
             await updateUser({
               id: contextMenu.users[0].id,
               data: { status: USER_STATUS.DISMISSED, dismissal: new Date() },
             });
-            toast.success("Usuário marcado como desligado com sucesso");
           }
         }
         setContextMenu(null);
@@ -309,7 +305,6 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             // Fallback to batch API
             const ids = contextMenu.users.map((user) => user.id);
             await batchDelete({ userIds: ids });
-            toast.success(`${contextMenu.users.length} usuários deletados com sucesso`);
             // Remove deleted IDs from selection
             removeFromSelection(ids);
           }
@@ -321,7 +316,6 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             removeFromSelection([contextMenu.users[0].id]);
           } else {
             await deleteUser(contextMenu.users[0].id);
-            toast.success("Usuário deletado com sucesso");
             // Remove deleted ID from selection
             removeFromSelection([contextMenu.users[0].id]);
           }

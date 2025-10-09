@@ -245,9 +245,8 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
               });
             }
           }
-          toast.success(`${items.length} corte(s) iniciado(s) com sucesso`);
         } catch (error) {
-          toast.error("Erro ao iniciar corte(s)");
+          // Error handled by API client
         }
         break;
 
@@ -265,9 +264,8 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
               });
             }
           }
-          toast.success(`${items.length} corte(s) finalizado(s) com sucesso`);
         } catch (error) {
-          toast.error("Erro ao finalizar corte(s)");
+          // Error handled by API client
         }
         break;
 
@@ -290,13 +288,12 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
     try {
       // Use Promise.all to delete all items
       await Promise.all(itemsToDelete.map((item) => mutations.deleteAsync(item.id)));
-      toast.success(`${itemsToDelete.length} corte(s) excluído(s) com sucesso`);
       // Clear selection if items were selected
       if (itemsToDelete.some((item) => isSelected(item.id))) {
         resetSelection();
       }
     } catch (error) {
-      toast.error("Erro ao excluir corte(s)");
+      // Error handled by API client
     } finally {
       setDeleteDialog({ open: false, items: [] });
     }
@@ -321,12 +318,10 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
         await mutations.createAsync(cutData);
       }
 
-      toast.success(`${data.quantity} novo(s) corte(s) criado(s) com sucesso`);
-
       setRequestModalOpen(false);
       setSelectedCutItem(null);
     } catch (error) {
-      toast.error("Ocorreu um erro ao criar a solicitação de corte");
+      // Error handled by API client
     }
   };
 

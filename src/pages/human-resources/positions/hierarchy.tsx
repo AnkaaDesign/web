@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconBriefcase, IconGripVertical, IconCheck, IconX } from "@tabler/icons-react";
+import { toast } from "sonner";
 import {
   DndContext,
   closestCenter,
@@ -121,15 +122,34 @@ export const PositionHierarchyPage = () => {
     setIsSaving(true);
     try {
       // Update ALL positions with their hierarchy value based on current order
-      await batchUpdateAsync({
+      const result = await batchUpdateAsync({
         positions: positions.map((position, index) => ({
           id: position.id,
           data: { hierarchy: index + 1 },
         })),
       });
+
+      // Show success toast
+      if (result?.data) {
+        const { totalSuccess, totalFailed } = result.data;
+        if (totalFailed === 0) {
+          toast.success(`Hierarquia atualizada com sucesso! ${totalSuccess} ${totalSuccess === 1 ? "cargo atualizado" : "cargos atualizados"}.`);
+        } else {
+          toast.warning(`${totalSuccess} ${totalSuccess === 1 ? "cargo atualizado" : "cargos atualizados"}, mas ${totalFailed} ${totalFailed === 1 ? "falhou" : "falharam"}.`);
+        }
+      } else {
+        toast.success("Hierarquia atualizada com sucesso!");
+      }
+
       setHasChanges(false);
+
+      // Navigate back to positions list after successful save
+      setTimeout(() => {
+        navigate(routes.humanResources.positions.root);
+      }, 1000);
     } catch (error) {
       console.error("Error updating hierarchy:", error);
+      toast.error("Erro ao atualizar hierarquia. Por favor, tente novamente.");
     } finally {
       setIsSaving(false);
     }
@@ -153,7 +173,7 @@ export const PositionHierarchyPage = () => {
           icon={IconBriefcase}
           breadcrumbs={[
             { label: "Início", href: routes.home },
-            { label: "Recursos Humanos" },
+            { label: "Recursos Humanos", href: routes.humanResources.root },
             { label: "Cargos", href: routes.humanResources.positions.root },
             { label: "Hierarquia" },
           ]}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Card,
@@ -43,12 +43,15 @@ import {
 import {
   usePayrolls,
   useBatchCreatePayroll,
-  useFinalizePayrollMonth
+  useFinalizePayrollMonth,
+  useSectors
 } from "../../../hooks";
 import { formatCurrency } from "../../../utils";
 import { routes } from "../../../constants";
 import type { Payroll } from "../../../types";
 import type { PayrollGetManyParams } from "../../../types";
+import { Combobox } from "@/components/ui/combobox";
+import { Label } from "@/components/ui/label";
 
 interface PayrollListProps {
   className?: string;
@@ -59,6 +62,7 @@ interface PayrollFilters {
   month: number;
   searchTerm: string;
   userId?: string;
+  sectorIds?: string[];
 }
 
 // Calculate net salary for a payroll entry
@@ -107,6 +111,7 @@ export function PayrollList({ className }: PayrollListProps) {
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
+  const hasInitializedSectorsRef = useRef(false);
 
   const [filters, setFilters] = useState<PayrollFilters>({
     year: currentYear,
@@ -120,6 +125,36 @@ export function PayrollList({ className }: PayrollListProps) {
   // Batch operations mutations
   const { mutate: batchCreatePayroll, isPending: isCreatingBatch } = useBatchCreatePayroll();
   const { mutate: finalizeMonth, isPending: isFinalizing } = useFinalizePayrollMonth();
+
+  // Fetch sectors for filtering
+  const { data: sectorsData } = useSectors({
+    orderBy: { name: "asc" },
+    limit: 100
+  });
+
+  // Get default sector IDs (production, warehouse, leader privileges)
+  const defaultSectorIds = useMemo(() => {
+    if (!sectorsData?.data) return [];
+
+    return sectorsData.data
+      .filter(sector =>
+        sector.privilege === 'PRODUCTION' ||
+        sector.privilege === 'WAREHOUSE' ||
+        sector.privilege === 'LEADER'
+      )
+      .map(sector => sector.id);
+  }, [sectorsData?.data]);
+
+  // Set default sectors when they become available
+  useEffect(() => {
+    if (!hasInitializedSectorsRef.current && defaultSectorIds.length > 0) {
+      setFilters(prev => ({
+        ...prev,
+        sectorIds: defaultSectorIds
+      }));
+      hasInitializedSectorsRef.current = true;
+    }
+  }, [defaultSectorIds]);
 
   // Table state management
   const {
@@ -153,6 +188,11 @@ export function PayrollList({ className }: PayrollListProps) {
         year: filters.year,
         month: filters.month,
         ...(filters.userId && { userId: filters.userId }),
+        ...(filters.sectorIds && filters.sectorIds.length > 0 && {
+          user: {
+            sectorId: { in: filters.sectorIds }
+          }
+        }),
         ...(filters.searchTerm && {
           OR: [
             {
@@ -497,6 +537,24 @@ export function PayrollList({ className }: PayrollListProps) {
               </div>
 
               <div className="space-y-2">
+                <Label className="text-sm font-medium">Setores</Label>
+                <Combobox
+                  mode="multiple"
+                  value={filters.sectorIds || []}
+                  onValueChange={(value) =>
+                    setFilters({ ...filters, sectorIds: value as string[] })
+                  }
+                  options={sectorsData?.data?.map(sector => ({
+                    value: sector.id,
+                    label: sector.name
+                  })) || []}
+                  placeholder="Todos os setores"
+                  emptyText="Nenhum setor encontrado"
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Buscar funcionário</label>
                 <Input
                   placeholder="Nome ou email..."
@@ -514,6 +572,7 @@ export function PayrollList({ className }: PayrollListProps) {
                     year: currentYear,
                     month: currentMonth,
                     searchTerm: "",
+                    sectorIds: defaultSectorIds,
                   })}
                   className="w-full"
                 >

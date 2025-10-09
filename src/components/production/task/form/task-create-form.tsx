@@ -524,27 +524,7 @@ export const TaskCreateForm = () => {
           // Clear URL state after successful submission
           urlState.resetForm();
 
-          // Success message
-          const layoutCount = truckId && layouts ? Object.keys(layouts).filter(side =>
-            layouts[side as keyof typeof layouts]?.sections?.length > 0
-          ).length : 0;
-
-          if (formData.cuts && formData.cuts.length > 0) {
-            const totalCuts = formData.cuts.reduce((sum, cut) => sum + (cut.quantity || 1), 0);
-            if (layoutCount > 0) {
-              // Success toast for task creation is handled automatically by API client
-              toast.success(`${totalCuts} corte(s) e ${layoutCount} layout(s) criados junto com a tarefa!`);
-            } else {
-              // Success toast for task creation is handled automatically by API client
-              toast.success(`${totalCuts} corte(s) criados junto com a tarefa!`);
-            }
-          } else {
-            if (layoutCount > 0) {
-              // Success toast for task creation is handled automatically by API client
-              toast.success(`${layoutCount} layout(s) criados junto com a tarefa!`);
-            }
-            // Success toast for task creation is handled automatically by API client
-          }
+          // Success toast for task creation is handled automatically by API client
 
           // Navigate after success message
           window.location.href = "/producao/cronograma";
