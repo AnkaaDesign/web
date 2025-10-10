@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -17,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   IconFilter,
   IconCheck,
-  IconTrash,
+  IconX,
   IconBuilding,
   IconUsers,
   IconCalculator,
@@ -132,25 +130,24 @@ export function BonusSimulationFilters({
   }));
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <IconFilter size={20} />
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <IconFilter className="h-5 w-5" />
             Filtros de Simulação de Bonificação
             {totalActiveFilters > 0 && (
               <Badge variant="secondary" className="ml-2">
                 {totalActiveFilters} ativos
               </Badge>
             )}
-          </DialogTitle>
-          <DialogDescription>
+          </SheetTitle>
+          <SheetDescription>
             Configure os filtros para personalizar a simulação de bonificação
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <ScrollArea className="h-[500px] mt-4">
-          <div className="space-y-6">
+        <div className="mt-6 space-y-6">
             {/* Period Section */}
             <div>
               <Label className="text-sm font-medium mb-3 block flex items-center gap-2">
@@ -252,30 +249,25 @@ export function BonusSimulationFilters({
                 {localFilters.excludeUserIds?.length || 0} usuário(s) excluído(s)
               </p>
             </div>
-          </div>
-        </ScrollArea>
 
-        <DialogFooter className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            onClick={handleClear}
-            className="gap-2"
-            disabled={totalActiveFilters === 0}
-          >
-            <IconTrash size={16} />
-            Limpar Filtros
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={handleClear}
+              className="flex-1"
+              disabled={totalActiveFilters === 0}
+            >
+              <IconX className="h-4 w-4 mr-2" />
+              Limpar Filtros
             </Button>
-            <Button onClick={handleApply} className="gap-2">
-              <IconCheck size={16} />
+            <Button onClick={handleApply} className="flex-1">
+              <IconCheck className="h-4 w-4 mr-2" />
               Aplicar Filtros
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

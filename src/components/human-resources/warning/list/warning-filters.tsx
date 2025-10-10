@@ -1,9 +1,15 @@
-import { useState } from "react";
-import { IconX } from "@tabler/icons-react";
+import { useState, useEffect } from "react";
+import { IconFilter, IconX } from "@tabler/icons-react";
 
 import { WARNING_SEVERITY, WARNING_SEVERITY_LABELS, WARNING_CATEGORY, WARNING_CATEGORY_LABELS } from "../../../../constants";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -23,6 +29,12 @@ export function WarningFilters({ open, onOpenChange, onApply, currentSeverity, c
   const [category, setCategory] = useState<WARNING_CATEGORY | "">(currentCategory || "");
   const [isActive, setIsActive] = useState<string>(currentIsActive === undefined ? "all" : currentIsActive ? "active" : "resolved");
 
+  useEffect(() => {
+    setSeverity(currentSeverity || "");
+    setCategory(currentCategory || "");
+    setIsActive(currentIsActive === undefined ? "all" : currentIsActive ? "active" : "resolved");
+  }, [currentSeverity, currentCategory, currentIsActive]);
+
   const handleApply = () => {
     onApply({
       severity: severity || undefined,
@@ -39,13 +51,19 @@ export function WarningFilters({ open, onOpenChange, onApply, currentSeverity, c
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Filtrar Advertências</DialogTitle>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <IconFilter className="h-5 w-5" />
+            Filtrar Advertências
+          </SheetTitle>
+          <SheetDescription>
+            Filtre as advertências por severidade, categoria ou status
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="mt-6 space-y-6">
           <div className="space-y-2">
             <Label htmlFor="severity">Severidade</Label>
             <Combobox
@@ -111,19 +129,17 @@ export function WarningFilters({ open, onOpenChange, onApply, currentSeverity, c
           </div>
         </div>
 
-        <DialogFooter className="flex justify-between sm:justify-between">
-          <Button variant="ghost" onClick={handleClear}>
+        {/* Action Buttons */}
+        <div className="flex gap-2 pt-4 border-t mt-6">
+          <Button variant="outline" onClick={handleClear} className="flex-1">
             <IconX className="h-4 w-4 mr-2" />
-            Limpar
+            Limpar Filtros
           </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleApply}>Aplicar</Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <Button onClick={handleApply} className="flex-1">
+            Aplicar Filtros
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

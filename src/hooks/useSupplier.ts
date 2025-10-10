@@ -157,7 +157,7 @@ export function useUpdateSupplier(id: string, queryParams?: SupplierQueryFormDat
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: SupplierUpdateFormData) => updateSupplier(id, data, queryParams),
+    mutationFn: (data: SupplierUpdateFormData & { logoFile?: File }) => updateSupplier(id, data, queryParams),
     onSuccess: (response) => {
       // Invalidate all supplier detail queries for this ID (with any include params)
       queryClient.invalidateQueries({

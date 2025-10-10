@@ -286,6 +286,28 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     });
   }, [filters, searchingFor, itemsData?.data, usersData?.data, onRemoveFilter]);
 
+  // Check if there are active filters (excluding search)
+  const hasActiveFilters = useMemo(() => {
+    return (
+      (filters.status?.length || 0) > 0 ||
+      (filters.itemIds?.length || 0) > 0 ||
+      (filters.userIds?.length || 0) > 0 ||
+      !!filters.scheduledDateRange ||
+      !!filters.actualDeliveryDateRange
+    );
+  }, [filters]);
+
+  // Count total active filters
+  const filterCount = useMemo(() => {
+    let count = 0;
+    if (filters.status?.length) count++;
+    if (filters.itemIds?.length) count++;
+    if (filters.userIds?.length) count++;
+    if (filters.scheduledDateRange) count++;
+    if (filters.actualDeliveryDateRange) count++;
+    return count;
+  }, [filters]);
+
   // Cleanup debounce on unmount
   useEffect(() => {
     return () => {
@@ -472,14 +494,11 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
           </div>
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={tableData.showSelectedOnly} onToggle={tableData.toggleShowSelectedOnly || (() => {})} selectionCount={tableData.selectionCount} />
-            <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)} className="group">
+            <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
               <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">Filtros</span>
-              {activeFilters.length > 0 && (
-                <Badge variant="secondary" className="ml-2 min-w-[1.25rem] h-5 px-1">
-                  {activeFilters.length}
-                </Badge>
-              )}
+              <span className="text-foreground">
+                Filtros{hasActiveFilters ? ` (${filterCount})` : ""}
+              </span>
             </Button>
             <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
           </div>

@@ -225,6 +225,23 @@ export function ServiceOrderList({ className }: ServiceOrderListProps) {
     });
   }, [filters, searchingFor, servicesData?.data, tasksData?.data, onRemoveFilter]);
 
+  // Calculate total filter count (excluding search)
+  const totalFilterCount = useMemo(() => {
+    const count = (
+      (filters.status?.length || 0) +
+      (filters.serviceIds?.length || 0) +
+      (filters.taskIds?.length || 0) +
+      (filters.startedAt?.from || filters.startedAt?.to ? 1 : 0) +
+      (filters.finishedAt?.from || filters.finishedAt?.to ? 1 : 0) +
+      (filters.createdAt?.gte || filters.createdAt?.lte ? 1 : 0) +
+      (filters.updatedAt?.gte || filters.updatedAt?.lte ? 1 : 0)
+    );
+    return count;
+  }, [filters]);
+
+  // Check if there are active filters (excluding search)
+  const hasActiveFilterCount = totalFilterCount > 0;
+
   // Context menu handlers
   const handleBulkEdit = (items: ServiceOrder[]) => {
     if (items.length === 1) {
@@ -342,9 +359,17 @@ export function ServiceOrderList({ className }: ServiceOrderListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)} className="group">
+            <Button
+              variant={hasActiveFilterCount ? "default" : "outline"}
+              size="default"
+              onClick={() => setShowFilterModal(true)}
+              className="group"
+            >
               <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">Filtros</span>
+              <span className="text-foreground">
+                Filtros
+                {hasActiveFilterCount ? ` (${totalFilterCount})` : ""}
+              </span>
             </Button>
             <ServiceOrderExport filters={filters} currentItems={tableData.items} totalRecords={tableData.totalRecords} />
           </div>

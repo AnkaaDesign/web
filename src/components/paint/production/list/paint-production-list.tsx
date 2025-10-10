@@ -387,14 +387,9 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
           {selectionCount > 0 && <ShowSelectedToggle selectionCount={selectionCount} showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} />}
 
           {/* Filter Button */}
-          <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)}>
+          <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)}>
             <IconFilter className="h-4 w-4 mr-2" />
-            Filtros
-            {hasActiveFilters && (
-              <Badge variant="secondary" className="ml-2">
-                {activeFilters.length}
-              </Badge>
-            )}
+            {hasActiveFilters ? `Filtros (${activeFilters.length})` : "Filtros"}
           </Button>
 
           {/* Column Visibility Manager */}

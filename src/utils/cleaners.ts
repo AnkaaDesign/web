@@ -74,17 +74,18 @@ export const cleanCEP = cleanZipCode;
  */
 export const cleanEmail = (value: string): string => {
   if (!value || typeof value !== "string") {
-    throw new Error("Email é obrigatório");
+    return ""; // Return empty string instead of throwing during typing
   }
 
   const cleaned = value.trim().toLowerCase();
 
   if (cleaned.length === 0) {
-    throw new Error("Email não pode ser vazio");
+    return ""; // Return empty string instead of throwing during typing
   }
 
   if (cleaned.length > 254) {
-    throw new Error("Email muito longo");
+    // Return trimmed value during typing, validation will catch it
+    return cleaned.substring(0, 254);
   }
 
   return cleaned;
@@ -180,14 +181,24 @@ export const cleanPasswordResetToken = (value: string): string => {
  */
 export const cleanContactMethod = (value: string): string => {
   if (!value || typeof value !== "string") {
-    throw new Error("Email ou telefone é obrigatório");
+    return ""; // Return empty string instead of throwing during typing
   }
 
   const trimmed = value.trim();
 
+  // Return empty if trimmed value is empty (allows partial input during typing)
+  if (trimmed.length === 0) {
+    return "";
+  }
+
   // Check if it's an email
   if (trimmed.includes("@")) {
-    return cleanEmail(trimmed);
+    try {
+      return cleanEmail(trimmed);
+    } catch {
+      // Return the trimmed value if cleanEmail fails during typing
+      return trimmed;
+    }
   }
 
   // Check if it's a phone number
@@ -196,7 +207,9 @@ export const cleanContactMethod = (value: string): string => {
     return cleanPhone(trimmed);
   }
 
-  throw new Error("Formato inválido. Digite um email ou telefone válido");
+  // For partial input during typing, just return trimmed value
+  // Validation will handle the final check on submit
+  return trimmed;
 };
 
 /**

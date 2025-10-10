@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import { IconFilter, IconX } from "@tabler/icons-react";
 import type { ItemBrandGetManyFormData } from "../../../../../schemas";
 
 interface BrandFiltersProps {
@@ -40,13 +41,19 @@ export function BrandFilters({ open, onOpenChange, filters, onFilterChange }: Br
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[400px] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Filtrar Marcas</DialogTitle>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <div className="flex items-center gap-2">
+            <IconFilter className="h-5 w-5" />
+            <SheetTitle>Filtrar Marcas</SheetTitle>
+          </div>
+          <SheetDescription>
+            Configure os filtros para refinar a lista de marcas
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="flex-1 overflow-auto grid gap-4 py-4">
+        <div className="mt-6 space-y-6">
           {/* Created date range */}
           <div className="grid gap-2">
             <Label>Data de criação</Label>
@@ -64,13 +71,14 @@ export function BrandFilters({ open, onOpenChange, filters, onFilterChange }: Br
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClear} disabled={!hasActiveFilters()}>
+        <div className="flex gap-2 pt-4 border-t mt-6">
+          <Button variant="outline" onClick={handleClear} disabled={!hasActiveFilters()} className="flex-1">
+            <IconX className="h-4 w-4 mr-2" />
             Limpar
           </Button>
-          <Button onClick={handleApply}>Aplicar Filtros</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <Button onClick={handleApply} className="flex-1">Aplicar Filtros</Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

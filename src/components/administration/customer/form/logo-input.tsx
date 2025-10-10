@@ -19,14 +19,13 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [uploadedFile, setUploadedFile] = useState<AnkaaFile | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [previewFiles, setPreviewFiles] = useState<FileWithPreview[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [isNewUpload, setIsNewUpload] = useState(false); // Track if this is a newly uploaded file
 
   // Track loaded logo ID to prevent duplicate API calls
   const [loadedLogoId, setLoadedLogoId] = useState<string | null>(null);
-  // Track if user explicitly deleted the logo to prevent reload
-  const [userDeletedLogo, setUserDeletedLogo] = useState(false);
 
   // Load existing logo if logoId is provided (from props or URL)
   useEffect(() => {
@@ -36,8 +35,8 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
       const logoIdToLoad = logoIdFromUrl || existingLogoId;
 
       // CRITICAL: Skip if we already loaded this logo ID to prevent infinite requests
-      // Also skip if user explicitly deleted the logo
-      if (!logoIdToLoad || logoIdToLoad === loadedLogoId || userDeletedLogo) {
+      // Only reload if the logoId to load is different from what we currently have loaded
+      if (!logoIdToLoad || logoIdToLoad === loadedLogoId) {
         return;
       }
 
@@ -85,7 +84,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
       setUploadedFile(null);
       setPreviewFiles([]);
       setIsNewUpload(false);
-      setLoadedLogoId(null); // Reset loaded logo ID
+      // DON'T reset loadedLogoId - keep it to prevent reloading
 
       // Remove logoId from URL
       const newParams = new URLSearchParams(searchParams);
@@ -94,26 +93,28 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
       return;
     }
 
-    // Reset the deleted flag when user uploads a new file
-    setUserDeletedLogo(false);
-
     const file = files[0]; // Only handle the first file for logo
 
     if (!file.uploaded) {
       // Upload the file
       setIsUploading(true);
-      try {
-        // Create FormData
-        const formData = new FormData();
-        formData.append("file", file as Blob);
-        formData.append("filename", file.name);
-        formData.append("mimetype", file.type);
-        formData.append("size", file.size.toString());
+      setUploadProgress(0);
 
-        // Upload the file with customer logo context
+      // Set initial file state with progress
+      setPreviewFiles([Object.assign(file, { uploadProgress: 0, uploaded: false })]);
+
+      try {
+        // Upload the file with customer logo context and progress tracking
         const response = await fileService.uploadSingleFile(file as File, {
           fileContext: "customerLogo",
           entityType: "customer",
+          onProgress: (progress) => {
+            setUploadProgress(progress.percentage);
+            // Update file with progress using Object.assign to preserve File properties
+            setPreviewFiles((prev) => prev.map(f =>
+              f.id === file.id ? Object.assign(f, { uploadProgress: progress.percentage }) : f
+            ));
+          },
         });
 
         if (response && response.data) {
@@ -134,14 +135,15 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
           newParams.set("logoId", response.data.id);
           setSearchParams(newParams);
 
-          // Update preview with uploaded status
-          const updatedFile: FileWithPreview = {
-            ...file,
-            id: response.data.id,
-            uploaded: true,
-            preview: normalizeThumbnailUrl(response.data.thumbnailUrl) || getFileUrl(response.data),
-          };
-          setPreviewFiles([updatedFile]);
+          // Update preview with uploaded status using Object.assign
+          setPreviewFiles((prev) => prev.map(f =>
+            f.id === file.id ? Object.assign(f, {
+              id: response.data.id,
+              uploaded: true,
+              uploadProgress: 100,
+              preview: normalizeThumbnailUrl(response.data.thumbnailUrl) || getFileUrl(response.data),
+            }) : f
+          ));
         }
       } catch (error) {
         toast.error("Erro ao enviar o logo. Tente novamente.");
@@ -149,6 +151,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
         setPreviewFiles([]);
       } finally {
         setIsUploading(false);
+        setUploadProgress(0);
       }
     } else {
       // File is already uploaded (when editing)
@@ -165,8 +168,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
     setUploadedFile(null);
     setPreviewFiles([]);
     setIsNewUpload(false);
-    setLoadedLogoId(null); // Reset loaded logo ID
-    setUserDeletedLogo(true); // Mark that user explicitly deleted the logo
+    // DON'T reset loadedLogoId - keep it to prevent reloading the same logo
 
     // Remove logoId from URL
     const newParams = new URLSearchParams(searchParams);
@@ -203,41 +205,19 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
           <FormItem>
             <FormLabel>Logo do Cliente</FormLabel>
             <FormControl>
-              <div className="space-y-4">
-                {previewFiles.length === 0 ? (
-                  <FileUploadField
-                    onFilesChange={handleFilesChange}
-                    maxFiles={1}
-                    maxSize={5 * 1024 * 1024} // 5MB
-                    acceptedFileTypes={{
-                      "image/*": [".jpeg", ".jpg", ".png", ".gif", ".svg", ".webp"],
-                    }}
-                    disabled={disabled || isUploading}
-                    showPreview={true}
-                    variant="compact"
-                    placeholder="Clique ou arraste o logo do cliente"
-                  />
-                ) : (
-                  <FileItem
-                    file={{
-                      id: uploadedFile?.id || previewFiles[0].id,
-                      filename: uploadedFile?.filename || previewFiles[0].name,
-                      originalName: uploadedFile?.originalName || previewFiles[0].name,
-                      mimetype: uploadedFile?.mimetype || previewFiles[0].type,
-                      size: uploadedFile?.size || previewFiles[0].size,
-                      path: uploadedFile?.path || "",
-                      thumbnailUrl: uploadedFile?.thumbnailUrl || null,
-                      createdAt: uploadedFile?.createdAt || new Date(),
-                      updatedAt: uploadedFile?.updatedAt || new Date(),
-                    }}
-                    viewMode="grid"
-                    onPreview={handleFilePreview}
-                    onDelete={!disabled && !isUploading ? handleFileDelete : undefined}
-                    showActions={!disabled && !isUploading}
-                  />
-                )}
-                {isUploading && <p className="text-sm text-muted-foreground">Enviando logo...</p>}
-              </div>
+              <FileUploadField
+                onFilesChange={handleFilesChange}
+                maxFiles={1}
+                maxSize={5 * 1024 * 1024} // 5MB
+                acceptedFileTypes={{
+                  "image/*": [".jpeg", ".jpg", ".png", ".gif", ".svg", ".webp"],
+                }}
+                disabled={disabled || isUploading}
+                showPreview={true}
+                variant="compact"
+                placeholder="Clique ou arraste o logo do cliente"
+                existingFiles={previewFiles}
+              />
             </FormControl>
             <FormMessage />
           </FormItem>

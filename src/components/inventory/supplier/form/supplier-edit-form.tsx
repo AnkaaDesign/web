@@ -5,7 +5,7 @@ import { SupplierForm } from "./supplier-form";
 
 interface SupplierEditFormProps {
   supplier: Supplier;
-  onSubmit: (data: Partial<SupplierUpdateFormData>) => Promise<void>;
+  onSubmit: (data: Partial<SupplierUpdateFormData> & { logoFile?: File }) => Promise<void>;
   isSubmitting?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
   onFormStateChange?: (formState: { isValid: boolean; isDirty: boolean }) => void;
@@ -37,19 +37,32 @@ export function SupplierEditForm({ supplier, onSubmit, isSubmitting, onDirtyChan
   // Track original values to determine what changed (only set once on mount)
   const originalValuesRef = React.useRef(defaultValues);
 
-  const handleSubmit = async (data: SupplierUpdateFormData) => {
-    // Compare with original values to find changed fields
+  const handleSubmit = async (data: SupplierUpdateFormData & { logoFile?: File }) => {
+    // Extract logoFile from data (passed by SupplierForm)
+    const { logoFile, ...formData } = data;
+
+    // If there's a logo file, we need to send ALL current form data (not just changes)
+    // because FormData requires all fields to be present
+    if (logoFile) {
+      await onSubmit({
+        ...formData,
+        logoFile,
+      });
+      return;
+    }
+
+    // No logo file - proceed with change detection as usual
     const changedFields: Partial<SupplierUpdateFormData> = {};
     const original = originalValuesRef.current;
 
     // Check each field for changes
-    Object.keys(data).forEach((key) => {
+    Object.keys(formData).forEach((key) => {
       const typedKey = key as keyof SupplierUpdateFormData;
 
       // Skip fields that don't exist in the form data
-      if (!(typedKey in data)) return;
+      if (!(typedKey in formData)) return;
 
-      const newValue = data[typedKey];
+      const newValue = formData[typedKey];
       const oldValue = typedKey in original ? (original as any)[typedKey] : undefined;
 
       // Special handling for phones - normalize for comparison

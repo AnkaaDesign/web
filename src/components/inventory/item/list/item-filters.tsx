@@ -1,7 +1,13 @@
 import { useState, useEffect } from "react";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { IconFilter, IconSearch, IconTag, IconTrendingUp, IconRuler, IconCalendar, IconX } from "@tabler/icons-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -187,11 +193,11 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
   const activeFilterCount = countActiveFilters();
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5 text-muted-foreground" />
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <IconFilter className="h-5 w-5" />
             Itens - Filtros
             {activeFilterCount > 0 && (
               <Badge
@@ -203,13 +209,13 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
                 {activeFilterCount}
               </Badge>
             )}
-          </DialogTitle>
-          <DialogDescription>Configure filtros para refinar a pesquisa de itens</DialogDescription>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>Configure filtros para refinar a pesquisa de itens</SheetDescription>
+        </SheetHeader>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Tabs defaultValue="basic" className="flex flex-col flex-1 overflow-hidden">
-            <TabsList className="grid w-full grid-cols-5 flex-shrink-0">
+        <div className="mt-6 space-y-6">
+          <Tabs defaultValue="basic" className="flex flex-col">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="basic" className="flex items-center gap-2">
                 <IconSearch className="h-4 w-4" />
                 Básico
@@ -232,8 +238,8 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
               </TabsTrigger>
             </TabsList>
 
-            <div className="flex-1 overflow-hidden mt-4">
-              <TabsContent value="basic" className="h-full overflow-auto space-y-8 p-4">
+            <div className="mt-4">
+              <TabsContent value="basic" className="space-y-4 mt-0">
                 <BasicFilters
                   showInactive={localState.showInactive}
                   onShowInactiveChange={(value: any) => setLocalState((prev: any) => ({ ...prev, showInactive: value }))}
@@ -248,7 +254,7 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
                 />
               </TabsContent>
 
-              <TabsContent value="entities" className="h-full overflow-auto space-y-8 p-4">
+              <TabsContent value="entities" className="space-y-4 mt-0">
                 <EntitySelectors
                   categoryIds={localState.categoryIds || []}
                   onCategoryIdsChange={(ids: any) => setLocalState((prev: any) => ({ ...prev, categoryIds: ids }))}
@@ -259,7 +265,7 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
                 />
               </TabsContent>
 
-              <TabsContent value="measures" className="h-full overflow-auto space-y-8 p-4">
+              <TabsContent value="measures" className="space-y-4 mt-0">
                 <MeasureFilters
                   measureUnits={localState.measureUnits || []}
                   onMeasureUnitsChange={(units: any) => setLocalState((prev: any) => ({ ...prev, measureUnits: units }))}
@@ -272,7 +278,7 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
                 />
               </TabsContent>
 
-              <TabsContent value="ranges" className="h-full overflow-auto space-y-8 p-4">
+              <TabsContent value="ranges" className="space-y-4 mt-0">
                 <RangeFilters
                   quantityRange={localState.quantityRange}
                   onQuantityRangeChange={(range: any) => setLocalState((prev: any) => ({ ...prev, quantityRange: range }))}
@@ -287,7 +293,7 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
                 />
               </TabsContent>
 
-              <TabsContent value="dates" className="h-full overflow-auto space-y-8 p-4">
+              <TabsContent value="dates" className="space-y-4 mt-0">
                 <DateFilters
                   createdAtRange={localState.createdAtRange}
                   onCreatedAtRangeChange={(range: any) => setLocalState((prev: any) => ({ ...prev, createdAtRange: range }))}
@@ -297,25 +303,24 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
               </TabsContent>
             </div>
           </Tabs>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleReset} className="flex-1">
+              <IconX className="h-4 w-4 mr-2" />
+              Limpar todos
+            </Button>
+            <Button onClick={handleApply} className="flex-1">
+              Aplicar filtros
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {activeFilterCount}
+                </Badge>
+              )}
+            </Button>
+          </div>
         </div>
-
-        <Separator className="mt-auto" />
-
-        <DialogFooter className="gap-2 flex-shrink-0">
-          <Button variant="outline" onClick={handleReset}>
-            <IconX className="h-4 w-4 mr-2" />
-            Limpar todos
-          </Button>
-          <Button onClick={handleApply}>
-            Aplicar filtros
-            {activeFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {activeFilterCount}
-              </Badge>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

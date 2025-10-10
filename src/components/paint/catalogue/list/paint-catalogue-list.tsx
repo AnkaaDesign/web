@@ -429,6 +429,29 @@ function PaintCatalogueListContent({ className }: PaintCatalogueListProps) {
     });
   }, [filters, searchingFor, paintTypesData?.data, paintBrandsData?.data, onRemoveFilter]);
 
+  // Count active filters (excluding search)
+  const hasActiveFilters = useMemo(() => {
+    let count = 0;
+    if (filters.paintTypeIds?.length) count++;
+    if (filters.paintBrandIds?.length) count++;
+    if (filters.finishes?.length) count++;
+    if (filters.manufacturers?.length) count++;
+    if (filters.palettes?.length) count++;
+    if (filters.hasFormulas !== undefined) count++;
+    return count > 0;
+  }, [filters]);
+
+  const totalFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.paintTypeIds?.length) count += filters.paintTypeIds.length;
+    if (filters.paintBrandIds?.length) count += filters.paintBrandIds.length;
+    if (filters.finishes?.length) count += filters.finishes.length;
+    if (filters.manufacturers?.length) count += filters.manufacturers.length;
+    if (filters.palettes?.length) count += filters.palettes.length;
+    if (filters.hasFormulas !== undefined) count++;
+    return count;
+  }, [filters]);
+
 
   // Handle paint click in minimized view
   const handlePaintClick = useCallback((paint: Paint) => {
@@ -463,9 +486,12 @@ function PaintCatalogueListContent({ className }: PaintCatalogueListProps) {
             </div>
             <div className="flex gap-2">
               {/* Filter Button */}
-              <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)} className="group">
+              <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
                 <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                <span className="text-foreground">Filtros</span>
+                <span className="text-foreground">
+                  Filtros
+                  {hasActiveFilters ? ` (${totalFilterCount})` : ""}
+                </span>
               </Button>
 
               {/* Sort Selector */}

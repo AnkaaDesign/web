@@ -1,5 +1,12 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { IconFilter, IconX } from "@tabler/icons-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -10,7 +17,6 @@ import { useSectors, useCustomers, useUsers } from "../../../../hooks";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { TASK_STATUS } from "../../../../constants";
 import { formatCurrency } from "../../../../utils";
-import { IconX } from "@tabler/icons-react";
 
 interface TaskHistoryFiltersProps {
   open: boolean;
@@ -96,13 +102,19 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Filtros do Histórico</DialogTitle>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <IconFilter className="h-5 w-5" />
+            Filtros do Histórico
+          </SheetTitle>
+          <SheetDescription>
+            Filtre as tarefas por status, data, setor, cliente e mais
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="mt-6 space-y-6">
           {/* Status Filter Switch */}
           <div className="space-y-2">
             <Label>Status das Tarefas</Label>
@@ -228,17 +240,17 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
           </div>
         </div>
 
-        <DialogFooter className="flex gap-2">
-          <Button variant="ghost" onClick={handleClear}>
+        {/* Action Buttons */}
+        <div className="flex gap-2 pt-4 border-t">
+          <Button variant="outline" onClick={handleClear} className="flex-1">
             <IconX className="h-4 w-4 mr-2" />
-            Limpar
+            Limpar Filtros
           </Button>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
+          <Button onClick={handleApply} className="flex-1">
+            Aplicar Filtros
           </Button>
-          <Button onClick={handleApply}>Aplicar Filtros</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

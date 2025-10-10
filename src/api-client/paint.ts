@@ -243,6 +243,19 @@ export class PaintService {
     const response = await apiClient.post<PaintMergeResponse>(`${this.basePath}/merge`, data, { params: query });
     return response.data;
   }
+
+  // =====================
+  // Component Intersection Operations
+  // =====================
+
+  /**
+   * Get available components based on intersection of paint brand and paint type
+   * Returns only components that exist in BOTH paint brand AND paint type
+   */
+  async getAvailableComponents(paintBrandId: string, paintTypeId: string): Promise<ItemGetManyResponse> {
+    const response = await apiClient.get<ItemGetManyResponse>(`${this.basePath}/components/available/${paintBrandId}/${paintTypeId}`);
+    return response.data;
+  }
 }
 
 // =====================
@@ -722,6 +735,9 @@ export const batchCreatePaints = (data: PaintBatchCreateFormData, query?: PaintQ
 export const batchUpdatePaints = (data: PaintBatchUpdateFormData, query?: PaintQueryFormData) => paintService.batchUpdatePaints(data, query);
 export const batchDeletePaints = (data: PaintBatchDeleteFormData) => paintService.batchDeletePaints(data);
 export const mergePaints = (data: PaintMergeFormData, query?: PaintQueryFormData) => paintService.mergePaints(data, query);
+
+// Component Intersection exports
+export const getAvailableComponents = (paintBrandId: string, paintTypeId: string) => paintService.getAvailableComponents(paintBrandId, paintTypeId);
 
 // Paint Brand Integration exports
 export const getPaintsByBrandId = (brandId: string, params?: Omit<PaintGetManyFormData, "paintBrandIds">) => paintService.getPaintsByBrandId(brandId, params);

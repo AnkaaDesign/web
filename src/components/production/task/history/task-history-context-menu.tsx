@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { IconEye, IconEdit, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
-import { routes, TASK_STATUS } from "../../../../constants";
+import { routes, TASK_STATUS, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import type { Task } from "../../../../types";
+import { getChangeLogs } from "../../../../api-client";
 
 interface TaskHistoryContextMenuProps {
   task?: Task;
@@ -46,16 +47,75 @@ export function TaskHistoryContextMenu({
 
   const handleReactivate = async () => {
     try {
+      // Get the previous status from changelog before it was put ON_HOLD
+      const getPreviousStatus = async (taskId: string): Promise<TASK_STATUS> => {
+        try {
+          // Query changelog for status field changes on this task
+          const changelogsResponse = await getChangeLogs({
+            entityTypes: [CHANGE_LOG_ENTITY_TYPE.TASK],
+            entityIds: [taskId],
+            where: {
+              field: { equals: "status" }
+            },
+            orderBy: { createdAt: "desc" },
+            limit: 10, // Get last 10 status changes
+          });
+
+          const changelogs = changelogsResponse?.data || [];
+
+          // Find the most recent status change to ON_HOLD
+          const onHoldChangeIndex = changelogs.findIndex(
+            log => log.newValue === TASK_STATUS.ON_HOLD
+          );
+
+          if (onHoldChangeIndex >= 0 && onHoldChangeIndex < changelogs.length) {
+            const onHoldChange = changelogs[onHoldChangeIndex];
+            // The oldValue from that change is what we want to restore
+            if (onHoldChange.oldValue &&
+                (onHoldChange.oldValue === TASK_STATUS.PENDING ||
+                 onHoldChange.oldValue === TASK_STATUS.IN_PRODUCTION)) {
+              return onHoldChange.oldValue as TASK_STATUS;
+            }
+          }
+
+          // Default to PENDING if no previous status found
+          return TASK_STATUS.PENDING;
+        } catch (error) {
+          console.error("Error fetching changelog:", error);
+          // Default to PENDING on error
+          return TASK_STATUS.PENDING;
+        }
+      };
+
       if (taskIds.length === 1) {
+        const previousStatus = await getPreviousStatus(taskIds[0]);
+        const reactivateData: any = { status: previousStatus };
+
+        // Include startedAt if changing to IN_PRODUCTION
+        if (previousStatus === TASK_STATUS.IN_PRODUCTION) {
+          reactivateData.startedAt = task?.startedAt || new Date().toISOString();
+        }
+
         await update({
           id: taskIds[0],
-          data: { status: TASK_STATUS.IN_PRODUCTION }
+          data: reactivateData
         });
       } else {
-        const updates = taskIds.map(id => ({
-          id,
-          data: { status: TASK_STATUS.IN_PRODUCTION }
-        }));
+        // For batch updates, get previous status for each task
+        const updates = await Promise.all(
+          taskIds.map(async (id) => {
+            const previousStatus = await getPreviousStatus(id);
+            const data: any = { status: previousStatus };
+
+            // Include startedAt if changing to IN_PRODUCTION
+            if (previousStatus === TASK_STATUS.IN_PRODUCTION) {
+              data.startedAt = new Date().toISOString();
+            }
+
+            return { id, data };
+          })
+        );
+
         await batchUpdate({ items: updates });
       }
     } catch (error) {

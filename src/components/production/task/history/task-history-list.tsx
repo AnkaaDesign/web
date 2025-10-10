@@ -8,7 +8,6 @@ import { useTableState } from "@/hooks/use-table-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { TaskHistoryTable } from "./task-history-table";
@@ -304,14 +303,13 @@ export function TaskHistoryList({
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <Button variant="outline" size="default" onClick={() => setShowFilterModal(!showFilterModal)} className="group">
-              <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">Filtros</span>
-              {activeFilters.length > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {activeFilters.length}
-                </Badge>
-              )}
+            <Button
+              variant={activeFilters.length > 0 ? "default" : "outline"}
+              size="default"
+              onClick={() => setShowFilterModal(!showFilterModal)}
+            >
+              <IconFilter className="h-4 w-4" />
+              <span>Filtros{activeFilters.length > 0 ? ` (${activeFilters.length})` : ''}</span>
             </Button>
             <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <TaskExport filters={queryFilters} currentItems={tableData.items} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />

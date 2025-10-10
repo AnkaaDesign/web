@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { IconX, IconCurrencyReal } from "@tabler/icons-react";
+import { IconX, IconCurrencyReal, IconFilter } from "@tabler/icons-react";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -32,13 +32,19 @@ export function PositionFilters({ open, onOpenChange, onApply, currentMinRemuner
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Filtrar Cargos</DialogTitle>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <IconFilter className="h-5 w-5" />
+            Filtrar Cargos
+          </SheetTitle>
+          <SheetDescription>
+            Filtre os cargos por faixa de remuneração
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="mt-6 space-y-6">
           <div className="space-y-4">
             <h3 className="text-sm font-medium flex items-center gap-2">
               <IconCurrencyReal className="h-4 w-4" />
@@ -67,21 +73,19 @@ export function PositionFilters({ open, onOpenChange, onApply, currentMinRemuner
               />
             </div>
           </div>
-        </div>
 
-        <DialogFooter className="flex justify-between sm:justify-between">
-          <Button variant="ghost" onClick={handleClear}>
-            <IconX className="h-4 w-4 mr-2" />
-            Limpar
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleClear} className="flex-1">
+              <IconX className="h-4 w-4 mr-2" />
+              Limpar Filtros
             </Button>
-            <Button onClick={handleApply}>Aplicar</Button>
+            <Button onClick={handleApply} className="flex-1">
+              Aplicar Filtros
+            </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

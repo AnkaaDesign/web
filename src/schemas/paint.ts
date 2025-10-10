@@ -1474,29 +1474,19 @@ export const paintFormulaGetManySchema = z
   })
   .transform(paintFormulaTransform);
 
-export const paintFormulaCreateSchema = z
-  .object({
-    description: z.string().min(1, "Descrição é obrigatória"),
-    paintId: z.string().uuid("Tinta inválida"),
-    components: z
-      .array(
-        z.object({
-          ratio: z.number().positive("Proporção deve ser positiva").min(0.1, "Proporção mínima é 0.1%").max(100, "Proporção máxima é 100%"),
-          itemId: z.string().uuid("Item inválido"),
-        }),
-      )
-      .min(1, "Fórmula deve ter pelo menos um componente"),
-  })
-  .refine(
-    (data) => {
-      // Ensure total ratio equals 100%
-      const totalRatio = data.components.reduce((sum, comp) => sum + comp.ratio, 0);
-      return Math.abs(totalRatio - 100) < 0.01; // Allow small floating point error
-    },
-    {
-      message: "A soma das proporções deve ser igual a 100%",
-    },
-  );
+export const paintFormulaCreateSchema = z.object({
+  description: z.string().min(1, "Descrição é obrigatória"),
+  paintId: z.string().uuid("Tinta inválida"),
+  components: z
+    .array(
+      z.object({
+        weightInGrams: z.number().positive("Peso deve ser positivo").min(0.1, "Peso mínimo é 0.1g"),
+        itemId: z.string().uuid("Item inválido"),
+        rawInput: z.string().optional(), // For internal use only, not sent to API
+      }),
+    )
+    .min(1, "Fórmula deve ter pelo menos um componente"),
+});
 
 export const paintFormulaUpdateSchema = z
   .object({

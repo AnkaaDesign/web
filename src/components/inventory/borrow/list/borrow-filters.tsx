@@ -1,5 +1,5 @@
 import React from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
@@ -83,10 +83,10 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
     })) || [];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] h-[70vh] max-h-[700px] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5 text-muted-foreground" />
             Empréstimos - Filtros
             {activeFilterCount > 0 && (
@@ -103,11 +103,11 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
                 </Tooltip>
               </TooltipProvider>
             )}
-          </DialogTitle>
-          <DialogDescription>Configure os filtros para refinar sua pesquisa de empréstimos</DialogDescription>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>Configure os filtros para refinar sua pesquisa de empréstimos</SheetDescription>
+        </SheetHeader>
 
-        <div className="flex-1 overflow-auto space-y-8 py-4">
+        <div className="mt-6 space-y-6">
           {/* Item Filter - Multi Combobox */}
           <div className="grid gap-2">
             <Label className="flex items-center gap-2">
@@ -337,14 +337,14 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClear} className="flex items-center gap-2">
+        <div className="flex gap-2 pt-4 border-t">
+          <Button variant="outline" onClick={handleClear} className="flex-1 flex items-center gap-2">
             <IconX className="h-4 w-4" />
             Limpar Tudo
           </Button>
-          <Button onClick={handleApply}>Aplicar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <Button onClick={handleApply} className="flex-1">Aplicar</Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

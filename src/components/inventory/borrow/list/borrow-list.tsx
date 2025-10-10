@@ -308,14 +308,9 @@ export function BorrowList({ className }: BorrowListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)} className="group">
-              <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">Filtros</span>
-              {activeFilters.length > 0 && (
-                <Badge variant="secondary" className="ml-2 min-w-[1.25rem] h-5 px-1">
-                  {activeFilters.length}
-                </Badge>
-              )}
+            <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
+              <IconFilter className="h-4 w-4" />
+              <span>Filtros{hasActiveFilters ? ` (${activeFilters.length})` : ""}</span>
             </Button>
             <ColumnVisibilityManager visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <BorrowExport filters={queryFilters} currentItems={tableData.items} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />

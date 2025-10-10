@@ -24,7 +24,7 @@ import { FollowUpDatePicker } from "./follow-up-date-picker";
 import { HrNotesTextarea } from "./hr-notes-textarea";
 import { ActiveSwitch } from "./active-switch";
 import { WitnessMultiSelect } from "./witness-multi-select";
-import { FileUploadField } from "@/components/file";
+import { FileUploadField, type FileWithPreview } from "@/components/file";
 
 interface CreateModeProps {
   mode: "create";
@@ -48,7 +48,7 @@ type WarningFormProps = (CreateModeProps | UpdateModeProps) & {
 export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolean; isValid: boolean }, WarningFormProps>((props, ref) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [_files, setFiles] = useState<File[]>([]);
+  const [attachmentFiles, setAttachmentFiles] = useState<FileWithPreview[]>([]);
   const { createAsync, updateAsync } = useWarningMutations();
 
   // Create a custom resolver based on mode
@@ -71,6 +71,7 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
     followUpDate: new Date(),
     hrNotes: "",
     witnessIds: [],
+    attachmentIds: [],
     ...(props.defaultValues || {}),
   };
 
@@ -85,6 +86,7 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
     followUpDate: new Date(props.warning.followUpDate),
     hrNotes: props.warning.hrNotes || "",
     witnessIds: props.warning.witness?.map((w: any) => w.id) || [],
+    attachmentIds: props.warning.attachments?.map((f: any) => f.id) || [],
     resolvedAt: props.warning.resolvedAt ? new Date(props.warning.resolvedAt) : undefined,
     ...(props.defaultValues || {}),
   } : {} as WarningUpdateFormData;
@@ -97,6 +99,35 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
     shouldFocusError: true, // Focus on first error field when validation fails
     criteriaMode: "all", // Show all errors for better UX
   });
+
+  // Initialize attachment files from existing warning (update mode)
+  useEffect(() => {
+    if (props.mode === "update" && props.warning.attachments) {
+      const existingFiles: FileWithPreview[] = props.warning.attachments.map((file: any) => {
+        const fileObj = Object.assign(
+          new File([new ArrayBuffer(0)], file.filename || file.originalName || "file", {
+            type: file.mimetype || "application/octet-stream",
+            lastModified: new Date(file.createdAt || Date.now()).getTime(),
+          }),
+          {
+            id: file.id,
+            uploaded: true,
+            uploadedFileId: file.id,
+            thumbnailUrl: file.thumbnailUrl,
+          },
+        ) as FileWithPreview;
+        return fileObj;
+      });
+      setAttachmentFiles(existingFiles);
+    }
+  }, [props.mode, props.mode === "update" ? props.warning : null]);
+
+  // Handle attachment file changes
+  const handleAttachmentFilesChange = (files: FileWithPreview[]) => {
+    setAttachmentFiles(files);
+    const fileIds = files.map((f) => f.uploadedFileId || f.id).filter(Boolean);
+    form.setValue("attachmentIds", fileIds);
+  };
 
   // Reset form when defaultValues change in update mode (e.g., new warning data loaded)
   const defaultValuesRef = useRef(props.mode === "update" ? updateDefaults : createDefaults);
@@ -197,25 +228,17 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
 
   const handleSubmit = async (data: WarningCreateFormData | WarningUpdateFormData) => {
     try {
-      const submitData =
-        props.mode === "create"
-          ? {
-              ...data,
-              attachmentIds: [], // Files will be uploaded separately
-            }
-          : data;
-
       if (props.onSubmit) {
-        await props.onSubmit(submitData as any);
+        await props.onSubmit(data as any);
       } else {
         if (props.mode === "create") {
-          const result = await createAsync(submitData as WarningCreateFormData);
+          const result = await createAsync(data as WarningCreateFormData);
           // Success toast is handled automatically by API client
           navigate(routes.humanResources.warnings.details(result.data?.id || ""));
         } else {
           await updateAsync({
             id: props.warning.id,
-            data: submitData as WarningUpdateFormData,
+            data: data as WarningUpdateFormData,
           });
           // Success toast is handled automatically by API client
           navigate(routes.humanResources.warnings.details(props.warning.id));
@@ -297,13 +320,18 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
               {/* HR Notes */}
               <HrNotesTextarea control={form.control} disabled={isSubmitting} />
 
-              {/* File Upload (create mode only) */}
-              {props.mode === "create" && (
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Anexos</label>
-                  <FileUploadField onFilesChange={setFiles} maxFiles={10} disabled={isSubmitting} showPreview variant="compact" />
-                </div>
-              )}
+              {/* File Upload */}
+              <div>
+                <label className="text-sm font-medium mb-2 block">Anexos</label>
+                <FileUploadField
+                  onFilesChange={handleAttachmentFilesChange}
+                  existingFiles={attachmentFiles}
+                  maxFiles={10}
+                  disabled={isSubmitting}
+                  showPreview
+                  variant="compact"
+                />
+              </div>
             </CardContent>
           </Card>
         </form>

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconFlask, IconChevronDown, IconChevronRight, IconCurrencyReal, IconDroplet } from "@tabler/icons-react";
+import { IconFlask, IconChevronDown, IconChevronRight, IconCurrencyReal, IconDroplet, IconFilter } from "@tabler/icons-react";
 
 import { usePaintFormulas } from "../../../hooks";
 import { routes } from "../../../constants";
@@ -19,12 +19,19 @@ import { IconPlus, IconSearch, IconAlertCircle } from "@tabler/icons-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
+import { FormulaFilters } from "@/components/paint/formula/formula-filters";
+import type { FormulaFiltersData } from "@/components/paint/formula/formula-filters";
 
 export default function FormulasList() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [openFormulas, setOpenFormulas] = useState<Set<string>>(new Set());
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [advancedFilters, setAdvancedFilters] = useState<FormulaFiltersData>({
+    paintNames: [],
+    hasComponents: "all",
+  });
 
   const {
     data: formulasResponse,
@@ -43,6 +50,67 @@ export default function FormulasList() {
   });
 
   const formulas = formulasResponse?.data || [];
+
+  // Extract unique paint names for filters
+  const availablePaintNames = useMemo(() => {
+    const paintNames = new Set<string>();
+    formulas.forEach((formula) => {
+      if (formula.paint?.name) {
+        paintNames.add(formula.paint.name);
+      }
+    });
+    return Array.from(paintNames).sort();
+  }, [formulas]);
+
+  // Apply advanced filters
+  const filteredFormulas = useMemo(() => {
+    let filtered = [...formulas];
+
+    // Filter by paint names
+    if (advancedFilters.paintNames && advancedFilters.paintNames.length > 0) {
+      filtered = filtered.filter(
+        (formula) =>
+          formula.paint?.name &&
+          advancedFilters.paintNames?.includes(formula.paint.name)
+      );
+    }
+
+    // Filter by has components
+    if (advancedFilters.hasComponents === "with") {
+      filtered = filtered.filter(
+        (formula) => formula.components && formula.components.length > 0
+      );
+    } else if (advancedFilters.hasComponents === "without") {
+      filtered = filtered.filter(
+        (formula) => !formula.components || formula.components.length === 0
+      );
+    }
+
+    return filtered;
+  }, [formulas, advancedFilters]);
+
+  // Check if there are active filters
+  const hasActiveFilters = useMemo(() => {
+    return (
+      (advancedFilters.paintNames?.length || 0) > 0 ||
+      advancedFilters.hasComponents !== "all"
+    );
+  }, [advancedFilters]);
+
+  const totalFilterCount = useMemo(() => {
+    let count = 0;
+    if (advancedFilters.paintNames?.length) {
+      count += advancedFilters.paintNames.length;
+    }
+    if (advancedFilters.hasComponents !== "all") {
+      count += 1;
+    }
+    return count;
+  }, [advancedFilters]);
+
+  const handleFilterChange = (filters: FormulaFiltersData) => {
+    setAdvancedFilters(filters);
+  };
 
   // Calculate component price based on ratio and formula density
   const calculateComponentPrice = (component: any, formula: any) => {
@@ -148,12 +216,26 @@ export default function FormulasList() {
               ]}
             />
 
-            {/* Search */}
+            {/* Search and Filters */}
             <Card className="shadow-sm border border-border" level={1}>
               <CardContent className="p-4 sm:p-6">
-                <div className="relative">
-                  <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input placeholder="Buscar fórmulas..." value={searchTerm} onChange={(value) => setSearchTerm(typeof value === "string" ? value : "")} className="pl-10" />
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className="relative flex-1">
+                    <IconSearch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input placeholder="Buscar fórmulas..." value={searchTerm} onChange={(value) => setSearchTerm(typeof value === "string" ? value : "")} className="pl-10" />
+                  </div>
+                  <Button
+                    variant={hasActiveFilters ? "default" : "outline"}
+                    size="default"
+                    onClick={() => setFiltersOpen(true)}
+                    className="group"
+                  >
+                    <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                    <span className="text-foreground">
+                      Filtros
+                      {hasActiveFilters ? ` (${totalFilterCount})` : ""}
+                    </span>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -182,15 +264,15 @@ export default function FormulasList() {
 
             {/* Content */}
             <section className="space-y-4">
-              {!isLoading && formulas.length === 0 ? (
+              {!isLoading && filteredFormulas.length === 0 ? (
                 <Card className="shadow-sm border border-border" level={1}>
                   <CardContent className="pt-4 sm:pt-6">
                     <div className="text-center py-8 sm:py-12 px-4">
                       <IconFlask className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-muted-foreground/50 mb-4" />
                       <p className="text-sm sm:text-base text-muted-foreground mb-4">
-                        {searchTerm ? "Nenhuma fórmula encontrada com esses critérios" : "Nenhuma fórmula cadastrada ainda"}
+                        {searchTerm || hasActiveFilters ? "Nenhuma fórmula encontrada com esses critérios" : "Nenhuma fórmula cadastrada ainda"}
                       </p>
-                      {!searchTerm && (
+                      {!searchTerm && !hasActiveFilters && (
                         <Button onClick={() => navigate(routes.painting.catalog.root)}>
                           <IconPlus className="h-4 w-4 mr-2" />
                           Criar Primeira Fórmula
@@ -200,7 +282,7 @@ export default function FormulasList() {
                   </CardContent>
                 </Card>
               ) : (
-                formulas.map((formula) => {
+                filteredFormulas.map((formula) => {
                   const componentCount = formula.components?.length || 0;
                   const hasValidDensity = formula.density && Number(formula.density) > 0;
                   const hasValidPrice = formula.pricePerLiter && Number(formula.pricePerLiter) > 0;
@@ -352,16 +434,27 @@ export default function FormulasList() {
             </section>
 
             {/* Results info */}
-            {!isLoading && formulas.length > 0 && (
+            {!isLoading && filteredFormulas.length > 0 && (
               <section className="animate-in fade-in-50 duration-1000 pb-4">
                 <div className="text-center">
-                  <p className="text-sm text-muted-foreground">{formulasResponse?.meta?.totalRecords || formulas.length} fórmula(s) encontrada(s)</p>
+                  <p className="text-sm text-muted-foreground">
+                    {filteredFormulas.length} de {formulasResponse?.meta?.totalRecords || formulas.length} fórmula(s) encontrada(s)
+                  </p>
                 </div>
               </section>
             )}
           </div>
         </main>
       </div>
+
+      {/* Advanced Filters Modal */}
+      <FormulaFilters
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        filters={advancedFilters}
+        onFilterChange={handleFilterChange}
+        availablePaintNames={availablePaintNames}
+      />
     </div>
   );
 }

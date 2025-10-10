@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { IconFilter, IconX } from "@tabler/icons-react";
 import { GARAGE_STATUS, GARAGE_STATUS_LABELS } from "../../../../constants";
 import type { GarageGetManyFormData } from "../../../../types";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Combobox } from "@/components/ui/combobox";
 import { Label } from "@/components/ui/label";
 
@@ -34,14 +35,17 @@ export function GarageFilters({ open, onOpenChange, onApply, filters }: GarageFi
   const hasFilters = status;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Filtros de Garagem</DialogTitle>
-          <DialogDescription>Defina os filtros para refinar a busca de garagens.</DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <IconFilter className="h-5 w-5" />
+            Filtros de Garagem
+          </SheetTitle>
+          <SheetDescription>Defina os filtros para refinar a busca de garagens.</SheetDescription>
+        </SheetHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="mt-6 space-y-6">
           <div className="space-y-2">
             <Label htmlFor="status">Status</Label>
             <Combobox
@@ -57,17 +61,18 @@ export function GarageFilters({ open, onOpenChange, onApply, filters }: GarageFi
               placeholder="Selecione um status"
             />
           </div>
-        </div>
 
-        <DialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0">
-          <Button type="button" variant="outline" onClick={handleReset} disabled={!hasFilters} className="w-full sm:w-auto">
-            Limpar
-          </Button>
-          <Button type="button" onClick={handleApply} className="w-full sm:w-auto">
-            Aplicar Filtros
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <div className="flex gap-2 pt-4 border-t">
+            <Button type="button" variant="outline" onClick={handleReset} disabled={!hasFilters} className="flex-1">
+              <IconX className="h-4 w-4 mr-2" />
+              Limpar
+            </Button>
+            <Button type="button" onClick={handleApply} className="flex-1">
+              Aplicar Filtros
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

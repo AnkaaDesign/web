@@ -18,7 +18,6 @@ import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/use-table-state";
 import { useTableFilters } from "@/hooks/use-table-filters";
-import { Badge } from "@/components/ui/badge";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -406,14 +405,17 @@ export function SupplierList({ className }: SupplierListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)} className="group">
+            <Button
+              variant={hasActiveFilters ? "default" : "outline"}
+              size="default"
+              onClick={() => setShowFilterModal(true)}
+              className="group"
+            >
               <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">Filtros</span>
-              {hasActiveFilters && (
-                <Badge variant="secondary" className="ml-2 min-w-[1.25rem] h-5 px-1">
-                  {activeFilters.length}
-                </Badge>
-              )}
+              <span className="text-foreground">
+                Filtros
+                {hasActiveFilters ? ` (${activeFilters.length})` : ""}
+              </span>
             </Button>
             <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <SupplierExport filters={queryFilters} currentSuppliers={tableData.suppliers} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />

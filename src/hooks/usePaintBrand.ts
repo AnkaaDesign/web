@@ -32,6 +32,7 @@ import {
   batchCreatePaintBrands,
   batchUpdatePaintBrands,
   batchDeletePaintBrands,
+  getAvailableComponents,
 } from "../api-client";
 
 // =====================================================
@@ -197,6 +198,29 @@ export function usePaintBrandsWithCounts(options?: { enabled?: boolean }) {
     },
     enabled: enabled,
     staleTime: 1000 * 60 * 15, // 15 minutes for analytics data
+  });
+}
+
+/**
+ * Hook for getting available components based on paint brand and paint type intersection
+ * Returns only components that exist in BOTH the selected paint brand AND paint type
+ * This is the correct hook for paint formulation component selection
+ */
+export function useAvailableComponents(options?: { paintBrandId?: string; paintTypeId?: string; enabled?: boolean }) {
+  const { paintBrandId, paintTypeId, enabled = true } = options || {};
+
+  return useQuery({
+    queryKey: ['paint', 'components', 'available', paintBrandId, paintTypeId],
+    queryFn: async () => {
+      if (!paintBrandId || !paintTypeId) {
+        return { success: true, data: [], message: 'Paint brand and paint type are required' };
+      }
+
+      const response = await getAvailableComponents(paintBrandId, paintTypeId);
+      return response;
+    },
+    enabled: enabled && !!paintBrandId && !!paintTypeId,
+    staleTime: 1000 * 60 * 5, // 5 minutes - component intersection doesn't change often
   });
 }
 

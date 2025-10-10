@@ -160,7 +160,18 @@ export const pisSchema = z.string().transform(cleanPIS).refine(isValidPIS, { mes
 export const emailSchema = z.string().transform(cleanEmail).refine(isValidEmail, { message: "E-mail inválido" });
 
 // Contact method schema (email or phone)
-export const contactMethodSchema = z.string().transform(cleanContactMethod).refine(isValidContactMethod, { message: "Digite um email ou telefone válido" });
+export const contactMethodSchema = z
+  .string()
+  .transform(cleanContactMethod)
+  .refine(
+    (val) => {
+      // Allow empty during typing (will be caught by required validation)
+      if (!val || val.trim() === "") return false;
+      // Otherwise must be valid
+      return isValidContactMethod(val);
+    },
+    { message: "Digite um email ou telefone válido" }
+  );
 
 // SMS code schema
 export const smsCodeSchema = z.string().transform(cleanSmsCode).refine(isValidSmsCode, { message: "Código SMS inválido" });

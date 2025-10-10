@@ -1,12 +1,18 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
 import { Combobox } from "@/components/ui/combobox";
-import { IconFilter, IconBriefcase, IconBuilding } from "@tabler/icons-react";
+import { IconFilter, IconBriefcase, IconBuilding, IconX } from "@tabler/icons-react";
 import { usePositions, useSectors } from "../../../hooks";
 import { USER_STATUS } from "../../../constants";
 import type { UserGetManyFormData } from "../../../schemas";
@@ -231,10 +237,10 @@ export function PerformanceLevelFilters({
     (localState.sectorIds.length > 0 ? 1 : 0);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" />
             Filtros
             {activeFilterCount > 0 && (
@@ -242,10 +248,13 @@ export function PerformanceLevelFilters({
                 {activeFilterCount} {activeFilterCount === 1 ? "ativo" : "ativos"}
               </Badge>
             )}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>
+            Filtre usuários por nível de desempenho, cargo e setor
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="space-y-6">
+        <div className="mt-6 space-y-6">
           {/* Performance Level Filter */}
           <div className="space-y-3">
             <Label>Nível de Desempenho</Label>
@@ -298,17 +307,19 @@ export function PerformanceLevelFilters({
               placeholder="Selecione os setores"
             />
           </div>
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleReset}>
-            Limpar filtros
-          </Button>
-          <Button onClick={handleApply}>
-            Aplicar filtros
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleReset} className="flex-1">
+              <IconX className="h-4 w-4 mr-2" />
+              Limpar filtros
+            </Button>
+            <Button onClick={handleApply} className="flex-1">
+              Aplicar filtros
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

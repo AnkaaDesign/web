@@ -1,5 +1,12 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { IconFilter, IconX } from "@tabler/icons-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -99,117 +106,119 @@ export function ObservationFilters({ open, onOpenChange, filters, onFilterChange
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <IconFilter className="h-5 w-5" />
             Filtros de Observações
-            {getActiveFilterCount() > 0 && <Badge variant="secondary">{getActiveFilterCount()}</Badge>}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>
+            Filtre as observações por tarefas, arquivos e datas
+          </SheetDescription>
+        </SheetHeader>
 
-        <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="basic">Básico</TabsTrigger>
-            <TabsTrigger value="tasks">Tarefas</TabsTrigger>
-            <TabsTrigger value="dates">Datas</TabsTrigger>
-          </TabsList>
+        <div className="mt-6 space-y-6">
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="basic">Básico</TabsTrigger>
+              <TabsTrigger value="tasks">Tarefas</TabsTrigger>
+              <TabsTrigger value="dates">Datas</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="basic" className="space-y-4">
-            <div className="space-y-4">
+            <TabsContent value="basic" className="space-y-4">
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Arquivos</Label>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={localState.hasFiles === true}
+                      onCheckedChange={(checked) => {
+                        setLocalState((prev) => ({
+                          ...prev,
+                          hasFiles: checked ? true : undefined,
+                        }));
+                      }}
+                    />
+                    <Label>Apenas com arquivos anexos</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={localState.hasFiles === false}
+                      onCheckedChange={(checked) => {
+                        setLocalState((prev) => ({
+                          ...prev,
+                          hasFiles: checked ? false : undefined,
+                        }));
+                      }}
+                    />
+                    <Label>Apenas sem arquivos anexos</Label>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="tasks" className="space-y-4">
               <div className="space-y-3">
-                <Label className="text-base font-medium">Arquivos</Label>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    checked={localState.hasFiles === true}
-                    onCheckedChange={(checked) => {
+                <Label className="text-base font-medium">
+                  Tarefas
+                  {localState.taskIds.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {localState.taskIds.length}
+                    </Badge>
+                  )}
+                </Label>
+                <div className="max-h-60 overflow-y-auto">
+                  <Combobox
+                    mode="multiple"
+                    options={tasks.map((task) => ({
+                      value: task.id,
+                      label: task.name,
+                    }))}
+                    value={localState.taskIds}
+                    onValueChange={(taskIds: string[]) => {
+                      setLocalState((prev) => ({ ...prev, taskIds }));
+                    }}
+                    placeholder="Selecionar tarefas..."
+                    searchPlaceholder="Buscar tarefas..."
+                  />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="dates" className="space-y-4">
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Data de Criação</Label>
+                  <DateTimeInput
+                    mode="date-range"
+                    value={{ from: localState.createdAfter, to: localState.createdBefore }}
+                    onChange={(range) => {
                       setLocalState((prev) => ({
                         ...prev,
-                        hasFiles: checked ? true : undefined,
+                        createdAfter: range?.from,
+                        createdBefore: range?.to,
                       }));
                     }}
+                    placeholder="Selecionar período..."
                   />
-                  <Label>Apenas com arquivos anexos</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Switch
-                    checked={localState.hasFiles === false}
-                    onCheckedChange={(checked) => {
-                      setLocalState((prev) => ({
-                        ...prev,
-                        hasFiles: checked ? false : undefined,
-                      }));
-                    }}
-                  />
-                  <Label>Apenas sem arquivos anexos</Label>
                 </div>
               </div>
-            </div>
-          </TabsContent>
+            </TabsContent>
+          </Tabs>
 
-          <TabsContent value="tasks" className="space-y-4">
-            <div className="space-y-3">
-              <Label className="text-base font-medium">
-                Tarefas
-                {localState.taskIds.length > 0 && (
-                  <Badge variant="secondary" className="ml-2">
-                    {localState.taskIds.length}
-                  </Badge>
-                )}
-              </Label>
-              <div className="max-h-60 overflow-y-auto">
-                <Combobox
-                  mode="multiple"
-                  options={tasks.map((task) => ({
-                    value: task.id,
-                    label: task.name,
-                  }))}
-                  value={localState.taskIds}
-                  onValueChange={(taskIds: string[]) => {
-                    setLocalState((prev) => ({ ...prev, taskIds }));
-                  }}
-                  placeholder="Selecionar tarefas..."
-                  searchPlaceholder="Buscar tarefas..."
-                />
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="dates" className="space-y-4">
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <Label className="text-base font-medium">Data de Criação</Label>
-                <DateTimeInput
-                  mode="date-range"
-                  value={{ from: localState.createdAfter, to: localState.createdBefore }}
-                  onChange={(range) => {
-                    setLocalState((prev) => ({
-                      ...prev,
-                      createdAfter: range?.from,
-                      createdBefore: range?.to,
-                    }));
-                  }}
-                  placeholder="Selecionar período..."
-                />
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={handleReset}>
-            Limpar todos
-          </Button>
-          <Button onClick={handleApply}>
-            Aplicar filtros
-            {getActiveFilterCount() > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {getActiveFilterCount()}
-              </Badge>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleReset} className="flex-1">
+              <IconX className="h-4 w-4 mr-2" />
+              Limpar todos
+            </Button>
+            <Button onClick={handleApply} className="flex-1">
+              Aplicar filtros
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

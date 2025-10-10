@@ -163,14 +163,9 @@ export function SectorList({ selectedPrivilege, onDataUpdate, className }: Secto
           <TableSearchInput value={displaySearchText} onChange={setSearch} placeholder="Buscar setores..." isPending={displaySearchText !== searchingFor} />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <Button variant="outline" size="default" onClick={() => setIsFilterModalOpen(true)} className={cn(activeFilters.length > 0 && "border-primary text-primary")}>
+            <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setIsFilterModalOpen(true)}>
               <IconFilter className="h-4 w-4 mr-2" />
-              Filtros
-              {activeFilters.length > 0 && (
-                <Badge variant="default" className="ml-2 h-5 px-1">
-                  {activeFilters.length}
-                </Badge>
-              )}
+              {hasActiveFilters ? `Filtros (${activeFilters.length})` : "Filtros"}
             </Button>
             <SectorExport
               filters={queryFilters}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
@@ -133,10 +133,10 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
   }));
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] h-[70vh] max-h-[700px] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" />
             Entregas de EPI - Filtros
             {activeFilterCount > 0 && (
@@ -153,11 +153,11 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
                 </Tooltip>
               </TooltipProvider>
             )}
-          </DialogTitle>
-          <DialogDescription>Configure filtros para refinar sua pesquisa de entregas de EPI</DialogDescription>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>Configure filtros para refinar sua pesquisa de entregas de EPI</SheetDescription>
+        </SheetHeader>
 
-        <div className="flex-1 overflow-auto space-y-8 py-4">
+        <div className="mt-6 space-y-6">
           {/* Status Filter */}
           <div className="grid gap-2">
             <Label className="flex items-center gap-2">
@@ -266,16 +266,19 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
               placeholder="Selecione o período"
             />
           </div>
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleReset} className="flex items-center gap-2">
-            <IconX className="h-4 w-4" />
-            Limpar Tudo
-          </Button>
-          <Button onClick={handleApply}>Aplicar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleReset} className="flex-1">
+              <IconX className="h-4 w-4 mr-2" />
+              Limpar Tudo
+            </Button>
+            <Button onClick={handleApply} className="flex-1">
+              Aplicar
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

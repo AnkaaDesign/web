@@ -365,6 +365,16 @@ export function UserList({ className }: UserListProps) {
     });
   }, [filters, searchingFor, positionsData?.data, sectorsData?.data, onRemoveFilter]);
 
+  // Count active filters for the button
+  const activeFilterCount = useMemo(() => {
+    return Object.entries(filters).filter(([key, value]) => {
+      if (key === "page" || key === "limit" || key === "itemsPerPage" || key === "orderBy" || key === "sortOrder") return false;
+      if (Array.isArray(value)) return value.length > 0;
+      if (typeof value === "object" && value !== null) return Object.keys(value).length > 0;
+      return value !== undefined && value !== null && value !== "";
+    }).length;
+  }, [filters]);
+
   // Context menu handlers
   const handleBulkEdit = (users: User[]) => {
     if (users.length === 1) {
@@ -458,9 +468,17 @@ export function UserList({ className }: UserListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)} className="group">
+            <Button
+              variant={hasActiveFilters ? "default" : "outline"}
+              size="default"
+              onClick={() => setShowFilterModal(true)}
+              className="group"
+            >
               <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">Filtros</span>
+              <span className="text-foreground">
+                Filtros
+                {hasActiveFilters ? ` (${activeFilterCount})` : ""}
+              </span>
             </Button>
             <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <UserExport filters={filters} currentUsers={tableData.users} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />

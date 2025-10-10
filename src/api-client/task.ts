@@ -62,13 +62,21 @@ export class TaskService {
   // Mutation Operations
   // =====================
 
-  async createTask(data: TaskCreateFormData, query?: TaskQueryFormData): Promise<TaskCreateResponse> {
-    const response = await apiClient.post<TaskCreateResponse>(this.basePath, data, { params: query });
+  async createTask(data: TaskCreateFormData | FormData, query?: TaskQueryFormData): Promise<TaskCreateResponse> {
+    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    const response = await apiClient.post<TaskCreateResponse>(this.basePath, data, {
+      params: query,
+      headers,
+    });
     return response.data;
   }
 
-  async updateTask(id: string, data: TaskUpdateFormData, query?: TaskQueryFormData): Promise<TaskUpdateResponse> {
-    const response = await apiClient.put<TaskUpdateResponse>(`${this.basePath}/${id}`, data, { params: query });
+  async updateTask(id: string, data: TaskUpdateFormData | FormData, query?: TaskQueryFormData): Promise<TaskUpdateResponse> {
+    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    const response = await apiClient.put<TaskUpdateResponse>(`${this.basePath}/${id}`, data, {
+      params: query,
+      headers,
+    });
     return response.data;
   }
 
@@ -126,8 +134,8 @@ export const getTasks = (params: TaskGetManyFormData = {}) => taskService.getTas
 export const getTaskById = (id: string, params?: Omit<TaskGetByIdFormData, "id">) => taskService.getTaskById(id, params);
 
 // Mutation Operations
-export const createTask = (data: TaskCreateFormData, query?: TaskQueryFormData) => taskService.createTask(data, query);
-export const updateTask = (id: string, data: TaskUpdateFormData, query?: TaskQueryFormData) => taskService.updateTask(id, data, query);
+export const createTask = (data: TaskCreateFormData | FormData, query?: TaskQueryFormData) => taskService.createTask(data, query);
+export const updateTask = (id: string, data: TaskUpdateFormData | FormData, query?: TaskQueryFormData) => taskService.updateTask(id, data, query);
 export const deleteTask = (id: string) => taskService.deleteTask(id);
 
 // Batch Operations

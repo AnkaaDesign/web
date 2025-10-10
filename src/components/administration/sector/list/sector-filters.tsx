@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { IconX } from "@tabler/icons-react";
+import { IconFilter, IconX } from "@tabler/icons-react";
 
 import { SECTOR_PRIVILEGES, SECTOR_PRIVILEGES_LABELS } from "../../../../constants";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -45,13 +45,19 @@ export function SectorFilters({ open, onOpenChange, onApply, currentPrivilege }:
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Filtrar Setores</DialogTitle>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <IconFilter className="h-5 w-5" />
+            Filtrar Setores
+          </SheetTitle>
+          <SheetDescription>
+            Filtre os setores por privilégios
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="mt-6 space-y-6">
           <div className="space-y-2">
             <Label htmlFor="privileges">Privilégios</Label>
             <Combobox
@@ -70,21 +76,19 @@ export function SectorFilters({ open, onOpenChange, onApply, currentPrivilege }:
               name="privileges"
             />
           </div>
-        </div>
 
-        <DialogFooter className="flex justify-between sm:justify-between">
-          <Button variant="ghost" onClick={handleClear}>
-            <IconX className="h-4 w-4 mr-2" />
-            Limpar
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleClear} className="flex-1">
+              <IconX className="h-4 w-4 mr-2" />
+              Limpar Filtros
             </Button>
-            <Button onClick={handleApply}>Aplicar</Button>
+            <Button onClick={handleApply} className="flex-1">
+              Aplicar Filtros
+            </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

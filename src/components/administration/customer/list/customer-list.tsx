@@ -258,6 +258,18 @@ export function CustomerList({ className }: CustomerListProps) {
     });
   }, [filters, searchingFor, onRemoveFilter]);
 
+  // Count active filters (excluding searchingFor for button display)
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.hasTasks) count++;
+    if (filters.states && filters.states.length > 0) count++;
+    if (filters.tags && filters.tags.length > 0) count++;
+    if (filters.taskCount?.min || filters.taskCount?.max) count++;
+    if (filters.createdAt?.gte || filters.createdAt?.lte) count++;
+    if (filters.updatedAt?.gte || filters.updatedAt?.lte) count++;
+    return count;
+  }, [filters]);
+
   // Context menu handlers
   const handleBulkEdit = (customers: Customer[]) => {
     if (customers.length === 1) {
@@ -335,9 +347,12 @@ export function CustomerList({ className }: CustomerListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)} className="group">
+            <Button variant={activeFilterCount > 0 ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
               <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">Filtros</span>
+              <span className="text-foreground">
+                Filtros
+                {activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+              </span>
             </Button>
             <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <CustomerExport filters={filters} currentCustomers={tableData.customers} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />

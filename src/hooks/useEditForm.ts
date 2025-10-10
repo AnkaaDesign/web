@@ -22,10 +22,16 @@ interface UseEditFormReturn<TFieldValues extends FieldValues = FieldValues> exte
 
 /**
  * Deep comparison of values with special handling for dates, arrays, and null/undefined
+ * CRITICAL: This function determines if a field has changed. Any edge case not handled
+ * will prevent change detection and disable the submit button.
  */
 function deepCompare(value1: any, value2: any): boolean {
-  // Handle null/undefined/empty string cases
+  // Handle null/undefined/empty string cases - BUT keep "0" as a valid value
   const normalize = (val: any) => {
+    // Explicitly handle falsy number values (0, -0) as valid
+    if (typeof val === "number") return val;
+
+    // Treat null, undefined, and empty string as null
     if (val === null || val === undefined || val === "") return null;
     if (val === "null" || val === "undefined") return null;
     return val;
@@ -40,10 +46,27 @@ function deepCompare(value1: any, value2: any): boolean {
   // One is null and the other isn't
   if ((normalized1 === null) !== (normalized2 === null)) return false;
 
-  // Handle dates
+  // Handle dates - compare timestamps with millisecond precision
   if (value1 instanceof Date || value2 instanceof Date) {
-    const date1 = value1 instanceof Date ? value1 : new Date(value1);
-    const date2 = value2 instanceof Date ? value2 : new Date(value2);
+    // If one is a Date and the other is not, they're different
+    if ((value1 instanceof Date) !== (value2 instanceof Date)) {
+      // Try to convert non-Date value to Date for comparison
+      try {
+        const date1 = value1 instanceof Date ? value1 : new Date(value1);
+        const date2 = value2 instanceof Date ? value2 : new Date(value2);
+
+        // Check if both dates are valid
+        if (!isNaN(date1.getTime()) && !isNaN(date2.getTime())) {
+          return date1.getTime() === date2.getTime();
+        }
+      } catch {
+        return false;
+      }
+      return false;
+    }
+
+    const date1 = value1 as Date;
+    const date2 = value2 as Date;
 
     // Check if both dates are valid
     if (!isNaN(date1.getTime()) && !isNaN(date2.getTime())) {
@@ -52,24 +75,35 @@ function deepCompare(value1: any, value2: any): boolean {
     return false;
   }
 
-  // Handle arrays
+  // Handle arrays - IMPORTANT: Order matters for arrays like services
   if (Array.isArray(value1) && Array.isArray(value2)) {
     if (value1.length !== value2.length) return false;
 
-    // For arrays of objects (like services)
-    if (value1.length > 0 && typeof value1[0] === "object") {
+    // For empty arrays, they're equal
+    if (value1.length === 0) return true;
+
+    // For arrays of objects (like services), use lodash for deep comparison
+    // This preserves order which is critical for service order detection
+    if (value1.length > 0 && typeof value1[0] === "object" && value1[0] !== null) {
       return _.isEqual(value1, value2);
     }
 
-    // For arrays of primitives (like IDs), compare sorted
-    const sorted1 = [...value1].sort();
-    const sorted2 = [...value2].sort();
-    return _.isEqual(sorted1, sorted2);
+    // For arrays of primitives (like IDs), DON'T sort - order might matter
+    // Only sort for primitive arrays where we're sure order doesn't matter (like paintIds)
+    // For now, compare directly to detect any changes
+    return _.isEqual(value1, value2);
   }
 
-  // Handle objects
+  // Handle objects (but not arrays or dates)
   if (typeof value1 === "object" && typeof value2 === "object" && value1 !== null && value2 !== null) {
     return _.isEqual(value1, value2);
+  }
+
+  // Handle numeric comparisons (0 === "0" should be false)
+  if (typeof value1 === "number" || typeof value2 === "number") {
+    // Strict type and value comparison for numbers
+    if (typeof value1 !== typeof value2) return false;
+    return value1 === value2;
   }
 
   // Primitive comparison
@@ -151,6 +185,7 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
             const filteredCurrent = currentServices.filter((s: any) => s && s.description && s.description.trim() !== "");
             const filteredOriginal = originalServices.filter((s: any) => s && s.description && s.description.trim() !== "");
 
+            // _.isEqual checks both content AND order, so this will detect order changes
             if (!_.isEqual(filteredCurrent, filteredOriginal)) {
               changedFields[typedKey] = filteredCurrent as any;
             }
@@ -160,6 +195,26 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
         } else {
           // For other fields, include the new value
           changedFields[typedKey] = currentValue;
+        }
+      } else if (key === "services" && Array.isArray(currentValue) && Array.isArray(originalValue)) {
+        // Even if deepCompare returns true, explicitly check services order
+        // This handles edge cases where dates might be compared as equal but are different objects
+        const currentServices = currentValue as any[];
+        const originalServices = originalValue as any[];
+
+        const filteredCurrent = currentServices.filter((s: any) => s && s.description && s.description.trim() !== "");
+        const filteredOriginal = originalServices.filter((s: any) => s && s.description && s.description.trim() !== "");
+
+        // Check if order changed by comparing descriptions in order
+        if (filteredCurrent.length === filteredOriginal.length) {
+          const orderChanged = filteredCurrent.some((curr, idx) => {
+            const orig = filteredOriginal[idx];
+            return curr.description !== orig.description;
+          });
+
+          if (orderChanged) {
+            changedFields[typedKey] = filteredCurrent as any;
+          }
         }
       }
     });

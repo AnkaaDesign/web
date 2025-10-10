@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -60,49 +60,51 @@ export function PositionForm(props: PositionFormProps) {
   });
 
   const isSubmitting = props.isSubmitting || form.formState.isSubmitting;
+  const [isInitialized, setIsInitialized] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // URL state persistence for create mode with debounce
-  const debouncedUpdateUrl = useCallback(
-    (() => {
-      let timeout: NodeJS.Timeout;
-      return (formData: Partial<PositionCreateFormData>) => {
-        if (timeout) clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          if (props.mode === "create") {
-            const params = new URLSearchParams();
-            if (formData.name) params.set("name", formData.name);
-            if (formData.remuneration !== undefined && formData.remuneration !== null) params.set("remuneration", formData.remuneration.toString());
-            if (formData.bonifiable !== undefined && formData.bonifiable !== null) params.set("bonifiable", formData.bonifiable.toString());
-            setSearchParams(params, { replace: true });
-          }
-        }, 1000);
-      };
-    })(),
-    [props.mode, setSearchParams],
-  );
-
-  // Initialize form from URL params (create mode only)
+  // Initialize form from URL params (create mode only) - runs only once on mount
   useEffect(() => {
-    if (props.mode === "create") {
+    if (props.mode === "create" && !isInitialized) {
       const name = searchParams.get("name");
       const remuneration = searchParams.get("remuneration");
       const bonifiable = searchParams.get("bonifiable");
 
-      if (name) form.setValue("name", name);
-      if (remuneration) form.setValue("remuneration", Number(remuneration));
-      if (bonifiable) form.setValue("bonifiable", bonifiable === "true");
+      if (name) form.setValue("name", name, { shouldValidate: false, shouldDirty: false });
+      if (remuneration) form.setValue("remuneration", Number(remuneration), { shouldValidate: false, shouldDirty: false });
+      if (bonifiable) form.setValue("bonifiable", bonifiable === "true", { shouldValidate: false, shouldDirty: false });
+      setIsInitialized(true);
     }
-  }, [props.mode, searchParams, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Watch form changes and update URL (create mode only)
   useEffect(() => {
-    if (props.mode === "create") {
-      const subscription = form.watch((value) => {
-        debouncedUpdateUrl(value as Partial<PositionCreateFormData>);
-      });
-      return () => subscription.unsubscribe();
-    }
-  }, [form, debouncedUpdateUrl, props.mode]);
+    if (props.mode !== "create" || !isInitialized) return;
+
+    const subscription = form.watch((value) => {
+      // Clear previous timer
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      // Set new timer
+      debounceTimerRef.current = setTimeout(() => {
+        const params = new URLSearchParams();
+        if (value.name) params.set("name", value.name);
+        if (value.remuneration !== undefined && value.remuneration !== null) params.set("remuneration", value.remuneration.toString());
+        if (value.bonifiable !== undefined && value.bonifiable !== null) params.set("bonifiable", value.bonifiable.toString());
+        setSearchParams(params, { replace: true });
+      }, 500);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [props.mode, isInitialized, form, setSearchParams]);
 
   const handleSubmit = async (data: PositionCreateFormData | PositionUpdateFormData) => {
     try {

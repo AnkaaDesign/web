@@ -38,7 +38,6 @@ import { LogoPaintsSelector } from "./logo-paints-selector";
 import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./multi-airbrushing-selector";
 import { FileUploadField, type FileWithPreview } from "@/components/file";
 import { Badge } from "@/components/ui/badge";
-import { uploadSingleFile } from "../../../../api-client";
 import { toast } from "sonner";
 import { LayoutForm } from "@/components/production/layout/layout-form";
 import { FormMoneyInput } from "@/components/ui/form-money-input";
@@ -90,17 +89,9 @@ export const TaskCreateForm = () => {
   const updateFileInList = (files: FileWithPreview[], fileId: string, updates: Partial<FileWithPreview>) => {
     return files.map((f) => {
       if (f.id === fileId) {
-        // Create new object with all properties
-        const updated: FileWithPreview = {
-          ...f,
-          ...updates,
-          // Explicitly preserve File properties that might not spread correctly
-          name: f.name,
-          size: f.size,
-          type: f.type,
-          lastModified: f.lastModified,
-        } as FileWithPreview;
-        return updated;
+        // Use Object.assign to preserve the File object prototype and properties
+        // This keeps all native File properties (size, name, type, lastModified, etc.)
+        return Object.assign(f, updates);
       }
       return f;
     });
@@ -144,244 +135,75 @@ export const TaskCreateForm = () => {
   const { createAsync } = useTaskMutations();
   const { createOrUpdateTruckLayout } = useLayoutMutations();
 
-  // Handle budget file upload
-  const handleBudgetFileChange = async (files: FileWithPreview[]) => {
+  // Handle budget file change (no longer uploads immediately)
+  const handleBudgetFileChange = (files: FileWithPreview[]) => {
     setBudgetFile(files);
-
-    const newFiles = files.filter((file) => !file.uploaded && !file.uploadProgress && !file.error);
-
-    for (const file of newFiles) {
-      try {
-        setBudgetFile((prev) =>
-          updateFileInList(prev, file.id, { uploadProgress: 0, uploaded: false })
-        );
-
-        const result = await uploadSingleFile(file, {
-          onProgress: (progress) => {
-            setBudgetFile((prev) =>
-              updateFileInList(prev, file.id, { uploadProgress: progress.percentage })
-            );
-          },
-        });
-
-        if (result.success && result.data) {
-          const uploadedFile = result.data;
-          setBudgetFile((prev) =>
-            updateFileInList(prev, file.id, {
-              uploadedFileId: uploadedFile.id,
-              uploaded: true,
-              uploadProgress: 100,
-              thumbnailUrl: uploadedFile.thumbnailUrl || undefined,
-              error: undefined,
-            })
-          );
-          form.setValue("budgetId", uploadedFile.id);
-        } else {
-          throw new Error(result.message || "Upload failed");
-        }
-      } catch (error) {
-        console.error("Budget file upload error:", error);
-        setBudgetFile((prev) =>
-          updateFileInList(prev, file.id, {
-            error: "Erro ao enviar arquivo",
-            uploadProgress: 0,
-            uploaded: false,
-          })
-        );
-      }
-    }
-
-    // Clear budgetId if no files
-    if (files.length === 0) {
-      form.setValue("budgetId", null);
-    }
+    // Files will be submitted with the form, not uploaded separately
   };
 
-  // Handle NFe file upload
-  const handleNfeFileChange = async (files: FileWithPreview[]) => {
+  // Handle NFe file change (no longer uploads immediately)
+  const handleNfeFileChange = (files: FileWithPreview[]) => {
     setNfeFile(files);
-
-    const newFiles = files.filter((file) => !file.uploaded && !file.uploadProgress && !file.error);
-
-    for (const file of newFiles) {
-      try {
-        setNfeFile((prev) =>
-          updateFileInList(prev, file.id, { uploadProgress: 0, uploaded: false })
-        );
-
-        const result = await uploadSingleFile(file, {
-          onProgress: (progress) => {
-            setNfeFile((prev) =>
-              updateFileInList(prev, file.id, { uploadProgress: progress.percentage })
-            );
-          },
-        });
-
-        if (result.success && result.data) {
-          const uploadedFile = result.data;
-          setNfeFile((prev) =>
-            updateFileInList(prev, file.id, {
-              uploadedFileId: uploadedFile.id,
-              uploaded: true,
-              uploadProgress: 100,
-              thumbnailUrl: uploadedFile.thumbnailUrl || undefined,
-              error: undefined,
-            })
-          );
-          form.setValue("nfeId", uploadedFile.id);
-        } else {
-          throw new Error(result.message || "Upload failed");
-        }
-      } catch (error) {
-        console.error("NFe file upload error:", error);
-        setNfeFile((prev) =>
-          updateFileInList(prev, file.id, {
-            error: "Erro ao enviar arquivo",
-            uploadProgress: 0,
-            uploaded: false,
-          })
-        );
-      }
-    }
-
-    // Clear nfeId if no files
-    if (files.length === 0) {
-      form.setValue("nfeId", null);
-    }
+    // Files will be submitted with the form, not uploaded separately
   };
 
-  // Handle receipt file upload
-  const handleReceiptFileChange = async (files: FileWithPreview[]) => {
+  // Handle receipt file change (no longer uploads immediately)
+  const handleReceiptFileChange = (files: FileWithPreview[]) => {
     setReceiptFile(files);
-
-    const newFiles = files.filter((file) => !file.uploaded && !file.uploadProgress && !file.error);
-
-    for (const file of newFiles) {
-      try {
-        setReceiptFile((prev) =>
-          updateFileInList(prev, file.id, { uploadProgress: 0, uploaded: false })
-        );
-
-        const result = await uploadSingleFile(file, {
-          onProgress: (progress) => {
-            setReceiptFile((prev) =>
-              updateFileInList(prev, file.id, { uploadProgress: progress.percentage })
-            );
-          },
-        });
-
-        if (result.success && result.data) {
-          const uploadedFile = result.data;
-          setReceiptFile((prev) =>
-            updateFileInList(prev, file.id, {
-              uploadedFileId: uploadedFile.id,
-              uploaded: true,
-              uploadProgress: 100,
-              thumbnailUrl: uploadedFile.thumbnailUrl || undefined,
-              error: undefined,
-            })
-          );
-          form.setValue("receiptId", uploadedFile.id);
-        } else {
-          throw new Error(result.message || "Upload failed");
-        }
-      } catch (error) {
-        console.error("Receipt file upload error:", error);
-        setReceiptFile((prev) =>
-          updateFileInList(prev, file.id, {
-            error: "Erro ao enviar arquivo",
-            uploadProgress: 0,
-            uploaded: false,
-          })
-        );
-      }
-    }
-
-    // Clear receiptId if no files
-    if (files.length === 0) {
-      form.setValue("receiptId", null);
-    }
+    // Files will be submitted with the form, not uploaded separately
   };
 
-  // Handle file changes and upload
-  const handleFilesChange = async (files: FileWithPreview[]) => {
+  // Handle artwork files change (no longer uploads immediately)
+  const handleFilesChange = (files: FileWithPreview[]) => {
     setUploadedFiles(files);
-
-    // Update file IDs based on current files
-    const currentFileIds = files.filter((f) => f.uploadedFileId).map((f) => f.uploadedFileId as string);
-
-    // Update URL state with uploaded file IDs
-    urlState.updateArtworkIds(currentFileIds);
-
-    // Upload new files that haven't been uploaded yet
-    const newFiles = files.filter((file) => !file.uploaded && !file.uploadProgress && !file.error);
-
-    for (const file of newFiles) {
-      try {
-        // Update file with upload progress
-        setUploadedFiles((prev) =>
-          updateFileInList(prev, file.id, {
-            uploadProgress: 0,
-            uploaded: false,
-          }),
-        );
-
-        const result = await uploadSingleFile(file, {
-          onProgress: (progress) => {
-            setUploadedFiles((prev) =>
-              updateFileInList(prev, file.id, {
-                uploadProgress: progress.percentage,
-              }),
-            );
-          },
-        });
-
-        if (result.success && result.data) {
-          const uploadedFile = result.data; // Update file with uploaded data
-          setUploadedFiles((prev) =>
-            updateFileInList(prev, file.id, {
-              uploadedFileId: uploadedFile.id,
-              uploaded: true,
-              uploadProgress: 100,
-              thumbnailUrl: uploadedFile.thumbnailUrl || undefined,
-              error: undefined,
-            }),
-          );
-
-          // Update URL state with the new file ID
-          const currentIds = urlState.artworkIds;
-          if (!currentIds.includes(uploadedFile.id)) {
-            urlState.updateArtworkIds([...currentIds, uploadedFile.id]);
-          }
-        } else {
-          throw new Error(result.message || "Upload failed");
-        }
-      } catch (error) {
-        console.error("File upload error:", error);
-
-        // Update file with error
-        setUploadedFiles((prev) =>
-          updateFileInList(prev, file.id, {
-            error: "Erro ao enviar arquivo",
-            uploadProgress: 0,
-            uploaded: false,
-          }),
-        );
-      }
-    }
+    // Files will be submitted with the form, not uploaded separately
   };
 
-  // Handle form submission
+  // Handle form submission with files
   const handleSubmit = useCallback(
     async (data: TaskCreateFormData) => {
       try {
         setIsSubmitting(true);
 
-        // Debug logging});
+        // Create FormData to include files with form data
+        const formData = new FormData();
 
-        // Use form data directly
-        const formData = data;
-        const result = await createAsync(formData); // Navigate to the task list after successful creation
+        // Add all form fields individually (flatten the object)
+        Object.entries(data).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) {
+            if (Array.isArray(value)) {
+              // For arrays, append each item separately or as JSON
+              formData.append(key, JSON.stringify(value));
+            } else if (typeof value === 'object') {
+              // For objects, stringify them
+              formData.append(key, JSON.stringify(value));
+            } else {
+              formData.append(key, String(value));
+            }
+          }
+        });
+
+        // Add budget files if exist
+        budgetFile.forEach((file) => {
+          formData.append('budgets', file as unknown as Blob);
+        });
+
+        // Add NFe files if exist
+        nfeFile.forEach((file) => {
+          formData.append('nfes', file as unknown as Blob);
+        });
+
+        // Add receipt files if exist
+        receiptFile.forEach((file) => {
+          formData.append('receipts', file as unknown as Blob);
+        });
+
+        // Add artwork files if exist
+        uploadedFiles.forEach((file) => {
+          formData.append('artworks', file as unknown as Blob);
+        });
+
+        const result = await createAsync(formData as any); // Navigate to the task list after successful creation
         if (result?.success && result.data) {
           // Get the truck ID from the created task
           const createdTask = result.data;
@@ -540,7 +362,7 @@ export const TaskCreateForm = () => {
         setIsSubmitting(false);
       }
     },
-    [createAsync, createOrUpdateTruckLayout, layouts, urlState],
+    [createAsync, createOrUpdateTruckLayout, layouts, urlState, budgetFile, nfeFile, receiptFile, uploadedFiles],
   );
 
   const handleCancel = useCallback(() => {
@@ -780,12 +602,12 @@ export const TaskCreateForm = () => {
                         </label>
                         <FileUploadField
                           onFilesChange={handleBudgetFileChange}
-                          maxFiles={1}
+                          maxFiles={5}
                           disabled={isSubmitting}
                           showPreview={false}
                           existingFiles={budgetFile}
                           variant="compact"
-                          placeholder="Adicionar orçamento"
+                          placeholder="Adicionar orçamentos"
                           label=""
                         />
                       </div>
@@ -798,12 +620,12 @@ export const TaskCreateForm = () => {
                         </label>
                         <FileUploadField
                           onFilesChange={handleNfeFileChange}
-                          maxFiles={1}
+                          maxFiles={5}
                           disabled={isSubmitting}
                           showPreview={false}
                           existingFiles={nfeFile}
                           variant="compact"
-                          placeholder="Adicionar NFe"
+                          placeholder="Adicionar NFes"
                           label=""
                         />
                       </div>
@@ -816,12 +638,12 @@ export const TaskCreateForm = () => {
                         </label>
                         <FileUploadField
                           onFilesChange={handleReceiptFileChange}
-                          maxFiles={1}
+                          maxFiles={5}
                           disabled={isSubmitting}
                           showPreview={false}
                           existingFiles={receiptFile}
                           variant="compact"
-                          placeholder="Adicionar recibo"
+                          placeholder="Adicionar recibos"
                           label=""
                         />
                       </div>

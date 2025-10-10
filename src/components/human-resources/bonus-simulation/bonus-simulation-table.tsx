@@ -135,17 +135,12 @@ export function BonusSimulationTable({ className }: BonusSimulationTableProps) {
         <div className="flex items-center gap-4">
           {/* Filters Button */}
           <Button
-            variant={activeFiltersCount > 0 ? "secondary" : "outline"}
+            variant={activeFiltersCount > 0 ? "default" : "outline"}
             onClick={() => setShowFiltersModal(true)}
             className="gap-2"
           >
             <IconFilter size={16} />
-            Filtros
-            {activeFiltersCount > 0 && (
-              <Badge variant="default" className="ml-1">
-                {activeFiltersCount}
-              </Badge>
-            )}
+            Filtros{activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ""}
           </Button>
 
           {/* Reset Button */}

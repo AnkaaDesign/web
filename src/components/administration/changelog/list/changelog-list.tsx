@@ -210,6 +210,10 @@ export function ChangelogList({ onDataChange }: ChangelogListProps) {
     return count;
   }, [filters]);
 
+  const hasActiveFilters = useMemo(() => {
+    return activeFilterCount > 0;
+  }, [activeFilterCount]);
+
   const columns = useMemo(() => createChangelogColumns(), []);
 
   return (
@@ -229,14 +233,12 @@ export function ChangelogList({ onDataChange }: ChangelogListProps) {
           </div>
 
           <div className="flex gap-2">
-            <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)} className="group">
+            <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
               <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">Filtros</span>
-              {activeFilterCount > 0 && (
-                <Badge variant="secondary" className="ml-2">
-                  {activeFilterCount}
-                </Badge>
-              )}
+              <span className="text-foreground">
+                Filtros
+                {hasActiveFilters ? ` (${activeFilterCount})` : ""}
+              </span>
             </Button>
 
             <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />

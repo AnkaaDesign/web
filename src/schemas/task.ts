@@ -49,8 +49,8 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
       budget: z.boolean().optional(), // @deprecated Use budgets instead
       nfe: z.boolean().optional(), // @deprecated Use nfes instead
       receipt: z.boolean().optional(), // @deprecated Use receipts instead
-      reembolsos: z.boolean().optional(), // @deprecated Use reimbursements instead
-      nfeReembolsos: z.boolean().optional(), // @deprecated Use reimbursementInvoices instead
+      reimbursement: z.boolean().optional(), // @deprecated Use reimbursements instead
+      nfeReimbursement: z.boolean().optional(), // @deprecated Use reimbursementInvoices instead
       observation: z
         .union([
           z.boolean(),

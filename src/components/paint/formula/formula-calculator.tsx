@@ -39,7 +39,6 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
   const [actualAmount, setActualAmount] = useState("");
   const [showErrorDialog, setShowErrorDialog] = useState(false);
   const [selectedComponentForError, setSelectedComponentForError] = useState<string | null>(null);
-  const [addedComponents, setAddedComponents] = useState<Set<string>>(new Set());
 
   // Update URL params when state changes
   useEffect(() => {
@@ -227,13 +226,18 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
         let correctedVolumeInMl = componentVolumeInMl;
         let additionalWeightNeeded = 0;
 
+        // Determine if component was already added (checked before the error)
+        const wasAlreadyAdded = selectedComponents.includes(component.id);
+        const isErrorComponent = component.id === errorComponentId;
+
         if (correctionMode && errorRatio !== 1) {
           // Apply error ratio to weight and volume
           correctedWeightInGrams = componentWeightInGrams * errorRatio;
           correctedVolumeInMl = componentVolumeInMl * errorRatio;
 
-          // If component is already added and not the error component
-          if (addedComponents.has(component.id) && component.id !== errorComponentId) {
+          // If component was already added (checked) and it's not the error component
+          // Show the additional amount needed (difference)
+          if (wasAlreadyAdded && !isErrorComponent) {
             additionalWeightNeeded = correctedWeightInGrams - componentWeightInGrams;
           }
         }
@@ -254,12 +258,12 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
           correctedWeightInGrams: correctionMode ? correctedWeightInGrams : undefined,
           correctedVolumeInMl: correctionMode ? correctedVolumeInMl : undefined,
           additionalWeightNeeded: correctionMode ? additionalWeightNeeded : undefined,
-          isAdded: addedComponents.has(component.id),
-          hasError: component.id === errorComponentId,
+          wasAlreadyAdded,
+          hasError: isErrorComponent,
         };
       })
       .sort((a, b) => b.ratio - a.ratio); // Sort by ratio (highest first)
-  }, [formula, desiredVolume, itemsMap, correctionMode, errorRatio, errorComponentId, addedComponents]);
+  }, [formula, desiredVolume, itemsMap, correctionMode, errorRatio, errorComponentId, selectedComponents]);
 
   // Calculate totals with validation
   const totals = useMemo(() => {
@@ -312,20 +316,8 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
   }, [calculatedComponents, desiredVolume, formula.pricePerLiter, formula.density]);
 
   const handleToggleComponent = (componentId: string) => {
-    if (correctionMode) {
-      // In correction mode, clicking toggles the "added" status
-      setAddedComponents((prev) => {
-        const newSet = new Set(prev);
-        if (newSet.has(componentId)) {
-          newSet.delete(componentId);
-        } else {
-          newSet.add(componentId);
-        }
-        return newSet;
-      });
-    } else {
-      setSelectedComponents((prev) => (prev.includes(componentId) ? prev.filter((id) => id !== componentId) : [...prev, componentId]));
-    }
+    // In both normal and correction mode, toggle the checkbox
+    setSelectedComponents((prev) => (prev.includes(componentId) ? prev.filter((id) => id !== componentId) : [...prev, componentId]));
   };
 
   const handleComponentError = (componentId: string) => {
@@ -338,9 +330,6 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
       setErrorComponentId(selectedComponentForError);
       setCorrectionMode(true);
       setShowErrorDialog(false);
-
-      // Mark the error component as added
-      setAddedComponents((prev) => new Set(prev).add(selectedComponentForError));
     }
   };
 
@@ -348,7 +337,6 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
     setCorrectionMode(false);
     setErrorComponentId(null);
     setActualAmount("");
-    setAddedComponents(new Set());
   };
 
   const handleProduction = async () => {
@@ -414,34 +402,6 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
 
   return (
     <div className="space-y-6">
-      {/* Correction Mode Banner */}
-      {correctionMode && errorComponentId && (
-        <Alert className="bg-amber-50 border-amber-200">
-          <IconAlertCircle className="h-4 w-4 text-amber-600" />
-          <AlertTitle className="text-amber-900">Modo de Correção Ativo</AlertTitle>
-          <AlertDescription className="text-amber-800">
-            {(() => {
-              const errorComponent = calculatedComponents.find((c) => c.id === errorComponentId);
-              return errorComponent ? (
-                <div className="space-y-2">
-                  <p>
-                    Componente com erro: <strong>{errorComponent.name}</strong>
-                  </p>
-                  <p>
-                    Quantidade esperada: {formatNumberWithDecimals(errorComponent.weightInGrams, 1)}g | Quantidade real:{" "}
-                    {formatNumberWithDecimals(parseFloat(actualAmount) || 0, 1)}g
-                  </p>
-                  <p className="text-sm">Proporção de erro: {formatNumberWithDecimals(errorRatio * 100, 2)}%</p>
-                  <Button variant="outline" size="sm" onClick={handleResetCorrection} className="mt-2">
-                    <IconRefresh className="h-4 w-4 mr-2" />
-                    Resetar Correção
-                  </Button>
-                </div>
-              ) : null;
-            })()}
-          </AlertDescription>
-        </Alert>
-      )}
       {/* Controls Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         {/* Volume Input with Quick Buttons */}
@@ -555,9 +515,9 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                     correctionMode && component.hasError && "bg-red-50 hover:bg-red-100",
                   )}
                   onClick={() => {
-                    if (correctionMode && !errorComponentId) {
-                      handleComponentError(component.id);
-                    } else if (!correctionMode) {
+                    // In correction mode: don't toggle checkboxes
+                    // In normal mode: toggle checkboxes
+                    if (!correctionMode) {
                       handleToggleComponent(component.id);
                     }
                   }}
@@ -567,7 +527,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                       {correctionMode ? (
                         component.hasError ? (
                           <IconAlertCircle className="h-4 w-4 text-red-600" />
-                        ) : component.isAdded ? (
+                        ) : component.wasAlreadyAdded ? (
                           <IconCheck className="h-4 w-4 text-green-600" />
                         ) : (
                           <IconX className="h-4 w-4 text-muted-foreground" />
@@ -598,16 +558,19 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                     <TableCell className="p-0 text-right">
                       <div className="px-4 py-2 tabular-nums text-base">
                         {component.hasError ? (
+                          // Show actual amount entered for error component
                           <span className="text-red-600 font-medium">
                             {parseFloat(actualAmount) > 20 ? Math.round(parseFloat(actualAmount)) : formatNumberWithDecimals(parseFloat(actualAmount) || 0, 1)}
                           </span>
                         ) : component.correctedWeightInGrams ? (
-                          component.isAdded && component.additionalWeightNeeded ? (
+                          component.wasAlreadyAdded && component.additionalWeightNeeded !== undefined ? (
+                            // Already added component: show additional amount needed (difference)
                             <span className="text-amber-600 font-medium">
                               +
                               {component.additionalWeightNeeded > 20 ? Math.round(component.additionalWeightNeeded) : formatNumberWithDecimals(component.additionalWeightNeeded, 1)}
                             </span>
                           ) : (
+                            // Not yet added component: show full corrected amount
                             <span className="text-blue-600 font-medium">
                               {component.correctedWeightInGrams > 20 ? Math.round(component.correctedWeightInGrams) : formatNumberWithDecimals(component.correctedWeightInGrams, 1)}
                             </span>
@@ -759,12 +722,32 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
               <Label htmlFor="actual-amount">Quantidade Real (g)</Label>
               <Input
                 id="actual-amount"
-                type="number"
+                type="text"
                 value={actualAmount}
-                onChange={(value) => setActualAmount(typeof value === "string" ? value : "")}
+                onChange={(value) => {
+                  const strValue = typeof value === "string" ? value : String(value || "");
+                  // Allow digits, comma, and period
+                  const cleaned = strValue.replace(/[^\d.,]/g, "");
+                  setActualAmount(cleaned);
+                }}
                 placeholder="Digite a quantidade real em gramas"
                 autoFocus
               />
+              {selectedComponentForError &&
+                (() => {
+                  const component = calculatedComponents.find((c) => c.id === selectedComponentForError);
+                  const expectedWeight = component?.weightInGrams || 0;
+                  const typedValue = parseFloat(actualAmount.replace(",", ".")) || 0;
+
+                  if (actualAmount && typedValue < expectedWeight) {
+                    return (
+                      <p className="text-xs text-destructive">
+                        A quantidade não pode ser menor que o esperado ({formatNumberWithDecimals(expectedWeight, 1)}g)
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
             </div>
           </div>
           <DialogFooter>
@@ -779,7 +762,18 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
             >
               Cancelar
             </Button>
-            <Button onClick={handleConfirmError} disabled={!actualAmount}>
+            <Button
+              onClick={handleConfirmError}
+              disabled={(() => {
+                if (!actualAmount) return true;
+
+                const component = calculatedComponents.find((c) => c.id === selectedComponentForError);
+                const expectedWeight = component?.weightInGrams || 0;
+                const typedValue = parseFloat(actualAmount.replace(",", ".")) || 0;
+
+                return typedValue < expectedWeight;
+              })()}
+            >
               Confirmar Erro
             </Button>
           </DialogFooter>

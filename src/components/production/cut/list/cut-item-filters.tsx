@@ -1,15 +1,14 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { IconChevronDown, IconChevronRight, IconFilter } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronRight, IconFilter, IconX } from "@tabler/icons-react";
 import { CUT_STATUS, CUT_TYPE, CUT_ORIGIN } from "../../../../constants";
 import { CUT_STATUS_LABELS, CUT_TYPE_LABELS, CUT_ORIGIN_LABELS } from "../../../../constants";
 import type { CutGetManyFormData } from "../../../../schemas";
@@ -129,22 +128,22 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
   const currentOrigin = (localFilters.where as any)?.origin || "all";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="px-6 py-4 border-b">
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" />
             Filtros de Cortes
             {activeFilterCount > 0 && (
               <Badge variant="secondary" className="ml-2">
-                {activeFilterCount} {activeFilterCount === 1 ? "ativo" : "ativos"}
+                {activeFilterCount}
               </Badge>
             )}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>Configure filtros para refinar a pesquisa de cortes</SheetDescription>
+        </SheetHeader>
 
-        <ScrollArea className="flex-1 px-6">
-          <div className="space-y-4 py-4">
+        <div className="mt-6 space-y-6">
             {/* Status and Type Section */}
             <Collapsible open={openSections.has("status")} onOpenChange={() => toggleSection("status")}>
               <CollapsibleTrigger className="flex items-center justify-between w-full py-2 hover:bg-muted/50 rounded px-2 transition-colors">
@@ -265,16 +264,24 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
                 </div>
               </CollapsibleContent>
             </Collapsible>
-          </div>
-        </ScrollArea>
 
-        <DialogFooter className="px-6 py-4 border-t">
-          <Button variant="outline" onClick={handleReset}>
-            Limpar filtros
-          </Button>
-          <Button onClick={handleApply}>Aplicar filtros</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleReset} className="flex-1">
+              <IconX className="h-4 w-4 mr-2" />
+              Limpar filtros
+            </Button>
+            <Button onClick={handleApply} className="flex-1">
+              Aplicar filtros
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {activeFilterCount}
+                </Badge>
+              )}
+            </Button>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

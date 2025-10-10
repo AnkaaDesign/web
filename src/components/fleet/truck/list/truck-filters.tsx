@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import type { TruckGetManyFormData } from "../../../../schemas";
 import { IconFilter, IconTruck, IconHome, IconMapPin, IconCalendar, IconX } from "@tabler/icons-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { TRUCK_MANUFACTURER } from "../../../../constants";
 
 import { TruckBasicFilters } from "./filters/truck-basic-filters";
@@ -138,10 +137,10 @@ export function TruckFilters({ open, onOpenChange, filters, onFilterChange }: Tr
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" />
             Filtros de Caminhões
             {getActiveFilterCount() > 0 && (
@@ -149,12 +148,12 @@ export function TruckFilters({ open, onOpenChange, filters, onFilterChange }: Tr
                 {getActiveFilterCount()}
               </Badge>
             )}
-          </DialogTitle>
-          <DialogDescription>Configure os filtros para refinar a pesquisa de caminhões</DialogDescription>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>Configure os filtros para refinar a pesquisa de caminhões</SheetDescription>
+        </SheetHeader>
 
-        <div className="flex-1 overflow-hidden">
-          <Tabs defaultValue="basic" className="h-full flex flex-col">
+        <div className="mt-6 space-y-6">
+          <Tabs defaultValue="basic" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="basic" className="flex items-center gap-2">
                 <IconTruck className="h-4 w-4" />
@@ -174,7 +173,7 @@ export function TruckFilters({ open, onOpenChange, filters, onFilterChange }: Tr
               </TabsTrigger>
             </TabsList>
 
-            <div className="flex-1 overflow-auto mt-4">
+            <div className="mt-4">
               <TabsContent value="basic" className="mt-0">
                 <TruckBasicFilters
                   hasGarage={filterState.hasGarage}
@@ -222,21 +221,17 @@ export function TruckFilters({ open, onOpenChange, filters, onFilterChange }: Tr
           </Tabs>
         </div>
 
-        <Separator />
-
-        <DialogFooter className="flex justify-between">
-          <Button variant="outline" onClick={handleClear} disabled={getActiveFilterCount() === 0}>
+        <div className="flex gap-2 pt-4 border-t">
+          <Button variant="outline" onClick={handleClear} disabled={getActiveFilterCount() === 0} className="flex-1">
             <IconX className="h-4 w-4 mr-2" />
             Limpar Filtros
           </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleApply}>Aplicar Filtros</Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+            Cancelar
+          </Button>
+          <Button onClick={handleApply} className="flex-1">Aplicar Filtros</Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

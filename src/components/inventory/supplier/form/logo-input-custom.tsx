@@ -22,7 +22,6 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
   const [showPreview, setShowPreview] = useState(false);
   const [_isNewUpload, setIsNewUpload] = useState(false);
   const [loadedLogoId, setLoadedLogoId] = useState<string | null>(null);
-  const [userDeletedLogo, setUserDeletedLogo] = useState(false);
 
   // Load existing logo if logoId is provided
   useEffect(() => {
@@ -30,7 +29,8 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
       const logoIdFromUrl = searchParams.get("logoId");
       const logoIdToLoad = logoIdFromUrl || existingLogoId;
 
-      if (!logoIdToLoad || logoIdToLoad === loadedLogoId || userDeletedLogo) {
+      // Only reload if the logoId to load is different from what we currently have loaded
+      if (!logoIdToLoad || logoIdToLoad === loadedLogoId) {
         return;
       }
 
@@ -55,7 +55,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
     };
 
     loadExistingLogo();
-  }, [existingLogoId, searchParams, loadedLogoId, userDeletedLogo, setValue]);
+  }, [existingLogoId, searchParams, loadedLogoId, setValue]);
 
   const handleFilesChange = async (files: FileWithPreview[]) => {
     if (files.length === 0) {
@@ -120,8 +120,7 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
   const handleRemoveFile = (_file: AnkaaFile) => {
     setValue("logoId", null);
     setUploadedFile(null);
-    // Preview is handled by the uploadedFile state
-    setUserDeletedLogo(true);
+    // DON'T reset loadedLogoId - keep it to prevent reloading the same logo
     setIsNewUpload(false);
 
     // Remove from URL parameters

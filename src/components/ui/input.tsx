@@ -54,7 +54,7 @@ interface CepData {
   erro?: boolean;
 }
 
-export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> {
+export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange" | "maxLength"> {
   type?: InputType;
   value?: string | number | null;
   onChange?: (value: string | number | null) => void;
@@ -69,6 +69,7 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   onTypingComplete?: () => void;
   withIcon?: boolean;
   transparent?: boolean;
+  maxLength?: number; // Handle maxLength in JavaScript to avoid Unicode issues
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -718,17 +719,17 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      // Don't process during IME composition
-      if (isComposingRef.current) return;
-
       const input = e.target;
       let rawValue = input.value;
       const oldCursorPos = input.selectionStart || 0;
       const isDeleting = lastKeyRef.current === "Backspace" || lastKeyRef.current === "Delete";
 
-
       // For basic text inputs, handle simply without formatting
+      // IMPORTANT: Don't block onChange during IME composition for text inputs
+      // because we're not doing any formatting - just passing the value through
       if (type === "text" || type === "email" || type === "password") {
+        // Don't enforce maxLength during typing to avoid interfering with IME composition
+        // maxLength will be enforced by schema validation
         setInternalValue(rawValue);
         setDisplayValue(naturalTyping ? displayValue : rawValue);
         setCursorPosition(null);
@@ -738,6 +739,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         }
         return;
       }
+
+      // For formatted inputs (CPF, phone, etc.), don't process during IME composition
+      if (isComposingRef.current) return;
 
       // Special handling for currency - build from cents
       if (type === "currency") {
@@ -1161,6 +1165,20 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         }
       }
 
+      // Enforce maxLength on blur for text inputs
+      if ((type === "text" || type === "email" || type === "password") && props.maxLength) {
+        const input = e.target;
+        const value = input.value;
+        if (value.length > props.maxLength) {
+          const trimmed = value.slice(0, props.maxLength);
+          setInternalValue(trimmed);
+          setDisplayValue(trimmed);
+          if (onChange) {
+            onChange(trimmed);
+          }
+        }
+      }
+
       // Call original onBlur if provided
       props.onBlur?.(e);
     };
@@ -1237,6 +1255,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     };
 
     const getMaxLength = (): number | undefined => {
+      // Don't use native maxLength for text/email/password to avoid Unicode issues
+      // We handle maxLength in JavaScript in handleChange instead
+      if (type === "text" || type === "email" || type === "password") {
+        return undefined;
+      }
+
       if (props.maxLength) return props.maxLength;
 
       switch (type) {

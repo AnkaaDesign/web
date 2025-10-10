@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FormSteps, type FormStep } from "@/components/ui/form-steps";
 import { paintCreateSchema, paintUpdateSchema, type PaintCreateFormData, type PaintUpdateFormData } from "../../../schemas";
 import type { PaintFormula } from "../../../types";
-import { usePaintBrandsForComponents, usePaintType } from "../../../hooks";
+import { useAvailableComponents, usePaintType } from "../../../hooks";
 import { serializeFormToUrlParams, deserializeUrlParamsToForm, debounce } from "@/utils/url-form-state";
 
 // Import form field components
@@ -158,10 +158,11 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     enabled: !!paintTypeId,
   });
 
-  // Get component items filtered by both paint type and paint brand
-  const { data: paintBrandsWithComponents } = usePaintBrandsForComponents({
+  // Get component items filtered by intersection of paint brand and paint type
+  const { data: availableComponentsResponse } = useAvailableComponents({
+    paintBrandId: paintBrandId || undefined,
     paintTypeId: paintTypeId || undefined,
-    enabled: !!paintTypeId, // Only fetch when paint type is selected
+    enabled: !!paintBrandId && !!paintTypeId, // Only fetch when both are selected
   });
 
   // Notify parent when paint type changes
@@ -171,25 +172,13 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     }
   }, [paintTypeId, onPaintTypeChange]);
 
-  // Extract and sort component items from paint brands data
+  // Sort component items returned from the backend (already filtered by intersection)
   const sortedComponentItems = React.useMemo(() => {
-    if (!paintBrandsWithComponents?.data) return [];
+    if (!availableComponentsResponse?.data) return [];
 
-    // Collect all unique component items from all paint brands
-    const allComponentItems = new Map();
-
-    paintBrandsWithComponents.data.forEach((brand) => {
-      brand.paints?.forEach((paint) => {
-        paint.paintType?.componentItems?.forEach((item) => {
-          if (!allComponentItems.has(item.id)) {
-            allComponentItems.set(item.id, item);
-          }
-        });
-      });
-    });
-
-    // Convert to array and sort by unicode, then by name
-    return Array.from(allComponentItems.values()).sort((a, b) => {
+    // Backend returns items that exist in BOTH paint brand AND paint type
+    // Just sort them by unicode, then by name
+    return [...availableComponentsResponse.data].sort((a, b) => {
       const aUnicode = a.uniCode || "";
       const bUnicode = b.uniCode || "";
 
@@ -202,7 +191,7 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
       // If both don't have unicode, sort by name
       return a.name.localeCompare(b.name, "pt-BR");
     });
-  }, [paintBrandsWithComponents?.data]);
+  }, [availableComponentsResponse?.data]);
 
   const handleSubmit = async (data: PaintCreateFormData | PaintUpdateFormData) => {
     // For create mode, we'll handle formulas separately after paint creation
@@ -346,8 +335,10 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
                 <CardContent>
                   <div className="space-y-6">
                     {/* Name and Code in the same row */}
-                    <div className="grid gap-6 md:grid-cols-2">
-                      <NameInput control={form.control} required />
+                    <div className="grid gap-6 md:grid-cols-3">
+                      <div className="md:col-span-2">
+                        <NameInput control={form.control} required />
+                      </div>
                       <CodeInput control={form.control} />
                     </div>
 

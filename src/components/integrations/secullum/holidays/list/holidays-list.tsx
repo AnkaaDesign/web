@@ -213,6 +213,10 @@ export function HolidaysList({ className }: HolidaysListProps) {
     });
   }
 
+  // Check if we have active filters (excluding search)
+  const hasActiveFilters = (yearFilter && yearFilter !== currentYear.toString()) || !!monthFilter;
+  const filterCount = (yearFilter && yearFilter !== currentYear.toString() ? 1 : 0) + (monthFilter ? 1 : 0);
+
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border overflow-hidden", className)}>
       <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
@@ -229,10 +233,9 @@ export function HolidaysList({ className }: HolidaysListProps) {
             />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="default" onClick={() => setIsFilterModalOpen(true)} className={cn(activeFilters.length > 0 && "border-primary text-primary")}>
+            <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setIsFilterModalOpen(true)}>
               <IconFilter className="h-4 w-4 mr-2" />
-              Filtros
-              {activeFilters.length > 0 && <span className="ml-2 px-1.5 py-0.5 bg-primary text-primary-foreground rounded-full text-xs">{activeFilters.length}</span>}
+              Filtros{hasActiveFilters ? ` (${filterCount})` : ""}
             </Button>
           </div>
         </div>

@@ -2,12 +2,15 @@ import { useMemo, useState } from "react";
 import { useSectors, useTasks } from "../../../../hooks";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
+import type { TaskGetManyFormData } from "../../../../schemas";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { TaskScheduleTable } from "./task-schedule-table";
 import { TaskScheduleEmptyState } from "./task-schedule-empty-state";
+import { TaskScheduleFilters } from "./task-schedule-filters";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { TaskScheduleExport } from "./task-schedule-export";
-import { IconSearch } from "@tabler/icons-react";
+import { IconSearch, IconFilter } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -29,6 +32,13 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   // Search state
   const [searchText, setSearchText] = useState("");
 
+  // Filters state
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filters, setFilters] = useState<Partial<TaskGetManyFormData>>({
+    status: [TASK_STATUS.PENDING, TASK_STATUS.IN_PRODUCTION],
+    limit: 1000,
+  });
+
   // Load production sectors
   const { data: sectorsData } = useSectors({
     where: {
@@ -41,10 +51,9 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
 
   const productionSectors = sectorsData?.data || [];
 
-  // Load tasks data - only active production tasks (excluding ON_HOLD)
+  // Load tasks data with filters applied
   const { data: tasksData, isLoading } = useTasks({
-    status: [TASK_STATUS.PENDING, TASK_STATUS.IN_PRODUCTION],
-    limit: 1000,
+    ...filters,
     include: {
       sector: true,
       customer: true,
@@ -58,6 +67,18 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   });
 
   const allTasks = tasksData?.data || [];
+
+  // Count active filters (excluding default filters)
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filters.searchingFor) count++;
+    if (filters.sectorIds && filters.sectorIds.length > 0) count++;
+    if (filters.termRange && (filters.termRange.from || filters.termRange.to)) count++;
+    if (filters.isOverdue) count++;
+    return count;
+  }, [filters]);
+
+  const hasActiveFilters = activeFiltersCount > 0;
 
   // Filter tasks based on search
   const filteredTasks = useMemo(() => {
@@ -128,6 +149,14 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
             />
           </div>
           <div className="flex gap-2">
+            <Button
+              variant={hasActiveFilters ? "default" : "outline"}
+              size="default"
+              onClick={() => setFiltersOpen(true)}
+            >
+              <IconFilter className="h-4 w-4 mr-2" />
+              Filtros{hasActiveFilters ? ` (${activeFiltersCount})` : ""}
+            </Button>
             <ColumnVisibilityManager visibleColumns={visibleColumns} onColumnVisibilityChange={setVisibleColumns} />
             <TaskScheduleExport tasks={filteredTasks} visibleColumns={visibleColumns} />
           </div>
@@ -167,6 +196,15 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
             </div>
           )}
         </div>
+
+        {/* Filters Sheet */}
+        <TaskScheduleFilters
+          open={filtersOpen}
+          onOpenChange={setFiltersOpen}
+          filters={filters}
+          onFilterChange={setFilters}
+          sectors={productionSectors}
+        />
       </CardContent>
     </Card>
   );

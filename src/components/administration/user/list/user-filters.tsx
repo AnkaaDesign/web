@@ -1,16 +1,20 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import type { DateRange } from "react-day-picker";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { usePositions, useSectors } from "../../../../hooks";
 import { USER_STATUS_LABELS } from "../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
-import { IconFilter, IconUser, IconBriefcase, IconBuilding, IconCalendar } from "@tabler/icons-react";
+import { IconFilter, IconUser, IconBriefcase, IconBuilding, IconCalendar, IconX } from "@tabler/icons-react";
 import type { UserGetManyFormData } from "../../../../schemas";
 
 interface UserFiltersProps {
@@ -93,10 +97,10 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
   }).length;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] p-0">
-        <DialogHeader className="px-6 py-4 border-b">
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" />
             Filtros Avançados
             {activeFilterCount > 0 && (
@@ -104,11 +108,13 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                 {activeFilterCount} {activeFilterCount === 1 ? "ativo" : "ativos"}
               </Badge>
             )}
-          </DialogTitle>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>
+            Filtre os usuários por status, cargo, setor e datas
+          </SheetDescription>
+        </SheetHeader>
 
-        <ScrollArea className="flex-1 px-6 py-4" style={{ maxHeight: "calc(90vh - 140px)" }}>
-          <div className="space-y-4">
+        <div className="mt-6 space-y-6">
             <div>
               <Label className="flex items-center gap-2 mb-2">
                 <IconUser className="h-4 w-4" />
@@ -232,16 +238,19 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                 numberOfMonths={2}
               />
             </div>
-          </div>
-        </ScrollArea>
 
-        <DialogFooter className="px-6 py-4 border-t">
-          <Button variant="outline" onClick={handleResetFilters}>
-            Limpar Filtros
-          </Button>
-          <Button onClick={handleApplyFilters}>Aplicar Filtros</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            {/* Action Buttons */}
+            <div className="flex gap-2 pt-4 border-t">
+              <Button variant="outline" onClick={handleResetFilters} className="flex-1">
+                <IconX className="h-4 w-4 mr-2" />
+                Limpar Filtros
+              </Button>
+              <Button onClick={handleApplyFilters} className="flex-1">
+                Aplicar Filtros
+              </Button>
+            </div>
+          </div>
+      </SheetContent>
+    </Sheet>
   );
 }

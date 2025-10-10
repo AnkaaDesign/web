@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import type { DateRange } from "react-day-picker";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -125,11 +125,11 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] h-[70vh] max-h-[700px] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <IconFilter className="h-5 w-5 text-muted-foreground" />
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <IconFilter className="h-5 w-5" />
             Clientes - Filtros
             {localActiveFilterCount > 0 && (
               <Badge
@@ -141,11 +141,11 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
                 {localActiveFilterCount}
               </Badge>
             )}
-          </DialogTitle>
-          <DialogDescription>Configure filtros para refinar a pesquisa de clientes</DialogDescription>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>Configure filtros para refinar a pesquisa de clientes</SheetDescription>
+        </SheetHeader>
 
-        <div className="flex-1 overflow-auto space-y-6 py-4">
+        <div className="mt-6 space-y-6">
           {/* Has Tasks Filter */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -321,25 +321,19 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
               numberOfMonths={2}
             />
           </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleReset} className="flex-1">
+              <IconX className="h-4 w-4 mr-2" />
+              Limpar Filtros
+            </Button>
+            <Button onClick={handleApply} className="flex-1">
+              Aplicar Filtros
+            </Button>
+          </div>
         </div>
-
-        <Separator className="mt-auto" />
-
-        <DialogFooter className="gap-2 flex-shrink-0">
-          <Button variant="outline" onClick={handleReset}>
-            <IconX className="h-4 w-4 mr-2" />
-            Limpar todos
-          </Button>
-          <Button onClick={handleApply}>
-            Aplicar filtros
-            {localActiveFilterCount > 0 && (
-              <Badge variant="secondary" className="ml-2">
-                {localActiveFilterCount}
-              </Badge>
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { debounce } from "../../../../utils";
 
 import type { SectorCreateFormData, SectorUpdateFormData, Sector } from "../../../../types";
 import { sectorCreateSchema, sectorUpdateSchema } from "../../../../schemas";
@@ -53,43 +52,50 @@ export function SectorForm(props: SectorFormProps) {
   });
 
   const isSubmitting = props.isSubmitting || form.formState.isSubmitting;
+  const [isInitialized, setIsInitialized] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // URL state persistence for create mode
-  const debouncedUpdateUrl = useMemo(
-    () =>
-      debounce((formData: Partial<SectorCreateFormData>) => {
-        if (props.mode === "create") {
-          const params = new URLSearchParams();
-          if (formData.name) params.set("name", formData.name);
-          if (formData.privileges) params.set("privileges", formData.privileges);
-          setSearchParams(params, { replace: true });
-        }
-      }, 1000),
-    [props.mode, setSearchParams],
-  );
-
-  // Initialize form from URL params (create mode only)
+  // Initialize form from URL params (create mode only) - runs only once on mount
   useEffect(() => {
-    if (props.mode === "create") {
+    if (props.mode === "create" && !isInitialized) {
       const name = searchParams.get("name");
       const privileges = searchParams.get("privileges");
 
-      if (name) form.setValue("name", name);
+      if (name) form.setValue("name", name, { shouldValidate: false, shouldDirty: false });
       if (privileges && Object.values(SECTOR_PRIVILEGES).includes(privileges as SECTOR_PRIVILEGES)) {
-        form.setValue("privileges", privileges as SECTOR_PRIVILEGES);
+        form.setValue("privileges", privileges as SECTOR_PRIVILEGES, { shouldValidate: false, shouldDirty: false });
       }
+      setIsInitialized(true);
     }
-  }, [props.mode, searchParams, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Watch form changes and update URL (create mode only)
   useEffect(() => {
-    if (props.mode === "create") {
-      const subscription = form.watch((value) => {
-        debouncedUpdateUrl(value as Partial<SectorCreateFormData>);
-      });
-      return () => subscription.unsubscribe();
-    }
-  }, [form, debouncedUpdateUrl, props.mode]);
+    if (props.mode !== "create" || !isInitialized) return;
+
+    const subscription = form.watch((value) => {
+      // Clear previous timer
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      // Set new timer
+      debounceTimerRef.current = setTimeout(() => {
+        const params = new URLSearchParams();
+        if (value.name) params.set("name", value.name);
+        if (value.privileges) params.set("privileges", value.privileges);
+        setSearchParams(params, { replace: true });
+      }, 500);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [props.mode, isInitialized, form, setSearchParams]);
 
   const handleSubmit = async (data: SectorCreateFormData | SectorUpdateFormData) => {
     try {

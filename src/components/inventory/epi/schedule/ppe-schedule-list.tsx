@@ -335,14 +335,9 @@ export function PpeScheduleList({ className }: PpeScheduleListProps) {
           </div>
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <Button variant="outline" size="default" onClick={() => setShowFilterModal(true)} className="group">
-              <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">Filtros</span>
-              {activeFilters.length > 0 && (
-                <Badge variant="secondary" className="ml-2 min-w-[1.25rem] h-5 px-1">
-                  {activeFilters.length}
-                </Badge>
-              )}
+            <Button variant={activeFilters.length > 0 ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
+              <IconFilter className="h-4 w-4" />
+              <span>{activeFilters.length > 0 ? `Filtros (${activeFilters.length})` : "Filtros"}</span>
             </Button>
             <ColumnVisibilityManager columns={createPpeScheduleColumns()} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
           </div>

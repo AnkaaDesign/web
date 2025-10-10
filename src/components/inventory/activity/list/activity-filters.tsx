@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { IconFilter, IconUserCheck, IconArrowsExchange, IconListDetails, IconUser, IconPackage, IconNumbers, IconCalendar, IconX } from "@tabler/icons-react";
 import { useUsers, useItems } from "../../../../hooks";
 
@@ -82,10 +82,10 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
   }));
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] h-[70vh] max-h-[700px] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" />
             Atividades - Filtros
             {activeFilterCount > 0 && (
@@ -102,11 +102,11 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
                 </Tooltip>
               </TooltipProvider>
             )}
-          </DialogTitle>
-          <DialogDescription>Configure os filtros para refinar a lista de atividades.</DialogDescription>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>Configure os filtros para refinar a lista de atividades.</SheetDescription>
+        </SheetHeader>
 
-        <div className="flex-1 overflow-auto space-y-8 py-4">
+        <div className="mt-6 space-y-6">
           {/* Attribution and Operation Filters */}
           <div className="grid grid-cols-2 gap-6">
             {/* Attribution Column */}
@@ -382,14 +382,14 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClear} className="flex items-center gap-2">
+        <div className="flex gap-2 pt-4 border-t">
+          <Button variant="outline" onClick={handleClear} className="flex-1 flex items-center gap-2">
             <IconX className="h-4 w-4" />
             Limpar Tudo
           </Button>
-          <Button onClick={handleApply}>Aplicar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <Button onClick={handleApply} className="flex-1">Aplicar</Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 };

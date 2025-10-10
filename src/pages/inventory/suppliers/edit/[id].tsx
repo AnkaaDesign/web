@@ -44,7 +44,7 @@ export const SupplierEditPage = () => {
 
   const updateSupplier = useUpdateSupplier(id!, { include: includeParams });
 
-  const handleSubmit = async (changedFields: Partial<SupplierUpdateFormData>) => {
+  const handleSubmit = async (changedFields: Partial<SupplierUpdateFormData> & { logoFile?: File }) => {
     if (!id) return;
 
     try {
@@ -89,6 +89,8 @@ export const SupplierEditPage = () => {
     );
   }
 
+  const isSubmitDisabled = updateSupplier.isPending || !formState.isValid || !formState.isDirty;
+
   const actions = [
     {
       key: "cancel",
@@ -103,7 +105,7 @@ export const SupplierEditPage = () => {
       icon: updateSupplier.isPending ? IconLoader2 : IconCheck,
       onClick: () => document.getElementById("supplier-form-submit")?.click(),
       variant: "default" as const,
-      disabled: updateSupplier.isPending || !formState.isValid || !formState.isDirty,
+      disabled: isSubmitDisabled,
       loading: updateSupplier.isPending,
     },
   ];

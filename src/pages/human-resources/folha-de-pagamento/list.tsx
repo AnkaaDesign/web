@@ -1084,6 +1084,9 @@ export default function PayrollListPage() {
     return count;
   }, [filters]);
 
+  // Check if there are active filters
+  const hasActiveFilters = activeFiltersCount > 0;
+
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="flex flex-col h-full space-y-4">
@@ -1130,16 +1133,11 @@ export default function PayrollListPage() {
                 <div className="flex items-center gap-2">
                   <Button
                     onClick={() => setShowFilters(!showFilters)}
-                    variant="outline"
+                    variant={hasActiveFilters ? "default" : "outline"}
                     size="default"
                   >
                     <IconFilter className="h-4 w-4 mr-2" />
-                    Filtros
-                    {activeFiltersCount > 0 && (
-                      <Badge variant="secondary" className="ml-2">
-                        {activeFiltersCount}
-                      </Badge>
-                    )}
+                    {hasActiveFilters ? `Filtros (${activeFiltersCount})` : "Filtros"}
                   </Button>
 
                   <PayrollColumnVisibilityManager

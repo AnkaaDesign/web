@@ -50,16 +50,21 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
   React.useEffect(() => {
     const subscription = form.watch((data) => {
       if (formulas.length > 0) {
+        // Calculate total weight for ratio conversion
+        const totalWeight = data.components?.reduce((sum, c) => sum + (c?.weightInGrams || 0), 0) || 0;
+
         const updatedFormula = {
           ...formulas[0],
           description: data.description || "Fórmula Principal",
           components:
             data.components?.map((c, index) => {
+              // Convert weightInGrams to ratio for display/storage
+              const ratio = totalWeight > 0 ? ((c?.weightInGrams || 0) / totalWeight) * 100 : 0;
               const component = {
                 id: formulas[0].components?.[index]?.id || `temp-comp-${Date.now()}-${index}`,
                 itemId: c?.itemId || "",
                 formulaPaintId: formulas[0].id || "",
-                ratio: c?.ratio || 0,
+                ratio: ratio,
                 createdAt: formulas[0].components?.[index]?.createdAt || new Date(),
                 updatedAt: new Date(),
               };
@@ -91,12 +96,6 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
     const validComponents = currentFormula.components?.filter((c) => c.itemId && c.ratio > 0) || [];
 
     if (validComponents.length > 0) {
-      // Check if ratios sum to 100%
-      const totalRatio = validComponents.reduce((sum, c) => sum + c.ratio, 0);
-      if (Math.abs(totalRatio - 100) > 0.01) {
-        warnings.push(`Proporções somam ${totalRatio.toFixed(1)}% (ideal: 100%)`);
-      }
-
       // Check for duplicate items
       const itemIds = validComponents.map((c) => c.itemId);
       const uniqueItemIds = new Set(itemIds);
@@ -149,7 +148,7 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
         {/* Help Text */}
         <div className="pt-8">
           <p className="text-xs text-muted-foreground/70">
-            Adicione os componentes da fórmula especificando suas proporções em porcentagem. Se não adicionar nenhum componente, a tinta será salva sem fórmula.
+            Adicione os componentes da fórmula especificando o peso em gramas de cada componente. Digite valores separados por espaço e pressione espaço para somar automaticamente. Se não adicionar nenhum componente, a tinta será salva sem fórmula.
           </p>
         </div>
       </div>

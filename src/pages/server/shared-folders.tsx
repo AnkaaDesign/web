@@ -52,6 +52,7 @@ import { usePageTracker } from "@/hooks/use-page-tracker";
 import { PageHeader } from "@/components/ui/page-header";
 import { useSharedFolders, useSharedFolderContents } from "../../hooks";
 import { useToast } from "@/hooks/use-toast";
+import { apiClient } from "@/api-client";
 
 export function ServerSharedFoldersPage() {
   const { user } = useAuth();
@@ -651,12 +652,6 @@ export function ServerSharedFoldersPage() {
       {/* Content Card */}
       <Card className="flex-1 flex flex-col min-h-0">
         <CardContent className="flex-1 overflow-auto p-6 space-y-4">
-          {/* Shared Folders List */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">Pastas WebDAV Compartilhadas ({sharedFolders?.data?.length || 0})</CardTitle>
-            </CardHeader>
-            <CardContent>
               {isLoading ? (
                 <div className="space-y-4">
                   {Array.from({ length: 5 }).map((_, i) => (
@@ -806,8 +801,6 @@ export function ServerSharedFoldersPage() {
                   )}
                 </div>
               )}
-            </CardContent>
-          </Card>
         </CardContent>
       </Card>
     </div>

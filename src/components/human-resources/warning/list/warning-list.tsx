@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
@@ -258,14 +257,17 @@ export function WarningList({ selectedSeverity, onDataUpdate, className }: Warni
           <TableSearchInput value={displaySearchText} onChange={setSearch} placeholder="Buscar advertências..." isPending={displaySearchText !== searchingFor} />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <Button variant="outline" size="default" onClick={() => setIsFilterModalOpen(true)} className={cn(hasActiveFilters && "border-primary text-primary")}>
-              <IconFilter className="h-4 w-4 mr-2" />
-              Filtros
-              {hasActiveFilters && (
-                <Badge variant="default" className="ml-2 h-5 px-1">
-                  {activeFilters.length}
-                </Badge>
-              )}
+            <Button
+              variant={hasActiveFilters ? "default" : "outline"}
+              size="default"
+              onClick={() => setIsFilterModalOpen(true)}
+              className="group"
+            >
+              <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <span className="text-foreground">
+                Filtros
+                {hasActiveFilters ? ` (${activeFilters.length})` : ""}
+              </span>
             </Button>
           </div>
         </div>

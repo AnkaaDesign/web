@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { type DateRange } from "react-day-picker";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { IconFilter, IconX } from "@tabler/icons-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CHANGE_LOG_ENTITY_TYPE, CHANGE_LOG_ENTITY_TYPE_LABELS, CHANGE_LOG_ACTION, CHANGE_LOG_ACTION_LABELS } from "../../../../constants";
@@ -83,22 +83,22 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
   }, [localFilters]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="p-6 pb-2">
-          <div className="flex items-center justify-between">
-            <DialogTitle>Filtros do Histórico</DialogTitle>
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <IconFilter className="h-5 w-5" />
+            Filtros do Histórico
             {activeFilterCount > 0 && (
               <Badge variant="secondary" className="ml-2">
                 {activeFilterCount} {activeFilterCount === 1 ? "filtro ativo" : "filtros ativos"}
               </Badge>
             )}
-          </div>
-          <DialogDescription>Configure os filtros para visualizar o histórico de alterações</DialogDescription>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>Configure os filtros para visualizar o histórico de alterações</SheetDescription>
+        </SheetHeader>
 
-        <ScrollArea className="flex-1 overflow-auto px-6">
-          <div className="space-y-6 pb-4">
+        <div className="mt-6 space-y-6">
             {/* Entity Types */}
             <div className="space-y-2">
               <Label>Tipos de Entidade</Label>
@@ -167,23 +167,19 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
                 placeholder="Selecione o período"
               />
             </div>
-          </div>
-        </ScrollArea>
 
-        <DialogFooter className="p-6 pt-4 border-t">
-          <div className="flex justify-between w-full">
-            <Button variant="ghost" onClick={handleReset} disabled={activeFilterCount === 0}>
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleReset} disabled={activeFilterCount === 0} className="flex-1">
+              <IconX className="h-4 w-4 mr-2" />
               Limpar Filtros
             </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button onClick={handleApply}>Aplicar Filtros</Button>
-            </div>
+            <Button onClick={handleApply} className="flex-1">
+              Aplicar Filtros
+            </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

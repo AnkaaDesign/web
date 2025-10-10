@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CalculationTable } from "./calculation-table";
 import { CalculationExport } from "./calculation-export";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
+import { CalculationFilters } from "./calculation-filters";
 import { createCalculationColumns } from "./calculation-table-columns";
 import { cn } from "@/lib/utils";
 import { useTableState } from "@/hooks/use-table-state";
@@ -13,7 +14,7 @@ import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { USER_STATUS } from "../../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { IconChevronLeft, IconChevronRight, IconCalendar } from "@tabler/icons-react";
+import { IconChevronLeft, IconChevronRight, IconCalendar, IconFilter } from "@tabler/icons-react";
 import { addMonths, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -89,6 +90,9 @@ export function CalculationList({ className }: CalculationListProps) {
   const [selectedUserId, setSelectedUserId] = useState(() => {
     return searchParams.get("userId") || "";
   });
+
+  // Filters state
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Fetch users for filter
   const {
@@ -361,6 +365,23 @@ export function CalculationList({ className }: CalculationListProps) {
     userId: selectedUserId,
   }), [selectedMonth, selectedUserId]);
 
+  // Check if there are active filters (for now, always false as we don't have advanced filters yet)
+  const hasActiveFilters = useMemo(() => {
+    // In the future, check if any advanced filters are applied
+    return false;
+  }, []);
+
+  const totalFilterCount = useMemo(() => {
+    // In the future, count the number of active filters
+    return 0;
+  }, []);
+
+  // Handle filter changes
+  const handleFilterChange = (filters: any) => {
+    // In the future, update filters state
+    // For now, just close the sheet
+  };
+
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
       <CardContent className="flex-1 flex flex-col p-6 space-y-4 min-h-0">
@@ -427,6 +448,18 @@ export function CalculationList({ className }: CalculationListProps) {
 
           <div className="flex gap-2 shrink-0">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
+            <Button
+              variant={hasActiveFilters ? "default" : "outline"}
+              size="default"
+              onClick={() => setFiltersOpen(true)}
+              className="group"
+            >
+              <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              <span className="text-foreground">
+                Filtros
+                {hasActiveFilters ? ` (${totalFilterCount})` : ""}
+              </span>
+            </Button>
             <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <CalculationExport
               filters={exportFilters}
@@ -448,6 +481,17 @@ export function CalculationList({ className }: CalculationListProps) {
           />
         </div>
       </CardContent>
+
+      {/* Filters Sheet */}
+      <CalculationFilters
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        filters={{
+          userId: selectedUserId,
+          selectedMonth: selectedMonth,
+        }}
+        onFilterChange={handleFilterChange}
+      />
     </Card>
   );
 }

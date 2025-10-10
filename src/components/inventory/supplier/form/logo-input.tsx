@@ -18,17 +18,14 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
   const form = useFormContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const [uploadedFile, setUploadedFile] = useState<AnkaaFile | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
   const [previewFiles, setPreviewFiles] = useState<FileWithPreview[]>([]);
   const [showPreview, setShowPreview] = useState(false);
-  const [isNewUpload, setIsNewUpload] = useState(false); // Track if this is a newly uploaded file
+  const [selectedFile, setSelectedFile] = useState<File | null>(null); // Store the actual File object
 
   // Track loaded logo ID to prevent duplicate API calls
   const [loadedLogoId, setLoadedLogoId] = useState<string | null>(null);
-  // Track if user explicitly deleted the logo to prevent reload
-  const [userDeletedLogo, setUserDeletedLogo] = useState(false);
 
-  // Load existing logo if logoId is provided (from props or URL)
+  // Load existing logo if logoId is provided (from props or URL) - only for edit mode
   useEffect(() => {
     const loadExistingLogo = async () => {
       // Check URL parameter first, then fallback to existingLogoId
@@ -36,8 +33,8 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
       const logoIdToLoad = logoIdFromUrl || existingLogoId;
 
       // CRITICAL: Skip if we already loaded this logo ID to prevent infinite requests
-      // Also skip if user explicitly deleted the logo
-      if (!logoIdToLoad || logoIdToLoad === loadedLogoId || userDeletedLogo) {
+      // Only reload if the logoId to load is different from what we currently have loaded
+      if (!logoIdToLoad || logoIdToLoad === loadedLogoId) {
         return;
       }
 
@@ -46,7 +43,6 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
         if (response.success && response.data) {
           const file = response.data;
           setUploadedFile(file);
-          setIsNewUpload(false); // This is an existing file, not a new upload
           setLoadedLogoId(logoIdToLoad); // Mark this logo as loaded
 
           // Update form with logoId from URL if it came from URL (but don't trigger re-render or validation)
@@ -82,10 +78,10 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
     if (files.length === 0) {
       // Clear the logo if no files selected
       form.setValue("logoId", null);
+      form.setValue("logoFile", null);
       setUploadedFile(null);
       setPreviewFiles([]);
-      setIsNewUpload(false);
-      setLoadedLogoId(null); // Reset loaded logo ID
+      setSelectedFile(null);
 
       // Remove logoId from URL
       const newParams = new URLSearchParams(searchParams);
@@ -94,100 +90,39 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
       return;
     }
 
-    // Reset the deleted flag when user uploads a new file
-    setUserDeletedLogo(false);
-
     const file = files[0]; // Only handle the first file for logo
 
-    if (!file.uploaded) {
-      // Upload the file
-      setIsUploading(true);
-      try {
-        // Create FormData
-        const formData = new FormData();
-        formData.append("file", file as Blob);
-        formData.append("filename", file.name);
-        formData.append("mimetype", file.type);
-        formData.append("size", file.size.toString());
+    // Store the actual File object (not FileWithPreview) for form submission
+    setSelectedFile(file as File);
 
-        // Upload the file with customer logo context
-        const response = await fileService.uploadSingleFile(file as File, {
-          fileContext: "customerLogo",
-          entityType: "customer",
-        });
+    // Update form with the file - store it in a hidden field
+    form.setValue("logoFile", file, {
+      shouldDirty: true,
+      shouldValidate: false,
+      shouldTouch: false,
+    });
 
-        if (response && response.data) {
-          // Set the uploaded file ID in the form with dirty flag but preserve other form state
-          // CRITICAL: Only update logoId field, don't trigger full form revalidation
-          form.setValue("logoId", response.data.id, {
-            shouldDirty: true, // Mark as dirty to indicate changes
-            shouldValidate: false, // Don't validate other fields
-            shouldTouch: false, // Don't mark as touched to avoid triggering resets
-          });
+    // Clear logoId since we're uploading a new file
+    form.setValue("logoId", null);
 
-          setUploadedFile(response.data);
-          setIsNewUpload(true); // Mark this as a newly uploaded file
-          setLoadedLogoId(response.data.id); // Mark as loaded to prevent re-fetch
-
-          // Update URL parameter to persist logo ID
-          const newParams = new URLSearchParams(searchParams);
-          newParams.set("logoId", response.data.id);
-          setSearchParams(newParams);
-
-          // Update preview with uploaded status
-          const updatedFile: FileWithPreview = {
-            ...file,
-            id: response.data.id,
-            uploaded: true,
-            preview: normalizeThumbnailUrl(response.data.thumbnailUrl) || getFileUrl(response.data),
-          };
-          setPreviewFiles([updatedFile]);
-        }
-      } catch (error) {
-        toast.error("Erro ao enviar o logo. Tente novamente.");
-        // Remove the file from preview on error
-        setPreviewFiles([]);
-      } finally {
-        setIsUploading(false);
-      }
-    } else {
-      // File is already uploaded (when editing)
-      setPreviewFiles(files);
-    }
+    // Set preview
+    setPreviewFiles([file]);
   };
 
   const handleFileDelete = async (_file: AnkaaFile) => {
-    const fileToDelete = uploadedFile;
-    const shouldDeleteFromServer = isNewUpload; // Only delete from server if it's a new upload
-
     // Clear UI state immediately for better UX
     form.setValue("logoId", null);
+    form.setValue("logoFile", null);
     setUploadedFile(null);
     setPreviewFiles([]);
-    setIsNewUpload(false);
-    setLoadedLogoId(null); // Reset loaded logo ID
-    setUserDeletedLogo(true); // Mark that user explicitly deleted the logo
+    setSelectedFile(null);
 
     // Remove logoId from URL
     const newParams = new URLSearchParams(searchParams);
     newParams.delete("logoId");
     setSearchParams(newParams);
 
-    // Only delete from server if this was a newly uploaded file in this session
-    if (shouldDeleteFromServer && fileToDelete?.id) {
-      try {
-        await fileService.deleteFile(fileToDelete.id);
-        // Don't show any toast here - the API client will show "Excluído com sucesso"
-        // which is already confusing enough for users
-      } catch (error) {
-        // Don't show error toast as the UI state was already cleared
-        // The file will be orphaned but can be cleaned up later
-      }
-    } else {
-      // For existing logos, just remove the reference
-      // Use a more user-friendly message
-      toast.info("Logo desmarcado do cliente");
-    }
+    toast.info("Logo removido");
   };
 
   const handleFilePreview = (_file: AnkaaFile) => {
@@ -201,43 +136,21 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
         name="logoId"
         render={() => (
           <FormItem>
-            <FormLabel>Logo do Cliente</FormLabel>
+            <FormLabel>Logo do Fornecedor</FormLabel>
             <FormControl>
-              <div className="space-y-4">
-                {previewFiles.length === 0 ? (
-                  <FileUploadField
-                    onFilesChange={handleFilesChange}
-                    maxFiles={1}
-                    maxSize={5 * 1024 * 1024} // 5MB
-                    acceptedFileTypes={{
-                      "image/*": [".jpeg", ".jpg", ".png", ".gif", ".svg", ".webp"],
-                    }}
-                    disabled={disabled || isUploading}
-                    showPreview={true}
-                    variant="compact"
-                    placeholder="Clique ou arraste o logo do cliente"
-                  />
-                ) : (
-                  <FileItem
-                    file={{
-                      id: uploadedFile?.id || previewFiles[0].id,
-                      filename: uploadedFile?.filename || previewFiles[0].name,
-                      originalName: uploadedFile?.originalName || previewFiles[0].name,
-                      mimetype: uploadedFile?.mimetype || previewFiles[0].type,
-                      size: uploadedFile?.size || previewFiles[0].size,
-                      path: uploadedFile?.path || "",
-                      thumbnailUrl: uploadedFile?.thumbnailUrl || null,
-                      createdAt: uploadedFile?.createdAt || new Date(),
-                      updatedAt: uploadedFile?.updatedAt || new Date(),
-                    }}
-                    viewMode="grid"
-                    onPreview={handleFilePreview}
-                    onDelete={!disabled && !isUploading ? handleFileDelete : undefined}
-                    showActions={!disabled && !isUploading}
-                  />
-                )}
-                {isUploading && <p className="text-sm text-muted-foreground">Enviando logo...</p>}
-              </div>
+              <FileUploadField
+                onFilesChange={handleFilesChange}
+                maxFiles={1}
+                maxSize={5 * 1024 * 1024} // 5MB
+                acceptedFileTypes={{
+                  "image/*": [".jpeg", ".jpg", ".png", ".gif", ".svg", ".webp"],
+                }}
+                disabled={disabled}
+                showPreview={true}
+                variant="compact"
+                placeholder="Clique ou arraste o logo do fornecedor"
+                existingFiles={previewFiles}
+              />
             </FormControl>
             <FormMessage />
           </FormItem>

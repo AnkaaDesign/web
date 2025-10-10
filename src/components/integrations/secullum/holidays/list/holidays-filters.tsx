@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { IconFilter, IconX } from "@tabler/icons-react";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -49,12 +50,19 @@ export function HolidaysFilters({ open, onOpenChange, onApply, currentYear, sele
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Filtrar Feriados</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <IconFilter className="h-5 w-5" />
+            Filtrar Feriados
+          </SheetTitle>
+          <SheetDescription>
+            Filtre os feriados por ano e mês
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="mt-6 space-y-6">
           <div className="space-y-2">
             <Label htmlFor="year">Ano</Label>
             <Combobox
@@ -89,14 +97,18 @@ export function HolidaysFilters({ open, onOpenChange, onApply, currentYear, sele
               name="month"
             />
           </div>
+
+          <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleClear} className="flex-1">
+              <IconX className="h-4 w-4 mr-2" />
+              Limpar Filtros
+            </Button>
+            <Button onClick={handleApply} className="flex-1">
+              Aplicar Filtros
+            </Button>
+          </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClear}>
-            Limpar
-          </Button>
-          <Button onClick={handleApply}>Aplicar</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

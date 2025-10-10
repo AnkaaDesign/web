@@ -123,6 +123,7 @@ export function FileUploadField({
   showFiles = true,
 }: FileUploadFieldProps) {
   const [files, setFiles] = useState<FileWithPreview[]>(existingFiles);
+  const [thumbnailErrors, setThumbnailErrors] = useState<Record<string, boolean>>({});
 
   // Sync with external file changes - only if content actually changed
   React.useEffect(() => {
@@ -323,12 +324,34 @@ export function FileUploadField({
                   const isUploaded = !!file.uploaded;
                   const isUploading = file.uploadProgress !== undefined && file.uploadProgress > 0 && file.uploadProgress < 100 && !isUploaded && !hasError;
 
+                  const thumbnailError = thumbnailErrors[file.id] || false;
+                  const shouldShowThumbnail = showPreview && !thumbnailError && (file.preview || (isUploaded && file.thumbnailUrl));
+
+                  const getThumbnailSrc = () => {
+                    const apiBaseUrl = (window as any).__ANKAA_API_URL__ || process.env.VITE_API_URL || "http://localhost:3030";
+                    if (file.thumbnailUrl) {
+                      if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
+                      if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;
+                      return file.thumbnailUrl;
+                    }
+                    if (file.preview) return file.preview;
+                    if (file.uploadedFileId) return `${apiBaseUrl}/files/thumbnail/${file.uploadedFileId}`;
+                    return "";
+                  };
+
                   return (
                     <div key={file.id} className="flex items-center gap-3 p-3 h-16 border rounded-lg bg-card hover:bg-muted/30 transition-colors">
-                      {/* File Icon Only - No Thumbnails in Upload */}
-                      <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded border bg-muted">
+                      {/* Thumbnail or Icon */}
+                      <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded border bg-muted overflow-hidden">
                         {isUploading ? (
                           <div className="w-5 h-5 border border-primary/30 border-t-primary animate-spin rounded-full" />
+                        ) : shouldShowThumbnail ? (
+                          <img
+                            src={getThumbnailSrc()}
+                            alt={file.name}
+                            className="w-full h-full object-cover"
+                            onError={() => setThumbnailErrors(prev => ({ ...prev, [file.id]: true }))}
+                          />
                         ) : (
                           <IconComponent className={cn("w-5 h-5", isUploaded ? "text-primary" : "text-muted-foreground")} />
                         )}
@@ -448,19 +471,40 @@ export function FileUploadField({
                 const hasError = !!file.error;
                 const isUploaded = !!file.uploaded;
                 const isUploading = file.uploadProgress !== undefined && file.uploadProgress > 0 && file.uploadProgress < 100 && !isUploaded && !hasError;
+                const thumbnailError = thumbnailErrors[file.id] || false;
+                const shouldShowThumbnail = showPreview && !thumbnailError && (file.preview || (isUploaded && file.thumbnailUrl));
+
+                const getThumbnailSrc = () => {
+                  const apiBaseUrl = (window as any).__ANKAA_API_URL__ || process.env.VITE_API_URL || "http://localhost:3030";
+                  if (file.thumbnailUrl) {
+                    if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
+                    if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;
+                    return file.thumbnailUrl;
+                  }
+                  if (file.preview) return file.preview;
+                  if (file.uploadedFileId) return `${apiBaseUrl}/files/thumbnail/${file.uploadedFileId}`;
+                  return "";
+                };
 
                 return (
                   <div key={file.id} className="flex flex-col">
                     {/* File card */}
                     <div className="flex flex-col items-center p-3 border border-border/50 rounded-lg bg-card">
-                      {/* Icon Only - No Thumbnails in Upload */}
-                      <div className="relative w-full h-24 mb-2">
+                      {/* Thumbnail or Icon */}
+                      <div className="relative w-full h-24 mb-2 overflow-hidden rounded border">
                         {isUploading ? (
-                          <div className="w-full h-full flex items-center justify-center rounded border bg-primary/5">
+                          <div className="w-full h-full flex items-center justify-center bg-primary/5">
                             <div className="w-6 h-6 border-2 border-primary/30 border-t-primary animate-spin rounded-full" />
                           </div>
+                        ) : shouldShowThumbnail ? (
+                          <img
+                            src={getThumbnailSrc()}
+                            alt={file.name}
+                            className="w-full h-full object-cover"
+                            onError={() => setThumbnailErrors(prev => ({ ...prev, [file.id]: true }))}
+                          />
                         ) : (
-                          <div className={cn("w-full h-full flex items-center justify-center rounded border", isUploaded ? "bg-primary/10" : "bg-muted")}>
+                          <div className={cn("w-full h-full flex items-center justify-center", isUploaded ? "bg-primary/10" : "bg-muted")}>
                             <IconComponent className={cn("w-8 h-8", isUploaded ? "text-primary" : "text-muted-foreground")} />
                           </div>
                         )}

@@ -64,18 +64,82 @@ export class SupplierService {
   // Mutation Operations
   // =====================
 
-  async createSupplier(data: SupplierCreateFormData, query?: SupplierQueryFormData): Promise<SupplierCreateResponse> {
-    const response = await apiClient.post<SupplierCreateResponse>(this.basePath, data, {
-      params: query,
-    });
-    return response.data;
+  async createSupplier(data: SupplierCreateFormData & { logoFile?: File }, query?: SupplierQueryFormData): Promise<SupplierCreateResponse> {
+    // Check if we have a file to upload
+    const { logoFile, ...supplierData } = data;
+
+    if (logoFile) {
+      // Create FormData to send file with supplier data
+      const formData = new FormData();
+
+      // Add logo file
+      formData.append('logo', logoFile);
+
+      // Add all supplier data as form fields
+      Object.entries(supplierData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          if (Array.isArray(value)) {
+            // For arrays (phones, tags), append each item separately
+            value.forEach((item, index) => {
+              formData.append(`${key}[${index}]`, String(item));
+            });
+          } else {
+            formData.append(key, String(value));
+          }
+        }
+      });
+
+      // Don't set Content-Type header manually - let Axios set it with the correct boundary
+      const response = await apiClient.post<SupplierCreateResponse>(this.basePath, formData, {
+        params: query,
+      });
+      return response.data;
+    } else {
+      // No file, send as regular JSON
+      const response = await apiClient.post<SupplierCreateResponse>(this.basePath, supplierData, {
+        params: query,
+      });
+      return response.data;
+    }
   }
 
-  async updateSupplier(id: string, data: SupplierUpdateFormData, query?: SupplierQueryFormData): Promise<SupplierUpdateResponse> {
-    const response = await apiClient.put<SupplierUpdateResponse>(`${this.basePath}/${id}`, data, {
-      params: query,
-    });
-    return response.data;
+  async updateSupplier(id: string, data: SupplierUpdateFormData & { logoFile?: File }, query?: SupplierQueryFormData): Promise<SupplierUpdateResponse> {
+    // Check if we have a file to upload
+    const { logoFile, ...supplierData } = data;
+
+    if (logoFile) {
+      // Create FormData to send file with supplier data
+      const formData = new FormData();
+
+      // Add logo file
+      formData.append('logo', logoFile);
+
+      // Add all supplier data as form fields (including changed fields)
+      Object.entries(supplierData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          if (Array.isArray(value)) {
+            // For arrays (phones, tags), append each item separately
+            value.forEach((item, index) => {
+              formData.append(`${key}[${index}]`, String(item));
+            });
+          } else {
+            formData.append(key, String(value));
+          }
+        }
+      });
+
+      // Don't set Content-Type header manually - let Axios set it with the correct boundary
+      const response = await apiClient.put<SupplierUpdateResponse>(`${this.basePath}/${id}`, formData, {
+        params: query,
+      });
+      return response.data;
+    } else {
+      // No file, send as regular JSON
+      const response = await apiClient.put<SupplierUpdateResponse>(`${this.basePath}/${id}`, supplierData, {
+        params: query,
+      });
+      return response.data;
+    }
   }
 
   async deleteSupplier(id: string): Promise<SupplierDeleteResponse> {
@@ -126,8 +190,8 @@ export const getAllSuppliers = (params?: Omit<SupplierGetManyFormData, "page" | 
 export const getSupplierById = (id: string, params?: Omit<SupplierGetByIdFormData, "id">) => supplierService.getSupplierById(id, params);
 
 // Mutation Operations
-export const createSupplier = (data: SupplierCreateFormData, query?: SupplierQueryFormData) => supplierService.createSupplier(data, query);
-export const updateSupplier = (id: string, data: SupplierUpdateFormData, query?: SupplierQueryFormData) => supplierService.updateSupplier(id, data, query);
+export const createSupplier = (data: SupplierCreateFormData & { logoFile?: File }, query?: SupplierQueryFormData) => supplierService.createSupplier(data, query);
+export const updateSupplier = (id: string, data: SupplierUpdateFormData & { logoFile?: File }, query?: SupplierQueryFormData) => supplierService.updateSupplier(id, data, query);
 export const deleteSupplier = (id: string) => supplierService.deleteSupplier(id);
 
 // Batch Operations

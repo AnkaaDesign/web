@@ -1,11 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { IconFilter, IconTrash, IconCheck } from "@tabler/icons-react";
+import { IconFilter, IconX, IconCheck } from "@tabler/icons-react";
 import type { UserGetManyFormData } from "../../../../schemas";
 import { useUsers, useSectors, usePositions } from "../../../../hooks";
 import { USER_STATUS } from "../../../../constants";
@@ -186,10 +185,10 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
             <IconFilter size={20} />
             Filtros de Folha de Pagamento
             {totalActiveFilters > 0 && (
@@ -197,12 +196,11 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 {totalActiveFilters} {totalActiveFilters === 1 ? "ativo" : "ativos"}
               </Badge>
             )}
-          </DialogTitle>
-          <DialogDescription>Configure os filtros para refinar a visualização da folha de pagamento.</DialogDescription>
-        </DialogHeader>
+          </SheetTitle>
+          <SheetDescription>Configure os filtros para refinar a visualização da folha de pagamento.</SheetDescription>
+        </SheetHeader>
 
-        <ScrollArea className="h-[500px] mt-4">
-          <div className="space-y-6">
+        <div className="mt-6 space-y-6">
             {/* Period Section */}
             <div>
               <Label className="text-sm font-medium mb-3 block">Período</Label>
@@ -459,25 +457,20 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 </div>
               )}
             </div>
-          </div>
-        </ScrollArea>
 
-        <DialogFooter className="flex items-center justify-between">
-          <Button variant="ghost" onClick={handleClear} className="gap-2">
-            <IconTrash size={16} />
-            Limpar Filtros
-          </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancelar
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleClear} className="flex-1">
+              <IconX className="h-4 w-4 mr-2" />
+              Limpar Filtros
             </Button>
-            <Button onClick={handleApply} className="gap-2">
-              <IconCheck size={16} />
+            <Button onClick={handleApply} className="flex-1">
+              <IconCheck className="h-4 w-4 mr-2" />
               Aplicar Filtros
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

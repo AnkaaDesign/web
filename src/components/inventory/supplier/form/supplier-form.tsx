@@ -209,10 +209,22 @@ export function SupplierForm(props: SupplierFormProps) {
         transformedData.tags = Object.values(transformedData.tags) as string[];
       }
 
+      // Get logoFile from form state (set by LogoInput component)
+      // Access it directly from the internal form state since it's not part of the schema
+      const logoFile = (form as any).getValues?.('logoFile') as File | null | undefined;
+
       if (mode === "create") {
-        await (props as CreateSupplierFormProps).onSubmit(transformedData as SupplierCreateFormData);
+        // Pass logo file with supplier data for create mode
+        await (props as CreateSupplierFormProps).onSubmit({
+          ...transformedData,
+          logoFile,
+        } as SupplierCreateFormData & { logoFile?: File });
       } else {
-        await (props as UpdateSupplierFormProps).onSubmit(transformedData as SupplierUpdateFormData);
+        // Pass logo file with supplier data for update mode as well
+        await (props as UpdateSupplierFormProps).onSubmit({
+          ...transformedData,
+          logoFile,
+        } as SupplierUpdateFormData & { logoFile?: File });
       }
     } catch (error) {
       // Error is handled by the parent component
