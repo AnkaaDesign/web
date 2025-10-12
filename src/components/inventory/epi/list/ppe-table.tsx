@@ -69,11 +69,12 @@ export function PpeTable({ visibleColumns, className, onEdit, filters = {}, onDa
     ],
   });
 
-  // Prepare query parameters
+  // Prepare query parameters - explicitly remove page/limit from filters to avoid conflicts
+  const { page: _removePage, limit: _removeLimit, ...cleanFilters } = filters;
   const queryFilters: Partial<ItemGetManyFormData> = {
     // When showSelectedOnly is true, don't apply filters
-    ...(showSelectedOnly ? {} : filters),
-    page, // page is already 1-based from useTableState
+    ...(showSelectedOnly ? {} : cleanFilters),
+    page: Math.max(1, page + 1), // Convert from 0-based (useTableState) to 1-based (API), ensure never 0
     limit: pageSize,
     orderBy: convertSortConfigsToOrderBy(sortConfigs),
     include: {
@@ -82,7 +83,7 @@ export function PpeTable({ visibleColumns, className, onEdit, filters = {}, onDa
       measures: true,
       prices: {
         where: {
-          isActive: true,
+          current: true,
         },
         orderBy: {
           createdAt: "desc",
@@ -100,9 +101,8 @@ export function PpeTable({ visibleColumns, className, onEdit, filters = {}, onDa
   }
 
   // Fetch data
-  const { data, isLoading, error } = useItems({
-    ...queryFilters,
-    keepPreviousData: true,
+  const { data, isLoading, error } = useItems(queryFilters, {
+    placeholderData: (previousData) => previousData,
   });
 
   // Update parent component with current data

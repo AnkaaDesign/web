@@ -60,7 +60,7 @@ export const CreateMaintenancePage = () => {
       },
       variant: "default" as const,
       loading: createMutation.isPending,
-      disabled: createMutation.isPending || !formState.isValid,
+      disabled: createMutation.isPending,
     },
   ];
 

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import type { PaintTypeCreateFormData, PaintTypeUpdateFormData } from "../../../../schemas";
@@ -12,7 +12,13 @@ interface ComponentItemsSelectorProps {
 }
 
 export function ComponentItemsSelector({ control, disabled, initialItems }: ComponentItemsSelectorProps) {
-  // Memoize initialOptions to prevent infinite loop - same as LogoPaintsSelector
+  // Create stable dependency for initialItems array
+  const initialItemsKey = useMemo(
+    () => initialItems?.map(i => i.id).sort().join(',') || '',
+    [initialItems]
+  );
+
+  // Memoize initialOptions with stable dependency
   const initialOptions = useMemo(() => {
     if (!initialItems || initialItems.length === 0) return [];
 
@@ -27,11 +33,10 @@ export function ComponentItemsSelector({ control, disabled, initialItems }: Comp
         value: item.id,
       };
     });
-  }, [initialItems?.map(i => i.id).join(',')]);
+  }, [initialItemsKey]);
 
   // Async query function for the combobox
-  const queryItems = useMemo(
-    () => async (searchTerm: string, page = 1) => {
+  const queryItems = useCallback(async (searchTerm: string, page = 1) => {
       try {
         // Build query parameters - same structure as paint selector
         const queryParams: any = {
@@ -79,9 +84,7 @@ export function ComponentItemsSelector({ control, disabled, initialItems }: Comp
           hasMore: false,
         };
       }
-    },
-    []
-  );
+    }, []);
 
   return (
     <FormField

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { useFormContext } from "react-hook-form";
@@ -14,12 +14,44 @@ type FormData = ItemCreateFormData | ItemUpdateFormData;
 
 interface SupplierSelectorProps {
   disabled?: boolean;
+  initialSupplier?: Supplier;
 }
 
-export function ItemSupplierSelector({ disabled }: SupplierSelectorProps) {
+export function ItemSupplierSelector({ disabled, initialSupplier }: SupplierSelectorProps) {
   const form = useFormContext<FormData>();
   const [isCreating, setIsCreating] = useState(false);
   const createSupplier = useCreateSupplier();
+
+  // Create memoized initialOptions with stable dependency
+  const initialOptions = useMemo(
+    () =>
+      initialSupplier
+        ? [
+            {
+              value: initialSupplier.id,
+              label: initialSupplier.fantasyName,
+              description: initialSupplier.corporateName || undefined,
+            },
+          ]
+        : [],
+    [initialSupplier?.id]
+  );
+
+  // Initialize cache with initial supplier
+  const cacheRef = useRef<Map<string, Supplier>>(new Map());
+
+  // Add initial supplier to cache on mount or when it changes
+  useMemo(() => {
+    if (initialSupplier) {
+      cacheRef.current.set(initialSupplier.id, initialSupplier);
+    }
+  }, [initialSupplier?.id]);
+
+  // Memoize getOptionLabel callback
+  const getOptionLabel = useCallback((supplier: Supplier) => supplier.fantasyName, []);
+
+  // Memoize getOptionValue callback
+  const getOptionValue = useCallback((supplier: Supplier) => supplier.id, []);
 
   const fetchSuppliers = async (searchTerm: string) => {
     const response = await getSuppliers({
@@ -38,6 +70,11 @@ export function ItemSupplierSelector({ disabled }: SupplierSelectorProps) {
     });
 
     if (response.success && response.data) {
+      // Add fetched suppliers to cache
+      response.data.forEach((supplier: Supplier) => {
+        cacheRef.current.set(supplier.id, supplier);
+      });
+
       return response.data.map((supplier: Supplier) => ({
         value: supplier.id,
         label: supplier.fantasyName,
@@ -88,7 +125,7 @@ export function ItemSupplierSelector({ disabled }: SupplierSelectorProps) {
               async={true}
               queryKey={["suppliers", "selector"]}
               queryFn={fetchSuppliers}
-              initialOptions={[]}
+              initialOptions={initialOptions}
               minSearchLength={0}
               placeholder="Pesquisar fornecedor..."
               emptyText="Nenhum fornecedor encontrado"

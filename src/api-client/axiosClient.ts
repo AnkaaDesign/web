@@ -378,7 +378,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         }
 
         const queryString = qs.stringify(params, {
-          arrayFormat: "brackets",
+          arrayFormat: "indices",
           encode: false,
           serializeDate: (date: Date) => date.toISOString(),
           skipNulls: true,
@@ -386,8 +386,8 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
           // Use bracket notation for nested objects (e.g., orderBy[name]=asc)
           allowDots: false,
           strictNullHandling: true,
-          // Add index format for arrays
-          indices: false,
+          // Use indices for arrays to produce orderBy[0][name]=asc instead of orderBy[][name]=asc
+          indices: true,
         });
 
         // Log serialized query string for debugging

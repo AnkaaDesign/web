@@ -15,14 +15,20 @@ export function PaintBrandEditPage() {
   const { update, updateMutation } = usePaintBrandMutations();
   const [formState, setFormState] = useState({ isValid: true, isDirty: false });
 
-  // Fetch paint brand data with component items
+  // Fetch paint brand data with component items including full item details
   const {
     data: paintBrandResponse,
     isLoading,
     error,
   } = usePaintBrand(id || "", {
     include: {
-      componentItems: true,
+      componentItems: {
+        include: {
+          brand: true,
+          category: true,
+          measures: true,
+        },
+      },
     },
     enabled: !!id,
   });
@@ -177,6 +183,7 @@ export function PaintBrandEditPage() {
             mode="update"
             paintBrandId={id!}
             defaultValues={defaultValues}
+            initialComponentItems={paintBrand.componentItems || []}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             isSubmitting={updateMutation.isPending}

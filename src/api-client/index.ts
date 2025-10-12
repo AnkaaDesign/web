@@ -109,3 +109,11 @@ export {
 export * from "./services/statistics";
 export * from "./services/deployment";
 export * from "./platform-utils";
+
+// Statistics Services
+export * from "./statistics-inventory.service";
+export * from "./statistics-production.service";
+export * from "./statistics-orders.service";
+export * from "./statistics-hr.service";
+export * from "./statistics-financial.service";
+export * from "./statistics-dashboard.service";

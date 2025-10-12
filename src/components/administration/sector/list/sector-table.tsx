@@ -69,6 +69,8 @@ const getPrivilegeColor = (privilege: string): "destructive" | "warning" | "purp
       return "orange"; // Orange - maintenance role
     case SECTOR_PRIVILEGES.WAREHOUSE:
       return "green"; // Green - warehouse role
+    case SECTOR_PRIVILEGES.FINANCIAL:
+      return "green"; // Green - financial role
     case SECTOR_PRIVILEGES.EXTERNAL:
       return "secondary"; // Gray - external access
     case SECTOR_PRIVILEGES.BASIC:

@@ -148,7 +148,9 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
             name="specificDate"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Data Específica *</FormLabel>
+                <FormLabel>
+                  Data Específica <span className="text-destructive">*</span>
+                </FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
                     <FormControl>
@@ -174,7 +176,9 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
             name="dayOfWeek"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Dia da Semana *</FormLabel>
+                <FormLabel>
+                  Dia da Semana <span className="text-destructive">*</span>
+                </FormLabel>
                 <FormControl>
                   <Combobox
                     value={field.value || ""}
@@ -203,7 +207,9 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
               name="month"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Mês *</FormLabel>
+                  <FormLabel>
+                    Mês <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Combobox
                       value={field.value || ""}
@@ -225,7 +231,9 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
               name="dayOfMonth"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Dia do Mês *</FormLabel>
+                  <FormLabel>
+                    Dia do Mês <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <Input type="number" min={1} max={31} value={field.value || ""} onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)} placeholder="1-31" />
                   </FormControl>
@@ -255,7 +263,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                   <FormItem>
                     <FormLabel className="flex items-center gap-2">
                       <IconShield className="h-4 w-4" />
-                      Configuração de EPI *
+                      Configuração de EPI <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
                       <PpeItemsConfiguration value={field.value || []} onChange={field.onChange} />
@@ -274,7 +282,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                     <FormItem>
                       <FormLabel className="flex items-center gap-2">
                         <Users className="h-4 w-4" />
-                        Tipo de Atribuição *
+                        Tipo de Atribuição <span className="text-destructive">*</span>
                       </FormLabel>
                       <FormControl>
                         <Combobox
@@ -302,7 +310,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                       <FormItem>
                         <FormLabel className="flex items-center gap-2">
                           <UserCheck className="h-4 w-4" />
-                          Funcionários Específicos *
+                          Funcionários Específicos <span className="text-destructive">*</span>
                         </FormLabel>
                         <FormControl>
                           <Combobox
@@ -349,14 +357,17 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                 )}
               </div>
 
-              {/* Schedule Configuration - All in one row */}
-              <div className="grid grid-cols-3 gap-2 md:gap-4">
+              {/* Schedule Configuration - Frequency gets full width, others in row below */}
+              <div className="space-y-4">
+                {/* Frequency - Full width */}
                 <FormField
                   control={form.control}
                   name="frequency"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Frequência *</FormLabel>
+                      <FormLabel>
+                        Frequência <span className="text-destructive">*</span>
+                      </FormLabel>
                       <FormControl>
                         <Combobox
                           value={field.value}
@@ -374,45 +385,50 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="frequencyCount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>A cada</FormLabel>
-                      <FormControl>
-                        <Input type="number" min={1} value={field.value} onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} placeholder="1" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {/* Day of Month - show inline for monthly frequency */}
-                {watchFrequency === SCHEDULE_FREQUENCY.MONTHLY ? (
+                {/* Frequency count and day of month in same row */}
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="dayOfMonth"
+                    name="frequencyCount"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Dia do Mês *</FormLabel>
+                        <FormLabel>A cada</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={31}
-                            value={field.value || ""}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                            placeholder="1-31"
-                          />
+                          <Input type="number" min={1} value={field.value} onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} placeholder="1" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                ) : (
-                  <div className="invisible">{/* Placeholder to maintain grid structure */}</div>
-                )}
+
+                  {/* Day of Month - show for monthly frequency */}
+                  {watchFrequency === SCHEDULE_FREQUENCY.MONTHLY ? (
+                    <FormField
+                      control={form.control}
+                      name="dayOfMonth"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Dia do Mês <span className="text-destructive">*</span>
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={31}
+                              value={field.value || ""}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
+                              placeholder="1-31"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <div className="invisible">{/* Placeholder to maintain grid structure */}</div>
+                  )}
+                </div>
               </div>
 
               {/* Frequency-specific fields (except monthly dayOfMonth which is now inline) */}

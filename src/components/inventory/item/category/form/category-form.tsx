@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useState } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router-dom";
@@ -10,6 +10,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { apiClient } from "../../../../../api-client";
 import { FormField, FormItem, FormLabel, FormControl } from "@/components/ui/form";
 import { serializeItemCategoryFormToUrlParams, debounce } from "@/utils/url-form-state";
+import type { Item } from "../../../../../types";
 
 // Import form components
 import { NameInput } from "./name-input";
@@ -17,6 +18,7 @@ import { TypeSelector } from "./type-selector";
 
 interface BaseCategoryFormProps {
   isSubmitting?: boolean;
+  initialItems?: Item[];
 }
 
 interface CreateCategoryFormProps extends BaseCategoryFormProps {
@@ -35,7 +37,7 @@ interface UpdateCategoryFormProps extends BaseCategoryFormProps {
 type CategoryFormProps = CreateCategoryFormProps | UpdateCategoryFormProps;
 
 export function CategoryForm(props: CategoryFormProps) {
-  const { isSubmitting, defaultValues, mode } = props;
+  const { isSubmitting, defaultValues, mode, initialItems } = props;
   const [searchParams, setSearchParams] = useSearchParams();
 
   // For create mode, merge URL params with provided defaults
@@ -146,50 +148,25 @@ export function CategoryForm(props: CategoryFormProps) {
     );
   }, []);
 
-  // State to store initial options
-  const [initialOptions, setInitialOptions] = useState<
-    Array<{
-      value: string;
-      label: string;
-      unicode?: string;
-      brand?: string;
-      category?: string;
-    }>
-  >([]);
+  // Create memoized initial options from initialItems
+  // Use stable dependency by joining IDs to prevent unnecessary re-renders
+  const initialOptions = useMemo(() => {
+    if (!initialItems || initialItems.length === 0) {
+      return [];
+    }
 
-  // Fetch initial options for selected items
-  useEffect(() => {
-    const fetchInitialOptions = async () => {
-      if (defaultValues?.itemIds && defaultValues.itemIds.length > 0) {
-        try {
-          const response = await apiClient.get("/items", {
-            params: {
-              where: { id: { in: defaultValues.itemIds } },
-              include: {
-                brand: true,
-                category: true,
-              },
-            },
-          });
+    return initialItems.map((item) => ({
+      value: item.id,
+      label: item.name,
+      unicode: item.uniCode || undefined,
+      brand: item.brand?.name,
+      category: item.category?.name,
+    }));
+  }, [initialItems?.map((i) => i.id).join(",")]);
 
-          const options =
-            response.data?.data?.map((item: { id: string; name: string; uniCode?: string; brand?: { name: string }; category?: { name: string } }) => ({
-              value: item.id,
-              label: item.name,
-              unicode: item.uniCode,
-              brand: item.brand?.name,
-              category: item.category?.name,
-            })) || [];
-
-          setInitialOptions(options);
-        } catch (error) {
-          console.error("Error fetching initial items:", error);
-        }
-      }
-    };
-
-    fetchInitialOptions();
-  }, [defaultValues?.itemIds]);
+  // Memoize the option label and value callbacks for stable references
+  const getOptionLabel = useCallback((option: any) => option.label, []);
+  const getOptionValue = useCallback((option: any) => option.value, []);
 
   return (
     <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
@@ -225,6 +202,9 @@ export function CategoryForm(props: CategoryFormProps) {
                           queryFn={searchItems}
                           formatDisplay="brand"
                           initialOptions={initialOptions}
+                          minSearchLength={0}
+                          getOptionLabel={getOptionLabel}
+                          getOptionValue={getOptionValue}
                           queryKey={["category-form-items"]}
                         />
                       </FormControl>

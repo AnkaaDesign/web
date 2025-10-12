@@ -542,17 +542,33 @@ export const routes = {
 
   // Statistics - Estatísticas - Statistics/Analytics
   statistics: {
+    root: "/estatisticas",
+    // Entity-specific statistics
     administration: "/estatisticas/administracao",
     humanResources: "/estatisticas/recursos-humanos",
-    inventory: {
-      root: "/estatisticas/estoque",
-      consumption: "/estatisticas/estoque/consumo",
-      stockMovement: "/estatisticas/estoque/movimentacao",
-      trends: "/estatisticas/estoque/tendencias",
-      topItems: "/estatisticas/estoque/top-itens",
-    },
+    inventory: "/estatisticas/estoque",
     production: "/estatisticas/producao",
-    root: "/estatisticas",
+    orders: "/estatisticas/pedidos",
+    financial: "/estatisticas/financeiro",
+    // Advanced Analytics
+    analytics: {
+      root: "/estatisticas/analytics",
+      predictive: "/estatisticas/analytics/preditiva",
+      comparative: "/estatisticas/analytics/comparativa",
+      correlation: "/estatisticas/analytics/correlacao",
+      cohort: "/estatisticas/analytics/cohort",
+    },
+    // Dashboards and Monitoring
+    dashboards: {
+      executive: "/estatisticas/dashboards/executivo",
+      goals: "/estatisticas/dashboards/metas",
+      realtime: "/estatisticas/dashboards/tempo-real",
+      explorer: "/estatisticas/dashboards/explorador",
+    },
+    // Reports
+    reports: {
+      builder: "/estatisticas/relatorios/construtor",
+    },
   },
 
   // Integrations - Integrações - System integrations

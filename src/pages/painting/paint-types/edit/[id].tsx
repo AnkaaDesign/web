@@ -15,14 +15,20 @@ export function PaintTypeEditPage() {
   const { update, updateMutation } = usePaintTypeMutations();
   const [formState, setFormState] = useState({ isValid: true, isDirty: false });
 
-  // Fetch paint type data with component items
+  // Fetch paint type data with component items (including nested relations)
   const {
     data: paintTypeResponse,
     isLoading,
     error,
   } = usePaintType(id || "", {
     include: {
-      componentItems: true,
+      componentItems: {
+        include: {
+          brand: true,
+          category: true,
+          measures: true,
+        },
+      },
     },
     enabled: !!id,
   });
@@ -131,6 +137,9 @@ export function PaintTypeEditPage() {
     componentItemIds: paintType.componentItems?.map((item) => item.id) || [],
   };
 
+  // Extract full component items for initial options
+  const initialComponentItems = paintType.componentItems || [];
+
   const actions = [
     {
       key: "cancel",
@@ -178,6 +187,7 @@ export function PaintTypeEditPage() {
             mode="update"
             paintTypeId={id!}
             defaultValues={defaultValues}
+            initialComponentItems={initialComponentItems}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             isSubmitting={updateMutation.isPending}

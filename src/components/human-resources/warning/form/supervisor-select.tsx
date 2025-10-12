@@ -1,3 +1,4 @@
+import { useMemo, useCallback } from "react";
 import { IconUserShield } from "@tabler/icons-react";
 
 import type { WarningCreateFormData, WarningUpdateFormData } from "../../../../schemas";
@@ -12,9 +13,50 @@ interface SupervisorSelectProps {
   control: any;
   disabled?: boolean;
   required?: boolean;
+  initialSupervisor?: User;
 }
 
-export function SupervisorSelect({ control, disabled, required }: SupervisorSelectProps) {
+export function SupervisorSelect({ control, disabled, required, initialSupervisor }: SupervisorSelectProps) {
+  // Memoize initialOptions to prevent infinite loop
+  const initialOptions = useMemo(() => initialSupervisor ? [initialSupervisor] : [], [initialSupervisor?.id]);
+
+  // Memoize callbacks to prevent infinite loop
+  const getOptionLabel = useCallback((user: User) => user.name, []);
+  const getOptionValue = useCallback((user: User) => user.id, []);
+
+  // Memoize queryFn
+  const queryFn = useCallback(async (search: string, page: number = 1) => {
+    const response = await userService.getUsers({
+      searchingFor: search,
+      limit: 20,
+      page,
+      where: {
+        status: { not: USER_STATUS.DISMISSED },
+        sector: {
+          privileges: {
+            in: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES],
+          },
+        },
+      },
+      include: { position: true, sector: true },
+    });
+
+    return {
+      data: response.data || [],
+      hasMore: response.meta?.hasNextPage || false,
+    };
+  }, []);
+
+  // Memoize renderOption
+  const renderOption = useCallback((user: User) => (
+    <div>
+      <p className="font-medium">{user.name}</p>
+      <p className="text-xs text-muted-foreground">
+        {user.position?.name} - {user.sector?.name}
+      </p>
+    </div>
+  ), []);
+
   return (
     <FormField
       control={control}
@@ -28,7 +70,7 @@ export function SupervisorSelect({ control, disabled, required }: SupervisorSele
             </div>
           </FormLabel>
           <FormControl>
-            <Combobox
+            <Combobox<User>
               value={field.value}
               onValueChange={field.onChange}
               disabled={disabled}
@@ -36,33 +78,13 @@ export function SupervisorSelect({ control, disabled, required }: SupervisorSele
               emptyText="Nenhum supervisor encontrado"
               searchPlaceholder="Buscar supervisor..."
               async={true}
-              queryKey={["users", "supervisors"]}
-              queryFn={async (search: string) => {
-                const response = await userService.getUsers({
-                  searchingFor: search,
-                  limit: 20,
-                  where: {
-                    status: { not: USER_STATUS.DISMISSED },
-                    sector: {
-                      privileges: {
-                        in: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES],
-                      },
-                    },
-                  },
-                  include: { position: true, sector: true },
-                });
-                return response.data || [];
-              }}
-              getOptionLabel={(user: User) => user.name}
-              getOptionValue={(user: User) => user.id}
-              renderOption={(user: User) => (
-                <div>
-                  <p className="font-medium">{user.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {user.position?.name} - {user.sector?.name}
-                  </p>
-                </div>
-              )}
+              queryKey={["users", "warning-supervisor"]}
+              queryFn={queryFn}
+              initialOptions={initialOptions}
+              getOptionLabel={getOptionLabel}
+              getOptionValue={getOptionValue}
+              renderOption={renderOption}
+              minSearchLength={0}
             />
           </FormControl>
           <FormMessage />

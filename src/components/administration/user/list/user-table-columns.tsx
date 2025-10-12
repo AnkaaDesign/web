@@ -148,9 +148,9 @@ export const createUserColumns = (): UserColumn[] => [
 
   // Data de Nascimento (Birth Date)
   {
-    key: "birthDate",
+    key: "birth",
     header: "DATA DE NASCIMENTO",
-    accessor: (user: User) => <div className="text-sm truncate">{user.birthDate ? formatDate(new Date(user.birthDate)) : <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.birth ? formatDate(new Date(user.birth)) : <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[150px]",
     align: "left",

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { IconCategory, IconCheck, IconLoader2 } from "@tabler/icons-react";
-import { useItemCategoryDetail, useItemCategoryMutations, useItems } from "../../../../../hooks";
+import { useItemCategoryDetail, useItemCategoryMutations } from "../../../../../hooks";
 import { type ItemCategoryUpdateFormData } from "../../../../../schemas";
 import { routes } from "../../../../../constants";
 
@@ -24,19 +24,20 @@ const EditCategoryPage = () => {
     error,
   } = useItemCategoryDetail(id!, {
     include: {
-      items: true, // We need items to show current associations
+      items: {
+        include: {
+          brand: true,
+          category: true,
+        },
+      },
     },
   });
 
   const category = response?.data;
 
-  // Get all items to determine current associations
-  const { data: itemsData, isLoading: isLoadingItems } = useItems({
-    where: { categoryId: id },
-    orderBy: { name: "asc" },
-  });
-
-  const currentItemIds = itemsData?.data?.map((item) => item.id) || [];
+  // Extract items from category
+  const currentItems = category?.items || [];
+  const currentItemIds = currentItems.map((item) => item.id);
 
   const handleFormSubmit = async (data: ItemCategoryUpdateFormData) => {
     if (!id) return;
@@ -77,7 +78,7 @@ const EditCategoryPage = () => {
     },
   ];
 
-  if (isLoading || isLoadingItems) {
+  if (isLoading) {
     return (
       <div className="container mx-auto max-w-4xl py-6">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -125,6 +126,7 @@ const EditCategoryPage = () => {
               name: category.name,
               itemIds: currentItemIds,
             }}
+            initialItems={currentItems}
             onSubmit={handleFormSubmit}
             isSubmitting={updateMutation.isPending}
           />

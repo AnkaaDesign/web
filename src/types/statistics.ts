@@ -507,3 +507,359 @@ export interface InventoryAnalyticsDashboard {
 }
 
 export interface InventoryAnalyticsDashboardResponse extends BaseGetUniqueResponse<InventoryAnalyticsDashboard> {}
+
+// =====================
+// Frontend-Specific Chart Types
+// =====================
+
+/**
+ * Frontend chart options for visualization libraries (e.g., Recharts, Chart.js)
+ */
+export interface FrontendChartOptions {
+  responsive: boolean;
+  maintainAspectRatio: boolean;
+  animation: {
+    duration: number;
+    easing: 'linear' | 'easeInQuad' | 'easeOutQuad' | 'easeInOutQuad';
+  };
+  plugins?: {
+    legend?: {
+      display: boolean;
+      position: 'top' | 'bottom' | 'left' | 'right';
+    };
+    tooltip?: {
+      enabled: boolean;
+      mode: 'index' | 'dataset' | 'point' | 'nearest';
+      intersect: boolean;
+    };
+  };
+}
+
+/**
+ * Chart dimension configuration for responsive layouts
+ */
+export interface ChartDimensions {
+  width: number | string;
+  height: number | string;
+  minWidth?: number;
+  minHeight?: number;
+  aspectRatio?: number;
+}
+
+/**
+ * Time period selector options for statistics UI
+ */
+export interface TimePeriodSelector {
+  value: STATISTICS_PERIOD;
+  label: string;
+  startDate?: Date;
+  endDate?: Date;
+  isCustom: boolean;
+}
+
+/**
+ * Filter panel configuration for statistics UI
+ */
+export interface StatisticsFilterPanel {
+  dateRange: {
+    from: Date | null;
+    to: Date | null;
+  };
+  period: STATISTICS_PERIOD;
+  groupBy: STATISTICS_GROUP_BY | null;
+  metric: STATISTICS_METRIC | null;
+  chartType: CHART_TYPE;
+  selectedCategories: string[];
+  selectedBrands: string[];
+  selectedSuppliers: string[];
+  selectedUsers: string[];
+  selectedSectors: string[];
+  selectedItems: string[];
+  activityReasons: ACTIVITY_REASON[];
+  activityOperations: ACTIVITY_OPERATION[];
+  minValue: number | null;
+  maxValue: number | null;
+}
+
+/**
+ * Statistics page state for UI management
+ */
+export interface StatisticsPageState {
+  isLoading: boolean;
+  error: string | null;
+  filters: StatisticsFilterPanel;
+  chartData: ConsumptionChartData | null;
+  selectedView: 'chart' | 'table' | 'both';
+  exportFormat: 'csv' | 'excel' | 'pdf' | 'png';
+  lastUpdated: Date | null;
+}
+
+/**
+ * Chart interaction events
+ */
+export interface ChartInteractionEvent {
+  type: 'click' | 'hover' | 'zoom' | 'pan';
+  dataPoint?: ConsumptionDataPoint;
+  seriesIndex?: number;
+  dataIndex?: number;
+  value?: number;
+  label?: string;
+}
+
+/**
+ * Export configuration for charts and data
+ */
+export interface ExportConfiguration {
+  format: 'csv' | 'excel' | 'pdf' | 'png' | 'svg' | 'json';
+  includeCharts: boolean;
+  includeData: boolean;
+  includeFilters: boolean;
+  includeSummary: boolean;
+  fileName?: string;
+  pageOrientation?: 'portrait' | 'landscape';
+  pageSize?: 'a4' | 'letter' | 'legal';
+}
+
+/**
+ * Dashboard widget configuration
+ */
+export interface DashboardWidget {
+  id: string;
+  type: 'chart' | 'metric' | 'table' | 'list';
+  title: string;
+  subtitle?: string;
+  position: {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  };
+  config: {
+    chartType?: CHART_TYPE;
+    metric?: STATISTICS_METRIC;
+    groupBy?: STATISTICS_GROUP_BY;
+    period?: STATISTICS_PERIOD;
+    refreshInterval?: number; // seconds
+    showTrend?: boolean;
+    showComparison?: boolean;
+  };
+  data?: any;
+  isLoading?: boolean;
+  error?: string | null;
+}
+
+/**
+ * Real-time update subscription
+ */
+export interface StatisticsSubscription {
+  id: string;
+  entityType: string;
+  filters: StatisticsFilter;
+  onUpdate: (update: RealtimeStatisticsUpdate) => void;
+  interval: number; // milliseconds
+  isActive: boolean;
+}
+
+/**
+ * Chart theme configuration
+ */
+export interface ChartTheme {
+  name: string;
+  colors: {
+    primary: string[];
+    secondary: string[];
+    success: string;
+    warning: string;
+    danger: string;
+    info: string;
+  };
+  fonts: {
+    title: string;
+    label: string;
+    legend: string;
+  };
+  backgrounds: {
+    chart: string;
+    tooltip: string;
+    legend: string;
+  };
+  borders: {
+    color: string;
+    width: number;
+    radius: number;
+  };
+}
+
+// =====================
+// Utility Types for Frontend
+// =====================
+
+/**
+ * Type guard for chart types
+ */
+export type ChartTypeGuard<T extends CHART_TYPE> = {
+  is: (type: CHART_TYPE) => type is T;
+};
+
+/**
+ * Mapped type for chart data by chart type
+ */
+export type ChartDataByType = {
+  [CHART_TYPE.PIE]: { labels: string[]; values: number[]; colors?: string[] };
+  [CHART_TYPE.DONUT]: { labels: string[]; values: number[]; colors?: string[]; innerRadius?: number };
+  [CHART_TYPE.BAR]: { labels: string[]; datasets: Array<{ label: string; data: number[]; backgroundColor?: string }> };
+  [CHART_TYPE.LINE]: { labels: string[]; datasets: Array<{ label: string; data: number[]; borderColor?: string }> };
+  [CHART_TYPE.AREA]: { labels: string[]; datasets: Array<{ label: string; data: number[]; fill?: boolean }> };
+  [CHART_TYPE.STACKED]: { labels: string[]; datasets: Array<{ label: string; data: number[]; stack?: string }> };
+};
+
+/**
+ * Hook return type for statistics queries
+ */
+export interface UseStatisticsResult<T> {
+  data: T | null;
+  isLoading: boolean;
+  error: Error | null;
+  refetch: () => Promise<void>;
+  invalidate: () => void;
+}
+
+/**
+ * Aggregated metric display
+ */
+export interface MetricCard {
+  id: string;
+  title: string;
+  value: number | string;
+  format: 'number' | 'currency' | 'percentage' | 'duration';
+  trend?: {
+    value: number;
+    direction: 'up' | 'down' | 'stable';
+    isPositive: boolean;
+  };
+  comparison?: {
+    label: string;
+    value: number;
+    format: 'number' | 'currency' | 'percentage';
+  };
+  icon?: string;
+  color?: string;
+  onClick?: () => void;
+}
+
+/**
+ * Data table configuration for statistics
+ */
+export interface StatisticsTableConfig {
+  columns: Array<{
+    key: string;
+    label: string;
+    type: 'text' | 'number' | 'currency' | 'percentage' | 'date';
+    sortable: boolean;
+    filterable: boolean;
+    width?: number | string;
+    format?: (value: any) => string;
+  }>;
+  data: any[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+  };
+  sorting: {
+    key: string;
+    direction: 'asc' | 'desc';
+  } | null;
+  onSort?: (key: string) => void;
+  onFilter?: (filters: Record<string, any>) => void;
+  onPageChange?: (page: number) => void;
+}
+
+/**
+ * Drill-down navigation for hierarchical data
+ */
+export interface DrillDownLevel {
+  level: number;
+  label: string;
+  groupBy: STATISTICS_GROUP_BY;
+  filters: Record<string, any>;
+  data: ConsumptionDataPoint[];
+}
+
+/**
+ * Comparison mode for period-over-period analysis
+ */
+export interface ComparisonMode {
+  enabled: boolean;
+  compareWith: 'previous-period' | 'previous-year' | 'custom';
+  customPeriod?: {
+    from: Date;
+    to: Date;
+  };
+  showDifference: boolean;
+  showPercentage: boolean;
+}
+
+/**
+ * Alert/notification configuration for statistics thresholds
+ */
+export interface StatisticsAlert {
+  id: string;
+  name: string;
+  description: string;
+  metric: STATISTICS_METRIC;
+  condition: 'above' | 'below' | 'equals' | 'between';
+  threshold: number | [number, number];
+  enabled: boolean;
+  notificationChannels: ('email' | 'push' | 'sms')[];
+  recipients: string[];
+  frequency: 'immediate' | 'daily' | 'weekly';
+}
+
+/**
+ * Saved report configuration
+ */
+export interface SavedReport {
+  id: string;
+  name: string;
+  description?: string;
+  type: 'chart' | 'table' | 'dashboard';
+  filters: StatisticsFilter;
+  chartConfig?: MultiSeriesChartConfig;
+  schedule?: {
+    enabled: boolean;
+    frequency: 'daily' | 'weekly' | 'monthly';
+    time: string; // HH:mm format
+    recipients: string[];
+  };
+  createdBy: string;
+  createdAt: Date;
+  lastRun?: Date;
+  isPublic: boolean;
+  tags: string[];
+}
+
+// =====================
+// Frontend Response Types
+// =====================
+
+/**
+ * Response type for filtered statistics queries
+ */
+export interface FilteredStatisticsResponse<T> extends BaseGetUniqueResponse<T> {
+  appliedFilters: StatisticsFilter;
+  resultCount: number;
+  executionTime: number; // milliseconds
+}
+
+/**
+ * Response type for chart data with rendering hints
+ */
+export interface ChartDataResponse extends BaseGetUniqueResponse<ConsumptionChartData> {
+  renderingHints?: {
+    recommendedHeight: number;
+    recommendedWidth: number;
+    dataPointLimit: number;
+    suggestedChartTypes: CHART_TYPE[];
+  };
+}

@@ -130,7 +130,6 @@ export function PpeList({ className }: PpeListProps) {
   // Parse filters from URL
   const getFiltersFromUrl = useCallback((): Partial<ItemGetManyFormData> => {
     const filters: Partial<ItemGetManyFormData> = {
-      limit: DEFAULT_PAGE_SIZE,
       where: {
         category: {
           type: ITEM_CATEGORY_TYPE.PPE,
@@ -247,7 +246,6 @@ export function PpeList({ className }: PpeListProps) {
   // Handler to clear all filters but keep search
   const handleClearAllFilters = useCallback(() => {
     setFilters({
-      limit: DEFAULT_PAGE_SIZE,
       where: {
         category: {
           type: ITEM_CATEGORY_TYPE.PPE,

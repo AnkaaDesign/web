@@ -923,7 +923,7 @@ export const maintenanceCreateSchema = z
       .default(MAINTENANCE_STATUS.PENDING),
     itemId: z.string().uuid("Item inválido"),
     maintenanceScheduleId: z.string().uuid("Cronograma de manutenção inválido").optional(),
-    scheduledFor: z.coerce.date({ invalid_type_error: "Data inválida" }).optional().nullable(),
+    scheduledFor: z.coerce.date({ invalid_type_error: "Data inválida", required_error: "Data agendada é obrigatória" }),
     itemsNeeded: z
       .array(
         z.object({
@@ -1554,7 +1554,7 @@ export const maintenanceScheduleCreateSchema = z
   .object({
     name: z.string().min(1, "Nome é obrigatório").max(255, "Nome deve ter no máximo 255 caracteres"),
     description: z.string().optional(),
-    itemId: z.string().uuid("Item inválido").optional(),
+    itemId: z.string().uuid("Item inválido"),
     frequency: z.enum(Object.values(SCHEDULE_FREQUENCY) as [string, ...string[]], {
       errorMap: () => ({ message: "Frequência inválida" }),
     }),
@@ -1567,7 +1567,13 @@ export const maintenanceScheduleCreateSchema = z
           quantity: z.number().positive("Quantidade deve ser positiva").default(1),
         }),
       )
-      .min(1, "Deve incluir pelo menos um item de manutenção"),
+      .optional()
+      .default([])
+      .transform((items) => {
+        // Filter out items with empty itemId
+        if (!items || items.length === 0) return [];
+        return items.filter((item) => item.itemId && item.itemId.trim() !== "");
+      }),
 
     // Specific scheduling fields - conditionally required based on frequency
     specificDate: z.coerce.date().optional(),

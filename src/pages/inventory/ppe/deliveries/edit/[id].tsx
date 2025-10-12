@@ -152,7 +152,7 @@ export const EPIDeliveryEdit = () => {
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
       <div className="space-y-4">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <PageHeader
             variant="form"
             title={`Editar Entrega #${ppeDelivery.id.slice(-8)}`}
@@ -170,7 +170,7 @@ export const EPIDeliveryEdit = () => {
           />
         </div>
 
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <PpeDeliveryForm
             mode="update"
             ppeDelivery={ppeDelivery}

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconCheck, IconLoader2, IconTag } from "@tabler/icons-react";
-import { useItemBrandDetail, useItemBrandMutations, useItems } from "../../../../../hooks";
+import { useItemBrandDetail, useItemBrandMutations } from "../../../../../hooks";
 import { type ItemBrandUpdateFormData } from "../../../../../schemas";
 import { routes } from "../../../../../constants";
 
@@ -30,13 +30,9 @@ const EditBrandPage = () => {
 
   const brand = response?.data;
 
-  // Get all items to determine current associations
-  const { data: itemsData, isLoading: isLoadingItems } = useItems({
-    where: { brandId: id },
-    orderBy: { name: "asc" },
-  });
-
-  const currentItemIds = itemsData?.data?.map((item) => item.id) || [];
+  // Extract items from brand data (already fetched with include)
+  const brandItems = brand?.items || [];
+  const currentItemIds = brandItems.map((item) => item.id);
 
   const handleFormSubmit = async (data: ItemBrandUpdateFormData) => {
     if (!id) return;
@@ -58,7 +54,7 @@ const EditBrandPage = () => {
     navigate(routes.inventory.products.brands.root, { replace: true });
   };
 
-  if (isLoading || isLoadingItems) {
+  if (isLoading) {
     return (
       <div className="h-full flex flex-col">
         <div className="flex-1 overflow-y-auto">
@@ -138,6 +134,7 @@ const EditBrandPage = () => {
               name: brand.name,
               itemIds: currentItemIds,
             }}
+            initialItems={brandItems}
             onSubmit={handleFormSubmit}
             isSubmitting={updateMutation.isPending}
           />

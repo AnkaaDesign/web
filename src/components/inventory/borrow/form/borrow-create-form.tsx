@@ -233,20 +233,6 @@ export function BorrowCreateForm() {
                 <BorrowUserSelector control={form.control} disabled={isSubmitting} />
               </div>
 
-              {/* Test Submit Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  console.log("Test button clicked");
-                  console.log("Form values:", form.getValues());
-                  console.log("Form errors:", form.formState.errors);
-                  form.handleSubmit(onSubmit)();
-                }}
-                className="bg-blue-500 text-white px-4 py-2 rounded"
-              >
-                Test Submit
-              </button>
-
               {/* Form validation summary */}
               {selectedItem && (
                 <div className="rounded-lg bg-muted/50 p-4 space-y-2">

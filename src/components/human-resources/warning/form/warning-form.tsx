@@ -285,9 +285,19 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
             <CardContent className="space-y-4">
               {/* Collaborator and Supervisor */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <CollaboratorSelect control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
+                <CollaboratorSelect
+                  control={form.control}
+                  disabled={isSubmitting}
+                  required={props.mode === "create"}
+                  initialCollaborator={props.mode === "update" ? props.warning.collaborator : undefined}
+                />
 
-                <SupervisorSelect control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
+                <SupervisorSelect
+                  control={form.control}
+                  disabled={isSubmitting}
+                  required={props.mode === "create"}
+                  initialSupervisor={props.mode === "update" ? props.warning.supervisor : undefined}
+                />
               </div>
 
               {/* Witnesses */}
@@ -295,6 +305,7 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
                 control={form.control}
                 disabled={isSubmitting}
                 excludeIds={[form.watch("collaboratorId"), form.watch("supervisorId")].filter((id: string | undefined): id is string => Boolean(id))}
+                initialWitnesses={props.mode === "update" ? props.warning.witness : undefined}
               />
             </CardContent>
           </Card>

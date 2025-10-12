@@ -9,6 +9,7 @@ import { itemCreateSchema, itemUpdateSchema, type ItemCreateFormData, type ItemU
 import { useItemCategories } from "../../../../hooks";
 import { ITEM_CATEGORY_TYPE } from "../../../../constants";
 import { serializeItemFormToUrlParams, debounce } from "@/utils/url-form-state";
+import type { Supplier } from "../../../../types";
 // import { FormValidationDebugger } from "@/components/debug/form-validation-debugger"; // Debug component removed
 
 // Import all form components
@@ -32,6 +33,7 @@ interface BaseItemFormProps {
   isSubmitting?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
   onFormStateChange?: (formState: { isValid: boolean; isDirty: boolean }) => void;
+  initialSupplier?: Supplier;
 }
 
 interface CreateItemFormProps extends BaseItemFormProps {
@@ -49,7 +51,7 @@ interface UpdateItemFormProps extends BaseItemFormProps {
 type ItemFormProps = CreateItemFormProps | UpdateItemFormProps;
 
 export function ItemForm(props: ItemFormProps) {
-  const { isSubmitting, defaultValues, mode, onFormStateChange, onDirtyChange } = props;
+  const { isSubmitting, defaultValues, mode, onFormStateChange, onDirtyChange, initialSupplier } = props;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(defaultValues?.categoryId || undefined);
@@ -293,7 +295,7 @@ export function ItemForm(props: ItemFormProps) {
                   <CategorySelector disabled={isSubmitting} onCategoryChange={setSelectedCategoryId} />
                   <ItemBrandSelector disabled={isSubmitting} />
                 </div>
-                <ItemSupplierSelector disabled={isSubmitting} />
+                <ItemSupplierSelector disabled={isSubmitting} initialSupplier={initialSupplier} />
               </div>
             </CardContent>
           </Card>

@@ -6,6 +6,7 @@ import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { paintTypeCreateSchema, paintTypeUpdateSchema, type PaintTypeCreateFormData, type PaintTypeUpdateFormData } from "../../../../schemas";
 import { serializePaintTypeFormToUrlParams, getDefaultPaintTypeFormValues, debounce } from "@/utils/url-form-state";
+import type { Item } from "../../../../types";
 
 // Import form field components
 import { NameInput } from "./name-input";
@@ -17,6 +18,7 @@ interface BaseFormProps {
   onCancel?: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
   onFormStateChange?: (formState: { isValid: boolean; isDirty: boolean }) => void;
+  initialComponentItems?: Item[];
 }
 
 interface CreateFormProps extends BaseFormProps {
@@ -35,7 +37,7 @@ interface UpdateFormProps extends BaseFormProps {
 type PaintTypeFormProps = CreateFormProps | UpdateFormProps;
 
 export function PaintTypeForm(props: PaintTypeFormProps) {
-  const { isSubmitting, defaultValues, mode, onDirtyChange, onFormStateChange } = props;
+  const { isSubmitting, defaultValues, mode, onDirtyChange, onFormStateChange, initialComponentItems } = props;
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Get URL-aware default values for create mode only
@@ -172,7 +174,7 @@ export function PaintTypeForm(props: PaintTypeFormProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ComponentItemsSelector control={form.control} disabled={isSubmitting} />
+              <ComponentItemsSelector control={form.control} disabled={isSubmitting} initialItems={initialComponentItems} />
             </CardContent>
           </Card>
 

@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useServiceLogs } from "../../hooks";
-// import { SystemLogsFilters } from "@/components/server/logs/system-logs-filters";
+import { SystemLogsFilters } from "@/components/server/logs/system-logs-filters";
 import { debounce } from "lodash";
 
 export function ServerLogsPage() {
@@ -300,14 +300,14 @@ export function ServerLogsPage() {
       </Card>
 
       {/* Filters Dialog */}
-      {/* <SystemLogsFilters
+      <SystemLogsFilters
         open={filtersOpen}
         onOpenChange={setFiltersOpen}
         currentService={selectedService}
         currentLines={logLines}
         currentSearch={displaySearchText}
         onApply={handleFiltersApply}
-      /> */}
+      />
     </div>
   );
 }

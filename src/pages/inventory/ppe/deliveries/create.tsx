@@ -48,7 +48,7 @@ export const EPIDeliveryCreate = () => {
 
   return (
     <div className="space-y-4">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
           <PageHeader
             variant="form"
             title="Nova Entrega de EPI"
@@ -65,7 +65,7 @@ export const EPIDeliveryCreate = () => {
           />
       </div>
 
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <PpeDeliveryForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
       </div>
     </div>

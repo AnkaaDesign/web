@@ -270,7 +270,12 @@ export function VacationForm(props: VacationFormProps) {
 
                 {!isCollective && (
                   <div className="pt-2">
-                    <CollaboratorSelect control={form.control} disabled={finalIsSubmitting || mode === "update"} required={mode === "create" && !isCollective} />
+                    <CollaboratorSelect
+                      control={form.control}
+                      disabled={finalIsSubmitting || mode === "update"}
+                      required={mode === "create" && !isCollective}
+                      initialCollaborator={mode === "update" ? (props as UpdateModeProps).vacation.user : undefined}
+                    />
                   </div>
                 )}
 

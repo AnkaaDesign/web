@@ -1,3 +1,4 @@
+import { useMemo, useCallback } from "react";
 import { IconUsers } from "@tabler/icons-react";
 
 import type { WarningCreateFormData, WarningUpdateFormData } from "../../../../schemas";
@@ -8,13 +9,63 @@ import { USER_STATUS } from "../../../../constants";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 
+type WitnessOption = { value: string; label: string; position?: string };
+
 interface WitnessMultiSelectProps {
   control: any;
   disabled?: boolean;
   excludeIds?: string[];
+  initialWitnesses?: User[];
 }
 
-export function WitnessMultiSelect({ control, disabled, excludeIds = [] }: WitnessMultiSelectProps) {
+export function WitnessMultiSelect({ control, disabled, excludeIds = [], initialWitnesses }: WitnessMultiSelectProps) {
+  // Memoize initialOptions to prevent infinite loop
+  const initialOptions = useMemo(() => {
+    if (!initialWitnesses || initialWitnesses.length === 0) return [];
+    return initialWitnesses.map(user => ({
+      value: user.id,
+      label: user.name,
+      position: user.position?.name,
+    }));
+  }, [initialWitnesses?.map(w => w.id).join(',')]);
+
+  // Memoize queryFn
+  const queryFn = useCallback(async (search: string, page: number = 1) => {
+    const validExcludeIds = excludeIds.filter((id) => id && id.trim() !== "");
+    const whereClause: any = { status: { not: USER_STATUS.DISMISSED } };
+
+    if (validExcludeIds.length > 0) {
+      whereClause.id = { notIn: validExcludeIds };
+    }
+
+    const response = await userService.getUsers({
+      searchingFor: search,
+      limit: 20,
+      page,
+      where: whereClause,
+      include: { position: true },
+    });
+
+    const data = (response.data || []).map((user: User) => ({
+      value: user.id,
+      label: user.name,
+      position: user.position?.name,
+    }));
+
+    return {
+      data,
+      hasMore: response.meta?.hasNextPage || false,
+    };
+  }, [excludeIds.join(',')]);
+
+  // Memoize renderOption
+  const renderOption = useCallback((option: WitnessOption) => (
+    <div>
+      <p className="font-medium">{option.label}</p>
+      {option.position && <p className="text-xs text-muted-foreground">{option.position}</p>}
+    </div>
+  ), []);
+
   return (
     <FormField
       control={control}
@@ -28,7 +79,7 @@ export function WitnessMultiSelect({ control, disabled, excludeIds = [] }: Witne
             </div>
           </FormLabel>
           <FormControl>
-            <Combobox
+            <Combobox<WitnessOption>
               mode="multiple"
               async={true}
               value={field.value || []}
@@ -37,33 +88,11 @@ export function WitnessMultiSelect({ control, disabled, excludeIds = [] }: Witne
               placeholder="Selecione as testemunhas"
               emptyText="Nenhuma testemunha encontrada"
               searchPlaceholder="Buscar testemunhas..."
-              queryFn={async (search: string) => {
-                const validExcludeIds = excludeIds.filter((id) => id && id.trim() !== "");
-                const whereClause: any = { status: { not: USER_STATUS.DISMISSED } };
-
-                if (validExcludeIds.length > 0) {
-                  whereClause.id = { notIn: validExcludeIds };
-                }
-
-                const response = await userService.getUsers({
-                  searchingFor: search,
-                  limit: 20,
-                  where: whereClause,
-                  include: { position: true },
-                });
-                return (response.data || []).map((user: User) => ({
-                  value: user.id,
-                  label: user.name,
-                  position: user.position?.name,
-                }));
-              }}
-              queryKey={["witness-users"]}
-              renderOption={(option: { value: string; label: string; position?: string }) => (
-                <div>
-                  <p className="font-medium">{option.label}</p>
-                  {option.position && <p className="text-xs text-muted-foreground">{option.position}</p>}
-                </div>
-              )}
+              queryFn={queryFn}
+              queryKey={["users", "warning-witnesses", excludeIds.join(',')]}
+              initialOptions={initialOptions}
+              renderOption={renderOption}
+              minSearchLength={0}
             />
           </FormControl>
           <FormDescription>Pessoas que presenciaram o incidente (opcional)</FormDescription>

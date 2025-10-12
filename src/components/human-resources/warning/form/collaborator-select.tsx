@@ -1,3 +1,4 @@
+import { useMemo, useCallback } from "react";
 import { IconUser } from "@tabler/icons-react";
 
 import type { WarningCreateFormData, WarningUpdateFormData } from "../../../../schemas";
@@ -12,9 +13,41 @@ interface CollaboratorSelectProps {
   control: any;
   disabled?: boolean;
   required?: boolean;
+  initialCollaborator?: User;
 }
 
-export function CollaboratorSelect({ control, disabled, required }: CollaboratorSelectProps) {
+export function CollaboratorSelect({ control, disabled, required, initialCollaborator }: CollaboratorSelectProps) {
+  // Memoize initialOptions to prevent infinite loop
+  const initialOptions = useMemo(() => initialCollaborator ? [initialCollaborator] : [], [initialCollaborator?.id]);
+
+  // Memoize callbacks to prevent infinite loop
+  const getOptionLabel = useCallback((user: User) => user.name, []);
+  const getOptionValue = useCallback((user: User) => user.id, []);
+
+  // Memoize queryFn
+  const queryFn = useCallback(async (search: string, page: number = 1) => {
+    const response = await userService.getUsers({
+      searchingFor: search,
+      limit: 20,
+      page,
+      where: { status: { not: USER_STATUS.DISMISSED } },
+      include: { position: true },
+    });
+
+    return {
+      data: response.data || [],
+      hasMore: response.meta?.hasNextPage || false,
+    };
+  }, []);
+
+  // Memoize renderOption
+  const renderOption = useCallback((user: User) => (
+    <div>
+      <p className="font-medium">{user.name}</p>
+      {user.position && <p className="text-xs text-muted-foreground">{user.position.name}</p>}
+    </div>
+  ), []);
+
   return (
     <FormField
       control={control}
@@ -28,7 +61,7 @@ export function CollaboratorSelect({ control, disabled, required }: Collaborator
             </div>
           </FormLabel>
           <FormControl>
-            <Combobox
+            <Combobox<User>
               value={field.value}
               onValueChange={field.onChange}
               disabled={disabled}
@@ -36,24 +69,13 @@ export function CollaboratorSelect({ control, disabled, required }: Collaborator
               emptyText="Nenhum colaborador encontrado"
               searchPlaceholder="Buscar colaborador..."
               async={true}
-              queryKey={["users", "search"]}
-              queryFn={async (search: string) => {
-                const response = await userService.getUsers({
-                  searchingFor: search,
-                  limit: 20,
-                  where: { status: { not: USER_STATUS.DISMISSED } },
-                  include: { position: true },
-                });
-                return response.data || [];
-              }}
-              getOptionLabel={(user: User) => user.name}
-              getOptionValue={(user: User) => user.id}
-              renderOption={(user: User) => (
-                <div>
-                  <p className="font-medium">{user.name}</p>
-                  {user.position && <p className="text-xs text-muted-foreground">{user.position.name}</p>}
-                </div>
-              )}
+              queryKey={["users", "warning-collaborator"]}
+              queryFn={queryFn}
+              initialOptions={initialOptions}
+              getOptionLabel={getOptionLabel}
+              getOptionValue={getOptionValue}
+              renderOption={renderOption}
+              minSearchLength={0}
             />
           </FormControl>
           <FormMessage />

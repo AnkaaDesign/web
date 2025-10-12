@@ -38,17 +38,17 @@ export class ServerService {
   }
 
   async startService(data: ServiceAction): Promise<ActionResponse> {
-    const response = await apiClient.post<ActionResponse>(`${this.basePath}/services/start`, data);
+    const response = await apiClient.post<ActionResponse>(`${this.basePath}/services/${data.serviceName}/start`);
     return response.data;
   }
 
   async stopService(data: ServiceAction): Promise<ActionResponse> {
-    const response = await apiClient.post<ActionResponse>(`${this.basePath}/services/stop`, data);
+    const response = await apiClient.post<ActionResponse>(`${this.basePath}/services/${data.serviceName}/stop`);
     return response.data;
   }
 
   async restartService(data: ServiceAction): Promise<ActionResponse> {
-    const response = await apiClient.post<ActionResponse>(`${this.basePath}/services/restart`, data);
+    const response = await apiClient.post<ActionResponse>(`${this.basePath}/services/${data.serviceName}/restart`);
     return response.data;
   }
 

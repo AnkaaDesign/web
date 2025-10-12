@@ -22,6 +22,7 @@ import type { Bonus, BonusIncludes } from "./bonus";
 export interface User extends BaseEntity {
   email: string | null;
   name: string;
+  avatarUrl?: string | null;
   status: USER_STATUS;
   statusOrder: number; // 1=Ativo, 2=Inativo, 3=Suspenso
   phone: string | null;

@@ -68,12 +68,27 @@ const AdministrationChangeLogs = lazy(() => import("@/pages/administration/chang
 const AdministrationChangeLogsDetails = lazy(() => import("@/pages/administration/change-logs/details/[id]").then((module) => ({ default: module.ChangeLogDetails })));
 
 // Statistics Pages
-const StatisticsRoot = lazy(() => import("@/pages/inventory/statistics"));
-const StatisticsInventory = lazy(() => import("@/pages/inventory/statistics"));
-const StatisticsInventoryConsumption = lazy(() => import("@/pages/inventory/statistics/consumption"));
-const StatisticsInventoryStockMovement = lazy(() => import("@/pages/inventory/statistics/stock-movement"));
-const StatisticsInventoryTrends = lazy(() => import("@/pages/inventory/statistics/trends"));
-const StatisticsInventoryTopItems = lazy(() => import("@/pages/inventory/statistics/top-items"));
+const StatisticsRoot = lazy(() => import("@/pages/statistics/index").then((module) => ({ default: module.default })));
+const StatisticsInventory = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.InventoryStatisticsPage })));
+const StatisticsProduction = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.ProductionStatisticsPage })));
+const StatisticsOrders = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.OrdersStatisticsPage })));
+const StatisticsHR = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.HRStatisticsPage })));
+const StatisticsFinancial = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.FinancialStatisticsPage })));
+
+// Advanced Analytics Pages
+const PredictiveAnalytics = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.PredictiveAnalytics })));
+const ComparativeAnalysis = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.ComparativeAnalysis })));
+const CorrelationAnalysis = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.CorrelationAnalysis })));
+const CohortAnalysis = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.CohortAnalysis })));
+
+// Dashboard and Monitoring Pages
+const ExecutiveDashboard = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.ExecutiveDashboard })));
+const GoalTracking = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.GoalTracking })));
+const RealTimeMonitoring = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.RealTimeMonitoring })));
+const DataExplorer = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.DataExplorer })));
+
+// Report Pages
+const CustomReportsBuilder = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.CustomReportsBuilder })));
 
 // Inventory
 const Inventory = lazy(() => import("@/pages/inventory/root").then((module) => ({ default: module.InventoryRootPage })));
@@ -91,6 +106,8 @@ const InventoryPpeDeliveriesEdit = lazy(() => import("@/pages/inventory/ppe/deli
 const InventoryPpeDeliveriesDetails = lazy(() => import("@/pages/inventory/ppe/deliveries/details/[id]").then((module) => ({ default: module.EPIDeliveryDetails })));
 const InventoryPpeSchedules = lazy(() => import("@/pages/inventory/ppe/schedules/list").then((module) => ({ default: module.PPESchedulesListPage })));
 const InventoryPpeSchedulesCreate = lazy(() => import("@/pages/inventory/ppe/schedules/create").then((module) => ({ default: module.PPEScheduleCreatePage })));
+const InventoryPpeSchedulesEdit = lazy(() => import("@/pages/inventory/ppe/schedules/edit/[id]").then((module) => ({ default: module.PPEScheduleEditPage })));
+const InventoryPpeSchedulesDetails = lazy(() => import("@/pages/inventory/ppe/schedules/details/[id]").then((module) => ({ default: module.EPIScheduleDetails })));
 const InventorySuppliers = lazy(() => import("@/pages/inventory/suppliers/list").then((module) => ({ default: module.SupplierListPage })));
 const SuppliersCreate = lazy(() => import("@/pages/inventory/suppliers/create").then((module) => ({ default: module.default })));
 const SuppliersEdit = lazy(() => import("@/pages/inventory/suppliers/edit/[id]").then((module) => ({ default: module.SupplierEditPage })));
@@ -766,6 +783,7 @@ function App() {
                 />
 
                 {/* Statistics routes */}
+                {/* Main Dashboard */}
                 <Route
                   path={routes.statistics.root}
                   element={
@@ -774,8 +792,10 @@ function App() {
                     </Suspense>
                   }
                 />
+
+                {/* Entity-Specific Statistics */}
                 <Route
-                  path={routes.statistics.inventory.root}
+                  path={routes.statistics.inventory}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <StatisticsInventory />
@@ -783,41 +803,120 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.statistics.inventory.consumption}
+                  path={routes.statistics.production}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <StatisticsInventoryConsumption />
+                      <StatisticsProduction />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.statistics.inventory.stockMovement}
+                  path={routes.statistics.orders}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <StatisticsInventoryStockMovement />
+                      <StatisticsOrders />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.statistics.inventory.trends}
+                  path={routes.statistics.humanResources}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <StatisticsInventoryTrends />
+                      <StatisticsHR />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.statistics.inventory.topItems}
+                  path={routes.statistics.financial}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <StatisticsInventoryTopItems />
+                      <StatisticsFinancial />
                     </Suspense>
                   }
                 />
+
+                {/* Advanced Analytics */}
+                <Route
+                  path={routes.statistics.analytics.predictive}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PredictiveAnalytics />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.statistics.analytics.comparative}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ComparativeAnalysis />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.statistics.analytics.correlation}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <CorrelationAnalysis />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.statistics.analytics.cohort}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <CohortAnalysis />
+                    </Suspense>
+                  }
+                />
+
+                {/* Dashboards and Monitoring */}
+                <Route
+                  path={routes.statistics.dashboards.executive}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ExecutiveDashboard />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.statistics.dashboards.goals}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <GoalTracking />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.statistics.dashboards.realtime}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <RealTimeMonitoring />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.statistics.dashboards.explorer}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <DataExplorer />
+                    </Suspense>
+                  }
+                />
+
+                {/* Reports */}
+                <Route
+                  path={routes.statistics.reports.builder}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <CustomReportsBuilder />
+                    </Suspense>
+                  }
+                />
+
                 {/* Redirect from old inventory statistics route to new one */}
                 <Route
                   path="/estoque/estatisticas"
-                  element={<Navigate to={routes.statistics.inventory.root} replace />}
+                  element={<Navigate to={routes.statistics.inventory} replace />}
                 />
                 {/* Inventory routes */}
                 <Route
@@ -937,6 +1036,22 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <InventoryPpeSchedulesCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.inventory.ppe.schedules.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <InventoryPpeSchedulesEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.inventory.ppe.schedules.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <InventoryPpeSchedulesDetails />
                     </Suspense>
                   }
                 />

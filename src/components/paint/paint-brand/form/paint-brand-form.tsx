@@ -10,12 +10,14 @@ import { serializePaintBrandFormToUrlParams, getDefaultPaintBrandFormValues, deb
 // Import form field components
 import { NameInput } from "./name-input";
 import { ComponentItemsSelector } from "./component-items-selector";
+import type { Item } from "../../../../types";
 
 interface BaseFormProps {
   isSubmitting?: boolean;
   onCancel?: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
   onFormStateChange?: (formState: { isValid: boolean; isDirty: boolean }) => void;
+  initialComponentItems?: Item[];
 }
 
 interface CreateFormProps extends BaseFormProps {
@@ -34,7 +36,7 @@ interface UpdateFormProps extends BaseFormProps {
 type PaintBrandFormProps = CreateFormProps | UpdateFormProps;
 
 export function PaintBrandForm(props: PaintBrandFormProps) {
-  const { isSubmitting, defaultValues, mode, onDirtyChange, onFormStateChange } = props;
+  const { isSubmitting, defaultValues, mode, onDirtyChange, onFormStateChange, initialComponentItems } = props;
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Get URL-aware default values for create mode only
@@ -167,7 +169,11 @@ export function PaintBrandForm(props: PaintBrandFormProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ComponentItemsSelector control={form.control} disabled={isSubmitting} />
+              <ComponentItemsSelector
+                control={form.control}
+                disabled={isSubmitting}
+                initialItems={initialComponentItems}
+              />
             </CardContent>
           </Card>
 

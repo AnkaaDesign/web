@@ -3,6 +3,7 @@ import { type FieldValues, type FieldPath } from "react-hook-form";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { getItems } from "../../../../api-client";
+import type { Item } from "../../../../types";
 
 interface ItemSelectorProps<TFieldValues extends FieldValues = FieldValues> {
   control: any;
@@ -10,6 +11,7 @@ interface ItemSelectorProps<TFieldValues extends FieldValues = FieldValues> {
   required?: boolean;
   fieldName?: FieldPath<TFieldValues>;
   label?: string;
+  initialItem?: Item;
 }
 
 export function MaintenanceItemSelector<TFieldValues extends FieldValues = FieldValues>({
@@ -18,7 +20,23 @@ export function MaintenanceItemSelector<TFieldValues extends FieldValues = Field
   required = false,
   fieldName = "itemId" as FieldPath<TFieldValues>,
   label = "Item",
+  initialItem,
 }: ItemSelectorProps<TFieldValues>) {
+  // Memoize initialOptions with stable dependency to prevent infinite loops
+  const initialOptions = useMemo(() => {
+    if (!initialItem) return [];
+
+    return [{
+      value: initialItem.id,
+      label: initialItem.name,
+      description: initialItem.uniCode ? `Código: ${initialItem.uniCode} • Estoque: ${initialItem.quantity || 0}` : `Estoque: ${initialItem.quantity || 0}`,
+    }];
+  }, [initialItem?.id]);
+
+  // Memoize getOptionLabel and getOptionValue callbacks with stable dependencies
+  const getOptionLabel = useCallback((item: any) => item.name, []);
+  const getOptionValue = useCallback((item: any) => item.id, []);
+
   // Async query function for Combobox with pagination
   const queryFn = useCallback(async (searchTerm: string, page: number = 1) => {
     const pageSize = 20;
@@ -70,6 +88,7 @@ export function MaintenanceItemSelector<TFieldValues extends FieldValues = Field
               async
               queryKey={["items", "maintenance-selector"]}
               queryFn={queryFn}
+              initialOptions={initialOptions}
               minSearchLength={0}
               pageSize={20}
               value={field.value || ""}

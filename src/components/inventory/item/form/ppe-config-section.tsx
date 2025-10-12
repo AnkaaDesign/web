@@ -141,25 +141,26 @@ export function PpeConfigSection({ disabled, required }: PpeConfigSectionProps) 
           />
 
           {/* Type and Size */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-6">
             <PpeTypeSelector name="ppeType" disabled={disabled} required={required} />
-            {/* PPE Size Selector - integrated with measures */}
-            <FormItem>
-              <FormLabel className="flex items-center gap-2">
-                <IconRuler className="h-4 w-4" />
-                Tamanho {required && "*"}
-              </FormLabel>
-              <PpeSizeSelector
-                name="__ppeSize" // Virtual field name
-                ppeType={ppeType}
-                disabled={disabled || !ppeType}
-                required={required}
-                value={getCurrentPpeSize()}
-                onValueChange={setPpeSize}
-              />
-              <FormMessage />
-            </FormItem>
           </div>
+
+          {/* Size - separate row */}
+          <FormItem>
+            <FormLabel className="flex items-center gap-2">
+              <IconRuler className="h-4 w-4" />
+              Tamanho {required && "*"}
+            </FormLabel>
+            <PpeSizeSelector
+              name="__ppeSize" // Virtual field name
+              ppeType={ppeType}
+              disabled={disabled || !ppeType}
+              required={required}
+              value={getCurrentPpeSize()}
+              onValueChange={setPpeSize}
+            />
+            <FormMessage />
+          </FormItem>
 
           {/* Delivery Configuration */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

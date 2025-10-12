@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -11,6 +11,7 @@ import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { maintenanceCreateSchema, maintenanceUpdateSchema, type MaintenanceCreateFormData, type MaintenanceUpdateFormData } from "../../../../schemas";
 import { MAINTENANCE_STATUS } from "../../../../constants";
+import type { Maintenance, Item } from "../../../../types";
 
 // Import form components
 import { MaintenanceStatusSelector } from "./status-selector";
@@ -19,6 +20,7 @@ import { MaintenanceItemSelector } from "./item-selector";
 interface BaseMaintenanceFormProps {
   isSubmitting?: boolean;
   onFormStateChange?: (formState: { isValid: boolean; isDirty: boolean }) => void;
+  initialMaintenance?: Maintenance;
 }
 
 interface CreateMaintenanceFormProps extends BaseMaintenanceFormProps {
@@ -36,7 +38,25 @@ interface UpdateMaintenanceFormProps extends BaseMaintenanceFormProps {
 type MaintenanceFormProps = CreateMaintenanceFormProps | UpdateMaintenanceFormProps;
 
 export function MaintenanceForm(props: MaintenanceFormProps) {
-  const { isSubmitting, defaultValues, mode, onFormStateChange } = props;
+  const { isSubmitting, defaultValues, mode, onFormStateChange, initialMaintenance } = props;
+
+  // Extract item entities from initialMaintenance for the combobox initial options
+  const mainItem = useMemo(() => {
+    return initialMaintenance?.item;
+  }, [initialMaintenance?.item]);
+
+  // Extract items needed with their item entities
+  const itemsNeededMap = useMemo(() => {
+    if (!initialMaintenance?.itemsNeeded) return new Map<string, Item>();
+
+    const map = new Map<string, Item>();
+    initialMaintenance.itemsNeeded.forEach((maintenanceItem) => {
+      if (maintenanceItem.item) {
+        map.set(maintenanceItem.itemId, maintenanceItem.item);
+      }
+    });
+    return map;
+  }, [initialMaintenance?.itemsNeeded]);
 
   // Default values for create mode
   const createDefaults: MaintenanceCreateFormData = {
@@ -152,14 +172,14 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
                         <FormItem>
                           <FormLabel className={isRequired ? "after:content-['*'] after:ml-0.5 after:text-destructive" : ""}>Nome da Manutenção</FormLabel>
                           <FormControl>
-                            <Input placeholder="Ex: Troca de óleo" disabled={isSubmitting} {...field} value={field.value || ""} onChange={(e) => field.onChange(e.target.value)} />
+                            <Input placeholder="Ex: Troca de óleo" disabled={isSubmitting} {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
 
-                    <MaintenanceItemSelector control={form.control} disabled={isSubmitting} fieldName="itemId" required={isRequired} label="Item para Manutenção" />
+                    <MaintenanceItemSelector control={form.control} disabled={isSubmitting} fieldName="itemId" required={isRequired} label="Item para Manutenção" initialItem={mainItem} />
 
                     <FormField
                       control={form.control}
@@ -218,11 +238,16 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
                 <CardDescription>Itens utilizados na manutenção. Deixe vazio para manutenções de limpeza ou que não requerem materiais.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-4 items-end">
-                    <div className="flex-1">
-                      <MaintenanceItemSelector control={form.control} fieldName={`itemsNeeded.${index}.itemId`} disabled={isSubmitting} label={index === 0 ? "Item" : undefined} />
-                    </div>
+                {fields.map((field, index) => {
+                  // Get the itemId for this row to look up the initial item
+                  const itemId = form.watch(`itemsNeeded.${index}.itemId` as any);
+                  const initialItemForRow = itemId ? itemsNeededMap.get(itemId) : undefined;
+
+                  return (
+                    <div key={field.id} className="flex gap-4 items-end">
+                      <div className="flex-1">
+                        <MaintenanceItemSelector control={form.control} fieldName={`itemsNeeded.${index}.itemId`} disabled={isSubmitting} label={index === 0 ? "Item" : undefined} initialItem={initialItemForRow} />
+                      </div>
                     <FormField
                       control={form.control}
                       name={`itemsNeeded.${index}.quantity`}
@@ -264,7 +289,8 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
                       </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
 
                 <Button type="button" variant="outline" size="sm" onClick={() => append({ itemId: "", quantity: 1 })} disabled={isSubmitting} className="w-full">
                   <IconPlus className="h-4 w-4 mr-2" />

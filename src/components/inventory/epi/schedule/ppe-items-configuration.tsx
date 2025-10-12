@@ -115,7 +115,7 @@ export function PpeItemsConfiguration({ value = [], onChange, className }: PpeIt
           return (
             <div key={item.ppeType} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
               {/* Vestuarios combobox */}
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-[200px]">
                 <Combobox
                   value={item.ppeType}
                   onValueChange={(newType) => updatePpeItem(originalIndex, "ppeType", newType)}

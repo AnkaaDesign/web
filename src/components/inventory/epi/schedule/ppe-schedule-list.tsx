@@ -107,6 +107,8 @@ export function PpeScheduleList({ className }: PpeScheduleListProps) {
       category: { type: ITEM_CATEGORY_TYPE.PPE },
     },
     orderBy: { name: "asc" },
+    page: 1, // API expects 1-based pagination (starts at 1)
+    limit: 100, // Load enough items for filters
   });
 
   // Get table state for selected items functionality

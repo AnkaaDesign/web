@@ -46,7 +46,8 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
     frequency: SCHEDULE_FREQUENCY.MONTHLY,
     frequencyCount: 1,
     isActive: true,
-    maintenanceItemsConfig: [{ itemId: "", quantity: 1 }], // This array needs at least one item according to schema
+    itemId: "", // Required field for item receiving maintenance
+    maintenanceItemsConfig: [], // Optional - items needed for maintenance
     ...(mode === "create" && defaultValues ? defaultValues : {}),
   };
 
@@ -121,12 +122,6 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
     }));
   }, []);
 
-  // Auto-add first item if array is empty (required by schema)
-  React.useEffect(() => {
-    if (mode === "create" && fields.length === 0) {
-      append({ itemId: "", quantity: 1 });
-    }
-  }, [mode, fields.length, append]);
 
   const handleSubmit = async (data: any) => {
     try {
@@ -161,18 +156,8 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
           return;
         }
 
-        // Validate items config
-        if (!data.maintenanceItemsConfig || data.maintenanceItemsConfig.length === 0) {
-          form.setError("maintenanceItemsConfig", { message: "Pelo menos um item é obrigatório" });
-          return;
-        }
-
-        // Filter out empty items and validate
-        const validItems = data.maintenanceItemsConfig.filter((item: any) => item.itemId && item.quantity > 0);
-        if (validItems.length === 0) {
-          form.setError("maintenanceItemsConfig", { message: "Pelo menos um item válido é obrigatório" });
-          return;
-        }
+        // Filter out empty items (maintenanceItemsConfig is optional)
+        const validItems = data.maintenanceItemsConfig?.filter((item: any) => item.itemId && item.quantity > 0) || [];
 
         // Clean up data for submission
         const processedData: MaintenanceScheduleCreateFormData = {
@@ -222,10 +207,10 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
   const isRequired = mode === "create";
 
   return (
-    <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
+    <Card className="h-full flex flex-col shadow-sm border border-border overflow-hidden">
+      <div className="flex-1 overflow-y-auto p-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-y-auto space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             {/* Hidden submit button for programmatic form submission */}
             <button type="submit" id="maintenance-schedule-form-submit" className="hidden" aria-hidden="true" />
 
@@ -496,8 +481,8 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
             {/* Items Needed Configuration */}
             <Card>
               <CardHeader>
-                <CardTitle>Itens Necessários {isRequired && <span className="text-destructive">*</span>}</CardTitle>
-                <CardDescription>Itens utilizados em cada manutenção</CardDescription>
+                <CardTitle>Itens Necessários</CardTitle>
+                <CardDescription>Itens utilizados em cada manutenção (opcional)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {fields.map((field, index) => (
@@ -540,13 +525,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        onClick={() => {
-                          remove(index);
-                          // If removing the last item and we need at least one, add a new empty one
-                          if (fields.length === 1) {
-                            append({ itemId: "", quantity: 1 });
-                          }
-                        }}
+                        onClick={() => remove(index)}
                         disabled={isSubmitting}
                         className="h-10 w-8"
                       >
@@ -564,7 +543,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
             </Card>
           </form>
         </Form>
-      </CardContent>
+      </div>
     </Card>
   );
 }

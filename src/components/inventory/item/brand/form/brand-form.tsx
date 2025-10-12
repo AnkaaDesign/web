@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useState } from "react";
+import { useEffect, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router-dom";
@@ -12,9 +12,11 @@ import { serializeItemBrandFormToUrlParams, deserializeUrlParamsToItemBrandForm,
 
 // Import form components
 import { NameInput } from "./name-input";
+import type { Item } from "../../../../../types";
 
 interface BaseBrandFormProps {
   isSubmitting?: boolean;
+  initialItems?: Item[];
 }
 
 interface CreateBrandFormProps extends BaseBrandFormProps {
@@ -33,7 +35,7 @@ interface UpdateBrandFormProps extends BaseBrandFormProps {
 type BrandFormProps = CreateBrandFormProps | UpdateBrandFormProps;
 
 export function BrandForm(props: BrandFormProps) {
-  const { isSubmitting, defaultValues, mode } = props;
+  const { isSubmitting, defaultValues, mode, initialItems } = props;
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Initialize state from URL parameters (only in create mode)
@@ -118,7 +120,25 @@ export function BrandForm(props: BrandFormProps) {
     }
   }, [mode, defaultValues, form]);
 
-  // Get current item IDs for update mode
+  // Create memoized initial options from initialItems prop
+  // Use stable dependency to prevent unnecessary re-renders
+  const initialOptions = useMemo(() => {
+    if (!initialItems || initialItems.length === 0) return [];
+
+    return initialItems.map((item) => ({
+      value: item.id,
+      label: item.name,
+      unicode: item.uniCode,
+      brand: item.brand?.name,
+      category: item.category?.name,
+    }));
+  }, [initialItems?.map((i) => i.id).join(",")]);
+
+  // Memoize getOptionLabel callback
+  const getOptionLabel = useCallback((option: any) => option.label, []);
+
+  // Memoize getOptionValue callback
+  const getOptionValue = useCallback((option: any) => option.value, []);
 
   // Function to search items from API
   const searchItems = useCallback(async (searchTerm: string) => {
@@ -144,43 +164,6 @@ export function BrandForm(props: BrandFormProps) {
       })) || []
     );
   }, []);
-
-  // State to store initial options
-  const [initialOptions, setInitialOptions] = useState<any[]>([]);
-
-  // Fetch initial options for selected items
-  useEffect(() => {
-    const fetchInitialOptions = async () => {
-      if (defaultValues?.itemIds && defaultValues.itemIds.length > 0) {
-        try {
-          const response = await apiClient.get("/items", {
-            params: {
-              where: { id: { in: defaultValues.itemIds } },
-              include: {
-                brand: true,
-                category: true,
-              },
-            },
-          });
-
-          const options =
-            response.data?.data?.map((item: any) => ({
-              value: item.id,
-              label: item.name,
-              unicode: item.uniCode,
-              brand: item.brand?.name,
-              category: item.category?.name,
-            })) || [];
-
-          setInitialOptions(options);
-        } catch (error) {
-          console.error("Error fetching initial items:", error);
-        }
-      }
-    };
-
-    fetchInitialOptions();
-  }, [defaultValues?.itemIds]);
 
   const handleSubmit = async (data: any) => {
     try {
@@ -231,6 +214,7 @@ export function BrandForm(props: BrandFormProps) {
                       queryFn={searchItems}
                       formatDisplay="category"
                       initialOptions={initialOptions}
+                      minSearchLength={0}
                     />
                   </FormControl>
                 </FormItem>

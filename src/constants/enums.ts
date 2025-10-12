@@ -1699,11 +1699,24 @@ export enum FAVORITE_PAGES {
 
   // Statistics Pages
   ESTATISTICAS = "/estatisticas",
+  // Entity-Specific Statistics
   ESTATISTICAS_ESTOQUE = "/estatisticas/estoque",
-  ESTATISTICAS_ESTOQUE_CONSUMO = "/estatisticas/estoque/consumo",
-  ESTATISTICAS_ESTOQUE_MOVIMENTACAO = "/estatisticas/estoque/movimentacao",
-  ESTATISTICAS_ESTOQUE_TENDENCIAS = "/estatisticas/estoque/tendencias",
-  ESTATISTICAS_ESTOQUE_TOP_ITENS = "/estatisticas/estoque/top-itens",
+  ESTATISTICAS_PRODUCAO = "/estatisticas/producao",
+  ESTATISTICAS_PEDIDOS = "/estatisticas/pedidos",
+  ESTATISTICAS_RECURSOS_HUMANOS = "/estatisticas/recursos-humanos",
+  ESTATISTICAS_FINANCEIRO = "/estatisticas/financeiro",
+  // Advanced Analytics
+  ESTATISTICAS_ANALYTICS_PREDITIVA = "/estatisticas/analytics/preditiva",
+  ESTATISTICAS_ANALYTICS_COMPARATIVA = "/estatisticas/analytics/comparativa",
+  ESTATISTICAS_ANALYTICS_CORRELACAO = "/estatisticas/analytics/correlacao",
+  ESTATISTICAS_ANALYTICS_COHORT = "/estatisticas/analytics/cohort",
+  // Dashboards
+  ESTATISTICAS_DASHBOARD_EXECUTIVO = "/estatisticas/dashboards/executivo",
+  ESTATISTICAS_DASHBOARD_METAS = "/estatisticas/dashboards/metas",
+  ESTATISTICAS_DASHBOARD_TEMPO_REAL = "/estatisticas/dashboards/tempo-real",
+  ESTATISTICAS_DASHBOARD_EXPLORADOR = "/estatisticas/dashboards/explorador",
+  // Reports
+  ESTATISTICAS_RELATORIOS_CONSTRUTOR = "/estatisticas/relatorios/construtor",
 
   // Inventory - Create Pages
   ESTOQUE_MOVIMENTACOES_CADASTRAR = "/estoque/movimentacoes/cadastrar",

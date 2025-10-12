@@ -101,6 +101,17 @@ export function SimplePaginationAdvanced({
   // If the page is out of bounds (startItem > totalItems), show proper message
   const isPageOutOfBounds = startItem > totalItems && totalItems > 0;
 
+  // Auto-correct page when out of bounds
+  React.useEffect(() => {
+    if (isPageOutOfBounds) {
+      const lastPage = Math.max(0, totalPages - 1);
+      if (currentPage !== lastPage) {
+        console.warn(`Page ${displayPage} is out of bounds. Auto-correcting to last page.`);
+        onPageChange(lastPage);
+      }
+    }
+  }, [isPageOutOfBounds, currentPage, totalPages, displayPage, onPageChange]);
+
   return (
     <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between py-1", className)}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6 lg:gap-8">

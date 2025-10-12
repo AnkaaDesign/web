@@ -127,8 +127,9 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
     }
   });
 
-  // Always return array for consistency with Prisma's orderBy handling
-  return orderByArray;
+  // Return single object if only one sort to avoid array serialization issues
+  // Return array only for multiple sorts (Prisma supports both formats)
+  return orderByArray.length === 1 ? orderByArray[0] : orderByArray;
 }
 
 /**

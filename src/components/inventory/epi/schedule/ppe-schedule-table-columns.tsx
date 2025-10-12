@@ -1,5 +1,5 @@
 import { formatDate, formatDateTime } from "../../../../utils";
-import { getDynamicFrequencyLabel } from "../../../../constants";
+import { getDynamicFrequencyLabel, PPE_TYPE_LABELS } from "../../../../constants";
 import type { PpeDeliverySchedule } from "../../../../types";
 import { Badge } from "../../../ui/badge";
 import { TABLE_LAYOUT } from "../../../ui/table-constants";
@@ -24,14 +24,14 @@ export const createPpeScheduleColumns = (): PpeScheduleColumn[] => [
 
       const displayText =
         ppeItems.length <= 2
-          ? ppeItems.map((item) => `${item.ppeType} (${item.quantity})`).join(", ")
+          ? ppeItems.map((item) => `${PPE_TYPE_LABELS[item.ppeType] || item.ppeType} (${item.quantity})`).join(", ")
           : `${ppeItems
               .slice(0, 2)
-              .map((item) => `${item.ppeType} (${item.quantity})`)
+              .map((item) => `${PPE_TYPE_LABELS[item.ppeType] || item.ppeType} (${item.quantity})`)
               .join(", ")} +${ppeItems.length - 2}`;
 
       return (
-        <div className="truncate text-sm" title={ppeItems.map((item) => `${item.ppeType}: ${item.quantity}`).join(", ")}>
+        <div className="truncate text-sm" title={ppeItems.map((item) => `${PPE_TYPE_LABELS[item.ppeType] || item.ppeType}: ${item.quantity}`).join(", ")}>
           {displayText}
         </div>
       );
@@ -160,5 +160,5 @@ export const createPpeScheduleColumns = (): PpeScheduleColumn[] => [
 
 // Default visible columns
 export const getDefaultVisibleColumns = (): Set<string> => {
-  return new Set(["id", "ppeItems", "assignmentType", "frequency", "nextRun", "isActive"]);
+  return new Set(["ppeItems", "assignmentType", "frequency", "nextRun", "isActive"]);
 };

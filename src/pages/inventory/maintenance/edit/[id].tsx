@@ -191,7 +191,7 @@ export const EditMaintenancePage = () => {
       {/* Scrollable Form Container */}
       <div className="flex-1 overflow-y-auto mt-6">
         <div className="max-w-5xl mx-auto h-full">
-          <MaintenanceForm mode="update" onSubmit={handleSubmit} defaultValues={formData} isSubmitting={updateMutation.isPending} onFormStateChange={setFormState} />
+          <MaintenanceForm mode="update" onSubmit={handleSubmit} defaultValues={formData} initialMaintenance={maintenance.data} isSubmitting={updateMutation.isPending} onFormStateChange={setFormState} />
         </div>
       </div>
     </div>
