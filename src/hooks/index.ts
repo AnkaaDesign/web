@@ -23,50 +23,6 @@ export * from "./useAuth";
 export * from "./usePrivileges";
 
 // =====================================================
-// Statistics & Analytics Hooks
-// =====================================================
-export {
-  inventoryStatisticsKeys,
-  useStatisticsFilters,
-  useInventoryStatistics,
-  useStockTrends,
-  useActivityAnalytics,
-  useStockMetrics,
-  useForecastingMetrics,
-  usePerformanceMetrics,
-  useConsumptionStatistics,
-  useComputedInventoryMetrics,
-  useRealTimeStatistics,
-  useStatisticsCache,
-} from "./use-inventory-statistics";
-export type {
-  StatisticsFilterState,
-  StatisticsFilters,
-  InventoryStatistics,
-  StockTrends,
-  ActivityAnalytics,
-  StockMetrics,
-  ForecastingMetrics,
-  PerformanceMetrics,
-  ConsumptionStatistics,
-} from "./use-inventory-statistics";
-// Re-export specific functions from other files to avoid conflicts
-export {
-  useActivityAnalytics as useActivityAnalyticsDetailed,
-  useActivityTrends,
-  useActivityHeatmap,
-  useActivityInsights,
-  activityAnalyticsKeys
-} from "./use-activity-analytics";
-export {
-  useStockMetrics as useStockMetricsDetailed,
-  usePerformanceMetrics as usePerformanceMetricsDetailed,
-  useStockForecasting,
-  useStockInsights,
-  stockMetricsKeys
-} from "./use-stock-metrics";
-
-// =====================================================
 // UI & Form Hooks
 // =====================================================
 export * from "./use-search-input";

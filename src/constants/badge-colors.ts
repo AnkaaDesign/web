@@ -116,70 +116,70 @@ export const BADGE_COLORS: Record<
 
   // Primary/Info variants (Blue tones)
   primary: {
-    bg: "bg-blue-600",
+    bg: "bg-blue-700",
     text: "text-white",
-    hover: "hover:bg-blue-700",
+    hover: "hover:bg-blue-800",
   },
   info: {
-    bg: "bg-sky-500",
+    bg: "bg-blue-700",
     text: "text-white",
-    hover: "hover:bg-sky-600",
+    hover: "hover:bg-blue-800",
   },
   inProgress: {
-    bg: "bg-blue-500",
+    bg: "bg-blue-700",
     text: "text-white",
-    hover: "hover:bg-blue-600",
+    hover: "hover:bg-blue-800",
   },
 
   // Success variants (Green tones - positive actions)
   success: {
-    bg: "bg-green-600",
+    bg: "bg-green-700",
     text: "text-white",
-    hover: "hover:bg-green-700",
+    hover: "hover:bg-green-800",
   },
   completed: {
-    bg: "bg-green-600",
+    bg: "bg-green-700",
     text: "text-white",
-    hover: "hover:bg-green-700",
+    hover: "hover:bg-green-800",
   },
   active: {
-    bg: "bg-green-600",
+    bg: "bg-green-700",
     text: "text-white",
-    hover: "hover:bg-green-700",
+    hover: "hover:bg-green-800",
   },
 
   // Warning variants (Orange/Amber tones - attention needed)
   warning: {
-    bg: "bg-orange-500",
+    bg: "bg-orange-600",
     text: "text-white",
-    hover: "hover:bg-orange-600",
+    hover: "hover:bg-orange-700",
   },
   pending: {
-    bg: "bg-amber-500",
+    bg: "bg-amber-600",
     text: "text-white",
-    hover: "hover:bg-amber-600",
+    hover: "hover:bg-amber-700",
   },
   onHold: {
-    bg: "bg-orange-500",
+    bg: "bg-orange-600",
     text: "text-white",
-    hover: "hover:bg-orange-600",
+    hover: "hover:bg-orange-700",
   },
 
   // Error/Destructive variants (Red tones - negative actions)
   error: {
-    bg: "bg-red-600",
+    bg: "bg-red-700",
     text: "text-white",
-    hover: "hover:bg-red-700",
+    hover: "hover:bg-red-800",
   },
   destructive: {
-    bg: "bg-red-600",
+    bg: "bg-red-700",
     text: "text-white",
-    hover: "hover:bg-red-700",
+    hover: "hover:bg-red-800",
   },
   cancelled: {
-    bg: "bg-red-600",
+    bg: "bg-red-700",
     text: "text-white",
-    hover: "hover:bg-red-700",
+    hover: "hover:bg-red-800",
   },
 
   // Inactive variant (Gray - disabled/inactive states)

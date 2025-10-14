@@ -67,28 +67,8 @@ const AdministrationNotificationsSend = lazy(() => import("@/pages/administratio
 const AdministrationChangeLogs = lazy(() => import("@/pages/administration/change-logs/list").then((module) => ({ default: module.default })));
 const AdministrationChangeLogsDetails = lazy(() => import("@/pages/administration/change-logs/details/[id]").then((module) => ({ default: module.ChangeLogDetails })));
 
-// Statistics Pages
-const StatisticsRoot = lazy(() => import("@/pages/statistics/index").then((module) => ({ default: module.default })));
-const StatisticsInventory = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.InventoryStatisticsPage })));
-const StatisticsProduction = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.ProductionStatisticsPage })));
-const StatisticsOrders = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.OrdersStatisticsPage })));
-const StatisticsHR = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.HRStatisticsPage })));
-const StatisticsFinancial = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.FinancialStatisticsPage })));
-
-// Advanced Analytics Pages
-const PredictiveAnalytics = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.PredictiveAnalytics })));
-const ComparativeAnalysis = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.ComparativeAnalysis })));
-const CorrelationAnalysis = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.CorrelationAnalysis })));
-const CohortAnalysis = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.CohortAnalysis })));
-
-// Dashboard and Monitoring Pages
-const ExecutiveDashboard = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.ExecutiveDashboard })));
-const GoalTracking = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.GoalTracking })));
-const RealTimeMonitoring = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.RealTimeMonitoring })));
-const DataExplorer = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.DataExplorer })));
-
-// Report Pages
-const CustomReportsBuilder = lazy(() => import("@/pages/statistics").then((module) => ({ default: module.CustomReportsBuilder })));
+// Under Construction Page
+const UnderConstruction = lazy(() => import("@/pages/under-construction"));
 
 // Inventory
 const Inventory = lazy(() => import("@/pages/inventory/root").then((module) => ({ default: module.InventoryRootPage })));
@@ -782,141 +762,24 @@ function App() {
                   }
                 />
 
-                {/* Statistics routes */}
-                {/* Main Dashboard */}
+                {/* Statistics routes - Under Construction */}
                 <Route
-                  path={routes.statistics.root}
+                  path="/estatisticas/*"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <StatisticsRoot />
+                      <UnderConstruction />
                     </Suspense>
                   }
                 />
 
-                {/* Entity-Specific Statistics */}
-                <Route
-                  path={routes.statistics.inventory}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <StatisticsInventory />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.statistics.production}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <StatisticsProduction />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.statistics.orders}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <StatisticsOrders />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.statistics.humanResources}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <StatisticsHR />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.statistics.financial}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <StatisticsFinancial />
-                    </Suspense>
-                  }
-                />
-
-                {/* Advanced Analytics */}
-                <Route
-                  path={routes.statistics.analytics.predictive}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PredictiveAnalytics />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.statistics.analytics.comparative}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ComparativeAnalysis />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.statistics.analytics.correlation}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <CorrelationAnalysis />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.statistics.analytics.cohort}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <CohortAnalysis />
-                    </Suspense>
-                  }
-                />
-
-                {/* Dashboards and Monitoring */}
-                <Route
-                  path={routes.statistics.dashboards.executive}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ExecutiveDashboard />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.statistics.dashboards.goals}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <GoalTracking />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.statistics.dashboards.realtime}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <RealTimeMonitoring />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.statistics.dashboards.explorer}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <DataExplorer />
-                    </Suspense>
-                  }
-                />
-
-                {/* Reports */}
-                <Route
-                  path={routes.statistics.reports.builder}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <CustomReportsBuilder />
-                    </Suspense>
-                  }
-                />
-
-                {/* Redirect from old inventory statistics route to new one */}
+                {/* Redirect from old inventory statistics route */}
                 <Route
                   path="/estoque/estatisticas"
-                  element={<Navigate to={routes.statistics.inventory} replace />}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <UnderConstruction />
+                    </Suspense>
+                  }
                 />
                 {/* Inventory routes */}
                 <Route

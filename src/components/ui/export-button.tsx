@@ -24,7 +24,7 @@ import type {
   ChartExportData,
   ExportConfig
 } from "../../utils";
-import { exportStatistics } from "@/utils/statistics-export";
+import { exportStatistics } from "@/utils/data-export";
 import { toast } from "sonner";
 
 interface ExportButtonProps {

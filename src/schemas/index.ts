@@ -135,5 +135,4 @@ export {
   type DiscountOrderBy,
   type DiscountWhere,
 } from "./discount";
-export * from "./statistics";
 export * from "./deployment";
