@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, forwardRef, useImperativeHandle } from "react";
+import { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { useController } from "react-hook-form";
 import { IconSpray, IconPlus, IconTrash, IconPhoto, IconPaperclip, IconFileInvoice, IconGripVertical } from "@tabler/icons-react";
 import { FormLabel } from "@/components/ui/form";
@@ -14,7 +14,6 @@ import type { FileWithPreview } from "@/components/file";
 import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
 import { formatCurrency, formatDate } from "../../../../utils";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { uploadSingleFile } from "../../../../api-client";
 import { toast } from "sonner";
 
 interface MultiAirbrushingSelectorProps {
@@ -34,7 +33,7 @@ interface AirbrushingItem {
   nfeFiles: FileWithPreview[];
   artworkFiles: FileWithPreview[];
   receiptIds?: string[];
-  nfeIds?: string[];
+  invoiceIds?: string[];
   artworkIds?: string[];
   uploading?: boolean;
   error?: string;
@@ -77,10 +76,10 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           startDate: airbrushing.startDate || null,
           finishDate: airbrushing.finishDate || null,
           receiptFiles: convertFilesToFileWithPreview(airbrushing.receipts),
-          nfeFiles: convertFilesToFileWithPreview(airbrushing.nfes),
+          nfeFiles: convertFilesToFileWithPreview(airbrushing.invoices),
           artworkFiles: convertFilesToFileWithPreview(airbrushing.artworks),
           receiptIds: airbrushing.receiptIds || [],
-          nfeIds: airbrushing.nfeIds || [],
+          invoiceIds: airbrushing.invoiceIds || [],
           artworkIds: airbrushing.artworkIds || [],
         }));
       }
@@ -89,47 +88,61 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
 
     const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
+    // Track if we're syncing to prevent infinite loops
+    const isSyncingToForm = useRef<boolean>(false);
+    const lastFieldValueRef = useRef<string>("");
+
     // Sync FROM form field TO local state when form resets (form → local)
     useEffect(() => {
-      if (field.value && Array.isArray(field.value) && field.value.length > 0) {
-        // Check if field value is different from current local state
-        const currentStateIds = airbrushings.map(a => `${a.startDate}-${a.price}-${a.status}`).join(',');
-        const fieldValueIds = field.value.map((a: any) => `${a.startDate}-${a.price}-${a.status}`).join(',');
+      // Skip if we're currently syncing to form
+      if (isSyncingToForm.current) return;
 
-        if (currentStateIds !== fieldValueIds) {
-          const newAirbrushings = field.value.map((airbrushing: any, index: number) => ({
-            id: `airbrushing-${Date.now()}-${index}`,
-            status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
-            price: airbrushing.price || null,
-            startDate: airbrushing.startDate || null,
-            finishDate: airbrushing.finishDate || null,
-            receiptFiles: convertFilesToFileWithPreview(airbrushing.receipts),
-            nfeFiles: convertFilesToFileWithPreview(airbrushing.nfes),
-            artworkFiles: convertFilesToFileWithPreview(airbrushing.artworks),
-            receiptIds: airbrushing.receiptIds || [],
-            nfeIds: airbrushing.nfeIds || [],
-            artworkIds: airbrushing.artworkIds || [],
-          }));
-          setAirbrushings(newAirbrushings);
-        }
+      const fieldValueStr = JSON.stringify(field.value);
+
+      // Skip if value hasn't changed
+      if (fieldValueStr === lastFieldValueRef.current) return;
+
+      lastFieldValueRef.current = fieldValueStr;
+
+      if (field.value && Array.isArray(field.value) && field.value.length > 0) {
+        const newAirbrushings = field.value.map((airbrushing: any, index: number) => ({
+          id: `airbrushing-${Date.now()}-${index}`,
+          status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
+          price: airbrushing.price || null,
+          startDate: airbrushing.startDate || null,
+          finishDate: airbrushing.finishDate || null,
+          receiptFiles: convertFilesToFileWithPreview(airbrushing.receipts),
+          nfeFiles: convertFilesToFileWithPreview(airbrushing.invoices),
+          artworkFiles: convertFilesToFileWithPreview(airbrushing.artworks),
+          receiptIds: airbrushing.receiptIds || [],
+          invoiceIds: airbrushing.invoiceIds || [],
+          artworkIds: airbrushing.artworkIds || [],
+        }));
+        setAirbrushings(newAirbrushings);
       } else if (!field.value || (Array.isArray(field.value) && field.value.length === 0)) {
         // Clear airbrushings if field value is empty
-        if (airbrushings.length > 0) {
-          setAirbrushings([]);
-        }
+        setAirbrushings([]);
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [field.value]);
 
     // Sync FROM local state TO form field when airbrushings change (local → form)
     useEffect(() => {
+      // Mark that we're syncing
+      isSyncingToForm.current = true;
+
       const formValue = airbrushings.map((airbrushing) => ({
         status: airbrushing.status,
         price: airbrushing.price,
         startDate: airbrushing.startDate,
         finishDate: airbrushing.finishDate,
         receiptIds: airbrushing.receiptIds || [],
-        nfeIds: airbrushing.nfeIds || [],
+        invoiceIds: airbrushing.invoiceIds || [],
         artworkIds: airbrushing.artworkIds || [],
+        // Include the actual files for submission with the form
+        receiptFiles: airbrushing.receiptFiles.filter(f => !f.uploaded && f instanceof File),
+        nfeFiles: airbrushing.nfeFiles.filter(f => !f.uploaded && f instanceof File),
+        artworkFiles: airbrushing.artworkFiles.filter(f => !f.uploaded && f instanceof File),
       }));
       field.onChange(formValue);
 
@@ -137,6 +150,12 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       if (onAirbrushingsCountChange) {
         onAirbrushingsCountChange(airbrushings.length);
       }
+
+      // Clear sync flag after next tick
+      setTimeout(() => {
+        isSyncingToForm.current = false;
+      }, 0);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [airbrushings]); // Only depend on airbrushings state
 
     const addAirbrushing = useCallback(() => {
@@ -150,7 +169,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         nfeFiles: [],
         artworkFiles: [],
         receiptIds: [],
-        nfeIds: [],
+        invoiceIds: [],
         artworkIds: [],
       };
       setAirbrushings((prev) => [...prev, newAirbrushing]);
@@ -168,131 +187,34 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
     }, []);
 
     const handleReceiptFilesChange = useCallback(
-      async (airbrushingId: string, files: FileWithPreview[]) => {
-        // Filter for new files that need uploading
-        const newFiles = files.filter((f) => !f.uploaded && !f.uploadedFileId);
-
-        if (newFiles.length > 0) {
-          updateAirbrushing(airbrushingId, { uploading: true, error: undefined });
-
-          try {
-            const fileIds: string[] = [];
-            for (const file of newFiles) {
-              try {
-                const result = await uploadSingleFile(file);
-                if (result.success && result.data) {
-                  fileIds.push(result.data.id);
-                }
-              } catch (error) {
-                console.error("Failed to upload receipt file:", error);
-                toast.error("Erro ao fazer upload do recibo");
-              }
-            }
-
-            updateAirbrushing(airbrushingId, {
-              receiptFiles: files,
-              receiptIds: [...files.filter((f) => f.uploadedFileId).map((f) => f.uploadedFileId!), ...fileIds],
-              uploading: false,
-            });
-          } catch (error) {
-            updateAirbrushing(airbrushingId, {
-              uploading: false,
-              error: "Erro ao fazer upload dos recibos",
-            });
-            toast.error("Erro ao fazer upload dos recibos");
-          }
-        } else {
-          updateAirbrushing(airbrushingId, {
-            receiptFiles: files,
-            receiptIds: files.map((f) => f.uploadedFileId!).filter(Boolean),
-          });
-        }
+      (airbrushingId: string, files: FileWithPreview[]) => {
+        // Store files without uploading - they'll be submitted with the form
+        updateAirbrushing(airbrushingId, {
+          receiptFiles: files,
+          receiptIds: files.filter(f => f.uploaded).map(f => f.uploadedFileId!).filter(Boolean),
+        });
       },
       [updateAirbrushing],
     );
 
     const handleNfeFilesChange = useCallback(
-      async (airbrushingId: string, files: FileWithPreview[]) => {
-        const newFiles = files.filter((f) => !f.uploaded && !f.uploadedFileId);
-
-        if (newFiles.length > 0) {
-          updateAirbrushing(airbrushingId, { uploading: true, error: undefined });
-
-          try {
-            const fileIds: string[] = [];
-            for (const file of newFiles) {
-              try {
-                const result = await uploadSingleFile(file);
-                if (result.success && result.data) {
-                  fileIds.push(result.data.id);
-                }
-              } catch (error) {
-                console.error("Failed to upload NFE file:", error);
-                toast.error("Erro ao fazer upload da NFe");
-              }
-            }
-
-            updateAirbrushing(airbrushingId, {
-              nfeFiles: files,
-              nfeIds: [...files.filter((f) => f.uploadedFileId).map((f) => f.uploadedFileId!), ...fileIds],
-              uploading: false,
-            });
-          } catch (error) {
-            updateAirbrushing(airbrushingId, {
-              uploading: false,
-              error: "Erro ao fazer upload das notas fiscais",
-            });
-            toast.error("Erro ao fazer upload das notas fiscais");
-          }
-        } else {
-          updateAirbrushing(airbrushingId, {
-            nfeFiles: files,
-            nfeIds: files.map((f) => f.uploadedFileId!).filter(Boolean),
-          });
-        }
+      (airbrushingId: string, files: FileWithPreview[]) => {
+        // Store files without uploading - they'll be submitted with the form
+        updateAirbrushing(airbrushingId, {
+          nfeFiles: files,
+          invoiceIds: files.filter(f => f.uploaded).map(f => f.uploadedFileId!).filter(Boolean),
+        });
       },
       [updateAirbrushing],
     );
 
     const handleArtworkFilesChange = useCallback(
-      async (airbrushingId: string, files: FileWithPreview[]) => {
-        const newFiles = files.filter((f) => !f.uploaded && !f.uploadedFileId);
-
-        if (newFiles.length > 0) {
-          updateAirbrushing(airbrushingId, { uploading: true, error: undefined });
-
-          try {
-            const fileIds: string[] = [];
-            for (const file of newFiles) {
-              try {
-                const result = await uploadSingleFile(file);
-                if (result.success && result.data) {
-                  fileIds.push(result.data.id);
-                }
-              } catch (error) {
-                console.error("Failed to upload artwork file:", error);
-                toast.error("Erro ao fazer upload da arte");
-              }
-            }
-
-            updateAirbrushing(airbrushingId, {
-              artworkFiles: files,
-              artworkIds: [...files.filter((f) => f.uploadedFileId).map((f) => f.uploadedFileId!), ...fileIds],
-              uploading: false,
-            });
-          } catch (error) {
-            updateAirbrushing(airbrushingId, {
-              uploading: false,
-              error: "Erro ao fazer upload das artes",
-            });
-            toast.error("Erro ao fazer upload das artes");
-          }
-        } else {
-          updateAirbrushing(airbrushingId, {
-            artworkFiles: files,
-            artworkIds: files.map((f) => f.uploadedFileId!).filter(Boolean),
-          });
-        }
+      (airbrushingId: string, files: FileWithPreview[]) => {
+        // Store files without uploading - they'll be submitted with the form
+        updateAirbrushing(airbrushingId, {
+          artworkFiles: files,
+          artworkIds: files.filter(f => f.uploaded).map(f => f.uploadedFileId!).filter(Boolean),
+        });
       },
       [updateAirbrushing],
     );

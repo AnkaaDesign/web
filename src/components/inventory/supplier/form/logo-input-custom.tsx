@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
 import { Label } from "@/components/ui/label";
 import { FileUploadField, FileItem, FilePreview, type FileWithPreview } from "@/components/file";
 import { Card } from "@/components/ui/card";
 import { fileService } from "../../../../api-client";
-import { toast } from "sonner";
 import type { File as AnkaaFile } from "../../../../types";
 import { useSupplierForm } from "./supplier-form-context";
 import { backendFileToFileWithPreview } from "@/lib/utils";
@@ -15,33 +13,27 @@ interface LogoInputProps {
 }
 
 export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
-  const { values, setValue, setError, clearError } = useSupplierForm();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { setValue, setError, clearError } = useSupplierForm();
   const [uploadedFile, setUploadedFile] = useState<AnkaaFile | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [logoFile, setLogoFile] = useState<FileWithPreview | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [_isNewUpload, setIsNewUpload] = useState(false);
   const [loadedLogoId, setLoadedLogoId] = useState<string | null>(null);
 
   // Load existing logo if logoId is provided
   useEffect(() => {
     const loadExistingLogo = async () => {
-      const logoIdFromUrl = searchParams.get("logoId");
-      const logoIdToLoad = logoIdFromUrl || existingLogoId;
-
       // Only reload if the logoId to load is different from what we currently have loaded
-      if (!logoIdToLoad || logoIdToLoad === loadedLogoId) {
+      if (!existingLogoId || existingLogoId === loadedLogoId) {
         return;
       }
 
       try {
-        const response = await fileService.getFileById(logoIdToLoad);
+        const response = await fileService.getFileById(existingLogoId);
         if (response.success && response.data) {
           const file = response.data;
           setUploadedFile(file);
-          setIsNewUpload(false);
-          setLoadedLogoId(logoIdToLoad);
-          setValue("logoId", logoIdToLoad);
+          setLoadedLogoId(existingLogoId);
+          setValue("logoId", existingLogoId);
 
           // Convert backend file to FileWithPreview
           const fileWithPreview = backendFileToFileWithPreview(file);
@@ -55,9 +47,9 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
     };
 
     loadExistingLogo();
-  }, [existingLogoId, searchParams, loadedLogoId, setValue]);
+  }, [existingLogoId, loadedLogoId, setValue]);
 
-  const handleFilesChange = async (files: FileWithPreview[]) => {
+  const handleFilesChange = (files: FileWithPreview[]) => {
     if (files.length === 0) {
       return;
     }
@@ -82,63 +74,34 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
     }
 
     clearError("logoId");
-    setIsUploading(true);
 
-    try {
-      // Store current phones value BEFORE upload
-      const currentPhones = values.phones; // Upload the file
-      const response = await fileService.uploadSingleFile(file as unknown as File);
-      if (response && response.data) {
-        // Set the uploaded file ID
-        setValue("logoId", response.data.id); // CRITICAL: Ensure phones array is preserved
-        // React can sometimes cause state issues during async operations
-        if (currentPhones && Array.isArray(currentPhones)) {
-          setValue("phones", currentPhones);
-        } else {
-        }
-
-        setUploadedFile(response.data);
-        setIsNewUpload(true);
-        setLoadedLogoId(response.data.id);
-
-        // Update URL parameter
-        const newParams = new URLSearchParams(searchParams);
-        newParams.set("logoId", response.data.id);
-        setSearchParams(newParams);
-
-        // Preview is handled by the uploadedFile state
-        toast.success("Logo enviado com sucesso!");
-      }
-    } catch (error) {
-      console.error("Failed to upload file:", error);
-      setError("logoId", "Falha ao enviar arquivo. Tente novamente.");
-    } finally {
-      setIsUploading(false);
-    }
+    // Store the file in state instead of uploading immediately
+    setLogoFile(file);
+    setValue("logoFile", file); // Store the actual file in form state
+    setValue("logoId", null); // Clear logoId since we have a new file
+    setUploadedFile(null); // Clear any previously loaded file
   };
 
-  const handleRemoveFile = (_file: AnkaaFile) => {
+  const handleRemoveFile = () => {
     setValue("logoId", null);
+    setValue("logoFile", null);
     setUploadedFile(null);
-    // DON'T reset loadedLogoId - keep it to prevent reloading the same logo
-    setIsNewUpload(false);
-
-    // Remove from URL parameters
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete("logoId");
-    setSearchParams(newParams);
+    setLogoFile(null);
   };
 
-  const canRemove = uploadedFile && !disabled;
+  const canRemove = (uploadedFile || logoFile) && !disabled;
+
+  // Determine what to show for the file
+  const displayFile = uploadedFile || logoFile;
 
   return (
     <div className="space-y-2">
       <Label>Logo</Label>
 
-      {!uploadedFile ? (
+      {!displayFile ? (
         <FileUploadField
           onFilesChange={handleFilesChange}
-          disabled={disabled || isUploading}
+          disabled={disabled}
           acceptedFileTypes={{
             "image/*": [".jpeg", ".jpg", ".png", ".gif", ".svg", ".webp"],
           }}
@@ -149,19 +112,31 @@ export function LogoInput({ disabled, existingLogoId }: LogoInputProps) {
         />
       ) : (
         <Card className="p-4">
-          <FileItem
-            file={uploadedFile}
-            onDelete={canRemove ? handleRemoveFile : undefined}
-            onPreview={(_file: AnkaaFile) => setShowPreview(true)}
-            showActions={true}
-            viewMode="grid"
-          />
+          {uploadedFile ? (
+            <FileItem
+              file={uploadedFile}
+              onDelete={canRemove ? handleRemoveFile : undefined}
+              onPreview={() => setShowPreview(true)}
+              showActions={true}
+              viewMode="grid"
+            />
+          ) : logoFile ? (
+            <FileUploadField
+              onFilesChange={handleFilesChange}
+              disabled={disabled}
+              existingFiles={[logoFile]}
+              acceptedFileTypes={{
+                "image/*": [".jpeg", ".jpg", ".png", ".gif", ".svg", ".webp"],
+              }}
+              maxFiles={1}
+              variant="compact"
+              showPreview={true}
+            />
+          ) : null}
         </Card>
       )}
 
       {showPreview && uploadedFile && <FilePreview files={[uploadedFile]} open={showPreview} onOpenChange={setShowPreview} initialFileIndex={0} />}
-
-      {isUploading && <p className="text-sm text-muted-foreground">Enviando logo...</p>}
     </div>
   );
 }

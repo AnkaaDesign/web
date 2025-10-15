@@ -137,7 +137,8 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
     setUploadedFiles(files);
     const fileIds = files.map((f) => f.id);
     setUploadedFileIds(fileIds);
-    form.setValue("fileIds", fileIds);
+    // IMPORTANT: Mark form as dirty when files change to enable submit button
+    form.setValue("fileIds", fileIds, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
   };
 
   // Handle form submission

@@ -88,7 +88,7 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
         },
       },
       receipts: true,
-      nfes: true,
+      invoices: true,
       artworks: true,
     }),
     [],

@@ -26,14 +26,14 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
           <div>
             <h3 className="text-base font-semibold mb-4 text-foreground">Dados Pessoais</h3>
             <div className="space-y-4">
-              {user.birthDate && (
+              {user.birth && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCake className="h-4 w-4" />
                     Data de Nascimento
                   </span>
                   <span className="text-sm font-semibold text-foreground">
-                    {formatDate(user.birthDate)} ({getAge(user.birthDate)} anos)
+                    {formatDate(user.birth)} ({getAge(user.birth)} anos)
                   </span>
                 </div>
               )}
@@ -81,16 +81,6 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
                     Setor Gerenciado
                   </span>
                   <span className="text-sm font-semibold text-foreground">{user.managedSector.name}</span>
-                </div>
-              )}
-
-              {user.admissional && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconCalendar className="h-4 w-4" />
-                    Data de Admissão
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">{formatDate(user.admissional)}</span>
                 </div>
               )}
 

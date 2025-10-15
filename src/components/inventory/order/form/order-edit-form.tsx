@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconDownload, IconCalendar } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconDownload, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal } from "@tabler/icons-react";
 import type { OrderCreateFormData } from "../../../../schemas";
 import type { Order, OrderItem } from "../../../../types";
 import { orderCreateSchema } from "../../../../schemas";
@@ -27,6 +27,8 @@ import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { useSuppliers } from "../../../../hooks";
+import { FileUploadField, type FileWithPreview } from "@/components/file";
+import { Separator } from "@/components/ui/separator";
 
 interface OrderEditFormProps {
   order: Order & {
@@ -113,6 +115,11 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       ),
     [order.items],
   );
+
+  // File upload state
+  const [budgetFiles, setBudgetFiles] = useState<FileWithPreview[]>([]);
+  const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
+  const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>([]);
 
   // URL state management for item selection (Stage 2) - initialized with existing data
   const {
@@ -248,6 +255,19 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       setSearchParams(setStepInUrl(searchParams, newStep), { replace: true });
     }
   }, [currentStep, searchParams, setSearchParams]);
+
+  // File change handlers
+  const handleBudgetFilesChange = useCallback((files: FileWithPreview[]) => {
+    setBudgetFiles(files);
+  }, []);
+
+  const handleReceiptFilesChange = useCallback((files: FileWithPreview[]) => {
+    setReceiptFiles(files);
+  }, []);
+
+  const handleNfeFilesChange = useCallback((files: FileWithPreview[]) => {
+    setNfeFiles(files);
+  }, []);
 
   // Stage validation
   const validateCurrentStep = useCallback((): boolean => {
@@ -791,63 +811,138 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                           <FormMessage className="text-sm text-red-500">{form.formState.errors.description?.message}</FormMessage>
                         </div>
 
-                        {/* Supplier and Date in the same row */}
+                        {/* Supplier, Date and Observations in the same row */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* Supplier */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">Fornecedor</Label>
-                            <Combobox<ComboboxOption>
-                              placeholder="Selecione um fornecedor (opcional)"
-                              options={suppliers.map((supplier) => ({
-                                value: supplier.id,
-                                label: supplier.fantasyName,
-                              }))}
-                              value={supplierId}
-                              onValueChange={(value) => updateSupplierId(typeof value === "string" ? value : undefined)}
-                              className="h-10 w-full"
-                              mode="single"
-                              searchable={true}
-                              clearable={true}
-                            />
-                          </div>
+                          {/* Left Column: Supplier and Date */}
+                          <div className="space-y-6">
+                            {/* Supplier */}
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium">Fornecedor</Label>
+                              <Combobox<ComboboxOption>
+                                placeholder="Selecione um fornecedor (opcional)"
+                                options={suppliers.map((supplier) => ({
+                                  value: supplier.id,
+                                  label: supplier.fantasyName,
+                                }))}
+                                value={supplierId}
+                                onValueChange={(value) => updateSupplierId(typeof value === "string" ? value : undefined)}
+                                className="h-10 w-full"
+                                mode="single"
+                                searchable={true}
+                                clearable={true}
+                              />
+                            </div>
 
-                          {/* Forecast Date */}
-                          <DateTimeInput
-                            value={forecast instanceof Date ? forecast : undefined}
-                            onChange={(date) => {
-                              if (date) {
-                                // Set to 13:00 São Paulo time
-                                const newDate = new Date(date);
-                                newDate.setHours(13, 0, 0, 0);
-                                updateForecast(newDate);
-                              } else {
-                                updateForecast(null);
-                              }
-                            }}
-                            context="delivery"
-                            label={
-                              <div className="flex items-center gap-2">
+                            {/* Forecast Date */}
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
                                 <IconCalendar className="h-4 w-4" />
                                 Previsão de Entrega
-                              </div>
-                            }
-                            placeholder="Selecione a data prevista (opcional)"
-                            description="Data estimada para recebimento dos itens"
-                            showClearButton={true}
-                            className="w-full"
-                          />
+                              </Label>
+                              <DateTimeInput
+                                value={forecast instanceof Date ? forecast : undefined}
+                                onChange={(date) => {
+                                  if (date) {
+                                    // Set to 13:00 São Paulo time
+                                    const newDate = new Date(date);
+                                    newDate.setHours(13, 0, 0, 0);
+                                    updateForecast(newDate);
+                                  } else {
+                                    updateForecast(null);
+                                  }
+                                }}
+                                context="delivery"
+                                placeholder="Selecione a data prevista (opcional)"
+                                showClearButton={true}
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Right Column: Observations */}
+                          <div className="space-y-2 flex flex-col">
+                            <Label className="text-sm font-medium">Observações</Label>
+                            <Textarea
+                              placeholder="Observações sobre o pedido (opcional)"
+                              value={notes}
+                              onChange={(e) => updateNotes(e.target.value)}
+                              className="resize-none w-full flex-1"
+                              rows={3}
+                            />
+                          </div>
                         </div>
 
-                        {/* Notes - Full width */}
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium">Observações</Label>
-                          <Textarea
-                            placeholder="Observações sobre o pedido (opcional)"
-                            value={notes}
-                            onChange={(e) => updateNotes(e.target.value)}
-                            className="min-h-20 max-h-32 w-full"
-                            rows={3}
-                          />
+                        {/* File uploads */}
+                        <div className="space-y-4">
+                          <Separator />
+                          <Label className="text-sm font-medium">Documentos (Opcional)</Label>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Budget File */}
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <IconCurrencyReal className="h-4 w-4" />
+                                Orçamento
+                              </Label>
+                              <FileUploadField
+                                onFilesChange={handleBudgetFilesChange}
+                                existingFiles={budgetFiles}
+                                maxFiles={1}
+                                maxSize={10 * 1024 * 1024}
+                                acceptedFileTypes={{
+                                  "application/pdf": [".pdf"],
+                                  "image/*": [".jpg", ".jpeg", ".png"],
+                                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+                                  "application/vnd.ms-excel": [".xls"],
+                                }}
+                                showPreview={true}
+                                variant="compact"
+                                placeholder="Adicionar orçamento"
+                              />
+                            </div>
+
+                            {/* Receipt File */}
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <IconReceipt className="h-4 w-4" />
+                                Recibo
+                              </Label>
+                              <FileUploadField
+                                onFilesChange={handleReceiptFilesChange}
+                                existingFiles={receiptFiles}
+                                maxFiles={1}
+                                maxSize={10 * 1024 * 1024}
+                                acceptedFileTypes={{
+                                  "application/pdf": [".pdf"],
+                                  "image/*": [".jpg", ".jpeg", ".png"],
+                                }}
+                                showPreview={true}
+                                variant="compact"
+                                placeholder="Adicionar recibo"
+                              />
+                            </div>
+
+                            {/* NFE File */}
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <IconFileInvoice className="h-4 w-4" />
+                                Nota Fiscal
+                              </Label>
+                              <FileUploadField
+                                onFilesChange={handleNfeFilesChange}
+                                existingFiles={nfeFiles}
+                                maxFiles={1}
+                                maxSize={10 * 1024 * 1024}
+                                acceptedFileTypes={{
+                                  "application/pdf": [".pdf"],
+                                  "image/*": [".jpg", ".jpeg", ".png"],
+                                }}
+                                showPreview={true}
+                                variant="compact"
+                                placeholder="Adicionar nota fiscal"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>

@@ -91,8 +91,7 @@ const EditCollaboratorPage = () => {
       zipCode: user.zipCode ?? null,
       site: user.site ?? null,
       // Convert ISO string dates to Date objects for proper form handling
-      birth: user.birthDate ? (user.birthDate instanceof Date ? user.birthDate : new Date(user.birthDate)) : null,
-      admissional: user.admissional ? (user.admissional instanceof Date ? user.admissional : new Date(user.admissional)) : null,
+      birth: user.birth ? (user.birth instanceof Date ? user.birth : new Date(user.birth)) : null,
       dismissal: user.dismissal ? (user.dismissal instanceof Date ? user.dismissal : new Date(user.dismissal)) : null,
       payrollNumber: user.payrollNumber ?? null,
     };

@@ -18,7 +18,6 @@ const SECTOR_DETAIL_VISIBLE_COLUMNS = new Set([
   "phone",
   "position.name",
   "status",
-  "admissional",
 ]);
 
 export function SectorUsersTable({ sector }: SectorUsersTableProps) {

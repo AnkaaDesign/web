@@ -41,7 +41,7 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
       budgets: z.boolean().optional(), // Many-to-many relation with File
-      nfes: z.boolean().optional(), // Many-to-many relation with File
+      invoices: z.boolean().optional(), // Many-to-many relation with File
       receipts: z.boolean().optional(), // Many-to-many relation with File
       reimbursements: z.boolean().optional(), // Many-to-many relation with File
       reimbursementInvoices: z.boolean().optional(), // Many-to-many relation with File
@@ -191,7 +191,7 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
               .object({
                 task: z.boolean().optional(),
                 receipts: z.boolean().optional(),
-                nfes: z.boolean().optional(),
+                invoices: z.boolean().optional(),
               })
               .optional(),
             orderBy: z
@@ -326,7 +326,7 @@ export const taskWhereSchema: z.ZodSchema<any> = z.lazy(() =>
           none: z.any().optional(),
         })
         .optional(),
-      nfes: z
+      invoices: z
         .object({
           some: z.any().optional(),
           every: z.any().optional(),
@@ -1402,7 +1402,7 @@ export const mapTaskToFormData = createMapToFormDataHelper<Task, TaskUpdateFormD
   price: task.price,
   // Many-to-many relations (arrays)
   budgetIds: task.budgets?.map((budget) => budget.id),
-  invoiceIds: task.nfes?.map((nfe) => nfe.id),
+  invoiceIds: task.invoices?.map((nfe) => nfe.id),
   receiptIds: task.receipts?.map((receipt) => receipt.id),
   reimbursementIds: task.reimbursements?.map((reimbursement) => reimbursement.id),
   reimbursementInvoiceIds: task.reimbursementInvoices?.map((reimbursementInvoice) => reimbursementInvoice.id),

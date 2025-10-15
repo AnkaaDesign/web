@@ -241,7 +241,8 @@ export function useTaskMutations() {
 
   // UPDATE
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: TaskUpdateFormData }) => updateTask(id, data),
+    mutationFn: ({ id, data, query }: { id: string; data: TaskUpdateFormData | FormData; query?: TaskQueryFormData }) =>
+      updateTask(id, data, query),
     onSuccess: (response, variables) => {
       invalidateTasks();
       queryClient.invalidateQueries({

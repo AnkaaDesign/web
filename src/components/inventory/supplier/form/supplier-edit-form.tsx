@@ -15,6 +15,7 @@ export function SupplierEditForm({ supplier, onSubmit, isSubmitting, onDirtyChan
   // Map API data to form data
   const defaultValues = React.useMemo(
     () => ({
+      id: supplier.id, // Include supplier ID for FormData context
       fantasyName: supplier.fantasyName,
       cnpj: supplier.cnpj,
       corporateName: supplier.corporateName,
@@ -37,7 +38,14 @@ export function SupplierEditForm({ supplier, onSubmit, isSubmitting, onDirtyChan
   // Track original values to determine what changed (only set once on mount)
   const originalValuesRef = React.useRef(defaultValues);
 
-  const handleSubmit = async (data: SupplierUpdateFormData & { logoFile?: File }) => {
+  const handleSubmit = async (data: SupplierUpdateFormData & { logoFile?: File } | FormData) => {
+    // If data is FormData (file upload), pass it through directly without filtering
+    // FormData is already prepared with all necessary fields by SupplierForm
+    if (data instanceof FormData) {
+      await onSubmit(data as any);
+      return;
+    }
+
     // Extract logoFile from data (passed by SupplierForm)
     const { logoFile, ...formData } = data;
 

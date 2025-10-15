@@ -2,12 +2,13 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconDownload, IconX, IconAlertTriangle } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconDownload, IconX, IconAlertTriangle, IconFileInvoice, IconReceipt, IconCurrencyReal } from "@tabler/icons-react";
 import type { OrderCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useSuppliers } from "../../../../hooks";
 import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { toast } from "sonner";
+import { FileUploadField, type FileWithPreview } from "@/components/file";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -61,6 +62,11 @@ export const OrderCreateForm = () => {
 
   // Initialize state from URL parameters
   const [currentStep, setCurrentStep] = useState(getStepFromUrl(searchParams));
+
+  // File upload state
+  const [budgetFiles, setBudgetFiles] = useState<FileWithPreview[]>([]);
+  const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
+  const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>([]);
 
   // URL state management for item selection (Stage 2)
   const {
@@ -291,6 +297,23 @@ export const OrderCreateForm = () => {
         return true;
     }
   }, [currentStep, form, selectedItems, prices]);
+
+  // Handle file changes
+  const handleBudgetFilesChange = useCallback((files: FileWithPreview[]) => {
+    setBudgetFiles(files);
+    // Mark form as dirty to enable submit
+    form.setValue("budgetId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
+  }, [form]);
+
+  const handleReceiptFilesChange = useCallback((files: FileWithPreview[]) => {
+    setReceiptFiles(files);
+    form.setValue("receiptId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
+  }, [form]);
+
+  const handleNfeFilesChange = useCallback((files: FileWithPreview[]) => {
+    setNfeFiles(files);
+    form.setValue("nfeId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
+  }, [form]);
 
   // Handle item selection
   const handleSelectItem = useCallback(
@@ -1014,82 +1037,159 @@ export const OrderCreateForm = () => {
                             <FormMessage className="text-sm text-red-500">{form.formState.errors.description?.message}</FormMessage>
                           </div>
 
-                          {/* Supplier and Date in the same row */}
+                          {/* Supplier, Date and Observations in the same row */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Supplier Selection */}
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium">Fornecedor</Label>
-                              <Combobox
-                                value={form.watch("supplierId") || ""}
-                                onValueChange={(value) => {
-                                  form.setValue("supplierId", value || undefined);
-                                  // Update URL state
-                                  updateSupplierId(value || undefined);
-                                }}
-                                options={
-                                  suppliers.length === 0
-                                    ? []
-                                    : suppliers.map((supplier) => ({
-                                        value: supplier.id,
-                                        label: supplier.fantasyName,
-                                      }))
-                                }
-                                placeholder="Selecione um fornecedor (opcional)"
-                                emptyText="Nenhum fornecedor encontrado"
-                                className="w-full"
-                              />
+                            {/* Left Column: Supplier and Date */}
+                            <div className="space-y-6">
+                              {/* Supplier Selection */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Fornecedor</Label>
+                                <Combobox
+                                  value={form.watch("supplierId") || ""}
+                                  onValueChange={(value) => {
+                                    form.setValue("supplierId", value || undefined);
+                                    // Update URL state
+                                    updateSupplierId(value || undefined);
+                                  }}
+                                  options={
+                                    suppliers.length === 0
+                                      ? []
+                                      : suppliers.map((supplier) => ({
+                                          value: supplier.id,
+                                          label: supplier.fantasyName,
+                                        }))
+                                  }
+                                  placeholder="Selecione um fornecedor (opcional)"
+                                  emptyText="Nenhum fornecedor encontrado"
+                                  className="w-full"
+                                />
+                              </div>
+
+                              {/* Scheduled Date */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium flex items-center gap-2">
+                                  <IconCalendar className="h-4 w-4" />
+                                  Data de Entrega
+                                </Label>
+                                <DateTimeInput
+                                  value={form.watch("forecast") || undefined}
+                                  onChange={(date) => {
+                                    if (date instanceof Date) {
+                                      // Set to 13:00 São Paulo time
+                                      const newDate = new Date(date);
+                                      newDate.setHours(13, 0, 0, 0);
+                                      form.setValue("forecast", newDate);
+                                      // Update URL state
+                                      updateForecast(newDate);
+                                    } else {
+                                      form.setValue("forecast", undefined);
+                                      // Update URL state
+                                      updateForecast(undefined);
+                                    }
+                                  }}
+                                  placeholder="Selecione a data de entrega (opcional)"
+                                  className="w-full"
+                                  mode="date"
+                                  context="forecast"
+                                />
+                              </div>
                             </div>
 
-                            {/* Scheduled Date */}
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium flex items-center gap-2">
-                                <IconCalendar className="h-4 w-4" />
-                                Data de Entrega
-                              </Label>
-                              <DateTimeInput
-                                value={form.watch("forecast") || undefined}
-                                onChange={(date) => {
-                                  if (date instanceof Date) {
-                                    // Set to 13:00 São Paulo time
-                                    const newDate = new Date(date);
-                                    newDate.setHours(13, 0, 0, 0);
-                                    form.setValue("forecast", newDate);
-                                    // Update URL state
-                                    updateForecast(newDate);
-                                  } else {
-                                    form.setValue("forecast", undefined);
-                                    // Update URL state
-                                    updateForecast(undefined);
-                                  }
+                            {/* Right Column: Observations */}
+                            <div className="space-y-2 flex flex-col">
+                              <Label className="text-sm font-medium">Observações</Label>
+                              <Textarea
+                                placeholder="Observações sobre o pedido (opcional)"
+                                value={form.watch("notes") || ""}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  // Update form state
+                                  form.setValue("notes", value, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                    shouldTouch: true,
+                                  });
+                                  // Update URL state
+                                  updateNotes(value);
                                 }}
-                                placeholder="Selecione a data de entrega (opcional)"
-                                className="w-full"
-                                mode="date"
-                                context="forecast"
+                                className="resize-none w-full flex-1"
+                                rows={5}
                               />
                             </div>
                           </div>
 
-                          {/* Notes - Full width */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">Observações</Label>
-                            <Textarea
-                              placeholder="Observações sobre o pedido (opcional)"
-                              value={form.watch("notes") || ""}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                // Update form state
-                                form.setValue("notes", value, {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                  shouldTouch: true,
-                                });
-                                // Update URL state
-                                updateNotes(value);
-                              }}
-                              className="min-h-[120px] resize-none w-full"
-                              rows={5}
-                            />
+                          {/* File uploads */}
+                          <div className="space-y-4">
+                            <Separator />
+                            <Label className="text-sm font-medium">Documentos (Opcional)</Label>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {/* Budget File */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium flex items-center gap-2">
+                                  <IconCurrencyReal className="h-4 w-4" />
+                                  Orçamento
+                                </Label>
+                                <FileUploadField
+                                  onFilesChange={handleBudgetFilesChange}
+                                  existingFiles={budgetFiles}
+                                  maxFiles={1}
+                                  maxSize={10 * 1024 * 1024} // 10MB
+                                  acceptedFileTypes={{
+                                    "application/pdf": [".pdf"],
+                                    "image/*": [".jpg", ".jpeg", ".png"],
+                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+                                    "application/vnd.ms-excel": [".xls"],
+                                  }}
+                                  showPreview={true}
+                                  variant="compact"
+                                  placeholder="Adicionar orçamento"
+                                />
+                              </div>
+
+                              {/* Receipt File */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium flex items-center gap-2">
+                                  <IconReceipt className="h-4 w-4" />
+                                  Recibo
+                                </Label>
+                                <FileUploadField
+                                  onFilesChange={handleReceiptFilesChange}
+                                  existingFiles={receiptFiles}
+                                  maxFiles={1}
+                                  maxSize={10 * 1024 * 1024} // 10MB
+                                  acceptedFileTypes={{
+                                    "application/pdf": [".pdf"],
+                                    "image/*": [".jpg", ".jpeg", ".png"],
+                                  }}
+                                  showPreview={true}
+                                  variant="compact"
+                                  placeholder="Adicionar recibo"
+                                />
+                              </div>
+
+                              {/* NFE File */}
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium flex items-center gap-2">
+                                  <IconFileInvoice className="h-4 w-4" />
+                                  Nota Fiscal
+                                </Label>
+                                <FileUploadField
+                                  onFilesChange={handleNfeFilesChange}
+                                  existingFiles={nfeFiles}
+                                  maxFiles={1}
+                                  maxSize={10 * 1024 * 1024} // 10MB
+                                  acceptedFileTypes={{
+                                    "application/pdf": [".pdf"],
+                                    "application/xml": [".xml"],
+                                    "image/*": [".jpg", ".jpeg", ".png"],
+                                  }}
+                                  showPreview={true}
+                                  variant="compact"
+                                  placeholder="Adicionar NF-e"
+                                />
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </CardContent>

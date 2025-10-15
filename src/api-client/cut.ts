@@ -51,13 +51,21 @@ export class CutService {
   // Mutation Operations
   // =====================
 
-  async createCut(data: CutCreateFormData, query?: CutQueryFormData): Promise<CutCreateResponse> {
-    const response = await apiClient.post<CutCreateResponse>(this.basePath, data, { params: query });
+  async createCut(data: CutCreateFormData | FormData, query?: CutQueryFormData): Promise<CutCreateResponse> {
+    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    const response = await apiClient.post<CutCreateResponse>(this.basePath, data, {
+      params: query,
+      headers,
+    });
     return response.data;
   }
 
-  async updateCut(id: string, data: CutUpdateFormData, query?: CutQueryFormData): Promise<CutUpdateResponse> {
-    const response = await apiClient.put<CutUpdateResponse>(`${this.basePath}/${id}`, data, { params: query });
+  async updateCut(id: string, data: CutUpdateFormData | FormData, query?: CutQueryFormData): Promise<CutUpdateResponse> {
+    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    const response = await apiClient.put<CutUpdateResponse>(`${this.basePath}/${id}`, data, {
+      params: query,
+      headers,
+    });
     return response.data;
   }
 
@@ -98,8 +106,8 @@ export const cutService = new CutService();
 
 export const getCuts = (params?: CutGetManyFormData) => cutService.getCuts(params);
 export const getCutById = (id: string, params?: CutQueryFormData) => cutService.getCutById(id, params);
-export const createCut = (data: CutCreateFormData, query?: CutQueryFormData) => cutService.createCut(data, query);
-export const updateCut = (id: string, data: CutUpdateFormData, query?: CutQueryFormData) => cutService.updateCut(id, data, query);
+export const createCut = (data: CutCreateFormData | FormData, query?: CutQueryFormData) => cutService.createCut(data, query);
+export const updateCut = (id: string, data: CutUpdateFormData | FormData, query?: CutQueryFormData) => cutService.updateCut(id, data, query);
 export const deleteCut = (id: string) => cutService.deleteCut(id);
 export const batchCreateCuts = (data: CutBatchCreateFormData, query?: CutQueryFormData) => cutService.batchCreateCuts(data, query);
 export const batchUpdateCuts = (data: CutBatchUpdateFormData, query?: CutQueryFormData) => cutService.batchUpdateCuts(data, query);

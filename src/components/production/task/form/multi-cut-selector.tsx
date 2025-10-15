@@ -12,7 +12,6 @@ import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas
 import { CUT_TYPE, CUT_TYPE_LABELS, CUT_ORIGIN } from "../../../../constants";
 import { FileUploadField } from "@/components/file";
 import type { FileWithPreview } from "@/components/file";
-import { uploadSingleFile } from "../../../../api-client";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { getApiBaseUrl } from "@/utils/file";
 
@@ -81,7 +80,6 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
   useEffect(() => {
     if (onCutsCountChange) {
       onCutsCountChange(cuts.length);
-    } else {
     }
   }, [cuts.length, onCutsCountChange]);
 
@@ -96,238 +94,107 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
     setCuts((prev) => prev.map((cut) => (cut.id === id ? { ...cut, ...updates } : cut)));
   }, []);
 
-  // Handle file upload for a specific cut
-  const handleFileUpload = useCallback(
-    async (cutId: string, files: FileWithPreview[]) => {
+  // Handle file change for a specific cut - no longer uploads immediately
+  const handleFileChange = useCallback(
+    (cutId: string, files: FileWithPreview[]) => {
       if (files.length === 0) {
         updateCut(cutId, { file: undefined, fileId: undefined });
         return;
       }
 
       const file = files[0];
-      updateCut(cutId, { file, uploading: true, error: undefined });
-
-      try {
-        const result = await uploadSingleFile(file, {
-          onProgress: (progress) => {
-            updateCut(cutId, {
-              file: {
-                ...file,
-                uploadProgress: progress.percentage,
-                uploaded: false,
-              } as FileWithPreview,
-            });
-          },
-        });
-
-        if (!result.success || !result.data) {
-          throw new Error(result.message || "Upload failed");
-        }
-
-        const uploadedFile = result.data;
-        const apiBaseUrl = getApiBaseUrl();
-        updateCut(cutId, {
-          fileId: uploadedFile.id,
-          file: {
-            ...file,
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            id: uploadedFile.id,
-            uploadProgress: 100,
-            uploaded: true,
-            thumbnailUrl: uploadedFile.thumbnailUrl || `${apiBaseUrl}/files/thumbnail/${uploadedFile.id}`,
-            uploadedFileId: uploadedFile.id,
-          } as FileWithPreview,
-          uploading: false,
-        });
-      } catch (error) {
-        updateCut(cutId, {
-          error: "Erro ao enviar arquivo",
-          uploading: false,
-          file: {
-            ...file,
-            error: "Upload failed",
-            uploadProgress: 0,
-            uploaded: false,
-          } as FileWithPreview,
-        });
-      }
+      // Store the file in the cut item - it will be uploaded when the form is submitted
+      updateCut(cutId, {
+        file: file,
+        fileId: undefined, // Clear fileId since we're using a new file
+        uploading: false,
+        error: undefined,
+      });
     },
     [updateCut],
   );
 
-  // Calculate total cuts
-  const totalCuts = cuts.reduce((sum, cut) => sum + cut.quantity, 0);
-
-  // Sync FROM form field TO local state when form resets (form → local)
+  // Sync Local→Form (SINGLE SOURCE OF TRUTH)
   useEffect(() => {
-    // Skip if we're currently syncing TO the form (prevents race conditions)
-    if (isSyncingToForm.current) {
-      console.log('[MultiCutSelector] Skipping Form→Local sync (currently syncing to form)');
+    // Skip if no cuts
+    if (cuts.length === 0) {
+      field.onChange([]);
       return;
     }
 
-    console.log('[MultiCutSelector] Field value changed:', field.value);
+    // Mark that we're syncing to prevent reverse sync
+    isSyncingToForm.current = true;
 
-    if (field.value && Array.isArray(field.value) && field.value.length > 0) {
-      // Compare only essential data (exclude file objects which have different formats)
-      const essentialData = field.value.map((cut: any) => ({
-        type: cut.type,
-        quantity: cut.quantity,
-        fileId: cut.fileId,
-      }));
-      const fieldValueString = JSON.stringify(essentialData);
-
-      console.log('[MultiCutSelector] Checking if should update. Last:', lastFieldValueRef.current, 'New:', fieldValueString);
-
-      // Only update local state if field value is different from what we last sent
-      if (fieldValueString !== lastFieldValueRef.current) {
-        console.log('[MultiCutSelector] Updating local state with', field.value.length, 'cuts');
-
-        const apiBaseUrl = getApiBaseUrl();
-        const newCuts = field.value.map((cut: any, index: number) => {
-          // Convert existing file to FileWithPreview format if available
-          const existingFile = cut.file ? {
-            id: cut.file.id,
-            name: cut.file.filename || cut.file.name || 'Arquivo anexado',
-            size: cut.file.size || 0,
-            type: cut.file.mimetype || cut.file.type || 'application/octet-stream',
-            uploaded: true,
-            uploadProgress: 100,
-            uploadedFileId: cut.file.id,
-            thumbnailUrl: cut.file.thumbnailUrl || `${apiBaseUrl}/files/thumbnail/${cut.file.id}`,
-          } as FileWithPreview : undefined;
-
-          return {
-            id: `cut-${Date.now()}-${index}`,
-            type: cut.type || CUT_TYPE.VINYL,
-            quantity: cut.quantity || 1,
-            fileId: cut.fileId,
-            file: existingFile,
-          };
-        });
-
-        console.log('[MultiCutSelector] New cuts state:', newCuts);
-        setCuts(newCuts);
-        lastFieldValueRef.current = fieldValueString;
-      }
-    } else if (!field.value || (Array.isArray(field.value) && field.value.length === 0)) {
-      console.log('[MultiCutSelector] Field value is empty, clearing cuts');
-      // Clear cuts if field value is empty
-      if (cuts.length > 0) {
-        setCuts([]);
-        lastFieldValueRef.current = "";
-      }
-    }
-  }, [field.value]);
-
-  // Sync FROM local state TO form field when cuts change (local → form)
-  useEffect(() => {
-    const formCuts = cuts.map((cut) => {
-      const formCut: any = {
-        type: cut.type,
-        quantity: cut.quantity,
-        fileId: cut.fileId || "",
-        origin: CUT_ORIGIN.PLAN,
-      };
-
-      // Preserve file object if it exists to prevent sync loops
-      if (cut.file) {
-        formCut.file = cut.file;
-      }
-
-      return formCut;
-    });
-
-    // Compare only essential data (exclude file objects)
-    const essentialData = formCuts.map((cut) => ({
+    // Transform cuts to the format expected by the form
+    const formData = cuts.map((cut) => ({
       type: cut.type,
       quantity: cut.quantity,
       fileId: cut.fileId,
+      file: cut.file, // Include the file object for submission
+      origin: CUT_ORIGIN.PLAN, // Always PLAN for task-created cuts
     }));
-    const formCutsString = JSON.stringify(essentialData);
 
-    // Only update field if local cuts changed (user interaction)
-    if (formCutsString !== lastFieldValueRef.current) {
-      console.log('[MultiCutSelector] Local→Form sync: updating field with', formCuts.length, 'cuts');
-      lastFieldValueRef.current = formCutsString;
+    // Update form field
+    field.onChange(formData);
 
-      // Set flag to prevent Form→Local from reacting to our change
-      isSyncingToForm.current = true;
-      field.onChange(formCuts);
+    // Clear sync flag after next tick
+    setTimeout(() => {
+      isSyncingToForm.current = false;
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cuts]); // Only depend on cuts, not field (field.onChange is stable)
 
-      // Reset flag after React finishes batching updates
-      setTimeout(() => {
-        isSyncingToForm.current = false;
-        console.log('[MultiCutSelector] Sync lock released');
-      }, 0);
+  // Sync Form→Local (only on initial load or external changes)
+  useEffect(() => {
+    // Skip if we're currently syncing to form
+    if (isSyncingToForm.current) return;
+
+    const fieldValue = field.value;
+    const fieldValueStr = JSON.stringify(fieldValue);
+
+    // Skip if value hasn't changed
+    if (fieldValueStr === lastFieldValueRef.current) return;
+
+    lastFieldValueRef.current = fieldValueStr;
+
+    // Initialize from form value if exists
+    if (fieldValue && Array.isArray(fieldValue) && fieldValue.length > 0) {
+      const newCuts: CutItem[] = fieldValue.map((item: any, index: number) => ({
+        id: item.id || `cut-${Date.now()}-${index}`,
+        type: item.type || CUT_TYPE.VINYL,
+        quantity: item.quantity || 1,
+        fileId: item.fileId,
+        file: item.file,
+      }));
+      setCuts(newCuts);
+      setExpandedItems(newCuts.map((c) => c.id));
+    } else if (fieldValue === null || (Array.isArray(fieldValue) && fieldValue.length === 0)) {
+      // Clear cuts if form field is empty/null
+      setCuts([]);
+      setExpandedItems([]);
     }
-  }, [cuts, field]);
+  }, [field.value]);
 
   return (
     <div className="space-y-4">
-      {/* Info Badge */}
       {cuts.length > 0 && (
-        <div className="flex justify-start">
-          <Badge variant="secondary" className="font-medium">
-            {cuts.length} {cuts.length === 1 ? "arquivo" : "arquivos"} • {totalCuts} {totalCuts === 1 ? "corte" : "cortes"} total
-          </Badge>
-        </div>
-      )}
-
-      {/* Cuts List */}
-      {cuts.length > 0 && (
-        <Accordion type="multiple" value={expandedItems} onValueChange={setExpandedItems} className="space-y-3">
-          {cuts.map((cut) => (
-            <AccordionItem key={cut.id} value={cut.id} className="border rounded-lg overflow-hidden bg-card">
-              <div className="flex items-center justify-between w-full px-4 py-3">
-                <AccordionTrigger className="flex-1 hover:no-underline hover:bg-muted/50 rounded mr-2">
-                  <div className="flex items-center gap-3">
+        <Accordion type="multiple" value={expandedItems} onValueChange={setExpandedItems} className="w-full space-y-2">
+          {cuts.map((cut, index) => (
+            <AccordionItem key={cut.id} value={cut.id} className="border rounded-lg">
+              <AccordionTrigger className="px-4 hover:no-underline">
+                <div className="flex items-center justify-between w-full pr-2">
+                  <div className="flex items-center gap-2">
                     <IconGripVertical className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{CUT_TYPE_LABELS[cut.type as CUT_TYPE] || cut.type}</span>
-                      <span className="text-muted-foreground">•</span>
-                      <span className="text-sm text-muted-foreground">
-                        {cut.quantity} {cut.quantity === 1 ? "unidade" : "unidades"}
-                      </span>
-                      {cut.fileId && (
-                        <>
-                          <span className="text-muted-foreground">•</span>
-                          <Badge variant="secondary" className="gap-1">
-                            <IconFile className="h-3 w-3" />
-                            Arquivo anexado
-                          </Badge>
-                        </>
-                      )}
-                    </div>
+                    <IconScissors className="h-4 w-4" />
+                    <span className="font-medium">Corte #{index + 1}</span>
+                    <Badge variant="secondary">{CUT_TYPE_LABELS[cut.type as keyof typeof CUT_TYPE_LABELS] || cut.type}</Badge>
+                    <Badge variant="outline">Qtd: {cut.quantity}</Badge>
                   </div>
-                </AccordionTrigger>
-                <div
-                  className="h-8 w-8 text-destructive hover:text-destructive rounded-md flex items-center justify-center hover:bg-destructive/10 cursor-pointer transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeCut(cut.id);
-                  }}
-                  role="button"
-                  tabIndex={disabled ? -1 : 0}
-                  onKeyDown={(e) => {
-                    if ((e.key === "Enter" || e.key === " ") && !disabled) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      removeCut(cut.id);
-                    }
-                  }}
-                  style={{ opacity: disabled ? 0.5 : 1, pointerEvents: disabled ? "none" : "auto" }}
-                >
-                  <IconTrash className="h-4 w-4" />
+                  {cut.file && <Badge variant="success">Arquivo anexado</Badge>}
                 </div>
-              </div>
-
-              <AccordionContent className="px-4 pb-4 pt-0">
-                <Separator className="mb-4" />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pt-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Left Column - File Upload */}
                   <div className="space-y-2">
                     <FormLabel className="flex items-center gap-2">
@@ -335,7 +202,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
                       Arquivo de Corte
                     </FormLabel>
                     <FileUploadField
-                      onFilesChange={(files) => handleFileUpload(cut.id, files)}
+                      onFilesChange={(files) => handleFileChange(cut.id, files)}
                       maxFiles={1}
                       acceptedFileTypes={{
                         "application/postscript": [".eps", ".ai"],
@@ -380,47 +247,40 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
                     {/* Quantity */}
                     <div className="space-y-2">
                       <FormLabel>Quantidade</FormLabel>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-9 w-9"
-                          onClick={() => updateCut(cut.id, { quantity: Math.max(1, cut.quantity - 1) })}
-                          disabled={disabled || cut.quantity <= 1}
-                        >
-                          -
-                        </Button>
-                        <Input
-                          type="number"
-                          min="1"
-                          max="100"
-                          value={cut.quantity}
-                          onChange={(value) => updateCut(cut.id, { quantity: typeof value === "number" ? value : parseInt(String(value)) || 1 })}
-                          disabled={disabled}
-                          className="text-center"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-9 w-9"
-                          onClick={() => updateCut(cut.id, { quantity: Math.min(100, cut.quantity + 1) })}
-                          disabled={disabled || cut.quantity >= 100}
-                        >
-                          +
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Serão criados {cut.quantity} {cut.quantity === 1 ? "corte" : "cortes"} deste tipo
-                      </p>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={cut.quantity}
+                        onChange={(e) => {
+                          const num = parseInt(e.target.value, 10);
+                          updateCut(cut.id, { quantity: isNaN(num) || num < 1 ? 1 : num });
+                        }}
+                        disabled={disabled}
+                        placeholder="1"
+                      />
                     </div>
                   </div>
+                </div>
+
+                <Separator className="my-4" />
+                <div className="flex justify-end">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => removeCut(cut.id)} disabled={disabled}>
+                    <IconTrash className="h-4 w-4 mr-1" />
+                    Remover
+                  </Button>
                 </div>
               </AccordionContent>
             </AccordionItem>
           ))}
         </Accordion>
+      )}
+
+      {cuts.length > 0 && cuts.some((c) => !c.file) && (
+        <Alert>
+          <IconAlertCircle className="h-4 w-4" />
+          <AlertDescription>Alguns cortes não possuem arquivos anexados. Adicione os arquivos antes de enviar o formulário.</AlertDescription>
+        </Alert>
       )}
     </div>
   );

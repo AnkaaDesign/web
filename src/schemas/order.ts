@@ -13,7 +13,7 @@ export const orderIncludeSchema = z
   .object({
     // Direct Order relations - Many-to-many file relations
     budgets: z.boolean().optional(), // Many-to-many relation with File
-    nfes: z.boolean().optional(), // Many-to-many relation with File
+    invoices: z.boolean().optional(), // Many-to-many relation with File
     receipts: z.boolean().optional(), // Many-to-many relation with File
     // Legacy field names for backwards compatibility (mapped in repository)
     budget: z.boolean().optional(), // @deprecated Use budgets instead

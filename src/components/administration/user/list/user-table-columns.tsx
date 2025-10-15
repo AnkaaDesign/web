@@ -135,17 +135,6 @@ export const createUserColumns = (): UserColumn[] => [
     align: "center",
   },
 
-
-  // Data de Admissão (Admissional Date)
-  {
-    key: "admissional",
-    header: "DATA DE ADMISSÃO",
-    accessor: (user: User) => <div className="text-sm truncate">{user.admissional ? formatDate(new Date(user.admissional)) : <span className="text-muted-foreground">-</span>}</div>,
-    sortable: true,
-    className: "min-w-[150px]",
-    align: "left",
-  },
-
   // Data de Nascimento (Birth Date)
   {
     key: "birth",

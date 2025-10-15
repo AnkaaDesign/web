@@ -40,7 +40,7 @@ export interface Task extends BaseEntity {
   sector?: Sector;
   customer?: Customer;
   budgets?: File[]; // Many-to-many relation
-  nfes?: File[]; // Many-to-many relation
+  invoices?: File[]; // Many-to-many relation
   receipts?: File[]; // Many-to-many relation
   reimbursements?: File[]; // Many-to-many relation
   reimbursementInvoices?: File[]; // Many-to-many relation
@@ -73,7 +73,7 @@ export interface TaskIncludes {
         include?: CustomerIncludes;
       };
   budgets?: boolean; // Many-to-many relation
-  nfes?: boolean; // Many-to-many relation
+  invoices?: boolean; // Many-to-many relation
   receipts?: boolean; // Many-to-many relation
   reimbursements?: boolean; // Many-to-many relation
   reimbursementInvoices?: boolean; // Many-to-many relation

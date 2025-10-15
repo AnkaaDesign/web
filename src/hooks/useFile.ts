@@ -3,7 +3,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
 import { fileKeys, taskKeys, customerKeys, supplierKeys, userKeys, activityKeys, itemKeys } from "./queryKeys";
-import { getFiles, getFileById, createFile, updateFile, deleteFile, batchCreateFiles, batchUpdateFiles, batchDeleteFiles, uploadSingleFile, fileService } from "../api-client";
+import { getFiles, getFileById, createFile, updateFile, deleteFile, batchCreateFiles, batchUpdateFiles, batchDeleteFiles, fileService } from "../api-client";
+// uploadSingleFile is deprecated - files should be submitted with forms using FormData
 import type { FileUploadOptions as ApiFileUploadOptions, FileUploadProgress as ApiFileUploadProgress } from "../api-client";
 import type { FileGetManyFormData, FileCreateFormData, FileUpdateFormData, FileBatchCreateFormData, FileBatchUpdateFormData, FileBatchDeleteFormData } from "../schemas";
 import type {
@@ -144,8 +145,15 @@ export const useFileUpload = (options: FileUploadOptions = {}) => {
         setUploadProgress(initialProgress);
         options.onProgress?.(initialProgress);
 
-        // Use the existing API client upload method
-        const response = await uploadSingleFile(file, {
+        // DEPRECATED: Direct file upload is no longer supported
+        // Files should be submitted with forms using FormData
+        throw new Error(
+          "Direct file upload is deprecated. Files should be submitted with forms using FormData. " +
+          "Please update your code to store files in form state and submit them with the form data."
+        );
+
+        // Legacy code kept for reference (no longer executed)
+        /* const response = await uploadSingleFile(file, {
           signal: options.signal || abortControllerRef.current.signal,
           timeout: options.timeout,
           onProgress: (progressEvent) => {
@@ -168,7 +176,8 @@ export const useFileUpload = (options: FileUploadOptions = {}) => {
             setUploadProgress(progress);
             options.onProgress?.(progress);
           },
-        });
+        }); */
+        const response = { data: null } as any; // Placeholder since code won't reach here
 
         // Complete progress
         const completedProgress: UploadProgress = {

@@ -52,13 +52,7 @@ const userFilterSchemas = {
   },
 
   // Date range filters
-  birthDate: {
-    schema: z.object({
-      gte: z.coerce.date().optional(),
-      lte: z.coerce.date().optional(),
-    }),
-  },
-  hireDate: {
+  birth: {
     schema: z.object({
       gte: z.coerce.date().optional(),
       lte: z.coerce.date().optional(),
@@ -121,8 +115,7 @@ const userFilterSchemas = {
       status: z.enum(["asc", "desc"]).optional(),
       statusOrder: z.enum(["asc", "desc"]).optional(),
       verified: z.enum(["asc", "desc"]).optional(),
-      birthDate: z.enum(["asc", "desc"]).optional(),
-      hireDate: z.enum(["asc", "desc"]).optional(),
+      birth: z.enum(["asc", "desc"]).optional(),
       performanceLevel: z.enum(["asc", "desc"]).optional(),
       lastLoginAt: z.enum(["asc", "desc"]).optional(),
       createdAt: z.enum(["asc", "desc"]).optional(),
@@ -191,8 +184,7 @@ export function convertToApiFilters(urlFilters: UserFilters): Partial<UserGetMan
   if (typeof urlFilters.requirePasswordChange === "boolean") apiFilters.requirePasswordChange = urlFilters.requirePasswordChange;
 
   // Date range filters
-  if (urlFilters.birthDate) apiFilters.birthDate = urlFilters.birthDate;
-  if (urlFilters.hireDate) apiFilters.hireDate = urlFilters.hireDate;
+  if (urlFilters.birth) apiFilters.birth = urlFilters.birth;
   if (urlFilters.createdAt) apiFilters.createdAt = urlFilters.createdAt;
   if (urlFilters.updatedAt) apiFilters.updatedAt = urlFilters.updatedAt;
   if (urlFilters.lastLoginAt) apiFilters.lastLoginAt = urlFilters.lastLoginAt;
@@ -234,8 +226,7 @@ export function convertFromApiFilters(apiFilters: Partial<UserGetManyFormData>):
   if (typeof apiFilters.requirePasswordChange === "boolean") urlFilters.requirePasswordChange = apiFilters.requirePasswordChange;
 
   // Date range filters
-  if (apiFilters.birthDate) urlFilters.birthDate = apiFilters.birthDate;
-  if (apiFilters.hireDate) urlFilters.hireDate = apiFilters.hireDate;
+  if (apiFilters.birth) urlFilters.birth = apiFilters.birth;
   if (apiFilters.createdAt) urlFilters.createdAt = apiFilters.createdAt;
   if (apiFilters.updatedAt) urlFilters.updatedAt = apiFilters.updatedAt;
   if (apiFilters.lastLoginAt) urlFilters.lastLoginAt = apiFilters.lastLoginAt;

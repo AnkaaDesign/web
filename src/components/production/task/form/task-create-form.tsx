@@ -20,7 +20,9 @@ import {
 import type { TaskCreateFormData } from "../../../../schemas";
 import { taskCreateSchema } from "../../../../schemas";
 import { useTaskMutations, useTaskFormUrlState, useLayoutMutations } from "../../../../hooks";
-import { TASK_STATUS } from "../../../../constants";
+import { TASK_STATUS, CUT_TYPE } from "../../../../constants";
+import { createFormDataWithContext } from "@/utils/form-data-helper";
+import { getCustomerById } from "../../../../api-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -165,43 +167,53 @@ export const TaskCreateForm = () => {
       try {
         setIsSubmitting(true);
 
-        // Create FormData to include files with form data
-        const formData = new FormData();
+        // Get customer data for file organization
+        const customerId = data.customerId;
+        const { data: customerResponse } = customerId ? await getCustomerById(customerId) : { data: null };
+        const customer = customerResponse?.data;
 
-        // Add all form fields individually (flatten the object)
-        Object.entries(data).forEach(([key, value]) => {
-          if (value !== null && value !== undefined) {
-            if (Array.isArray(value)) {
-              // For arrays, append each item separately or as JSON
-              formData.append(key, JSON.stringify(value));
-            } else if (typeof value === 'object') {
-              // For objects, stringify them
-              formData.append(key, JSON.stringify(value));
-            } else {
-              formData.append(key, String(value));
-            }
+        // Prepare files object
+        const files = {
+          budgets: budgetFile.filter(f => f instanceof File) as File[],
+          invoices: nfeFile.filter(f => f instanceof File) as File[],
+          receipts: receiptFile.filter(f => f instanceof File) as File[],
+          artworks: uploadedFiles.filter(f => f instanceof File) as File[],
+        };
+
+        // Handle cut files - need special processing for organization
+        const cuts = data.cuts as any[] || [];
+        const cutFiles: File[] = [];
+        const cutsWithContext = cuts.map(cut => {
+          if (cut.file && cut.file instanceof File) {
+            cutFiles.push(cut.file);
+            // Add metadata for file organization
+            return {
+              ...cut,
+              _fileContext: {
+                cutType: cut.type === CUT_TYPE.VINYL ? 'vinyl' : 'stencil',
+                customerName: customer?.fantasyName || customer?.corporateName || '',
+              }
+            };
           }
+          return cut;
         });
 
-        // Add budget files if exist
-        budgetFile.forEach((file) => {
-          formData.append('budgets', file as unknown as Blob);
-        });
+        // Update cuts in data with context
+        data.cuts = cutsWithContext;
 
-        // Add NFe files if exist
-        nfeFile.forEach((file) => {
-          formData.append('nfes', file as unknown as Blob);
-        });
-
-        // Add receipt files if exist
-        receiptFile.forEach((file) => {
-          formData.append('receipts', file as unknown as Blob);
-        });
-
-        // Add artwork files if exist
-        uploadedFiles.forEach((file) => {
-          formData.append('artworks', file as unknown as Blob);
-        });
+        // Create FormData with proper context
+        const formData = createFormDataWithContext(
+          data,
+          { ...files, cuts: cutFiles },
+          {
+            entityType: 'task',
+            customer: customer ? {
+              id: customer.id,
+              name: customer.corporateName || customer.fantasyName,
+              fantasyName: customer.fantasyName,
+            } : undefined,
+          }
+        );
 
         const result = await createAsync(formData as any); // Navigate to the task list after successful creation
         if (result?.success && result.data) {
@@ -770,7 +782,7 @@ export const TaskCreateForm = () => {
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <IconScissors className="h-5 w-5" />
-                        Recortes
+                        Plano de Corte
                       </CardTitle>
                       <Button
                         type="button"

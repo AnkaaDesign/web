@@ -66,14 +66,14 @@ export function Breadcrumb({ items }: BreadcrumbProps = {}) {
           <React.Fragment key={crumb.id}>
             {showSeparator && index > 0 && <IconChevronRight className="w-4 h-4" />}
             {canNavigate ? (
-              <button onClick={() => handleBreadcrumbClick(crumb.path)} className="flex items-center gap-1 hover:text-foreground transition-colors">
-                {isHome && <IconHome2 className="w-4 h-4" />}
-                {crumb.title}
+              <button onClick={() => handleBreadcrumbClick(crumb.path)} className="flex items-center gap-1 hover:text-foreground transition-colors max-w-[200px]" title={crumb.title}>
+                {isHome && <IconHome2 className="w-4 h-4 shrink-0" />}
+                <span className="truncate">{crumb.title}</span>
               </button>
             ) : (
-              <span className={cn("flex items-center gap-1", isLast && "text-foreground font-medium")}>
-                {isHome && <IconHome2 className="w-4 h-4" />}
-                {crumb.title}
+              <span className={cn("flex items-center gap-1 max-w-[200px]", isLast && "text-foreground font-medium")}>
+                {isHome && <IconHome2 className="w-4 h-4 shrink-0" />}
+                <span className="truncate" title={crumb.title}>{crumb.title}</span>
               </span>
             )}
           </React.Fragment>

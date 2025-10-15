@@ -10,8 +10,8 @@ interface ResignationDateInputProps {
 export function ResignationDateInput({ disabled }: ResignationDateInputProps) {
   const form = useFormContext<UserCreateFormData | UserUpdateFormData>();
 
-  // Watch hire date to set minimum date for termination
-  const hireDate = form.watch("hireDate");
+  // Watch exp1StartAt (admission date) to set minimum date for termination
+  const exp1StartAt = form.watch("exp1StartAt");
 
   return (
     <FormField
@@ -25,7 +25,7 @@ export function ResignationDateInput({ disabled }: ResignationDateInputProps) {
           disabled={disabled}
           mode="date"
           constraints={{
-            minDate: hireDate || undefined,
+            minDate: exp1StartAt || undefined,
             maxDate: new Date(),
           }}
         />

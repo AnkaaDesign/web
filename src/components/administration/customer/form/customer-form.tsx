@@ -6,6 +6,7 @@ import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { customerCreateSchema, customerUpdateSchema, type CustomerCreateFormData, type CustomerUpdateFormData } from "../../../../schemas";
 import { serializeCustomerFormToUrlParams, getDefaultCustomerFormValues, debounce } from "@/utils/url-form-state";
+import { createCustomerFormData } from "@/utils/form-data-helper";
 
 // Import all form components
 import { FantasyNameInput } from "./fantasy-name-input";
@@ -176,10 +177,63 @@ export function CustomerForm(props: CustomerFormProps) {
         transformedData.tags = Object.values(transformedData.tags) as string[];
       }
 
-      if (mode === "create") {
-        await (props as CreateCustomerFormProps).onSubmit(transformedData as CustomerCreateFormData);
+      // Check if we have a logo file to upload
+      // Get logoFile from both submitted data AND current form state (in case it wasn't included in submission)
+      const logoFile = (transformedData as any).logoFile || form.getValues('logoFile' as any);
+
+      // Debug logging (production enabled temporarily for debugging)
+      console.log('[CustomerForm] onSubmit - logoFile check:', {
+        hasLogoFile: !!logoFile,
+        isFile: logoFile instanceof File,
+        logoFileType: logoFile?.constructor?.name,
+        fromData: !!(transformedData as any).logoFile,
+        fromFormState: !!form.getValues('logoFile' as any),
+        allKeys: Object.keys(transformedData),
+        mode: mode,
+      });
+
+      // If we have a file, create FormData with proper context
+      if (logoFile && logoFile instanceof File) {
+        console.log('[CustomerForm] Creating FormData with logoFile:', {
+          fileName: logoFile.name,
+          fileSize: logoFile.size,
+          fileType: logoFile.type,
+          customerId: mode === "update" ? defaultValues?.id : undefined,
+          customerName: transformedData.corporateName || transformedData.fantasyName,
+        });
+
+        // Extract logoFile from data and prepare clean data object
+        const { logoFile: _, ...dataWithoutFile } = transformedData as any;
+
+        // Create FormData with proper context for file organization
+        const formData = createCustomerFormData(
+          dataWithoutFile,
+          logoFile,
+          {
+            id: mode === "update" ? defaultValues?.id : undefined,
+            name: transformedData.corporateName || transformedData.fantasyName,
+            fantasyName: transformedData.fantasyName,
+          }
+        );
+
+        console.log('[CustomerForm] FormData created, submitting...');
+
+        if (mode === "create") {
+          await (props as CreateCustomerFormProps).onSubmit(formData as any);
+        } else {
+          await (props as UpdateCustomerFormProps).onSubmit(formData as any);
+        }
+
+        console.log('[CustomerForm] FormData submission completed');
       } else {
-        await (props as UpdateCustomerFormProps).onSubmit(transformedData as CustomerUpdateFormData);
+        // No file, send as regular JSON (remove logoFile field if present)
+        const { logoFile: _, ...dataWithoutFile } = transformedData as any;
+
+        if (mode === "create") {
+          await (props as CreateCustomerFormProps).onSubmit(dataWithoutFile as CustomerCreateFormData);
+        } else {
+          await (props as UpdateCustomerFormProps).onSubmit(dataWithoutFile as CustomerUpdateFormData);
+        }
       }
     } catch (error) {
       // Error is handled by the parent component

@@ -44,13 +44,16 @@ export const SupplierEditPage = () => {
 
   const updateSupplier = useUpdateSupplier(id!, { include: includeParams });
 
-  const handleSubmit = async (changedFields: Partial<SupplierUpdateFormData> & { logoFile?: File }) => {
+  const handleSubmit = async (changedFields: Partial<SupplierUpdateFormData> & { logoFile?: File } | FormData) => {
     if (!id) return;
 
     try {
+      // Check if we have changes (FormData always has changes, regular objects need key check)
+      const hasChanges = changedFields instanceof FormData || Object.keys(changedFields).length > 0;
+
       // Only submit if there are changes
-      if (Object.keys(changedFields).length > 0) {
-        const response = await updateSupplier.mutateAsync(changedFields);
+      if (hasChanges) {
+        const response = await updateSupplier.mutateAsync(changedFields as any);
 
         if (response?.data?.id) {
           navigate(routes.inventory.suppliers.details(id));

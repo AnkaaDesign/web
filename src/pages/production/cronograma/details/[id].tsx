@@ -352,7 +352,7 @@ export const TaskDetailsPage = () => {
       services: true,
       artworks: true,
       budgets: true,
-      nfes: true,
+      invoices: true,
       receipts: true,
       observation: {
         include: {
@@ -362,7 +362,7 @@ export const TaskDetailsPage = () => {
       airbrushing: {
         include: {
           receipts: true,
-          nfes: true,
+          invoices: true,
           artworks: true,
         },
         orderBy: {
@@ -1021,14 +1021,14 @@ export const TaskDetailsPage = () => {
               )}
 
               {/* Documents Card - Budget, NFE, Receipt */}
-              {((task.budgets && task.budgets.length > 0) || (task.nfes && task.nfes.length > 0) || (task.receipts && task.receipts.length > 0)) && (
+              {((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0)) && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1050" level={1}>
                   <CardHeader className="pb-4">
                     <CardTitle className="flex items-center gap-2 text-lg font-medium">
                       <IconFileText className="h-5 w-5 text-muted-foreground" />
                       Documentos
                       <Badge variant="secondary" className="ml-2">
-                        {[...(task.budgets || []), ...(task.nfes || []), ...(task.receipts || [])].length}
+                        {[...(task.budgets || []), ...(task.invoices || []), ...(task.receipts || [])].length}
                       </Badge>
                     </CardTitle>
                   </CardHeader>
@@ -1048,14 +1048,14 @@ export const TaskDetailsPage = () => {
                         </div>
                       )}
 
-                      {task.nfes && task.nfes.length > 0 && (
+                      {task.invoices && task.invoices.length > 0 && (
                         <div>
                           <div className="flex items-center gap-2 mb-3">
                             <IconFileText className="h-4 w-4 text-muted-foreground" />
                             <h4 className="text-sm font-semibold">Notas Fiscais</h4>
                           </div>
                           <div className="flex flex-wrap gap-2">
-                            {task.nfes.map((nfe: any) => (
+                            {task.invoices.map((nfe: any) => (
                               <FilePreviewCard key={nfe.id} file={nfe} size="md" showMetadata={true} />
                             ))}
                           </div>
@@ -1329,7 +1329,7 @@ export const TaskDetailsPage = () => {
                               )}
 
                               {/* Files count */}
-                              {((airbrushing.receipts?.length ?? 0) > 0 || (airbrushing.nfes?.length ?? 0) > 0 || (airbrushing.artworks?.length ?? 0) > 0) && (
+                              {((airbrushing.receipts?.length ?? 0) > 0 || (airbrushing.invoices?.length ?? 0) > 0 || (airbrushing.artworks?.length ?? 0) > 0) && (
                                 <div className="flex gap-2 text-xs text-muted-foreground">
                                   {(airbrushing.receipts?.length ?? 0) > 0 && (
                                     <div className="flex items-center gap-1">
@@ -1337,10 +1337,10 @@ export const TaskDetailsPage = () => {
                                       <span>{airbrushing.receipts?.length ?? 0} recibo(s)</span>
                                     </div>
                                   )}
-                                  {(airbrushing.nfes?.length ?? 0) > 0 && (
+                                  {(airbrushing.invoices?.length ?? 0) > 0 && (
                                     <div className="flex items-center gap-1">
                                       <IconFileText className="h-3 w-3" />
-                                      <span>{airbrushing.nfes?.length ?? 0} NFe(s)</span>
+                                      <span>{airbrushing.invoices?.length ?? 0} NFe(s)</span>
                                     </div>
                                   )}
                                   {(airbrushing.artworks?.length ?? 0) > 0 && (

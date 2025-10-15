@@ -54,16 +54,20 @@ export class WarningService {
   // Mutation Operations
   // =====================
 
-  async createWarning(data: WarningCreateFormData, query?: WarningQueryFormData): Promise<WarningCreateResponse> {
+  async createWarning(data: WarningCreateFormData | FormData, query?: WarningQueryFormData): Promise<WarningCreateResponse> {
+    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
     const response = await apiClient.post<WarningCreateResponse>(this.basePath, data, {
       params: query,
+      headers,
     });
     return response.data;
   }
 
-  async updateWarning(id: string, data: WarningUpdateFormData, query?: WarningQueryFormData): Promise<WarningUpdateResponse> {
+  async updateWarning(id: string, data: WarningUpdateFormData | FormData, query?: WarningQueryFormData): Promise<WarningUpdateResponse> {
+    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
     const response = await apiClient.put<WarningUpdateResponse>(`${this.basePath}/${id}`, data, {
       params: query,
+      headers,
     });
     return response.data;
   }
@@ -115,8 +119,8 @@ export const getWarnings = (params?: WarningGetManyFormData) => warningService.g
 export const getWarningById = (id: string, params?: Omit<WarningGetByIdFormData, "id">) => warningService.getWarningById(id, params);
 
 // Mutation Operations
-export const createWarning = (data: WarningCreateFormData, query?: WarningQueryFormData) => warningService.createWarning(data, query);
-export const updateWarning = (id: string, data: WarningUpdateFormData, query?: WarningQueryFormData) => warningService.updateWarning(id, data, query);
+export const createWarning = (data: WarningCreateFormData | FormData, query?: WarningQueryFormData) => warningService.createWarning(data, query);
+export const updateWarning = (id: string, data: WarningUpdateFormData | FormData, query?: WarningQueryFormData) => warningService.updateWarning(id, data, query);
 export const deleteWarning = (id: string) => warningService.deleteWarning(id);
 
 // Batch Operations

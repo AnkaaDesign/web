@@ -15,6 +15,7 @@ export function CustomerEditForm({ customer, onSubmit, isSubmitting, onDirtyChan
   // Map API data to form data
   const defaultValues = React.useMemo(
     () => ({
+      id: customer.id, // Include customer ID for FormData context
       fantasyName: customer.fantasyName,
       cnpj: customer.cnpj,
       cpf: customer.cpf,
@@ -38,10 +39,29 @@ export function CustomerEditForm({ customer, onSubmit, isSubmitting, onDirtyChan
   // Track original values to determine what changed (only set once on mount)
   const originalValuesRef = React.useRef(defaultValues);
 
-  const handleSubmit = async (data: CustomerUpdateFormData) => {
+  const handleSubmit = async (data: CustomerUpdateFormData | FormData) => {
+    console.log('[CustomerEditForm] handleSubmit called', {
+      isFormData: data instanceof FormData,
+      dataType: data?.constructor?.name,
+    });
+
+    // If data is FormData (file upload), pass it through directly without filtering
+    // FormData is already prepared with only the necessary fields by CustomerForm
+    if (data instanceof FormData) {
+      console.log('[CustomerEditForm] Detected FormData, passing through to onSubmit');
+      await onSubmit(data as any);
+      console.log('[CustomerEditForm] FormData onSubmit completed');
+      return;
+    }
+
     // Compare with original values to find changed fields
     const changedFields: Partial<CustomerUpdateFormData> = {};
     const original = originalValuesRef.current;
+
+    // Check if we have a logo file to upload (always include if present)
+    if ((data as any).logoFile) {
+      (changedFields as any).logoFile = (data as any).logoFile;
+    }
 
     // Check each field for changes
     Object.keys(data).forEach((key) => {
@@ -49,6 +69,9 @@ export function CustomerEditForm({ customer, onSubmit, isSubmitting, onDirtyChan
 
       // Skip fields that don't exist in the form data
       if (!(typedKey in data)) return;
+
+      // Skip logoFile as it's already handled above
+      if (typedKey === 'logoFile') return;
 
       const newValue = data[typedKey];
       const oldValue = typedKey in original ? (original as any)[typedKey] : undefined;

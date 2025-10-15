@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { IconPaint, IconTrash, IconRefresh, IconEdit, IconHistory } from "@tabler/icons-react";
+import { IconPaint, IconTrash, IconRefresh, IconEdit } from "@tabler/icons-react";
 
 import { usePaint, usePaintMutations } from "../../../../hooks";
 import { routes } from "../../../../constants";
@@ -18,8 +18,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { LoadingPage } from "@/components/navigation/loading-page";
 import { ErrorCard } from "@/components/ui/error-card";
 import { PaintSpecificationsCard, PaintFormulasCard, PaintProductionHistoryCard, RelatedPaintsCard } from "@/components/paint/catalogue/detail";
+import { PaintTasksTable } from "@/components/paint/catalogue/detail/paint-tasks-table";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
-import { RelatedTasksCard } from "@/components/shared/related-tasks-card";
 import { CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 
 export default function PaintDetailsPage() {
@@ -86,15 +86,6 @@ export default function PaintDetailsPage() {
     },
   });
 
-  // Combine general paintings and logo tasks - moved before early returns
-  const allPaintTasks = useMemo(() => {
-    if (!response?.data) return [];
-    const paint = response.data;
-    return [
-      ...(paint.generalPaintings || []),
-      ...(paint.logoTasks || []),
-    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [response?.data]);
 
   if (isLoading) {
     return (
@@ -198,28 +189,14 @@ export default function PaintDetailsPage() {
           <div className="animate-in fade-in-50 duration-700 transition-all">
             {/* Mobile: Single column */}
             <div className="block lg:hidden space-y-4">
-              <RelatedTasksCard
-                tasks={allPaintTasks}
-                title="Histórico de Uso"
-                icon={IconHistory}
-                showViewToggle={true}
-                defaultView="grid"
-                className="h-auto"
-              />
+              <PaintTasksTable paint={paint} />
               <PaintProductionHistoryCard paint={paint} className="h-auto" />
             </div>
 
             {/* Desktop: 2 columns - Same height */}
             <div className="hidden lg:block">
               <div className="grid grid-cols-2 gap-6">
-                <RelatedTasksCard
-                  tasks={allPaintTasks}
-                  title="Histórico de Uso"
-                  icon={IconHistory}
-                  showViewToggle={true}
-                  defaultView="grid"
-                  className="h-[550px]"
-                />
+                <PaintTasksTable paint={paint} />
                 <PaintProductionHistoryCard paint={paint} className="h-[550px]" />
               </div>
             </div>

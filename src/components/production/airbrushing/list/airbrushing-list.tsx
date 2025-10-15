@@ -185,7 +185,7 @@ export function AirbrushingList({ className }: AirbrushingListProps) {
           },
         },
         receipts: true,
-        nfes: true,
+        invoices: true,
       },
       orderBy: { createdAt: "desc" },
       limit: DEFAULT_PAGE_SIZE,

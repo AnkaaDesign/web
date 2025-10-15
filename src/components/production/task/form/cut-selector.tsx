@@ -3,11 +3,11 @@ import { IconScissors, IconFile, IconUpload } from "@tabler/icons-react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import { useController } from "react-hook-form";
 import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
 import { CUT_TYPE_LABELS, CUT_TYPE, CUT_ORIGIN } from "../../../../constants";
 import { FileUploadField } from "@/components/file";
 import type { FileWithPreview } from "@/components/file";
-import { uploadSingleFile } from "../../../../api-client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface CutSelectorProps {
@@ -26,70 +26,28 @@ export function CutSelector({ control, disabled }: CutSelectorProps) {
   });
 
   const handleFileUpload = useCallback(
-    async (files: FileWithPreview[]) => {
+    (files: FileWithPreview[]) => {
       setCutFile(files);
 
       if (files.length > 0) {
         const file = files[0];
-        try {
-          // Update file with upload progress
-          setCutFile([
-            {
-              ...file,
-              uploadProgress: 0,
-              uploaded: false,
-            } as FileWithPreview,
-          ]);
-
-          const result = await uploadSingleFile(file, {
-            onProgress: (progress) => {
-              setCutFile([
-                {
-                  ...file,
-                  uploadProgress: progress.percentage,
-                  uploaded: false,
-                } as FileWithPreview,
-              ]);
-            },
-          });
-
-          if (result.success && result.data) {
-            const uploadedFile = result.data;
-
-            // Update file with uploaded data
-            setCutFile([
-              {
-                ...file,
-                uploadedFileId: uploadedFile.id,
-                uploaded: true,
-                uploadProgress: 100,
-                thumbnailUrl: uploadedFile.thumbnailUrl || undefined,
-                error: undefined,
-              } as FileWithPreview,
-            ]);
-
-            // Update form field properly
-            fileIdField.onChange(uploadedFile.id);
-          } else {
-            throw new Error(result.message || "Upload failed");
-          }
-        } catch (error) {
-          console.error("File upload failed:", error);
-          setCutFile([
-            {
-              ...file,
-              error: "Erro ao enviar arquivo",
-              uploadProgress: 0,
-              uploaded: false,
-            } as FileWithPreview,
-          ]);
+        // Store the file for form submission instead of uploading immediately
+        fileIdField.onChange(null); // Clear file ID since we have a new file
+        // Store the actual file in a field the form can access
+        const form = control._formValues || control._defaultValues;
+        if (form) {
+          form.cutFile = file; // Store the file for submission
         }
       } else {
         // Clear the file ID when no files
         fileIdField.onChange("");
+        const form = control._formValues || control._defaultValues;
+        if (form) {
+          form.cutFile = null;
+        }
       }
     },
-    [fileIdField],
+    [fileIdField, control],
   );
 
   return (

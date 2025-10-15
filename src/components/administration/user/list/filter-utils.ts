@@ -207,9 +207,9 @@ export function extractActiveFilters(
   }
 
   // Date filters
-  if (filters.birthDate?.gte || filters.birthDate?.lte) {
-    const gte = filters.birthDate.gte;
-    const lte = filters.birthDate.lte;
+  if (filters.birth?.gte || filters.birth?.lte) {
+    const gte = filters.birth.gte;
+    const lte = filters.birth.lte;
     let value = "";
 
     if (gte && lte) {
@@ -221,33 +221,11 @@ export function extractActiveFilters(
     }
 
     activeFilters.push({
-      key: "birthDate",
+      key: "birth",
       label: "Data Nascimento",
       value,
       iconType: "calendar",
-      onRemove: () => onRemoveFilter("birthDate"),
-    });
-  }
-
-  if (filters.hireDate?.gte || filters.hireDate?.lte) {
-    const gte = filters.hireDate.gte;
-    const lte = filters.hireDate.lte;
-    let value = "";
-
-    if (gte && lte) {
-      value = `${formatDate(gte)} - ${formatDate(lte)}`;
-    } else if (gte) {
-      value = `≥ ${formatDate(gte)}`;
-    } else if (lte) {
-      value = `≤ ${formatDate(lte)}`;
-    }
-
-    activeFilters.push({
-      key: "hireDate",
-      label: "Data Contratação",
-      value,
-      iconType: "calendar",
-      onRemove: () => onRemoveFilter("hireDate"),
+      onRemove: () => onRemoveFilter("birth"),
     });
   }
 
@@ -409,11 +387,8 @@ export function createFilterRemover(currentFilters: Partial<UserGetManyFormData>
       case "commissionsCount":
         delete newFilters.commissionsCount;
         break;
-      case "birthDate":
-        delete newFilters.birthDate;
-        break;
-      case "hireDate":
-        delete newFilters.hireDate;
+      case "birth":
+        delete newFilters.birth;
         break;
       case "createdAt":
         delete newFilters.createdAt;

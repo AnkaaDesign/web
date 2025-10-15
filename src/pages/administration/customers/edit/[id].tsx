@@ -38,13 +38,16 @@ export const EditCustomerPage = () => {
 
   const { updateAsync: updateCustomer, isUpdating } = useCustomerMutations();
 
-  const handleSubmit = async (changedFields: Partial<CustomerUpdateFormData>) => {
+  const handleSubmit = async (changedFields: Partial<CustomerUpdateFormData> | FormData) => {
     if (!id) return;
 
     try {
+      // Check if we have changes (FormData always has changes, regular objects need key check)
+      const hasChanges = changedFields instanceof FormData || Object.keys(changedFields).length > 0;
+
       // Only submit if there are changes
-      if (Object.keys(changedFields).length > 0) {
-        const response = await updateCustomer({ id: id!, data: changedFields });
+      if (hasChanges) {
+        const response = await updateCustomer({ id: id!, data: changedFields as any });
 
         if (response?.data?.id) {
           navigate(routes.administration.customers.details(id));

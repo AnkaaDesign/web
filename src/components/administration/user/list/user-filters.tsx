@@ -149,16 +149,16 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
               <DateTimeInput
                 mode="date-range"
                 value={{
-                  from: localFilters.birthDate?.gte,
-                  to: localFilters.birthDate?.lte,
+                  from: localFilters.birth?.gte,
+                  to: localFilters.birth?.lte,
                 }}
                 onChange={(dateRange: DateRange | null) => {
                   if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                    setLocalFilters({ ...localFilters, birthDate: undefined });
+                    setLocalFilters({ ...localFilters, birth: undefined });
                   } else {
                     setLocalFilters({
                       ...localFilters,
-                      birthDate: {
+                      birth: {
                         ...(dateRange.from && { gte: dateRange.from }),
                         ...(dateRange.to && { lte: dateRange.to }),
                       },
@@ -174,37 +174,6 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                 placeholder="Selecionar período..."
                 description="Filtra por período de nascimento do usuário"
                 context="birth"
-                numberOfMonths={2}
-              />
-
-              <DateTimeInput
-                mode="date-range"
-                value={{
-                  from: localFilters.hireDate?.gte,
-                  to: localFilters.hireDate?.lte,
-                }}
-                onChange={(dateRange: DateRange | null) => {
-                  if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                    setLocalFilters({ ...localFilters, hireDate: undefined });
-                  } else {
-                    setLocalFilters({
-                      ...localFilters,
-                      hireDate: {
-                        ...(dateRange.from && { gte: dateRange.from }),
-                        ...(dateRange.to && { lte: dateRange.to }),
-                      },
-                    });
-                  }
-                }}
-                label={
-                  <div className="flex items-center gap-2 mb-2">
-                    <IconCalendar className="h-4 w-4" />
-                    Data de Admissão
-                  </div>
-                }
-                placeholder="Selecionar período..."
-                description="Filtra por período de admissão do usuário"
-                context="hire"
                 numberOfMonths={2}
               />
 

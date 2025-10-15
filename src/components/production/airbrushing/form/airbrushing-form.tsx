@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAirbrushing, useAirbrushingMutations, useTaskDetail } from "../../../../hooks";
 import type { AirbrushingCreateFormData, AirbrushingUpdateFormData } from "../../../../schemas";
 import { airbrushingCreateSchema, airbrushingUpdateSchema } from "../../../../schemas";
-import { routes, AIRBRUSHING_STATUS } from "../../../../constants";
+import { routes, AIRBRUSHING_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
@@ -103,7 +103,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
         },
       },
       receipts: true,
-      nfes: true,
+      invoices: true,
       artworks: true,
     },
     enabled: mode === "edit" && !!airbrushingId,
@@ -138,7 +138,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       price: null,
       taskId: initialTaskId || "",
       receiptIds: [],
-      nfeIds: [],
+      invoiceIds: [],
       artworkIds: [],
       ...(mode === "edit" ? {} : { status: AIRBRUSHING_STATUS.PENDING }), // Status is set automatically for create mode
     },
@@ -154,7 +154,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
         status: airbrushing.status,
         taskId: airbrushing.taskId,
         receiptIds: airbrushing.receipts?.map((f) => f.id) || [],
-        nfeIds: airbrushing.nfes?.map((f) => f.id) || [],
+        invoiceIds: airbrushing.invoices?.map((f) => f.id) || [],
         artworkIds: airbrushing.artworks?.map((f) => f.id) || [],
       });
 
@@ -179,8 +179,8 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
           return fileObj;
         }) || [];
 
-      const nfes: FileWithPreview[] =
-        airbrushing.nfes?.map((file) => {
+      const invoices: FileWithPreview[] =
+        airbrushing.invoices?.map((file) => {
           const fileObj = Object.assign(
             new File([new ArrayBuffer(0)], file.filename || file.originalName || "file", {
               type: file.mimetype || "application/octet-stream",
@@ -241,7 +241,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
     const taskIdFromUrl = searchParams.get("taskId");
     if (taskIdFromUrl && mode === "create") {
       setSelectedTasks(new Set([taskIdFromUrl]));
-      form.setValue("taskId", taskIdFromUrl);
+      form.setValue("taskId", taskIdFromUrl, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
     }
   }, [searchParams, mode, form]);
 
@@ -326,11 +326,11 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
     if (isSelected) {
       // Deselect task
       setSelectedTasks(new Set());
-      form.setValue("taskId", "");
+      form.setValue("taskId", "", { shouldValidate: true, shouldDirty: true, shouldTouch: true });
     } else {
       // Select task (only one can be selected)
       setSelectedTasks(new Set([taskId]));
-      form.setValue("taskId", taskId);
+      form.setValue("taskId", taskId, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
       // Clear task error when a task is selected
       form.clearErrors("taskId");
       // Update step errors
@@ -356,7 +356,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
     setNfeFiles(files);
     const fileIds = files.map((f) => f.uploadedFileId || f.id).filter(Boolean);
     setNfeFileIds(fileIds);
-    form.setValue("nfeIds", fileIds);
+    form.setValue("invoiceIds", fileIds);
   };
 
   // Handle artwork file changes
@@ -586,7 +586,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
                           <div>
                             <p className="text-xs font-medium text-muted-foreground mb-1">STATUS</p>
-                            <Badge variant="outline">{selectedTask?.data?.status}</Badge>
+                            <Badge variant="outline">{TASK_STATUS_LABELS[selectedTask?.data?.status as keyof typeof TASK_STATUS_LABELS] || selectedTask?.data?.status}</Badge>
                           </div>
 
                           <div>

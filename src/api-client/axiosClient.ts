@@ -137,7 +137,7 @@ const getApiUrl = (): string => {
 
 const DEFAULT_CONFIG: ApiClientConfig = {
   baseURL: getApiUrl(),
-  timeout: 30000,
+  timeout: 300000, // 5 minutes to allow for large file uploads
   retryAttempts: 0, // Disable retries to prevent infinite loops with rate limiting
   retryDelay: 1000,
   enableNotifications: true,

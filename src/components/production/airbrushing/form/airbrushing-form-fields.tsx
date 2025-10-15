@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { FileUploadField, type FileWithPreview } from "@/components/file";
 import type { AirbrushingCreateFormData, AirbrushingUpdateFormData } from "../../../../schemas";
-import { IconCurrencyReal, IconPaperclip, IconFileInvoice, IconPhoto } from "@tabler/icons-react";
+import { IconPaperclip, IconFileInvoice, IconPhoto } from "@tabler/icons-react";
 
 interface AirbrushingFormFieldsProps {
   control: any;
@@ -37,12 +37,9 @@ export function AirbrushingFormFields({
           name="price"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="flex items-center gap-2">
-                <IconCurrencyReal className="h-4 w-4" />
-                Preço do Serviço
-              </FormLabel>
+              <FormLabel>Preço do Serviço</FormLabel>
               <FormControl>
-                <Input type="currency" value={field.value || undefined} onChange={field.onChange} placeholder="R$ 0,00" />
+                <Input type="currency" value={field.value || undefined} onChange={field.onChange} placeholder="R$ 0,00" className="bg-transparent" />
               </FormControl>
               <FormMessage />
             </FormItem>

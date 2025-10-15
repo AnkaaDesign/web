@@ -6,6 +6,7 @@ import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supplierCreateSchema, supplierUpdateSchema, type SupplierCreateFormData, type SupplierUpdateFormData } from "../../../../schemas";
 import { serializeSupplierFormToUrlParams, getDefaultSupplierFormValues, debounce } from "@/utils/url-form-state";
+import { createSupplierFormData } from "@/utils/form-data-helper";
 
 // Import all form components
 import { FantasyNameInput } from "./fantasy-name-input";
@@ -209,22 +210,49 @@ export function SupplierForm(props: SupplierFormProps) {
         transformedData.tags = Object.values(transformedData.tags) as string[];
       }
 
-      // Get logoFile from form state (set by LogoInput component)
-      // Access it directly from the internal form state since it's not part of the schema
-      const logoFile = (form as any).getValues?.('logoFile') as File | null | undefined;
+      // Check if we have a logo file to upload
+      // Get logoFile from both submitted data AND current form state (in case it wasn't included in submission)
+      const logoFile = (transformedData as any).logoFile || form.getValues('logoFile' as any);
 
-      if (mode === "create") {
-        // Pass logo file with supplier data for create mode
-        await (props as CreateSupplierFormProps).onSubmit({
-          ...transformedData,
+      // Debug logging
+      console.log('[SupplierForm] onSubmit - logoFile check:', {
+        hasLogoFile: !!logoFile,
+        isFile: logoFile instanceof File,
+        logoFileType: logoFile?.constructor?.name,
+        fromData: !!(transformedData as any).logoFile,
+        fromFormState: !!form.getValues('logoFile' as any),
+      });
+
+      // If we have a file, create FormData with proper context
+      if (logoFile && logoFile instanceof File) {
+        // Extract logoFile from data and prepare clean data object
+        const { logoFile: _, ...dataWithoutFile } = transformedData as any;
+
+        // Create FormData with proper context for file organization
+        const formData = createSupplierFormData(
+          dataWithoutFile,
           logoFile,
-        } as SupplierCreateFormData & { logoFile?: File });
+          {
+            id: mode === "update" ? defaultValues?.id : undefined,
+            name: transformedData.corporateName || transformedData.fantasyName,
+            fantasyName: transformedData.fantasyName,
+          }
+        );
+
+        if (mode === "create") {
+          await (props as CreateSupplierFormProps).onSubmit(formData as any);
+        } else {
+          await (props as UpdateSupplierFormProps).onSubmit(formData as any);
+        }
       } else {
-        // Pass logo file with supplier data for update mode as well
-        await (props as UpdateSupplierFormProps).onSubmit({
-          ...transformedData,
-          logoFile,
-        } as SupplierUpdateFormData & { logoFile?: File });
+        // No file, send as regular JSON (remove logoFile field if present)
+        const { logoFile: _, ...dataWithoutFile } = transformedData as any;
+
+        if (mode === "create") {
+          await (props as CreateSupplierFormProps).onSubmit(dataWithoutFile as SupplierCreateFormData);
+        } else {
+          await (props as UpdateSupplierFormProps).onSubmit(dataWithoutFile as SupplierUpdateFormData);
+        }
       }
     } catch (error) {
       // Error is handled by the parent component

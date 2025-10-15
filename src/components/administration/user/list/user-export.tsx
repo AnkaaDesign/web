@@ -27,8 +27,7 @@ const EXPORT_COLUMNS: ExportColumn<User>[] = [
   { id: "sector.name", label: "Setor", getValue: (user: User) => user.sector?.name || "" },
   { id: "tasksCount", label: "Tarefas", getValue: (user: User) => user._count?.createdTasks?.toString() || "0" },
   { id: "vacationsCount", label: "Férias", getValue: (user: User) => user._count?.vacations?.toString() || "0" },
-  { id: "admissional", label: "Data de Admissão", getValue: (user: User) => (user.admissional ? formatDate(new Date(user.admissional)) : "") },
-  { id: "birthDate", label: "Data de Nascimento", getValue: (user: User) => (user.birth ? formatDate(new Date(user.birth)) : "") },
+  { id: "birth", label: "Data de Nascimento", getValue: (user: User) => (user.birth ? formatDate(new Date(user.birth)) : "") },
   { id: "dismissal", label: "Data de Demissão", getValue: (user: User) => (user.dismissal ? formatDate(new Date(user.dismissal)) : "") },
   { id: "status", label: "Status", getValue: (user: User) => getUserStatusBadgeText(user) },
   { id: "performanceLevel", label: "Nível de Performance", getValue: (user: User) => user.performanceLevel?.toString() || "0" },
@@ -332,8 +331,7 @@ export function UserExport({ className, filters, currentUsers = [], totalRecords
                 case "performanceLevel":
                   width = "70px";
                   break;
-                case "admissional":
-                case "birthDate":
+                case "birth":
                 case "dismissal":
                   width = "100px";
                   break;

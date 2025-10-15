@@ -1,0 +1,99 @@
+{
+  "description": "File organization configuration for backend services - Maps file types and entities to WebDAV directories",
+  "webdavRoot": "/srv/webdav",
+  "fileOrganization": {
+    "customer": {
+      "logo": "Logos/Clientes/{customerFantasyName}/"
+    },
+    "supplier": {
+      "logo": "Logos/Fornecedores/{supplierFantasyName}/"
+    },
+    "warning": {
+      "attachment": "Advertencias/{userName}/"
+    },
+    "cut": {
+      "vinyl": "Plotter/{customerFantasyName}/Adesivos/",
+      "stencil": "Plotter/{customerFantasyName}/Estencis/",
+      "default": "Plotter/{customerFantasyName}/Outros/"
+    },
+    "task": {
+      "budget": "Orcamentos/Tarefas/{customerFantasyName}/",
+      "receipt": "Comprovantes/Tarefas/{customerFantasyName}/",
+      "invoice": "NFs/Tarefas/{customerFantasyName}/",
+      "artwork_image": "Projetos/{customerFantasyName}/Images/",
+      "artwork_pdf": "Projetos/{customerFantasyName}/Pdfs/",
+      "artwork_other": "Projetos/{customerFantasyName}/Outros/"
+    },
+    "airbrushing": {
+      "budget": "Orcamentos/Aerografia/{customerFantasyName}/",
+      "receipt": "Comprovantes/Aerografia/{customerFantasyName}/",
+      "invoice": "NFs/Aerografia/{customerFantasyName}/",
+      "artwork": "Auxiliares/Aerografia/{customerFantasyName}/"
+    },
+    "order": {
+      "budget": "Orcamentos/Pedidos/{customerFantasyName}/",
+      "receipt": "Comprovantes/Pedidos/{customerFantasyName}/",
+      "invoice": "NFs/Pedidos/{customerFantasyName}/"
+    },
+    "withdrawal": {
+      "receipt": "Comprovantes/Retiradas/{customerFantasyName}/",
+      "invoice": "NFs/Retiradas/{customerFantasyName}/"
+    },
+    "entry": {
+      "invoice": "NFs/Fornecedores/{supplierFantasyName}/",
+      "document": "NFs/Fornecedores/{supplierFantasyName}/"
+    },
+    "exit": {
+      "invoice": "NFs/Clientes/{customerFantasyName}/",
+      "document": "NFs/Clientes/{customerFantasyName}/"
+    }
+  },
+  "specialDirectories": {
+    "thumbnails": "Thumbnails/",
+    "temporary": "Temporario/",
+    "uploads": "Uploads/",
+    "trash": "Lixeira/",
+    "recycle": ".recycle/",
+    "drafts": "Rascunhos/",
+    "photos": "Fotos/",
+    "arts": "Artes/",
+    "backup": "Backup/",
+    "notes": "Observacoes/"
+  },
+  "contextFieldMapping": {
+    "customerFantasyName": ["customer.fantasyName", "customer.name", "customerId"],
+    "supplierFantasyName": ["supplier.fantasyName", "supplier.name", "supplierId"],
+    "userName": ["user.name", "user.fullName", "userId"]
+  },
+  "fileTypeDetection": {
+    "patterns": {
+      "logo": ["logo", "logotipo"],
+      "budget": ["orcamento", "budget", "cotacao", "quote"],
+      "receipt": ["comprovante", "receipt", "recibo"],
+      "invoice": ["nf", "nota", "invoice", "nfe", "nfse", "fiscal"],
+      "artwork": ["arte", "artwork", "design", "projeto", "art"],
+      "cut": ["corte", "cut", "plotter", "eps", "cdr", "ai", "svg", "dxf"]
+    },
+    "extensions": {
+      "image": ["jpg", "jpeg", "png", "gif", "svg", "webp", "bmp"],
+      "pdf": ["pdf"],
+      "cut": ["eps", "ai", "cdr", "svg", "dxf"],
+      "document": ["doc", "docx", "xls", "xlsx", "txt", "csv"]
+    }
+  },
+  "nameSanitization": {
+    "invalidChars": "[<>:\"/\\\\|?*\\x00-\\x1f]",
+    "replacement": "-",
+    "maxLength": 255,
+    "fallbackName": "Sem-Nome"
+  },
+  "implementationNotes": {
+    "1": "The backend should read the '_context' field from FormData to get entity metadata",
+    "2": "Each file field should have a corresponding '{fieldName}_metadata' field with file type info",
+    "3": "Directory paths should be created if they don't exist",
+    "4": "Variables in paths (e.g., {customerFantasyName}) should be replaced with actual values",
+    "5": "All directory and file names should be sanitized before use",
+    "6": "If context data is missing, use fallback directories or reject the upload",
+    "7": "Thumbnails should be generated in the Thumbnails directory with proper organization"
+  }
+}

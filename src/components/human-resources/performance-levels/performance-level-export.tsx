@@ -19,7 +19,6 @@ const EXPORT_COLUMNS: ExportColumn<User>[] = [
   { id: "performanceLevel", label: "Nível de Desempenho", getValue: (user) => user.performanceLevel?.toString() || "0" },
   { id: "bonus", label: "Bonificação", getValue: (user) => "" },  // To be implemented
   { id: "status", label: "Status", getValue: (user) => USER_STATUS_LABELS[user.status] || user.status },
-  { id: "hireDate", label: "Data de Admissão", getValue: (user) => user.hireDate ? new Date(user.hireDate).toLocaleDateString("pt-BR") : "" },
   { id: "createdAt", label: "Data de Cadastro", getValue: (user) => new Date(user.createdAt).toLocaleDateString("pt-BR") },
 ];
 

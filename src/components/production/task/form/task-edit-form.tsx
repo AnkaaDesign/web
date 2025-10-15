@@ -22,7 +22,8 @@ import {
 import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
 import { useTaskMutations, useObservationMutations, useCutsByTask } from "../../../../hooks";
-import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE } from "../../../../constants";
+import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -42,7 +43,6 @@ import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./mu
 import { FileUploadField, type FileWithPreview } from "@/components/file";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
-import { uploadSingleFile } from "../../../../api-client";
 import type { ObservationCreateFormData } from "../../../../schemas";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -124,7 +124,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     convertToFileWithPreview((task as any).budgets || task.budget)
   );
   const [nfeFile, setNfeFile] = useState<FileWithPreview[]>(
-    convertToFileWithPreview((task as any).nfes || task.nfe)
+    convertToFileWithPreview((task as any).invoices || task.nfe)
   );
   const [receiptFile, setReceiptFile] = useState<FileWithPreview[]>(
     convertToFileWithPreview((task as any).receipts || task.receipt)
@@ -155,7 +155,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   const [isObservationOpen, setIsObservationOpen] = useState(false);
   const [observationDescription, setObservationDescription] = useState("");
   const [observationFiles, setObservationFiles] = useState<FileWithPreview[]>([]);
-  const [observationFileIds, setObservationFileIds] = useState<string[]>([]);
   const [isCreatingObservation, setIsCreatingObservation] = useState(false);
 
   // Map task data to form values
@@ -240,10 +239,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           price: a.price,
           status: a.status,
           receiptIds: a.receipts?.map((r) => r.id) || [],
-          nfeIds: a.nfes?.map((n) => n.id) || [],
+          invoiceIds: a.invoices?.map((n) => n.id) || [],
           artworkIds: a.artworks?.map((art) => art.id) || [],
           receipts: a.receipts || [],
-          nfes: a.nfes || [],
+          invoices: a.invoices || [],
           artworks: a.artworks || [],
         })) || [],
     } as TaskUpdateFormData;
@@ -254,6 +253,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     async (changedData: Partial<TaskUpdateFormData>) => {
       try {
         setIsSubmitting(true);
+
+        // DEBUG: Log what fields are in changedData
+        console.log('[TaskEditForm] changedData keys:', Object.keys(changedData));
+        console.log('[TaskEditForm] changedData:', changedData);
 
         // Validate that we have changes (form, layout, or file changes)
         if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges) {
@@ -270,58 +273,154 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
         // Check if we have new files that need to be uploaded
         const newBudgetFiles = budgetFile.filter(f => !f.uploaded);
-        const newNfeFiles = nfeFile.filter(f => !f.uploaded);
+        const newNnvoiceFiles = nfeFile.filter(f => !f.uploaded);
         const newReceiptFiles = receiptFile.filter(f => !f.uploaded);
         const newArtworkFiles = uploadedFiles.filter(f => !f.uploaded);
 
-        const hasNewFiles = newBudgetFiles.length > 0 || newNfeFiles.length > 0 ||
-                           newReceiptFiles.length > 0 || newArtworkFiles.length > 0;
+        // Check for cut files
+        const cuts = changedData.cuts as any[] || [];
+        const hasCutFiles = cuts.some(cut => cut.file && cut.file instanceof File);
+
+        // Check for airbrushing files
+        const airbrushings = changedData.airbrushings as any[] || [];
+        const hasAirbrushingFiles = airbrushings.some(a =>
+          (a.receiptFiles && a.receiptFiles.some((f: any) => f instanceof File)) ||
+          (a.nfeFiles && a.nfeFiles.some((f: any) => f instanceof File)) ||
+          (a.artworkFiles && a.artworkFiles.some((f: any) => f instanceof File))
+        );
+
+        const hasNewFiles = newBudgetFiles.length > 0 || newNnvoiceFiles.length > 0 ||
+                           newReceiptFiles.length > 0 || newArtworkFiles.length > 0 ||
+                           hasCutFiles || hasAirbrushingFiles;
 
         let result;
 
         if (hasNewFiles) {
-          // Use FormData when files are present
-          const formData = new FormData();
+          // Get customer data for file organization context
+          const customer = task.customer;
 
-          // Add all form fields
-          Object.entries(changedData).forEach(([key, value]) => {
-            if (value !== null && value !== undefined) {
-              if (Array.isArray(value)) {
-                formData.append(key, JSON.stringify(value));
-              } else if (typeof value === 'object') {
-                formData.append(key, JSON.stringify(value));
-              } else if (typeof value === 'number') {
-                // Keep numbers as numbers by using JSON.stringify
-                formData.append(key, JSON.stringify(value));
-              } else {
-                formData.append(key, String(value));
+          // Prepare files object for the helper
+          const files: Record<string, File[]> = {};
+
+          if (newBudgetFiles.length > 0) {
+            files.budgets = newBudgetFiles.filter(f => f instanceof File) as File[];
+          }
+          if (newNnvoiceFiles.length > 0) {
+            files.invoices = newNnvoiceFiles.filter(f => f instanceof File) as File[];
+          }
+          if (newReceiptFiles.length > 0) {
+            files.receipts = newReceiptFiles.filter(f => f instanceof File) as File[];
+          }
+          if (newArtworkFiles.length > 0) {
+            files.artworks = newArtworkFiles.filter(f => f instanceof File) as File[];
+          }
+
+          // Handle cut files if cuts were changed
+          const cuts = changedData.cuts as any[] || [];
+          const cutFiles: File[] = [];
+          if (cuts.length > 0) {
+            const cutsWithContext = cuts.map(cut => {
+              if (cut.file && cut.file instanceof File) {
+                cutFiles.push(cut.file);
+                // Add metadata for file organization
+                return {
+                  ...cut,
+                  _fileContext: {
+                    cutType: cut.type === CUT_TYPE.VINYL ? 'vinyl' : 'stencil',
+                    customerName: customer?.fantasyName || customer?.corporateName || '',
+                  }
+                };
               }
+              return cut;
+            });
+            // Update cuts in changedData with context
+            changedData.cuts = cutsWithContext;
+            if (cutFiles.length > 0) {
+              files.cuts = cutFiles;
+            }
+          }
+
+          // Handle airbrushing files if airbrushings were changed
+          const airbrushings = changedData.airbrushings as any[] || [];
+          if (airbrushings.length > 0) {
+            airbrushings.forEach((airbrushing, index) => {
+              // Extract files from airbrushing objects
+              if (airbrushing.receiptFiles && Array.isArray(airbrushing.receiptFiles)) {
+                const airbrushingReceipts = airbrushing.receiptFiles.filter((f: any) => f instanceof File);
+                if (airbrushingReceipts.length > 0) {
+                  files[`airbrushings[${index}].receipts`] = airbrushingReceipts;
+                }
+              }
+              if (airbrushing.nfeFiles && Array.isArray(airbrushing.nfeFiles)) {
+                const airbrushingNfes = airbrushing.nfeFiles.filter((f: any) => f instanceof File);
+                if (airbrushingNfes.length > 0) {
+                  files[`airbrushings[${index}].invoices`] = airbrushingNfes;
+                }
+              }
+              if (airbrushing.artworkFiles && Array.isArray(airbrushing.artworkFiles)) {
+                const airbrushingArtworks = airbrushing.artworkFiles.filter((f: any) => f instanceof File);
+                if (airbrushingArtworks.length > 0) {
+                  files[`airbrushings[${index}].artworks`] = airbrushingArtworks;
+                }
+              }
+            });
+          }
+
+          // Fields that should NEVER be sent via FormData to avoid huge payloads
+          // These are large arrays that bloat the payload size
+          const excludedFields = new Set(['cuts', 'airbrushings', 'services', 'paintIds', 'artworkIds', 'budgetIds', 'invoiceIds', 'receiptIds']);
+
+          // Prepare data object with only changed fields (excluding large arrays unless they changed)
+          const dataForFormData: Record<string, any> = {};
+          let fieldCount = 0;
+          Object.entries(changedData).forEach(([key, value]) => {
+            // Skip excluded fields (large arrays) - they should only be sent if explicitly updated
+            if (excludedFields.has(key)) {
+              console.log(`[TaskEditForm] Skipping large field: ${key}`);
+              return;
+            }
+
+            if (value !== null && value !== undefined) {
+              dataForFormData[key] = value;
+              fieldCount++;
             }
           });
 
-          // Add budget files if exist
-          newBudgetFiles.forEach((file) => {
-            formData.append('budgets', file as unknown as Blob);
-          });
+          // CRITICAL: If no form fields were added but we have files, add a marker field
+          // This prevents the body from being undefined, which causes multer to hang
+          if (fieldCount === 0) {
+            dataForFormData._hasFiles = true;
+            console.log('[TaskEditForm] No changed fields - added marker field to prevent empty body');
+          }
 
-          // Add NFe files if exist
-          newNfeFiles.forEach((file) => {
-            formData.append('nfes', file as unknown as Blob);
-          });
+          console.log('[TaskEditForm] FormData prepared with', fieldCount, 'changed fields and', Object.keys(files).length, 'file types');
 
-          // Add receipt files if exist
-          newReceiptFiles.forEach((file) => {
-            formData.append('receipts', file as unknown as Blob);
-          });
-
-          // Add artwork files if exist
-          newArtworkFiles.forEach((file) => {
-            formData.append('artworks', file as unknown as Blob);
-          });
+          // Use the helper to create FormData with proper context
+          const formData = createFormDataWithContext(
+            dataForFormData,
+            files,
+            {
+              entityType: 'task',
+              entityId: task.id,
+              customer: customer ? {
+                id: customer.id,
+                name: customer.corporateName || customer.fantasyName,
+                fantasyName: customer.fantasyName,
+              } : undefined,
+            }
+          );
 
           result = await updateAsync({
             id: task.id,
             data: formData as any,
+            query: {
+              include: {
+                budgets: true,
+                invoices: true,
+                receipts: true,
+                artworks: true,
+              },
+            },
           });
         } else {
           // Use regular JSON when no files are present
@@ -330,6 +429,14 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           result = await updateAsync({
             id: task.id,
             data: submitData,
+            query: {
+              include: {
+                budgets: true,
+                invoices: true,
+                receipts: true,
+                artworks: true,
+              },
+            },
           });
         }
 
@@ -360,7 +467,8 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       reValidateMode: "onChange",
       criteriaMode: "all",
     },
-    fieldsToOmitIfUnchanged: ["cuts"], // Don't send cuts array if unchanged
+    // Don't send these large arrays if they haven't changed (reduces payload size)
+    fieldsToOmitIfUnchanged: ["cuts", "airbrushings", "services", "paintIds"],
   });
 
   // Debug: Log form values after initialization
@@ -418,50 +526,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     // Files will be submitted with the form, not uploaded separately
   };
 
-  // Handle observation files
-  const handleObservationFilesChange = async (files: FileWithPreview[]) => {
+  // Handle observation files (no longer uploads immediately)
+  const handleObservationFilesChange = (files: FileWithPreview[]) => {
     setObservationFiles(files);
-
-    // Upload new files that haven't been uploaded yet
-    const newFiles = files.filter((file) => !file.uploaded && !file.uploadProgress && !file.error);
-
-    for (const file of newFiles) {
-      try {
-        // Update file with upload progress
-        setObservationFiles((prev) => updateFileInList(prev, file.id, { uploadProgress: 0, uploaded: false }));
-
-        const result = await uploadSingleFile(file, {
-          onProgress: (progress) => {
-            setObservationFiles((prev) => updateFileInList(prev, file.id, { uploadProgress: progress.percentage }));
-          },
-        });
-
-        if (result.success && result.data) {
-          const uploadedFile = result.data;
-
-          // Update file with uploaded data
-          setObservationFiles((prev) =>
-            updateFileInList(prev, file.id, {
-              uploadedFileId: uploadedFile.id,
-              uploaded: true,
-              uploadProgress: 100,
-              thumbnailUrl: uploadedFile.thumbnailUrl || undefined,
-              error: undefined,
-            })
-          );
-
-          // Add file ID to the list
-          setObservationFileIds((prev) => [...prev, uploadedFile.id]);
-        } else {
-          throw new Error(result.message || "Upload failed");
-        }
-      } catch (error) {
-        console.error("File upload error:", error);
-
-        // Update file with error
-        setObservationFiles((prev) => updateFileInList(prev, file.id, { error: "Erro ao enviar arquivo", uploadProgress: 0, uploaded: false }));
-      }
-    }
+    // Files will be submitted with the observation creation, not uploaded separately
   };
 
   // Handle observation creation
@@ -474,20 +542,50 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     try {
       setIsCreatingObservation(true);
 
-      const observationData: ObservationCreateFormData = {
-        description: observationDescription,
-        taskId: task.id,
-        fileIds: observationFileIds,
-      };
+      // Check if we have files to upload
+      const newFiles = observationFiles.filter(f => !f.uploaded && f instanceof File);
 
-      await createObservation(observationData);
+      if (newFiles.length > 0) {
+        // Create FormData when files are present
+        const formData = new FormData();
+        formData.append('description', observationDescription);
+        formData.append('taskId', task.id);
+
+        // Add files
+        newFiles.forEach((file) => {
+          formData.append('files', file as unknown as Blob);
+        });
+
+        // Add existing file IDs if any
+        const existingFileIds = observationFiles
+          .filter(f => f.uploaded)
+          .map(f => (f as any).uploadedFileId || f.id)
+          .filter(Boolean);
+
+        if (existingFileIds.length > 0) {
+          formData.append('fileIds', JSON.stringify(existingFileIds));
+        }
+
+        await createObservation(formData as any);
+      } else {
+        // No new files, send as regular JSON
+        const observationData: ObservationCreateFormData = {
+          description: observationDescription,
+          taskId: task.id,
+          fileIds: observationFiles
+            .filter(f => f.uploaded)
+            .map(f => (f as any).uploadedFileId || f.id)
+            .filter(Boolean),
+        };
+
+        await createObservation(observationData);
+      }
 
       // Success toast is handled automatically by API client
 
       // Reset observation form
       setObservationDescription("");
       setObservationFiles([]);
-      setObservationFileIds([]);
       setIsObservationOpen(false);
     } catch (error) {
       console.error("Error creating observation:", error);
@@ -685,130 +783,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                         </FormItem>
                       )}
                     />
-                  </CardContent>
-                </Card>
-
-                {/* Issues & Observations Card */}
-                <Card className="bg-transparent">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <IconAlertCircle className="h-5 w-5" />
-                      Problemas e Observações
-                      <Badge variant="secondary" className="ml-auto">
-                        Opcional
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {isObservationOpen ? (
-                      <div className="space-y-4">
-                        <Alert>
-                          <IconAlertCircle className="h-4 w-4" />
-                          <AlertTitle>Criar Observação</AlertTitle>
-                          <AlertDescription>
-                            As observações são registradas quando há problemas ou questões importantes identificadas na tarefa. Criar uma observação irá suspender automaticamente
-                            as comissões relacionadas a esta tarefa.
-                          </AlertDescription>
-                        </Alert>
-
-                        {/* Description Field */}
-                        <div className="space-y-2">
-                          <Label htmlFor="observation-description">
-                            Descrição da Observação <span className="text-destructive">*</span>
-                          </Label>
-                          <Textarea
-                            id="observation-description"
-                            value={observationDescription}
-                            onChange={(value) => setObservationDescription(typeof value === "string" ? value : "")}
-                            placeholder="Descreva detalhadamente o problema ou observação identificada..."
-                            className="min-h-32 resize-y"
-                            disabled={isCreatingObservation}
-                          />
-                          <div className="text-xs text-muted-foreground text-right">{observationDescription.length}/1000 caracteres</div>
-                        </div>
-
-                        {/* File Upload for Observation */}
-                        <div className="space-y-2">
-                          <Label>Arquivos da Observação (Opcional)</Label>
-                          <FileUploadField
-                            onFilesChange={handleObservationFilesChange}
-                            existingFiles={observationFiles}
-                            maxFiles={5}
-                            disabled={isCreatingObservation}
-                            showPreview={true}
-                            variant="compact"
-                            placeholder="Adicione arquivos de evidência"
-                            label="Arquivos da observação"
-                          />
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex justify-end gap-2 pt-4 border-t">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              setIsObservationOpen(false);
-                              setObservationDescription("");
-                              setObservationFiles([]);
-                              setObservationFileIds([]);
-                            }}
-                            disabled={isCreatingObservation}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button type="button" onClick={handleCreateObservation} disabled={isCreatingObservation || !observationDescription.trim()}>
-                            {isCreatingObservation ? (
-                              <>
-                                <IconLoader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Criando...
-                              </>
-                            ) : (
-                              <>
-                                <IconCheck className="h-4 w-4 mr-2" />
-                                Criar Observação
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <div className="text-center py-8 border-2 border-dashed border-muted rounded-lg">
-                          <div className="space-y-2">
-                            <div className="mx-auto w-12 h-12 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center">
-                              <IconAlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                            </div>
-                            <h3 className="text-lg font-semibold">Identificou algum problema?</h3>
-                            <p className="text-muted-foreground max-w-md mx-auto">
-                              Crie uma observação para registrar problemas ou questões importantes relacionadas a esta tarefa. Isso irá suspender as comissões automaticamente.
-                            </p>
-                          </div>
-                          <div className="mt-4">
-                            <Button type="button" onClick={() => setIsObservationOpen(true)} disabled={isSubmitting} variant="outline">
-                              <IconPlus className="h-4 w-4 mr-2" />
-                              Criar Observação
-                            </Button>
-                          </div>
-                        </div>
-
-                        {/* Show existing observations for this task */}
-                        {task.observation && (
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">Observações Existentes</Label>
-                            <div className="space-y-2">
-                              <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg text-sm">
-                                <IconAlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                                <div className="flex-1">
-                                  <p className="text-foreground">{task.observation.description}</p>
-                                  <p className="text-xs text-muted-foreground mt-1">Criada em {new Date(task.observation.createdAt).toLocaleDateString("pt-BR")}</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
 
@@ -1101,13 +1075,129 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                   </CardContent>
                 </Card>
 
+                {/* Issues & Observations Card */}
+                <Card className="bg-transparent">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconAlertCircle className="h-5 w-5" />
+                        Problemas e Observações
+                      </CardTitle>
+                      {!isObservationOpen && (
+                        <Button
+                          type="button"
+                          onClick={() => setIsObservationOpen(true)}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Criar Observação
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {isObservationOpen ? (
+                      <div className="space-y-4">
+                        <Alert>
+                          <IconAlertCircle className="h-4 w-4" />
+                          <AlertTitle>Criar Observação</AlertTitle>
+                          <AlertDescription>
+                            As observações são registradas quando há problemas ou questões importantes identificadas na tarefa. Criar uma observação irá suspender automaticamente
+                            as comissões relacionadas a esta tarefa.
+                          </AlertDescription>
+                        </Alert>
+
+                        {/* Description Field */}
+                        <div className="space-y-2">
+                          <Label htmlFor="observation-description">
+                            Descrição da Observação <span className="text-destructive">*</span>
+                          </Label>
+                          <Textarea
+                            id="observation-description"
+                            value={observationDescription}
+                            onChange={(value) => setObservationDescription(typeof value === "string" ? value : "")}
+                            placeholder="Descreva detalhadamente o problema ou observação identificada..."
+                            className="min-h-32 resize-y"
+                            disabled={isCreatingObservation}
+                          />
+                          <div className="text-xs text-muted-foreground text-right">{observationDescription.length}/1000 caracteres</div>
+                        </div>
+
+                        {/* File Upload for Observation */}
+                        <div className="space-y-2">
+                          <Label>Arquivos da Observação (Opcional)</Label>
+                          <FileUploadField
+                            onFilesChange={handleObservationFilesChange}
+                            existingFiles={observationFiles}
+                            maxFiles={5}
+                            disabled={isCreatingObservation}
+                            showPreview={true}
+                            variant="compact"
+                            placeholder="Adicione arquivos de evidência"
+                            label="Arquivos da observação"
+                          />
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex justify-end gap-2 pt-4 border-t">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setIsObservationOpen(false);
+                              setObservationDescription("");
+                              setObservationFiles([]);
+                            }}
+                            disabled={isCreatingObservation}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button type="button" onClick={handleCreateObservation} disabled={isCreatingObservation || !observationDescription.trim()}>
+                            {isCreatingObservation ? (
+                              <>
+                                <IconLoader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Criando...
+                              </>
+                            ) : (
+                              <>
+                                <IconCheck className="h-4 w-4 mr-2" />
+                                Criar Observação
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Show existing observations for this task */}
+                        {task.observation && (
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Observações Existentes</Label>
+                            <div className="space-y-2">
+                              <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg text-sm">
+                                <IconAlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <p className="text-foreground">{task.observation.description}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">Criada em {new Date(task.observation.createdAt).toLocaleDateString("pt-BR")}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
                 {/* Cut Plans Section - Multiple Cuts Support */}
                 <Card className="bg-transparent">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <IconScissors className="h-5 w-5" />
-                        Recortes
+                        Plano de Corte
                       </CardTitle>
                       <Button
                         type="button"

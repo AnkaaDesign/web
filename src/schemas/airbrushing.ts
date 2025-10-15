@@ -61,7 +61,7 @@ export const airbrushingIncludeSchema = z
         }),
       ])
       .optional(),
-    nfes: z
+    invoices: z
       .union([
         z.boolean(),
         z.object({
@@ -481,7 +481,7 @@ export const airbrushingCreateSchema = z
     status: z.nativeEnum(AIRBRUSHING_STATUS).default(AIRBRUSHING_STATUS.PENDING),
     taskId: z.string().uuid("Tarefa inválida"),
     receiptIds: z.array(z.string().uuid()).optional(),
-    nfeIds: z.array(z.string().uuid()).optional(),
+    invoiceIds: z.array(z.string().uuid()).optional(),
     artworkIds: z.array(z.string().uuid()).optional(),
   })
   .transform(toFormData);
@@ -500,7 +500,7 @@ export const airbrushingUpdateSchema = z
     status: z.nativeEnum(AIRBRUSHING_STATUS).optional(),
     taskId: z.string().uuid("Tarefa inválida").optional(),
     receiptIds: z.array(z.string().uuid()).optional(),
-    nfeIds: z.array(z.string().uuid()).optional(),
+    invoiceIds: z.array(z.string().uuid()).optional(),
     artworkIds: z.array(z.string().uuid()).optional(),
   })
   .transform(toFormData);
@@ -578,7 +578,7 @@ export const airbrushingCreateNestedSchema = z
       .optional(),
     status: z.nativeEnum(AIRBRUSHING_STATUS).default(AIRBRUSHING_STATUS.PENDING),
     receiptIds: z.array(z.string().uuid()).optional(),
-    nfeIds: z.array(z.string().uuid()).optional(),
+    invoiceIds: z.array(z.string().uuid()).optional(),
     artworkIds: z.array(z.string().uuid()).optional(),
   })
   .transform(toFormData);
@@ -596,6 +596,6 @@ export const mapAirbrushingToFormData = createMapToFormDataHelper<Airbrushing, A
   status: airbrushing.status,
   taskId: airbrushing.taskId,
   receiptIds: airbrushing.receipts?.map((file) => file.id),
-  nfeIds: airbrushing.nfes?.map((file) => file.id),
+  invoiceIds: airbrushing.invoices?.map((file) => file.id),
   artworkIds: airbrushing.artworks?.map((file) => file.id),
 }));

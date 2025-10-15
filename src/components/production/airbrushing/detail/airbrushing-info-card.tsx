@@ -33,7 +33,7 @@ interface AirbrushingInfoCardProps {
       size: number;
       mimetype: string;
     }[];
-    nfes?: {
+    invoices?: {
       id: string;
       filename: string;
       originalName: string;
@@ -266,7 +266,7 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
       )}
 
       {/* NFEs Card */}
-      {airbrushing.nfes && airbrushing.nfes.length > 0 && (
+      {airbrushing.invoices && airbrushing.invoices.length > 0 && (
         <Card className="shadow-sm border border-border">
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-3 text-xl">
@@ -275,14 +275,14 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
               </div>
               Notas Fiscais Anexadas
               <Badge variant="secondary" className="ml-auto">
-                {airbrushing.nfes.length} arquivo{airbrushing.nfes.length > 1 ? "s" : ""}
+                {airbrushing.invoices.length} arquivo{airbrushing.invoices.length > 1 ? "s" : ""}
               </Badge>
             </CardTitle>
           </CardHeader>
 
           <CardContent className="pt-0">
             <div className="grid grid-cols-1 gap-4">
-              {airbrushing.nfes.map((file) => (
+              {airbrushing.invoices.map((file) => (
                 <FileItem key={file.id} file={file} showActions={false} className="bg-muted/30" />
               ))}
             </div>

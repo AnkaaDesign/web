@@ -54,16 +54,20 @@ export class AirbrushingService {
   // Mutation Operations
   // =====================
 
-  async createAirbrushing(data: AirbrushingCreateFormData, query?: AirbrushingQueryFormData): Promise<AirbrushingCreateResponse> {
+  async createAirbrushing(data: AirbrushingCreateFormData | FormData, query?: AirbrushingQueryFormData): Promise<AirbrushingCreateResponse> {
+    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
     const response = await apiClient.post<AirbrushingCreateResponse>(this.basePath, data, {
       params: query,
+      headers,
     });
     return response.data;
   }
 
-  async updateAirbrushing(id: string, data: AirbrushingUpdateFormData, query?: AirbrushingQueryFormData): Promise<AirbrushingUpdateResponse> {
+  async updateAirbrushing(id: string, data: AirbrushingUpdateFormData | FormData, query?: AirbrushingQueryFormData): Promise<AirbrushingUpdateResponse> {
+    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
     const response = await apiClient.put<AirbrushingUpdateResponse>(`${this.basePath}/${id}`, data, {
       params: query,
+      headers,
     });
     return response.data;
   }
@@ -115,8 +119,8 @@ export const getAirbrushings = (params?: AirbrushingGetManyFormData) => airbrush
 export const getAirbrushingById = (id: string, params?: Omit<AirbrushingGetByIdFormData, "id">) => airbrushingService.getAirbrushingById(id, params);
 
 // Mutation Operations
-export const createAirbrushing = (data: AirbrushingCreateFormData, query?: AirbrushingQueryFormData) => airbrushingService.createAirbrushing(data, query);
-export const updateAirbrushing = (id: string, data: AirbrushingUpdateFormData, query?: AirbrushingQueryFormData) => airbrushingService.updateAirbrushing(id, data, query);
+export const createAirbrushing = (data: AirbrushingCreateFormData | FormData, query?: AirbrushingQueryFormData) => airbrushingService.createAirbrushing(data, query);
+export const updateAirbrushing = (id: string, data: AirbrushingUpdateFormData | FormData, query?: AirbrushingQueryFormData) => airbrushingService.updateAirbrushing(id, data, query);
 export const deleteAirbrushing = (id: string) => airbrushingService.deleteAirbrushing(id);
 
 // Batch Operations

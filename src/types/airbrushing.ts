@@ -20,7 +20,7 @@ export interface Airbrushing extends BaseEntity {
   // Relations (optional, populated based on query)
   task?: Task;
   receipts?: File[];
-  nfes?: File[];
+  invoices?: File[];
   artworks?: File[];
 }
 
@@ -39,7 +39,7 @@ export interface AirbrushingIncludes {
     | {
         include?: FileIncludes;
       };
-  nfes?:
+  invoices?:
     | boolean
     | {
         include?: FileIncludes;

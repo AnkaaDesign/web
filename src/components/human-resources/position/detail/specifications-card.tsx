@@ -1,10 +1,9 @@
-import { IconInfoCircle, IconCalendar, IconHash } from "@tabler/icons-react";
+import { IconInfoCircle, IconCalendar } from "@tabler/icons-react";
 
 import type { Position } from "../../../../types";
 import { formatDateTime, formatCurrency } from "../../../../utils";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 interface SpecificationsCardProps {
   position: Position;
@@ -41,29 +40,15 @@ export function SpecificationsCard({ position }: SpecificationsCardProps) {
             </div>
             <div className="flex items-center justify-between py-1">
               <span className="text-sm text-muted-foreground">Funcionários</span>
-              <Badge variant="secondary" className="font-normal">
+              <span className="text-sm font-medium">
                 {position._count?.users || 0} funcionário{(position._count?.users || 0) !== 1 ? "s" : ""}
-              </Badge>
+              </span>
             </div>
             <div className="flex items-center justify-between py-1">
               <span className="text-sm text-muted-foreground">Histórico de Remunerações</span>
               <span className="text-sm font-medium">
                 {position._count?.remunerations || 0} registro{(position._count?.remunerations || 0) !== 1 ? "s" : ""}
               </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Identification */}
-        <div>
-          <h3 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
-            <IconHash className="h-4 w-4" />
-            Identificação
-          </h3>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between py-1">
-              <span className="text-sm text-muted-foreground">ID do Cargo</span>
-              <code className="text-xs bg-muted px-2 py-1 rounded font-mono">{position.id}</code>
             </div>
           </div>
         </div>

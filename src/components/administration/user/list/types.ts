@@ -18,7 +18,7 @@ export interface UserFilters {
   managedSectorId?: string[];
   hasCommissions?: boolean;
   hasManagedSector?: boolean;
-  birthDate?: {
+  birth?: {
     gte?: Date;
     lte?: Date;
   };

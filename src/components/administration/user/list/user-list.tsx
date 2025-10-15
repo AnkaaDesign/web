@@ -143,21 +143,12 @@ export function UserList({ className }: UserListProps) {
       };
     }
 
-    const birthDateAfter = params.get("birthDateAfter");
-    const birthDateBefore = params.get("birthDateBefore");
-    if (birthDateAfter || birthDateBefore) {
-      filters.birthDate = {
-        ...(birthDateAfter && { gte: new Date(birthDateAfter) }),
-        ...(birthDateBefore && { lte: new Date(birthDateBefore) }),
-      };
-    }
-
-    const hireDateAfter = params.get("hireDateAfter");
-    const hireDateBefore = params.get("hireDateBefore");
-    if (hireDateAfter || hireDateBefore) {
-      filters.hireDate = {
-        ...(hireDateAfter && { gte: new Date(hireDateAfter) }),
-        ...(hireDateBefore && { lte: new Date(hireDateBefore) }),
+    const birthAfter = params.get("birthAfter");
+    const birthBefore = params.get("birthBefore");
+    if (birthAfter || birthBefore) {
+      filters.birth = {
+        ...(birthAfter && { gte: new Date(birthAfter) }),
+        ...(birthBefore && { lte: new Date(birthBefore) }),
       };
     }
 
@@ -212,10 +203,8 @@ export function UserList({ className }: UserListProps) {
     if (filters.createdAt?.lte) params.createdBefore = filters.createdAt.lte.toISOString();
     if (filters.updatedAt?.gte) params.updatedAfter = filters.updatedAt.gte.toISOString();
     if (filters.updatedAt?.lte) params.updatedBefore = filters.updatedAt.lte.toISOString();
-    if (filters.birthDate?.gte) params.birthDateAfter = filters.birthDate.gte.toISOString();
-    if (filters.birthDate?.lte) params.birthDateBefore = filters.birthDate.lte.toISOString();
-    if (filters.hireDate?.gte) params.hireDateAfter = filters.hireDate.gte.toISOString();
-    if (filters.hireDate?.lte) params.hireDateBefore = filters.hireDate.lte.toISOString();
+    if (filters.birth?.gte) params.birthAfter = filters.birth.gte.toISOString();
+    if (filters.birth?.lte) params.birthBefore = filters.birth.lte.toISOString();
     if (filters.lastLoginAt?.gte) params.lastLoginAfter = filters.lastLoginAt.gte.toISOString();
     if (filters.lastLoginAt?.lte) params.lastLoginBefore = filters.lastLoginAt.lte.toISOString();
 

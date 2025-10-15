@@ -3,12 +3,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { debounce } from "../../../../utils";
+import { createWarningFormData } from "@/utils/form-data-helper";
 
 import type { Warning } from "../../../../types";
 import type { WarningCreateFormData, WarningUpdateFormData } from "../../../../schemas";
 import { warningCreateSchema, warningUpdateSchema } from "../../../../schemas";
 import { routes } from "../../../../constants";
-import { useWarningMutations } from "../../../../hooks";
+import { useWarningMutations, useUser } from "../../../../hooks";
 
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -125,8 +126,11 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
   // Handle attachment file changes
   const handleAttachmentFilesChange = (files: FileWithPreview[]) => {
     setAttachmentFiles(files);
-    const fileIds = files.map((f) => f.uploadedFileId || f.id).filter(Boolean);
-    form.setValue("attachmentIds", fileIds);
+    // Store the files in form state for submission (not the IDs)
+    // IMPORTANT: Mark form as dirty when files change to enable submit button
+    form.setValue("attachmentFiles", files, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+    // Clear attachmentIds when new files are selected
+    form.setValue("attachmentIds", [], { shouldDirty: true, shouldTouch: true });
   };
 
   // Reset form when defaultValues change in update mode (e.g., new warning data loaded)
@@ -228,20 +232,75 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
 
   const handleSubmit = async (data: WarningCreateFormData | WarningUpdateFormData) => {
     try {
-      if (props.onSubmit) {
-        await props.onSubmit(data as any);
-      } else {
-        if (props.mode === "create") {
-          const result = await createAsync(data as WarningCreateFormData);
-          // Success toast is handled automatically by API client
-          navigate(routes.humanResources.warnings.details(result.data?.id || ""));
+      // Get attachment files from form state
+      const attachmentFilesFromForm = (data as any).attachmentFiles as FileWithPreview[] | undefined;
+      const newAttachmentFiles = attachmentFilesFromForm?.filter(f => !f.uploaded && f instanceof File);
+
+      // Get user data for the collaborator to organize files properly
+      const collaboratorId = data.collaboratorId;
+      // TODO: You'll need to fetch the user data based on collaboratorId
+      // For now, using the collaboratorId as a fallback
+
+      // Check if we have new files to upload
+      if (newAttachmentFiles && newAttachmentFiles.length > 0) {
+        // Remove attachmentFiles from data and prepare clean data object
+        const { attachmentFiles: _, attachmentIds: __, ...dataWithoutFiles } = data as any;
+
+        // Add existing attachment IDs for files that are already uploaded
+        const existingAttachmentIds = attachmentFilesFromForm
+          ?.filter(f => f.uploaded)
+          ?.map(f => (f as any).uploadedFileId || f.id)
+          ?.filter(Boolean) || [];
+
+        if (existingAttachmentIds.length > 0) {
+          dataWithoutFiles.existingAttachmentIds = existingAttachmentIds;
+        }
+
+        // Create FormData with proper context for file organization
+        const formData = createWarningFormData(
+          dataWithoutFiles,
+          newAttachmentFiles,
+          {
+            id: collaboratorId,
+            name: collaboratorId, // TODO: Replace with actual user name when available
+          }
+        );
+
+        if (props.onSubmit) {
+          await props.onSubmit(formData as any);
         } else {
-          await updateAsync({
-            id: props.warning.id,
-            data: data as WarningUpdateFormData,
-          });
-          // Success toast is handled automatically by API client
-          navigate(routes.humanResources.warnings.details(props.warning.id));
+          if (props.mode === "create") {
+            const result = await createAsync(formData as any);
+            // Success toast is handled automatically by API client
+            navigate(routes.humanResources.warnings.details(result.data?.id || ""));
+          } else {
+            await updateAsync({
+              id: props.warning.id,
+              data: formData as any,
+            });
+            // Success toast is handled automatically by API client
+            navigate(routes.humanResources.warnings.details(props.warning.id));
+          }
+        }
+      } else {
+        // No new files, send as regular JSON
+        const { attachmentFiles: _, ...dataWithoutFiles } = data as any;
+
+        if (props.onSubmit) {
+          await props.onSubmit(dataWithoutFiles as any);
+        } else {
+          if (props.mode === "create") {
+            const result = await createAsync(dataWithoutFiles as WarningCreateFormData);
+            // Success toast is handled automatically by API client
+            navigate(routes.humanResources.warnings.details(result.data?.id || ""));
+          } else {
+            await updateAsync({
+              id: props.warning.id,
+              data: dataWithoutFiles as WarningUpdateFormData,
+            });
+            // Success toast is handled automatically by API client
+            navigate(routes.humanResources.warnings.details(props.warning.id));
+          }
         }
       }
     } catch (error) {

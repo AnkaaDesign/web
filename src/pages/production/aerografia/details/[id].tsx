@@ -39,7 +39,7 @@ export const AirbrushingDetails = () => {
         },
       },
       receipts: true,
-      nfes: true,
+      invoices: true,
     },
     enabled: !!id,
   });

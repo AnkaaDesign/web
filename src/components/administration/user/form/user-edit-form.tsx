@@ -22,9 +22,7 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
       pis: user.pis,
       status: user.status,
       verified: user.verified,
-      hireDate: user.hireDate,
-      birthDate: user.birthDate,
-      admissional: user.admissional,
+      birth: user.birth,
       dismissal: user.dismissal,
       positionId: user.positionId,
       performanceLevel: user.performanceLevel,
@@ -107,7 +105,7 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
         }
       }
       // Special handling for dates
-      else if (typedKey === "hireDate" || typedKey === "birthDate" || typedKey === "admissional" || typedKey === "dismissal") {
+      else if (typedKey === "birth" || typedKey === "dismissal") {
         const newDate = newValue instanceof Date ? newValue.toISOString() : newValue;
         const oldDate = oldValue instanceof Date ? oldValue.toISOString() : oldValue;
         if (newDate !== oldDate) {

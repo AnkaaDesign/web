@@ -24,15 +24,13 @@ import {
   IconUsers,
   IconTrendingUp,
   IconCalendarStats,
-  IconLayoutList,
-  IconLayoutGrid,
 } from "@tabler/icons-react";
 
 // Import the detail components
 import { PayrollDetailsCard } from "@/components/human-resources/payroll/detail/payroll-details-card";
 import { TasksInBonusCard } from "@/components/human-resources/payroll/detail/tasks-in-bonus-card";
 import { UsersStatsCard } from "@/components/human-resources/payroll/detail/users-stats-card";
-import { RelatedTasksCard } from "@/components/shared/related-tasks-card";
+import { PayrollTasksTable } from "@/components/human-resources/payroll/detail/payroll-tasks-table";
 
 interface PayrollDetailPageParams {
   payrollId: string; // Only payrollId is needed now
@@ -55,7 +53,6 @@ export default function PayrollDetailPage() {
   // Fetch payroll details including bonuses
   const [payrollData, setPayrollData] = useState<any>(null);
   const [payrollLoading, setPayrollLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // Track page access
   usePageTracker({
@@ -490,17 +487,12 @@ export default function PayrollDetailPage() {
                 </Card>
               )}
 
-            {/* Tasks Grid - Only show for eligible users */}
+            {/* Tasks Table - Only show for eligible users */}
             {user?.position?.bonifiable ? (
               <div className="space-y-4">
-                <RelatedTasksCard
+                <PayrollTasksTable
                   tasks={payrollData?.bonus?.tasks || []}
-                  title={`Tarefas de ${user?.name || 'Funcionário'}`}
-                  icon={IconClipboardList}
-                  showViewToggle={true}
-                  defaultView="grid"
-                  displayMode="commission"
-                  className="h-[800px]"
+                  userName={user?.name}
                 />
               </div>
             ) : null}

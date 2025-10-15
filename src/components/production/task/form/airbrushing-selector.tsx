@@ -31,7 +31,7 @@ export const AirbrushingSelector = ({ control, disabled, isEditMode = false }: A
         startDate: null,
         finishDate: null,
         receiptIds: [],
-        nfeIds: [],
+        invoiceIds: [],
       });
     } else {
       // Clear airbrushing when disabling

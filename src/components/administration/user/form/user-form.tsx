@@ -10,8 +10,6 @@ import { formatDateTime } from "../../../../utils/date";
 // Import all form components
 import { NameInput } from "./name-input";
 import { FormInput } from "@/components/ui/form-input";
-import { HireDateInput } from "./hire-date-input";
-import { AdmissionalDateInput } from "./admissional-date-input";
 import { DismissalDateInput } from "./dismissal-date-input";
 import { BirthDateInput } from "./birth-date-input";
 import { PositionSelector } from "./position-selector";
@@ -86,7 +84,6 @@ export function UserForm(props: UserFormProps) {
 
     // Additional dates
     birth: null,
-    admissional: new Date(), // Required field - default to today
     dismissal: null,
 
     // Status tracking dates
@@ -139,7 +136,6 @@ export function UserForm(props: UserFormProps) {
       zipCode: null,
       site: null,
       birth: null,
-      admissional: null,
       dismissal: null,
       exp1StartAt: null,
       exp1EndAt: null,

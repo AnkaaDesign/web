@@ -38,7 +38,7 @@ export const TaskEditPage = () => {
       airbrushings: {
         include: {
           receipts: true,
-          nfes: true,
+          invoices: true,
           artworks: true,
         },
       },

@@ -54,16 +54,24 @@ export class ObservationService {
   // Mutation Operations
   // =====================
 
-  async createObservation(data: ObservationCreateFormData, query?: ObservationQueryFormData): Promise<ObservationCreateResponse> {
+  async createObservation(data: ObservationCreateFormData | FormData, query?: ObservationQueryFormData): Promise<ObservationCreateResponse> {
+    const headers = data instanceof FormData
+      ? { 'Content-Type': 'multipart/form-data' }
+      : {};
     const response = await apiClient.post<ObservationCreateResponse>(this.basePath, data, {
       params: query,
+      headers,
     });
     return response.data;
   }
 
-  async updateObservation(id: string, data: ObservationUpdateFormData, query?: ObservationQueryFormData): Promise<ObservationUpdateResponse> {
+  async updateObservation(id: string, data: ObservationUpdateFormData | FormData, query?: ObservationQueryFormData): Promise<ObservationUpdateResponse> {
+    const headers = data instanceof FormData
+      ? { 'Content-Type': 'multipart/form-data' }
+      : {};
     const response = await apiClient.put<ObservationUpdateResponse>(`${this.basePath}/${id}`, data, {
       params: query,
+      headers,
     });
     return response.data;
   }
@@ -115,8 +123,8 @@ export const getObservations = (params?: ObservationGetManyFormData) => observat
 export const getObservationById = (id: string, params?: Omit<ObservationGetByIdFormData, "id">) => observationService.getObservationById(id, params);
 
 // Mutation Operations
-export const createObservation = (data: ObservationCreateFormData, query?: ObservationQueryFormData) => observationService.createObservation(data, query);
-export const updateObservation = (id: string, data: ObservationUpdateFormData, query?: ObservationQueryFormData) => observationService.updateObservation(id, data, query);
+export const createObservation = (data: ObservationCreateFormData | FormData, query?: ObservationQueryFormData) => observationService.createObservation(data, query);
+export const updateObservation = (id: string, data: ObservationUpdateFormData | FormData, query?: ObservationQueryFormData) => observationService.updateObservation(id, data, query);
 export const deleteObservation = (id: string) => observationService.deleteObservation(id);
 
 // Batch Operations
