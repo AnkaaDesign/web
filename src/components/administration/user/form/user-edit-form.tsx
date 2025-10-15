@@ -12,6 +12,14 @@ interface UserEditFormProps {
 }
 
 export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFormStateChange }: UserEditFormProps) {
+  // Helper function to safely convert date strings to Date objects
+  const toDate = (value: string | Date | null | undefined): Date | null => {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    const parsed = new Date(value);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  };
+
   // Map API data to form data
   const defaultValues = React.useMemo(
     () => ({
@@ -21,9 +29,10 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
       cpf: user.cpf,
       pis: user.pis,
       status: user.status,
+      currentStatus: user.status, // Required for validation in update mode
       verified: user.verified,
-      birth: user.birth,
-      dismissal: user.dismissal,
+      birth: toDate(user.birth),
+      dismissal: toDate(user.dismissal),
       positionId: user.positionId,
       performanceLevel: user.performanceLevel,
       sectorId: user.sectorId,
@@ -55,13 +64,13 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
         gloves: null,
         rainBoots: null,
       },
-      // Status tracking timestamps (read-only, auto-managed by backend)
-      contractedAt: user.contractedAt,
-      exp1StartAt: user.exp1StartAt,
-      exp1EndAt: user.exp1EndAt,
-      exp2StartAt: user.exp2StartAt,
-      exp2EndAt: user.exp2EndAt,
-      dismissedAt: user.dismissedAt,
+      // Status tracking timestamps - properly convert to Date objects
+      contractedAt: toDate(user.contractedAt),
+      exp1StartAt: toDate(user.exp1StartAt),
+      exp1EndAt: toDate(user.exp1EndAt),
+      exp2StartAt: toDate(user.exp2StartAt),
+      exp2EndAt: toDate(user.exp2EndAt),
+      dismissedAt: toDate(user.dismissedAt),
       // Don't include password in default values
       password: undefined,
     }),
@@ -83,18 +92,6 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
       // Skip fields that don't exist in the form data
       if (!(typedKey in data)) return;
 
-      // Skip read-only status tracking fields (auto-managed by backend)
-      if (
-        typedKey === "contractedAt" ||
-        typedKey === "exp1StartAt" ||
-        typedKey === "exp1EndAt" ||
-        typedKey === "exp2StartAt" ||
-        typedKey === "exp2EndAt" ||
-        typedKey === "dismissedAt"
-      ) {
-        return;
-      }
-
       const newValue = data[typedKey];
       const oldValue = typedKey in original ? (original as any)[typedKey] : undefined;
 
@@ -105,7 +102,16 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
         }
       }
       // Special handling for dates
-      else if (typedKey === "birth" || typedKey === "dismissal") {
+      else if (
+        typedKey === "birth" ||
+        typedKey === "dismissal" ||
+        typedKey === "exp1StartAt" ||
+        typedKey === "exp1EndAt" ||
+        typedKey === "exp2StartAt" ||
+        typedKey === "exp2EndAt" ||
+        typedKey === "contractedAt" ||
+        typedKey === "dismissedAt"
+      ) {
         const newDate = newValue instanceof Date ? newValue.toISOString() : newValue;
         const oldDate = oldValue instanceof Date ? oldValue.toISOString() : oldValue;
         if (newDate !== oldDate) {

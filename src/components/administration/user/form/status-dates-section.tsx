@@ -5,15 +5,36 @@ import { FormField } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import type { UserCreateFormData, UserUpdateFormData } from "../../../../schemas";
 import { USER_STATUS } from "../../../../constants";
-import { addDays, max as maxDate, startOfDay } from "date-fns";
+import { addDays, max as maxDate, startOfDay, getDay, subDays } from "date-fns";
 
 interface StatusDatesSectionProps {
   disabled?: boolean;
 }
 
 /**
+ * Adjusts a date to the previous Friday if it falls on a weekend
+ * @param date The date to adjust
+ * @returns The adjusted date (Friday if weekend, original date otherwise)
+ */
+function adjustToFridayIfWeekend(date: Date): Date {
+  const dayOfWeek = getDay(date);
+
+  // Sunday = 0, Saturday = 6
+  if (dayOfWeek === 0) {
+    // Sunday -> move back to Friday (2 days)
+    return subDays(date, 2);
+  } else if (dayOfWeek === 6) {
+    // Saturday -> move back to Friday (1 day)
+    return subDays(date, 1);
+  }
+
+  return date;
+}
+
+/**
  * Calculates all status-related dates based on exp1StartAt
  * Each experience period is 45 days
+ * End dates are adjusted to Friday if they fall on weekends
  */
 function calculateStatusDates(exp1StartAt: Date | null) {
   if (!exp1StartAt) {
@@ -24,14 +45,19 @@ function calculateStatusDates(exp1StartAt: Date | null) {
     };
   }
 
-  const exp1EndAt = addDays(exp1StartAt, 45);
+  // Calculate exp1 end date (45 days) and adjust to Friday if weekend
+  const rawExp1EndAt = addDays(exp1StartAt, 45);
+  const exp1EndAt = adjustToFridayIfWeekend(rawExp1EndAt);
+
   const today = startOfDay(new Date());
 
   // exp2StartAt should be at least today, but normally the day after exp1 ends
   const calculatedExp2Start = addDays(exp1EndAt, 1);
   const exp2StartAt = maxDate([calculatedExp2Start, today]);
 
-  const exp2EndAt = addDays(exp2StartAt, 45); // 45 days from actual exp2 start
+  // Calculate exp2 end date (45 days) and adjust to Friday if weekend
+  const rawExp2EndAt = addDays(exp2StartAt, 45);
+  const exp2EndAt = adjustToFridayIfWeekend(rawExp2EndAt);
 
   return {
     exp1EndAt,
@@ -51,16 +77,15 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
     if (exp1StartAt) {
       const dates = calculateStatusDates(exp1StartAt);
 
-      // Only update if values are not manually set
-      if (!form.getValues("exp1EndAt")) {
-        form.setValue("exp1EndAt", dates.exp1EndAt, { shouldValidate: false });
-      }
-      if (!form.getValues("exp2StartAt")) {
-        form.setValue("exp2StartAt", dates.exp2StartAt, { shouldValidate: false });
-      }
-      if (!form.getValues("exp2EndAt")) {
-        form.setValue("exp2EndAt", dates.exp2EndAt, { shouldValidate: false });
-      }
+      // Always recalculate these read-only fields whenever exp1StartAt changes
+      form.setValue("exp1EndAt", dates.exp1EndAt, { shouldValidate: false, shouldDirty: true });
+      form.setValue("exp2StartAt", dates.exp2StartAt, { shouldValidate: false, shouldDirty: true });
+      form.setValue("exp2EndAt", dates.exp2EndAt, { shouldValidate: false, shouldDirty: true });
+    } else {
+      // Clear dates if exp1StartAt is cleared
+      form.setValue("exp1EndAt", null, { shouldValidate: false, shouldDirty: true });
+      form.setValue("exp2StartAt", null, { shouldValidate: false, shouldDirty: true });
+      form.setValue("exp2EndAt", null, { shouldValidate: false, shouldDirty: true });
     }
   }, [exp1StartAt, form]);
 
