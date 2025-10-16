@@ -105,24 +105,20 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
       componentRatio = componentRatio * 100;
     }
 
+    // Formula ratios are WEIGHT percentages, not volume percentages
     const volumeInMl = parseFloat(desiredVolume) || 0;
-    const expectedVolume = (volumeInMl * componentRatio) / 100;
+    const formulaDensity = Number(formula.density) || 1.0;
+
+    // Calculate expected weight based on total weight and component ratio
+    const totalWeightInGrams = volumeInMl * formulaDensity;
+    const expectedWeight = (totalWeightInGrams * componentRatio) / 100;
+
+    // Get actual weight entered by user
     const actualWeight = parseFloat(actualAmount) || 0;
 
-    // We need to find the component's density to convert actual weight to volume
-    const item = itemsMap.get(errorComponent.itemId) || errorComponent.item;
-    const weightMeasure = item?.measures?.find((m) => m.measureType === "WEIGHT");
-    const volumeMeasure = item?.measures?.find((m) => m.measureType === "VOLUME");
-    let itemDensity = Number(formula.density) || 1.0;
-
-    if (weightMeasure?.value && volumeMeasure?.value && volumeMeasure.value > 0) {
-      itemDensity = weightMeasure.value / volumeMeasure.value;
-    }
-
-    const actualVolume = actualWeight / itemDensity;
-
-    return actualVolume / expectedVolume;
-  }, [correctionMode, errorComponentId, actualAmount, formula, desiredVolume, itemsMap]);
+    // Error ratio is simply actual weight / expected weight
+    return actualWeight / expectedWeight;
+  }, [correctionMode, errorComponentId, actualAmount, formula, desiredVolume]);
 
   // Calculate components based on desired volume
   const calculatedComponents = useMemo(() => {
@@ -231,15 +227,18 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
         const isErrorComponent = component.id === errorComponentId;
 
         if (correctionMode && errorRatio !== 1) {
-          // Apply error ratio to weight and volume
+          // Apply error ratio to weight and volume for components not yet added
           correctedWeightInGrams = componentWeightInGrams * errorRatio;
           correctedVolumeInMl = componentVolumeInMl * errorRatio;
 
           // If component was already added (checked) and it's not the error component
-          // Show the additional amount needed (difference)
+          // Calculate how much MORE is needed to reach the corrected amount
           if (wasAlreadyAdded && !isErrorComponent) {
+            // Additional amount = corrected total - original amount already added
             additionalWeightNeeded = correctedWeightInGrams - componentWeightInGrams;
           }
+          // For components not yet added, they need the full corrected amount
+          // (no calculation needed here, just use correctedWeightInGrams)
         }
 
         return {
@@ -566,8 +565,10 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                           component.wasAlreadyAdded && component.additionalWeightNeeded !== undefined ? (
                             // Already added component: show additional amount needed (difference)
                             <span className="text-amber-600 font-medium">
-                              +
-                              {component.additionalWeightNeeded > 20 ? Math.round(component.additionalWeightNeeded) : formatNumberWithDecimals(component.additionalWeightNeeded, 1)}
+                              {component.additionalWeightNeeded >= 0 ? "+" : ""}
+                              {component.additionalWeightNeeded > 20 || component.additionalWeightNeeded < -20
+                                ? Math.round(component.additionalWeightNeeded)
+                                : formatNumberWithDecimals(component.additionalWeightNeeded, 1)}
                             </span>
                           ) : (
                             // Not yet added component: show full corrected amount

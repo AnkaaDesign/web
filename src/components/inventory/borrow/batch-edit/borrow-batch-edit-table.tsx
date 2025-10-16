@@ -5,15 +5,11 @@ import { z } from "zod";
 import type { Borrow } from "../../../../types";
 import { useBorrowBatchMutations } from "../../../../hooks";
 import { BORROW_STATUS, BORROW_STATUS_LABELS, BORROW_STATUS_ORDER, routes } from "../../../../constants";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
-import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { IconLoader, IconDeviceFloppy, IconX } from "@tabler/icons-react";
 import { formatDate, formatDateTime } from "../../../../utils";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
@@ -37,16 +33,18 @@ type BorrowBatchEditFormData = z.infer<typeof borrowBatchEditSchema>;
 interface BorrowBatchEditTableProps {
   borrows: Borrow[];
   onCancel: () => void;
+  onSubmit?: () => void;
 }
 
-export function BorrowBatchEditTable({ borrows, onCancel }: BorrowBatchEditTableProps) {
+export function BorrowBatchEditTable({ borrows, onCancel, onSubmit }: BorrowBatchEditTableProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { batchUpdateAsync } = useBorrowBatchMutations();
 
   const form = useForm<BorrowBatchEditFormData>({
     resolver: zodResolver(borrowBatchEditSchema),
-    mode: "onChange",
+    mode: "onChange", // Validate on change for immediate feedback
+    reValidateMode: "onChange", // Re-validate on change
     defaultValues: {
       borrows: borrows.map((borrow) => ({
         id: borrow.id,
@@ -103,49 +101,23 @@ export function BorrowBatchEditTable({ borrows, onCancel }: BorrowBatchEditTable
 
   // Handle status change with proper date logic and status order
   const handleStatusChange = (index: number, newStatus: BORROW_STATUS) => {
-    form.setValue(`borrows.${index}.data.status`, newStatus);
-    form.setValue(`borrows.${index}.data.statusOrder`, BORROW_STATUS_ORDER[newStatus] || 1);
+    form.setValue(`borrows.${index}.data.status`, newStatus, { shouldDirty: true, shouldTouch: true });
+    form.setValue(`borrows.${index}.data.statusOrder`, BORROW_STATUS_ORDER[newStatus] || 1, { shouldDirty: true });
 
     // Automatically set returnedAt when marking as returned
     if (newStatus === BORROW_STATUS.RETURNED && !form.getValues(`borrows.${index}.data.returnedAt`)) {
-      form.setValue(`borrows.${index}.data.returnedAt`, new Date());
-    } else if (newStatus === BORROW_STATUS.ACTIVE) {
-      form.setValue(`borrows.${index}.data.returnedAt`, null);
+      form.setValue(`borrows.${index}.data.returnedAt`, new Date(), { shouldDirty: true });
+    } else if (newStatus === BORROW_STATUS.ACTIVE || newStatus === BORROW_STATUS.LOST) {
+      // ACTIVE and LOST status should have null returnedAt
+      form.setValue(`borrows.${index}.data.returnedAt`, null, { shouldDirty: true });
     }
   };
 
   return (
     <Form {...form}>
       <Card className="h-full flex flex-col">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Editar Empréstimos em Lote</CardTitle>
-              <div className="mt-2">
-                <Breadcrumb />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
-                <IconX className="mr-2 h-4 w-4" />
-                Cancelar
-              </Button>
-              <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSubmitting || !form.formState.isValid}>
-                {isSubmitting ? (
-                  <>
-                    <IconLoader className="mr-2 h-4 w-4 animate-spin" />
-                    Salvando...
-                  </>
-                ) : (
-                  <>
-                    <IconDeviceFloppy className="mr-2 h-4 w-4" />
-                    Salvar Alterações
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
+        {/* Hidden submit button for page header to trigger */}
+        <button id="borrow-batch-form-submit" type="button" onClick={form.handleSubmit(handleSubmit)} style={{ display: "none" }} disabled={isSubmitting} />
         <CardContent className="p-6 flex-1 overflow-hidden flex flex-col">
           <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-1">
@@ -218,7 +190,7 @@ export function BorrowBatchEditTable({ borrows, onCancel }: BorrowBatchEditTable
                         <div className="px-4 py-2">
                           <div>
                             <p className="font-medium">{borrow.user?.name || "Usuário não encontrado"}</p>
-                            {borrow.user?.position && <p className="text-sm text-muted-foreground">{borrow.user.position.name}</p>}
+                            {borrow.user?.sector && <p className="text-sm text-muted-foreground">{borrow.user.sector.name}</p>}
                           </div>
                         </div>
                       </TableCell>

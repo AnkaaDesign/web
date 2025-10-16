@@ -21,7 +21,7 @@ export function UnicodeCell({ control, index }: UnicodeCellProps) {
           onBlur={field.onBlur}
           ref={field.ref}
           placeholder="Código único"
-          className={`h-10 ${fieldState.error ? "border-destructive" : ""}`}
+          className={`h-10 bg-transparent ${fieldState.error ? "border-destructive" : ""}`}
         />
       )}
     />

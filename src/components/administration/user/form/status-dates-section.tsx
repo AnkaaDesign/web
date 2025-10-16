@@ -1,11 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useFormContext } from "react-hook-form";
 import { IconCalendar } from "@tabler/icons-react";
 import { FormField } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import type { UserCreateFormData, UserUpdateFormData } from "../../../../schemas";
 import { USER_STATUS } from "../../../../constants";
-import { addDays, max as maxDate, startOfDay, getDay, subDays } from "date-fns";
+import { addDays, startOfDay, getDay, subDays } from "date-fns";
 
 interface StatusDatesSectionProps {
   disabled?: boolean;
@@ -45,15 +45,15 @@ function calculateStatusDates(exp1StartAt: Date | null) {
     };
   }
 
-  // Calculate exp1 end date (45 days) and adjust to Friday if weekend
-  const rawExp1EndAt = addDays(exp1StartAt, 45);
+  // Normalize to start of day to avoid timezone issues
+  const normalizedStart = startOfDay(exp1StartAt);
+
+  // Calculate exp1 end date (45 days from start, so end is on day 46) and adjust to Friday if weekend
+  const rawExp1EndAt = addDays(normalizedStart, 45);
   const exp1EndAt = adjustToFridayIfWeekend(rawExp1EndAt);
 
-  const today = startOfDay(new Date());
-
-  // exp2StartAt should be at least today, but normally the day after exp1 ends
-  const calculatedExp2Start = addDays(exp1EndAt, 1);
-  const exp2StartAt = maxDate([calculatedExp2Start, today]);
+  // exp2 starts the day after exp1 ends
+  const exp2StartAt = addDays(exp1EndAt, 1);
 
   // Calculate exp2 end date (45 days) and adjust to Friday if weekend
   const rawExp2EndAt = addDays(exp2StartAt, 45);
@@ -72,12 +72,30 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
   const exp1StartAt = form.watch("exp1StartAt");
   const contractedAt = form.watch("contractedAt");
 
-  // Auto-calculate dates when exp1StartAt changes
+  // Track previous values to detect actual changes (not just initial mount)
+  const prevExp1StartAtRef = useRef<Date | null | undefined>(undefined);
+  const prevStatusRef = useRef<USER_STATUS | undefined>(undefined);
+  const isFirstRenderRef = useRef(true);
+
+  // Auto-calculate dates when exp1StartAt changes (but not on initial mount)
   useEffect(() => {
+    // Skip on first render to avoid overwriting values loaded from API
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      prevExp1StartAtRef.current = exp1StartAt;
+      return;
+    }
+
+    // Only recalculate if exp1StartAt actually changed
+    const hasChanged = prevExp1StartAtRef.current?.getTime() !== exp1StartAt?.getTime();
+    if (!hasChanged) return;
+
+    prevExp1StartAtRef.current = exp1StartAt;
+
     if (exp1StartAt) {
       const dates = calculateStatusDates(exp1StartAt);
 
-      // Always recalculate these read-only fields whenever exp1StartAt changes
+      // Recalculate these read-only fields when user changes exp1StartAt
       form.setValue("exp1EndAt", dates.exp1EndAt, { shouldValidate: false, shouldDirty: true });
       form.setValue("exp2StartAt", dates.exp2StartAt, { shouldValidate: false, shouldDirty: true });
       form.setValue("exp2EndAt", dates.exp2EndAt, { shouldValidate: false, shouldDirty: true });
@@ -89,14 +107,18 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
     }
   }, [exp1StartAt, form]);
 
-  // Update dates when status changes
+  // Update dates when status changes (but not on initial mount)
   useEffect(() => {
-    if (status === USER_STATUS.EXPERIENCE_PERIOD_2 && exp1StartAt) {
-      // Recalculate exp2 dates to ensure exp2StartAt is at least today
-      const dates = calculateStatusDates(exp1StartAt);
-      form.setValue("exp2StartAt", dates.exp2StartAt, { shouldValidate: false });
-      form.setValue("exp2EndAt", dates.exp2EndAt, { shouldValidate: false });
+    // Skip if this is the first render or status hasn't changed
+    if (prevStatusRef.current === undefined) {
+      prevStatusRef.current = status;
+      return;
     }
+
+    const hasChanged = prevStatusRef.current !== status;
+    if (!hasChanged) return;
+
+    prevStatusRef.current = status;
 
     if (status === USER_STATUS.CONTRACTED && !contractedAt) {
       // Set contractedAt to today if transitioning to CONTRACTED
@@ -107,7 +129,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
       // Set dismissedAt to today if transitioning to DISMISSED
       form.setValue("dismissedAt", startOfDay(new Date()), { shouldValidate: false });
     }
-  }, [status, exp1StartAt, contractedAt, form]);
+  }, [status, contractedAt, form]);
 
   // Don't show section if status is not set
   if (!status) {
@@ -198,7 +220,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                     label="Início da Experiência 2"
                     disabled={true}
                     mode="date"
-                    helperText="Calculado automaticamente (dia seguinte ao fim da Exp. 1, ou hoje se já passou)"
+                    helperText="Calculado automaticamente (dia seguinte ao fim da Exp. 1)"
                   />
                 )}
               />

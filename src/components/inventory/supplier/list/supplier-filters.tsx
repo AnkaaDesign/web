@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import type { SupplierGetManyFormData } from "../../../../schemas";
-import type { DateRange } from "react-day-picker";
 import {
   Sheet,
   SheetContent,
@@ -269,36 +268,51 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
           <Separator />
 
           {/* Created At Date Range */}
-          <div className="space-y-2">
-            <DateTimeInput
-              mode="date-range"
-              value={{
-                from: localState.createdAt?.gte,
-                to: localState.createdAt?.lte,
-              }}
-              onChange={(dateRange: DateRange | null) => {
-                if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                  setLocalState((prev) => ({ ...prev, createdAt: undefined }));
-                } else {
-                  setLocalState((prev) => ({
-                    ...prev,
-                    createdAt: {
-                      ...(dateRange.from && { gte: dateRange.from }),
-                      ...(dateRange.to && { lte: dateRange.to }),
-                    },
-                  }));
-                }
-              }}
-              label={
-                <div className="flex items-center gap-2">
-                  <IconCalendarPlus className="h-4 w-4" />
-                  Data de Cadastro
-                </div>
-              }
-              placeholder="Selecionar período..."
-              description="Filtra por período de cadastro do fornecedor"
-              numberOfMonths={2}
-            />
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <IconCalendarPlus className="h-4 w-4" />
+              Data de Cadastro
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <DateTimeInput
+                mode="date"
+                value={localState.createdAt?.gte}
+                onChange={(date: Date | null) => {
+                  if (!date && !localState.createdAt?.lte) {
+                    setLocalState((prev) => ({ ...prev, createdAt: undefined }));
+                  } else {
+                    setLocalState((prev) => ({
+                      ...prev,
+                      createdAt: {
+                        ...(date && { gte: date }),
+                        ...(localState.createdAt?.lte && { lte: localState.createdAt.lte }),
+                      },
+                    }));
+                  }
+                }}
+                label="De"
+                placeholder="Selecionar data inicial..."
+              />
+              <DateTimeInput
+                mode="date"
+                value={localState.createdAt?.lte}
+                onChange={(date: Date | null) => {
+                  if (!date && !localState.createdAt?.gte) {
+                    setLocalState((prev) => ({ ...prev, createdAt: undefined }));
+                  } else {
+                    setLocalState((prev) => ({
+                      ...prev,
+                      createdAt: {
+                        ...(localState.createdAt?.gte && { gte: localState.createdAt.gte }),
+                        ...(date && { lte: date }),
+                      },
+                    }));
+                  }
+                }}
+                label="Até"
+                placeholder="Selecionar data final..."
+              />
+            </div>
           </div>
         </div>
 

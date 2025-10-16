@@ -24,7 +24,7 @@ export function NameCell({ control, index, disabled }: NameCellProps) {
               onBlur={field.onBlur}
               ref={field.ref}
               disabled={disabled}
-              className="h-10"
+              className="h-10 bg-transparent"
               placeholder="Nome do produto"
             />
           </FormControl>

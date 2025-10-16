@@ -207,58 +207,98 @@ export function PaintProductionAdvancedFilters({ filters, onFilterChange, classN
 
       {/* Creation Date Range */}
       <div className="space-y-3">
-        <Label className="flex items-center gap-2 text-sm font-medium">
+        <div className="text-sm font-medium flex items-center gap-2">
           <IconCalendar className="h-4 w-4" />
           Data de Criação
-        </Label>
-        <DateTimeInput
-          mode="date-range"
-          context="generic"
-          value={filters.createdAt ? { from: filters.createdAt.gte, to: filters.createdAt.lte } : undefined}
-          onChange={(range) => {
-            const newFilters = { ...filters };
-            if (range && typeof range === "object" && "from" in range && (range.from || range.to)) {
-              newFilters.createdAt = {
-                ...(range.from && { gte: range.from }),
-                ...(range.to && { lte: range.to }),
-              };
-            } else {
-              delete newFilters.createdAt;
-            }
-            onFilterChange(newFilters);
-          }}
-          placeholder="Selecione o período de criação"
-          showClearButton={true}
-          numberOfMonths={2}
-        />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <DateTimeInput
+            mode="date"
+            context="generic"
+            value={filters.createdAt?.gte}
+            onChange={(date: Date | null) => {
+              const newFilters = { ...filters };
+              if (!date && !filters.createdAt?.lte) {
+                delete newFilters.createdAt;
+              } else {
+                newFilters.createdAt = {
+                  ...(date && { gte: date }),
+                  ...(filters.createdAt?.lte && { lte: filters.createdAt.lte }),
+                };
+              }
+              onFilterChange(newFilters);
+            }}
+            label="De"
+            placeholder="Selecionar data inicial..."
+          />
+          <DateTimeInput
+            mode="date"
+            context="generic"
+            value={filters.createdAt?.lte}
+            onChange={(date: Date | null) => {
+              const newFilters = { ...filters };
+              if (!date && !filters.createdAt?.gte) {
+                delete newFilters.createdAt;
+              } else {
+                newFilters.createdAt = {
+                  ...(filters.createdAt?.gte && { gte: filters.createdAt.gte }),
+                  ...(date && { lte: date }),
+                };
+              }
+              onFilterChange(newFilters);
+            }}
+            label="Até"
+            placeholder="Selecionar data final..."
+          />
+        </div>
       </div>
 
       {/* Updated Date Range */}
       <div className="space-y-3">
-        <Label className="flex items-center gap-2 text-sm font-medium">
+        <div className="text-sm font-medium flex items-center gap-2">
           <IconCalendar className="h-4 w-4" />
           Data de Atualização
-        </Label>
-        <DateTimeInput
-          mode="date-range"
-          context="generic"
-          value={filters.updatedAt ? { from: filters.updatedAt.gte, to: filters.updatedAt.lte } : undefined}
-          onChange={(range) => {
-            const newFilters = { ...filters };
-            if (range && typeof range === "object" && "from" in range && (range.from || range.to)) {
-              newFilters.updatedAt = {
-                ...(range.from && { gte: range.from }),
-                ...(range.to && { lte: range.to }),
-              };
-            } else {
-              delete newFilters.updatedAt;
-            }
-            onFilterChange(newFilters);
-          }}
-          placeholder="Selecione o período de atualização"
-          showClearButton={true}
-          numberOfMonths={2}
-        />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <DateTimeInput
+            mode="date"
+            context="generic"
+            value={filters.updatedAt?.gte}
+            onChange={(date: Date | null) => {
+              const newFilters = { ...filters };
+              if (!date && !filters.updatedAt?.lte) {
+                delete newFilters.updatedAt;
+              } else {
+                newFilters.updatedAt = {
+                  ...(date && { gte: date }),
+                  ...(filters.updatedAt?.lte && { lte: filters.updatedAt.lte }),
+                };
+              }
+              onFilterChange(newFilters);
+            }}
+            label="De"
+            placeholder="Selecionar data inicial..."
+          />
+          <DateTimeInput
+            mode="date"
+            context="generic"
+            value={filters.updatedAt?.lte}
+            onChange={(date: Date | null) => {
+              const newFilters = { ...filters };
+              if (!date && !filters.updatedAt?.gte) {
+                delete newFilters.updatedAt;
+              } else {
+                newFilters.updatedAt = {
+                  ...(filters.updatedAt?.gte && { gte: filters.updatedAt.gte }),
+                  ...(date && { lte: date }),
+                };
+              }
+              onFilterChange(newFilters);
+            }}
+            label="Até"
+            placeholder="Selecionar data final..."
+          />
+        </div>
       </div>
 
       {/* Helper Text */}

@@ -43,7 +43,7 @@ export function PriceCell({ control, index, disabled = false, required = false, 
                   onBlur={field.onBlur}
                   disabled={disabled}
                   className={cn(
-                    "h-10",
+                    "h-10 bg-transparent",
                     hasError && "border-destructive focus-visible:ring-destructive",
                     hasWarning && !hasError && "border-amber-500 focus-visible:ring-amber-500",
                   )}

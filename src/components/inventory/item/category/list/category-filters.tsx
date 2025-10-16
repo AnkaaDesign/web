@@ -90,19 +90,54 @@ export function CategoryFilters({ open, onOpenChange, filters, onFilterChange }:
           </div> */}
 
           {/* Created date range */}
-          <div className="grid gap-2">
-            <Label>Data de criação</Label>
-            <DateTimeInput
-              mode="date-range"
-              value={localFilters.createdAt}
-              onChange={(range) => {
-                setLocalFilters({
-                  ...localFilters,
-                  createdAt: range,
-                });
-              }}
-              placeholder="Selecione o período"
-            />
+          <div className="space-y-3">
+            <div className="text-sm font-medium">Data de criação</div>
+            <div className="grid grid-cols-2 gap-3">
+              <DateTimeInput
+                mode="date"
+                value={localFilters.createdAt?.gte}
+                onChange={(date: Date | null) => {
+                  if (!date && !localFilters.createdAt?.lte) {
+                    setLocalFilters({
+                      ...localFilters,
+                      createdAt: undefined,
+                    });
+                  } else {
+                    setLocalFilters({
+                      ...localFilters,
+                      createdAt: {
+                        ...(date && { gte: date }),
+                        ...(localFilters.createdAt?.lte && { lte: localFilters.createdAt.lte }),
+                      },
+                    });
+                  }
+                }}
+                label="De"
+                placeholder="Selecionar data inicial..."
+              />
+              <DateTimeInput
+                mode="date"
+                value={localFilters.createdAt?.lte}
+                onChange={(date: Date | null) => {
+                  if (!date && !localFilters.createdAt?.gte) {
+                    setLocalFilters({
+                      ...localFilters,
+                      createdAt: undefined,
+                    });
+                  } else {
+                    setLocalFilters({
+                      ...localFilters,
+                      createdAt: {
+                        ...(localFilters.createdAt?.gte && { gte: localFilters.createdAt.gte }),
+                        ...(date && { lte: date }),
+                      },
+                    });
+                  }
+                }}
+                label="Até"
+                placeholder="Selecionar data final..."
+              />
+            </div>
           </div>
         </div>
 

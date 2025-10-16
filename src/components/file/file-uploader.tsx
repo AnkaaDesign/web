@@ -357,7 +357,7 @@ export function FileUploader({
     };
 
     return (
-      <div className="flex flex-col w-48">
+      <div className="flex flex-col w-48 min-w-0">
         {/* File card with fixed width */}
         <div className="relative flex flex-col items-center p-2 border border-border/50 rounded-lg bg-card overflow-hidden">
           {/* Integrated progress overlay */}
@@ -369,7 +369,7 @@ export function FileUploader({
           />
 
           {/* Thumbnail/Icon */}
-          <div className="relative w-44 h-28 mb-2">
+          <div className="relative w-44 h-28 mb-2 flex-shrink-0">
             {isUploading ? (
               // Show loading spinner during upload
               <div className="w-full h-full flex items-center justify-center rounded border bg-primary/5">
@@ -405,32 +405,35 @@ export function FileUploader({
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => removeFile(file.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                removeFile(file.id);
+              }}
               disabled={disabled}
-              className="absolute top-1 right-1 h-5 w-5 bg-background/80 hover:bg-destructive hover:text-white rounded-full shadow-sm"
+              className="absolute top-1 right-1 h-6 w-6 p-0 flex-shrink-0 bg-background/90 hover:bg-destructive hover:text-white rounded-full shadow-sm z-10"
             >
-              <IconX className="w-3 h-3" />
+              <IconX className="w-3.5 h-3.5" />
             </Button>
 
             {/* Error indicator */}
             {hasError && (
-              <div className="absolute -top-1 -left-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                <IconAlertCircle className="w-2.5 h-2.5 text-white" />
+              <div className="absolute top-1 left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow-sm">
+                <IconAlertCircle className="w-3 h-3 text-white" />
               </div>
             )}
           </div>
 
           {/* File name */}
-          <p className="text-xs font-medium text-foreground text-center truncate w-full px-1" title={file.name}>
+          <p className="text-xs font-medium text-foreground text-center truncate w-full max-w-full px-1" title={file.name}>
             {file.name || "Arquivo sem nome"}
           </p>
 
           {/* File size */}
-          <p className="text-xs text-muted-foreground mt-0.5">{formatFileSize(file.size || 0)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 flex-shrink-0">{formatFileSize(file.size || 0)}</p>
         </div>
 
         {/* Error message below card (only for severe errors) */}
-        {hasError && uploadStatus === "error" && <p className="text-xs text-destructive text-center mt-1 px-1 animate-error-shake">{file.error}</p>}
+        {hasError && uploadStatus === "error" && <p className="text-xs text-destructive text-center mt-1 px-1 animate-error-shake truncate max-w-full" title={file.error}>{file.error}</p>}
       </div>
     );
   };

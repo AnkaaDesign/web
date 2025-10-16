@@ -9,7 +9,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import type { DateRange } from "react-day-picker";
 import { Badge } from "@/components/ui/badge";
 import { usePositions, useSectors } from "../../../../hooks";
 import { USER_STATUS_LABELS } from "../../../../constants";
@@ -145,67 +144,102 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
               />
             </div>
 
-            <div className="space-y-4">
-              <DateTimeInput
-                mode="date-range"
-                value={{
-                  from: localFilters.birth?.gte,
-                  to: localFilters.birth?.lte,
-                }}
-                onChange={(dateRange: DateRange | null) => {
-                  if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                    setLocalFilters({ ...localFilters, birth: undefined });
-                  } else {
-                    setLocalFilters({
-                      ...localFilters,
-                      birth: {
-                        ...(dateRange.from && { gte: dateRange.from }),
-                        ...(dateRange.to && { lte: dateRange.to }),
-                      },
-                    });
-                  }
-                }}
-                label={
-                  <div className="flex items-center gap-2 mb-2">
-                    <IconCalendar className="h-4 w-4" />
-                    Data de Nascimento
-                  </div>
-                }
-                placeholder="Selecionar período..."
-                description="Filtra por período de nascimento do usuário"
-                context="birth"
-                numberOfMonths={2}
-              />
+            <div className="space-y-6">
+              {/* Birth Date Range */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <IconCalendar className="h-4 w-4" />
+                  Data de Nascimento
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <DateTimeInput
+                    mode="date"
+                    value={localFilters.birth?.gte}
+                    onChange={(date: Date | null) => {
+                      if (!date && !localFilters.birth?.lte) {
+                        setLocalFilters({ ...localFilters, birth: undefined });
+                      } else {
+                        setLocalFilters({
+                          ...localFilters,
+                          birth: {
+                            ...(date && { gte: date }),
+                            ...(localFilters.birth?.lte && { lte: localFilters.birth.lte }),
+                          },
+                        });
+                      }
+                    }}
+                    label="De"
+                    placeholder="Selecionar data inicial..."
+                  />
+                  <DateTimeInput
+                    mode="date"
+                    value={localFilters.birth?.lte}
+                    onChange={(date: Date | null) => {
+                      if (!date && !localFilters.birth?.gte) {
+                        setLocalFilters({ ...localFilters, birth: undefined });
+                      } else {
+                        setLocalFilters({
+                          ...localFilters,
+                          birth: {
+                            ...(localFilters.birth?.gte && { gte: localFilters.birth.gte }),
+                            ...(date && { lte: date }),
+                          },
+                        });
+                      }
+                    }}
+                    label="Até"
+                    placeholder="Selecionar data final..."
+                  />
+                </div>
+              </div>
 
-              <DateTimeInput
-                mode="date-range"
-                value={{
-                  from: localFilters.dismissedAt?.gte,
-                  to: localFilters.dismissedAt?.lte,
-                }}
-                onChange={(dateRange: DateRange | null) => {
-                  if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                    setLocalFilters({ ...localFilters, dismissedAt: undefined });
-                  } else {
-                    setLocalFilters({
-                      ...localFilters,
-                      dismissedAt: {
-                        ...(dateRange.from && { gte: dateRange.from }),
-                        ...(dateRange.to && { lte: dateRange.to }),
-                      },
-                    });
-                  }
-                }}
-                label={
-                  <div className="flex items-center gap-2 mb-2">
-                    <IconCalendar className="h-4 w-4" />
-                    Data de Demissão
-                  </div>
-                }
-                placeholder="Selecionar período..."
-                description="Filtra por período de demissão do usuário"
-                numberOfMonths={2}
-              />
+              {/* Dismissed Date Range */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <IconCalendar className="h-4 w-4" />
+                  Data de Demissão
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <DateTimeInput
+                    mode="date"
+                    value={localFilters.dismissedAt?.gte}
+                    onChange={(date: Date | null) => {
+                      if (!date && !localFilters.dismissedAt?.lte) {
+                        setLocalFilters({ ...localFilters, dismissedAt: undefined });
+                      } else {
+                        setLocalFilters({
+                          ...localFilters,
+                          dismissedAt: {
+                            ...(date && { gte: date }),
+                            ...(localFilters.dismissedAt?.lte && { lte: localFilters.dismissedAt.lte }),
+                          },
+                        });
+                      }
+                    }}
+                    label="De"
+                    placeholder="Selecionar data inicial..."
+                  />
+                  <DateTimeInput
+                    mode="date"
+                    value={localFilters.dismissedAt?.lte}
+                    onChange={(date: Date | null) => {
+                      if (!date && !localFilters.dismissedAt?.gte) {
+                        setLocalFilters({ ...localFilters, dismissedAt: undefined });
+                      } else {
+                        setLocalFilters({
+                          ...localFilters,
+                          dismissedAt: {
+                            ...(localFilters.dismissedAt?.gte && { gte: localFilters.dismissedAt.gte }),
+                            ...(date && { lte: date }),
+                          },
+                        });
+                      }
+                    }}
+                    label="Até"
+                    placeholder="Selecionar data final..."
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Action Buttons */}

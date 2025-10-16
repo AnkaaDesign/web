@@ -337,10 +337,10 @@ export default function PayrollDetailPage() {
 
         <div className="flex-1 overflow-y-auto">
           <div className="space-y-6">
-            {/* User Payroll Summary and Period Statistics Grid */}
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* User Payroll Summary */}
-              <Card>
+            {/* User Payroll Summary and Discounts Grid */}
+            <div className="grid gap-6 md:grid-cols-2 items-start">
+              {/* Merged Card: User Payroll Summary + Period Statistics */}
+              <Card className="h-full">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <IconCurrencyReal className="h-5 w-5" />
@@ -364,17 +364,19 @@ export default function PayrollDetailPage() {
                         {user?.sector?.name || "-"}
                       </p>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Nível Performance</p>
-                      <Badge variant={(user?.performanceLevel || 0) > 0 ? "default" : "secondary"}>
-                        {user?.performanceLevel || "0"}
-                      </Badge>
-                      {statistics.isLive && (
-                        <p className="text-xs text-yellow-600 mt-1">
-                          (dados em tempo real)
-                        </p>
-                      )}
-                    </div>
+                    {user?.position?.bonifiable && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">Nível Performance</p>
+                        <Badge variant={(user?.performanceLevel || 0) > 0 ? "default" : "secondary"}>
+                          {user?.performanceLevel || "0"}
+                        </Badge>
+                        {statistics.isLive && (
+                          <p className="text-xs text-yellow-600 mt-1">
+                            (dados em tempo real)
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <div className="space-y-1">
                       <p className="text-sm text-muted-foreground">Bonificável</p>
                       <Badge variant={user?.position?.bonifiable ? "success" : "secondary"}>
@@ -415,90 +417,57 @@ export default function PayrollDetailPage() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Period Statistics - Only show if user is eligible */}
+                  {user?.position?.bonifiable && (
+                    <>
+                      <Separator className="my-4" />
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 mb-3">
+                          <IconCalendarStats className="h-5 w-5" />
+                          <h3 className="text-lg font-semibold">Estatísticas do Período</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Dados de performance para {monthName} de {year}
+                          <span className="block text-xs mt-1">
+                            Período: {startDate.toLocaleDateString('pt-BR')} a {endDate.toLocaleDateString('pt-BR')}
+                          </span>
+                          {statistics.isLive && (
+                            <span className="block text-xs text-yellow-600 mt-1">
+                              ⚠️ Dados calculados em tempo real (bônus ainda não criado)
+                            </span>
+                          )}
+                        </p>
+                        <div className="grid gap-4 grid-cols-2 mt-4">
+                          <div className="text-center p-4 rounded-lg bg-muted/50">
+                            <IconUsers className="h-8 w-8 text-primary mx-auto mb-2" />
+                            <p className="text-2xl font-bold">{statistics.totalParticipants}</p>
+                            <p className="text-xs text-muted-foreground">Funcionários com Bônus</p>
+                          </div>
+                          <div className="text-center p-4 rounded-lg bg-muted/50">
+                            <IconClipboardList className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                            <p className="text-2xl font-bold">{statistics.totalTasks}</p>
+                            <p className="text-xs text-muted-foreground">Total de Tarefas</p>
+                          </div>
+                          <div className="text-center p-4 rounded-lg bg-muted/50">
+                            <IconTrendingUp className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                            <p className="text-2xl font-bold">{statistics.totalWeightedTasks.toFixed(1)}</p>
+                            <p className="text-xs text-muted-foreground">Tarefas Ponderadas</p>
+                          </div>
+                          <div className="text-center p-4 rounded-lg bg-muted/50">
+                            <IconCalendarStats className="h-8 w-8 text-orange-600 mx-auto mb-2" />
+                            <p className="text-2xl font-bold">{statistics.averageWeightedTasks.toFixed(1)}</p>
+                            <p className="text-xs text-muted-foreground">Média por Funcionário</p>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Period Statistics - Only show if user is eligible */}
-              {user?.position?.bonifiable ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <IconCalendarStats className="h-5 w-5" />
-                      Estatísticas do Período
-                    </CardTitle>
-                    <CardDescription>
-                      Dados de performance para {monthName} de {year}
-                      <span className="text-xs block text-muted-foreground mt-1">
-                        Período: {startDate.toLocaleDateString('pt-BR')} a {endDate.toLocaleDateString('pt-BR')}
-                      </span>
-                      {statistics.isLive && (
-                        <span className="text-xs block text-yellow-600 mt-1">
-                          ⚠️ Dados calculados em tempo real (bônus ainda não criado)
-                        </span>
-                      )}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 grid-cols-2">
-                      <div className="text-center p-4 rounded-lg bg-muted/50">
-                        <IconUsers className="h-8 w-8 text-primary mx-auto mb-2" />
-                        <p className="text-2xl font-bold">{statistics.totalParticipants}</p>
-                        <p className="text-xs text-muted-foreground">Funcionários com Bônus</p>
-                      </div>
-                      <div className="text-center p-4 rounded-lg bg-muted/50">
-                        <IconClipboardList className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                        <p className="text-2xl font-bold">{statistics.totalTasks}</p>
-                        <p className="text-xs text-muted-foreground">Total de Tarefas</p>
-                      </div>
-                      <div className="text-center p-4 rounded-lg bg-muted/50">
-                        <IconTrendingUp className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                        <p className="text-2xl font-bold">{statistics.totalWeightedTasks.toFixed(1)}</p>
-                        <p className="text-xs text-muted-foreground">Tarefas Ponderadas</p>
-                      </div>
-                      <div className="text-center p-4 rounded-lg bg-muted/50">
-                        <IconCalendarStats className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-                        <p className="text-2xl font-bold">{statistics.averageWeightedTasks.toFixed(1)}</p>
-                        <p className="text-xs text-muted-foreground">Média por Funcionário</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <IconCalendarStats className="h-5 w-5" />
-                      Estatísticas do Período
-                    </CardTitle>
-                    <CardDescription>
-                      Funcionário não elegível para bonificação
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8">
-                      <IconAlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                      <p className="text-muted-foreground">
-                        Este funcionário não está elegível para bonificação.
-                        <br />
-                        As estatísticas de tarefas não são aplicáveis.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-            {/* Tasks Table - Only show for eligible users */}
-            {user?.position?.bonifiable ? (
-              <div className="space-y-4">
-                <PayrollTasksTable
-                  tasks={payrollData?.bonus?.tasks || []}
-                  userName={user?.name}
-                />
-              </div>
-            ) : null}
-
-            {/* Discounts Card */}
-            <Card>
+              {/* Discounts Card */}
+              <Card className="h-full">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <IconCurrencyReal className="h-5 w-5" />
@@ -557,6 +526,16 @@ export default function PayrollDetailPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Tasks Table - Only show for eligible users */}
+            {user?.position?.bonifiable && (
+              <div className="w-full">
+                <PayrollTasksTable
+                  tasks={payrollData?.bonus?.tasks || []}
+                  userName={user?.name}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

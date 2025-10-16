@@ -701,8 +701,6 @@ export const orderScheduleWhereSchema: z.ZodSchema = z.lazy(() =>
 
 const orderFilters = {
   searchingFor: z.string().optional(),
-  hasItems: z.boolean().optional(),
-  isFromSchedule: z.boolean().optional(),
   status: z
     .array(
       z.enum(Object.values(ORDER_STATUS) as [string, ...string[]], {
@@ -809,26 +807,6 @@ const orderTransform = (data: any) => {
       ],
     });
     delete data.searchingFor;
-  }
-
-  // Handle hasItems filter
-  if (typeof data.hasItems === "boolean") {
-    if (data.hasItems) {
-      andConditions.push({ items: { some: {} } });
-    } else {
-      andConditions.push({ items: { none: {} } });
-    }
-    delete data.hasItems;
-  }
-
-  // Handle isFromSchedule filter
-  if (typeof data.isFromSchedule === "boolean") {
-    if (data.isFromSchedule) {
-      andConditions.push({ orderScheduleId: { not: null } });
-    } else {
-      andConditions.push({ orderScheduleId: null });
-    }
-    delete data.isFromSchedule;
   }
 
   // Handle status filter

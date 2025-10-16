@@ -175,15 +175,11 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
           task.data.status !== originalTask.status ||
           task.data.serialNumber !== originalTask.serialNumber ||
           task.data.plate !== originalTask.plate ||
-          task.data.details !== originalTask.details ||
           task.data.customerId !== originalTask.customerId ||
           task.data.sectorId !== originalTask.sectorId ||
           task.data.generalPaintingId !== originalTask.generalPainting?.id ||
           task.data.price !== originalTask.price ||
           task.data.priority !== originalTask.priority ||
-          task.data.truckHeight !== originalTask.truck?.height ||
-          task.data.truckLength !== originalTask.truck?.length ||
-          task.data.truckWidth !== originalTask.truck?.width ||
           task.data.entryDate?.toISOString() !== originalTask.entryDate ||
           task.data.term?.toISOString() !== originalTask.term ||
           task.data.startedAt?.toISOString() !== originalTask.startedAt ||
@@ -204,18 +200,6 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
           id: task.id,
           data: { ...task.data },
         };
-
-        // Handle truck data
-        if (task.data.truckHeight !== null || task.data.truckLength !== null || task.data.truckWidth !== null) {
-          transformed.data.truck = {
-            height: task.data.truckHeight || 3.5,
-            length: task.data.truckLength || 12.0,
-            width: task.data.truckWidth || 2.8,
-          };
-        }
-        delete transformed.data.truckHeight;
-        delete transformed.data.truckLength;
-        delete transformed.data.truckWidth;
 
         return transformed;
       });
@@ -263,7 +247,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
 
           {/* Tasks Table */}
           <div className="border border-border rounded-lg overflow-x-auto overflow-y-auto flex-1">
-            <Table className={cn("w-full min-w-[4000px] [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
+            <Table className={cn("w-full min-w-[3000px] [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
               <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted sticky top-0 z-10">
                 <TableRow className="bg-muted hover:bg-muted even:bg-muted">
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-64">
@@ -306,18 +290,6 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-56">
                     <div className="px-3 py-2">Finalizado em</div>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-30">
-                    <div className="px-3 py-2">Altura</div>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-30">
-                    <div className="px-3 py-2">Comprimento</div>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-30">
-                    <div className="px-3 py-2">Largura</div>
-                  </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-80">
-                    <div className="px-3 py-2">Observações</div>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -404,32 +376,12 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                             <DateTimeCell control={form.control} name={`tasks.${index}.data.finishedAt`} placeholder="Data/hora de conclusão" />
                           </div>
                         </TableCell>
-                        <TableCell className="w-30 p-0 !border-r-0">
-                          <div className="px-3 py-2">
-                            <FormInput control={form.control} name={`tasks.${index}.data.truckHeight`} type="number" step="0.1" placeholder="Altura (m)" />
-                          </div>
-                        </TableCell>
-                        <TableCell className="w-30 p-0 !border-r-0">
-                          <div className="px-3 py-2">
-                            <FormInput control={form.control} name={`tasks.${index}.data.truckLength`} type="number" step="0.1" placeholder="Comp. (m)" />
-                          </div>
-                        </TableCell>
-                        <TableCell className="w-30 p-0 !border-r-0">
-                          <div className="px-3 py-2">
-                            <FormInput control={form.control} name={`tasks.${index}.data.truckWidth`} type="number" step="0.1" placeholder="Larg. (m)" />
-                          </div>
-                        </TableCell>
-                        <TableCell className="w-80 p-0 !border-r-0">
-                          <div className="px-3 py-2">
-                            <FormInput control={form.control} name={`tasks.${index}.data.details`} placeholder="Observações" />
-                          </div>
-                        </TableCell>
                       </TableRow>
                     );
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={18} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
                       Carregando tarefas...
                     </TableCell>
                   </TableRow>

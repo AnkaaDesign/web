@@ -31,7 +31,7 @@ export function BrandCell({ control, index, disabled }: BrandCellProps) {
               }
               placeholder={isLoading ? "Carregando..." : "Selecione"}
               searchPlaceholder="Buscar marca..."
-              className="h-10"
+              className="h-10 bg-transparent"
             />
           </FormControl>
         </FormItem>

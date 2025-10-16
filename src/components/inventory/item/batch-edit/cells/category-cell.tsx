@@ -32,7 +32,7 @@ export function CategoryCell({ control, index, disabled }: CategoryCellProps) {
               }
               placeholder={isLoading ? "Carregando..." : "Selecione"}
               searchPlaceholder="Buscar categoria..."
-              className="h-10"
+              className="h-10 bg-transparent"
             />
           </FormControl>
         </FormItem>

@@ -52,7 +52,7 @@ export default function PaintDetailsPage() {
       generalPaintings: {
         include: {
           customer: true,
-          user: true,
+          createdBy: true,
           sector: true,
           services: true,
         },
@@ -60,7 +60,7 @@ export default function PaintDetailsPage() {
       logoTasks: {
         include: {
           customer: true,
-          user: true,
+          createdBy: true,
           sector: true,
           services: true,
         },

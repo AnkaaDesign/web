@@ -1,7 +1,6 @@
 import type { ActivityGetManyFormData } from "../../../../../schemas";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { IconCalendarPlus } from "@tabler/icons-react";
-import type { DateRange } from "react-day-picker";
 
 interface ActivityDateFiltersProps {
   filters: Partial<ActivityGetManyFormData>;
@@ -9,34 +8,53 @@ interface ActivityDateFiltersProps {
 }
 
 export const ActivityDateFilters = ({ filters, updateFilter }: ActivityDateFiltersProps) => {
-  const handleCreatedAtChange = (dateRange: DateRange | null) => {
-    if (!dateRange || (!dateRange.from && !dateRange.to)) {
+  const handleCreatedAtFromChange = (date: Date | null) => {
+    if (!date && !filters.createdAt?.lte) {
       updateFilter("createdAt", undefined);
     } else {
       updateFilter("createdAt", {
-        ...(dateRange.from && { gte: dateRange.from }),
-        ...(dateRange.to && { lte: dateRange.to }),
+        ...(date && { gte: date }),
+        ...(filters.createdAt?.lte && { lte: filters.createdAt.lte }),
       });
     }
   };
 
-  const currentCreatedAtRange: DateRange = {
-    from: filters.createdAt?.gte,
-    to: filters.createdAt?.lte,
+  const handleCreatedAtToChange = (date: Date | null) => {
+    if (!date && !filters.createdAt?.gte) {
+      updateFilter("createdAt", undefined);
+    } else {
+      updateFilter("createdAt", {
+        ...(filters.createdAt?.gte && { gte: filters.createdAt.gte }),
+        ...(date && { lte: date }),
+      });
+    }
   };
 
   return (
     <div className="grid gap-4">
       {/* Created At Date Range */}
-      <DateTimeInput
-        mode="date-range"
-        value={currentCreatedAtRange}
-        onChange={handleCreatedAtChange}
-        label="Data de Criação"
-        placeholder="Selecionar período..."
-        description="Filtra por período de criação da atividade"
-        numberOfMonths={2}
-      />
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <IconCalendarPlus className="h-4 w-4" />
+          Data de Criação
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <DateTimeInput
+            mode="date"
+            value={filters.createdAt?.gte}
+            onChange={handleCreatedAtFromChange}
+            label="De"
+            placeholder="Selecionar data inicial..."
+          />
+          <DateTimeInput
+            mode="date"
+            value={filters.createdAt?.lte}
+            onChange={handleCreatedAtToChange}
+            label="Até"
+            placeholder="Selecionar data final..."
+          />
+        </div>
+      </div>
     </div>
   );
 };

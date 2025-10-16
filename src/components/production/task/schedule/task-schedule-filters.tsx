@@ -48,6 +48,36 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
     setLocalFilters(resetFilters);
   };
 
+  const handleFromChange = (date: Date | null) => {
+    if (!date && !localFilters.termRange?.to) {
+      const { termRange, ...rest } = localFilters;
+      setLocalFilters(rest);
+    } else {
+      setLocalFilters({
+        ...localFilters,
+        termRange: {
+          ...(date && { from: date }),
+          ...(localFilters.termRange?.to && { to: localFilters.termRange.to }),
+        },
+      });
+    }
+  };
+
+  const handleToChange = (date: Date | null) => {
+    if (!date && !localFilters.termRange?.from) {
+      const { termRange, ...rest } = localFilters;
+      setLocalFilters(rest);
+    } else {
+      setLocalFilters({
+        ...localFilters,
+        termRange: {
+          ...(localFilters.termRange?.from && { from: localFilters.termRange.from }),
+          ...(date && { to: date }),
+        },
+      });
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
@@ -62,17 +92,6 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          {/* Search */}
-          <div className="space-y-2">
-            <Label htmlFor="search">Buscar</Label>
-            <Input
-              id="search"
-              placeholder="Nome, número de série..."
-              value={localFilters.searchingFor || ""}
-              onChange={(value) => setLocalFilters({ ...localFilters, searchingFor: value as string })}
-            />
-          </div>
-
           {/* Sectors */}
           <div className="space-y-2">
             <Label>Equipes</Label>
@@ -89,35 +108,24 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
           </div>
 
           {/* Term Range */}
-          <div className="space-y-2">
-            <Label>Período do Prazo</Label>
-            <DateTimeInput
-              mode="date-range"
-              value={
-                localFilters.termRange
-                  ? {
-                      from: localFilters.termRange.from as Date | undefined,
-                      to: localFilters.termRange.to as Date | undefined,
-                    }
-                  : undefined
-              }
-              onChange={(range) => {
-                if (range && typeof range === "object" && "from" in range && (range.from || range.to)) {
-                  setLocalFilters({
-                    ...localFilters,
-                    termRange: {
-                      from: range.from || undefined,
-                      to: range.to || undefined,
-                    },
-                  });
-                } else {
-                  const { termRange, ...rest } = localFilters;
-                  setLocalFilters(rest);
-                }
-              }}
-              placeholder="Selecionar período do prazo"
-              numberOfMonths={2}
-            />
+          <div className="space-y-3">
+            <div className="text-sm font-medium">Período do Prazo</div>
+            <div className="grid grid-cols-2 gap-3">
+              <DateTimeInput
+                mode="date"
+                value={localFilters.termRange?.from as Date | undefined}
+                onChange={handleFromChange}
+                label="De"
+                placeholder="Selecionar data inicial..."
+              />
+              <DateTimeInput
+                mode="date"
+                value={localFilters.termRange?.to as Date | undefined}
+                onChange={handleToChange}
+                label="Até"
+                placeholder="Selecionar data final..."
+              />
+            </div>
           </div>
 
           {/* Show Overdue Only */}

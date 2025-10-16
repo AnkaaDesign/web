@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from "react";
-import { type DateRange } from "react-day-picker";
 import { IconFilter, IconX } from "@tabler/icons-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -142,30 +141,50 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
             </div>
 
             {/* Date Range */}
-            <div className="space-y-2">
-              <Label>Data de Criação</Label>
-              <DateTimeInput
-                mode="date-range"
-                value={{
-                  from: localFilters.createdAt?.gte,
-                  to: localFilters.createdAt?.lte,
-                }}
-                onChange={(range: DateRange | undefined) => {
-                  if (range?.from || range?.to) {
-                    setLocalFilters({
-                      ...localFilters,
-                      createdAt: {
-                        ...(range.from && { gte: range.from }),
-                        ...(range.to && { lte: range.to }),
-                      },
-                    });
-                  } else {
-                    const { createdAt, ...rest } = localFilters;
-                    setLocalFilters(rest);
-                  }
-                }}
-                placeholder="Selecione o período"
-              />
+            <div className="space-y-3">
+              <div className="text-sm font-medium">Data de Criação</div>
+              <div className="grid grid-cols-2 gap-3">
+                <DateTimeInput
+                  mode="date"
+                  value={localFilters.createdAt?.gte}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localFilters.createdAt?.lte) {
+                      const { createdAt, ...rest } = localFilters;
+                      setLocalFilters(rest);
+                    } else {
+                      setLocalFilters({
+                        ...localFilters,
+                        createdAt: {
+                          ...(date && { gte: date }),
+                          ...(localFilters.createdAt?.lte && { lte: localFilters.createdAt.lte }),
+                        },
+                      });
+                    }
+                  }}
+                  label="De"
+                  placeholder="Selecionar data inicial..."
+                />
+                <DateTimeInput
+                  mode="date"
+                  value={localFilters.createdAt?.lte}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localFilters.createdAt?.gte) {
+                      const { createdAt, ...rest } = localFilters;
+                      setLocalFilters(rest);
+                    } else {
+                      setLocalFilters({
+                        ...localFilters,
+                        createdAt: {
+                          ...(localFilters.createdAt?.gte && { gte: localFilters.createdAt.gte }),
+                          ...(date && { lte: date }),
+                        },
+                      });
+                    }
+                  }}
+                  label="Até"
+                  placeholder="Selecionar data final..."
+                />
+              </div>
             </div>
 
           {/* Action Buttons */}

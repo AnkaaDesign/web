@@ -62,7 +62,7 @@ export function DateFilters({ createdAtRange, onCreatedAtRangeChange, updatedAtR
           <IconCalendarPlus className="h-4 w-4" />
           Data de Criação
         </div>
-        <div className="space-y-3 pl-6">
+        <div className="grid grid-cols-2 gap-3">
           <DateTimeInput
             mode="date"
             value={createdAtRange?.gte}
@@ -88,7 +88,7 @@ export function DateFilters({ createdAtRange, onCreatedAtRangeChange, updatedAtR
           <IconCalendarStats className="h-4 w-4" />
           Data de Atualização
         </div>
-        <div className="space-y-3 pl-6">
+        <div className="grid grid-cols-2 gap-3">
           <DateTimeInput
             mode="date"
             value={updatedAtRange?.gte}

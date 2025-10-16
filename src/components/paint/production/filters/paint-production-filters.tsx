@@ -185,35 +185,59 @@ export function PaintProductionFilters({ open, onOpenChange, filters, onFiltersC
           </div>
 
           {/* Production Date Range */}
-          <div className="grid gap-2">
-            <Label className="flex items-center gap-2">
+          <div className="space-y-3">
+            <div className="text-sm font-medium flex items-center gap-2">
               <IconCalendar className="h-4 w-4" />
               Data de Produção
-            </Label>
-            <DateTimeInput
-              mode="date-range"
-              context="generic"
-              value={localFilters.createdAt ? { from: localFilters.createdAt.gte, to: localFilters.createdAt.lte } : undefined}
-              onChange={(range) => {
-                if (range && typeof range === "object" && "from" in range && (range.from || range.to)) {
-                  setLocalFilters({
-                    ...localFilters,
-                    createdAt: {
-                      ...(range.from && { gte: range.from }),
-                      ...(range.to && { lte: range.to }),
-                    },
-                  });
-                } else {
-                  setLocalFilters({
-                    ...localFilters,
-                    createdAt: undefined,
-                  });
-                }
-              }}
-              placeholder="Selecione o período de produção"
-              showClearButton={true}
-              numberOfMonths={2}
-            />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <DateTimeInput
+                mode="date"
+                context="generic"
+                value={localFilters.createdAt?.gte}
+                onChange={(date: Date | null) => {
+                  if (!date && !localFilters.createdAt?.lte) {
+                    setLocalFilters({
+                      ...localFilters,
+                      createdAt: undefined,
+                    });
+                  } else {
+                    setLocalFilters({
+                      ...localFilters,
+                      createdAt: {
+                        ...(date && { gte: date }),
+                        ...(localFilters.createdAt?.lte && { lte: localFilters.createdAt.lte }),
+                      },
+                    });
+                  }
+                }}
+                label="De"
+                placeholder="Selecionar data inicial..."
+              />
+              <DateTimeInput
+                mode="date"
+                context="generic"
+                value={localFilters.createdAt?.lte}
+                onChange={(date: Date | null) => {
+                  if (!date && !localFilters.createdAt?.gte) {
+                    setLocalFilters({
+                      ...localFilters,
+                      createdAt: undefined,
+                    });
+                  } else {
+                    setLocalFilters({
+                      ...localFilters,
+                      createdAt: {
+                        ...(localFilters.createdAt?.gte && { gte: localFilters.createdAt.gte }),
+                        ...(date && { lte: date }),
+                      },
+                    });
+                  }
+                }}
+                label="Até"
+                placeholder="Selecionar data final..."
+              />
+            </div>
           </div>
 
           {/* Volume Range */}

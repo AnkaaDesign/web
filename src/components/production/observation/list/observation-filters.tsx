@@ -189,19 +189,33 @@ export function ObservationFilters({ open, onOpenChange, filters, onFilterChange
             <TabsContent value="dates" className="space-y-4">
               <div className="space-y-4">
                 <div className="space-y-3">
-                  <Label className="text-base font-medium">Data de Criação</Label>
-                  <DateTimeInput
-                    mode="date-range"
-                    value={{ from: localState.createdAfter, to: localState.createdBefore }}
-                    onChange={(range) => {
-                      setLocalState((prev) => ({
-                        ...prev,
-                        createdAfter: range?.from,
-                        createdBefore: range?.to,
-                      }));
-                    }}
-                    placeholder="Selecionar período..."
-                  />
+                  <div className="text-base font-medium">Data de Criação</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <DateTimeInput
+                      mode="date"
+                      value={localState.createdAfter}
+                      onChange={(date: Date | null) => {
+                        setLocalState((prev) => ({
+                          ...prev,
+                          createdAfter: date || undefined,
+                        }));
+                      }}
+                      label="De"
+                      placeholder="Selecionar data inicial..."
+                    />
+                    <DateTimeInput
+                      mode="date"
+                      value={localState.createdBefore}
+                      onChange={(date: Date | null) => {
+                        setLocalState((prev) => ({
+                          ...prev,
+                          createdBefore: date || undefined,
+                        }));
+                      }}
+                      label="Até"
+                      placeholder="Selecionar data final..."
+                    />
+                  </div>
                 </div>
               </div>
             </TabsContent>

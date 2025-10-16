@@ -1,7 +1,6 @@
 import { Separator } from "@/components/ui/separator";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { IconCalendarPlus, IconCalendarStats } from "@tabler/icons-react";
-import type { DateRange } from "react-day-picker";
 
 interface DateFiltersProps {
   createdAtRange?: { gte?: Date; lte?: Date };
@@ -11,73 +10,101 @@ interface DateFiltersProps {
 }
 
 export function DateFilters({ createdAtRange, onCreatedAtRangeChange, updatedAtRange, onUpdatedAtRangeChange }: DateFiltersProps) {
-  const handleCreatedAtChange = (dateRange: DateRange | null) => {
-    if (!dateRange || (!dateRange.from && !dateRange.to)) {
+  const handleCreatedAtFromChange = (date: Date | null) => {
+    if (!date && !createdAtRange?.lte) {
       onCreatedAtRangeChange(undefined);
     } else {
       onCreatedAtRangeChange({
-        ...(dateRange.from && { gte: dateRange.from }),
-        ...(dateRange.to && { lte: dateRange.to }),
+        ...(date && { gte: date }),
+        ...(createdAtRange?.lte && { lte: createdAtRange.lte }),
       });
     }
   };
 
-  const handleUpdatedAtChange = (dateRange: DateRange | null) => {
-    if (!dateRange || (!dateRange.from && !dateRange.to)) {
+  const handleCreatedAtToChange = (date: Date | null) => {
+    if (!date && !createdAtRange?.gte) {
+      onCreatedAtRangeChange(undefined);
+    } else {
+      onCreatedAtRangeChange({
+        ...(createdAtRange?.gte && { gte: createdAtRange.gte }),
+        ...(date && { lte: date }),
+      });
+    }
+  };
+
+  const handleUpdatedAtFromChange = (date: Date | null) => {
+    if (!date && !updatedAtRange?.lte) {
       onUpdatedAtRangeChange(undefined);
     } else {
       onUpdatedAtRangeChange({
-        ...(dateRange.from && { gte: dateRange.from }),
-        ...(dateRange.to && { lte: dateRange.to }),
+        ...(date && { gte: date }),
+        ...(updatedAtRange?.lte && { lte: updatedAtRange.lte }),
       });
     }
   };
 
-  const currentCreatedAtRange: DateRange = {
-    from: createdAtRange?.gte,
-    to: createdAtRange?.lte,
-  };
-
-  const currentUpdatedAtRange: DateRange = {
-    from: updatedAtRange?.gte,
-    to: updatedAtRange?.lte,
+  const handleUpdatedAtToChange = (date: Date | null) => {
+    if (!date && !updatedAtRange?.gte) {
+      onUpdatedAtRangeChange(undefined);
+    } else {
+      onUpdatedAtRangeChange({
+        ...(updatedAtRange?.gte && { gte: updatedAtRange.gte }),
+        ...(date && { lte: date }),
+      });
+    }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* Created At Range */}
-      <DateTimeInput
-        mode="date-range"
-        value={currentCreatedAtRange}
-        onChange={handleCreatedAtChange}
-        label={
-          <div className="flex items-center gap-2">
-            <IconCalendarPlus className="h-4 w-4" />
-            Data de Cadastro
-          </div>
-        }
-        placeholder="Selecionar período..."
-        description="Filtra por período de cadastro do fornecedor"
-        numberOfMonths={2}
-      />
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <IconCalendarPlus className="h-4 w-4" />
+          Data de Cadastro
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <DateTimeInput
+            mode="date"
+            value={createdAtRange?.gte}
+            onChange={handleCreatedAtFromChange}
+            label="De"
+            placeholder="Selecionar data inicial..."
+          />
+          <DateTimeInput
+            mode="date"
+            value={createdAtRange?.lte}
+            onChange={handleCreatedAtToChange}
+            label="Até"
+            placeholder="Selecionar data final..."
+          />
+        </div>
+      </div>
 
       <Separator />
 
       {/* Updated At Range */}
-      <DateTimeInput
-        mode="date-range"
-        value={currentUpdatedAtRange}
-        onChange={handleUpdatedAtChange}
-        label={
-          <div className="flex items-center gap-2">
-            <IconCalendarStats className="h-4 w-4" />
-            Data de Atualização
-          </div>
-        }
-        placeholder="Selecionar período..."
-        description="Filtra por período de atualização do fornecedor"
-        numberOfMonths={2}
-      />
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <IconCalendarStats className="h-4 w-4" />
+          Data de Atualização
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <DateTimeInput
+            mode="date"
+            value={updatedAtRange?.gte}
+            onChange={handleUpdatedAtFromChange}
+            label="De"
+            placeholder="Selecionar data inicial..."
+          />
+          <DateTimeInput
+            mode="date"
+            value={updatedAtRange?.lte}
+            onChange={handleUpdatedAtToChange}
+            label="Até"
+            placeholder="Selecionar data final..."
+          />
+        </div>
+      </div>
     </div>
   );
 }

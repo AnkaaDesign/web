@@ -7,7 +7,7 @@ import { useUser, useUserMutations } from "../../../../hooks";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { BasicInfoCard, AddressCard, ProfessionalInfoCard, LoginInfoCard, RelatedActivitiesCard } from "@/components/administration/user/detail";
+import { BasicInfoCard, AddressCard, ProfessionalInfoCard, LoginInfoCard, RelatedActivitiesCard, PpeSizesCard } from "@/components/administration/user/detail";
 import { UserDetailSkeleton } from "@/components/administration/user/detail/user-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ const CollaboratorDetailsPage = () => {
       position: true,
       sector: true,
       managedSector: true,
+      ppeSize: true,
       activities: {
         include: {
           item: true,
@@ -130,10 +131,15 @@ const CollaboratorDetailsPage = () => {
               <LoginInfoCard user={user} />
             </div>
 
-            {/* Activities and Changelog History - Side by Side */}
+            {/* PPE Sizes and Changelog History - Side by Side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <RelatedActivitiesCard user={user} />
+              <PpeSizesCard user={user} />
               <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.USER} entityId={id} maxHeight="400px" className="h-[500px]" />
+            </div>
+
+            {/* Related Activities */}
+            <div className="grid grid-cols-1 gap-6">
+              <RelatedActivitiesCard user={user} />
             </div>
           </div>
         </div>

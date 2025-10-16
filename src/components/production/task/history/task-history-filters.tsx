@@ -130,35 +130,50 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
           </div>
 
           {/* Date Range Filter - Finished Date */}
-          <div className="space-y-2">
-            <Label>Data de Finalização</Label>
-            <DateTimeInput
-              mode="date-range"
-              value={
-                localFilters.finishedDateRange
-                  ? {
-                      from: localFilters.finishedDateRange.from as Date | undefined,
-                      to: localFilters.finishedDateRange.to as Date | undefined,
-                    }
-                  : undefined
-              }
-              onChange={(range) => {
-                if (range && typeof range === "object" && "from" in range && (range.from || range.to)) {
-                  setLocalFilters({
-                    ...localFilters,
-                    finishedDateRange: {
-                      from: range.from || undefined,
-                      to: range.to || undefined,
-                    },
-                  });
-                } else {
-                  const { finishedDateRange, ...rest } = localFilters;
-                  setLocalFilters(rest);
-                }
-              }}
-              placeholder="Selecionar período de finalização"
-              numberOfMonths={2}
-            />
+          <div className="space-y-3">
+            <div className="text-sm font-medium">Data de Finalização</div>
+            <div className="grid grid-cols-2 gap-3">
+              <DateTimeInput
+                mode="date"
+                value={localFilters.finishedDateRange?.from as Date | undefined}
+                onChange={(date: Date | null) => {
+                  if (!date && !localFilters.finishedDateRange?.to) {
+                    const { finishedDateRange, ...rest } = localFilters;
+                    setLocalFilters(rest);
+                  } else {
+                    setLocalFilters({
+                      ...localFilters,
+                      finishedDateRange: {
+                        ...(date && { from: date }),
+                        ...(localFilters.finishedDateRange?.to && { to: localFilters.finishedDateRange.to }),
+                      },
+                    });
+                  }
+                }}
+                label="De"
+                placeholder="Selecionar data inicial..."
+              />
+              <DateTimeInput
+                mode="date"
+                value={localFilters.finishedDateRange?.to as Date | undefined}
+                onChange={(date: Date | null) => {
+                  if (!date && !localFilters.finishedDateRange?.from) {
+                    const { finishedDateRange, ...rest } = localFilters;
+                    setLocalFilters(rest);
+                  } else {
+                    setLocalFilters({
+                      ...localFilters,
+                      finishedDateRange: {
+                        ...(localFilters.finishedDateRange?.from && { from: localFilters.finishedDateRange.from }),
+                        ...(date && { to: date }),
+                      },
+                    });
+                  }
+                }}
+                label="Até"
+                placeholder="Selecionar data final..."
+              />
+            </div>
           </div>
 
           {/* Sector Filter */}

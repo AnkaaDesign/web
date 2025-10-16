@@ -39,7 +39,7 @@ export function BarcodeCell({ control, index, disabled }: BarcodeCellProps) {
             <FormControl>
               <Popover open={isOpen} onOpenChange={setIsOpen}>
                 <PopoverTrigger asChild>
-                  <Button type="button" variant="outline" size="sm" disabled={disabled} className="h-10 w-full justify-start">
+                  <Button type="button" variant="outline" size="sm" disabled={disabled} className="h-10 w-full justify-start bg-transparent hover:bg-muted">
                     <IconBarcode className="mr-2 h-4 w-4" />
                     {barcodes.length > 0 ? <span>{barcodes.length} código(s)</span> : <span className="text-muted-foreground">Adicionar</span>}
                   </Button>

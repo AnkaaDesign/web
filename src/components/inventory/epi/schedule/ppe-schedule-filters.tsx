@@ -11,7 +11,6 @@ import { IconFilter, IconX, IconUser, IconPackage, IconCalendarEvent, IconClock,
 import { useUsers, useItems } from "../../../../hooks";
 import type { PpeDeliveryScheduleGetManyFormData } from "../../../../schemas";
 import { SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, ITEM_CATEGORY_TYPE } from "../../../../constants";
-import { type DateRange } from "react-day-picker";
 
 interface PpeScheduleFiltersProps {
   open: boolean;
@@ -32,7 +31,7 @@ interface FilterState {
   isActive?: boolean;
 
   // Date range filters
-  nextRunRange?: DateRange;
+  nextRunRange?: { from?: Date; to?: Date };
 }
 
 export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange }: PpeScheduleFiltersProps) {
@@ -49,21 +48,14 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
   useEffect(() => {
     if (!open) return;
 
-    // Convert API date range format to DateRange format
-    const convertToDateRange = (apiRange?: { gte?: Date; lte?: Date }): DateRange | undefined => {
-      if (!apiRange) return undefined;
-      return {
-        from: apiRange.gte,
-        to: apiRange.lte,
-      };
-    };
-
     setLocalState({
       itemIds: filters.itemIds || [],
       userIds: filters.userIds || [],
       frequency: filters.frequency || [],
       isActive: filters.isActive,
-      nextRunRange: convertToDateRange(filters.nextRunRange),
+      nextRunRange: filters.nextRunRange
+        ? { from: filters.nextRunRange.gte, to: filters.nextRunRange.lte }
+        : undefined,
     });
   }, [open]);
 
@@ -257,17 +249,51 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
           </div>
 
           {/* Next Delivery Date Range */}
-          <div className="grid gap-2">
-            <Label className="flex items-center gap-2">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
               <IconCalendarEvent className="h-4 w-4" />
               Próxima Entrega
-            </Label>
-            <DateTimeInput
-              mode="date-range"
-              value={localState.nextRunRange}
-              onChange={(range) => setLocalState((prev) => ({ ...prev, nextRunRange: range }))}
-              placeholder="Selecione o período"
-            />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <DateTimeInput
+                mode="date"
+                value={localState.nextRunRange?.from}
+                onChange={(date: Date | null) => {
+                  if (!date && !localState.nextRunRange?.to) {
+                    setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
+                  } else {
+                    setLocalState((prev) => ({
+                      ...prev,
+                      nextRunRange: {
+                        ...(date && { from: date }),
+                        ...(localState.nextRunRange?.to && { to: localState.nextRunRange.to }),
+                      },
+                    }));
+                  }
+                }}
+                label="De"
+                placeholder="Selecionar data inicial..."
+              />
+              <DateTimeInput
+                mode="date"
+                value={localState.nextRunRange?.to}
+                onChange={(date: Date | null) => {
+                  if (!date && !localState.nextRunRange?.from) {
+                    setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
+                  } else {
+                    setLocalState((prev) => ({
+                      ...prev,
+                      nextRunRange: {
+                        ...(localState.nextRunRange?.from && { from: localState.nextRunRange.from }),
+                        ...(date && { to: date }),
+                      },
+                    }));
+                  }
+                }}
+                label="Até"
+                placeholder="Selecionar data final..."
+              />
+            </div>
           </div>
 
           {/* Action Buttons */}

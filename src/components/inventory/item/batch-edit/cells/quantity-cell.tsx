@@ -15,7 +15,7 @@ export function QuantityCell({ control, index, disabled }: QuantityCellProps) {
       render={({ field }) => (
         <FormItem>
           <FormControl>
-            <Input type="number" min={0} disabled={disabled} className="h-10" placeholder="0" value={field.value} onChange={(value) => field.onChange(value)} />
+            <Input type="number" min={0} disabled={disabled} className="h-10 bg-transparent" placeholder="0" value={field.value} onChange={(value) => field.onChange(value)} />
           </FormControl>
         </FormItem>
       )}

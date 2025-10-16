@@ -1,6 +1,5 @@
 import { Separator } from "@/components/ui/separator";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import type { DateRange } from "react-day-picker";
 
 interface MaintenanceDateFiltersProps {
   nextRunRange?: { gte?: Date; lte?: Date };
@@ -19,35 +18,68 @@ export function MaintenanceDateFilters({
   updatedAtRange,
   onUpdatedAtRangeChange,
 }: MaintenanceDateFiltersProps) {
-  const handleNextRunRangeChange = (dateRange: DateRange | null) => {
-    if (!dateRange || (!dateRange.from && !dateRange.to)) {
+  const handleNextRunFromChange = (date: Date | null) => {
+    if (!date && !nextRunRange?.lte) {
       onNextRunRangeChange(undefined);
     } else {
       onNextRunRangeChange({
-        ...(dateRange.from && { gte: dateRange.from }),
-        ...(dateRange.to && { lte: dateRange.to }),
+        ...(date && { gte: date }),
+        ...(nextRunRange?.lte && { lte: nextRunRange.lte }),
       });
     }
   };
 
-  const handleCreatedAtRangeChange = (dateRange: DateRange | null) => {
-    if (!dateRange || (!dateRange.from && !dateRange.to)) {
+  const handleNextRunToChange = (date: Date | null) => {
+    if (!date && !nextRunRange?.gte) {
+      onNextRunRangeChange(undefined);
+    } else {
+      onNextRunRangeChange({
+        ...(nextRunRange?.gte && { gte: nextRunRange.gte }),
+        ...(date && { lte: date }),
+      });
+    }
+  };
+
+  const handleCreatedAtFromChange = (date: Date | null) => {
+    if (!date && !createdAtRange?.lte) {
       onCreatedAtRangeChange(undefined);
     } else {
       onCreatedAtRangeChange({
-        ...(dateRange.from && { gte: dateRange.from }),
-        ...(dateRange.to && { lte: dateRange.to }),
+        ...(date && { gte: date }),
+        ...(createdAtRange?.lte && { lte: createdAtRange.lte }),
       });
     }
   };
 
-  const handleUpdatedAtRangeChange = (dateRange: DateRange | null) => {
-    if (!dateRange || (!dateRange.from && !dateRange.to)) {
+  const handleCreatedAtToChange = (date: Date | null) => {
+    if (!date && !createdAtRange?.gte) {
+      onCreatedAtRangeChange(undefined);
+    } else {
+      onCreatedAtRangeChange({
+        ...(createdAtRange?.gte && { gte: createdAtRange.gte }),
+        ...(date && { lte: date }),
+      });
+    }
+  };
+
+  const handleUpdatedAtFromChange = (date: Date | null) => {
+    if (!date && !updatedAtRange?.lte) {
       onUpdatedAtRangeChange(undefined);
     } else {
       onUpdatedAtRangeChange({
-        ...(dateRange.from && { gte: dateRange.from }),
-        ...(dateRange.to && { lte: dateRange.to }),
+        ...(date && { gte: date }),
+        ...(updatedAtRange?.lte && { lte: updatedAtRange.lte }),
+      });
+    }
+  };
+
+  const handleUpdatedAtToChange = (date: Date | null) => {
+    if (!date && !updatedAtRange?.gte) {
+      onUpdatedAtRangeChange(undefined);
+    } else {
+      onUpdatedAtRangeChange({
+        ...(updatedAtRange?.gte && { gte: updatedAtRange.gte }),
+        ...(date && { lte: date }),
       });
     }
   };
@@ -55,51 +87,71 @@ export function MaintenanceDateFilters({
   return (
     <div className="space-y-6">
       {/* Next Run Date Range */}
-      <DateTimeInput
-        mode="date-range"
-        value={{
-          from: nextRunRange?.gte,
-          to: nextRunRange?.lte,
-        }}
-        onChange={handleNextRunRangeChange}
-        label="Próxima Manutenção"
-        context="maintenance"
-        placeholder="Selecionar período..."
-        description="Filtra por período da próxima manutenção agendada"
-        numberOfMonths={2}
-      />
+      <div className="space-y-3">
+        <div className="text-sm font-medium">Próxima Manutenção</div>
+        <div className="grid grid-cols-2 gap-3">
+          <DateTimeInput
+            mode="date"
+            value={nextRunRange?.gte}
+            onChange={handleNextRunFromChange}
+            label="De"
+            placeholder="Selecionar data inicial..."
+          />
+          <DateTimeInput
+            mode="date"
+            value={nextRunRange?.lte}
+            onChange={handleNextRunToChange}
+            label="Até"
+            placeholder="Selecionar data final..."
+          />
+        </div>
+      </div>
 
       <Separator />
 
       {/* Created Date Range */}
-      <DateTimeInput
-        mode="date-range"
-        value={{
-          from: createdAtRange?.gte,
-          to: createdAtRange?.lte,
-        }}
-        onChange={handleCreatedAtRangeChange}
-        label="Data de Criação"
-        placeholder="Selecionar período..."
-        description="Filtra por período de criação da manutenção"
-        numberOfMonths={2}
-      />
+      <div className="space-y-3">
+        <div className="text-sm font-medium">Data de Criação</div>
+        <div className="grid grid-cols-2 gap-3">
+          <DateTimeInput
+            mode="date"
+            value={createdAtRange?.gte}
+            onChange={handleCreatedAtFromChange}
+            label="De"
+            placeholder="Selecionar data inicial..."
+          />
+          <DateTimeInput
+            mode="date"
+            value={createdAtRange?.lte}
+            onChange={handleCreatedAtToChange}
+            label="Até"
+            placeholder="Selecionar data final..."
+          />
+        </div>
+      </div>
 
       <Separator />
 
       {/* Updated Date Range */}
-      <DateTimeInput
-        mode="date-range"
-        value={{
-          from: updatedAtRange?.gte,
-          to: updatedAtRange?.lte,
-        }}
-        onChange={handleUpdatedAtRangeChange}
-        label="Data de Atualização"
-        placeholder="Selecionar período..."
-        description="Filtra por período da última atualização"
-        numberOfMonths={2}
-      />
+      <div className="space-y-3">
+        <div className="text-sm font-medium">Data de Atualização</div>
+        <div className="grid grid-cols-2 gap-3">
+          <DateTimeInput
+            mode="date"
+            value={updatedAtRange?.gte}
+            onChange={handleUpdatedAtFromChange}
+            label="De"
+            placeholder="Selecionar data inicial..."
+          />
+          <DateTimeInput
+            mode="date"
+            value={updatedAtRange?.lte}
+            onChange={handleUpdatedAtToChange}
+            label="Até"
+            placeholder="Selecionar data final..."
+          />
+        </div>
+      </div>
     </div>
   );
 }

@@ -15,7 +15,6 @@ import type { TaskGetManyFormData } from "../../../../schemas";
 import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
 import { IconChevronDown, IconChevronRight, IconFilter, IconX } from "@tabler/icons-react";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import type { DateRange } from "react-day-picker";
 
 interface TaskFiltersProps {
   open: boolean;
@@ -347,166 +346,293 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                 <h3 className="text-sm font-medium">Datas</h3>
                 <div className="flex items-center gap-2">{openSections.has("dates") ? <IconChevronDown className="h-4 w-4" /> : <IconChevronRight className="h-4 w-4" />}</div>
               </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-4 pt-2">
-                <div className="grid grid-cols-1 gap-4">
-                  <DateTimeInput
-                    mode="date-range"
-                    value={{
-                      from: localFilters.entryDateRange?.from as Date | undefined,
-                      to: localFilters.entryDateRange?.to as Date | undefined,
-                    }}
-                    onChange={(dateRange: DateRange | null) => {
-                      if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                        const { entryDateRange, ...rest } = localFilters;
-                        setLocalFilters(rest);
-                      } else {
-                        setLocalFilters({
-                          ...localFilters,
-                          entryDateRange: {
-                            from: dateRange.from || undefined,
-                            to: dateRange.to || undefined,
-                          },
-                        });
-                      }
-                    }}
-                    label="Data de Entrada"
-                    placeholder="Selecionar período..."
-                    description="Filtra por período de entrada da tarefa"
-                    numberOfMonths={2}
-                  />
+              <CollapsibleContent className="space-y-6 pt-2">
+                {/* Data de Entrada */}
+                <div className="space-y-3">
+                  <div className="text-sm font-medium">Data de Entrada</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.entryDateRange?.from as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.entryDateRange?.to) {
+                          const { entryDateRange, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            entryDateRange: {
+                              ...(date && { from: date }),
+                              ...(localFilters.entryDateRange?.to && { to: localFilters.entryDateRange.to }),
+                            },
+                          });
+                        }
+                      }}
+                      label="De"
+                      placeholder="Selecionar data inicial..."
+                    />
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.entryDateRange?.to as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.entryDateRange?.from) {
+                          const { entryDateRange, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            entryDateRange: {
+                              ...(localFilters.entryDateRange?.from && { from: localFilters.entryDateRange.from }),
+                              ...(date && { to: date }),
+                            },
+                          });
+                        }
+                      }}
+                      label="Até"
+                      placeholder="Selecionar data final..."
+                    />
+                  </div>
+                </div>
 
-                  <DateTimeInput
-                    mode="date-range"
-                    value={{
-                      from: localFilters.termRange?.from as Date | undefined,
-                      to: localFilters.termRange?.to as Date | undefined,
-                    }}
-                    onChange={(dateRange: DateRange | null) => {
-                      if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                        const { termRange, ...rest } = localFilters;
-                        setLocalFilters(rest);
-                      } else {
-                        setLocalFilters({
-                          ...localFilters,
-                          termRange: {
-                            from: dateRange.from || undefined,
-                            to: dateRange.to || undefined,
-                          },
-                        });
-                      }
-                    }}
-                    label="Prazo"
-                    placeholder="Selecionar período..."
-                    description="Filtra por prazo de conclusão da tarefa"
-                    context="due"
-                    numberOfMonths={2}
-                  />
+                {/* Prazo */}
+                <div className="space-y-3">
+                  <div className="text-sm font-medium">Prazo</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.termRange?.from as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.termRange?.to) {
+                          const { termRange, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            termRange: {
+                              ...(date && { from: date }),
+                              ...(localFilters.termRange?.to && { to: localFilters.termRange.to }),
+                            },
+                          });
+                        }
+                      }}
+                      label="De"
+                      placeholder="Selecionar data inicial..."
+                      context="due"
+                    />
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.termRange?.to as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.termRange?.from) {
+                          const { termRange, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            termRange: {
+                              ...(localFilters.termRange?.from && { from: localFilters.termRange.from }),
+                              ...(date && { to: date }),
+                            },
+                          });
+                        }
+                      }}
+                      label="Até"
+                      placeholder="Selecionar data final..."
+                      context="due"
+                    />
+                  </div>
+                </div>
 
-                  <DateTimeInput
-                    mode="date-range"
-                    value={{
-                      from: localFilters.startedDateRange?.from as Date | undefined,
-                      to: localFilters.startedDateRange?.to as Date | undefined,
-                    }}
-                    onChange={(dateRange: DateRange | null) => {
-                      if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                        const { startedDateRange, ...rest } = localFilters;
-                        setLocalFilters(rest);
-                      } else {
-                        setLocalFilters({
-                          ...localFilters,
-                          startedDateRange: {
-                            from: dateRange.from || undefined,
-                            to: dateRange.to || undefined,
-                          },
-                        });
-                      }
-                    }}
-                    label="Data de Início"
-                    placeholder="Selecionar período..."
-                    description="Filtra por período de início da tarefa"
-                    context="start"
-                    numberOfMonths={2}
-                  />
+                {/* Data de Início */}
+                <div className="space-y-3">
+                  <div className="text-sm font-medium">Data de Início</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.startedDateRange?.from as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.startedDateRange?.to) {
+                          const { startedDateRange, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            startedDateRange: {
+                              ...(date && { from: date }),
+                              ...(localFilters.startedDateRange?.to && { to: localFilters.startedDateRange.to }),
+                            },
+                          });
+                        }
+                      }}
+                      label="De"
+                      placeholder="Selecionar data inicial..."
+                      context="start"
+                    />
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.startedDateRange?.to as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.startedDateRange?.from) {
+                          const { startedDateRange, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            startedDateRange: {
+                              ...(localFilters.startedDateRange?.from && { from: localFilters.startedDateRange.from }),
+                              ...(date && { to: date }),
+                            },
+                          });
+                        }
+                      }}
+                      label="Até"
+                      placeholder="Selecionar data final..."
+                      context="start"
+                    />
+                  </div>
+                </div>
 
-                  <DateTimeInput
-                    mode="date-range"
-                    value={{
-                      from: localFilters.finishedDateRange?.from as Date | undefined,
-                      to: localFilters.finishedDateRange?.to as Date | undefined,
-                    }}
-                    onChange={(dateRange: DateRange | null) => {
-                      if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                        const { finishedDateRange, ...rest } = localFilters;
-                        setLocalFilters(rest);
-                      } else {
-                        setLocalFilters({
-                          ...localFilters,
-                          finishedDateRange: {
-                            from: dateRange.from || undefined,
-                            to: dateRange.to || undefined,
-                          },
-                        });
-                      }
-                    }}
-                    label="Data de Conclusão"
-                    placeholder="Selecionar período..."
-                    description="Filtra por período de conclusão da tarefa"
-                    context="end"
-                    numberOfMonths={2}
-                  />
+                {/* Data de Conclusão */}
+                <div className="space-y-3">
+                  <div className="text-sm font-medium">Data de Conclusão</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.finishedDateRange?.from as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.finishedDateRange?.to) {
+                          const { finishedDateRange, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            finishedDateRange: {
+                              ...(date && { from: date }),
+                              ...(localFilters.finishedDateRange?.to && { to: localFilters.finishedDateRange.to }),
+                            },
+                          });
+                        }
+                      }}
+                      label="De"
+                      placeholder="Selecionar data inicial..."
+                      context="end"
+                    />
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.finishedDateRange?.to as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.finishedDateRange?.from) {
+                          const { finishedDateRange, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            finishedDateRange: {
+                              ...(localFilters.finishedDateRange?.from && { from: localFilters.finishedDateRange.from }),
+                              ...(date && { to: date }),
+                            },
+                          });
+                        }
+                      }}
+                      label="Até"
+                      placeholder="Selecionar data final..."
+                      context="end"
+                    />
+                  </div>
+                </div>
 
-                  <DateTimeInput
-                    mode="date-range"
-                    value={{
-                      from: localFilters.createdAtRange?.from as Date | undefined,
-                      to: localFilters.createdAtRange?.to as Date | undefined,
-                    }}
-                    onChange={(dateRange: DateRange | null) => {
-                      if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                        const { createdAtRange, ...rest } = localFilters;
-                        setLocalFilters(rest);
-                      } else {
-                        setLocalFilters({
-                          ...localFilters,
-                          createdAtRange: {
-                            from: dateRange.from || undefined,
-                            to: dateRange.to || undefined,
-                          },
-                        });
-                      }
-                    }}
-                    label="Data de Criação"
-                    placeholder="Selecionar período..."
-                    description="Filtra por período de criação da tarefa"
-                    numberOfMonths={2}
-                  />
+                {/* Data de Criação */}
+                <div className="space-y-3">
+                  <div className="text-sm font-medium">Data de Criação</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.createdAtRange?.from as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.createdAtRange?.to) {
+                          const { createdAtRange, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            createdAtRange: {
+                              ...(date && { from: date }),
+                              ...(localFilters.createdAtRange?.to && { to: localFilters.createdAtRange.to }),
+                            },
+                          });
+                        }
+                      }}
+                      label="De"
+                      placeholder="Selecionar data inicial..."
+                    />
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.createdAtRange?.to as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.createdAtRange?.from) {
+                          const { createdAtRange, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            createdAtRange: {
+                              ...(localFilters.createdAtRange?.from && { from: localFilters.createdAtRange.from }),
+                              ...(date && { to: date }),
+                            },
+                          });
+                        }
+                      }}
+                      label="Até"
+                      placeholder="Selecionar data final..."
+                    />
+                  </div>
+                </div>
 
-                  <DateTimeInput
-                    mode="date-range"
-                    value={{
-                      from: localFilters.updatedAtRange?.from as Date | undefined,
-                      to: localFilters.updatedAtRange?.to as Date | undefined,
-                    }}
-                    onChange={(dateRange: DateRange | null) => {
-                      if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                        const { updatedAtRange, ...rest } = localFilters;
-                        setLocalFilters(rest);
-                      } else {
-                        setLocalFilters({
-                          ...localFilters,
-                          updatedAtRange: {
-                            from: dateRange.from || undefined,
-                            to: dateRange.to || undefined,
-                          },
-                        });
-                      }
-                    }}
-                    label="Data de Atualização"
-                    placeholder="Selecionar período..."
-                    description="Filtra por período de atualização da tarefa"
-                    numberOfMonths={2}
-                  />
+                {/* Data de Atualização */}
+                <div className="space-y-3">
+                  <div className="text-sm font-medium">Data de Atualização</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.updatedAtRange?.from as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.updatedAtRange?.to) {
+                          const { updatedAtRange, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            updatedAtRange: {
+                              ...(date && { from: date }),
+                              ...(localFilters.updatedAtRange?.to && { to: localFilters.updatedAtRange.to }),
+                            },
+                          });
+                        }
+                      }}
+                      label="De"
+                      placeholder="Selecionar data inicial..."
+                    />
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.updatedAtRange?.to as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.updatedAtRange?.from) {
+                          const { updatedAtRange, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            updatedAtRange: {
+                              ...(localFilters.updatedAtRange?.from && { from: localFilters.updatedAtRange.from }),
+                              ...(date && { to: date }),
+                            },
+                          });
+                        }
+                      }}
+                      label="Até"
+                      placeholder="Selecionar data final..."
+                    />
+                  </div>
                 </div>
               </CollapsibleContent>
             </Collapsible>

@@ -1,4 +1,3 @@
-import type { DateRange } from "react-day-picker";
 import { FormField } from "@/components/ui/form";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 
@@ -11,53 +10,63 @@ interface DateRangeSelectorProps {
   placeholder?: string;
 }
 
-export function DateRangeSelector({ control, name, label, description, disabled, placeholder = "Selecione um período" }: DateRangeSelectorProps) {
+export function DateRangeSelector({ control, name, label, description, disabled }: DateRangeSelectorProps) {
   return (
     <FormField
       control={control}
       name={name}
       render={({ field }) => {
-        // Convert from our API format to DateRange format
-        const dateRange: DateRange | undefined = field.value
-          ? {
-              from: field.value.gte ? new Date(field.value.gte) : undefined,
-              to: field.value.lte ? new Date(field.value.lte) : undefined,
-            }
-          : undefined;
+        // Handle date changes for the "from" field
+        const handleFromChange = (date: Date | null) => {
+          const currentValue = field.value || {};
 
-        // Handle DateRange changes and convert back to API format
-        const handleDateRangeChange = (range: DateRange | null) => {
-          if (!range) {
+          if (!date && !currentValue.lte) {
             field.onChange(undefined);
-            return;
+          } else {
+            field.onChange({
+              ...(date && { gte: date }),
+              ...(currentValue.lte && { lte: currentValue.lte }),
+            });
           }
+        };
 
-          const newValue: { gte?: Date; lte?: Date } = {};
+        // Handle date changes for the "to" field
+        const handleToChange = (date: Date | null) => {
+          const currentValue = field.value || {};
 
-          if (range.from) {
-            newValue.gte = range.from;
+          if (!date && !currentValue.gte) {
+            field.onChange(undefined);
+          } else {
+            field.onChange({
+              ...(currentValue.gte && { gte: currentValue.gte }),
+              ...(date && { lte: date }),
+            });
           }
-
-          if (range.to) {
-            newValue.lte = range.to;
-          }
-
-          // Only set the value if we have at least one date
-          field.onChange(Object.keys(newValue).length > 0 ? newValue : undefined);
         };
 
         return (
-          <DateTimeInput
-            field={field}
-            mode="date-range"
-            value={dateRange}
-            onChange={handleDateRangeChange}
-            label={label}
-            placeholder={placeholder}
-            description={description}
-            disabled={disabled}
-            numberOfMonths={2}
-          />
+          <div className="space-y-3">
+            <div className="text-sm font-medium">{label}</div>
+            {description && <p className="text-sm text-muted-foreground">{description}</p>}
+            <div className="grid grid-cols-2 gap-3 pl-6">
+              <DateTimeInput
+                mode="date"
+                value={field.value?.gte}
+                onChange={handleFromChange}
+                label="De"
+                placeholder="Selecionar data inicial..."
+                disabled={disabled}
+              />
+              <DateTimeInput
+                mode="date"
+                value={field.value?.lte}
+                onChange={handleToChange}
+                label="Até"
+                placeholder="Selecionar data final..."
+                disabled={disabled}
+              />
+            </div>
+          </div>
         );
       }}
     />
@@ -75,41 +84,55 @@ interface StandaloneDateRangeSelectorProps {
   className?: string;
 }
 
-export function StandaloneDateRangeSelector({ value, onChange, label, description, disabled, placeholder = "Selecione um período", className }: StandaloneDateRangeSelectorProps) {
-  // Convert from our API format to DateRange format
-  const dateRange: DateRange | undefined = value
-    ? {
-        from: value.gte ? new Date(value.gte) : undefined,
-        to: value.lte ? new Date(value.lte) : undefined,
-      }
-    : undefined;
-
-  // Handle DateRange changes and convert back to API format
-  const handleDateRangeChange = (range: DateRange | undefined) => {
-    if (!range) {
+export function StandaloneDateRangeSelector({ value, onChange, label, description, disabled, className }: StandaloneDateRangeSelectorProps) {
+  // Handle date changes for the "from" field
+  const handleFromChange = (date: Date | null) => {
+    if (!date && !value?.lte) {
       onChange(undefined);
-      return;
+    } else {
+      onChange({
+        ...(date && { gte: date }),
+        ...(value?.lte && { lte: value.lte }),
+      });
     }
+  };
 
-    const newValue: { gte?: Date; lte?: Date } = {};
-
-    if (range.from) {
-      newValue.gte = range.from;
+  // Handle date changes for the "to" field
+  const handleToChange = (date: Date | null) => {
+    if (!date && !value?.gte) {
+      onChange(undefined);
+    } else {
+      onChange({
+        ...(value?.gte && { gte: value.gte }),
+        ...(date && { lte: date }),
+      });
     }
-
-    if (range.to) {
-      newValue.lte = range.to;
-    }
-
-    // Only set the value if we have at least one date
-    onChange(Object.keys(newValue).length > 0 ? newValue : undefined);
   };
 
   return (
     <div className={className}>
-      {label && <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 mb-2 block">{label}</label>}
-      <DateRangePicker dateRange={dateRange} onDateRangeChange={handleDateRangeChange} placeholder={placeholder} disabled={disabled} className="w-full" />
-      {description && <p className="text-sm text-muted-foreground mt-2">{description}</p>}
+      <div className="space-y-3">
+        {label && <div className="text-sm font-medium">{label}</div>}
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        <div className="grid grid-cols-2 gap-3 pl-6">
+          <DateTimeInput
+            mode="date"
+            value={value?.gte}
+            onChange={handleFromChange}
+            label="De"
+            placeholder="Selecionar data inicial..."
+            disabled={disabled}
+          />
+          <DateTimeInput
+            mode="date"
+            value={value?.lte}
+            onChange={handleToChange}
+            label="Até"
+            placeholder="Selecionar data final..."
+            disabled={disabled}
+          />
+        </div>
+      </div>
     </div>
   );
 }

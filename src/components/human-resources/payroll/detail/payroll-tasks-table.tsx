@@ -31,7 +31,7 @@ export function PayrollTasksTable({ tasks, userName = "Funcionário" }: PayrollT
   } : {};
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -43,7 +43,7 @@ export function PayrollTasksTable({ tasks, userName = "Funcionário" }: PayrollT
           </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="max-h-[600px] overflow-auto">
         <CustomerTasksTable
           visibleColumns={PAYROLL_DETAIL_TASK_VISIBLE_COLUMNS}
           filters={filters}

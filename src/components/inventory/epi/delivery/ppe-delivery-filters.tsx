@@ -210,61 +210,99 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
           </div>
 
           {/* Scheduled Date Range */}
-          <div className="grid gap-2">
-            <Label className="flex items-center gap-2">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
               <IconCalendarEvent className="h-4 w-4" />
               Data Programada
-            </Label>
-            <DateTimeInput
-              mode="date-range"
-              value={{
-                from: localState.scheduledDateRange?.gte,
-                to: localState.scheduledDateRange?.lte,
-              }}
-              onChange={(range) => {
-                if (range?.from || range?.to) {
-                  setLocalState((prev) => ({
-                    ...prev,
-                    scheduledDateRange: {
-                      ...(range.from && { gte: range.from }),
-                      ...(range.to && { lte: range.to }),
-                    },
-                  }));
-                } else {
-                  setLocalState((prev) => ({ ...prev, scheduledDateRange: undefined }));
-                }
-              }}
-              placeholder="Selecione o período"
-            />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <DateTimeInput
+                mode="date"
+                value={localState.scheduledDateRange?.gte}
+                onChange={(date: Date | null) => {
+                  if (!date && !localState.scheduledDateRange?.lte) {
+                    setLocalState((prev) => ({ ...prev, scheduledDateRange: undefined }));
+                  } else {
+                    setLocalState((prev) => ({
+                      ...prev,
+                      scheduledDateRange: {
+                        ...(date && { gte: date }),
+                        ...(localState.scheduledDateRange?.lte && { lte: localState.scheduledDateRange.lte }),
+                      },
+                    }));
+                  }
+                }}
+                label="De"
+                placeholder="Selecionar data inicial..."
+              />
+              <DateTimeInput
+                mode="date"
+                value={localState.scheduledDateRange?.lte}
+                onChange={(date: Date | null) => {
+                  if (!date && !localState.scheduledDateRange?.gte) {
+                    setLocalState((prev) => ({ ...prev, scheduledDateRange: undefined }));
+                  } else {
+                    setLocalState((prev) => ({
+                      ...prev,
+                      scheduledDateRange: {
+                        ...(localState.scheduledDateRange?.gte && { gte: localState.scheduledDateRange.gte }),
+                        ...(date && { lte: date }),
+                      },
+                    }));
+                  }
+                }}
+                label="Até"
+                placeholder="Selecionar data final..."
+              />
+            </div>
           </div>
 
           {/* Actual Delivery Date Range */}
-          <div className="grid gap-2">
-            <Label className="flex items-center gap-2">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
               <IconCalendarPlus className="h-4 w-4" />
               Data de Entrega Real
-            </Label>
-            <DateTimeInput
-              mode="date-range"
-              value={{
-                from: localState.actualDeliveryDateRange?.gte,
-                to: localState.actualDeliveryDateRange?.lte,
-              }}
-              onChange={(range) => {
-                if (range?.from || range?.to) {
-                  setLocalState((prev) => ({
-                    ...prev,
-                    actualDeliveryDateRange: {
-                      ...(range.from && { gte: range.from }),
-                      ...(range.to && { lte: range.to }),
-                    },
-                  }));
-                } else {
-                  setLocalState((prev) => ({ ...prev, actualDeliveryDateRange: undefined }));
-                }
-              }}
-              placeholder="Selecione o período"
-            />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <DateTimeInput
+                mode="date"
+                value={localState.actualDeliveryDateRange?.gte}
+                onChange={(date: Date | null) => {
+                  if (!date && !localState.actualDeliveryDateRange?.lte) {
+                    setLocalState((prev) => ({ ...prev, actualDeliveryDateRange: undefined }));
+                  } else {
+                    setLocalState((prev) => ({
+                      ...prev,
+                      actualDeliveryDateRange: {
+                        ...(date && { gte: date }),
+                        ...(localState.actualDeliveryDateRange?.lte && { lte: localState.actualDeliveryDateRange.lte }),
+                      },
+                    }));
+                  }
+                }}
+                label="De"
+                placeholder="Selecionar data inicial..."
+              />
+              <DateTimeInput
+                mode="date"
+                value={localState.actualDeliveryDateRange?.lte}
+                onChange={(date: Date | null) => {
+                  if (!date && !localState.actualDeliveryDateRange?.gte) {
+                    setLocalState((prev) => ({ ...prev, actualDeliveryDateRange: undefined }));
+                  } else {
+                    setLocalState((prev) => ({
+                      ...prev,
+                      actualDeliveryDateRange: {
+                        ...(localState.actualDeliveryDateRange?.gte && { gte: localState.actualDeliveryDateRange.gte }),
+                        ...(date && { lte: date }),
+                      },
+                    }));
+                  }
+                }}
+                label="Até"
+                placeholder="Selecionar data final..."
+              />
+            </div>
           </div>
 
           {/* Action Buttons */}

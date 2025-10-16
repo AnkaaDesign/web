@@ -340,7 +340,7 @@ export function FileUploadField({
                   };
 
                   return (
-                    <div key={file.id} className="flex items-center gap-3 p-3 h-16 border rounded-lg bg-card hover:bg-muted/30 transition-colors">
+                    <div key={file.id} className="flex items-center gap-3 p-3 min-h-16 border rounded-lg bg-card hover:bg-muted/30 transition-colors">
                       {/* Thumbnail or Icon */}
                       <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded border bg-muted overflow-hidden">
                         {isUploading ? (
@@ -358,11 +358,11 @@ export function FileUploadField({
                       </div>
 
                       {/* File Info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate" title={file.name}>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <p className="text-sm font-medium text-foreground truncate max-w-full" title={file.name}>
                           {file.name}
                         </p>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-xs text-muted-foreground">{formatFileSize(file.size || 0)}</p>
                           {isUploaded && (
                             <Badge variant="success" className="text-[10px] px-1.5 py-0 h-4">
@@ -385,16 +385,19 @@ export function FileUploadField({
                         )}
 
                         {/* Error message */}
-                        {hasError && <p className="text-xs text-destructive mt-1">{file.error}</p>}
+                        {hasError && <p className="text-xs text-destructive mt-1 truncate" title={file.error}>{file.error}</p>}
                       </div>
 
                       {/* Remove button */}
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeFile(file.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeFile(file.id);
+                        }}
                         disabled={disabled}
-                        className="h-6 w-6 p-0 hover:bg-destructive hover:text-white rounded-full"
+                        className="flex-shrink-0 h-6 w-6 p-0 hover:bg-destructive hover:text-white rounded-full"
                       >
                         <IconX className="w-3 h-3" />
                       </Button>
@@ -487,11 +490,11 @@ export function FileUploadField({
                 };
 
                 return (
-                  <div key={file.id} className="flex flex-col">
+                  <div key={file.id} className="flex flex-col min-w-0">
                     {/* File card */}
-                    <div className="flex flex-col items-center p-3 border border-border/50 rounded-lg bg-card">
+                    <div className="flex flex-col items-center p-3 border border-border/50 rounded-lg bg-card overflow-hidden">
                       {/* Thumbnail or Icon */}
-                      <div className="relative w-full h-24 mb-2 overflow-hidden rounded border">
+                      <div className="relative w-full h-24 mb-2 overflow-hidden rounded border flex-shrink-0">
                         {isUploading ? (
                           <div className="w-full h-full flex items-center justify-center bg-primary/5">
                             <div className="w-6 h-6 border-2 border-primary/30 border-t-primary animate-spin rounded-full" />
@@ -513,33 +516,36 @@ export function FileUploadField({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => removeFile(file.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFile(file.id);
+                          }}
                           disabled={disabled}
-                          className="absolute top-1 right-1 h-5 w-5 bg-background/80 hover:bg-destructive hover:text-white rounded-full shadow-sm"
+                          className="absolute top-1 right-1 h-6 w-6 p-0 flex-shrink-0 bg-background/90 hover:bg-destructive hover:text-white rounded-full shadow-sm z-10"
                         >
-                          <IconX className="w-3 h-3" />
+                          <IconX className="w-3.5 h-3.5" />
                         </Button>
 
                         {/* Status indicator */}
                         {hasError && (
-                          <div className="absolute -top-1 -left-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                            <IconAlertCircle className="w-2.5 h-2.5 text-white" />
+                          <div className="absolute top-1 left-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow-sm">
+                            <IconAlertCircle className="w-3 h-3 text-white" />
                           </div>
                         )}
                         {isUploaded && !hasError && (
-                          <div className="absolute -top-1 -left-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                            <IconCheck className="w-2.5 h-2.5 text-white" />
+                          <div className="absolute top-1 left-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center shadow-sm">
+                            <IconCheck className="w-3 h-3 text-white" />
                           </div>
                         )}
                       </div>
 
                       {/* File name */}
-                      <p className="text-xs font-medium text-foreground text-center truncate w-full px-1" title={file.name}>
+                      <p className="text-xs font-medium text-foreground text-center truncate w-full px-1 max-w-full" title={file.name}>
                         {file.name}
                       </p>
 
                       {/* File size */}
-                      <p className="text-xs text-muted-foreground mt-0.5">{formatFileSize(file.size || 0)}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 flex-shrink-0">{formatFileSize(file.size || 0)}</p>
                     </div>
 
                     {/* Progress bar */}
@@ -553,7 +559,7 @@ export function FileUploadField({
                     )}
 
                     {/* Error message */}
-                    {hasError && <p className="text-xs text-destructive text-center mt-1 px-1">{file.error}</p>}
+                    {hasError && <p className="text-xs text-destructive text-center mt-1 px-1 truncate max-w-full" title={file.error}>{file.error}</p>}
                   </div>
                 );
               })}

@@ -31,7 +31,7 @@ export function SupplierCell({ control, index, disabled }: SupplierCellProps) {
               }
               placeholder={isLoading ? "Carregando..." : "Selecione"}
               searchPlaceholder="Buscar fornecedor..."
-              className="h-10"
+              className="h-10 bg-transparent"
             />
           </FormControl>
         </FormItem>

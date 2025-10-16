@@ -12,7 +12,6 @@ import { IconChevronDown, IconChevronRight, IconFilter, IconX } from "@tabler/ic
 import { CUT_STATUS, CUT_TYPE, CUT_ORIGIN } from "../../../../constants";
 import { CUT_STATUS_LABELS, CUT_TYPE_LABELS, CUT_ORIGIN_LABELS } from "../../../../constants";
 import type { CutGetManyFormData } from "../../../../schemas";
-import type { DateRange } from "react-day-picker";
 
 interface CutItemFiltersProps {
   open: boolean;
@@ -235,32 +234,50 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
                 </div>
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <DateTimeInput
-                    mode="date-range"
-                    value={{
-                      from: localFilters.createdAt?.gte as Date | undefined,
-                      to: localFilters.createdAt?.lte as Date | undefined,
-                    }}
-                    onChange={(dateRange: DateRange | null) => {
-                      if (!dateRange || (!dateRange.from && !dateRange.to)) {
-                        const { createdAt, ...rest } = localFilters;
-                        setLocalFilters(rest);
-                      } else {
-                        setLocalFilters({
-                          ...localFilters,
-                          createdAt: {
-                            gte: dateRange.from || undefined,
-                            lte: dateRange.to || undefined,
-                          },
-                        });
-                      }
-                    }}
-                    label="Data de Criação"
-                    placeholder="Selecionar período..."
-                    description="Filtra por período de criação do corte"
-                    numberOfMonths={2}
-                  />
+                <div className="space-y-3">
+                  <div className="text-sm font-medium">Data de Criação</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.createdAt?.gte as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.createdAt?.lte) {
+                          const { createdAt, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            createdAt: {
+                              ...(date && { gte: date }),
+                              ...(localFilters.createdAt?.lte && { lte: localFilters.createdAt.lte }),
+                            },
+                          });
+                        }
+                      }}
+                      label="De"
+                      placeholder="Selecionar data inicial..."
+                    />
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.createdAt?.lte as Date | undefined}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.createdAt?.gte) {
+                          const { createdAt, ...rest } = localFilters;
+                          setLocalFilters(rest);
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            createdAt: {
+                              ...(localFilters.createdAt?.gte && { gte: localFilters.createdAt.gte }),
+                              ...(date && { lte: date }),
+                            },
+                          });
+                        }
+                      }}
+                      label="Até"
+                      placeholder="Selecionar data final..."
+                    />
+                  </div>
                 </div>
               </CollapsibleContent>
             </Collapsible>

@@ -161,16 +161,19 @@ export function UserForm(props: UserFormProps) {
   });
 
   // Reset form when defaultValues change in update mode (e.g., new user data loaded)
-  const defaultValuesRef = useRef(defaultValues);
+  const isInitialMountRef = useRef(true);
   useEffect(() => {
-    if (mode === "update" && defaultValues && defaultValues !== defaultValuesRef.current) {
-      // Reset form with new defaults and mark form as untouched/pristine
+    if (mode === "update" && defaultValues) {
+      // Always reset when defaultValues are provided
+      // This ensures form fields are properly populated, including nested fields like ppeSize
       form.reset(defaultValues, {
         keepDefaultValues: false,
         keepDirty: false,
         keepTouched: false,
       });
-      defaultValuesRef.current = defaultValues;
+
+      // Mark that we've completed initial mount
+      isInitialMountRef.current = false;
     }
   }, [defaultValues, form, mode]);
 

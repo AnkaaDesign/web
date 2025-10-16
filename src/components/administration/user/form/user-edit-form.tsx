@@ -1,4 +1,5 @@
 import React from "react";
+import { parseISO, isValid as isValidDate } from "date-fns";
 import type { User } from "../../../../types";
 import { type UserUpdateFormData } from "../../../../schemas";
 import { UserForm } from "./user-form";
@@ -13,11 +14,22 @@ interface UserEditFormProps {
 
 export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFormStateChange }: UserEditFormProps) {
   // Helper function to safely convert date strings to Date objects
+  // Parses ISO strings as local dates to avoid timezone shifts
   const toDate = (value: string | Date | null | undefined): Date | null => {
     if (!value) return null;
     if (value instanceof Date) return value;
-    const parsed = new Date(value);
-    return isNaN(parsed.getTime()) ? null : parsed;
+
+    // Parse ISO date string and interpret the date component in local timezone
+    // For "2025-07-23T00:00:00.000Z", extract "2025-07-23" and parse as local date
+    const dateStr = typeof value === 'string' ? value.split('T')[0] : null;
+    if (!dateStr) return null;
+
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (!year || !month || !day) return null;
+
+    // Create date in local timezone (month is 0-indexed)
+    const localDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+    return isValidDate(localDate) ? localDate : null;
   };
 
   // Map API data to form data
