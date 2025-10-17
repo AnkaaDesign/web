@@ -491,6 +491,14 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         config.headers["X-Request-ID"] = requestId;
       }
 
+      // Handle FormData - remove Content-Type to let browser set it with boundary
+      if (config.data instanceof FormData) {
+        delete config.headers["Content-Type"];
+        if (finalConfig.enableLogging) {
+          console.log(`[AXIOS] FormData detected, Content-Type header removed for ${config.url}`);
+        }
+      }
+
       // Debug logging for batch operations
       if (config.url?.includes("/batch") && config.method?.toLowerCase() === "put") {
         console.log("🔍 BATCH DEBUG: Request interceptor data:");

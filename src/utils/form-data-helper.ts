@@ -210,14 +210,14 @@ export function createOrderFormData(
     receipts?: File[];
     invoices?: File[];
   },
-  customer?: FormDataOptions['customer']
+  supplier?: FormDataOptions['supplier']
 ): FormData {
   return createFormDataWithContext(
     data,
     files,
     {
       entityType: 'order',
-      customer,
+      supplier,
     }
   );
 }

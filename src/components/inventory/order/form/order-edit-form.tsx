@@ -457,6 +457,18 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
 
       if (hasNewFiles) {
         // Use FormData when there are files to upload
+        const supplierInfo = order.supplier ? {
+          id: order.supplier.id,
+          name: order.supplier.fantasyName,
+        } : undefined;
+
+        console.log('[SUBMIT] Creating FormData with:');
+        console.log('[SUBMIT] - Data:', data);
+        console.log('[SUBMIT] - Budget files:', newBudgetFiles.length, newBudgetFiles);
+        console.log('[SUBMIT] - Receipt files:', newReceiptFiles.length, newReceiptFiles);
+        console.log('[SUBMIT] - NFE files:', newNfeFiles.length, newNfeFiles);
+        console.log('[SUBMIT] - Supplier info:', supplierInfo);
+
         const formData = createOrderFormData(
           data,
           {
@@ -464,13 +476,14 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
             receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
             invoices: newNfeFiles.length > 0 ? newNfeFiles as File[] : undefined,
           },
-          order.supplier ? {
-            id: order.supplier.id,
-            name: order.supplier.fantasyName,
-          } : undefined
+          supplierInfo
         );
 
-        console.log('[SUBMIT] Using FormData with files');
+        console.log('[SUBMIT] FormData created, type:', formData.constructor.name);
+        console.log('[SUBMIT] FormData entries:');
+        for (const [key, value] of formData.entries()) {
+          console.log(`  - ${key}:`, value instanceof File ? `File(${value.name})` : value);
+        }
 
         await updateAsync({
           id: order.id,
