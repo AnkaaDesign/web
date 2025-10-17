@@ -320,7 +320,7 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
   }, [baseQueryFilters, currentSort]);
 
   // Fetch paints
-  const { data: paintsData, isLoading } = usePaints(queryFilters);
+  const { data: paintsData, isLoading, refetch } = usePaints(queryFilters);
 
   // Process and sort paints for color display
   const sortedPaints = useMemo(() => {
