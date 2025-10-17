@@ -52,9 +52,12 @@ export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true,
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
-    // Notify parent of order change using the latest ref
-    if (onOrderChange && latestOrderRef.current !== paints) {
-      onOrderChange(latestOrderRef.current);
+    // Notify parent of order change - compare IDs to detect actual order changes
+    if (onOrderChange) {
+      const orderChanged = latestOrderRef.current.some((paint, index) => paint.id !== paints[index]?.id);
+      if (orderChanged) {
+        onOrderChange(latestOrderRef.current);
+      }
     }
   };
   if (isLoading) {
