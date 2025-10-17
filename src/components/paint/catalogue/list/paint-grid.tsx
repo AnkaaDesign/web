@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Paint } from "../../../../types";
 import { formatHexColor } from "./color-utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,10 +22,12 @@ export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true,
   // Local state for drag-and-drop reordering
   const [orderedPaints, setOrderedPaints] = useState<Paint[]>(paints);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const latestOrderRef = useRef<Paint[]>(paints);
 
   // Update ordered paints when paints prop changes
   useEffect(() => {
     setOrderedPaints(paints);
+    latestOrderRef.current = paints;
   }, [paints]);
 
   const handleDragStart = (index: number) => {
@@ -44,14 +46,15 @@ export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true,
     newPaints.splice(targetIndex, 0, draggedPaint);
 
     setOrderedPaints(newPaints);
+    latestOrderRef.current = newPaints;
     setDraggedIndex(targetIndex);
   };
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
-    // Notify parent of order change
-    if (onOrderChange) {
-      onOrderChange(orderedPaints);
+    // Notify parent of order change using the latest ref
+    if (onOrderChange && latestOrderRef.current !== paints) {
+      onOrderChange(latestOrderRef.current);
     }
   };
   if (isLoading) {
