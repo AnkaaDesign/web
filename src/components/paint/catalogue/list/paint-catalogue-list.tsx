@@ -326,14 +326,36 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
   const sortedPaints = useMemo(() => {
     if (!paintsData?.data) return [];
 
-    // If color sort is selected, apply advanced color sorting algorithm
+    // If color sort is selected, check if we should use manual order or algorithm
     if (currentSort === "color") {
-      const sorted = [...paintsData.data].sort((a, b) => {
-        const aValue = getColorSortValue(a);
-        const bValue = getColorSortValue(b);
-        return aValue - bValue;
-      });
-      return sorted;
+      // Check if any paint has a colorOrder value
+      const hasColorOrder = paintsData.data.some(paint => paint.colorOrder !== null);
+
+      if (hasColorOrder) {
+        // Use manual colorOrder if available, falling back to algorithm for paints without it
+        const sorted = [...paintsData.data].sort((a, b) => {
+          // If both have colorOrder, use that
+          if (a.colorOrder !== null && b.colorOrder !== null) {
+            return a.colorOrder - b.colorOrder;
+          }
+          // If only one has colorOrder, it comes first
+          if (a.colorOrder !== null) return -1;
+          if (b.colorOrder !== null) return 1;
+          // If neither has colorOrder, use algorithm
+          const aValue = getColorSortValue(a);
+          const bValue = getColorSortValue(b);
+          return aValue - bValue;
+        });
+        return sorted;
+      } else {
+        // Use algorithm if no colorOrder values exist
+        const sorted = [...paintsData.data].sort((a, b) => {
+          const aValue = getColorSortValue(a);
+          const bValue = getColorSortValue(b);
+          return aValue - bValue;
+        });
+        return sorted;
+      }
     }
 
     // For other sorts, the API already sorted them
