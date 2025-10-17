@@ -1,4 +1,5 @@
 import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 
 interface MaintenanceDateFiltersProps {
@@ -90,20 +91,26 @@ export function MaintenanceDateFilters({
       <div className="space-y-3">
         <div className="text-sm font-medium">Próxima Manutenção</div>
         <div className="grid grid-cols-2 gap-3">
-          <DateTimeInput
-            mode="date"
-            value={nextRunRange?.gte}
-            onChange={handleNextRunFromChange}
-            label="De"
-            placeholder="Selecionar data inicial..."
-          />
-          <DateTimeInput
-            mode="date"
-            value={nextRunRange?.lte}
-            onChange={handleNextRunToChange}
-            label="Até"
-            placeholder="Selecionar data final..."
-          />
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+            <DateTimeInput
+              mode="date"
+              value={nextRunRange?.gte}
+              onChange={handleNextRunFromChange}
+              hideLabel
+              placeholder="Selecionar data inicial..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+            <DateTimeInput
+              mode="date"
+              value={nextRunRange?.lte}
+              onChange={handleNextRunToChange}
+              hideLabel
+              placeholder="Selecionar data final..."
+            />
+          </div>
         </div>
       </div>
 
@@ -113,20 +120,26 @@ export function MaintenanceDateFilters({
       <div className="space-y-3">
         <div className="text-sm font-medium">Data de Criação</div>
         <div className="grid grid-cols-2 gap-3">
-          <DateTimeInput
-            mode="date"
-            value={createdAtRange?.gte}
-            onChange={handleCreatedAtFromChange}
-            label="De"
-            placeholder="Selecionar data inicial..."
-          />
-          <DateTimeInput
-            mode="date"
-            value={createdAtRange?.lte}
-            onChange={handleCreatedAtToChange}
-            label="Até"
-            placeholder="Selecionar data final..."
-          />
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+            <DateTimeInput
+              mode="date"
+              value={createdAtRange?.gte}
+              onChange={handleCreatedAtFromChange}
+              hideLabel
+              placeholder="Selecionar data inicial..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+            <DateTimeInput
+              mode="date"
+              value={createdAtRange?.lte}
+              onChange={handleCreatedAtToChange}
+              hideLabel
+              placeholder="Selecionar data final..."
+            />
+          </div>
         </div>
       </div>
 
@@ -136,20 +149,26 @@ export function MaintenanceDateFilters({
       <div className="space-y-3">
         <div className="text-sm font-medium">Data de Atualização</div>
         <div className="grid grid-cols-2 gap-3">
-          <DateTimeInput
-            mode="date"
-            value={updatedAtRange?.gte}
-            onChange={handleUpdatedAtFromChange}
-            label="De"
-            placeholder="Selecionar data inicial..."
-          />
-          <DateTimeInput
-            mode="date"
-            value={updatedAtRange?.lte}
-            onChange={handleUpdatedAtToChange}
-            label="Até"
-            placeholder="Selecionar data final..."
-          />
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+            <DateTimeInput
+              mode="date"
+              value={updatedAtRange?.gte}
+              onChange={handleUpdatedAtFromChange}
+              hideLabel
+              placeholder="Selecionar data inicial..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+            <DateTimeInput
+              mode="date"
+              value={updatedAtRange?.lte}
+              onChange={handleUpdatedAtToChange}
+              hideLabel
+              placeholder="Selecionar data final..."
+            />
+          </div>
         </div>
       </div>
     </div>

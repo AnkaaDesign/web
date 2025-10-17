@@ -218,10 +218,13 @@ export function BonusSimulationFilters({
                 mode="multiple"
                 placeholder="Selecione os setores..."
                 emptyText="Nenhum setor encontrado"
+                searchPlaceholder="Buscar setores..."
                 options={sectorOptions}
                 value={localFilters.sectorIds || []}
                 onValueChange={handleSectorsChange}
                 className="w-full"
+                searchable={true}
+                clearable={true}
               />
               <p className="text-xs text-muted-foreground mt-1">
                 {localFilters.sectorIds?.length || 0} setor(es) selecionado(s)
@@ -240,10 +243,13 @@ export function BonusSimulationFilters({
                 mode="multiple"
                 placeholder="Selecione usuários para excluir..."
                 emptyText="Nenhum usuário encontrado"
+                searchPlaceholder="Buscar usuários..."
                 options={userOptions}
                 value={localFilters.excludeUserIds || []}
                 onValueChange={handleExcludeUsersChange}
                 className="w-full"
+                searchable={true}
+                clearable={true}
               />
               <p className="text-xs text-muted-foreground mt-1">
                 {localFilters.excludeUserIds?.length || 0} usuário(s) excluído(s)

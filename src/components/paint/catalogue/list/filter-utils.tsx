@@ -126,6 +126,17 @@ export function extractActiveFilters(filters: Partial<PaintGetManyFormData>, onR
     });
   }
 
+  // Color similarity filter
+  if (filters.similarColor && filters.similarColor.trim() !== "" && filters.similarColor !== "#000000") {
+    activeFilters.push({
+      key: "similarColor",
+      label: "Cor similar",
+      value: filters.similarColor,
+      icon: <IconPalette className="h-3 w-3" />,
+      onRemove: () => onRemoveFilter("similarColor"),
+    });
+  }
+
   // Date filters
   if (filters.createdAt?.gte || filters.createdAt?.lte) {
     let dateLabel = "Criado";
@@ -226,6 +237,11 @@ export function createFilterRemover(filters: Partial<PaintGetManyFormData>, hand
 
       case "hasFormulas":
         delete newFilters.hasFormulas;
+        break;
+
+      case "similarColor":
+        delete newFilters.similarColor;
+        delete newFilters.similarColorThreshold;
         break;
 
       case "createdAt":

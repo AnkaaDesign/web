@@ -4,7 +4,7 @@ import { useFiles, useFileMutations, useFileBatchMutations } from "../../hooks";
 import type { File } from "../../types";
 import type { FileGetManyFormData } from "../../schemas";
 import { routes } from "../../constants";
-import { formatFileSize, getFileCategory, getFileDisplayName } from "../../utils";
+import { formatFileSize, getFileCategory, getFileDisplayName } from "../../utils/file";
 import { FileTypeIcon } from "@/components/ui/file-type-icon";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -217,10 +217,10 @@ export function FileList({ className }: FileListProps) {
         customerLogo: true,
         supplierLogo: true,
         orderBudgets: true,
-        orderNfes: true,
+        orderInvoices: true,
         orderReceipts: true,
         taskBudgets: true,
-        taskNfes: true,
+        taskInvoices: true,
         taskReceipts: true,
         warning: true,
         observations: true,

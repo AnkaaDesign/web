@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconBuilding, IconCertificate, IconUser } from "@tabler/icons-react";
+import { IconBuilding, IconCertificate, IconUser, IconFileDescription } from "@tabler/icons-react";
 import type { Customer } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { maskCNPJ, maskCPF } from "../../../../utils";
-import { getFileUrl } from "@/utils/file";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 
 interface BasicInfoCardProps {
   customer: Customer;
@@ -24,17 +24,15 @@ export function BasicInfoCard({ customer, className }: BasicInfoCardProps) {
       <CardContent className="pt-0 flex-1">
         <div className="space-y-6">
           {/* Logo Section */}
-          {customer.logo && customer.logo.id && (
-            <div className="flex justify-center mb-6">
-              <div className="w-32 h-32 rounded-lg border-2 border-muted overflow-hidden bg-muted/30 flex items-center justify-center">
-                <img
-                  src={getFileUrl(customer.logo)}
-                  alt={`Logo de ${customer.fantasyName}`}
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            </div>
-          )}
+          <div className="flex justify-center mb-6">
+            <CustomerLogoDisplay
+              logo={customer.logo}
+              customerName={customer.fantasyName}
+              size="2xl"
+              shape="rounded"
+              bordered={true}
+            />
+          </div>
 
           {/* Basic Information Section */}
           <div>
@@ -69,6 +67,16 @@ export function BasicInfoCard({ customer, className }: BasicInfoCardProps) {
                     CPF
                   </span>
                   <span className="text-sm font-semibold text-foreground">{maskCPF(customer.cpf)}</span>
+                </div>
+              )}
+
+              {customer.situacaoCadastral && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconFileDescription className="h-4 w-4" />
+                    Situação Cadastral
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{customer.situacaoCadastral}</span>
                 </div>
               )}
             </div>

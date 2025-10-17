@@ -288,6 +288,10 @@ export function PerformanceLevelFilters({
               value={localState.positionIds}
               onValueChange={handlePositionChange}
               placeholder="Selecione os cargos"
+              emptyText="Nenhum cargo encontrado"
+              searchPlaceholder="Buscar cargos..."
+              searchable={true}
+              clearable={true}
             />
           </div>
 
@@ -305,6 +309,10 @@ export function PerformanceLevelFilters({
               value={localState.sectorIds}
               onValueChange={handleSectorChange}
               placeholder="Selecione os setores"
+              emptyText="Nenhum setor encontrado"
+              searchPlaceholder="Buscar setores..."
+              searchable={true}
+              clearable={true}
             />
           </div>
 

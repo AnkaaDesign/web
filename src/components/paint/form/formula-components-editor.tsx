@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useMemo } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
-import { IconTrash } from "@tabler/icons-react";
+import { IconTrash, IconPlus } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -159,80 +159,103 @@ export function FormulaComponentsEditor({ className, availableItems = [] }: Form
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className="grid grid-cols-[1fr_200px_40px] gap-2 text-sm font-medium text-muted-foreground mb-2">
+      <div className="grid grid-cols-[1fr_200px_80px] gap-2 text-sm font-medium text-muted-foreground mb-2">
         <div>Componente</div>
         <div>Quantidade (g)</div>
         <div></div>
       </div>
 
-      {fields.map((field, index) => (
-        <div key={field.id} ref={index === fields.length - 1 ? lastRowRef : null} className="grid grid-cols-[1fr_200px_40px] gap-2 items-center">
-          <Combobox
-            options={getComboboxOptionsForRow(index)}
-            value={watch(`components.${index}.itemId`)}
-            onValueChange={(value) => handleItemSelect(index, value || "")}
-            placeholder="Selecione um componente"
-            emptyText="Nenhum item disponível"
-            searchable={true}
-            className="w-full bg-transparent"
-          />
+      {fields.map((field, index) => {
+        const isLastRow = index === fields.length - 1;
+        const isRowFilled = watch(`components.${index}.itemId`) && watch(`components.${index}.weightInGrams`) > 0;
 
-          <Input
-            ref={(el) => {
-              if (el) inputRefs.current[index] = el;
-            }}
-            type="text"
-            placeholder="0"
-            value={watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`) || ""}
-            onChange={(e) => {
-              const previousValue = watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`)?.toString() || "";
-              handleAmountChange(index, e.target.value, previousValue);
-            }}
-            onKeyDown={(e) => handleKeyDown(e, index, "input")}
-            onBlur={(e) => {
-              // Finalize the value on blur
-              const value = e.target.value.trim();
-              if (value) {
-                const parts = value.split(/\s+/).filter(Boolean);
-                const numbers = parts.map(p => parseFloat(p)).filter(n => !isNaN(n));
+        return (
+          <div key={field.id} ref={isLastRow ? lastRowRef : null} className="grid grid-cols-[1fr_200px_80px] gap-2 items-center">
+            <Combobox
+              options={getComboboxOptionsForRow(index)}
+              value={watch(`components.${index}.itemId`)}
+              onValueChange={(value) => handleItemSelect(index, value || "")}
+              placeholder="Selecione um componente"
+              emptyText="Nenhum item disponível"
+              searchable={true}
+              className="w-full bg-transparent"
+            />
 
-                if (numbers.length >= 2) {
-                  // Multiple numbers - calculate sum
-                  const sum = numbers.reduce((acc, num) => acc + num, 0);
-                  const rounded = Math.round(sum * 100) / 100;
-                  setValue(`components.${index}.weightInGrams`, rounded);
-                  setValue(`components.${index}.rawInput`, rounded.toString());
-                } else if (numbers.length === 1) {
-                  // Single number
-                  const rounded = Math.round(numbers[0] * 100) / 100;
-                  setValue(`components.${index}.weightInGrams`, rounded);
-                  setValue(`components.${index}.rawInput`, rounded.toString());
+            <Input
+              ref={(el) => {
+                if (el) inputRefs.current[index] = el;
+              }}
+              type="text"
+              placeholder="0"
+              value={watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`) || ""}
+              onChange={(e) => {
+                const previousValue = watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`)?.toString() || "";
+                handleAmountChange(index, e.target.value, previousValue);
+              }}
+              onKeyDown={(e) => handleKeyDown(e, index, "input")}
+              onBlur={(e) => {
+                // Finalize the value on blur
+                const value = e.target.value.trim();
+                if (value) {
+                  const parts = value.split(/\s+/).filter(Boolean);
+                  const numbers = parts.map(p => parseFloat(p)).filter(n => !isNaN(n));
+
+                  if (numbers.length >= 2) {
+                    // Multiple numbers - calculate sum
+                    const sum = numbers.reduce((acc, num) => acc + num, 0);
+                    const rounded = Math.round(sum * 100) / 100;
+                    setValue(`components.${index}.weightInGrams`, rounded);
+                    setValue(`components.${index}.rawInput`, rounded.toString());
+                  } else if (numbers.length === 1) {
+                    // Single number
+                    const rounded = Math.round(numbers[0] * 100) / 100;
+                    setValue(`components.${index}.weightInGrams`, rounded);
+                    setValue(`components.${index}.rawInput`, rounded.toString());
+                  }
                 }
-              }
-            }}
-            className="text-right bg-transparent"
-          />
+              }}
+              className="text-right bg-transparent"
+            />
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              if (fields.length > 1) {
-                remove(index);
-              } else {
-                // Clear the inputs for the only row instead of removing it
-                setValue(`components.${index}.itemId`, "");
-                setValue(`components.${index}.weightInGrams`, 0);
-                setValue(`components.${index}.rawInput`, "");
-              }
-            }}
-            className="text-red-600 hover:text-red-700 h-10"
-          >
-            <IconTrash className="h-4 w-4" />
-          </Button>
-        </div>
-      ))}
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (fields.length > 1) {
+                    remove(index);
+                  } else {
+                    // Clear the inputs for the only row instead of removing it
+                    setValue(`components.${index}.itemId`, "");
+                    setValue(`components.${index}.weightInGrams`, 0);
+                    setValue(`components.${index}.rawInput`, "");
+                  }
+                }}
+                className="text-red-600 hover:text-red-700 h-10 w-10 p-0"
+              >
+                <IconTrash className="h-5 w-5" />
+              </Button>
+
+              {isLastRow && isRowFilled && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    append({ itemId: "", weightInGrams: 0, rawInput: "" });
+                    setTimeout(() => {
+                      const comboboxButton = lastRowRef.current?.querySelector('[role="combobox"]') as HTMLButtonElement;
+                      comboboxButton?.focus();
+                    }, 100);
+                  }}
+                  className="h-10 w-10 p-0"
+                >
+                  <IconPlus className="h-5 w-5" />
+                </Button>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

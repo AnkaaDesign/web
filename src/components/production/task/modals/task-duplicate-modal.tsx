@@ -86,7 +86,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
         budgetId: task.budgetId,
         nfeId: task.nfeId,
         receiptId: task.receiptId,
-        price: task.price,
 
         // Relations - copy artwork and paint IDs
         artworkIds: task.artworks?.map((file) => file.id),

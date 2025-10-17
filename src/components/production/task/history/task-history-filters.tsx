@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { IconFilter, IconX } from "@tabler/icons-react";
+import { IconFilter, IconX, IconChecklist } from "@tabler/icons-react";
 import {
   Sheet,
   SheetContent,
@@ -12,10 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
-import { Switch } from "@/components/ui/switch";
 import { useSectors, useCustomers, useUsers } from "../../../../hooks";
 import type { TaskGetManyFormData } from "../../../../schemas";
-import { TASK_STATUS } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
 import { formatCurrency } from "../../../../utils";
 
 interface TaskHistoryFiltersProps {
@@ -50,21 +49,12 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
   const [priceMin, setPriceMin] = useState(filters.priceRange?.from?.toString() || "");
   const [priceMax, setPriceMax] = useState(filters.priceRange?.to?.toString() || "");
 
-  // Status filter state - check if current filters include pending/in-production tasks
-  const [includeInProgressTasks, setIncludeInProgressTasks] = useState(() => {
-    const currentStatuses = filters.status || [];
-    return currentStatuses.includes(TASK_STATUS.PENDING) || currentStatuses.includes(TASK_STATUS.IN_PRODUCTION);
-  });
-
   // Reset local state when dialog opens
   useEffect(() => {
     if (open) {
       setLocalFilters({ ...filters });
       setPriceMin(filters.priceRange?.from?.toString() || "");
       setPriceMax(filters.priceRange?.to?.toString() || "");
-
-      const currentStatuses = filters.status || [];
-      setIncludeInProgressTasks(currentStatuses.includes(TASK_STATUS.PENDING) || currentStatuses.includes(TASK_STATUS.IN_PRODUCTION));
     }
   }, [open, filters]);
 
@@ -82,13 +72,6 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
       delete updatedFilters.priceRange;
     }
 
-    // Handle status filter
-    if (includeInProgressTasks) {
-      updatedFilters.status = [TASK_STATUS.COMPLETED, TASK_STATUS.PENDING, TASK_STATUS.IN_PRODUCTION, TASK_STATUS.ON_HOLD];
-    } else {
-      updatedFilters.status = [TASK_STATUS.COMPLETED];
-    }
-
     onFilterChange(updatedFilters);
     onOpenChange(false);
   };
@@ -98,8 +81,13 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
     setLocalFilters({});
     setPriceMin("");
     setPriceMax("");
-    setIncludeInProgressTasks(false);
   };
+
+  // Status options
+  const statusOptions = Object.entries(TASK_STATUS_LABELS).map(([value, label]) => ({
+    value,
+    label,
+  }));
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -115,64 +103,73 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          {/* Status Filter Switch */}
+          {/* Status Filter */}
           <div className="space-y-2">
-            <Label>Status das Tarefas</Label>
-            <div className="flex items-center space-x-2">
-              <Switch id="include-in-progress" checked={includeInProgressTasks} onCheckedChange={setIncludeInProgressTasks} />
-              <Label htmlFor="include-in-progress" className="text-sm">
-                Incluir tarefas pendentes e em produção
-              </Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {includeInProgressTasks ? "Mostrando tarefas finalizadas, pendentes, em produção e em espera" : "Mostrando apenas tarefas finalizadas"}
-            </p>
+            <Label className="flex items-center gap-2">
+              <IconChecklist className="h-4 w-4" />
+              Status das Tarefas
+            </Label>
+            <Combobox
+              mode="multiple"
+              options={statusOptions}
+              value={localFilters.status || []}
+              onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, status: value.length > 0 ? value : undefined })}
+              placeholder="Selecione os status"
+              searchable={true}
+              minSearchLength={0}
+            />
           </div>
 
           {/* Date Range Filter - Finished Date */}
           <div className="space-y-3">
             <div className="text-sm font-medium">Data de Finalização</div>
             <div className="grid grid-cols-2 gap-3">
-              <DateTimeInput
-                mode="date"
-                value={localFilters.finishedDateRange?.from as Date | undefined}
-                onChange={(date: Date | null) => {
-                  if (!date && !localFilters.finishedDateRange?.to) {
-                    const { finishedDateRange, ...rest } = localFilters;
-                    setLocalFilters(rest);
-                  } else {
-                    setLocalFilters({
-                      ...localFilters,
-                      finishedDateRange: {
-                        ...(date && { from: date }),
-                        ...(localFilters.finishedDateRange?.to && { to: localFilters.finishedDateRange.to }),
-                      },
-                    });
-                  }
-                }}
-                label="De"
-                placeholder="Selecionar data inicial..."
-              />
-              <DateTimeInput
-                mode="date"
-                value={localFilters.finishedDateRange?.to as Date | undefined}
-                onChange={(date: Date | null) => {
-                  if (!date && !localFilters.finishedDateRange?.from) {
-                    const { finishedDateRange, ...rest } = localFilters;
-                    setLocalFilters(rest);
-                  } else {
-                    setLocalFilters({
-                      ...localFilters,
-                      finishedDateRange: {
-                        ...(localFilters.finishedDateRange?.from && { from: localFilters.finishedDateRange.from }),
-                        ...(date && { to: date }),
-                      },
-                    });
-                  }
-                }}
-                label="Até"
-                placeholder="Selecionar data final..."
-              />
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localFilters.finishedDateRange?.from as Date | undefined}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localFilters.finishedDateRange?.to) {
+                      const { finishedDateRange, ...rest } = localFilters;
+                      setLocalFilters(rest);
+                    } else {
+                      setLocalFilters({
+                        ...localFilters,
+                        finishedDateRange: {
+                          ...(date && { from: date }),
+                          ...(localFilters.finishedDateRange?.to && { to: localFilters.finishedDateRange.to }),
+                        },
+                      });
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data inicial..."
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localFilters.finishedDateRange?.to as Date | undefined}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localFilters.finishedDateRange?.from) {
+                      const { finishedDateRange, ...rest } = localFilters;
+                      setLocalFilters(rest);
+                    } else {
+                      setLocalFilters({
+                        ...localFilters,
+                        finishedDateRange: {
+                          ...(localFilters.finishedDateRange?.from && { from: localFilters.finishedDateRange.from }),
+                          ...(date && { to: date }),
+                        },
+                      });
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data final..."
+                />
+              </div>
             </div>
           </div>
 

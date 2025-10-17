@@ -1,6 +1,7 @@
+import { useCallback, useMemo, useRef } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { useGarageLanes } from "../../../../hooks";
+import { Combobox } from "@/components/ui/combobox";
+import { getGarageLanes } from "../../../../api-client";
 import type { ParkingSpotCreateFormData, ParkingSpotUpdateFormData } from "../../../../schemas";
 import { IconRoad } from "@tabler/icons-react";
 
@@ -8,32 +9,84 @@ interface GarageLaneSelectorProps {
   control: any;
   disabled?: boolean;
   garageId?: string; // Filter lanes by garage
+  initialLane?: any; // Initial lane data for editing
 }
 
-export function GarageLaneSelector({ control, disabled, garageId }: GarageLaneSelectorProps) {
-  // Fetch garage lanes for selection
-  const { data: lanesResponse, isLoading } = useGarageLanes({
-    where: garageId ? { garageId } : undefined,
-    include: {
-      garage: true,
-    },
-    orderBy: { createdAt: "asc" },
-    take: 100,
-  });
+export function GarageLaneSelector({ control, disabled, garageId, initialLane }: GarageLaneSelectorProps) {
+  // Create a stable cache for fetched lanes
+  const cacheRef = useRef<Map<string, { label: string; value: string; description?: string }>>(new Map());
 
-  const lanes = lanesResponse?.data || [];
+  // Memoize initial options
+  const initialOptions = useMemo(() => {
+    if (!initialLane) return [];
 
-  // Create combobox options with lane info
-  const laneOptions: ComboboxOption[] = lanes.map((lane) => {
-    const laneName = lane.name || `Faixa ${lane.id.slice(0, 8)}`;
-    const garageName = lane.garage?.name || "Garagem";
+    const laneName = initialLane.name || `Faixa ${initialLane.id.slice(0, 8)}`;
+    const garageName = initialLane.garage?.name || "Garagem";
+    const label = `${laneName} - ${garageName}`;
+    const description = `${initialLane.width}m × ${initialLane.length}m | Posição: (${initialLane.xPosition}, ${initialLane.yPosition})`;
 
-    return {
-      value: lane.id,
-      label: `${laneName} - ${garageName}`,
-      description: `${lane.width}m × ${lane.length}m | Posição: (${lane.xPosition}, ${lane.yPosition})`,
+    const option = {
+      label,
+      value: initialLane.id,
+      description,
     };
-  });
+
+    cacheRef.current.set(initialLane.id, option);
+    return [option];
+  }, [initialLane]);
+
+  // Async query function for lanes
+  const queryLanes = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { createdAt: "asc" },
+        page: page,
+        take: 50,
+        include: {
+          garage: true,
+        },
+      };
+
+      if (garageId) {
+        queryParams.where = { garageId };
+      }
+
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      const response = await getGarageLanes(queryParams);
+      const lanes = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = lanes.map((lane) => {
+        const laneName = lane.name || `Faixa ${lane.id.slice(0, 8)}`;
+        const garageName = lane.garage?.name || "Garagem";
+        const label = `${laneName} - ${garageName}`;
+        const description = `${lane.width}m × ${lane.length}m | Posição: (${lane.xPosition}, ${lane.yPosition})`;
+
+        const option = {
+          label,
+          value: lane.id,
+          description,
+        };
+
+        cacheRef.current.set(lane.id, option);
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching garage lanes:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, [garageId]);
 
   return (
     <FormField
@@ -48,13 +101,21 @@ export function GarageLaneSelector({ control, disabled, garageId }: GarageLaneSe
           </FormLabel>
           <FormControl>
             <Combobox
-              options={laneOptions}
+              async={true}
+              queryKey={["garage-lanes-selector", garageId]}
+              queryFn={queryLanes}
+              initialOptions={initialOptions}
               value={field.value || ""}
               onValueChange={field.onChange}
               placeholder="Selecione a faixa..."
               emptyText="Nenhuma faixa encontrada"
-              disabled={disabled || isLoading}
+              searchPlaceholder="Buscar faixa..."
+              disabled={disabled}
               searchable={true}
+              clearable={true}
+              pageSize={50}
+              minSearchLength={0}
+              debounceMs={300}
               className="w-full"
             />
           </FormControl>

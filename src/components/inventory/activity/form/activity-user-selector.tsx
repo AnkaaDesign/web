@@ -1,17 +1,19 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import type { User } from "../../../../types";
 import { USER_STATUS } from "../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
+import { getUsers } from "../../../../api-client";
 
 interface ActivityUserSelectorProps {
   value?: string;
   onChange: (value: string | undefined) => void;
-  users: User[];
+  users?: User[];
   placeholder?: string;
   size?: "default" | "sm";
   className?: string;
   disabled?: boolean;
+  initialUser?: User;
 }
 
 export const ActivityUserSelector = ({
@@ -22,54 +24,80 @@ export const ActivityUserSelector = ({
   size = "default",
   className,
   disabled = false,
+  initialUser,
 }: ActivityUserSelectorProps) => {
-  // Filter and sort users: contracted/experience period first, then by name
-  const sortedUsers = useMemo(() => {
-    return [...users].sort((a, b) => {
-      // Active users (contracted or experience period) first
-      const aIsActive = a.status === USER_STATUS.CONTRACTED ||
-                        a.status === USER_STATUS.EXPERIENCE_PERIOD_1 ||
-                        a.status === USER_STATUS.EXPERIENCE_PERIOD_2;
-      const bIsActive = b.status === USER_STATUS.CONTRACTED ||
-                        b.status === USER_STATUS.EXPERIENCE_PERIOD_1 ||
-                        b.status === USER_STATUS.EXPERIENCE_PERIOD_2;
+  // Memoize initialOptions with stable dependency
+  const initialOptions = useMemo(() => {
+    if (!initialUser) return [];
 
-      if (aIsActive && !bIsActive) {
-        return -1;
-      }
-      if (!aIsActive && bIsActive) {
-        return 1;
-      }
-      // Then sort by name
-      return a.name.localeCompare(b.name, "pt-BR");
+    const parts = [initialUser.name];
+    if (initialUser.sector?.name) {
+      parts.push(initialUser.sector.name);
+    }
+    if (initialUser.status === USER_STATUS.DISMISSED) {
+      parts.push("(Desligado)");
+    }
+
+    return [{
+      value: initialUser.id,
+      label: parts.join(" - "),
+    }];
+  }, [initialUser?.id]);
+
+  // Async query function for Combobox with pagination
+  const queryFn = useCallback(async (searchTerm: string, page: number = 1) => {
+    const pageSize = 50;
+    const response = await getUsers({
+      take: pageSize,
+      skip: (page - 1) * pageSize,
+      where: searchTerm ? {
+        OR: [
+          { name: { contains: searchTerm, mode: "insensitive" } },
+          { email: { contains: searchTerm, mode: "insensitive" } },
+        ],
+      } : {},
+      orderBy: [
+        { status: "asc" }, // Active users first
+        { name: "asc" },
+      ],
+      include: {
+        sector: true,
+      },
     });
-  }, [users]);
 
-  // Convert users to ComboboxOption format with enhanced labels
-  const options: ComboboxOption[] = useMemo(() => {
-    return sortedUsers.map((user) => {
-      const parts = [user.name];
+    const usersData = response.data || [];
+    const total = response.total || 0;
+    const hasMore = (page * pageSize) < total;
 
-      // Add sector if available
-      if (user.sector?.name) {
-        parts.push(user.sector.name);
-      }
+    return {
+      data: usersData.map((user) => {
+        const parts = [user.name];
+        if (user.sector?.name) {
+          parts.push(user.sector.name);
+        }
+        if (user.status === USER_STATUS.DISMISSED) {
+          parts.push("(Desligado)");
+        }
 
-      // Add status indicator for dismissed users
-      if (user.status === USER_STATUS.DISMISSED) {
-        parts.push("(Desligado)");
-      }
-
-      return {
-        value: user.id,
-        label: parts.join(" - "),
-      };
-    });
-  }, [sortedUsers]);
+        return {
+          value: user.id,
+          label: parts.join(" - "),
+        };
+      }),
+      hasMore,
+      total,
+    };
+  }, []);
 
   return (
     <Combobox
-      options={options}
+      async
+      queryKey={["users", "activity-selector"]}
+      queryFn={queryFn}
+      initialOptions={initialOptions}
+      minSearchLength={0}
+      pageSize={50}
+      debounceMs={300}
       value={value}
       onValueChange={onChange}
       placeholder={placeholder}

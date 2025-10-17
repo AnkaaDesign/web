@@ -38,16 +38,7 @@ export class TaskService {
   // =====================
 
   async getTasks(params: TaskGetManyFormData = {}): Promise<TaskGetManyResponse> {
-    console.log("[TaskService] getTasks called with params:", {
-      page: params.page,
-      limit: params.limit,
-      status: params.status,
-      hasInclude: !!params.include,
-      hasOrderBy: !!params.orderBy,
-      allParamKeys: Object.keys(params)
-    });
     const response = await apiClient.get<TaskGetManyResponse>(this.basePath, { params });
-    console.log("[TaskService] getTasks response meta:", response.data?.meta);
     return response.data;
   }
 

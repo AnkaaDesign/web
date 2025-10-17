@@ -157,6 +157,19 @@ export const createTaskColumns = (): TaskColumn[] => [
     },
   },
   {
+    id: "chassisNumber",
+    header: "Nº CHASSI",
+    accessorKey: "chassisNumber",
+    sortable: true,
+    filterable: true,
+    defaultVisible: false,
+    width: "200px",
+    formatter: (value: string | null) => {
+      if (!value) return <span className="text-muted-foreground">-</span>;
+      return <span className="font-mono">{value}</span>;
+    },
+  },
+  {
     id: "price",
     header: "VALOR",
     accessorKey: "price",

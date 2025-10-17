@@ -11,9 +11,18 @@ interface AdvancedColorPickerProps {
   onChange: (color: string) => void;
   disabled?: boolean;
   className?: string;
+  popoverSide?: "top" | "right" | "bottom" | "left";
+  popoverAlign?: "start" | "center" | "end";
 }
 
-export function AdvancedColorPicker({ color, onChange, disabled, className }: AdvancedColorPickerProps) {
+export function AdvancedColorPicker({
+  color,
+  onChange,
+  disabled,
+  className,
+  popoverSide = "bottom",
+  popoverAlign = "start"
+}: AdvancedColorPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [tempColor, setTempColor] = useState(color);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -101,7 +110,15 @@ export function AdvancedColorPicker({ color, onChange, disabled, className }: Ad
           <IconPalette className="h-4 w-4 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="p-0 border-0" align="start" side="bottom" sideOffset={8}>
+      <PopoverContent
+        className="p-0 border-0 w-auto"
+        align={popoverAlign}
+        side="top"
+        sideOffset={8}
+        alignOffset={-20}
+        avoidCollisions={true}
+        collisionPadding={{ top: 8, right: 8, bottom: 8, left: 8 }}
+      >
         <div className="photoshop-picker-wrapper" ref={pickerRef}>
           <PhotoshopPicker
             color={tempColor}

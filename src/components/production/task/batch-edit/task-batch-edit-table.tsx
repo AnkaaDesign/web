@@ -16,7 +16,6 @@ import { SectorCell } from "./cells/sector-cell";
 import { CustomerCell } from "./cells/customer-cell";
 import { GeneralPaintingCell } from "./cells/general-painting-cell";
 import { DateTimeCell } from "./cells/date-time-cell";
-import { PriceCell } from "./cells/price-cell";
 import { PriorityCell } from "./cells/priority-cell";
 import { DateCell } from "./cells/date-cell";
 import { cn } from "@/lib/utils";
@@ -56,7 +55,6 @@ const taskBatchEditSchema = z.object({
           customerId: z.string().uuid().nullable().optional(),
           sectorId: z.string().uuid().nullable().optional(),
           generalPaintingId: z.string().uuid().nullable().optional(),
-          price: moneySchema.nullable().optional(),
           priority: z
             .enum(Object.values(PRIORITY_TYPE) as [string, ...string[]])
             .nullable()
@@ -117,7 +115,6 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                 customerId: task.customerId || null,
                 sectorId: task.sectorId || null,
                 generalPaintingId: task.generalPainting?.id || null,
-                price: task.price ?? 0,
                 priority: task.priority || null,
                 truckHeight: task.truck?.height || null,
                 truckLength: task.truck?.length || null,
@@ -152,7 +149,6 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
           customerId: task.customerId || null,
           sectorId: task.sectorId || null,
           generalPaintingId: task.generalPainting?.id || null,
-          price: task.price ?? 0,
           priority: task.priority || null,
           truckHeight: task.truck?.height || null,
           truckLength: task.truck?.length || null,
@@ -178,7 +174,6 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
           task.data.customerId !== originalTask.customerId ||
           task.data.sectorId !== originalTask.sectorId ||
           task.data.generalPaintingId !== originalTask.generalPainting?.id ||
-          task.data.price !== originalTask.price ||
           task.data.priority !== originalTask.priority ||
           task.data.entryDate?.toISOString() !== originalTask.entryDate ||
           task.data.term?.toISOString() !== originalTask.term ||
@@ -273,9 +268,6 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-40">
                     <div className="px-3 py-2">Placa</div>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-40">
-                    <div className="px-3 py-2">Valor</div>
-                  </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-60">
                     <div className="px-3 py-2">Pintura Geral</div>
                   </TableHead>
@@ -346,11 +338,6 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                             <FormInput control={form.control} name={`tasks.${index}.data.plate`} placeholder="Placa" className="uppercase" />
                           </div>
                         </TableCell>
-                        <TableCell className="w-40 p-0 !border-r-0">
-                          <div className="px-3 py-2">
-                            <PriceCell control={form.control} index={index} />
-                          </div>
-                        </TableCell>
                         <TableCell className="w-60 p-0 !border-r-0">
                           <div className="px-3 py-2">
                             <GeneralPaintingCell control={form.control} index={index} />
@@ -381,7 +368,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
                       Carregando tarefas...
                     </TableCell>
                   </TableRow>

@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import type { FieldValues } from "react-hook-form";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { IconBriefcase } from "@tabler/icons-react";
-import { usePositionsInfinite } from "../../../../hooks";
-import type { Position, PositionGetManyResponse } from "../../../../types";
+import { getPositions } from "../../../../api-client";
+import type { Position } from "../../../../types";
 
 interface PositionSelectorProps<T extends FieldValues = FieldValues> {
   control?: any;
@@ -17,6 +17,7 @@ interface PositionSelectorProps<T extends FieldValues = FieldValues> {
   className?: string;
   excludeIds?: string[];
   onQuickCreate?: (name: string) => Promise<Position | null>;
+  initialPosition?: Position;
 }
 
 export function PositionSelector<T extends FieldValues = FieldValues>({
@@ -30,55 +31,65 @@ export function PositionSelector<T extends FieldValues = FieldValues>({
   className,
   excludeIds = [],
   onQuickCreate,
+  initialPosition,
 }: PositionSelectorProps<T>) {
-  const [isCreating, setIsCreating] = useState(false);
+  // Memoize initial options
+  const initialOptions = useMemo(() => {
+    if (!initialPosition) return [];
+    return [{
+      value: initialPosition.id,
+      label: initialPosition.name,
+    }];
+  }, [initialPosition]);
 
-  const { data: positionsPages, isLoading } = usePositionsInfinite({
-    limit: 50,
-    orderBy: { name: "asc" },
-  });
-
-  // Flatten all pages into a single array
-  const allPositions = useMemo(() => {
-    if (!positionsPages?.pages) return [];
-
-    const positions: Position[] = [];
-    positionsPages.pages.forEach((page: PositionGetManyResponse) => {
-      if (page?.data) {
-        positions.push(...page.data);
-      }
-    });
-
-    // Filter out excluded IDs
-    return positions.filter((position) => !excludeIds.includes(position.id));
-  }, [positionsPages?.pages, excludeIds]);
-
-  const positionOptions = allPositions.map((position) => ({
-    value: position.id,
-    label: position.name,
-  }));
-
-  const handleCreatePosition = async (name: string): Promise<string | null> => {
-    if (!onQuickCreate) return null;
-
-    setIsCreating(true);
+  // Async query function for the combobox
+  const queryPositions = useCallback(async (searchTerm: string, page = 1) => {
     try {
-      const newPosition = await onQuickCreate(name);
-      return newPosition?.id || null;
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+      };
+
+      // Only add searchingFor if there's a search term
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      const response = await getPositions(queryParams);
+      const positions = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      // Filter out excluded IDs
+      const filteredPositions = positions.filter((position) => !excludeIds.includes(position.id));
+
+      // Convert positions to options format
+      const options = filteredPositions.map((position) => ({
+        value: position.id,
+        label: position.name,
+      }));
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
     } catch (error) {
-      console.error("Error creating position:", error);
-      return null;
-    } finally {
-      setIsCreating(false);
+      console.error("Error fetching positions:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, [excludeIds]);
+
+  const handleCreate = async (value: string): Promise<void> => {
+    if (onQuickCreate) {
+      await onQuickCreate(value);
     }
   };
 
-  const handleCreate = async (value: string): Promise<void> => {
-    await handleCreatePosition(value);
-  };
-
   if (!control) {
-    return null; // or some fallback UI
+    return null;
   }
 
   return (
@@ -94,17 +105,23 @@ export function PositionSelector<T extends FieldValues = FieldValues>({
           </FormLabel>
           <FormControl>
             <Combobox
+              async={true}
+              queryKey={["positions"]}
+              queryFn={queryPositions}
+              initialOptions={initialOptions}
               value={field.value ?? ""}
               onValueChange={field.onChange}
-              options={positionOptions}
               placeholder={placeholder}
               emptyText={emptyMessage}
-              disabled={disabled || isLoading || isCreating}
+              disabled={disabled}
               clearable={!required}
+              searchable={true}
               allowCreate={!!onQuickCreate}
               createLabel={(value: string) => `Criar cargo "${value}"`}
               onCreate={onQuickCreate ? handleCreate : undefined}
-              isCreating={isCreating}
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
             />
           </FormControl>
           <FormMessage />

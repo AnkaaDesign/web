@@ -1,0 +1,265 @@
+{
+  "agent": "Agent 3: File Upload Testing (Edit Form)",
+  "mission": "Test file uploads in the EDIT form for existing tasks",
+  "testUrl": "https://test.ankaa.live",
+  "credentials": {
+    "email": "kennedy.ankaa@gmail.com",
+    "password": "abc123456"
+  },
+  "executionDate": "2025-10-17",
+  "executionStatus": "Tests Created - Awaiting Network Access",
+  "testSuiteLocation": "/home/kennedy/repositories/web/tests/agent3-file-upload-edit-form.spec.ts",
+  "reportLocation": "/home/kennedy/repositories/web/agent3-file-upload-edit-form-report.json",
+  "summary": {
+    "totalTests": 5,
+    "passed": 0,
+    "failed": 5,
+    "warnings": 0,
+    "note": "All tests failed due to DNS resolution - https://test.ankaa.live is not accessible from current network"
+  },
+  "testScenarios": [
+    {
+      "id": 1,
+      "name": "Adding Files to Existing Task",
+      "priority": "HIGH",
+      "description": "Verify new files can be added to existing tasks without replacing existing files",
+      "status": "READY",
+      "keyChecks": [
+        "Submit button enabled after adding files",
+        "Existing files preserved",
+        "New files saved successfully",
+        "File counts increase or stay same (never decrease)"
+      ],
+      "criticalIssues": [
+        "Submit button remains disabled after file selection",
+        "Existing files disappear when adding new ones",
+        "Files don't persist after save"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Replacing Files",
+      "priority": "MEDIUM",
+      "description": "Verify files can be deleted and replaced",
+      "status": "READY",
+      "keyChecks": [
+        "Delete buttons visible and functional",
+        "Submit button enabled after replacement",
+        "Only replaced file changes"
+      ],
+      "criticalIssues": [
+        "No delete/remove buttons available",
+        "Submit button disabled after replacement",
+        "All files removed instead of just one"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Mixed Updates (Text + Files)",
+      "priority": "HIGH",
+      "description": "Verify text field changes and file uploads work together",
+      "status": "READY",
+      "keyChecks": [
+        "Submit button enabled after both types of changes",
+        "Text changes persist",
+        "File uploads persist",
+        "No data loss"
+      ],
+      "criticalIssues": [
+        "One change type overwrites the other",
+        "Submit button inconsistent",
+        "Data not persisting correctly"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "File-Only Updates (CRITICAL TEST)",
+      "priority": "CRITICAL",
+      "description": "Verify files can be uploaded WITHOUT changing any text fields",
+      "status": "READY",
+      "keyChecks": [
+        "Submit button MUST be enabled with file-only changes",
+        "Files upload without text changes",
+        "No unintended changes to other fields"
+      ],
+      "criticalIssues": [
+        "CRITICAL BUG: Submit button disabled when ONLY files are changed",
+        "Users cannot upload files without making dummy text changes",
+        "Form validation doesn't detect file input changes",
+        "Files don't save without text field changes"
+      ],
+      "whyCritical": "This test identifies a common UX bug where forms only detect 'changes' on text fields, not file inputs. If this fails, users cannot upload files to existing tasks without making dummy text changes - a serious usability issue."
+    },
+    {
+      "id": 5,
+      "name": "Navigation Test with Files",
+      "priority": "LOW",
+      "description": "Verify unsaved file selections are properly cleared on navigation",
+      "status": "READY",
+      "keyChecks": [
+        "File inputs cleared after navigation",
+        "No phantom file uploads",
+        "Server-side file count unchanged"
+      ],
+      "criticalIssues": [
+        "Files persist in form after navigation",
+        "Files accidentally saved without submit",
+        "Confusing UX with stale file selections"
+      ]
+    }
+  ],
+  "fileUploadFields": [
+    {
+      "field": "orcamento",
+      "label": "Budget (Orçamento)",
+      "selector": "input[name=\"orcamentos\"]",
+      "fileType": "PDF",
+      "testFiles": [
+        "sample-budget.pdf",
+        "sample-budget-2.pdf"
+      ]
+    },
+    {
+      "field": "notaFiscal",
+      "label": "Invoice (Nota Fiscal)",
+      "selector": "input[name=\"notas_fiscais\"]",
+      "fileType": "PDF",
+      "testFiles": [
+        "sample-invoice.pdf",
+        "sample-invoice-2.pdf"
+      ]
+    },
+    {
+      "field": "recibo",
+      "label": "Receipt (Recibo)",
+      "selector": "input[name=\"recibos\"]",
+      "fileType": "PDF",
+      "testFiles": [
+        "sample-receipt.pdf",
+        "sample-receipt-2.pdf"
+      ]
+    },
+    {
+      "field": "artes",
+      "label": "Artwork (Artes)",
+      "selector": "input[name=\"artes\"]",
+      "fileType": "JPEG",
+      "testFiles": [
+        "sample-artwork.jpg",
+        "sample-artwork-2.jpg"
+      ]
+    }
+  ],
+  "howToRun": {
+    "basicCommand": "cd /home/kennedy/repositories/web && BASE_URL=https://test.ankaa.live npx playwright test agent3-file-upload-edit-form.spec.ts",
+    "headedMode": "HEADLESS=false BASE_URL=https://test.ankaa.live npx playwright test agent3-file-upload-edit-form.spec.ts",
+    "specificTest": "npx playwright test agent3-file-upload-edit-form.spec.ts -g \"File-Only\"",
+    "prerequisites": [
+      "Network access to https://test.ankaa.live (VPN may be required)",
+      "Valid test credentials",
+      "At least one existing task in /producao/cronograma"
+    ]
+  },
+  "artifacts": {
+    "testFile": "/home/kennedy/repositories/web/tests/agent3-file-upload-edit-form.spec.ts",
+    "jsonReport": "/home/kennedy/repositories/web/agent3-file-upload-edit-form-report.json",
+    "documentation": "/home/kennedy/repositories/web/AGENT3-FILE-UPLOAD-EDIT-FORM-README.md",
+    "quickStart": "/home/kennedy/repositories/web/RUN-AGENT3-TESTS.md",
+    "summary": "/home/kennedy/repositories/web/AGENT3-TEST-REPORT-SUMMARY.md",
+    "screenshots": "/home/kennedy/repositories/web/test-results/agent3-*.png",
+    "videos": "/home/kennedy/repositories/web/test-results/*.webm",
+    "fixtures": "/home/kennedy/repositories/web/tests/fixtures/"
+  },
+  "currentExecutionResults": {
+    "timestamp": "2025-10-17T10:29:43.437Z",
+    "networkStatus": "FAILED - DNS resolution error",
+    "error": "net::ERR_NAME_NOT_RESOLVED at https://test.ankaa.live/",
+    "explanation": "The test URL is not accessible from the current network. This is expected for internal/staging environments that require VPN or specific network access.",
+    "nextSteps": [
+      "Ensure network connectivity to https://test.ankaa.live",
+      "Connect to VPN if required",
+      "Re-run tests with: cd /home/kennedy/repositories/web && BASE_URL=https://test.ankaa.live npx playwright test agent3-file-upload-edit-form.spec.ts",
+      "Review JSON report after successful execution",
+      "Address any CRITICAL issues first (especially Test 4)"
+    ]
+  },
+  "expectedIssues": {
+    "mostLikely": [
+      {
+        "issue": "Submit button disabled with file-only changes",
+        "test": "Test 4: File-Only Updates",
+        "severity": "CRITICAL",
+        "impact": "Users cannot upload files without changing text fields",
+        "rootCause": "Form dirty state detection only tracks text inputs, not file inputs",
+        "fix": "Update form validation to include file input change detection"
+      },
+      {
+        "issue": "Files don't persist after save",
+        "test": "Tests 1, 3, 4",
+        "severity": "CRITICAL",
+        "impact": "File upload feature completely broken",
+        "rootCause": "Backend not processing file uploads OR frontend not sending files",
+        "fix": "Check file upload endpoint, verify FormData, check backend logs"
+      },
+      {
+        "issue": "Existing files replaced instead of appended",
+        "test": "Test 1: Adding Files",
+        "severity": "HIGH",
+        "impact": "Data loss when uploading new files",
+        "rootCause": "File array is replaced instead of merged",
+        "fix": "Fix file merge logic in frontend or backend"
+      }
+    ],
+    "possibleWarnings": [
+      {
+        "issue": "Delete buttons not found",
+        "test": "Test 2: Replacing Files",
+        "severity": "MEDIUM",
+        "impact": "Cannot test file replacement",
+        "rootCause": "Delete functionality not implemented or wrong selector",
+        "fix": "Implement file deletion UI or update test selectors"
+      },
+      {
+        "issue": "File inputs not found",
+        "test": "All tests",
+        "severity": "HIGH",
+        "impact": "Cannot test file uploads",
+        "rootCause": "Selectors don't match actual form fields",
+        "fix": "Update FILE_SELECTORS in test file to match application"
+      }
+    ]
+  },
+  "successCriteria": {
+    "allTestsPass": "All 5 tests complete with PASS status",
+    "noCriticalIssues": "No CRITICAL issues reported, especially in Test 4",
+    "fileUploadsWork": "Files can be uploaded with and without text changes",
+    "filesPreserved": "Existing files are preserved when adding new ones",
+    "deletionWorks": "Files can be deleted and replaced",
+    "navigationClears": "Unsaved files are cleared on navigation"
+  },
+  "testingApproach": {
+    "framework": "Playwright",
+    "language": "TypeScript",
+    "strategy": "End-to-end functional testing",
+    "coverage": [
+      "File upload UI interactions",
+      "Form validation state",
+      "Submit button enable/disable logic",
+      "File persistence after save",
+      "File deletion and replacement",
+      "Navigation behavior"
+    ]
+  },
+  "recommendations": [
+    "Run Test 4 (File-Only Updates) first as it identifies the most common critical bug",
+    "Use headed mode (HEADLESS=false) for first run to observe behavior",
+    "Review screenshots and videos for failed tests to understand issues",
+    "Fix CRITICAL issues before addressing warnings",
+    "Re-run full suite after fixes to ensure no regressions"
+  ],
+  "contactAndSupport": {
+    "fullDocumentation": "/home/kennedy/repositories/web/AGENT3-FILE-UPLOAD-EDIT-FORM-README.md",
+    "quickReference": "/home/kennedy/repositories/web/RUN-AGENT3-TESTS.md",
+    "debuggingSection": "See 'Common Issues and Solutions' in AGENT3-FILE-UPLOAD-EDIT-FORM-README.md"
+  }
+}

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import type { File as AnkaaFile } from "../../types";
-import { formatFileSize, getFileCategory, getFileDisplayName, isImageFile, getFileUrl } from "../../utils";
+import { formatFileSize, getFileCategory, getFileDisplayName, getFileUrl, isImageFile } from "../../utils/file";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { IconPhoto, IconFileText, IconVideo, IconMusic, IconFileZip, IconFile, IconVectorBezier, IconEye } from "@tabler/icons-react";
@@ -98,7 +98,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
     // Handle different file types
     if (file.mimetype === "application/pdf") {
       // Open PDF in new tab
-      const apiUrl = (window as any).__ANKAA_API_URL__ || process.env.VITE_API_URL || "http://192.168.0.123:3030";
+      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.123:3030";
       window.open(`${apiUrl}/files/serve/${file.id}`, "_blank");
     } else if (isImage || category === "video") {
       // Open image/video in preview modal if available
@@ -110,7 +110,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
       onDownload(file);
     } else {
       // Default: try to open in new tab
-      const apiUrl = (window as any).__ANKAA_API_URL__ || process.env.VITE_API_URL || "http://192.168.0.123:3030";
+      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.123:3030";
       window.open(`${apiUrl}/files/${file.id}/download`, "_blank");
     }
   };
@@ -156,7 +156,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
               <img
                 src={(() => {
                   // Use the correct API URL - same as the one used for API calls
-                  const apiUrl = (window as any).__ANKAA_API_URL__ || process.env.VITE_API_URL || "http://192.168.0.123:3030";
+                  const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://192.168.0.123:3030";
                   let thumbnailSrc = "";
 
                   if (file.thumbnailUrl) {

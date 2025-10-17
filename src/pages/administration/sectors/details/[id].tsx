@@ -147,11 +147,11 @@ export const SectorDetailPage = () => {
               <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.SECTOR} entityId={id} entityName={sector.name} entityCreatedAt={sector.createdAt} maxHeight="500px" />
             </div>
 
-            {/* Related Users */}
-            <SectorUsersTable sector={sector} />
-
             {/* Related Tasks */}
             <SectorTasksTable sector={sector} />
+
+            {/* Related Users - Last Section */}
+            <SectorUsersTable sector={sector} />
           </div>
         </div>
 

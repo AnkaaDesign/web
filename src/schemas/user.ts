@@ -12,6 +12,7 @@ import { USER_STATUS, VERIFICATION_TYPE } from "../constants";
 export const userIncludeSchema = z
   .object({
     // Direct User relations
+    avatar: z.boolean().optional(),
     ppeSize: z
       .union([
         z.boolean(),
@@ -430,6 +431,23 @@ export const userWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
+      payrollNumber: z
+        .union([
+          z.number(),
+          z.null(),
+          z.object({
+            equals: z.union([z.number(), z.null()]).optional(),
+            not: z.union([z.number(), z.null()]).optional(),
+            in: z.array(z.number()).optional(),
+            notIn: z.array(z.number()).optional(),
+            lt: z.number().optional(),
+            lte: z.number().optional(),
+            gt: z.number().optional(),
+            gte: z.number().optional(),
+          }),
+        ])
+        .optional(),
+
       verified: z
         .union([
           z.boolean(),
@@ -614,6 +632,7 @@ export const userWhereSchema: z.ZodSchema = z.lazy(() =>
 
 const userFilters = {
   searchingFor: z.string().optional(),
+  payrollNumber: z.coerce.number().int().optional(),
   sectorIds: z.array(z.string()).optional(),
   managedSectorIds: z.array(z.string()).optional(),
   positionIds: z.array(z.string()).optional(),
@@ -884,6 +903,7 @@ export const userCreateSchema = z
   .object({
     email: emailSchema.nullable().optional(),
     name: createNameSchema(2, 200, "Nome"),
+    avatarId: z.string().uuid("ID de avatar inválido").nullable().optional(),
     status: z
       .enum(Object.values(USER_STATUS) as [string, ...string[]], {
         errorMap: () => ({ message: "status inválido" }),
@@ -949,6 +969,7 @@ export const userUpdateSchema = z
   .object({
     email: emailSchema.nullable().optional(),
     name: createNameSchema(2, 200, "Nome").optional(),
+    avatarId: z.string().uuid("ID de avatar inválido").nullable().optional(),
     status: z
       .enum(Object.values(USER_STATUS) as [string, ...string[]], {
         errorMap: () => ({ message: "status inválido" }),

@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { useTaskDetail } from "../../../../hooks";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { IconUser } from "@tabler/icons-react";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 
 interface CustomerDisplayProps {
   taskId?: string;
@@ -66,17 +66,26 @@ export function CustomerDisplay({ taskId }: CustomerDisplayProps) {
       <Card>
         <CardContent className="p-4">
           <div className="flex items-start space-x-3">
-            <div className="flex-shrink-0">
-              <IconUser className="h-5 w-5 text-muted-foreground" />
-            </div>
+            <CustomerLogoDisplay
+              logo={customer.logo}
+              customerName={customer.fantasyName || customer.corporateName || "Cliente"}
+              size="lg"
+              shape="rounded"
+              className="flex-shrink-0"
+            />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground">{customer.name}</p>
+              <p className="text-sm font-medium text-foreground">{customer.fantasyName}</p>
+              {customer.corporateName && <p className="text-xs text-muted-foreground">{customer.corporateName}</p>}
               {customer.email && <p className="text-sm text-muted-foreground">{customer.email}</p>}
-              {customer.phone && <p className="text-sm text-muted-foreground">{customer.phone}</p>}
-              <div className="flex items-center space-x-2 mt-2">
-                <Badge variant="secondary">{customer.type || "Cliente"}</Badge>
-                {customer.status && <Badge variant={customer.status === "ACTIVE" ? "default" : "secondary"}>{customer.status === "ACTIVE" ? "Ativo" : "Inativo"}</Badge>}
-              </div>
+              {customer.phones && customer.phones.length > 0 && <p className="text-sm text-muted-foreground">{customer.phones[0]}</p>}
+              {customer.tags && customer.tags.length > 0 && (
+                <div className="flex items-center flex-wrap gap-2 mt-2">
+                  {customer.tags.slice(0, 3).map((tag, index) => (
+                    <Badge key={index} variant="secondary">{tag}</Badge>
+                  ))}
+                  {customer.tags.length > 3 && <Badge variant="outline">+{customer.tags.length - 3}</Badge>}
+                </div>
+              )}
             </div>
           </div>
         </CardContent>

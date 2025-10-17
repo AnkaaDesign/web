@@ -1,7 +1,7 @@
 import { IconPaperclip, IconDownload, IconFile } from "@tabler/icons-react";
 
 import type { Warning } from "../../../../types";
-import { formatFileSize } from "../../../../utils";
+import { formatFileSize } from "../../../../utils/file";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

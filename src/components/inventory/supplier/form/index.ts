@@ -10,3 +10,7 @@ export { NeighborhoodInput } from "./neighborhood-input";
 export { CityInput } from "./city-input";
 export { SupplierStateSelector } from "./state-selector";
 export { GooglePlacesAutocomplete } from "./google-places-autocomplete";
+export { LogoInput } from "./logo-input";
+export { DocumentsInput } from "./documents-input";
+
+export type { DocumentCategory } from "./documents-input";

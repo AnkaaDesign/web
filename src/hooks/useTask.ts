@@ -90,21 +90,10 @@ export function useTasks(params?: UseTasksParams) {
   // Include pagination in query key for proper pagination support
   // Each page should be a separate cached query
   const queryKey = useMemo(() => {
-    console.log("[useTasks] Building query key with params:", {
-      restParams: restParams ? {
-        page: restParams.page,
-        limit: restParams.limit,
-        status: restParams.status,
-        hasOtherFilters: Object.keys(restParams).filter(k => !['page', 'limit', 'status'].includes(k)).length > 0
-      } : 'undefined'
-    });
-
     if (!restParams) return taskKeys.list();
 
     // Include all parameters (including page/limit) in query key
-    const key = taskKeys.list(restParams);
-    console.log("[useTasks] Generated query key:", key);
-    return key;
+    return taskKeys.list(restParams);
   }, [JSON.stringify(restParams)]); // Use JSON.stringify for deep comparison
 
   const query = useQuery({

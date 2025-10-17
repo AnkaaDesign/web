@@ -26,10 +26,9 @@ export function SupervisorSelect({ control, disabled, required, initialSuperviso
 
   // Memoize queryFn
   const queryFn = useCallback(async (search: string, page: number = 1) => {
-    const response = await userService.getUsers({
-      searchingFor: search,
-      limit: 20,
+    const queryParams: any = {
       page,
+      take: 50,
       where: {
         status: { not: USER_STATUS.DISMISSED },
         sector: {
@@ -39,7 +38,13 @@ export function SupervisorSelect({ control, disabled, required, initialSuperviso
         },
       },
       include: { position: true, sector: true },
-    });
+    };
+
+    if (search && search.trim()) {
+      queryParams.searchingFor = search.trim();
+    }
+
+    const response = await userService.getUsers(queryParams);
 
     return {
       data: response.data || [],
@@ -85,6 +90,10 @@ export function SupervisorSelect({ control, disabled, required, initialSuperviso
               getOptionValue={getOptionValue}
               renderOption={renderOption}
               minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
+              searchable={true}
+              clearable={true}
             />
           </FormControl>
           <FormMessage />

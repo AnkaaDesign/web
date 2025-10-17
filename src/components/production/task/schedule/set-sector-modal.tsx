@@ -67,15 +67,18 @@ export function SetSectorModal({ open, onOpenChange, tasks, onConfirm }: SetSect
                   <FormLabel>Setor de Produção</FormLabel>
                   <FormControl>
                     <Combobox
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      options={sectors.map(
-                        (sector): ComboboxOption => ({
-                          value: sector.id,
-                          label: sector.name,
-                        }),
-                      )}
-                      placeholder="Selecione um setor ou deixe vazio"
+                      value={field.value ?? undefined}
+                      onValueChange={(value) => field.onChange(value || null)}
+                      options={[
+                        { value: "", label: "Indefinido (sem setor)" },
+                        ...sectors.map(
+                          (sector): ComboboxOption => ({
+                            value: sector.id,
+                            label: sector.name,
+                          }),
+                        ),
+                      ]}
+                      placeholder="Selecione um setor"
                       searchable={sectors.length > 10}
                       clearable={true}
                     />

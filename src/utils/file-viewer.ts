@@ -8,6 +8,8 @@ export interface FileViewerConfig {
   allowedMimeTypes?: string[];
   maxFileSize?: number; // in bytes
   enableSecurity?: boolean;
+  pdfViewMode?: "new-tab" | "modal" | "inline"; // How to open PDFs (default: new-tab)
+  pdfMaxFileSize?: number; // Max PDF file size for inline viewing (default: 50MB)
 }
 
 export interface FileViewAction {
@@ -68,11 +70,24 @@ const getApiBaseUrl = (): string => {
     if (windowApiUrl) return windowApiUrl;
   }
 
-  if (typeof process !== "undefined" && process.env?.VITE_API_URL) {
-    return process.env.VITE_API_URL;
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
   }
 
   return "http://localhost:3030";
+};
+
+/**
+ * Check if a file is a PDF
+ */
+export const isPDFFile = (file: AnkaaFile): boolean => {
+  const mimeType = file.mimetype?.toLowerCase() || "";
+  const filename = file.filename?.toLowerCase() || "";
+
+  return (
+    mimeType === "application/pdf" ||
+    filename.endsWith(".pdf")
+  );
 };
 
 /**
@@ -173,6 +188,35 @@ export const generateFileUrls = (file: AnkaaFile, baseUrl?: string) => {
 };
 
 /**
+ * Validate PDF-specific requirements
+ */
+export const validatePDFFile = (file: AnkaaFile, config: FileViewerConfig = {}): { isValid: boolean; warnings: string[] } => {
+  const warnings: string[] = [];
+  const { pdfMaxFileSize = 50 * 1024 * 1024 } = config; // 50MB default for inline viewing
+
+  if (!isPDFFile(file)) {
+    return { isValid: false, warnings: ["File is not a PDF"] };
+  }
+
+  // Check PDF size for inline viewing
+  if (file.size > pdfMaxFileSize) {
+    warnings.push(
+      `PDF is ${(file.size / (1024 * 1024)).toFixed(2)}MB. Files larger than ${(pdfMaxFileSize / (1024 * 1024)).toFixed(0)}MB may not load properly in inline viewer.`
+    );
+  }
+
+  // Check for very large PDFs
+  if (file.size > 100 * 1024 * 1024) {
+    warnings.push("PDF is very large and may take time to load. Consider downloading instead.");
+  }
+
+  return {
+    isValid: true,
+    warnings,
+  };
+};
+
+/**
  * Determine the appropriate viewing action for a file
  */
 export const determineFileViewAction = (file: AnkaaFile, config: FileViewerConfig = {}): FileViewAction => {
@@ -199,13 +243,37 @@ export const determineFileViewAction = (file: AnkaaFile, config: FileViewerConfi
         security,
       };
 
-    case "pdfs":
+    case "pdfs": {
+      // Enhanced PDF handling with configurable view mode
+      const pdfViewMode = config.pdfViewMode || "new-tab";
+      const pdfValidation = validatePDFFile(file, config);
+
+      // Merge PDF-specific warnings with security warnings
+      const allWarnings = [...security.warnings, ...pdfValidation.warnings];
+
+      // For very large PDFs, always use new-tab regardless of config
+      if (file.size > 100 * 1024 * 1024 && pdfViewMode !== "new-tab") {
+        return {
+          type: "new-tab",
+          url: urls.serve,
+          component: "pdf-viewer",
+          security: {
+            ...security,
+            warnings: [...allWarnings, "Opening large PDF in new tab for better performance"],
+          },
+        };
+      }
+
       return {
-        type: "new-tab",
+        type: pdfViewMode,
         url: urls.serve,
         component: "pdf-viewer",
-        security,
+        security: {
+          ...security,
+          warnings: allWarnings,
+        },
       };
+    }
 
     case "videos":
       return {
@@ -399,6 +467,8 @@ export const getFileTypeIcon = (file: AnkaaFile): string => {
 export const fileViewerService = {
   detectFileCategory,
   validateFileSecurity,
+  validatePDFFile,
+  isPDFFile,
   generateFileUrls,
   determineFileViewAction,
   executeFileViewAction,
@@ -408,8 +478,23 @@ export const fileViewerService = {
 
   // Configuration presets
   configs: {
-    secure: { enableSecurity: true, maxFileSize: 100 * 1024 * 1024 }, // 100MB
-    permissive: { enableSecurity: false, maxFileSize: 500 * 1024 * 1024 }, // 500MB
-    default: { enableSecurity: true, maxFileSize: 200 * 1024 * 1024 }, // 200MB
+    secure: {
+      enableSecurity: true,
+      maxFileSize: 100 * 1024 * 1024, // 100MB
+      pdfViewMode: "new-tab" as const,
+      pdfMaxFileSize: 50 * 1024 * 1024, // 50MB
+    },
+    permissive: {
+      enableSecurity: false,
+      maxFileSize: 500 * 1024 * 1024, // 500MB
+      pdfViewMode: "modal" as const,
+      pdfMaxFileSize: 100 * 1024 * 1024, // 100MB
+    },
+    default: {
+      enableSecurity: true,
+      maxFileSize: 200 * 1024 * 1024, // 200MB
+      pdfViewMode: "new-tab" as const,
+      pdfMaxFileSize: 50 * 1024 * 1024, // 50MB
+    },
   },
 };

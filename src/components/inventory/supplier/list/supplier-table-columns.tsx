@@ -3,7 +3,7 @@ import type { Supplier } from "../../../../types";
 import { Badge } from "../../../ui/badge";
 import { TABLE_LAYOUT } from "../../../ui/table-constants";
 import type { SupplierColumn } from "./types";
-import { getFileUrl } from "@/utils/file";
+import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 export const createSupplierColumns = (): SupplierColumn[] => [
   // Basic Information (Primary columns - most commonly used)
@@ -12,21 +12,12 @@ export const createSupplierColumns = (): SupplierColumn[] => [
     header: "NOME",
     accessor: (supplier: Supplier) => (
       <div className="flex items-center gap-2">
-        {supplier.logo?.id ? (
-          <img
-            src={getFileUrl(supplier.logo)}
-            alt={`${supplier.fantasyName} logo`}
-            className="h-8 w-8 rounded-md object-cover flex-shrink-0 border border-border/50"
-            onError={(e) => {
-              // Hide image if it fails to load
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        ) : (
-          <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0 border border-border/50">
-            <span className="text-xs font-semibold text-muted-foreground">{supplier.fantasyName.charAt(0).toUpperCase()}</span>
-          </div>
-        )}
+        <SupplierLogoDisplay
+          logo={supplier.logo}
+          supplierName={supplier.fantasyName}
+          size="sm"
+          shape="rounded"
+        />
         <span className="font-medium truncate">{supplier.fantasyName}</span>
       </div>
     ),

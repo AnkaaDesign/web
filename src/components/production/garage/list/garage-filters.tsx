@@ -59,6 +59,9 @@ export function GarageFilters({ open, onOpenChange, onApply, filters }: GarageFi
                 })),
               ]}
               placeholder="Selecione um status"
+              emptyText="Nenhum status encontrado"
+              searchable={true}
+              clearable={true}
             />
           </div>
 

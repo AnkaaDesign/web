@@ -1,0 +1,441 @@
+/* Media Viewer Animations and Styles */
+
+/* Fade in animation for modal */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Scale animation for content */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+/* Slide animations for navigation */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+}
+
+@keyframes slideOutLeft {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-100px);
+  }
+}
+
+/* Pulse animation for loading */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Spin animation for loader */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Media viewer overlay */
+.media-viewer-overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.media-viewer-overlay.closing {
+  animation: fadeOut 0.2s ease-out;
+}
+
+/* Media viewer content */
+.media-viewer-content {
+  animation: scaleIn 0.3s ease-out;
+}
+
+.media-viewer-content.closing {
+  animation: scaleOut 0.2s ease-out;
+}
+
+/* Navigation transition */
+.media-viewer-item.next {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.media-viewer-item.prev {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.media-viewer-item.exit-next {
+  animation: slideOutLeft 0.3s ease-out;
+}
+
+.media-viewer-item.exit-prev {
+  animation: slideOutRight 0.3s ease-out;
+}
+
+/* Custom scrollbar for thumbnail strip */
+.media-viewer-thumbnails::-webkit-scrollbar {
+  height: 8px;
+}
+
+.media-viewer-thumbnails::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.media-viewer-thumbnails::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.media-viewer-thumbnails::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Video progress bar custom styling */
+.video-progress-bar {
+  position: relative;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.video-progress-bar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(to right, #3b82f6, #8b5cf6);
+  transition: width 0.1s linear;
+}
+
+.video-progress-bar:hover::before {
+  background: linear-gradient(to right, #60a5fa, #a78bfa);
+}
+
+/* Loading spinner */
+.media-loader {
+  animation: spin 1s linear infinite;
+}
+
+/* Image zoom transition */
+.media-image {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.media-image.dragging {
+  transition: none;
+  cursor: grabbing;
+}
+
+/* Smooth opacity transitions */
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.fade-out {
+  animation: fadeOut 0.3s ease-out;
+}
+
+/* Thumbnail hover effect */
+.media-thumbnail {
+  position: relative;
+  transition: all 0.2s ease-out;
+}
+
+.media-thumbnail::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+
+.media-thumbnail:hover::after {
+  opacity: 1;
+}
+
+.media-thumbnail.active {
+  transform: scale(1.1);
+}
+
+/* Control button hover effects */
+.media-control-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease-out;
+}
+
+.media-control-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(0);
+  transition: transform 0.2s ease-out;
+  border-radius: inherit;
+}
+
+.media-control-btn:hover::before {
+  transform: scale(1);
+}
+
+.media-control-btn:active {
+  transform: scale(0.95);
+}
+
+/* Disabled state */
+.media-control-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.media-control-btn:disabled::before {
+  display: none;
+}
+
+/* Video controls fade */
+.video-controls {
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+
+.video-controls.hidden {
+  opacity: 0;
+  transform: translateY(20px);
+  pointer-events: none;
+}
+
+/* Error state */
+.media-error {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Focus visible for accessibility */
+.media-viewer-overlay *:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Mobile touch feedback */
+@media (hover: none) and (pointer: coarse) {
+  .media-control-btn:active {
+    transform: scale(0.9);
+  }
+
+  .media-thumbnail:active {
+    transform: scale(0.95);
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .media-viewer-overlay {
+    background: #000;
+  }
+
+  .media-control-btn {
+    border: 2px solid currentColor;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  .media-viewer-overlay {
+    display: none;
+  }
+}
+
+/* Backdrop blur effect (optional) */
+.media-viewer-backdrop-blur {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Gradient overlays */
+.gradient-overlay-top {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.6) 0%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+.gradient-overlay-bottom {
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.8) 0%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+/* Smooth scrolling for thumbnails */
+.media-viewer-thumbnails {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Range input styling */
+input[type='range'].media-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type='range'].media-slider::-webkit-slider-track {
+  background: rgba(255, 255, 255, 0.3);
+  height: 4px;
+  border-radius: 2px;
+}
+
+input[type='range'].media-slider::-moz-range-track {
+  background: rgba(255, 255, 255, 0.3);
+  height: 4px;
+  border-radius: 2px;
+}
+
+input[type='range'].media-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  margin-top: -6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+input[type='range'].media-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+input[type='range'].media-slider:hover::-webkit-slider-thumb {
+  background: #f0f0f0;
+  transform: scale(1.1);
+}
+
+input[type='range'].media-slider:hover::-moz-range-thumb {
+  background: #f0f0f0;
+  transform: scale(1.1);
+}
+
+input[type='range'].media-slider:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.5);
+}
+
+input[type='range'].media-slider:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.5);
+}
+
+/* Loading shimmer effect */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.media-loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}

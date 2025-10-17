@@ -1,9 +1,10 @@
 // packages/interfaces/src/customer.ts
 
-import type { ORDER_BY_DIRECTION } from "../constants";
-import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
+import type { ORDER_BY_DIRECTION } from '@constants';
+import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, BaseMergeResponse } from "./common";
 import type { File, FileIncludes } from "./file";
 import type { Task, TaskIncludes } from "./task";
+import type { EconomicActivity, EconomicActivityIncludes } from "./economic-activity";
 
 // =====================
 // Main Entity Interface
@@ -26,9 +27,12 @@ export interface Customer extends BaseEntity {
   phones: string[];
   tags: string[];
   logoId: string | null;
+  economicActivityId: string | null;
+  situacaoCadastral: string | null;
 
   // Relations
   logo?: File;
+  economicActivity?: EconomicActivity;
   tasks?: Task[];
 
   // Count relations
@@ -48,6 +52,11 @@ export interface CustomerIncludes {
     | boolean
     | {
         include?: FileIncludes;
+      };
+  economicActivity?:
+    | boolean
+    | {
+        include?: EconomicActivityIncludes;
       };
   tasks?:
     | boolean
@@ -92,6 +101,7 @@ export interface CustomerGetManyResponse extends BaseGetManyResponse<Customer> {
 export interface CustomerCreateResponse extends BaseCreateResponse<Customer> {}
 export interface CustomerUpdateResponse extends BaseUpdateResponse<Customer> {}
 export interface CustomerDeleteResponse extends BaseDeleteResponse {}
+export interface CustomerMergeResponse extends BaseMergeResponse<Customer> {}
 
 // =====================
 // Batch Operation Responses

@@ -4,15 +4,19 @@ import { fileViewerService } from "../../utils/file-viewer";
 import type { FileViewerConfig } from "../../utils/file-viewer";
 import { FilePreview } from "./file-preview";
 import { VideoPlayer } from "./video-player";
+import { PDFViewer } from "./pdf-viewer";
 import { toast } from "sonner";
 
 export interface FileViewerState {
   isImageModalOpen: boolean;
   isVideoModalOpen: boolean;
+  isPdfModalOpen: boolean;
   currentFiles: AnkaaFile[];
   currentFileIndex: number;
   currentVideoFile: AnkaaFile | null;
   currentVideoUrl: string | null;
+  currentPdfFile: AnkaaFile | null;
+  currentPdfUrl: string | null;
 }
 
 export interface FileViewerProps {
@@ -33,6 +37,8 @@ export const FileViewerContext = React.createContext<{
     closeImageModal: () => void;
     openVideoModal: (file: AnkaaFile, url: string) => void;
     closeVideoModal: () => void;
+    openPdfModal: (file: AnkaaFile, url: string) => void;
+    closePdfModal: () => void;
     viewFile: (file: AnkaaFile) => void;
     downloadFile: (file: AnkaaFile) => void;
   };
@@ -42,10 +48,13 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
   const [state, setState] = React.useState<FileViewerState>({
     isImageModalOpen: false,
     isVideoModalOpen: false,
+    isPdfModalOpen: false,
     currentFiles: [],
     currentFileIndex: 0,
     currentVideoFile: null,
     currentVideoUrl: null,
+    currentPdfFile: null,
+    currentPdfUrl: null,
   });
 
   const viewerConfig = React.useMemo(
@@ -95,6 +104,24 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
         }));
       },
 
+      openPdfModal: (file: AnkaaFile, url: string) => {
+        setState((prev) => ({
+          ...prev,
+          isPdfModalOpen: true,
+          currentPdfFile: file,
+          currentPdfUrl: url,
+        }));
+      },
+
+      closePdfModal: () => {
+        setState((prev) => ({
+          ...prev,
+          isPdfModalOpen: false,
+          currentPdfFile: null,
+          currentPdfUrl: null,
+        }));
+      },
+
       viewFile: (file: AnkaaFile) => {
         const action = fileViewerService.determineFileViewAction(file, viewerConfig);
 
@@ -104,6 +131,8 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
               actions.openImageModal([file], 0);
             } else if (component === "video-player") {
               actions.openVideoModal(file, url);
+            } else if (component === "pdf-viewer") {
+              actions.openPdfModal(file, url);
             }
           },
           onInlinePlayer: (url, _targetFile) => {
@@ -185,6 +214,22 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
           }}
           mode="modal"
           onDownload={actions.downloadFile}
+        />
+      )}
+
+      {/* PDF Modal */}
+      {state.isPdfModalOpen && state.currentPdfFile && state.currentPdfUrl && (
+        <PDFViewer
+          file={state.currentPdfFile}
+          url={state.currentPdfUrl}
+          open={state.isPdfModalOpen}
+          onOpenChange={(open) => {
+            if (!open) actions.closePdfModal();
+          }}
+          mode={viewerConfig.pdfViewMode || "new-tab"}
+          onDownload={actions.downloadFile}
+          maxFileSize={viewerConfig.pdfMaxFileSize}
+          showToolbar={true}
         />
       )}
     </FileViewerContext.Provider>

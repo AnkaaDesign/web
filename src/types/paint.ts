@@ -35,7 +35,7 @@ export interface Paint extends BaseEntity {
   tags: string[];
   palette: COLOR_PALETTE;
   paletteOrder: number;
-  colorOrder: number | null;
+  colorOrder: number;
   paintTypeId: string;
   paintBrandId: string | null;
 

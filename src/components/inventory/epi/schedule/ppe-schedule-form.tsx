@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { IconLoader2 as Loader2, IconCalendar as CalendarIcon, IconShield, IconUsers as Users, IconUserCheck as UserCheck, IconUserX as UserX } from "@tabler/icons-react";
 import { ppeDeliveryScheduleCreateSchema, ppeDeliveryScheduleUpdateSchema, type PpeDeliveryScheduleCreateFormData, type PpeDeliveryScheduleUpdateFormData } from "../../../../schemas";
-import { useUsers } from "../../../../hooks";
+import { getUsers } from "../../../../api-client";
 import { type PpeDeliverySchedule } from "../../../../types";
 import {
   PPE_TYPE,
@@ -57,6 +57,9 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
 
   const [selectedAssignmentType, setSelectedAssignmentType] = useState<ASSIGNMENT_TYPE>(mode === "update" ? props.ppeSchedule.assignmentType : ASSIGNMENT_TYPE.ALL);
 
+  // Create a stable cache for fetched users
+  const cacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+
   // Setup form based on mode
   const form = useForm<PpeDeliveryScheduleCreateFormData | PpeDeliveryScheduleUpdateFormData>({
     resolver: zodResolver(mode === "create" ? ppeDeliveryScheduleCreateSchema : ppeDeliveryScheduleUpdateSchema),
@@ -100,18 +103,56 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
     }
   }, [watchAssignmentType]);
 
-  // Fetch users for selection
-  const { data: usersData } = useUsers({
-    take: 100, // Maximum allowed by API
-    orderBy: { name: "asc" },
-    where: { status: { not: USER_STATUS.DISMISSED } },
-  });
+  // Async query function for users
+  const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        where: { status: { not: USER_STATUS.DISMISSED } },
+      };
 
-  const userOptions =
-    usersData?.data?.map((user) => ({
-      value: user.id,
-      label: user.name,
-    })) || [];
+      // Only add searchingFor if there's a search term
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      const response = await getUsers(queryParams);
+      const users = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      // Convert users to options format and add to cache
+      const options = users.map((user) => {
+        const option = {
+          value: user.id,
+          label: user.name,
+        };
+        cacheRef.current.set(user.id, option);
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
+
+  // Get initial options from cache for selected user IDs
+  const initialUserOptions = useMemo(() => {
+    const userIds = form.watch("includedUserIds") || form.watch("excludedUserIds") || [];
+    if (!userIds.length) return [];
+    return userIds
+      .map(id => cacheRef.current.get(id))
+      .filter((opt): opt is { label: string; value: string } => opt !== undefined);
+  }, [form.watch("includedUserIds"), form.watch("excludedUserIds")]);
 
   const handleSubmit = async (data: PpeDeliveryScheduleCreateFormData | PpeDeliveryScheduleUpdateFormData) => {
     try {
@@ -235,7 +276,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                     Dia do Mês <span className="text-destructive">*</span>
                   </FormLabel>
                   <FormControl>
-                    <Input type="number" min={1} max={31} value={field.value || ""} onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)} placeholder="1-31" />
+                    <Input type="number" min={1} max={31} value={field.value || ""} onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)} placeholder="1-31" className="bg-transparent" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -314,12 +355,19 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                         </FormLabel>
                         <FormControl>
                           <Combobox
-                            options={userOptions}
+                            async={true}
+                            queryKey={["users-schedule-included"]}
+                            queryFn={queryUsers}
+                            initialOptions={initialUserOptions}
                             value={field.value || []}
                             onValueChange={field.onChange}
                             placeholder="Selecione os funcionários"
                             emptyText="Nenhum funcionário encontrado"
+                            searchPlaceholder="Buscar funcionários..."
                             mode="multiple"
+                            minSearchLength={0}
+                            pageSize={50}
+                            debounceMs={300}
                           />
                         </FormControl>
                         <FormDescription>Selecione os funcionários que receberão os EPIs neste agendamento</FormDescription>
@@ -341,12 +389,19 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                         </FormLabel>
                         <FormControl>
                           <Combobox
-                            options={userOptions}
+                            async={true}
+                            queryKey={["users-schedule-excluded"]}
+                            queryFn={queryUsers}
+                            initialOptions={initialUserOptions}
                             value={field.value || []}
                             onValueChange={field.onChange}
                             placeholder="Selecione os funcionários a excluir"
                             emptyText="Nenhum funcionário encontrado"
+                            searchPlaceholder="Buscar funcionários..."
                             mode="multiple"
+                            minSearchLength={0}
+                            pageSize={50}
+                            debounceMs={300}
                           />
                         </FormControl>
                         <FormDescription>Selecione os funcionários que NÃO receberão os EPIs neste agendamento</FormDescription>
@@ -357,9 +412,9 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                 )}
               </div>
 
-              {/* Schedule Configuration - Frequency gets full width, others in row below */}
-              <div className="space-y-4">
-                {/* Frequency - Full width */}
+              {/* Schedule Configuration - Frequency, a cada, and dia do mes in same row */}
+              <div className="grid grid-cols-[2fr,1fr,1fr] gap-4">
+                {/* Frequency */}
                 <FormField
                   control={form.control}
                   name="frequency"
@@ -385,50 +440,49 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                   )}
                 />
 
-                {/* Frequency count and day of month in same row */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Frequency count (A cada) */}
+                <FormField
+                  control={form.control}
+                  name="frequencyCount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>A cada</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} value={field.value} onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} placeholder="1" className="bg-transparent" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Day of Month - show for monthly frequency */}
+                {watchFrequency === SCHEDULE_FREQUENCY.MONTHLY ? (
                   <FormField
                     control={form.control}
-                    name="frequencyCount"
+                    name="dayOfMonth"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>A cada</FormLabel>
+                        <FormLabel>
+                          Dia do Mês <span className="text-destructive">*</span>
+                        </FormLabel>
                         <FormControl>
-                          <Input type="number" min={1} value={field.value} onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} placeholder="1" />
+                          <Input
+                            type="number"
+                            min={1}
+                            max={31}
+                            value={field.value || ""}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
+                            placeholder="1-31"
+                            className="bg-transparent"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-
-                  {/* Day of Month - show for monthly frequency */}
-                  {watchFrequency === SCHEDULE_FREQUENCY.MONTHLY ? (
-                    <FormField
-                      control={form.control}
-                      name="dayOfMonth"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>
-                            Dia do Mês <span className="text-destructive">*</span>
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min={1}
-                              max={31}
-                              value={field.value || ""}
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
-                              placeholder="1-31"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  ) : (
-                    <div className="invisible">{/* Placeholder to maintain grid structure */}</div>
-                  )}
-                </div>
+                ) : (
+                  <div className="invisible">{/* Placeholder to maintain grid structure */}</div>
+                )}
               </div>
 
               {/* Frequency-specific fields (except monthly dayOfMonth which is now inline) */}

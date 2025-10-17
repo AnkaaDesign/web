@@ -224,34 +224,16 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
         }}
       />
 
-      {/* Show checkbox and info for users with sizes configured */}
+      {/* Show checkbox for users with sizes configured */}
       {userId && hasSizesConfigured && (
-        <div className="space-y-1.5">
-          <div className="flex items-center space-x-2">
-            <Checkbox id="show-all-sizes" checked={showAllSizes} onCheckedChange={(checked) => setShowAllSizes(Boolean(checked))} />
-            <label
-              htmlFor="show-all-sizes"
-              className="text-sm text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none"
-            >
-              Mostrar todos os tamanhos disponíveis
-            </label>
-          </div>
-
-          {/* Info text showing current filter state */}
-          <div className="text-xs text-muted-foreground pl-6">
-            {!showAllSizes ? (
-              <p>
-                Filtrando por tamanhos configurados:
-                {userSizes.shirts && ` Camisa ${userSizes.shirts}`}
-                {userSizes.pants && ` • Calça ${userSizes.pants}`}
-                {userSizes.boots && ` • Botas ${userSizes.boots}`}
-                {userSizes.sleeves && ` • Mangas ${userSizes.sleeves}`}
-                {userSizes.mask && ` • Máscara ${userSizes.mask}`}
-              </p>
-            ) : (
-              <p>Exibindo todos os tamanhos (filtro desativado)</p>
-            )}
-          </div>
+        <div className="flex items-center space-x-2">
+          <Checkbox id="show-all-sizes" checked={showAllSizes} onCheckedChange={(checked) => setShowAllSizes(Boolean(checked))} />
+          <label
+            htmlFor="show-all-sizes"
+            className="text-sm text-muted-foreground leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer select-none"
+          >
+            Mostrar todos os tamanhos
+          </label>
         </div>
       )}
 

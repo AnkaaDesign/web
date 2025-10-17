@@ -1,0 +1,58 @@
+{
+  "agent": "Agent 3: File Upload Testing (Edit Form)",
+  "testUrl": "https://test.ankaa.live",
+  "timestamp": "2025-10-17T10:29:43.437Z",
+  "summary": {
+    "total": 5,
+    "passed": 0,
+    "failed": 5,
+    "warnings": 0
+  },
+  "results": [
+    {
+      "testName": "Adding Files to Existing Task",
+      "status": "FAIL",
+      "details": "\nError: page.goto: net::ERR_NAME_NOT_RESOLVED at https://test.ankaa.live/\nCall log:\n\u001b[2m  - navigating to \"https://test.ankaa.live/\", waiting until \"load\"\u001b[22m\n",
+      "timestamp": "2025-10-17T10:29:40.474Z",
+      "issues": [
+        "Exception: page.goto: net::ERR_NAME_NOT_RESOLVED at https://test.ankaa.live/\nCall log:\n\u001b[2m  - navigating to \"https://test.ankaa.live/\", waiting until \"load\"\u001b[22m\n"
+      ]
+    },
+    {
+      "testName": "Replacing Files",
+      "status": "FAIL",
+      "details": "\nError: page.goto: net::ERR_NAME_NOT_RESOLVED at https://test.ankaa.live/\nCall log:\n\u001b[2m  - navigating to \"https://test.ankaa.live/\", waiting until \"load\"\u001b[22m\n",
+      "timestamp": "2025-10-17T10:29:41.137Z",
+      "issues": [
+        "Exception: page.goto: net::ERR_NAME_NOT_RESOLVED at https://test.ankaa.live/\nCall log:\n\u001b[2m  - navigating to \"https://test.ankaa.live/\", waiting until \"load\"\u001b[22m\n"
+      ]
+    },
+    {
+      "testName": "Mixed Updates (Text + Files)",
+      "status": "FAIL",
+      "details": "\nError: page.goto: net::ERR_NAME_NOT_RESOLVED at https://test.ankaa.live/\nCall log:\n\u001b[2m  - navigating to \"https://test.ankaa.live/\", waiting until \"load\"\u001b[22m\n",
+      "timestamp": "2025-10-17T10:29:41.780Z",
+      "issues": [
+        "Exception: page.goto: net::ERR_NAME_NOT_RESOLVED at https://test.ankaa.live/\nCall log:\n\u001b[2m  - navigating to \"https://test.ankaa.live/\", waiting until \"load\"\u001b[22m\n"
+      ]
+    },
+    {
+      "testName": "File-Only Updates",
+      "status": "FAIL",
+      "details": "\nError: page.goto: net::ERR_NAME_NOT_RESOLVED at https://test.ankaa.live/\nCall log:\n\u001b[2m  - navigating to \"https://test.ankaa.live/\", waiting until \"load\"\u001b[22m\n",
+      "timestamp": "2025-10-17T10:29:42.540Z",
+      "issues": [
+        "Exception: page.goto: net::ERR_NAME_NOT_RESOLVED at https://test.ankaa.live/\nCall log:\n\u001b[2m  - navigating to \"https://test.ankaa.live/\", waiting until \"load\"\u001b[22m\n"
+      ]
+    },
+    {
+      "testName": "Navigation Test with Files",
+      "status": "FAIL",
+      "details": "\nError: page.goto: net::ERR_NAME_NOT_RESOLVED at https://test.ankaa.live/\nCall log:\n\u001b[2m  - navigating to \"https://test.ankaa.live/\", waiting until \"load\"\u001b[22m\n",
+      "timestamp": "2025-10-17T10:29:43.076Z",
+      "issues": [
+        "Exception: page.goto: net::ERR_NAME_NOT_RESOLVED at https://test.ankaa.live/\nCall log:\n\u001b[2m  - navigating to \"https://test.ankaa.live/\", waiting until \"load\"\u001b[22m\n"
+      ]
+    }
+  ]
+}

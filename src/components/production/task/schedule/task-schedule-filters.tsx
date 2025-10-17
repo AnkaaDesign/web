@@ -111,20 +111,26 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
           <div className="space-y-3">
             <div className="text-sm font-medium">Período do Prazo</div>
             <div className="grid grid-cols-2 gap-3">
-              <DateTimeInput
-                mode="date"
-                value={localFilters.termRange?.from as Date | undefined}
-                onChange={handleFromChange}
-                label="De"
-                placeholder="Selecionar data inicial..."
-              />
-              <DateTimeInput
-                mode="date"
-                value={localFilters.termRange?.to as Date | undefined}
-                onChange={handleToChange}
-                label="Até"
-                placeholder="Selecionar data final..."
-              />
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localFilters.termRange?.from as Date | undefined}
+                  onChange={handleFromChange}
+                  hideLabel
+                  placeholder="Selecionar data inicial..."
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localFilters.termRange?.to as Date | undefined}
+                  onChange={handleToChange}
+                  hideLabel
+                  placeholder="Selecionar data final..."
+                />
+              </div>
             </div>
           </div>
 

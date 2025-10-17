@@ -583,7 +583,8 @@ export type CutWhere = z.infer<typeof cutWhereSchema>;
 // Nested schema for creating cuts from other entities (like tasks)
 export const cutCreateNestedSchema = z
   .object({
-    fileId: z.string().uuid("Arquivo inválido"),
+    fileId: z.string().uuid("Arquivo inválido").optional().nullable(),
+    file: z.any().optional().nullable(), // Allow File object from frontend
     type: z.nativeEnum(CUT_TYPE, {
       errorMap: () => ({ message: "Tipo de corte inválido" }),
     }),
@@ -599,6 +600,7 @@ export const cutCreateNestedSchema = z
     parentCutId: z.string().uuid("Corte pai inválido").nullable().optional(),
     quantity: z.number().int().min(1).max(100).optional().default(1),
   })
+  .passthrough() // Allow extra fields from frontend
   .transform(toFormData);
 
 // Map helper

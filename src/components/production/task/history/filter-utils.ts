@@ -37,18 +37,18 @@ export function extractActiveFilters(
     });
   }
 
-  // Status filter - only show if not the default (COMPLETED)
-  if (filters.status && filters.status.length > 0 && !(filters.status.length === 1 && filters.status[0] === TASK_STATUS.COMPLETED)) {
-    const includesInProgress = filters.status.includes(TASK_STATUS.PENDING) || filters.status.includes(TASK_STATUS.IN_PRODUCTION);
-    if (includesInProgress) {
+  // Status filter - show individual badges for each status
+  if (filters.status && filters.status.length > 0) {
+    filters.status.forEach((status: TASK_STATUS) => {
       activeFilters.push({
-        key: "includeInProgress",
+        key: `status-${status}`,
         label: "Status",
-        value: "Incluindo tarefas em andamento",
-        iconType: "clock",
-        onRemove: () => onRemoveFilter("includeInProgress"),
+        value: TASK_STATUS_LABELS[status] || status,
+        iconType: "checklist",
+        itemId: status,
+        onRemove: () => onRemoveFilter("status", status),
       });
-    }
+    });
   }
 
   // Entity filters - Sectors (individual badges for each sector)
@@ -265,9 +265,20 @@ export function createFilterRemover(currentFilters: Partial<TaskGetManyFormData>
       case "searchingFor":
         delete newFilters.searchingFor;
         break;
-      case "includeInProgress":
-        // Reset to default status (COMPLETED only)
-        newFilters.status = [TASK_STATUS.COMPLETED];
+      case "status":
+        if (itemId && Array.isArray(newFilters.status)) {
+          // Remove specific status from array
+          const filteredStatuses = newFilters.status.filter((s) => s !== itemId);
+          if (filteredStatuses.length > 0) {
+            newFilters.status = filteredStatuses;
+          } else {
+            // If no statuses left, reset to default (COMPLETED, INVOICED, SETTLED)
+            newFilters.status = [TASK_STATUS.COMPLETED, TASK_STATUS.INVOICED, TASK_STATUS.SETTLED];
+          }
+        } else {
+          // Remove all statuses and reset to default
+          newFilters.status = [TASK_STATUS.COMPLETED, TASK_STATUS.INVOICED, TASK_STATUS.SETTLED];
+        }
         break;
       case "sectorIds":
         if (itemId && Array.isArray(newFilters.sectorIds)) {

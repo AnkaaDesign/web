@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { File as AnkaaFile } from "../../types";
-import { formatFileSize, getFileCategory, isImageFile } from "../../utils";
+import { formatFileSize, getFileCategory, isImageFile } from "../../utils/file";
+import { getPDFThumbnailUrl, isPDFFile } from "../../utils/pdf-thumbnail";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,7 +73,12 @@ const getFileIcon = (file: AnkaaFile, size: number = 16) => {
 };
 
 const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" = "small"): string => {
-  const apiUrl = (window as any).__ANKAA_API_URL__ || process.env.VITE_API_URL || "http://localhost:3030";
+  const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
+
+  // Handle PDF thumbnails
+  if (isPDFFile(file)) {
+    return getPDFThumbnailUrl(file, { size });
+  }
 
   if (file.thumbnailUrl) {
     if (file.thumbnailUrl.startsWith("http")) {
@@ -112,10 +118,10 @@ export const FileThumbnail: React.FC<FileThumbnailProps> = ({ file, size = "md",
   const [showThumbnail, setShowThumbnail] = useState(false);
 
   const isImage = isImageFile(file);
-  const isPdf = file.mimetype === "application/pdf";
+  const isPdf = isPDFFile(file);
   const isEps = isEpsFile(file);
   const canPreview = isImage || isPdf || isEps;
-  const hasThumbnail = file.thumbnailUrl || isImage;
+  const hasThumbnail = file.thumbnailUrl || isImage || isPdf;
   const sizeConfig = getSizeConfig(size);
 
   React.useEffect(() => {

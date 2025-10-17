@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { IconFilter, IconX, IconUser, IconPackage, IconCalendarEvent, IconClock, IconToggleLeft } from "@tabler/icons-react";
-import { useUsers, useItems } from "../../../../hooks";
+import { getUsers, getItems } from "../../../../api-client";
 import type { PpeDeliveryScheduleGetManyFormData } from "../../../../schemas";
 import { SCHEDULE_FREQUENCY, SCHEDULE_FREQUENCY_LABELS, ITEM_CATEGORY_TYPE } from "../../../../constants";
 
@@ -37,12 +37,9 @@ interface FilterState {
 export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange }: PpeScheduleFiltersProps) {
   const [localState, setLocalState] = useState<FilterState>({});
 
-  // Fetch data for filters
-  const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
-  const { data: itemsData } = useItems({
-    where: { category: { type: ITEM_CATEGORY_TYPE.PPE } },
-    orderBy: { name: "asc" },
-  });
+  // Create stable caches for fetched data
+  const itemsCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+  const usersCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
 
   // Initialize local state when dialog opens
   useEffect(() => {
@@ -58,6 +55,104 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
         : undefined,
     });
   }, [open]);
+
+  // Async query function for items
+  const queryItems = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        where: { category: { type: ITEM_CATEGORY_TYPE.PPE } },
+      };
+
+      // Only add searchingFor if there's a search term
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      const response = await getItems(queryParams);
+      const items = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      // Convert items to options format and add to cache
+      const options = items.map((item) => {
+        const option = {
+          value: item.id,
+          label: `${item.name}${item.uniCode ? ` (${item.uniCode})` : ""}`,
+        };
+        itemsCacheRef.current.set(item.id, option);
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching items:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
+
+  // Async query function for users
+  const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+      };
+
+      // Only add searchingFor if there's a search term
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      const response = await getUsers(queryParams);
+      const users = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      // Convert users to options format and add to cache
+      const options = users.map((user) => {
+        const option = {
+          value: user.id,
+          label: user.name,
+        };
+        usersCacheRef.current.set(user.id, option);
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
+
+  // Get initial options from cache for selected IDs
+  const initialItemOptions = useMemo(() => {
+    if (!localState.itemIds?.length) return [];
+    return localState.itemIds
+      .map(id => itemsCacheRef.current.get(id))
+      .filter((opt): opt is { label: string; value: string } => opt !== undefined);
+  }, [localState.itemIds]);
+
+  const initialUserOptions = useMemo(() => {
+    if (!localState.userIds?.length) return [];
+    return localState.userIds
+      .map(id => usersCacheRef.current.get(id))
+      .filter((opt): opt is { label: string; value: string } => opt !== undefined);
+  }, [localState.userIds]);
 
   const handleApply = () => {
     // Build the filters object from local state
@@ -124,18 +219,6 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
   const activeFilterCount = countActiveFilters();
 
   // Transform data for comboboxes
-  const itemOptions =
-    itemsData?.data?.map((item) => ({
-      value: item.id,
-      label: `${item.name}${item.uniCode ? ` (${item.uniCode})` : ""}`,
-    })) || [];
-
-  const userOptions =
-    usersData?.data?.map((user) => ({
-      value: user.id,
-      label: user.name,
-    })) || [];
-
   const frequencyOptions = Object.entries(SCHEDULE_FREQUENCY_LABELS).map(([value, label]) => ({
     value,
     label,
@@ -174,13 +257,19 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
               Itens
             </Label>
             <Combobox
+              async={true}
+              queryKey={["items-filter-schedule"]}
+              queryFn={queryItems}
+              initialOptions={initialItemOptions}
               mode="multiple"
-              options={itemOptions}
               value={localState.itemIds || []}
               onValueChange={(value) => setLocalState((prev) => ({ ...prev, itemIds: value }))}
               placeholder="Selecione itens..."
               emptyText="Nenhum item encontrado"
               searchPlaceholder="Buscar itens..."
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
             />
           </div>
 
@@ -191,13 +280,19 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
               Usuários
             </Label>
             <Combobox
+              async={true}
+              queryKey={["users-filter-schedule"]}
+              queryFn={queryUsers}
+              initialOptions={initialUserOptions}
               mode="multiple"
-              options={userOptions}
               value={localState.userIds || []}
               onValueChange={(value) => setLocalState((prev) => ({ ...prev, userIds: value }))}
               placeholder="Selecione usuários..."
               emptyText="Nenhum usuário encontrado"
               searchPlaceholder="Buscar usuários..."
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
             />
           </div>
 
@@ -255,44 +350,50 @@ export function PpeScheduleFilters({ open, onOpenChange, filters, onFilterChange
               Próxima Entrega
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <DateTimeInput
-                mode="date"
-                value={localState.nextRunRange?.from}
-                onChange={(date: Date | null) => {
-                  if (!date && !localState.nextRunRange?.to) {
-                    setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
-                  } else {
-                    setLocalState((prev) => ({
-                      ...prev,
-                      nextRunRange: {
-                        ...(date && { from: date }),
-                        ...(localState.nextRunRange?.to && { to: localState.nextRunRange.to }),
-                      },
-                    }));
-                  }
-                }}
-                label="De"
-                placeholder="Selecionar data inicial..."
-              />
-              <DateTimeInput
-                mode="date"
-                value={localState.nextRunRange?.to}
-                onChange={(date: Date | null) => {
-                  if (!date && !localState.nextRunRange?.from) {
-                    setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
-                  } else {
-                    setLocalState((prev) => ({
-                      ...prev,
-                      nextRunRange: {
-                        ...(localState.nextRunRange?.from && { from: localState.nextRunRange.from }),
-                        ...(date && { to: date }),
-                      },
-                    }));
-                  }
-                }}
-                label="Até"
-                placeholder="Selecionar data final..."
-              />
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localState.nextRunRange?.from}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localState.nextRunRange?.to) {
+                      setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
+                    } else {
+                      setLocalState((prev) => ({
+                        ...prev,
+                        nextRunRange: {
+                          ...(date && { from: date }),
+                          ...(localState.nextRunRange?.to && { to: localState.nextRunRange.to }),
+                        },
+                      }));
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data inicial..."
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localState.nextRunRange?.to}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localState.nextRunRange?.from) {
+                      setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
+                    } else {
+                      setLocalState((prev) => ({
+                        ...prev,
+                        nextRunRange: {
+                          ...(localState.nextRunRange?.from && { from: localState.nextRunRange.from }),
+                          ...(date && { to: date }),
+                        },
+                      }));
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data final..."
+                />
+              </div>
             </div>
           </div>
 

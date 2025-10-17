@@ -29,8 +29,8 @@ const getApiBaseUrl = (): string => {
     if (windowApiUrl) return windowApiUrl;
   }
 
-  if (typeof process !== "undefined" && process.env?.VITE_API_URL) {
-    return process.env.VITE_API_URL;
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
   }
 
   return "http://localhost:3030";

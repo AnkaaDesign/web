@@ -14,6 +14,7 @@ import {
   IconCar,
   IconHome,
   IconLoader2,
+  IconFileCheck,
 } from "@tabler/icons-react";
 import { useFormContext, type Path } from "react-hook-form";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ interface FormInputProps<T extends Record<string, any>> extends Omit<InputProps,
   neighborhoodFieldName?: Path<T>;
   cityFieldName?: Path<T>;
   stateFieldName?: Path<T>;
+  logradouroFieldName?: Path<T>;
 }
 
 const typeIcons = {
@@ -46,6 +48,7 @@ const typeIcons = {
   rg: IconIdBadge,
   plate: IconCar,
   cep: IconHome,
+  "inscricao-estadual": IconFileCheck,
 } as const;
 
 export function FormInput<T extends Record<string, any>>({
@@ -61,6 +64,7 @@ export function FormInput<T extends Record<string, any>>({
   neighborhoodFieldName,
   cityFieldName,
   stateFieldName,
+  logradouroFieldName,
   ...props
 }: FormInputProps<T>) {
   const form = useFormContext<T>();
@@ -78,6 +82,9 @@ export function FormInput<T extends Record<string, any>>({
         if (data.logradouro && addressFieldName) {
           form.setValue(addressFieldName, data.logradouro as any, { shouldDirty: true });
         }
+        if (data.logradouroType && logradouroFieldName) {
+          form.setValue(logradouroFieldName, data.logradouroType as any, { shouldDirty: true });
+        }
         if (data.bairro && neighborhoodFieldName) {
           form.setValue(neighborhoodFieldName, data.bairro as any, { shouldDirty: true });
         }
@@ -89,7 +96,7 @@ export function FormInput<T extends Record<string, any>>({
         }
       }
     },
-    [type, form, addressFieldName, neighborhoodFieldName, cityFieldName, stateFieldName],
+    [type, form, addressFieldName, neighborhoodFieldName, cityFieldName, stateFieldName, logradouroFieldName],
   );
 
   return (

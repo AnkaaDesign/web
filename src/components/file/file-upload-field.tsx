@@ -328,7 +328,7 @@ export function FileUploadField({
                   const shouldShowThumbnail = showPreview && !thumbnailError && (file.preview || (isUploaded && file.thumbnailUrl));
 
                   const getThumbnailSrc = () => {
-                    const apiBaseUrl = (window as any).__ANKAA_API_URL__ || process.env.VITE_API_URL || "http://localhost:3030";
+                    const apiBaseUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
                     if (file.thumbnailUrl) {
                       if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
                       if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;
@@ -478,7 +478,7 @@ export function FileUploadField({
                 const shouldShowThumbnail = showPreview && !thumbnailError && (file.preview || (isUploaded && file.thumbnailUrl));
 
                 const getThumbnailSrc = () => {
-                  const apiBaseUrl = (window as any).__ANKAA_API_URL__ || process.env.VITE_API_URL || "http://localhost:3030";
+                  const apiBaseUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
                   if (file.thumbnailUrl) {
                     if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
                     if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;

@@ -285,8 +285,6 @@ export interface AdministrationDashboardData {
   taskOverview: {
     totalTasks: DashboardMetric;
     tasksByStatus: DashboardChartData;
-    tasksWithPrice: DashboardMetric; // price is not null
-    totalRevenue: DashboardMetric; // sum of task.price
     tasksBySector: DashboardChartData;
   };
   notificationMetrics: {
@@ -524,8 +522,6 @@ export interface ProductionDashboardData {
     averageAirbrushTime: DashboardMetric;
   };
   revenueAnalysis: {
-    totalRevenue: DashboardMetric; // sum of task prices
-    averageTaskValue: DashboardMetric;
     revenueByMonth: TimeSeriesDataPoint[];
     revenueBySector: DashboardChartData;
     revenueByCustomerType: DashboardChartData;
@@ -564,7 +560,6 @@ export interface UnifiedDashboardData {
   };
   administration: {
     orderSummary: Pick<AdministrationDashboardData["orderOverview"], "totalOrders" | "pendingOrders" | "overdueOrders">;
-    revenue: number; // sum of task prices
     missingNfe: number; // count of orders + tasks without nfe
   };
   paint: {

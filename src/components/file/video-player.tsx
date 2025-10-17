@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { IconX, IconDownload, IconPlayerPlay, IconPlayerPause, IconVolume, IconVolumeOff, IconMaximize, IconMinimize } from "@tabler/icons-react";
 import type { File as AnkaaFile } from "../../types";
-import { formatFileSize } from "../../utils";
+import { formatFileSize } from "../../utils/file";
 
 export interface VideoPlayerProps {
   file: AnkaaFile;

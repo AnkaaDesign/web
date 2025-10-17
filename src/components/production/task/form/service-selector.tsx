@@ -47,7 +47,7 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
     const params: any = {
       orderBy: { description: "asc" },
       page: page,
-      take: 20,
+      take: 50,
     };
 
     // Only add search filter if there's a search term
@@ -177,6 +177,8 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
                       loadMoreText="Carregar mais serviços"
                       loadingMoreText="Carregando..."
                       minSearchLength={0}
+                      pageSize={50}
+                      debounceMs={300}
                       className="w-full"
                     />
                   </FormControl>

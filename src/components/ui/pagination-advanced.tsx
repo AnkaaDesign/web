@@ -102,13 +102,21 @@ export function SimplePaginationAdvanced({
   const isPageOutOfBounds = startItem > totalItems && totalItems > 0;
 
   // Auto-correct page when out of bounds
+  // Use a ref to track if we've already attempted correction to prevent infinite loops
+  const correctionAttemptedRef = React.useRef(false);
+
   React.useEffect(() => {
     if (isPageOutOfBounds) {
       const lastPage = Math.max(0, totalPages - 1);
-      if (currentPage !== lastPage) {
+      // Only attempt correction if we haven't tried yet AND the page is actually different
+      if (currentPage !== lastPage && !correctionAttemptedRef.current) {
         console.warn(`Page ${displayPage} is out of bounds. Auto-correcting to last page.`);
+        correctionAttemptedRef.current = true;
         onPageChange(lastPage);
       }
+    } else {
+      // Reset the flag when page is no longer out of bounds
+      correctionAttemptedRef.current = false;
     }
   }, [isPageOutOfBounds, currentPage, totalPages, displayPage, onPageChange]);
 

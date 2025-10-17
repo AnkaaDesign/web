@@ -4,6 +4,8 @@ import { FormField, FormItem, FormControl } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { getCustomers } from "../../../../../api-client";
 import type { Customer } from "../../../../../types";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
+import { formatCNPJ } from "../../../../../utils";
 
 interface CustomerCellProps {
   control: any;
@@ -47,6 +49,22 @@ export function CustomerCell({ control, index }: CustomerCellProps) {
               searchPlaceholder="Buscar cliente..."
               getOptionLabel={(customer: Customer) => customer.fantasyName}
               getOptionValue={(customer: Customer) => customer.id}
+              renderOption={(customer: Customer) => (
+                <div className="flex items-center gap-2">
+                  <CustomerLogoDisplay
+                    logo={customer.logo}
+                    customerName={customer.fantasyName}
+                    size="xs"
+                    shape="rounded"
+                  />
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="font-medium truncate">{customer.fantasyName}</span>
+                    {customer.cnpj && (
+                      <span className="text-xs text-muted-foreground">{formatCNPJ(customer.cnpj)}</span>
+                    )}
+                  </div>
+                </div>
+              )}
               allowClear
               searchable
             />

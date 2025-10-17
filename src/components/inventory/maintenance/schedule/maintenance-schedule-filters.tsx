@@ -245,44 +245,50 @@ export function MaintenanceScheduleFilters({
               Próxima Execução
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <DateTimeInput
-                mode="date"
-                value={localState.nextRunRange?.from}
-                onChange={(date: Date | null) => {
-                  if (!date && !localState.nextRunRange?.to) {
-                    setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
-                  } else {
-                    setLocalState((prev) => ({
-                      ...prev,
-                      nextRunRange: {
-                        ...(date && { from: date }),
-                        ...(localState.nextRunRange?.to && { to: localState.nextRunRange.to }),
-                      },
-                    }));
-                  }
-                }}
-                label="De"
-                placeholder="Selecionar data inicial..."
-              />
-              <DateTimeInput
-                mode="date"
-                value={localState.nextRunRange?.to}
-                onChange={(date: Date | null) => {
-                  if (!date && !localState.nextRunRange?.from) {
-                    setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
-                  } else {
-                    setLocalState((prev) => ({
-                      ...prev,
-                      nextRunRange: {
-                        ...(localState.nextRunRange?.from && { from: localState.nextRunRange.from }),
-                        ...(date && { to: date }),
-                      },
-                    }));
-                  }
-                }}
-                label="Até"
-                placeholder="Selecionar data final..."
-              />
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localState.nextRunRange?.from}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localState.nextRunRange?.to) {
+                      setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
+                    } else {
+                      setLocalState((prev) => ({
+                        ...prev,
+                        nextRunRange: {
+                          ...(date && { from: date }),
+                          ...(localState.nextRunRange?.to && { to: localState.nextRunRange.to }),
+                        },
+                      }));
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data inicial..."
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localState.nextRunRange?.to}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localState.nextRunRange?.from) {
+                      setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
+                    } else {
+                      setLocalState((prev) => ({
+                        ...prev,
+                        nextRunRange: {
+                          ...(localState.nextRunRange?.from && { from: localState.nextRunRange.from }),
+                          ...(date && { to: date }),
+                        },
+                      }));
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data final..."
+                />
+              </div>
             </div>
           </div>
 

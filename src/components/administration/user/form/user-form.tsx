@@ -26,6 +26,7 @@ import { CityInput } from "@/components/ui/form-city-input";
 import { StateSelector } from "@/components/ui/form-state-selector";
 import { PayrollNumberInput } from "./payroll-number-input";
 import { PpeSizesSection } from "./ppe-sizes-section";
+import { AvatarUpload } from "./avatar-upload";
 
 interface BaseUserFormProps {
   isSubmitting?: boolean;
@@ -108,6 +109,9 @@ export function UserForm(props: UserFormProps) {
       rainBoots: null,
     },
 
+    // Avatar
+    avatarId: null,
+
     ...defaultValues,
   };
 
@@ -144,6 +148,7 @@ export function UserForm(props: UserFormProps) {
       contractedAt: null,
       dismissedAt: null,
       payrollNumber: null,
+      avatarId: null,
       ppeSize: {
         shirts: null,
         boots: null,
@@ -245,6 +250,25 @@ export function UserForm(props: UserFormProps) {
     <div className="h-full overflow-y-auto p-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          {/* Avatar Upload */}
+          {mode === "update" && defaultValues && (
+            <Card className="bg-transparent">
+              <CardHeader>
+                <CardTitle>Foto de Perfil</CardTitle>
+                <CardDescription>Foto do colaborador</CardDescription>
+              </CardHeader>
+              <CardContent className="flex justify-center">
+                <AvatarUpload
+                  user={defaultValues as any}
+                  disabled={isSubmitting}
+                  onAvatarChange={(avatarId) => {
+                    form.setValue("avatarId", avatarId, { shouldDirty: true });
+                  }}
+                />
+              </CardContent>
+            </Card>
+          )}
+
           {/* Basic Information */}
           <Card className="bg-transparent">
               <CardHeader>

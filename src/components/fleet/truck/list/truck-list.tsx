@@ -324,9 +324,9 @@ export function TruckList({ className }: TruckListProps) {
           />
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
-              <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">
+            <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)}>
+              <IconFilter className="h-4 w-4" />
+              <span>
                 {hasActiveFilters ? `Filtros (${activeFilters.length})` : "Filtros"}
               </span>
             </Button>

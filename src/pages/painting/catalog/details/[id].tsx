@@ -185,21 +185,9 @@ export default function PaintDetailsPage() {
             </div>
           </div>
 
-          {/* Row 2: Task History and Production History - Same Height */}
+          {/* Row 2: Task History - Full Width */}
           <div className="animate-in fade-in-50 duration-700 transition-all">
-            {/* Mobile: Single column */}
-            <div className="block lg:hidden space-y-4">
-              <PaintTasksTable paint={paint} />
-              <PaintProductionHistoryCard paint={paint} className="h-auto" />
-            </div>
-
-            {/* Desktop: 2 columns - Same height */}
-            <div className="hidden lg:block">
-              <div className="grid grid-cols-2 gap-6">
-                <PaintTasksTable paint={paint} />
-                <PaintProductionHistoryCard paint={paint} className="h-[550px]" />
-              </div>
-            </div>
+            <PaintTasksTable paint={paint} />
           </div>
 
           {/* Row 3: Changelog - Full Width */}
@@ -219,6 +207,11 @@ export default function PaintDetailsPage() {
               <RelatedPaintsCard paint={paint} />
             </div>
           )}
+
+          {/* Row 5: Production History - Full Width (Last Section) */}
+          <div className="animate-in fade-in-50 duration-1100 transition-all">
+            <PaintProductionHistoryCard paint={paint} className="h-auto lg:h-[550px]" />
+          </div>
         </div>
       </div>
 

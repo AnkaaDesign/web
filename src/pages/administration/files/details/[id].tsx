@@ -6,7 +6,8 @@ import { CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatFileSize, formatDateTime, getFileCategory } from "../../../../utils";
+import { formatDateTime } from "../../../../utils";
+import { formatFileSize, getFileCategory } from "../../../../utils/file";
 import { FileTypeIcon } from "@/components/ui/file-type-icon";
 import { Badge } from "@/components/ui/badge";
 
@@ -21,16 +22,16 @@ export const FileDetailsPage = () => {
         customerLogo: true,
         supplierLogo: true,
         orderBudgets: true,
-        orderNfes: true,
+        orderInvoices: true,
         orderReceipts: true,
         taskBudgets: true,
-        taskNfes: true,
+        taskInvoices: true,
         taskReceipts: true,
         warning: true,
         observations: true,
-        airbrushingNfes: true,
+        airbrushingInvoices: true,
         airbrushingReceipts: true,
-        externalWithdrawalNfes: true,
+        externalWithdrawalInvoices: true,
         externalWithdrawalReceipts: true,
       },
     },

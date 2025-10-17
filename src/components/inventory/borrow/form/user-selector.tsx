@@ -1,89 +1,103 @@
-import { useState, useMemo, useEffect } from "react";
+import { useMemo, useCallback } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
-import { useUsers } from "../../../../hooks";
-import type { BorrowCreateFormData, BorrowUpdateFormData } from "../../../../schemas";
 import { USER_STATUS } from "../../../../constants";
 import type { User } from "../../../../types";
-import { toast } from "sonner";
+import { getUsers } from "../../../../api-client";
 
 interface UserSelectorProps {
   control: any;
   disabled?: boolean;
   selectedUserId?: string;
+  initialUser?: User;
 }
 
-export function BorrowUserSelector({ control, disabled, selectedUserId }: UserSelectorProps) {
-  const [search] = useState("");
+export function BorrowUserSelector({ control, disabled, selectedUserId, initialUser }: UserSelectorProps) {
+  // Memoize initialOptions with stable dependency
+  const initialOptions = useMemo(() => {
+    if (!initialUser) return [];
 
-  // Fetch active users (experience period and contracted) with their positions and sectors
-  const {
-    data: usersResponse,
-    isLoading,
-    error,
-  } = useUsers({
-    statuses: [
-      USER_STATUS.EXPERIENCE_PERIOD_1,
-      USER_STATUS.EXPERIENCE_PERIOD_2,
-      USER_STATUS.CONTRACTED
-    ],
-    orderBy: { name: "asc" },
-    take: 150,
-    include: {
-      position: {
-        include: {
-          sector: true,
+    return [{
+      value: initialUser.id,
+      label: initialUser.name,
+      description: initialUser.position?.name,
+    }];
+  }, [initialUser?.id]);
+
+  // Async query function for Combobox with pagination
+  const queryFn = useCallback(async (searchTerm: string, page: number = 1) => {
+    const pageSize = 50;
+    const response = await getUsers({
+      take: pageSize,
+      skip: (page - 1) * pageSize,
+      where: {
+        status: {
+          in: [
+            USER_STATUS.EXPERIENCE_PERIOD_1,
+            USER_STATUS.EXPERIENCE_PERIOD_2,
+            USER_STATUS.CONTRACTED,
+          ],
+        },
+        ...(searchTerm ? {
+          OR: [
+            { name: { contains: searchTerm, mode: "insensitive" } },
+            { email: { contains: searchTerm, mode: "insensitive" } },
+            { cpf: { contains: searchTerm } },
+          ],
+        } : {}),
+      },
+      orderBy: { name: "asc" },
+      include: {
+        position: {
+          include: {
+            sector: true,
+          },
         },
       },
-    },
-  });
+    });
 
-  const users = usersResponse?.data || [];
+    const users = response.data || [];
+    const total = response.total || 0;
+    const hasMore = (page * pageSize) < total;
 
-  // Get selected user for displaying details and validation
-  const selectedUser = users.find((user: User) => user.id === selectedUserId);
+    return {
+      data: users.map((user) => ({
+        value: user.id,
+        label: user.name,
+        description: user.position?.name,
+        metadata: {
+          email: user.email,
+          position: user.position,
+          status: user.status,
+        },
+      })),
+      hasMore,
+      total,
+    };
+  }, []);
 
-  // Filter users based on search
-  const filteredUsers = useMemo(() => {
-    if (!search) return users;
+  // Custom render function for user options
+  const renderUserOption = (option: any) => {
+    const metadata = option.metadata;
+    if (!metadata) return option.label;
 
-    const searchLower = search.toLowerCase();
-    return users.filter(
-      (user: User) =>
-        user.name.toLowerCase().includes(searchLower) ||
-        (user.email && user.email.toLowerCase().includes(searchLower)) ||
-        (user.cpf && user.cpf.includes(search)) ||
-        (user.position?.name && user.position.name.toLowerCase().includes(searchLower)),
+    return (
+      <div className="flex items-center justify-between w-full">
+        <div className="flex flex-col">
+          <span className="truncate">{option.label}</span>
+          {metadata.position && (
+            <span className="text-xs text-muted-foreground">{metadata.position.name}</span>
+          )}
+        </div>
+        {metadata.position?.sector && (
+          <Badge variant="outline" className="text-xs flex-shrink-0">
+            {metadata.position.sector.name}
+          </Badge>
+        )}
+      </div>
     );
-  }, [users, search]);
-
-  const userOptions = filteredUsers.map((user: User) => ({
-    value: user.id,
-    label: user.name,
-    searchableText: `${user.name} ${user.email || ""} ${user.cpf || ""} ${user.position?.name || ""}`.toLowerCase(),
-    email: user.email,
-    position: user.position?.name,
-    sector: user.position?.sector?.name,
-    status: user.status,
-  }));
-
-  // Show warning if no active users are available
-  const hasNoActiveUsers = !isLoading && userOptions.length === 0;
-
-  // Validate selected user
-  useEffect(() => {
-    if (selectedUser) {
-      // Check if user is in valid status (not dismissed)
-      if (selectedUser.status === USER_STATUS.DISMISSED) {
-        toast.error("Usuário selecionado está desligado");
-      }
-      // Check if user has a position (for better tracking)
-      if (!selectedUser.position) {
-        toast.warning("Usuário selecionado não possui cargo definido");
-      }
-    }
-  }, [selectedUser]);
+  };
 
   return (
     <FormField
@@ -94,45 +108,22 @@ export function BorrowUserSelector({ control, disabled, selectedUserId }: UserSe
           <FormLabel>Usuário *</FormLabel>
           <FormControl>
             <Combobox
+              async
+              queryKey={["users", "borrow-selector"]}
+              queryFn={queryFn}
+              initialOptions={initialOptions}
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
               value={field.value || ""}
               onValueChange={field.onChange}
-              options={userOptions}
               placeholder="Selecione um usuário"
               emptyText="Nenhum usuário encontrado"
-              disabled={disabled || isLoading}
+              disabled={disabled}
+              renderOption={renderUserOption}
               searchable
             />
           </FormControl>
-          {selectedUser && (
-            <FormDescription className="space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span>Usuário: {selectedUser.name}</span>
-                {selectedUser.position && (
-                  <Badge variant="secondary" className="text-xs">
-                    {selectedUser.position.name}
-                  </Badge>
-                )}
-                {selectedUser.position?.sector && (
-                  <Badge variant="outline" className="text-xs">
-                    {selectedUser.position.sector.name}
-                  </Badge>
-                )}
-                <Badge
-                  variant={selectedUser.status === USER_STATUS.DISMISSED ? "destructive" : "default"}
-                  className="text-xs"
-                >
-                  {selectedUser.status === USER_STATUS.EXPERIENCE_PERIOD_1 ? "Experiência 1/2" :
-                   selectedUser.status === USER_STATUS.EXPERIENCE_PERIOD_2 ? "Experiência 2/2" :
-                   selectedUser.status === USER_STATUS.CONTRACTED ? "Contratado" :
-                   "Desligado"}
-                </Badge>
-              </div>
-              {selectedUser.email && <div className="text-sm text-muted-foreground">Email: {selectedUser.email}</div>}
-              {!selectedUser.position && <div className="text-amber-600 text-sm">⚠️ Usuário sem cargo definido</div>}
-            </FormDescription>
-          )}
-          {hasNoActiveUsers && <FormDescription className="text-amber-600">⚠️ Nenhum usuário ativo encontrado. Verifique se há usuários ativos no sistema.</FormDescription>}
-          {error && <FormDescription className="text-destructive">Erro ao carregar usuários. Tente novamente.</FormDescription>}
           <FormMessage />
         </FormItem>
       )}

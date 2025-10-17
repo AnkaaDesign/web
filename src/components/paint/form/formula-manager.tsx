@@ -144,13 +144,6 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
         <div className="space-y-4">
           <FormulaSampler availableItems={availableItems} />
         </div>
-
-        {/* Help Text */}
-        <div className="pt-8">
-          <p className="text-xs text-muted-foreground/70">
-            Adicione os componentes da fórmula especificando o peso em gramas de cada componente. Digite valores separados por espaço e pressione espaço para somar automaticamente. Se não adicionar nenhum componente, a tinta será salva sem fórmula.
-          </p>
-        </div>
       </div>
     </FormProvider>
   );

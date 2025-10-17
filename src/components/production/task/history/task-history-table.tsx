@@ -105,6 +105,7 @@ export function TaskHistoryTable({
   const queryParams = React.useMemo(() => {
     console.log("[TaskHistoryTable] Building query params:", {
       filters,
+      filtersSearchingFor: filters.searchingFor,
       page,
       pageSize,
       showSelectedOnly,
@@ -137,6 +138,7 @@ export function TaskHistoryTable({
     };
 
     console.log("[TaskHistoryTable] Query params built:", {
+      searchingFor: params.searchingFor,
       page: params.page,
       limit: params.limit,
       status: params.status,
@@ -210,6 +212,10 @@ export function TaskHistoryTable({
     toggleSelection(id);
   };
 
+  const handleContextMenuClose = React.useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
   const renderSortIndicator = (columnKey: string) => {
     const currentSort = sortConfigs.find(s => s.column === columnKey);
 
@@ -232,6 +238,16 @@ export function TaskHistoryTable({
     tasks: Task[];
     isBulk: boolean;
   } | null>(null);
+
+  // Log context menu state changes
+  React.useEffect(() => {
+    console.log('[TaskHistoryTable] Context menu state changed:', contextMenu ? {
+      x: contextMenu.x,
+      y: contextMenu.y,
+      tasksCount: contextMenu.tasks.length,
+      isBulk: contextMenu.isBulk
+    } : null);
+  }, [contextMenu]);
 
   // Context menu handlers
   const handleContextMenu = (e: React.MouseEvent, task: Task) => {
@@ -264,7 +280,20 @@ export function TaskHistoryTable({
 
   // Close context menu when clicking outside
   React.useEffect(() => {
-    const handleClick = () => setContextMenu(null);
+    const handleClick = (e: MouseEvent) => {
+      // Don't close if clicking inside a dropdown menu or dialog/modal
+      const target = e.target as HTMLElement;
+      if (
+        target.closest('[role="menu"]') ||
+        target.closest('[role="dialog"]') ||
+        target.closest('[data-radix-popper-content-wrapper]')
+      ) {
+        console.log('[TaskHistoryTable] Click inside menu/modal, not closing context menu');
+        return;
+      }
+      console.log('[TaskHistoryTable] Click outside, closing context menu');
+      setContextMenu(null);
+    };
     document.addEventListener("click", handleClick);
     return () => document.removeEventListener("click", handleClick);
   }, []);
@@ -458,9 +487,9 @@ export function TaskHistoryTable({
       {/* Context Menu */}
       {contextMenu && (
         <TaskHistoryContextMenu
-          task={contextMenu.tasks[0]}
+          tasks={contextMenu.tasks}
           position={{ x: contextMenu.x, y: contextMenu.y }}
-          onClose={() => setContextMenu(null)}
+          onClose={handleContextMenuClose}
           selectedIds={contextMenu.isBulk ? selectedIds : [contextMenu.tasks[0]?.id].filter(Boolean)}
         />
       )}

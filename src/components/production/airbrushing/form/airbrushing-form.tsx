@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "../../../../utils";
 import type { FileWithPreview } from "@/components/file";
+import { createAirbrushingFormData } from "@/utils/form-data-helper";
 
 export interface AirbrushingFormHandle {
   handleNext: () => void;
@@ -377,15 +378,58 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       }
 
       const data = form.getValues();
+
+      // Check if there are new files to upload
+      const newReceiptFiles = receiptFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
+      const newNfeFiles = nfeFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
+      const newArtworkFiles = artworkFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
+      const hasNewFiles = newReceiptFiles.length > 0 || newNfeFiles.length > 0 || newArtworkFiles.length > 0;
+
+      console.log('[AIRBRUSHING FORM] Submission data:', {
+        mode,
+        hasNewFiles,
+        receiptFilesCount: newReceiptFiles.length,
+        nfeFilesCount: newNfeFiles.length,
+        artworkFilesCount: newArtworkFiles.length,
+      });
+
       let result;
 
-      if (mode === "create") {
-        result = await create(data as AirbrushingCreateFormData);
+      if (hasNewFiles) {
+        console.log('[AIRBRUSHING FORM] Creating FormData with files');
+        const customerInfo = selectedTask?.data?.customer ? {
+          id: selectedTask.data.customer.id,
+          name: selectedTask.data.customer.fantasyName || selectedTask.data.customer.name,
+        } : undefined;
+
+        const formData = createAirbrushingFormData(
+          data,
+          {
+            receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
+            invoices: newNfeFiles.length > 0 ? newNfeFiles as File[] : undefined,
+            artworks: newArtworkFiles.length > 0 ? newArtworkFiles as File[] : undefined,
+          },
+          customerInfo
+        );
+
+        if (mode === "create") {
+          result = await create(formData as any);
+        } else {
+          result = await update({
+            id: airbrushingId!,
+            data: formData as any,
+          });
+        }
       } else {
-        result = await update({
-          id: airbrushingId!,
-          data: data as AirbrushingUpdateFormData,
-        });
+        console.log('[AIRBRUSHING FORM] Submitting without files');
+        if (mode === "create") {
+          result = await create(data as AirbrushingCreateFormData);
+        } else {
+          result = await update({
+            id: airbrushingId!,
+            data: data as AirbrushingUpdateFormData,
+          });
+        }
       }
 
       // Success toast is handled automatically by API client
@@ -398,7 +442,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
     } catch (error) {
       toast.error(`Erro ao ${mode === "create" ? "criar" : "atualizar"} aerografia`);
     }
-  }, [validateCurrentStep, form, mode, create, update, airbrushingId, onSuccess, navigate]);
+  }, [validateCurrentStep, form, mode, create, update, airbrushingId, onSuccess, navigate, receiptFiles, nfeFiles, artworkFiles, selectedTask]);
 
   const isLastStep = currentStep === steps.length;
   const isFirstStep = currentStep === 1;

@@ -170,7 +170,7 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
                     name="quantity"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Quantidade *</FormLabel>
+                        <FormLabel>Quantidade <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -188,6 +188,7 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
                               }
                             }}
                             placeholder="Quantidade"
+                            className="bg-transparent"
                           />
                         </FormControl>
                         <FormMessage />
@@ -204,7 +205,7 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
                   name="quantity"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Quantidade *</FormLabel>
+                      <FormLabel>Quantidade <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -222,7 +223,7 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
                             }
                           }}
                           placeholder="Quantidade"
-                          className="max-w-[150px]"
+                          className="max-w-[150px] bg-transparent"
                         />
                       </FormControl>
                       <FormMessage />

@@ -1,10 +1,11 @@
 import * as React from "react";
 import { IconArrowLeft, IconArrowRight, IconX, IconZoomIn, IconZoomOut, IconDownload, IconExternalLink, IconVectorBezier } from "@tabler/icons-react";
-import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../types";
-import { isImageFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension } from "../../utils";
+import { isImageFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension } from "../../utils/file";
 
 const isEpsFile = (file: AnkaaFile): boolean => {
   const epsMimeTypes = ["application/postscript", "application/x-eps", "application/eps", "image/eps", "image/x-eps"];
@@ -50,10 +51,10 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
     setCurrentIndex(initialFileIndex);
   }, [initialFileIndex]);
 
+  // Reset zoom and loading when image changes (but not when fitZoom updates)
   React.useEffect(() => {
-    setZoom(fitZoom);
     setImageLoading(true);
-  }, [currentIndex, fitZoom]);
+  }, [currentIndex]);
 
   // Update image dimensions when zoom changes
   React.useEffect(() => {
@@ -130,9 +131,7 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [open, onOpenChange, handlePrevious, handleNext, handleZoomIn, handleZoomOut, handleResetZoom]);
 
-  const handleImageLoad = () => {
-    setImageLoading(false);
-
+  const handleImageLoad = React.useCallback(() => {
     // Calculate optimal zoom to fit image in container
     if (imageRef.current && containerRef.current) {
       const img = imageRef.current;
@@ -158,10 +157,12 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
       img.style.width = `${scaledWidth}px`;
       img.style.height = `${scaledHeight}px`;
 
+      // Update fit zoom and current zoom together
       setFitZoom(optimalScale);
       setZoom(optimalScale);
+      setImageLoading(false);
     }
-  };
+  }, [totalImages]);
 
   const handleDownload = () => {
     if (!currentFile) return;
@@ -186,6 +187,9 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogOverlay className="bg-black/90 backdrop-blur-sm" />
       <DialogContent className="max-w-[100vw] max-h-[100vh] w-full h-full p-0 border-0 bg-transparent shadow-none" aria-describedby="file-preview-description">
+        <VisuallyHidden>
+          <DialogTitle>Visualizador de Arquivo: {currentFile.filename}</DialogTitle>
+        </VisuallyHidden>
         <div className="relative w-full h-full">
           {/* Fixed Header - Always visible */}
           <div className="fixed top-4 left-4 right-4 z-[100] flex items-center justify-between pointer-events-none">

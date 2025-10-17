@@ -7,6 +7,7 @@ import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, Icon
 import { cn } from "@/lib/utils";
 import { formatDate, formatDateTime } from "../../../../utils";
 import type { Order } from "../../../../types";
+import { FilePreviewCard } from "@/components/file";
 
 interface OrderInfoCardProps {
   order: Order;
@@ -129,37 +130,44 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
         {(order.budget || order.nfe || order.receipt) && (
           <>
             <Separator className="bg-border/50" />
-            <div className="space-y-4">
-              <h3 className="text-base font-semibold mb-4 text-foreground">Anexos</h3>
-              <div className="space-y-2">
-                {order.budget && (
-                  <div className="flex items-center gap-2">
-                    <IconFile className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Orçamento</span>
-                    <Badge variant="outline" className="text-xs">
-                      Anexado
-                    </Badge>
+            <div className="space-y-6">
+              <h3 className="text-base font-semibold text-foreground">Documentos Anexados</h3>
+
+              {order.budget && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
+                    <h4 className="text-sm font-semibold">Orçamento</h4>
                   </div>
-                )}
-                {order.nfe && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <FilePreviewCard file={order.budget} size="md" showMetadata={true} />
+                  </div>
+                </div>
+              )}
+
+              {order.nfe && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
                     <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">NFe</span>
-                    <Badge variant="outline" className="text-xs">
-                      Anexado
-                    </Badge>
+                    <h4 className="text-sm font-semibold">Nota Fiscal</h4>
                   </div>
-                )}
-                {order.receipt && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <FilePreviewCard file={order.nfe} size="md" showMetadata={true} />
+                  </div>
+                </div>
+              )}
+
+              {order.receipt && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
                     <IconReceipt className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Recibo</span>
-                    <Badge variant="outline" className="text-xs">
-                      Anexado
-                    </Badge>
+                    <h4 className="text-sm font-semibold">Recibo</h4>
                   </div>
-                )}
-              </div>
+                  <div className="flex flex-wrap gap-2">
+                    <FilePreviewCard file={order.receipt} size="md" showMetadata={true} />
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}

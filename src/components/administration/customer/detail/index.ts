@@ -5,3 +5,5 @@ export { RelatedServiceOrdersCard } from "./related-service-orders-card";
 export { CustomerActivityCard } from "./customer-activity-card";
 export { RelatedInvoicesCard } from "./related-invoices-card";
 export { CustomerTasksTable } from "./customer-tasks-table";
+export { CustomerTasksList } from "./customer-tasks-list";
+export { DocumentsCard } from "./documents-card";

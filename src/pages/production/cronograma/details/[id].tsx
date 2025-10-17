@@ -29,6 +29,7 @@ import {
   AIRBRUSHING_STATUS_LABELS,
 } from "../../../../constants";
 import { formatDate, formatDateTime, formatCurrency, isValidTaskStatusTransition } from "../../../../utils";
+import { generateBudgetPDF } from "../../../../utils/budget-pdf-generator";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import {
   AlertDialog,
@@ -55,6 +56,7 @@ import {
   IconCurrencyReal,
   IconFile,
   IconFileText,
+  IconFileInvoice,
   IconPaint,
   IconFiles,
   IconAlertCircle,
@@ -72,11 +74,13 @@ import {
   IconLayoutGrid,
   IconHistory,
   IconPlayerPause,
+  IconBarcode,
+  IconList,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-normal-map-renderer";
-import { FilePreviewCard, FilePreviewModal } from "@/components/file";
+import { FileItem, FilePreviewModal, useFileViewer, type FileViewMode } from "@/components/file";
 
 // Component to display truck layout SVG preview
 const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?: string }) => {
@@ -336,6 +340,28 @@ export const TaskDetailsPage = () => {
   const [nextServiceOrderToStart, setNextServiceOrderToStart] = useState<any>(null);
   const [filePreviewModalOpen, setFilePreviewModalOpen] = useState(false);
   const [filePreviewInitialIndex, setFilePreviewInitialIndex] = useState(0);
+  const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("list");
+  const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("list");
+
+  // Try to get file viewer context (optional)
+  let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
+  try {
+    fileViewerContext = useFileViewer();
+  } catch {
+    // Context not available
+  }
+
+  const handlePreview = (file: any) => {
+    if (fileViewerContext) {
+      fileViewerContext.actions.viewFile(file);
+    }
+  };
+
+  const handleDownload = (file: any) => {
+    if (fileViewerContext) {
+      fileViewerContext.actions.downloadFile(file);
+    }
+  };
 
   // Fetch task details with all relations
   const {
@@ -351,6 +377,7 @@ export const TaskDetailsPage = () => {
       createdBy: true,
       services: true,
       artworks: true,
+      budget: true,
       budgets: true,
       invoices: true,
       receipts: true,
@@ -548,6 +575,12 @@ export const TaskDetailsPage = () => {
     setNextServiceOrderToStart(null);
   };
 
+  // Handle budget PDF download
+  const handleDownloadBudgetPDF = () => {
+    if (!task || !task.budget) return;
+    generateBudgetPDF({ task });
+  };
+
   // Loading state
   if (isLoading) {
     return (
@@ -700,17 +733,6 @@ export const TaskDetailsPage = () => {
                           </div>
                         </div>
                       )}
-
-                      {/* Price */}
-                      {task.price != null && (
-                        <div className="flex items-start gap-3">
-                          <IconCurrencyReal className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-muted-foreground">Valor</p>
-                            <p className="text-sm font-semibold">{formatCurrency(task.price)}</p>
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     <div className="space-y-4">
@@ -720,7 +742,7 @@ export const TaskDetailsPage = () => {
                           <IconHash className="h-5 w-5 text-muted-foreground mt-0.5" />
                           <div className="flex-1">
                             <p className="text-sm font-medium text-muted-foreground">Número de Série</p>
-                            <p className="text-sm font-semibold">{task.serialNumber}</p>
+                            <p className="text-sm font-semibold font-mono">{task.serialNumber}</p>
                           </div>
                         </div>
                       )}
@@ -731,7 +753,18 @@ export const TaskDetailsPage = () => {
                           <IconCar className="h-5 w-5 text-muted-foreground mt-0.5" />
                           <div className="flex-1">
                             <p className="text-sm font-medium text-muted-foreground">Placa</p>
-                            <p className="text-sm font-semibold uppercase">{task.plate}</p>
+                            <p className="text-sm font-semibold font-mono uppercase">{task.plate}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Chassis Number */}
+                      {task.chassisNumber && (
+                        <div className="flex items-start gap-3">
+                          <IconBarcode className="h-5 w-5 text-muted-foreground mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-muted-foreground">Nº Chassi</p>
+                            <p className="text-sm font-semibold font-mono">{task.chassisNumber}</p>
                           </div>
                         </div>
                       )}
@@ -839,6 +872,70 @@ export const TaskDetailsPage = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Budget Card */}
+              {task.budget && task.budget.length > 0 && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-825" level={1}>
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-lg font-medium">
+                        <IconFileInvoice className="h-5 w-5 text-muted-foreground" />
+                        Orçamento Detalhado
+                      </CardTitle>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDownloadBudgetPDF}
+                        className="gap-2"
+                      >
+                        <IconDownload className="h-4 w-4" />
+                        Baixar PDF
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0 flex-1">
+                    <div className="space-y-4">
+                      {/* Budget items table */}
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">
+                                Referência
+                              </th>
+                              <th className="px-4 py-3 text-right text-sm font-semibold text-muted-foreground w-32">
+                                Valor
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {task.budget.map((item, index) => (
+                              <tr key={item.id || index} className="hover:bg-muted/30 transition-colors">
+                                <td className="px-4 py-3 text-sm">{item.referencia}</td>
+                                <td className="px-4 py-3 text-sm text-right font-medium">
+                                  {formatCurrency(item.valor)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Total row */}
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-base font-bold text-foreground">TOTAL</span>
+                          <span className="text-lg font-bold text-primary">
+                            {formatCurrency(
+                              task.budget.reduce((sum, item) => sum + item.valor, 0)
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Truck Layout Card */}
               {task.truck && (
@@ -963,7 +1060,14 @@ export const TaskDetailsPage = () => {
                           {/* Squared File Preview on Right */}
                           {cut.file && (
                             <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <FilePreviewCard file={cut.file} size="sm" className="w-20 h-20" />
+                              <FileItem
+                                file={cut.file}
+                                viewMode="list"
+                                onPreview={handlePreview}
+                                onDownload={handleDownload}
+                                showActions
+                                className="w-20 h-20"
+                              />
                             </div>
                           )}
                         </div>
@@ -985,35 +1089,62 @@ export const TaskDetailsPage = () => {
                           {task.artworks?.length ?? 0}
                         </Badge>
                       </CardTitle>
-                      {(task.artworks?.length ?? 0) > 1 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
-                            for (let i = 0; i < (task.artworks?.length ?? 0); i++) {
-                              const file = task.artworks?.[i];
-                              if (file) {
-                                const downloadUrl = `${apiUrl}/files/${file.id}/download`;
-                                window.open(downloadUrl, "_blank");
+                      <div className="flex items-center gap-2">
+                        {(task.artworks?.length ?? 0) > 1 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
+                              for (let i = 0; i < (task.artworks?.length ?? 0); i++) {
+                                const file = task.artworks?.[i];
+                                if (file) {
+                                  const downloadUrl = `${apiUrl}/files/${file.id}/download`;
+                                  window.open(downloadUrl, "_blank");
+                                }
+                                if (i < (task.artworks?.length ?? 0) - 1) {
+                                  await new Promise((resolve) => setTimeout(resolve, 200));
+                                }
                               }
-                              if (i < (task.artworks?.length ?? 0) - 1) {
-                                await new Promise((resolve) => setTimeout(resolve, 200));
-                              }
-                            }
-                          }}
-                          className="text-xs"
-                        >
-                          <IconDownload className="h-3 w-3 mr-1" />
-                          Baixar Todos
-                        </Button>
-                      )}
+                            }}
+                            className="text-xs"
+                          >
+                            <IconDownload className="h-3 w-3 mr-1" />
+                            Baixar Todos
+                          </Button>
+                        )}
+                        <div className="flex gap-1">
+                          <Button
+                            variant={artworksViewMode === "list" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setArtworksViewMode("list")}
+                            className="h-7 w-7 p-0"
+                          >
+                            <IconList className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant={artworksViewMode === "grid" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setArtworksViewMode("grid")}
+                            className="h-7 w-7 p-0"
+                          >
+                            <IconLayoutGrid className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0 flex-1">
-                    <div className="flex flex-wrap gap-2">
+                    <div className={cn(artworksViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
                       {task.artworks?.map((file) => (
-                        <FilePreviewCard key={file.id} file={file} size="md" showMetadata={false} />
+                        <FileItem
+                          key={file.id}
+                          file={file}
+                          viewMode={artworksViewMode}
+                          onPreview={handlePreview}
+                          onDownload={handleDownload}
+                          showActions
+                        />
                       ))}
                     </div>
                   </CardContent>
@@ -1024,13 +1155,33 @@ export const TaskDetailsPage = () => {
               {((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0)) && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1050" level={1}>
                   <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                      <IconFileText className="h-5 w-5 text-muted-foreground" />
-                      Documentos
-                      <Badge variant="secondary" className="ml-2">
-                        {[...(task.budgets || []), ...(task.invoices || []), ...(task.receipts || [])].length}
-                      </Badge>
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-lg font-medium">
+                        <IconFileText className="h-5 w-5 text-muted-foreground" />
+                        Documentos
+                        <Badge variant="secondary" className="ml-2">
+                          {[...(task.budgets || []), ...(task.invoices || []), ...(task.receipts || [])].length}
+                        </Badge>
+                      </CardTitle>
+                      <div className="flex gap-1">
+                        <Button
+                          variant={documentsViewMode === "list" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setDocumentsViewMode("list")}
+                          className="h-7 w-7 p-0"
+                        >
+                          <IconList className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant={documentsViewMode === "grid" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setDocumentsViewMode("grid")}
+                          className="h-7 w-7 p-0"
+                        >
+                          <IconLayoutGrid className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent className="pt-0 flex-1">
                     <div className="space-y-6">
@@ -1040,9 +1191,16 @@ export const TaskDetailsPage = () => {
                             <IconCurrencyReal className="h-4 w-4 text-muted-foreground" />
                             <h4 className="text-sm font-semibold">Orçamentos</h4>
                           </div>
-                          <div className="flex flex-wrap gap-2">
+                          <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
                             {task.budgets.map((budget: any) => (
-                              <FilePreviewCard key={budget.id} file={budget} size="md" showMetadata={true} />
+                              <FileItem
+                                key={budget.id}
+                                file={budget}
+                                viewMode={documentsViewMode}
+                                onPreview={handlePreview}
+                                onDownload={handleDownload}
+                                showActions
+                              />
                             ))}
                           </div>
                         </div>
@@ -1054,9 +1212,16 @@ export const TaskDetailsPage = () => {
                             <IconFileText className="h-4 w-4 text-muted-foreground" />
                             <h4 className="text-sm font-semibold">Notas Fiscais</h4>
                           </div>
-                          <div className="flex flex-wrap gap-2">
+                          <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
                             {task.invoices.map((nfe: any) => (
-                              <FilePreviewCard key={nfe.id} file={nfe} size="md" showMetadata={true} />
+                              <FileItem
+                                key={nfe.id}
+                                file={nfe}
+                                viewMode={documentsViewMode}
+                                onPreview={handlePreview}
+                                onDownload={handleDownload}
+                                showActions
+                              />
                             ))}
                           </div>
                         </div>
@@ -1068,9 +1233,16 @@ export const TaskDetailsPage = () => {
                             <IconFile className="h-4 w-4 text-muted-foreground" />
                             <h4 className="text-sm font-semibold">Recibos</h4>
                           </div>
-                          <div className="flex flex-wrap gap-2">
+                          <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
                             {task.receipts.map((receipt: any) => (
-                              <FilePreviewCard key={receipt.id} file={receipt} size="md" showMetadata={true} />
+                              <FileItem
+                                key={receipt.id}
+                                file={receipt}
+                                viewMode={documentsViewMode}
+                                onPreview={handlePreview}
+                                onDownload={handleDownload}
+                                showActions
+                              />
                             ))}
                           </div>
                         </div>
@@ -1266,17 +1438,18 @@ export const TaskDetailsPage = () => {
                           <IconFiles className="h-4 w-4" />
                           Arquivos Anexados
                         </h4>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-3">
                           {task.observation.files.map((file: any, index: number) => (
-                            <FilePreviewCard
+                            <FileItem
                               key={file.id}
                               file={file}
-                              size="md"
-                              showMetadata={false}
-                              onPreview={() => {
+                              viewMode="grid"
+                              onPreview={(f) => {
                                 setFilePreviewInitialIndex(index);
                                 setFilePreviewModalOpen(true);
                               }}
+                              onDownload={handleDownload}
+                              showActions
                             />
                           ))}
                         </div>

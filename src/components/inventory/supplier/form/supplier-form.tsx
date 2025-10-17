@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supplierCreateSchema, supplierUpdateSchema, type SupplierCreateFormData, type SupplierUpdateFormData } from "../../../../schemas";
 import { serializeSupplierFormToUrlParams, getDefaultSupplierFormValues, debounce } from "@/utils/url-form-state";
 import { createSupplierFormData } from "@/utils/form-data-helper";
+import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
 
 // Import all form components
 import { FantasyNameInput } from "./fantasy-name-input";
@@ -20,6 +21,7 @@ import { AddressComplementInput } from "@/components/ui/form-address-complement-
 import { NeighborhoodInput } from "@/components/ui/form-neighborhood-input";
 import { CityInput } from "@/components/ui/form-city-input";
 import { StateSelector } from "@/components/ui/form-state-selector";
+import { LogradouroSelect } from "@/components/ui/form-logradouro-select";
 import { LogoInput } from "./logo-input";
 import { TagsInput } from "./tags-input";
 
@@ -67,6 +69,7 @@ export function SupplierForm(props: SupplierFormProps) {
       cnpj: null,
       corporateName: null,
       email: null,
+      logradouro: null,
       address: null,
       addressNumber: null,
       addressComplement: null,
@@ -90,6 +93,7 @@ export function SupplierForm(props: SupplierFormProps) {
       cnpj: null,
       corporateName: null,
       email: null,
+      logradouro: null,
       address: null,
       addressNumber: null,
       addressComplement: null,
@@ -107,6 +111,62 @@ export function SupplierForm(props: SupplierFormProps) {
     shouldFocusError: true, // Focus on first error field when validation fails
     criteriaMode: "all", // Show all errors for better UX
   });
+
+  // CNPJ lookup hook
+  const { lookupCnpj } = useCnpjLookup({
+    onSuccess: (data) => {
+      // Autofill fields with data from Brasil API
+      form.setValue("fantasyName", data.fantasyName, { shouldDirty: true, shouldValidate: true });
+      if (data.corporateName) {
+        form.setValue("corporateName", data.corporateName, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.email) {
+        form.setValue("email", data.email, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.zipCode) {
+        form.setValue("zipCode", data.zipCode, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.logradouroType) {
+        form.setValue("logradouro", data.logradouroType, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.address) {
+        form.setValue("address", data.address, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.addressNumber) {
+        form.setValue("addressNumber", data.addressNumber, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.addressComplement) {
+        form.setValue("addressComplement", data.addressComplement, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.neighborhood) {
+        form.setValue("neighborhood", data.neighborhood, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.city) {
+        form.setValue("city", data.city, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.state) {
+        form.setValue("state", data.state, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.phones && data.phones.length > 0) {
+        // Add all phones to the phones array, avoiding duplicates
+        const currentPhones = form.getValues("phones") || [];
+        const newPhones = data.phones.filter(phone => !currentPhones.includes(phone));
+        if (newPhones.length > 0) {
+          form.setValue("phones", [...currentPhones, ...newPhones], { shouldDirty: true, shouldValidate: true });
+        }
+      }
+    },
+  });
+
+  // Watch CNPJ field and trigger lookup when complete
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === "cnpj" && value.cnpj) {
+        lookupCnpj(value.cnpj);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, lookupCnpj]);
 
   // Reset form when defaultValues change in update mode (e.g., new supplier data loaded)
   const defaultValuesRef = useRef(defaultValues);
@@ -323,19 +383,27 @@ export function SupplierForm(props: SupplierFormProps) {
                   neighborhoodFieldName="neighborhood"
                   cityFieldName="city"
                   stateFieldName="state"
+                  logradouroFieldName="logradouro"
                 />
-                <AddressInput disabled={isSubmitting} useGooglePlaces={!!import.meta.env.VITE_GOOGLE_MAPS_API_KEY} required={false} />
-                <AddressNumberInput disabled={isSubmitting} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <AddressComplementInput disabled={isSubmitting} />
-                <NeighborhoodInput disabled={isSubmitting} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <CityInput disabled={isSubmitting} required={false} />
                 <StateSelector disabled={isSubmitting} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
+                <div className="md:col-span-2">
+                  <LogradouroSelect<SupplierCreateFormData | SupplierUpdateFormData> disabled={isSubmitting} />
+                </div>
+                <div className="md:col-span-3">
+                  <AddressInput disabled={isSubmitting} useGooglePlaces={!!import.meta.env.VITE_GOOGLE_MAPS_API_KEY} required={false} />
+                </div>
+                <div className="md:col-span-1">
+                  <AddressNumberInput disabled={isSubmitting} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <NeighborhoodInput disabled={isSubmitting} />
+                <AddressComplementInput disabled={isSubmitting} />
               </div>
             </CardContent>
           </Card>

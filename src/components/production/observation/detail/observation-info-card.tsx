@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileItem } from "@/components/file/file-item";
+import { useFileViewer } from "@/components/file/file-viewer";
 import { IconAlertCircle, IconCalendar, IconUser, IconTruck, IconFileText, IconBuildingFactory, IconCircleCheck } from "@tabler/icons-react";
 import { type Observation } from "../../../../types";
 import { formatDate, formatRelativeTime } from "../../../../utils";
@@ -47,6 +48,8 @@ interface ObservationInfoCardProps {
 }
 
 export function ObservationInfoCard({ observation, className }: ObservationInfoCardProps) {
+  const fileViewer = useFileViewer();
+
   const getTaskStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "PENDING":
@@ -348,16 +351,24 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
         </CardHeader>
 
         <CardContent className="pt-0">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {observation.files?.map((file) => (
+          <div className="flex flex-wrap gap-3">
+            {observation.files?.map((file, index) => (
               <FileItem
                 key={file.id}
                 file={file}
+                viewMode="grid"
+                onPreview={() => {
+                  // Open image modal with all files for gallery navigation
+                  fileViewer.actions.openImageModal(observation.files || [], index);
+                }}
                 onDelete={() => {
                   // File deletion would require a separate action
                   // This is usually handled at the parent component level
                 }}
                 showActions={false}
+                showFilename={false}
+                showFileSize={false}
+                showRelativeTime={false}
                 className="bg-muted/30"
               />
             ))}

@@ -9,12 +9,14 @@ import {
   formatCurrency,
   formatPercentage,
   formatNumberWithDecimals,
+  formatChassis,
   cleanCPF,
   cleanCNPJ,
   cleanPhone,
   cleanPIS,
   cleanCEP,
   cleanNumeric,
+  cleanChassis,
   isValidCPF,
   isValidCNPJ,
   isValidPhone,
@@ -43,6 +45,7 @@ type InputType =
   | "time"
   | "rg"
   | "plate"
+  | "chassis"
   | "integer"
   | "natural";
 
@@ -177,6 +180,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           }
           case "plate":
             return strValue.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 8);
+          case "chassis":
+            return formatChassis(strValue);
           case "rg":
             return strValue.replace(/[^0-9A-Za-z.-]/g, "").slice(0, 15);
           default:
@@ -238,6 +243,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           }
           case "plate":
             return val.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+          case "chassis":
+            return cleanChassis(val);
           case "rg":
             return val.replace(/[^0-9A-Za-z.-]/g, "");
           default:
@@ -1244,6 +1251,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           return "0%";
         case "plate":
           return "ABC1234";
+        case "chassis":
+          return "9BD 17205 1R 123456";
         case "rg":
           return "12.345.678-9";
         case "integer":
@@ -1276,6 +1285,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           return 9;
         case "plate":
           return 8;
+        case "chassis":
+          return 20; // 17 chars + 3 spaces
         case "rg":
           return 15;
         case "currency":

@@ -61,7 +61,7 @@ export const FilePreviewGrid: React.FC<FilePreviewGridProps> = ({
       onDownload(file);
     } else {
       // Default download behavior
-      const apiUrl = (window as any).__ANKAA_API_URL__ || process.env.VITE_API_URL || "http://localhost:3030";
+      const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
       const downloadUrl = `${apiUrl}/files/${file.id}/download`;
       window.open(downloadUrl, "_blank");
     }

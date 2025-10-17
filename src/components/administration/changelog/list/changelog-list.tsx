@@ -233,9 +233,9 @@ export function ChangelogList({ onDataChange }: ChangelogListProps) {
           </div>
 
           <div className="flex gap-2">
-            <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
-              <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">
+            <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)}>
+              <IconFilter className="h-4 w-4" />
+              <span>
                 Filtros
                 {hasActiveFilters ? ` (${activeFilterCount})` : ""}
               </span>

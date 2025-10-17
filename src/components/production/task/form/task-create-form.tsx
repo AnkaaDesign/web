@@ -34,6 +34,7 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CustomerSelector } from "./customer-selector";
 import { SectorSelector } from "./sector-selector";
 import { ServiceSelectorFixed } from "./service-selector";
+import { BudgetSelector, type BudgetSelectorRef } from "./budget-selector";
 import { MultiCutSelector, type MultiCutSelectorRef } from "./multi-cut-selector";
 import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
@@ -47,15 +48,19 @@ import { FormMoneyInput } from "@/components/ui/form-money-input";
 export const TaskCreateForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>([]);
+  const [observationFiles, setObservationFiles] = useState<FileWithPreview[]>([]);
   const [budgetFile, setBudgetFile] = useState<FileWithPreview[]>([]);
   const [nfeFile, setNfeFile] = useState<FileWithPreview[]>([]);
   const [receiptFile, setReceiptFile] = useState<FileWithPreview[]>([]);
   const multiCutSelectorRef = useRef<MultiCutSelectorRef>(null);
   const multiAirbrushingSelectorRef = useRef<MultiAirbrushingSelectorRef>(null);
+  const budgetSelectorRef = useRef<BudgetSelectorRef>(null);
   const [cutsCount, setCutsCount] = useState(0);
   const [airbrushingsCount, setAirbrushingsCount] = useState(0);
+  const [budgetCount, setBudgetCount] = useState(0);
   const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
   const [isLayoutOpen, setIsLayoutOpen] = useState(false);
+  const [isObservationOpen, setIsObservationOpen] = useState(false);
   const [layouts, setLayouts] = useState<{
     left?: any;
     right?: any;
@@ -112,6 +117,7 @@ export const TaskCreateForm = () => {
       customerId: urlState.customerId || "",
       sectorId: urlState.sectorId || undefined,
       serialNumber: urlState.serialNumber,
+      chassisNumber: urlState.chassisNumber,
       plate: urlState.plate,
       details: urlState.details,
       entryDate: urlState.entryDate || null,
@@ -161,6 +167,18 @@ export const TaskCreateForm = () => {
     // Files will be submitted with the form, not uploaded separately
   };
 
+  // Handle observation files change
+  const handleObservationFilesChange = (files: FileWithPreview[]) => {
+    setObservationFiles(files);
+    // Update form value with file IDs
+    const fileIds = files.map((f) => f.uploadedFileId || f.id).filter(Boolean);
+    const currentObservation = form.getValues("observation");
+    form.setValue("observation", {
+      ...currentObservation,
+      artworkIds: fileIds,
+    });
+  };
+
   // Handle form submission with files
   const handleSubmit = useCallback(
     async (data: TaskCreateFormData) => {
@@ -198,8 +216,11 @@ export const TaskCreateForm = () => {
           return cut;
         });
 
-        // Update cuts in data with context
-        data.cuts = cutsWithContext;
+        // Backend doesn't support 'cuts' (plural) field - remove it from data
+        // Cuts will be created separately after task creation
+        console.log('[SUBMIT] Before deleting cuts:', 'cuts' in data ? 'PRESENT' : 'NOT PRESENT');
+        delete (data as any).cuts;
+        console.log('[SUBMIT] After deleting cuts:', 'cuts' in data ? 'STILL PRESENT (BUG!)' : 'DELETED (OK)');
 
         // Create FormData with proper context
         const formData = createFormDataWithContext(
@@ -386,7 +407,49 @@ export const TaskCreateForm = () => {
   const hasErrors = Object.keys(formState.errors).length > 0;
   const isDirty = formState.isDirty;
 
-  // Debug form state// Navigation actions
+  // Debug form state
+  console.log('📋 [FORM STATE]', {
+    isDirty,
+    isValid: formState.isValid,
+    hasErrors,
+    isSubmitting,
+    errorCount: Object.keys(formState.errors).length,
+    errors: formState.errors,
+  });
+
+  // Log errors separately for better visibility in tests
+  if (hasErrors) {
+    try {
+      console.log('📋 [FORM ERRORS - RAW]', formState.errors);
+
+      // Try to extract readable error info
+      const errorKeys = Object.keys(formState.errors);
+      console.log('📋 [FORM ERROR FIELDS]', errorKeys.join(', '));
+
+      // Log each error field individually
+      errorKeys.forEach(key => {
+        const err = formState.errors[key as keyof typeof formState.errors];
+        console.log(`📋 [ERROR ${key}]`, typeof err, err);
+      });
+    } catch (e) {
+      console.log('📋 [ERROR LOGGING FAILED]', String(e));
+    }
+  }
+
+  // Check if all required fields are filled
+  const name = form.watch("name");
+  const customerId = form.watch("customerId");
+  const services = form.watch("services");
+
+  const hasRequiredFields = Boolean(
+    name &&
+    name.trim().length >= 3 &&
+    customerId &&
+    services &&
+    services.length > 0
+  );
+
+  // Navigation actions
   const navigationActions = [
     {
       key: "cancel",
@@ -402,7 +465,7 @@ export const TaskCreateForm = () => {
       icon: isSubmitting ? IconLoader2 : IconCheck,
       onClick: form.handleSubmit(handleSubmit),
       variant: "default" as const,
-      disabled: isSubmitting,
+      disabled: isSubmitting || hasErrors || !hasRequiredFields,
       loading: isSubmitting,
     },
   ];
@@ -472,14 +535,14 @@ export const TaskCreateForm = () => {
                       <CustomerSelector control={form.control} disabled={isSubmitting} required />
                     </div>
 
-                    {/* Serial Number and Plate */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Serial Number, Plate and Chassis Number */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       {/* Serial Number */}
                       <FormField
                         control={form.control}
                         name="serialNumber"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="md:col-span-1">
                             <FormLabel>Número de Série</FormLabel>
                             <FormControl>
                               <Input
@@ -504,7 +567,7 @@ export const TaskCreateForm = () => {
                         control={form.control}
                         name="plate"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="md:col-span-1">
                             <FormLabel>Placa</FormLabel>
                             <FormControl>
                               <Input
@@ -517,6 +580,31 @@ export const TaskCreateForm = () => {
                                 }}
                                 disabled={isSubmitting}
                                 className="bg-transparent"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Chassis Number */}
+                      <FormField
+                        control={form.control}
+                        name="chassisNumber"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Número do Chassi (17 caracteres)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="chassis"
+                                value={field.value || ""}
+                                placeholder="Ex: 9BW ZZZ37 7V T004251"
+                                className="bg-transparent"
+                                onChange={(value) => {
+                                  field.onChange(value || null);
+                                  urlState.updateChassisNumber(value ? String(value) : "");
+                                }}
+                                disabled={isSubmitting}
                               />
                             </FormControl>
                             <FormMessage />
@@ -588,81 +676,6 @@ export const TaskCreateForm = () => {
                   </CardContent>
                 </Card>
 
-                {/* Financial Information Card */}
-                <Card className="bg-transparent">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <IconCurrencyReal className="h-5 w-5" />
-                      Informações Financeiras
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Price */}
-                    <FormMoneyInput
-                      name="price"
-                      label="Valor Total"
-                      placeholder="R$ 0,00"
-                      disabled={isSubmitting}
-                    />
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Budget File */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                          Orçamento
-                        </label>
-                        <FileUploadField
-                          onFilesChange={handleBudgetFileChange}
-                          maxFiles={5}
-                          disabled={isSubmitting}
-                          showPreview={false}
-                          existingFiles={budgetFile}
-                          variant="compact"
-                          placeholder="Adicionar orçamentos"
-                          label=""
-                        />
-                      </div>
-
-                      {/* NFe File */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <IconFile className="h-4 w-4 text-muted-foreground" />
-                          Nota Fiscal
-                        </label>
-                        <FileUploadField
-                          onFilesChange={handleNfeFileChange}
-                          maxFiles={5}
-                          disabled={isSubmitting}
-                          showPreview={false}
-                          existingFiles={nfeFile}
-                          variant="compact"
-                          placeholder="Adicionar NFes"
-                          label=""
-                        />
-                      </div>
-
-                      {/* Receipt File */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <IconReceipt className="h-4 w-4 text-muted-foreground" />
-                          Recibo
-                        </label>
-                        <FileUploadField
-                          onFilesChange={handleReceiptFileChange}
-                          maxFiles={5}
-                          disabled={isSubmitting}
-                          showPreview={false}
-                          existingFiles={receiptFile}
-                          variant="compact"
-                          placeholder="Adicionar recibos"
-                          label=""
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
                 {/* Services Card */}
                 <Card className="bg-transparent">
                   <CardHeader>
@@ -682,6 +695,23 @@ export const TaskCreateForm = () => {
                         </FormItem>
                       )}
                     />
+                  </CardContent>
+                </Card>
+
+                {/* Paint Selection */}
+                <Card className="bg-transparent">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <IconPalette className="h-5 w-5" />
+                      Tintas
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* General Painting Selector */}
+                    <GeneralPaintingSelector control={form.control} disabled={isSubmitting} />
+
+                    {/* Logo Paints Multi-selector */}
+                    <LogoPaintsSelector control={form.control} disabled={isSubmitting} />
                   </CardContent>
                 </Card>
 
@@ -776,6 +806,189 @@ export const TaskCreateForm = () => {
                   </CardContent>
                 </Card>
 
+                {/* Financial Information Card */}
+                <Card className="bg-transparent">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <IconCurrencyReal className="h-5 w-5" />
+                      Informações Financeiras
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Budget File */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
+                          Orçamento
+                        </label>
+                        <FileUploadField
+                          onFilesChange={handleBudgetFileChange}
+                          maxFiles={5}
+                          disabled={isSubmitting}
+                          showPreview={false}
+                          existingFiles={budgetFile}
+                          variant="compact"
+                          placeholder="Adicionar orçamentos"
+                          label=""
+                        />
+                      </div>
+
+                      {/* NFe File */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <IconFile className="h-4 w-4 text-muted-foreground" />
+                          Nota Fiscal
+                        </label>
+                        <FileUploadField
+                          onFilesChange={handleNfeFileChange}
+                          maxFiles={5}
+                          disabled={isSubmitting}
+                          showPreview={false}
+                          existingFiles={nfeFile}
+                          variant="compact"
+                          placeholder="Adicionar NFes"
+                          label=""
+                        />
+                      </div>
+
+                      {/* Receipt File */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <IconReceipt className="h-4 w-4 text-muted-foreground" />
+                          Recibo
+                        </label>
+                        <FileUploadField
+                          onFilesChange={handleReceiptFileChange}
+                          maxFiles={5}
+                          disabled={isSubmitting}
+                          showPreview={false}
+                          existingFiles={receiptFile}
+                          variant="compact"
+                          placeholder="Adicionar recibos"
+                          label=""
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Budget Card */}
+                <Card className="bg-transparent">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFileInvoice className="h-5 w-5" />
+                        Orçamento Detalhado
+                      </CardTitle>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (budgetSelectorRef.current) {
+                            budgetSelectorRef.current.addBudget();
+                          }
+                        }}
+                        disabled={isSubmitting}
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <IconPlus className="h-4 w-4" />
+                        Adicionar Orçamento ({budgetCount})
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <BudgetSelector ref={budgetSelectorRef} control={form.control} disabled={isSubmitting} onBudgetCountChange={setBudgetCount} />
+                  </CardContent>
+                </Card>
+
+                {/* Observation Section */}
+                <Card className="bg-transparent">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFile className="h-5 w-5" />
+                        Observação
+                      </CardTitle>
+                      {!isObservationOpen && (
+                        <Button
+                          type="button"
+                          onClick={() => setIsObservationOpen(true)}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Adicionar Observação
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {isObservationOpen ? (
+                      <div className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="observation"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Descrição da Observação</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  value={field.value?.description || ""}
+                                  onChange={(e) => {
+                                    const description = e.target.value;
+                                    field.onChange(description ? { description } : null);
+                                  }}
+                                  placeholder="Descreva problemas ou observações sobre a tarefa..."
+                                  rows={4}
+                                  disabled={isSubmitting}
+                                  className="bg-transparent"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Observation Files */}
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium flex items-center gap-2">
+                            <IconFile className="h-4 w-4 text-muted-foreground" />
+                            Arquivos de Evidência (Opcional)
+                          </label>
+                          <FileUploadField
+                            onFilesChange={handleObservationFilesChange}
+                            maxFiles={10}
+                            disabled={isSubmitting}
+                            showPreview={true}
+                            existingFiles={observationFiles}
+                            variant="compact"
+                            placeholder="Adicione fotos, documentos ou outros arquivos"
+                            label="Arquivos anexados"
+                          />
+                        </div>
+
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setIsObservationOpen(false);
+                              form.setValue("observation", null);
+                              setObservationFiles([]);
+                            }}
+                            disabled={isSubmitting}
+                          >
+                            Remover
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+
                 {/* Cut Plans Section - Improved Multiple Cuts Support */}
                 <Card className="bg-transparent">
                   <CardHeader>
@@ -833,23 +1046,6 @@ export const TaskCreateForm = () => {
                   </CardHeader>
                   <CardContent>
                     <MultiAirbrushingSelector ref={multiAirbrushingSelectorRef} control={form.control} disabled={isSubmitting} onAirbrushingsCountChange={setAirbrushingsCount} />
-                  </CardContent>
-                </Card>
-
-                {/* Paint Selection */}
-                <Card className="bg-transparent">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <IconPalette className="h-5 w-5" />
-                      Tintas
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* General Painting Selector */}
-                    <GeneralPaintingSelector control={form.control} disabled={isSubmitting} />
-
-                    {/* Logo Paints Multi-selector */}
-                    <LogoPaintsSelector control={form.control} disabled={isSubmitting} />
                   </CardContent>
                 </Card>
 

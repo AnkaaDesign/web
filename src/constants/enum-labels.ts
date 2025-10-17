@@ -153,6 +153,8 @@ export const TASK_STATUS_LABELS: Record<TASK_STATUS, string> = {
   [TASK_STATUS.COMPLETED]: "Finalizado",
   [TASK_STATUS.CANCELLED]: "Cancelado",
   [TASK_STATUS.ON_HOLD]: "Em Espera",
+  [TASK_STATUS.INVOICED]: "Faturado",
+  [TASK_STATUS.SETTLED]: "Liquidado",
 };
 
 export const SERVICE_ORDER_STATUS_LABELS: Record<SERVICE_ORDER_STATUS, string> = {

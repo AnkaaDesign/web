@@ -146,6 +146,9 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   const isOptionDisabledRef = useRef(isOptionDisabled);
   const initialOptionsRef = useRef(initialOptions);
 
+  // Cache to maintain all items that have been loaded or selected - persists across filter changes
+  const allItemsCacheRef = useRef<Map<string, TData>>(new Map());
+
   // Update refs when props change (without triggering effects)
   useEffect(() => {
     getOptionValueRef.current = getOptionValue;
@@ -251,22 +254,37 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
       // Start with fetched data
       let newOptions = asyncResponse.data || [];
 
-      // If we have initialOptions and a selected value, ensure the selected option is included
-      const currentInitialOptions = initialOptionsRef.current;
-      if (currentInitialOptions && currentInitialOptions.length > 0 && value) {
-        const selectedValues = Array.isArray(value) ? value : [value];
-        const selectedInitialOptions = currentInitialOptions.filter(opt =>
-          selectedValues.includes(getOptionValueRef.current(opt))
-        );
+      // Add all fetched items to the cache
+      newOptions.forEach(item => {
+        const itemValue = getOptionValueRef.current(item);
+        allItemsCacheRef.current.set(itemValue, item);
+      });
 
-        // Merge selected initial options with fetched data, avoiding duplicates
-        const fetchedValues = new Set(newOptions.map(item => getOptionValueRef.current(item)));
-        selectedInitialOptions.forEach(opt => {
-          if (!fetchedValues.has(getOptionValueRef.current(opt))) {
-            newOptions = [opt, ...newOptions];
+      // If we have initialOptions, add them to cache
+      const currentInitialOptions = initialOptionsRef.current;
+      if (currentInitialOptions && currentInitialOptions.length > 0) {
+        currentInitialOptions.forEach(opt => {
+          const itemValue = getOptionValueRef.current(opt);
+          if (!allItemsCacheRef.current.has(itemValue)) {
+            allItemsCacheRef.current.set(itemValue, opt);
           }
         });
       }
+
+      // Get current selected values
+      const currentSelectedValues = Array.isArray(value) ? value : (value ? [value] : []);
+
+      // Merge in selected items from cache that aren't in the current response
+      // This ensures selected items persist even when they don't match the current filter
+      const fetchedValues = new Set(newOptions.map(item => getOptionValueRef.current(item)));
+      currentSelectedValues.forEach(selectedValue => {
+        if (!fetchedValues.has(selectedValue) && allItemsCacheRef.current.has(selectedValue)) {
+          const cachedItem = allItemsCacheRef.current.get(selectedValue);
+          if (cachedItem) {
+            newOptions = [cachedItem, ...newOptions];
+          }
+        }
+      });
 
       // Deduplicate items based on their value to prevent duplicate key warnings
       const deduplicatedData = newOptions.filter(
@@ -299,6 +317,12 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
 
       // Handle backward compatibility
       if (Array.isArray(result)) {
+        // Add items to cache
+        result.forEach(item => {
+          const itemValue = getOptionValue(item);
+          allItemsCacheRef.current.set(itemValue, item);
+        });
+
         // Deduplicate when adding more items
         setAllAsyncOptions((prev) => {
           const combined = [...prev, ...result];
@@ -315,6 +339,12 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
         });
         setHasMore(false);
       } else {
+        // Add items to cache
+        (result.data || []).forEach(item => {
+          const itemValue = getOptionValue(item);
+          allItemsCacheRef.current.set(itemValue, item);
+        });
+
         // Deduplicate when adding more items
         setAllAsyncOptions((prev) => {
           const combined = [...prev, ...(result.data || [])];

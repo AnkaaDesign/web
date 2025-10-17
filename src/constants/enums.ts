@@ -51,6 +51,29 @@ export enum USER_STATUS {
   DISMISSED = "DISMISSED",
 }
 
+export const REGISTRATION_STATUS_OPTIONS = [
+  { value: "ATIVA", label: "Ativa" },
+  { value: "SUSPENSA", label: "Suspensa" },
+  { value: "INAPTA", label: "Inapta" },
+  { value: "ATIVA_NAO_REGULAR", label: "Ativa Não Regular" },
+  { value: "BAIXADA", label: "Baixada" },
+] as const;
+
+export const LOGRADOURO_TYPE_OPTIONS = [
+  { value: "RUA", label: "Rua" },
+  { value: "AVENIDA", label: "Avenida" },
+  { value: "ALAMEDA", label: "Alameda" },
+  { value: "TRAVESSA", label: "Travessa" },
+  { value: "PRACA", label: "Praça" },
+  { value: "RODOVIA", label: "Rodovia" },
+  { value: "ESTRADA", label: "Estrada" },
+  { value: "MARGINAL", label: "Marginal" },
+  { value: "VIA", label: "Via" },
+  { value: "PASSARELA", label: "Passarela" },
+  { value: "VIELA", label: "Viela" },
+  { value: "BECO", label: "Beco" },
+] as const;
+
 // Helper constants for common user status queries
 export const ACTIVE_USER_STATUSES = [
   USER_STATUS.EXPERIENCE_PERIOD_1,
@@ -64,6 +87,8 @@ export enum TASK_STATUS {
   COMPLETED = "COMPLETED",
   CANCELLED = "CANCELLED",
   ON_HOLD = "ON_HOLD",
+  INVOICED = "INVOICED",
+  SETTLED = "SETTLED",
 }
 
 export enum SERVICE_ORDER_STATUS {

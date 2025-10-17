@@ -3,7 +3,7 @@ import { IconBuilding, IconCertificate } from "@tabler/icons-react";
 import type { Supplier } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { maskCNPJ } from "../../../../utils";
-import { getFileUrl } from "@/utils/file";
+import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 interface BasicInfoCardProps {
   supplier: Supplier;
@@ -24,17 +24,14 @@ export function BasicInfoCard({ supplier, className }: BasicInfoCardProps) {
       <CardContent className="pt-0 flex-1">
         <div className="space-y-6">
           {/* Logo Section */}
-          {supplier.logo && supplier.logo.id && (
-            <div className="flex justify-center mb-6">
-              <div className="w-32 h-32 rounded-lg border-2 border-muted overflow-hidden bg-muted/30 flex items-center justify-center">
-                <img
-                  src={getFileUrl(supplier.logo)}
-                  alt={`Logo de ${supplier.fantasyName}`}
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            </div>
-          )}
+          <div className="flex justify-center mb-6">
+            <SupplierLogoDisplay
+              logo={supplier.logo}
+              supplierName={supplier.fantasyName}
+              size="2xl"
+              shape="rounded"
+            />
+          </div>
 
           {/* Basic Information Section */}
           <div>

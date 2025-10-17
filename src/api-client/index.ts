@@ -45,6 +45,7 @@ export * from "./order";
 export * from "./paint";
 export * from "./position";
 export * from "./preferences";
+export * from "./profile";
 export * from "./warning";
 export * from "./sector";
 export * from "./service";

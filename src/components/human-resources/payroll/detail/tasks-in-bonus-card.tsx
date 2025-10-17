@@ -139,9 +139,8 @@ export function TasksInBonusCard({
       t.commission === COMMISSION_STATUS.PARTIAL_COMMISSION
     ).length;
     const totalWeighted = fullCommission + (partialCommission * 0.5);
-    const totalValue = filteredTasks.reduce((sum, task) => sum + (task.price || 0), 0);
 
-    return { total, fullCommission, partialCommission, totalWeighted, totalValue };
+    return { total, fullCommission, partialCommission, totalWeighted };
   }, [filteredTasks]);
 
   // Table columns
@@ -245,25 +244,6 @@ export function TasksInBonusCard({
       sortable: true,
       className: "w-24",
       align: "center",
-    },
-    {
-      key: "price",
-      header: "Valor",
-      accessor: (task) => (
-        <div className="text-sm font-medium text-right">
-          {task.price ? (
-            <div className="flex items-center justify-end gap-2">
-              <IconCurrencyReal className="h-3 w-3 text-muted-foreground" />
-              <span className="tabular-nums">{formatCurrency(task.price)}</span>
-            </div>
-          ) : (
-            <span className="text-muted-foreground">-</span>
-          )}
-        </div>
-      ),
-      sortable: true,
-      className: "w-32",
-      align: "right",
     },
   ];
 

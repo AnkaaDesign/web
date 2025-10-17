@@ -146,11 +146,6 @@ export function BonusDiscountManager({
       render: (task) => task.customer?.name || "N/A",
     },
     {
-      key: "price",
-      title: "Valor",
-      render: (task) => formatCurrency(task.price || 0),
-    },
-    {
       key: "actions",
       title: "Ações",
       render: (task) => (
@@ -371,7 +366,7 @@ export function BonusDiscountManager({
                   <SelectContent>
                     {availableTasks.map((task) => (
                       <SelectItem key={task.id} value={task.id}>
-                        {task.name} - {task.customer?.name} - {formatCurrency(task.price || 0)}
+                        {task.name} - {task.customer?.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

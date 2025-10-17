@@ -709,6 +709,9 @@ export function serializeCustomerFormToUrlParams(formData: Partial<CustomerCreat
   // File ID
   if (formData.logoId && formData.logoId.trim()) params.set("logoId", formData.logoId);
 
+  // Situacao Cadastral
+  if (formData.situacaoCadastral && formData.situacaoCadastral.trim()) params.set("situacaoCadastral", formData.situacaoCadastral);
+
   // Serialize arrays
   if (formData.phones && formData.phones.length > 0) {
     params.set("phones", JSON.stringify(formData.phones));
@@ -769,6 +772,9 @@ export function deserializeUrlParamsToCustomerForm(searchParams: URLSearchParams
 
   const logoId = searchParams.get("logoId");
   if (logoId) formData.logoId = logoId;
+
+  const situacaoCadastral = searchParams.get("situacaoCadastral");
+  if (situacaoCadastral) formData.situacaoCadastral = situacaoCadastral;
 
   // Parse arrays
   try {
@@ -910,6 +916,9 @@ export function deserializeUrlParamsToSupplierForm(searchParams: URLSearchParams
 
   const logoId = searchParams.get("logoId");
   if (logoId) formData.logoId = logoId;
+
+  const situacaoCadastral = searchParams.get("situacaoCadastral");
+  if (situacaoCadastral) formData.situacaoCadastral = situacaoCadastral;
 
   // Parse arrays
   try {

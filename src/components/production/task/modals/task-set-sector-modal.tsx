@@ -69,6 +69,13 @@ export const TaskSetSectorModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
       return;
     }
 
+    console.log('[TaskSetSectorModal] ========== SUBMIT STARTED ==========');
+    console.log('[TaskSetSectorModal] Form data:', data);
+    console.log('[TaskSetSectorModal] sectorId value:', data.sectorId);
+    console.log('[TaskSetSectorModal] sectorId type:', typeof data.sectorId);
+    console.log('[TaskSetSectorModal] Number of updatable tasks:', updatableTasks.length);
+    console.log('[TaskSetSectorModal] Task IDs:', updatableTasks.map(t => t.id));
+
     try {
       setIsSubmitting(true);
 
@@ -80,17 +87,33 @@ export const TaskSetSectorModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
         },
       }));
 
+      console.log('[TaskSetSectorModal] Prepared updates:', JSON.stringify(updates, null, 2));
+      console.log('[TaskSetSectorModal] Calling batchUpdate...');
+
       const result = await batchUpdate({ tasks: updates });
 
+      console.log('[TaskSetSectorModal] Batch update result:', result);
+
       if (result.success) {
+        console.log('[TaskSetSectorModal] ========== SUBMIT SUCCESSFUL ==========');
         handleOpenChange(false);
         onSuccess?.();
+      } else {
+        console.error('[TaskSetSectorModal] ========== SUBMIT FAILED ==========');
+        console.error('[TaskSetSectorModal] Result:', result);
       }
     } catch (error) {
-      console.error("Error updating tasks sector:", error);
+      console.error('[TaskSetSectorModal] ========== ERROR OCCURRED ==========');
+      console.error('[TaskSetSectorModal] Error:', error);
+      console.error('[TaskSetSectorModal] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error))
+      });
       // Error is handled by the mutation hook
     } finally {
       setIsSubmitting(false);
+      console.log('[TaskSetSectorModal] ========== SUBMIT ENDED ==========');
     }
   };
 
@@ -132,15 +155,18 @@ export const TaskSetSectorModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
                   <FormLabel>Setor de Produção</FormLabel>
                   <FormControl>
                     <Combobox
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      options={sectors.map(
-                        (sector): ComboboxOption => ({
-                          value: sector.id,
-                          label: sector.name,
-                        }),
-                      )}
-                      placeholder={sectorsLoading ? "Carregando..." : "Selecione um setor ou deixe vazio"}
+                      value={field.value ?? undefined}
+                      onValueChange={(value) => field.onChange(value || null)}
+                      options={[
+                        { value: "", label: "Indefinido (sem setor)" },
+                        ...sectors.map(
+                          (sector): ComboboxOption => ({
+                            value: sector.id,
+                            label: sector.name,
+                          }),
+                        ),
+                      ]}
+                      placeholder={sectorsLoading ? "Carregando..." : "Selecione um setor"}
                       disabled={isSubmitting || sectorsLoading}
                       loading={sectorsLoading}
                       searchable={sectors.length > 10}

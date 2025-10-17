@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useRef } from "react";
 import { IconUsers } from "@tabler/icons-react";
 
 import type { WarningCreateFormData, WarningUpdateFormData } from "../../../../schemas";
@@ -19,14 +19,22 @@ interface WitnessMultiSelectProps {
 }
 
 export function WitnessMultiSelect({ control, disabled, excludeIds = [], initialWitnesses }: WitnessMultiSelectProps) {
+  // Create a stable cache for fetched items
+  const cacheRef = useRef<Map<string, WitnessOption>>(new Map());
+
   // Memoize initialOptions to prevent infinite loop
   const initialOptions = useMemo(() => {
     if (!initialWitnesses || initialWitnesses.length === 0) return [];
-    return initialWitnesses.map(user => ({
-      value: user.id,
-      label: user.name,
-      position: user.position?.name,
-    }));
+    return initialWitnesses.map(user => {
+      const option = {
+        value: user.id,
+        label: user.name,
+        position: user.position?.name,
+      };
+      // Add to cache
+      cacheRef.current.set(user.id, option);
+      return option;
+    });
   }, [initialWitnesses?.map(w => w.id).join(',')]);
 
   // Memoize queryFn
@@ -38,19 +46,29 @@ export function WitnessMultiSelect({ control, disabled, excludeIds = [], initial
       whereClause.id = { notIn: validExcludeIds };
     }
 
-    const response = await userService.getUsers({
-      searchingFor: search,
-      limit: 20,
+    const queryParams: any = {
       page,
+      take: 50,
       where: whereClause,
       include: { position: true },
-    });
+    };
 
-    const data = (response.data || []).map((user: User) => ({
-      value: user.id,
-      label: user.name,
-      position: user.position?.name,
-    }));
+    if (search && search.trim()) {
+      queryParams.searchingFor = search.trim();
+    }
+
+    const response = await userService.getUsers(queryParams);
+
+    const data = (response.data || []).map((user: User) => {
+      const option = {
+        value: user.id,
+        label: user.name,
+        position: user.position?.name,
+      };
+      // Add to cache
+      cacheRef.current.set(user.id, option);
+      return option;
+    });
 
     return {
       data,
@@ -93,6 +111,10 @@ export function WitnessMultiSelect({ control, disabled, excludeIds = [], initial
               initialOptions={initialOptions}
               renderOption={renderOption}
               minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
+              searchable={true}
+              clearable={true}
             />
           </FormControl>
           <FormDescription>Pessoas que presenciaram o incidente (opcional)</FormDescription>

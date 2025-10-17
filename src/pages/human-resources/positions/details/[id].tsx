@@ -154,10 +154,14 @@ export const PositionDetailPage = () => {
               <RemunerationHistoryCard position={position} />
             </div>
 
-            {/* Related Users and Changelog Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <RelatedUsersCard position={position} />
+            {/* Changelog - Single column */}
+            <div className="grid grid-cols-1 gap-6">
               <ChangelogHistory entityType={"POSITION" as any} entityId={id} entityName={position.name} entityCreatedAt={position.createdAt} maxHeight="500px" />
+            </div>
+
+            {/* Related Users - Full width, last section */}
+            <div className="grid grid-cols-1 gap-6">
+              <RelatedUsersCard position={position} />
             </div>
           </div>
         </div>

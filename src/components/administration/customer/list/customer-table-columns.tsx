@@ -1,7 +1,7 @@
 import type { Customer } from "../../../../types";
 import { formatCNPJ, formatCPF, formatBrazilianPhone, formatDateTime } from "../../../../utils";
 import { Badge } from "@/components/ui/badge";
-import { getFileUrl } from "@/utils/file";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 
 export interface CustomerColumn {
   key: string;
@@ -19,21 +19,13 @@ export function createCustomerColumns(): CustomerColumn[] {
       header: "NOME FANTASIA",
       accessor: (customer) => (
         <div className="flex items-center gap-2">
-          {customer.logo?.id ? (
-            <img
-              src={getFileUrl(customer.logo)}
-              alt={`${customer.fantasyName} logo`}
-              className="h-8 w-8 rounded-md object-cover flex-shrink-0 border border-border/50"
-              onError={(e) => {
-                // Hide image if it fails to load
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
-          ) : (
-            <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0 border border-border/50">
-              <span className="text-xs font-semibold text-muted-foreground">{customer.fantasyName?.charAt(0)?.toUpperCase() || "?"}</span>
-            </div>
-          )}
+          <CustomerLogoDisplay
+            logo={customer.logo}
+            customerName={customer.fantasyName}
+            size="sm"
+            shape="rounded"
+            className="flex-shrink-0"
+          />
           <span className="font-medium truncate max-w-[200px]">{customer.fantasyName}</span>
         </div>
       ),

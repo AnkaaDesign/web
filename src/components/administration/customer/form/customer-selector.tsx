@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Combobox } from "@/components/ui/combobox";
-import { useCustomersInfinite } from "../../../../hooks";
-import type { Customer, CustomerGetManyResponse } from "../../../../types";
-import { IconUser, IconBuilding } from "@tabler/icons-react";
+import { getCustomers } from "../../../../api-client";
+import type { Customer } from "../../../../types";
 import { formatCNPJ, formatCPF } from "../../../../utils";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 
 interface CustomerSelectorProps {
   value?: string | null;
@@ -14,6 +14,7 @@ interface CustomerSelectorProps {
   className?: string;
   excludeIds?: string[];
   onQuickCreate?: (name: string) => Promise<Customer | null>;
+  initialCustomer?: Customer;
 }
 
 export function CustomerSelector({
@@ -25,25 +26,61 @@ export function CustomerSelector({
   className,
   excludeIds = [],
   onQuickCreate,
+  initialCustomer,
 }: CustomerSelectorProps) {
   const [isCreating, setIsCreating] = useState(false);
 
-  // Fetch customers with infinite scrolling
-  const { data } = useCustomersInfinite({
-    orderBy: { fantasyName: "asc" },
-  });
+  // Memoize initial options with proper formatting
+  const initialOptions = useMemo(() => {
+    if (!initialCustomer) return [];
 
-  // Flatten pages and filter out excluded IDs
-  const customers = useMemo(() => {
-    if (!data?.pages) return [];
-    const allCustomers = data.pages.flatMap((page: CustomerGetManyResponse) => page.data || []);
-    return excludeIds.length > 0 ? allCustomers.filter((customer: Customer) => !excludeIds.includes(customer.id)) : allCustomers;
-  }, [data, excludeIds]);
+    let description = "";
+    if (initialCustomer.cnpj) {
+      description = `CNPJ: ${formatCNPJ(initialCustomer.cnpj)}`;
+    } else if (initialCustomer.cpf) {
+      description = `CPF: ${formatCPF(initialCustomer.cpf)}`;
+    }
 
-  // Format options for combobox
-  const options = useMemo(
-    () =>
-      customers.map((customer: Customer) => {
+    return [{
+      value: initialCustomer.id,
+      label: initialCustomer.fantasyName,
+      description,
+      icon: (
+        <CustomerLogoDisplay
+          logo={initialCustomer.logo}
+          customerName={initialCustomer.fantasyName}
+          size="xs"
+          shape="rounded"
+        />
+      ),
+    }];
+  }, [initialCustomer]);
+
+  // Async query function for the combobox
+  const queryCustomers = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { fantasyName: "asc" },
+        page: page,
+        take: 50,
+      };
+
+      // Only add searchingFor if there's a search term
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      const response = await getCustomers(queryParams);
+      const customers = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      // Filter out excluded IDs
+      const filteredCustomers = excludeIds.length > 0
+        ? customers.filter((customer: Customer) => !excludeIds.includes(customer.id))
+        : customers;
+
+      // Convert customers to options format
+      const options = filteredCustomers.map((customer: Customer) => {
         let description = "";
         if (customer.cnpj) {
           description = `CNPJ: ${formatCNPJ(customer.cnpj)}`;
@@ -55,22 +92,44 @@ export function CustomerSelector({
           value: customer.id,
           label: customer.fantasyName,
           description,
-          icon: customer.cnpj ? <IconBuilding className="h-4 w-4" /> : <IconUser className="h-4 w-4" />,
+          icon: (
+            <CustomerLogoDisplay
+              logo={customer.logo}
+              customerName={customer.fantasyName}
+              size="xs"
+              shape="rounded"
+            />
+          ),
         };
-      }),
-    [customers],
-  );
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, [excludeIds]);
 
   return (
     <Combobox
+      async={true}
+      queryKey={["customers"]}
+      queryFn={queryCustomers}
+      initialOptions={initialOptions}
       value={value || undefined}
       onValueChange={(value) => onChange(value || null)}
-      options={options}
       placeholder={placeholder}
       emptyText={emptyMessage}
       searchable={true}
       disabled={disabled || isCreating}
       className={className}
+      clearable={true}
       allowCreate={!!onQuickCreate && !isCreating}
       createLabel={(name: string) => `Criar cliente "${name}"`}
       onCreate={
@@ -89,6 +148,9 @@ export function CustomerSelector({
           : undefined
       }
       isCreating={isCreating}
+      minSearchLength={0}
+      pageSize={50}
+      debounceMs={300}
     />
   );
 }

@@ -1,21 +1,22 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { IconEye, IconEdit, IconPlayerPlay, IconTrash } from "@tabler/icons-react";
+import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2 } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
-import { routes, TASK_STATUS, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
+import { routes, TASK_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
-import { getChangeLogs } from "../../../../api-client";
+import { SetStatusModal } from "../schedule/set-status-modal";
+import { SetSectorModal } from "../schedule/set-sector-modal";
 
 interface TaskHistoryContextMenuProps {
-  task?: Task;
+  tasks: Task[];
   position: { x: number; y: number };
   onClose: () => void;
   selectedIds: string[];
 }
 
 export function TaskHistoryContextMenu({
-  task,
+  tasks,
   position,
   onClose,
   selectedIds
@@ -23,105 +24,126 @@ export function TaskHistoryContextMenu({
   const navigate = useNavigate();
   const { update, remove } = useTaskMutations();
   const { batchUpdate, batchDelete } = useTaskBatchMutations();
+  const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
+  const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(true);
+  const openingModalRef = React.useRef(false);
 
   const isBulk = selectedIds.length > 1;
-  const taskIds = isBulk ? selectedIds : task ? [task.id] : [];
+  const taskIds = tasks.map(t => t.id);
+  const task = tasks[0];
+
+  // When a modal opens, close the dropdown
+  React.useEffect(() => {
+    if (setStatusModalOpen || setSectorModalOpen) {
+      console.log('[TaskHistoryContextMenu] Modal opened, closing dropdown');
+      openingModalRef.current = false;
+      setDropdownOpen(false);
+    }
+  }, [setStatusModalOpen, setSectorModalOpen]);
+
+  // Close the entire component when dropdown closes and no modals are open
+  React.useEffect(() => {
+    console.log('[TaskHistoryContextMenu] Effect running:', {
+      dropdownOpen,
+      setStatusModalOpen,
+      setSectorModalOpen,
+      openingModal: openingModalRef.current,
+      shouldClose: !dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !openingModalRef.current
+    });
+
+    // Don't close if we're in the process of opening a modal
+    if (!dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !openingModalRef.current) {
+      console.log('[TaskHistoryContextMenu] Calling onClose()');
+      onClose();
+    }
+  }, [dropdownOpen, setStatusModalOpen, setSectorModalOpen, onClose]);
 
   const handleView = () => {
     if (task && !isBulk) {
       navigate(routes.production.schedule.details(task.id));
     }
-    onClose();
+    setDropdownOpen(false);
   };
 
   const handleEdit = () => {
     if (taskIds.length === 1) {
-      navigate(routes.production.tasks.edit(taskIds[0]));
+      navigate(routes.production.schedule.edit(taskIds[0]));
     } else if (taskIds.length > 1) {
       // Navigate to batch edit page if available
       const ids = taskIds.join(",");
-      navigate(`${routes.production.tasks.root}/batch-edit?ids=${ids}`);
+      navigate(`${routes.production.schedule.root}/editar-em-lote?ids=${ids}`);
     }
-    onClose();
+    setDropdownOpen(false);
   };
 
-  const handleReactivate = async () => {
+  const handleSetSector = () => {
+    console.log('[TaskHistoryContextMenu] handleSetSector called');
+    openingModalRef.current = true;
+    setSetSectorModalOpen(true);
+  };
+
+  const handleSetSectorConfirm = async (sectorId: string | null) => {
     try {
-      // Get the previous status from changelog before it was put ON_HOLD
-      const getPreviousStatus = async (taskId: string): Promise<TASK_STATUS> => {
-        try {
-          // Query changelog for status field changes on this task
-          const changelogsResponse = await getChangeLogs({
-            entityTypes: [CHANGE_LOG_ENTITY_TYPE.TASK],
-            entityIds: [taskId],
-            where: {
-              field: { equals: "status" }
-            },
-            orderBy: { createdAt: "desc" },
-            limit: 10, // Get last 10 status changes
-          });
-
-          const changelogs = changelogsResponse?.data || [];
-
-          // Find the most recent status change to ON_HOLD
-          const onHoldChangeIndex = changelogs.findIndex(
-            log => log.newValue === TASK_STATUS.ON_HOLD
-          );
-
-          if (onHoldChangeIndex >= 0 && onHoldChangeIndex < changelogs.length) {
-            const onHoldChange = changelogs[onHoldChangeIndex];
-            // The oldValue from that change is what we want to restore
-            if (onHoldChange.oldValue &&
-                (onHoldChange.oldValue === TASK_STATUS.PENDING ||
-                 onHoldChange.oldValue === TASK_STATUS.IN_PRODUCTION)) {
-              return onHoldChange.oldValue as TASK_STATUS;
-            }
-          }
-
-          // Default to PENDING if no previous status found
-          return TASK_STATUS.PENDING;
-        } catch (error) {
-          console.error("Error fetching changelog:", error);
-          // Default to PENDING on error
-          return TASK_STATUS.PENDING;
-        }
-      };
-
       if (taskIds.length === 1) {
-        const previousStatus = await getPreviousStatus(taskIds[0]);
-        const reactivateData: any = { status: previousStatus };
+        await update({
+          id: taskIds[0],
+          data: { sectorId }
+        });
+      } else {
+        const updates = taskIds.map(id => ({
+          id,
+          data: { sectorId }
+        }));
+        await batchUpdate({ items: updates });
+      }
+    } catch (error) {
+      console.error("Error updating task sector:", error);
+    }
+  };
 
-        // Include startedAt if changing to IN_PRODUCTION
-        if (previousStatus === TASK_STATUS.IN_PRODUCTION) {
-          reactivateData.startedAt = task?.startedAt || new Date().toISOString();
+  const handleSetStatus = () => {
+    console.log('[TaskHistoryContextMenu] handleSetStatus called');
+    openingModalRef.current = true;
+    setSetStatusModalOpen(true);
+  };
+
+  const handleSetStatusConfirm = async (status: typeof TASK_STATUS.IN_PRODUCTION | typeof TASK_STATUS.COMPLETED | typeof TASK_STATUS.INVOICED | typeof TASK_STATUS.SETTLED) => {
+    console.log('[TaskHistoryContextMenu] handleSetStatusConfirm called with status:', status);
+    try {
+      if (taskIds.length === 1) {
+        const updateData: any = { status };
+
+        // Set startedAt when changing to IN_PRODUCTION
+        if (status === TASK_STATUS.IN_PRODUCTION) {
+          updateData.startedAt = task?.startedAt || new Date();
+        }
+        // Set finishedAt when changing to COMPLETED
+        else if (status === TASK_STATUS.COMPLETED) {
+          updateData.finishedAt = task?.finishedAt || new Date();
         }
 
         await update({
           id: taskIds[0],
-          data: reactivateData
+          data: updateData
         });
       } else {
-        // For batch updates, get previous status for each task
-        const updates = await Promise.all(
-          taskIds.map(async (id) => {
-            const previousStatus = await getPreviousStatus(id);
-            const data: any = { status: previousStatus };
+        const updates = taskIds.map(id => {
+          const updateData: any = { status };
 
-            // Include startedAt if changing to IN_PRODUCTION
-            if (previousStatus === TASK_STATUS.IN_PRODUCTION) {
-              data.startedAt = new Date().toISOString();
-            }
+          if (status === TASK_STATUS.IN_PRODUCTION) {
+            updateData.startedAt = new Date();
+          } else if (status === TASK_STATUS.COMPLETED) {
+            updateData.finishedAt = new Date();
+          }
 
-            return { id, data };
-          })
-        );
-
+          return { id, data: updateData };
+        });
         await batchUpdate({ items: updates });
       }
     } catch (error) {
-      console.error("Error reactivating task(s):", error);
+      console.error("Error updating task status:", error);
     }
-    onClose();
   };
 
   const handleDelete = async () => {
@@ -131,7 +153,7 @@ export function TaskHistoryContextMenu({
     );
 
     if (!confirmed) {
-      onClose();
+      setDropdownOpen(false);
       return;
     }
 
@@ -144,56 +166,102 @@ export function TaskHistoryContextMenu({
     } catch (error) {
       console.error("Error deleting task(s):", error);
     }
-    onClose();
+    setDropdownOpen(false);
   };
 
   if (!position || taskIds.length === 0) return null;
 
+  console.log('[TaskHistoryContextMenu] Rendering with states:', {
+    dropdownOpen,
+    setStatusModalOpen,
+    setSectorModalOpen,
+    taskIds: taskIds.length
+  });
+
   return (
-    <DropdownMenu open={true} onOpenChange={(open) => !open && onClose()}>
-      <DropdownMenuContent
-        style={{
-          position: "fixed",
-          left: position.x,
-          top: position.y,
-        }}
-        className="w-56"
-        onCloseAutoFocus={(e) => e.preventDefault()}
-      >
-        {isBulk && (
-          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-            {taskIds.length} tarefas selecionadas
-          </div>
-        )}
+    <>
+      <DropdownMenu open={dropdownOpen} onOpenChange={(open) => !open && setDropdownOpen(false)}>
+        <DropdownMenuContent
+          style={{
+            position: "fixed",
+            left: position.x,
+            top: position.y,
+          }}
+          className="w-56"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          {isBulk && (
+            <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+              {taskIds.length} tarefas selecionadas
+            </div>
+          )}
 
-        {/* View action - single selection only */}
-        {!isBulk && task && (
-          <DropdownMenuItem onClick={handleView}>
-            <IconEye className="mr-2 h-4 w-4" />
-            Visualizar
+          {/* View action - single selection only */}
+          {!isBulk && task && (
+            <DropdownMenuItem onClick={handleView}>
+              <IconEye className="mr-2 h-4 w-4" />
+              Visualizar
+            </DropdownMenuItem>
+          )}
+
+          {/* Edit action */}
+          <DropdownMenuItem onClick={handleEdit}>
+            <IconEdit className="mr-2 h-4 w-4" />
+            {isBulk ? "Editar selecionadas" : "Editar"}
           </DropdownMenuItem>
-        )}
 
-        {/* Edit action */}
-        <DropdownMenuItem onClick={handleEdit}>
-          <IconEdit className="mr-2 h-4 w-4" />
-          {isBulk ? "Editar selecionadas" : "Editar"}
-        </DropdownMenuItem>
+          <DropdownMenuSeparator />
 
-        {/* Reactivate action - for completed tasks */}
-        <DropdownMenuItem onClick={handleReactivate}>
-          <IconPlayerPlay className="mr-2 h-4 w-4" />
-          {isBulk ? "Reativar selecionadas" : "Reativar"}
-        </DropdownMenuItem>
+          {/* Set Sector action */}
+          <DropdownMenuItem
+            onClick={handleSetSector}
+            onSelect={(e) => e.preventDefault()}
+          >
+            <IconBuildingFactory2 className="mr-2 h-4 w-4" />
+            {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}
+          </DropdownMenuItem>
 
-        <DropdownMenuSeparator />
+          {/* Set Status action - includes option to put back in production */}
+          <DropdownMenuItem
+            onClick={handleSetStatus}
+            onSelect={(e) => e.preventDefault()}
+          >
+            <IconFileInvoice className="mr-2 h-4 w-4" />
+            Definir Status
+          </DropdownMenuItem>
 
-        {/* Delete action */}
-        <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-          <IconTrash className="mr-2 h-4 w-4" />
-          {isBulk ? "Deletar selecionadas" : "Deletar"}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuSeparator />
+
+          {/* Delete action */}
+          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+            <IconTrash className="mr-2 h-4 w-4" />
+            {isBulk ? "Deletar selecionadas" : "Deletar"}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Set Sector Modal */}
+      <SetSectorModal
+        open={setSectorModalOpen}
+        onOpenChange={(open) => {
+          console.log('[TaskHistoryContextMenu] SetSectorModal onOpenChange:', open);
+          setSetSectorModalOpen(open);
+        }}
+        tasks={tasks}
+        onConfirm={handleSetSectorConfirm}
+      />
+
+      {/* Set Status Modal */}
+      <SetStatusModal
+        open={setStatusModalOpen}
+        onOpenChange={(open) => {
+          console.log('[TaskHistoryContextMenu] SetStatusModal onOpenChange:', open);
+          setSetStatusModalOpen(open);
+        }}
+        tasks={tasks}
+        onConfirm={handleSetStatusConfirm}
+        allowedStatuses={[TASK_STATUS.IN_PRODUCTION, TASK_STATUS.COMPLETED, TASK_STATUS.INVOICED, TASK_STATUS.SETTLED]}
+      />
+    </>
   );
 }

@@ -12,6 +12,7 @@ import type { ServiceOrder, ServiceOrderIncludes } from "./serviceOrder";
 import type { Airbrushing, AirbrushingIncludes } from "./airbrushing";
 import type { Cut, CutIncludes } from "./cut";
 import type { Truck, TruckIncludes } from "./truck";
+import type { Budget, BudgetIncludes } from "./budget";
 
 // =====================
 // Task Interface
@@ -23,6 +24,7 @@ export interface Task extends BaseEntity {
   statusOrder: number;
   commission: COMMISSION_STATUS;
   serialNumber: string | null;
+  chassisNumber?: string | null;
   plate?: string | null;
   details: string | null;
   entryDate: Date | null;
@@ -39,7 +41,8 @@ export interface Task extends BaseEntity {
   // Relations
   sector?: Sector;
   customer?: Customer;
-  budgets?: File[]; // Many-to-many relation
+  budget?: Budget[]; // Budget items relation
+  budgets?: File[]; // Many-to-many relation (budget files)
   invoices?: File[]; // Many-to-many relation
   receipts?: File[]; // Many-to-many relation
   reimbursements?: File[]; // Many-to-many relation
@@ -72,7 +75,12 @@ export interface TaskIncludes {
     | {
         include?: CustomerIncludes;
       };
-  budgets?: boolean; // Many-to-many relation
+  budget?:
+    | boolean
+    | {
+        include?: BudgetIncludes;
+      }; // Budget items relation
+  budgets?: boolean; // Many-to-many relation (budget files)
   invoices?: boolean; // Many-to-many relation
   receipts?: boolean; // Many-to-many relation
   reimbursements?: boolean; // Many-to-many relation
@@ -149,6 +157,7 @@ export interface TaskOrderBy {
   statusOrder?: ORDER_BY_DIRECTION;
   commission?: ORDER_BY_DIRECTION;
   serialNumber?: ORDER_BY_DIRECTION;
+  chassisNumber?: ORDER_BY_DIRECTION;
   plate?: ORDER_BY_DIRECTION;
   details?: ORDER_BY_DIRECTION;
   entryDate?: ORDER_BY_DIRECTION;

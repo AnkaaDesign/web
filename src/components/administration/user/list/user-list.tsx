@@ -253,10 +253,12 @@ export function UserList({ className }: UserListProps) {
       Array.isArray(filterWithoutOrderBy.status) &&
       filterWithoutOrderBy.status.length > 0;
 
-    // Build result object
+    // Build result object - preserve searchingFor from baseQueryFilters
     const result: Partial<UserGetManyFormData> = {
       ...filterWithoutOrderBy,
       limit: DEFAULT_PAGE_SIZE,
+      // Make sure searchingFor is preserved
+      searchingFor: filterWithoutOrderBy.searchingFor,
     };
 
     // Remove any where.status filters to avoid conflicts
@@ -452,7 +454,7 @@ export function UserList({ className }: UserListProps) {
               console.log("[UserList] Search input changed to:", value);
               setSearch(value);
             }}
-            placeholder="Buscar por nome, email, CPF, PIS..."
+            placeholder="Buscar: nome, email, CPF ou nº folha (apenas números)"
             isPending={displaySearchText !== searchingFor}
           />
           <div className="flex gap-2">
@@ -461,10 +463,9 @@ export function UserList({ className }: UserListProps) {
               variant={hasActiveFilters ? "default" : "outline"}
               size="default"
               onClick={() => setShowFilterModal(true)}
-              className="group"
             >
-              <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">
+              <IconFilter className="h-4 w-4" />
+              <span>
                 Filtros
                 {hasActiveFilters ? ` (${activeFilterCount})` : ""}
               </span>

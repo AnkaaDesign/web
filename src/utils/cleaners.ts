@@ -4,6 +4,18 @@ export const cleanNumeric = (value: string): string => {
   return value.replace(/\D/g, "");
 };
 
+export const cleanChassis = (value: string): string => {
+  if (!value || typeof value !== "string") {
+    return "";
+  }
+
+  // Remove all non-alphanumeric characters and convert to uppercase
+  const cleaned = value.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+
+  // Limit to 17 characters (Brazilian VIN standard)
+  return cleaned.substring(0, 17);
+};
+
 export const cleanCPF = (value: string): string => {
   if (!value || typeof value !== "string") {
     return "";

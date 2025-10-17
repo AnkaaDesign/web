@@ -284,3 +284,21 @@ export function createExitFormData(
     }
   );
 }
+
+/**
+ * Helper for Observation forms
+ */
+export function createObservationFormData(
+  data: Record<string, any>,
+  files?: File[],
+  customer?: FormDataOptions['customer']
+): FormData {
+  return createFormDataWithContext(
+    data,
+    { files: files },
+    {
+      entityType: 'observation',
+      customer,
+    }
+  );
+}

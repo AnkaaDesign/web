@@ -234,44 +234,50 @@ export function MaintenanceFilters({ open, onOpenChange, filters, onFilterChange
               Próxima Manutenção
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <DateTimeInput
-                mode="date"
-                value={localState.nextRunRange?.gte}
-                onChange={(date: Date | null) => {
-                  if (!date && !localState.nextRunRange?.lte) {
-                    setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
-                  } else {
-                    setLocalState((prev) => ({
-                      ...prev,
-                      nextRunRange: {
-                        ...(date && { gte: date }),
-                        ...(localState.nextRunRange?.lte && { lte: localState.nextRunRange.lte }),
-                      },
-                    }));
-                  }
-                }}
-                label="De"
-                placeholder="Selecionar data inicial..."
-              />
-              <DateTimeInput
-                mode="date"
-                value={localState.nextRunRange?.lte}
-                onChange={(date: Date | null) => {
-                  if (!date && !localState.nextRunRange?.gte) {
-                    setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
-                  } else {
-                    setLocalState((prev) => ({
-                      ...prev,
-                      nextRunRange: {
-                        ...(localState.nextRunRange?.gte && { gte: localState.nextRunRange.gte }),
-                        ...(date && { lte: date }),
-                      },
-                    }));
-                  }
-                }}
-                label="Até"
-                placeholder="Selecionar data final..."
-              />
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localState.nextRunRange?.gte}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localState.nextRunRange?.lte) {
+                      setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
+                    } else {
+                      setLocalState((prev) => ({
+                        ...prev,
+                        nextRunRange: {
+                          ...(date && { gte: date }),
+                          ...(localState.nextRunRange?.lte && { lte: localState.nextRunRange.lte }),
+                        },
+                      }));
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data inicial..."
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localState.nextRunRange?.lte}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localState.nextRunRange?.gte) {
+                      setLocalState((prev) => ({ ...prev, nextRunRange: undefined }));
+                    } else {
+                      setLocalState((prev) => ({
+                        ...prev,
+                        nextRunRange: {
+                          ...(localState.nextRunRange?.gte && { gte: localState.nextRunRange.gte }),
+                          ...(date && { lte: date }),
+                        },
+                      }));
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data final..."
+                />
+              </div>
             </div>
           </div>
 
@@ -282,44 +288,50 @@ export function MaintenanceFilters({ open, onOpenChange, filters, onFilterChange
               Data de Criação
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <DateTimeInput
-                mode="date"
-                value={localState.createdAtRange?.gte}
-                onChange={(date: Date | null) => {
-                  if (!date && !localState.createdAtRange?.lte) {
-                    setLocalState((prev) => ({ ...prev, createdAtRange: undefined }));
-                  } else {
-                    setLocalState((prev) => ({
-                      ...prev,
-                      createdAtRange: {
-                        ...(date && { gte: date }),
-                        ...(localState.createdAtRange?.lte && { lte: localState.createdAtRange.lte }),
-                      },
-                    }));
-                  }
-                }}
-                label="De"
-                placeholder="Selecionar data inicial..."
-              />
-              <DateTimeInput
-                mode="date"
-                value={localState.createdAtRange?.lte}
-                onChange={(date: Date | null) => {
-                  if (!date && !localState.createdAtRange?.gte) {
-                    setLocalState((prev) => ({ ...prev, createdAtRange: undefined }));
-                  } else {
-                    setLocalState((prev) => ({
-                      ...prev,
-                      createdAtRange: {
-                        ...(localState.createdAtRange?.gte && { gte: localState.createdAtRange.gte }),
-                        ...(date && { lte: date }),
-                      },
-                    }));
-                  }
-                }}
-                label="Até"
-                placeholder="Selecionar data final..."
-              />
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localState.createdAtRange?.gte}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localState.createdAtRange?.lte) {
+                      setLocalState((prev) => ({ ...prev, createdAtRange: undefined }));
+                    } else {
+                      setLocalState((prev) => ({
+                        ...prev,
+                        createdAtRange: {
+                          ...(date && { gte: date }),
+                          ...(localState.createdAtRange?.lte && { lte: localState.createdAtRange.lte }),
+                        },
+                      }));
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data inicial..."
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localState.createdAtRange?.lte}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localState.createdAtRange?.gte) {
+                      setLocalState((prev) => ({ ...prev, createdAtRange: undefined }));
+                    } else {
+                      setLocalState((prev) => ({
+                        ...prev,
+                        createdAtRange: {
+                          ...(localState.createdAtRange?.gte && { gte: localState.createdAtRange.gte }),
+                          ...(date && { lte: date }),
+                        },
+                      }));
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data final..."
+                />
+              </div>
             </div>
           </div>
           {/* Action Buttons */}

@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import type { OrderScheduleCreateFormData } from "../../../../schemas";
@@ -12,10 +13,11 @@ interface SupplierSelectorProps {
 }
 
 export function OrderScheduleSupplierSelector({ control, disabled = false, required = false }: SupplierSelectorProps) {
-  const fetchSuppliers = async (searchTerm: string) => {
+  const fetchSuppliers = useCallback(async (searchTerm: string, page: number = 1) => {
+    const pageSize = 50;
     const response = await getSuppliers({
-      page: 1,
-      limit: 20,
+      page: page,
+      take: pageSize,
       where: {
         status: SUPPLIER_STATUS.ACTIVE,
         ...(searchTerm
@@ -31,19 +33,25 @@ export function OrderScheduleSupplierSelector({ control, disabled = false, requi
       orderBy: { fantasyName: "asc" },
     });
 
-    if (response.success && response.data) {
-      return [
-        { label: "Nenhum fornecedor selecionado", value: "_no_supplier" },
-        ...response.data.map((supplier: Supplier) => ({
-          value: supplier.id,
-          label: supplier.fantasyName,
-          description: supplier.corporateName || undefined,
-        })),
-      ];
-    }
+    const suppliers = response.data || [];
+    const total = response.total || 0;
+    const hasMore = (page * pageSize) < total;
 
-    return [{ label: "Nenhum fornecedor selecionado", value: "_no_supplier" }];
-  };
+    const options = [
+      { label: "Nenhum fornecedor selecionado", value: "_no_supplier" },
+      ...suppliers.map((supplier: Supplier) => ({
+        value: supplier.id,
+        label: supplier.fantasyName,
+        description: supplier.corporateName || undefined,
+      })),
+    ];
+
+    return {
+      data: options,
+      hasMore: hasMore,
+      total: total + 1, // +1 for the "_no_supplier" option
+    };
+  }, []);
 
   return (
     <FormField
@@ -61,11 +69,14 @@ export function OrderScheduleSupplierSelector({ control, disabled = false, requi
               queryFn={fetchSuppliers}
               initialOptions={[{ label: "Nenhum fornecedor selecionado", value: "_no_supplier" }]}
               minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
               placeholder="Pesquisar fornecedor..."
               searchPlaceholder="Digite o nome ou CNPJ..."
               emptyText="Nenhum fornecedor encontrado"
               disabled={disabled}
               clearable={!required}
+              searchable
             />
           </FormControl>
           <FormMessage />

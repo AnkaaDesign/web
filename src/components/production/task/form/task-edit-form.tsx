@@ -11,7 +11,6 @@ import {
   IconPalette,
   IconFile,
   IconRuler,
-  IconAlertCircle,
   IconSparkles,
   IconScissors,
   IconPlus,
@@ -21,7 +20,7 @@ import {
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
-import { useTaskMutations, useObservationMutations, useCutsByTask } from "../../../../hooks";
+import { useTaskMutations, useCutsByTask } from "../../../../hooks";
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { Button } from "@/components/ui/button";
@@ -36,14 +35,12 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CustomerSelector } from "./customer-selector";
 import { SectorSelector } from "./sector-selector";
 import { ServiceSelectorFixed } from "./service-selector";
+import { BudgetSelector, type BudgetSelectorRef } from "./budget-selector";
 import { MultiCutSelector, type MultiCutSelectorRef } from "./multi-cut-selector";
 import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./multi-airbrushing-selector";
 import { FileUploadField, type FileWithPreview } from "@/components/file";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Label } from "@/components/ui/label";
-import type { ObservationCreateFormData } from "../../../../schemas";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { LayoutForm } from "@/components/production/layout/layout-form";
@@ -89,7 +86,6 @@ const convertToFileWithPreview = (file: any | any[] | undefined | null): FileWit
 
 export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   const { updateAsync } = useTaskMutations();
-  const { create: createObservation } = useObservationMutations();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch cuts separately using useCutsByTask hook (same approach as detail page)
@@ -134,10 +130,16 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   const [cutsCount, setCutsCount] = useState(0);
   const multiAirbrushingSelectorRef = useRef<MultiAirbrushingSelectorRef>(null);
   const [airbrushingsCount, setAirbrushingsCount] = useState(0);
+  const budgetSelectorRef = useRef<BudgetSelectorRef>(null);
+  const [budgetCount, setBudgetCount] = useState(0);
   const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
   const [isLayoutOpen, setIsLayoutOpen] = useState(false);
   const [hasLayoutChanges, setHasLayoutChanges] = useState(false);
   const [hasFileChanges, setHasFileChanges] = useState(false);
+  const [isObservationOpen, setIsObservationOpen] = useState(!!task.observation?.description);
+  const [observationFiles, setObservationFiles] = useState<FileWithPreview[]>(
+    convertToFileWithPreview(task.observation?.artworks)
+  );
 
   // Get truck ID from task - assuming task has truck relation
   const truckId = task.truck?.id || task.truckId;
@@ -151,11 +153,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     }
   }, [layoutsData]);
 
-  // Observation creation state
-  const [isObservationOpen, setIsObservationOpen] = useState(false);
-  const [observationDescription, setObservationDescription] = useState("");
-  const [observationFiles, setObservationFiles] = useState<FileWithPreview[]>([]);
-  const [isCreatingObservation, setIsCreatingObservation] = useState(false);
 
   // Map task data to form values
   const mapDataToForm = useCallback((taskData: Task): TaskUpdateFormData => {
@@ -203,6 +200,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       name: taskData.name || "",
       status: taskData.status || TASK_STATUS.PENDING,
       serialNumber: taskData.serialNumber || null,
+      chassisNumber: taskData.chassisNumber || null,
       plate: taskData.plate || null,
       details: taskData.details || null,
       entryDate: taskData.entryDate ? new Date(taskData.entryDate) : null,
@@ -214,6 +212,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       generalPaintingId: taskData.paintId || null,
       price: taskData.price || null,
       budgetId: taskData.budgetId || null,
+      budget: taskData.budget?.map((b) => ({
+        referencia: b.referencia || "",
+        valor: b.valor || 0,
+      })) || [],
       nfeId: taskData.nfeId || null,
       receiptId: taskData.receiptId || null,
       services:
@@ -245,6 +247,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           invoices: a.invoices || [],
           artworks: a.artworks || [],
         })) || [],
+      observation: taskData.observation ? {
+        description: taskData.observation.description || "",
+        artworkIds: taskData.observation.artworks?.map((f: any) => f.id) || [],
+      } : null,
     } as TaskUpdateFormData;
   }, [cutsData]); // Depend on cutsData to re-run when cuts are fetched
 
@@ -255,8 +261,12 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
         setIsSubmitting(true);
 
         // DEBUG: Log what fields are in changedData
+        console.log('[TaskEditForm] ========== FORM SUBMISSION ==========');
+        console.log('[TaskEditForm] Task ID:', task.id);
         console.log('[TaskEditForm] changedData keys:', Object.keys(changedData));
-        console.log('[TaskEditForm] changedData:', changedData);
+        console.log('[TaskEditForm] changedData:', JSON.stringify(changedData, null, 2).substring(0, 500));
+        console.log('[TaskEditForm] hasLayoutChanges:', hasLayoutChanges);
+        console.log('[TaskEditForm] hasFileChanges:', hasFileChanges);
 
         // Validate that we have changes (form, layout, or file changes)
         if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges) {
@@ -352,9 +362,9 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                 }
               }
               if (airbrushing.nfeFiles && Array.isArray(airbrushing.nfeFiles)) {
-                const airbrushingNfes = airbrushing.nfeFiles.filter((f: any) => f instanceof File);
-                if (airbrushingNfes.length > 0) {
-                  files[`airbrushings[${index}].invoices`] = airbrushingNfes;
+                const airbrushingInvoices = airbrushing.nfeFiles.filter((f: any) => f instanceof File);
+                if (airbrushingInvoices.length > 0) {
+                  files[`airbrushings[${index}].invoices`] = airbrushingInvoices;
                 }
               }
               if (airbrushing.artworkFiles && Array.isArray(airbrushing.artworkFiles)) {
@@ -368,15 +378,29 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
           // Fields that should NEVER be sent via FormData to avoid huge payloads
           // These are large arrays that bloat the payload size
-          const excludedFields = new Set(['cuts', 'airbrushings', 'services', 'paintIds', 'artworkIds', 'budgetIds', 'invoiceIds', 'receiptIds']);
+          // MUST MATCH fieldsToOmitIfUnchanged in useEditForm config
+          const excludedFields = new Set([
+            'cuts',
+            'airbrushings',
+            'services',
+            'paintIds',
+            'artworkIds',
+            'budgetIds',
+            'invoiceIds',
+            'receiptIds',
+            'reimbursementIds',
+            'reimbursementInvoiceIds'
+          ]);
 
           // Prepare data object with only changed fields (excluding large arrays unless they changed)
           const dataForFormData: Record<string, any> = {};
           let fieldCount = 0;
+          let excludedCount = 0;
           Object.entries(changedData).forEach(([key, value]) => {
             // Skip excluded fields (large arrays) - they should only be sent if explicitly updated
             if (excludedFields.has(key)) {
-              console.log(`[TaskEditForm] Skipping large field: ${key}`);
+              console.log(`[TaskEditForm] Excluding large field from FormData: ${key}`);
+              excludedCount++;
               return;
             }
 
@@ -384,6 +408,14 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
               dataForFormData[key] = value;
               fieldCount++;
             }
+          });
+
+          // Log summary
+          console.log('[TaskEditForm] FormData field processing:', {
+            totalChangedFields: Object.keys(changedData).length,
+            excludedFields: excludedCount,
+            includedFields: fieldCount,
+            fileTypes: Object.keys(files).length
           });
 
           // CRITICAL: If no form fields were added but we have files, add a marker field
@@ -425,6 +457,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
         } else {
           // Use regular JSON when no files are present
           const submitData = { ...changedData };
+
+          console.log('[TaskEditForm] Using JSON submission (no files)');
+          console.log('[TaskEditForm] submitData keys:', Object.keys(submitData));
+          console.log('[TaskEditForm] submitData:', JSON.stringify(submitData, null, 2).substring(0, 500));
 
           result = await updateAsync({
             id: task.id,
@@ -468,7 +504,19 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       criteriaMode: "all",
     },
     // Don't send these large arrays if they haven't changed (reduces payload size)
-    fieldsToOmitIfUnchanged: ["cuts", "airbrushings", "services", "paintIds"],
+    // This must match the excludedFields Set in handleFormSubmit for consistency
+    fieldsToOmitIfUnchanged: [
+      "cuts",
+      "airbrushings",
+      "services",
+      "paintIds",
+      "artworkIds",
+      "budgetIds",
+      "invoiceIds",
+      "receiptIds",
+      "reimbursementIds",
+      "reimbursementInvoiceIds",
+    ],
   });
 
   // Debug: Log form values after initialization
@@ -526,73 +574,17 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     // Files will be submitted with the form, not uploaded separately
   };
 
-  // Handle observation files (no longer uploads immediately)
+  // Handle observation files change
   const handleObservationFilesChange = (files: FileWithPreview[]) => {
     setObservationFiles(files);
-    // Files will be submitted with the observation creation, not uploaded separately
-  };
-
-  // Handle observation creation
-  const handleCreateObservation = async () => {
-    if (!observationDescription.trim()) {
-      toast.error("Descrição da observação é obrigatória");
-      return;
-    }
-
-    try {
-      setIsCreatingObservation(true);
-
-      // Check if we have files to upload
-      const newFiles = observationFiles.filter(f => !f.uploaded && f instanceof File);
-
-      if (newFiles.length > 0) {
-        // Create FormData when files are present
-        const formData = new FormData();
-        formData.append('description', observationDescription);
-        formData.append('taskId', task.id);
-
-        // Add files
-        newFiles.forEach((file) => {
-          formData.append('files', file as unknown as Blob);
-        });
-
-        // Add existing file IDs if any
-        const existingFileIds = observationFiles
-          .filter(f => f.uploaded)
-          .map(f => (f as any).uploadedFileId || f.id)
-          .filter(Boolean);
-
-        if (existingFileIds.length > 0) {
-          formData.append('fileIds', JSON.stringify(existingFileIds));
-        }
-
-        await createObservation(formData as any);
-      } else {
-        // No new files, send as regular JSON
-        const observationData: ObservationCreateFormData = {
-          description: observationDescription,
-          taskId: task.id,
-          fileIds: observationFiles
-            .filter(f => f.uploaded)
-            .map(f => (f as any).uploadedFileId || f.id)
-            .filter(Boolean),
-        };
-
-        await createObservation(observationData);
-      }
-
-      // Success toast is handled automatically by API client
-
-      // Reset observation form
-      setObservationDescription("");
-      setObservationFiles([]);
-      setIsObservationOpen(false);
-    } catch (error) {
-      console.error("Error creating observation:", error);
-      // Error handled by API client
-    } finally {
-      setIsCreatingObservation(false);
-    }
+    setHasFileChanges(true);
+    // Update form value with file IDs
+    const fileIds = files.map((f) => f.uploadedFileId || f.id).filter(Boolean);
+    const currentObservation = form.getValues("observation");
+    form.setValue("observation", {
+      ...currentObservation,
+      artworkIds: fileIds,
+    });
   };
 
   const handleCancel = useCallback(() => {
@@ -701,14 +693,14 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                       <CustomerSelector control={form.control} disabled={isSubmitting} required initialCustomer={task.customer} />
                     </div>
 
-                    {/* Serial Number and Plate */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Serial Number, Plate and Chassis Number */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       {/* Serial Number */}
                       <FormField
                         control={form.control}
                         name="serialNumber"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="md:col-span-1">
                             <FormLabel>Número de Série</FormLabel>
                             <FormControl>
                               <Input
@@ -730,7 +722,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                         control={form.control}
                         name="plate"
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="md:col-span-1">
                             <FormLabel>Placa</FormLabel>
                             <FormControl>
                               <Input type="plate" {...field} value={field.value || ""} disabled={isSubmitting} className="bg-transparent" />
@@ -739,37 +731,62 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                           </FormItem>
                         )}
                       />
+
+                      {/* Chassis Number */}
+                      <FormField
+                        control={form.control}
+                        name="chassisNumber"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel>Número do Chassi (17 caracteres)</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="chassis"
+                                value={field.value || ""}
+                                placeholder="Ex: 9BW ZZZ37 7V T004251"
+                                className="bg-transparent"
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
 
-                    {/* Sector */}
-                    <SectorSelector control={form.control} disabled={isSubmitting} productionOnly />
+                    {/* Sector and Status in a row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Sector */}
+                      <SectorSelector control={form.control} disabled={isSubmitting} productionOnly />
 
-                  {/* Status Field (edit-specific) */}
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status</FormLabel>
-                        <FormControl>
-                          <Combobox
-                            value={field.value}
-                            onValueChange={field.onChange}
-                            disabled={isSubmitting}
-                            options={Object.values(TASK_STATUS).map((status) => ({
-                              value: status,
-                              label: TASK_STATUS_LABELS[status],
-                            }))}
-                            placeholder="Selecione o status"
-                            searchable={false}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      {/* Status Field (edit-specific) */}
+                      <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Status</FormLabel>
+                            <FormControl>
+                              <Combobox
+                                value={field.value}
+                                onValueChange={field.onChange}
+                                disabled={isSubmitting}
+                                options={Object.values(TASK_STATUS).map((status) => ({
+                                  value: status,
+                                  label: TASK_STATUS_LABELS[status],
+                                }))}
+                                placeholder="Selecione o status"
+                                searchable={false}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
-                  {/* Details */}
+                    {/* Details */}
                     <FormField
                       control={form.control}
                       name="details"
@@ -854,81 +871,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                           />
                         )}
                       />
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Financial Information Card */}
-                <Card className="bg-transparent">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <IconCurrencyReal className="h-5 w-5" />
-                      Informações Financeiras
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Price */}
-                    <FormMoneyInput
-                      name="price"
-                      label="Valor Total"
-                      placeholder="R$ 0,00"
-                      disabled={isSubmitting}
-                    />
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Budget File */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                          Orçamento
-                        </label>
-                        <FileUploadField
-                          onFilesChange={handleBudgetFileChange}
-                          maxFiles={5}
-                          disabled={isSubmitting}
-                          showPreview={false}
-                          existingFiles={budgetFile}
-                          variant="compact"
-                          placeholder="Adicionar orçamentos"
-                          label=""
-                        />
-                      </div>
-
-                      {/* NFe File */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <IconFile className="h-4 w-4 text-muted-foreground" />
-                          Nota Fiscal
-                        </label>
-                        <FileUploadField
-                          onFilesChange={handleNfeFileChange}
-                          maxFiles={5}
-                          disabled={isSubmitting}
-                          showPreview={false}
-                          existingFiles={nfeFile}
-                          variant="compact"
-                          placeholder="Adicionar NFes"
-                          label=""
-                        />
-                      </div>
-
-                      {/* Receipt File */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <IconReceipt className="h-4 w-4 text-muted-foreground" />
-                          Recibo
-                        </label>
-                        <FileUploadField
-                          onFilesChange={handleReceiptFileChange}
-                          maxFiles={5}
-                          disabled={isSubmitting}
-                          showPreview={false}
-                          existingFiles={receiptFile}
-                          variant="compact"
-                          placeholder="Adicionar recibos"
-                          label=""
-                        />
-                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1075,13 +1017,109 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                   </CardContent>
                 </Card>
 
-                {/* Issues & Observations Card */}
+                {/* Financial Information Card */}
+                <Card className="bg-transparent">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <IconCurrencyReal className="h-5 w-5" />
+                      Informações Financeiras
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Budget File */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
+                          Orçamento
+                        </label>
+                        <FileUploadField
+                          onFilesChange={handleBudgetFileChange}
+                          maxFiles={5}
+                          disabled={isSubmitting}
+                          showPreview={false}
+                          existingFiles={budgetFile}
+                          variant="compact"
+                          placeholder="Adicionar orçamentos"
+                          label=""
+                        />
+                      </div>
+
+                      {/* NFe File */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <IconFile className="h-4 w-4 text-muted-foreground" />
+                          Nota Fiscal
+                        </label>
+                        <FileUploadField
+                          onFilesChange={handleNfeFileChange}
+                          maxFiles={5}
+                          disabled={isSubmitting}
+                          showPreview={false}
+                          existingFiles={nfeFile}
+                          variant="compact"
+                          placeholder="Adicionar NFes"
+                          label=""
+                        />
+                      </div>
+
+                      {/* Receipt File */}
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <IconReceipt className="h-4 w-4 text-muted-foreground" />
+                          Recibo
+                        </label>
+                        <FileUploadField
+                          onFilesChange={handleReceiptFileChange}
+                          maxFiles={5}
+                          disabled={isSubmitting}
+                          showPreview={false}
+                          existingFiles={receiptFile}
+                          variant="compact"
+                          placeholder="Adicionar recibos"
+                          label=""
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Budget Card */}
                 <Card className="bg-transparent">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
-                        <IconAlertCircle className="h-5 w-5" />
-                        Problemas e Observações
+                        <IconFileInvoice className="h-5 w-5" />
+                        Orçamento Detalhado
+                      </CardTitle>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (budgetSelectorRef.current) {
+                            budgetSelectorRef.current.addBudget();
+                          }
+                        }}
+                        disabled={isSubmitting}
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <IconPlus className="h-4 w-4" />
+                        Adicionar Orçamento ({budgetCount})
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <BudgetSelector ref={budgetSelectorRef} control={form.control} disabled={isSubmitting} onBudgetCountChange={setBudgetCount} />
+                  </CardContent>
+                </Card>
+
+                {/* Observation Section */}
+                <Card className="bg-transparent">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFile className="h-5 w-5" />
+                        Observação
                       </CardTitle>
                       {!isObservationOpen && (
                         <Button
@@ -1092,7 +1130,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                           className="gap-2"
                         >
                           <IconPlus className="h-4 w-4" />
-                          Criar Observação
+                          Adicionar Observação
                         </Button>
                       )}
                     </div>
@@ -1100,94 +1138,65 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                   <CardContent>
                     {isObservationOpen ? (
                       <div className="space-y-4">
-                        <Alert>
-                          <IconAlertCircle className="h-4 w-4" />
-                          <AlertTitle>Criar Observação</AlertTitle>
-                          <AlertDescription>
-                            As observações são registradas quando há problemas ou questões importantes identificadas na tarefa. Criar uma observação irá suspender automaticamente
-                            as comissões relacionadas a esta tarefa.
-                          </AlertDescription>
-                        </Alert>
+                        <FormField
+                          control={form.control}
+                          name="observation"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Descrição da Observação</FormLabel>
+                              <FormControl>
+                                <Textarea
+                                  value={field.value?.description || ""}
+                                  onChange={(e) => {
+                                    const description = e.target.value;
+                                    field.onChange(description ? { ...field.value, description } : null);
+                                  }}
+                                  placeholder="Descreva problemas ou observações sobre a tarefa..."
+                                  rows={4}
+                                  disabled={isSubmitting}
+                                  className="bg-transparent"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-                        {/* Description Field */}
+                        {/* Observation Files */}
                         <div className="space-y-2">
-                          <Label htmlFor="observation-description">
-                            Descrição da Observação <span className="text-destructive">*</span>
+                          <Label className="text-sm font-medium flex items-center gap-2">
+                            <IconFile className="h-4 w-4 text-muted-foreground" />
+                            Arquivos de Evidência (Opcional)
                           </Label>
-                          <Textarea
-                            id="observation-description"
-                            value={observationDescription}
-                            onChange={(value) => setObservationDescription(typeof value === "string" ? value : "")}
-                            placeholder="Descreva detalhadamente o problema ou observação identificada..."
-                            className="min-h-32 resize-y"
-                            disabled={isCreatingObservation}
-                          />
-                          <div className="text-xs text-muted-foreground text-right">{observationDescription.length}/1000 caracteres</div>
-                        </div>
-
-                        {/* File Upload for Observation */}
-                        <div className="space-y-2">
-                          <Label>Arquivos da Observação (Opcional)</Label>
                           <FileUploadField
                             onFilesChange={handleObservationFilesChange}
-                            existingFiles={observationFiles}
-                            maxFiles={5}
-                            disabled={isCreatingObservation}
+                            maxFiles={10}
+                            disabled={isSubmitting}
                             showPreview={true}
+                            existingFiles={observationFiles}
                             variant="compact"
-                            placeholder="Adicione arquivos de evidência"
-                            label="Arquivos da observação"
+                            placeholder="Adicione fotos, documentos ou outros arquivos"
+                            label="Arquivos anexados"
                           />
                         </div>
 
-                        {/* Actions */}
-                        <div className="flex justify-end gap-2 pt-4 border-t">
+                        <div className="flex justify-end">
                           <Button
                             type="button"
-                            variant="outline"
+                            variant="ghost"
+                            size="sm"
                             onClick={() => {
                               setIsObservationOpen(false);
-                              setObservationDescription("");
+                              form.setValue("observation", null);
                               setObservationFiles([]);
                             }}
-                            disabled={isCreatingObservation}
+                            disabled={isSubmitting}
                           >
-                            Cancelar
-                          </Button>
-                          <Button type="button" onClick={handleCreateObservation} disabled={isCreatingObservation || !observationDescription.trim()}>
-                            {isCreatingObservation ? (
-                              <>
-                                <IconLoader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Criando...
-                              </>
-                            ) : (
-                              <>
-                                <IconCheck className="h-4 w-4 mr-2" />
-                                Criar Observação
-                              </>
-                            )}
+                            Remover
                           </Button>
                         </div>
                       </div>
-                    ) : (
-                      <>
-                        {/* Show existing observations for this task */}
-                        {task.observation && (
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">Observações Existentes</Label>
-                            <div className="space-y-2">
-                              <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg text-sm">
-                                <IconAlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                                <div className="flex-1">
-                                  <p className="text-foreground">{task.observation.description}</p>
-                                  <p className="text-xs text-muted-foreground mt-1">Criada em {new Date(task.observation.createdAt).toLocaleDateString("pt-BR")}</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
+                    ) : null}
                   </CardContent>
                 </Card>
 

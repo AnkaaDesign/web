@@ -9,9 +9,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import type { AirbrushingGetManyFormData } from "../../../../schemas";
@@ -32,8 +30,6 @@ interface FilterState {
   status: AIRBRUSHING_STATUS[];
   priceMin?: number;
   priceMax?: number;
-  hasStartDate?: boolean;
-  hasFinishDate?: boolean;
   createdAfter?: Date;
   createdBefore?: Date;
 }
@@ -44,8 +40,6 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
     status: [],
     priceMin: undefined,
     priceMax: undefined,
-    hasStartDate: undefined,
-    hasFinishDate: undefined,
     createdAfter: undefined,
     createdBefore: undefined,
   });
@@ -59,8 +53,6 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
       status: filters.status || [],
       priceMin: filters.priceRange?.min,
       priceMax: filters.priceRange?.max,
-      hasStartDate: filters.hasStartDate,
-      hasFinishDate: filters.hasFinishDate,
       createdAfter: filters.createdAt?.gte,
       createdBefore: filters.createdAt?.lte,
     });
@@ -98,20 +90,6 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
       delete newFilters.priceRange;
     }
 
-    // Has start date
-    if (localState.hasStartDate !== undefined) {
-      newFilters.hasStartDate = localState.hasStartDate;
-    } else {
-      delete newFilters.hasStartDate;
-    }
-
-    // Has finish date
-    if (localState.hasFinishDate !== undefined) {
-      newFilters.hasFinishDate = localState.hasFinishDate;
-    } else {
-      delete newFilters.hasFinishDate;
-    }
-
     // Date range
     if (localState.createdAfter || localState.createdBefore) {
       newFilters.createdAt = {};
@@ -135,8 +113,6 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
       status: [],
       priceMin: undefined,
       priceMax: undefined,
-      hasStartDate: undefined,
-      hasFinishDate: undefined,
       createdAfter: undefined,
       createdBefore: undefined,
     });
@@ -147,8 +123,6 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
     if (localState.taskIds.length > 0) count++;
     if (localState.status.length > 0) count++;
     if (localState.priceMin !== undefined || localState.priceMax !== undefined) count++;
-    if (localState.hasStartDate !== undefined) count++;
-    if (localState.hasFinishDate !== undefined) count++;
     if (localState.createdAfter || localState.createdBefore) count++;
     return count;
   };
@@ -159,207 +133,140 @@ export function AirbrushingFilters({ open, onOpenChange, filters, onFilterChange
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" />
-            Filtros de Airbrushings
+            Filtros de Aerografia
             {getActiveFilterCount() > 0 && <Badge variant="secondary">{getActiveFilterCount()}</Badge>}
           </SheetTitle>
           <SheetDescription>
-            Configure os filtros para visualizar airbrushings específicos
+            Configure os filtros para visualizar aerografias específicas
           </SheetDescription>
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          <Tabs defaultValue="basic" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="basic">Básico</TabsTrigger>
-              <TabsTrigger value="status">Status</TabsTrigger>
-              <TabsTrigger value="tasks">Tarefas</TabsTrigger>
-              <TabsTrigger value="dates">Datas</TabsTrigger>
-            </TabsList>
+          <div className="space-y-3">
+            <Label className="text-base font-medium">
+              Status
+              {localState.status.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {localState.status.length}
+                </Badge>
+              )}
+            </Label>
+            <Combobox
+              mode="multiple"
+              options={Object.values(AIRBRUSHING_STATUS).map((status) => ({
+                value: status,
+                label: AIRBRUSHING_STATUS_LABELS[status],
+              }))}
+              value={localState.status}
+              onValueChange={(status: string[]) => {
+                setLocalState((prev) => ({ ...prev, status: status as AIRBRUSHING_STATUS[] }));
+              }}
+              placeholder="Selecionar status..."
+              searchPlaceholder="Buscar status..."
+              emptyText="Nenhum status encontrado"
+              searchable={true}
+              clearable={true}
+            />
+          </div>
 
-          <TabsContent value="basic" className="space-y-4">
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <Label className="text-base font-medium">Faixa de Preço</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-sm">Preço mínimo</Label>
-                    <Input
-                      type="number"
-                      placeholder="0.00"
-                      value={localState.priceMin || ""}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                        const value = e.target.value;
-                        setLocalState((prev) => ({
-                          ...prev,
-                          priceMin: value ? parseFloat(value) : undefined,
-                        }));
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm">Preço máximo</Label>
-                    <Input
-                      type="number"
-                      placeholder="999999.99"
-                      value={localState.priceMax || ""}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                        const value = e.target.value;
-                        setLocalState((prev) => ({
-                          ...prev,
-                          priceMax: value ? parseFloat(value) : undefined,
-                        }));
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
+          <div className="space-y-3">
+            <Label className="text-base font-medium">
+              Tarefas
+              {localState.taskIds.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {localState.taskIds.length}
+                </Badge>
+              )}
+            </Label>
+            <Combobox
+              mode="multiple"
+              options={tasks.map((task) => ({
+                value: task.id,
+                label: task.name,
+              }))}
+              value={localState.taskIds}
+              onValueChange={(taskIds: string[]) => {
+                setLocalState((prev) => ({ ...prev, taskIds }));
+              }}
+              placeholder="Selecionar tarefas..."
+              searchPlaceholder="Buscar tarefas..."
+              emptyText="Nenhuma tarefa encontrada"
+              searchable={true}
+              clearable={true}
+            />
+          </div>
 
-              <div className="space-y-3">
-                <Label className="text-base font-medium">Datas de Execução</Label>
-                <div className="flex flex-col space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={localState.hasStartDate === true}
-                      onCheckedChange={(checked: boolean) => {
-                        setLocalState((prev) => ({
-                          ...prev,
-                          hasStartDate: checked ? true : undefined,
-                        }));
-                      }}
-                    />
-                    <Label>Apenas com data de início</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={localState.hasStartDate === false}
-                      onCheckedChange={(checked: boolean) => {
-                        setLocalState((prev) => ({
-                          ...prev,
-                          hasStartDate: checked ? false : undefined,
-                        }));
-                      }}
-                    />
-                    <Label>Apenas sem data de início</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={localState.hasFinishDate === true}
-                      onCheckedChange={(checked: boolean) => {
-                        setLocalState((prev) => ({
-                          ...prev,
-                          hasFinishDate: checked ? true : undefined,
-                        }));
-                      }}
-                    />
-                    <Label>Apenas com data de finalização</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={localState.hasFinishDate === false}
-                      onCheckedChange={(checked: boolean) => {
-                        setLocalState((prev) => ({
-                          ...prev,
-                          hasFinishDate: checked ? false : undefined,
-                        }));
-                      }}
-                    />
-                    <Label>Apenas sem data de finalização</Label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="status" className="space-y-4">
-            <div className="space-y-3">
-              <Label className="text-base font-medium">
-                Status
-                {localState.status.length > 0 && (
-                  <Badge variant="secondary" className="ml-2">
-                    {localState.status.length}
-                  </Badge>
-                )}
-              </Label>
-              <div className="max-h-60 overflow-y-auto">
-                <Combobox
-                  mode="multiple"
-                  options={Object.values(AIRBRUSHING_STATUS).map((status) => ({
-                    value: status,
-                    label: AIRBRUSHING_STATUS_LABELS[status],
-                  }))}
-                  value={localState.status}
-                  onValueChange={(status: string[]) => {
-                    setLocalState((prev) => ({ ...prev, status: status as AIRBRUSHING_STATUS[] }));
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Faixa de Preço</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-sm">Preço mínimo</Label>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={localState.priceMin || ""}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const value = e.target.value;
+                    setLocalState((prev) => ({
+                      ...prev,
+                      priceMin: value ? parseFloat(value) : undefined,
+                    }));
                   }}
-                  placeholder="Selecionar status..."
-                  searchPlaceholder="Buscar status..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Preço máximo</Label>
+                <Input
+                  type="number"
+                  placeholder="999999.99"
+                  value={localState.priceMax || ""}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const value = e.target.value;
+                    setLocalState((prev) => ({
+                      ...prev,
+                      priceMax: value ? parseFloat(value) : undefined,
+                    }));
+                  }}
                 />
               </div>
             </div>
-          </TabsContent>
+          </div>
 
-          <TabsContent value="tasks" className="space-y-4">
-            <div className="space-y-3">
-              <Label className="text-base font-medium">
-                Tarefas
-                {localState.taskIds.length > 0 && (
-                  <Badge variant="secondary" className="ml-2">
-                    {localState.taskIds.length}
-                  </Badge>
-                )}
-              </Label>
-              <div className="max-h-60 overflow-y-auto">
-                <Combobox
-                  mode="multiple"
-                  options={tasks.map((task) => ({
-                    value: task.id,
-                    label: task.name,
-                  }))}
-                  value={localState.taskIds}
-                  onValueChange={(taskIds: string[]) => {
-                    setLocalState((prev) => ({ ...prev, taskIds }));
+          <div className="space-y-3">
+            <div className="text-base font-medium">Data de Criação</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localState.createdAfter}
+                  onChange={(date: Date | null) => {
+                    setLocalState((prev) => ({
+                      ...prev,
+                      createdAfter: date || undefined,
+                    }));
                   }}
-                  placeholder="Selecionar tarefas..."
-                  searchPlaceholder="Buscar tarefas..."
+                  hideLabel
+                  placeholder="Selecionar data inicial..."
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localState.createdBefore}
+                  onChange={(date: Date | null) => {
+                    setLocalState((prev) => ({
+                      ...prev,
+                      createdBefore: date || undefined,
+                    }));
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data final..."
                 />
               </div>
             </div>
-          </TabsContent>
-
-          <TabsContent value="dates" className="space-y-4">
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <div className="text-base font-medium">Data de Criação</div>
-                <div className="grid grid-cols-2 gap-3">
-                  <DateTimeInput
-                    mode="date"
-                    value={localState.createdAfter}
-                    onChange={(date: Date | null) => {
-                      setLocalState((prev) => ({
-                        ...prev,
-                        createdAfter: date || undefined,
-                      }));
-                    }}
-                    label="De"
-                    placeholder="Selecionar data inicial..."
-                  />
-                  <DateTimeInput
-                    mode="date"
-                    value={localState.createdBefore}
-                    onChange={(date: Date | null) => {
-                      setLocalState((prev) => ({
-                        ...prev,
-                        createdBefore: date || undefined,
-                      }));
-                    }}
-                    label="Até"
-                    placeholder="Selecionar data final..."
-                  />
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-          </Tabs>
+          </div>
 
           {/* Action Buttons */}
           <div className="flex gap-2 pt-4 border-t">

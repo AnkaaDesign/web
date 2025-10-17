@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import type { File as AnkaaFile } from "../../types";
-import { formatFileSize, getFileCategory, getFileDisplayName, isImageFile } from "../../utils";
+import { formatFileSize, getFileCategory, getFileDisplayName, isImageFile } from "../../utils/file";
 import { fileViewerService } from "../../utils/file-viewer";
+import { getPDFThumbnailUrl, isPDFFile } from "../../utils/pdf-thumbnail";
 import { formatRelativeTime } from "../../utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,9 @@ export interface FileItemProps {
   onDownload?: (file: AnkaaFile) => void;
   onDelete?: (file: AnkaaFile) => void;
   showActions?: boolean;
+  showFilename?: boolean;
+  showFileSize?: boolean;
+  showRelativeTime?: boolean;
   className?: string;
 }
 
@@ -30,7 +34,12 @@ const isEpsFile = (file: AnkaaFile): boolean => {
 // Removed getFileIcon function - now using FileTypeIcon/FileTypeAvatar components
 
 const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" | "large" = "medium"): string => {
-  const apiUrl = (window as any).__ANKAA_API_URL__ || process.env.VITE_API_URL || "http://localhost:3030";
+  const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
+
+  // Handle PDF thumbnails
+  if (isPDFFile(file)) {
+    return getPDFThumbnailUrl(file, { size });
+  }
 
   if (file.thumbnailUrl) {
     // If it's already a full URL, use it
@@ -47,16 +56,16 @@ const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" | "large" = "
   return "";
 };
 
-const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload, onDelete, showActions = true, className }) => {
+const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload, onDelete, showActions = true, showFilename = true, showFileSize = true, showRelativeTime = true, className }) => {
   const [thumbnailError, setThumbnailError] = useState(false);
   const [thumbnailLoading, setThumbnailLoading] = useState(true);
   const [showThumbnail, setShowThumbnail] = useState(false);
   const category = getFileCategory(file);
   const isImage = isImageFile(file);
-  const isPdf = file.mimetype === "application/pdf";
+  const isPdf = isPDFFile(file);
   const isEps = isEpsFile(file);
   const canPreviewFile = fileViewerService.canPreviewFile(file);
-  const hasThumbnail = file.thumbnailUrl || isImage;
+  const hasThumbnail = file.thumbnailUrl || isImage || isPdf;
 
   // Try to get file viewer context (optional)
   let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
@@ -78,11 +87,12 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
   }, [hasThumbnail]);
 
   const handleClick = () => {
-    // Use the new file viewer service if available
-    if (fileViewerContext) {
-      fileViewerContext.actions.viewFile(file);
-    } else if (canPreviewFile && onPreview) {
+    // Prioritize onPreview prop when provided (for custom handling like gallery navigation)
+    if (onPreview) {
       onPreview(file);
+    } else if (fileViewerContext) {
+      // Use the new file viewer service if available
+      fileViewerContext.actions.viewFile(file);
     } else if (onDownload) {
       onDownload(file);
     }
@@ -132,13 +142,17 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
         </div>
 
         {/* File Info */}
-        <div className="space-y-1">
-          <h4 className="text-sm font-medium text-foreground leading-tight">{getFileDisplayName(file, 25)}</h4>
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{formatFileSize(file.size)}</span>
+        {(showFilename || showFileSize || showRelativeTime) && (
+          <div className="space-y-1">
+            {showFilename && <h4 className="text-sm font-medium text-foreground leading-tight">{getFileDisplayName(file, 25)}</h4>}
+            {showFileSize && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{formatFileSize(file.size)}</span>
+              </div>
+            )}
+            {showRelativeTime && file.createdAt && <p className="text-xs text-muted-foreground">{formatRelativeTime(new Date(file.createdAt))}</p>}
           </div>
-          {file.createdAt && <p className="text-xs text-muted-foreground">{formatRelativeTime(new Date(file.createdAt))}</p>}
-        </div>
+        )}
 
         {/* Actions */}
         {showActions && (
@@ -202,16 +216,16 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
   );
 };
 
-const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload, onDelete, showActions = true, className }) => {
+const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload, onDelete, showActions = true, showFilename = true, showFileSize = true, showRelativeTime = true, className }) => {
   const [thumbnailError, setThumbnailError] = useState(false);
   const [thumbnailLoading, setThumbnailLoading] = useState(true);
   const [showThumbnail, setShowThumbnail] = useState(false);
   const category = getFileCategory(file);
   const isImage = isImageFile(file);
-  const isPdf = file.mimetype === "application/pdf";
+  const isPdf = isPDFFile(file);
   const isEps = isEpsFile(file);
   const canPreviewFile = fileViewerService.canPreviewFile(file);
-  const hasThumbnail = file.thumbnailUrl || isImage;
+  const hasThumbnail = file.thumbnailUrl || isImage || isPdf;
 
   // Try to get file viewer context (optional)
   let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
@@ -233,11 +247,12 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
   }, [hasThumbnail]);
 
   const handleClick = () => {
-    // Use the new file viewer service if available
-    if (fileViewerContext) {
-      fileViewerContext.actions.viewFile(file);
-    } else if (canPreviewFile && onPreview) {
+    // Prioritize onPreview prop when provided (for custom handling like gallery navigation)
+    if (onPreview) {
       onPreview(file);
+    } else if (fileViewerContext) {
+      // Use the new file viewer service if available
+      fileViewerContext.actions.viewFile(file);
     } else if (onDownload) {
       onDownload(file);
     }
@@ -285,16 +300,14 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
       {/* File Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-foreground truncate">{getFileDisplayName(file, 40)}</h4>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0 ml-2">
-            <span>{formatFileSize(file.size)}</span>
-            {file.createdAt && (
-              <>
-                <span className="font-enhanced-unicode">•</span>
-                <span>{formatRelativeTime(new Date(file.createdAt))}</span>
-              </>
-            )}
-          </div>
+          {showFilename && <h4 className="text-sm font-medium text-foreground truncate">{getFileDisplayName(file, 40)}</h4>}
+          {(showFileSize || showRelativeTime) && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0 ml-2">
+              {showFileSize && <span>{formatFileSize(file.size)}</span>}
+              {showFileSize && showRelativeTime && file.createdAt && <span className="font-enhanced-unicode">•</span>}
+              {showRelativeTime && file.createdAt && <span>{formatRelativeTime(new Date(file.createdAt))}</span>}
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-between mt-1">
           <p className="text-xs text-muted-foreground capitalize">{category}</p>

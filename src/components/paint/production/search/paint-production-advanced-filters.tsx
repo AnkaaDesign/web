@@ -212,44 +212,50 @@ export function PaintProductionAdvancedFilters({ filters, onFilterChange, classN
           Data de Criação
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <DateTimeInput
-            mode="date"
-            context="generic"
-            value={filters.createdAt?.gte}
-            onChange={(date: Date | null) => {
-              const newFilters = { ...filters };
-              if (!date && !filters.createdAt?.lte) {
-                delete newFilters.createdAt;
-              } else {
-                newFilters.createdAt = {
-                  ...(date && { gte: date }),
-                  ...(filters.createdAt?.lte && { lte: filters.createdAt.lte }),
-                };
-              }
-              onFilterChange(newFilters);
-            }}
-            label="De"
-            placeholder="Selecionar data inicial..."
-          />
-          <DateTimeInput
-            mode="date"
-            context="generic"
-            value={filters.createdAt?.lte}
-            onChange={(date: Date | null) => {
-              const newFilters = { ...filters };
-              if (!date && !filters.createdAt?.gte) {
-                delete newFilters.createdAt;
-              } else {
-                newFilters.createdAt = {
-                  ...(filters.createdAt?.gte && { gte: filters.createdAt.gte }),
-                  ...(date && { lte: date }),
-                };
-              }
-              onFilterChange(newFilters);
-            }}
-            label="Até"
-            placeholder="Selecionar data final..."
-          />
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+            <DateTimeInput
+              mode="date"
+              context="generic"
+              value={filters.createdAt?.gte}
+              onChange={(date: Date | null) => {
+                const newFilters = { ...filters };
+                if (!date && !filters.createdAt?.lte) {
+                  delete newFilters.createdAt;
+                } else {
+                  newFilters.createdAt = {
+                    ...(date && { gte: date }),
+                    ...(filters.createdAt?.lte && { lte: filters.createdAt.lte }),
+                  };
+                }
+                onFilterChange(newFilters);
+              }}
+              hideLabel
+              placeholder="Selecionar data inicial..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+            <DateTimeInput
+              mode="date"
+              context="generic"
+              value={filters.createdAt?.lte}
+              onChange={(date: Date | null) => {
+                const newFilters = { ...filters };
+                if (!date && !filters.createdAt?.gte) {
+                  delete newFilters.createdAt;
+                } else {
+                  newFilters.createdAt = {
+                    ...(filters.createdAt?.gte && { gte: filters.createdAt.gte }),
+                    ...(date && { lte: date }),
+                  };
+                }
+                onFilterChange(newFilters);
+              }}
+              hideLabel
+              placeholder="Selecionar data final..."
+            />
+          </div>
         </div>
       </div>
 
@@ -260,44 +266,50 @@ export function PaintProductionAdvancedFilters({ filters, onFilterChange, classN
           Data de Atualização
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <DateTimeInput
-            mode="date"
-            context="generic"
-            value={filters.updatedAt?.gte}
-            onChange={(date: Date | null) => {
-              const newFilters = { ...filters };
-              if (!date && !filters.updatedAt?.lte) {
-                delete newFilters.updatedAt;
-              } else {
-                newFilters.updatedAt = {
-                  ...(date && { gte: date }),
-                  ...(filters.updatedAt?.lte && { lte: filters.updatedAt.lte }),
-                };
-              }
-              onFilterChange(newFilters);
-            }}
-            label="De"
-            placeholder="Selecionar data inicial..."
-          />
-          <DateTimeInput
-            mode="date"
-            context="generic"
-            value={filters.updatedAt?.lte}
-            onChange={(date: Date | null) => {
-              const newFilters = { ...filters };
-              if (!date && !filters.updatedAt?.gte) {
-                delete newFilters.updatedAt;
-              } else {
-                newFilters.updatedAt = {
-                  ...(filters.updatedAt?.gte && { gte: filters.updatedAt.gte }),
-                  ...(date && { lte: date }),
-                };
-              }
-              onFilterChange(newFilters);
-            }}
-            label="Até"
-            placeholder="Selecionar data final..."
-          />
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+            <DateTimeInput
+              mode="date"
+              context="generic"
+              value={filters.updatedAt?.gte}
+              onChange={(date: Date | null) => {
+                const newFilters = { ...filters };
+                if (!date && !filters.updatedAt?.lte) {
+                  delete newFilters.updatedAt;
+                } else {
+                  newFilters.updatedAt = {
+                    ...(date && { gte: date }),
+                    ...(filters.updatedAt?.lte && { lte: filters.updatedAt.lte }),
+                  };
+                }
+                onFilterChange(newFilters);
+              }}
+              hideLabel
+              placeholder="Selecionar data inicial..."
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+            <DateTimeInput
+              mode="date"
+              context="generic"
+              value={filters.updatedAt?.lte}
+              onChange={(date: Date | null) => {
+                const newFilters = { ...filters };
+                if (!date && !filters.updatedAt?.gte) {
+                  delete newFilters.updatedAt;
+                } else {
+                  newFilters.updatedAt = {
+                    ...(filters.updatedAt?.gte && { gte: filters.updatedAt.gte }),
+                    ...(date && { lte: date }),
+                  };
+                }
+                onFilterChange(newFilters);
+              }}
+              hideLabel
+              placeholder="Selecionar data final..."
+            />
+          </div>
         </div>
       </div>
 

@@ -155,7 +155,37 @@ export class PaintService {
   // =====================
 
   async getPaints(params: PaintGetManyFormData = {}): Promise<PaintGetManyResponse> {
-    const response = await apiClient.get<PaintGetManyResponse>(this.basePath, { params });
+    // Clean up params to remove empty strings, undefined, and null values
+    const cleanedParams = Object.entries(params).reduce((acc, [key, value]) => {
+      // Skip empty strings, null, undefined
+      if (value === "" || value === null || value === undefined) {
+        return acc;
+      }
+
+      // CRITICAL: Skip color similarity if it's the default black color or invalid
+      if (key === "similarColor" && (value === "#000000" || value === "")) {
+        return acc;
+      }
+
+      // CRITICAL: Skip threshold if there's no color
+      if (key === "similarColorThreshold" && (!params.similarColor || params.similarColor === "#000000" || params.similarColor === "")) {
+        return acc;
+      }
+
+      // Only include valid values
+      acc[key as keyof PaintGetManyFormData] = value;
+      return acc;
+    }, {} as Partial<PaintGetManyFormData>);
+
+    // Debug logging (remove after fixing)
+    if (cleanedParams.similarColor || params.similarColor) {
+      console.log("[API Client] Color similarity params:", {
+        original: { similarColor: params.similarColor, threshold: params.similarColorThreshold },
+        cleaned: { similarColor: cleanedParams.similarColor, threshold: cleanedParams.similarColorThreshold }
+      });
+    }
+
+    const response = await apiClient.get<PaintGetManyResponse>(this.basePath, { params: cleanedParams });
     return response.data;
   }
 

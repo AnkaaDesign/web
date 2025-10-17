@@ -274,44 +274,50 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
               Data de Cadastro
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <DateTimeInput
-                mode="date"
-                value={localState.createdAt?.gte}
-                onChange={(date: Date | null) => {
-                  if (!date && !localState.createdAt?.lte) {
-                    setLocalState((prev) => ({ ...prev, createdAt: undefined }));
-                  } else {
-                    setLocalState((prev) => ({
-                      ...prev,
-                      createdAt: {
-                        ...(date && { gte: date }),
-                        ...(localState.createdAt?.lte && { lte: localState.createdAt.lte }),
-                      },
-                    }));
-                  }
-                }}
-                label="De"
-                placeholder="Selecionar data inicial..."
-              />
-              <DateTimeInput
-                mode="date"
-                value={localState.createdAt?.lte}
-                onChange={(date: Date | null) => {
-                  if (!date && !localState.createdAt?.gte) {
-                    setLocalState((prev) => ({ ...prev, createdAt: undefined }));
-                  } else {
-                    setLocalState((prev) => ({
-                      ...prev,
-                      createdAt: {
-                        ...(localState.createdAt?.gte && { gte: localState.createdAt.gte }),
-                        ...(date && { lte: date }),
-                      },
-                    }));
-                  }
-                }}
-                label="Até"
-                placeholder="Selecionar data final..."
-              />
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localState.createdAt?.gte}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localState.createdAt?.lte) {
+                      setLocalState((prev) => ({ ...prev, createdAt: undefined }));
+                    } else {
+                      setLocalState((prev) => ({
+                        ...prev,
+                        createdAt: {
+                          ...(date && { gte: date }),
+                          ...(localState.createdAt?.lte && { lte: localState.createdAt.lte }),
+                        },
+                      }));
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data inicial..."
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localState.createdAt?.lte}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localState.createdAt?.gte) {
+                      setLocalState((prev) => ({ ...prev, createdAt: undefined }));
+                    } else {
+                      setLocalState((prev) => ({
+                        ...prev,
+                        createdAt: {
+                          ...(localState.createdAt?.gte && { gte: localState.createdAt.gte }),
+                          ...(date && { lte: date }),
+                        },
+                      }));
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data final..."
+                />
+              </div>
             </div>
           </div>
         </div>

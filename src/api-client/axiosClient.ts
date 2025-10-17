@@ -379,7 +379,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
 
         const queryString = qs.stringify(params, {
           arrayFormat: "indices",
-          encode: false,
+          encode: true, // CRITICAL: Must encode special characters like # in hex colors
           serializeDate: (date: Date) => date.toISOString(),
           skipNulls: true,
           addQueryPrefix: false,
@@ -489,6 +489,40 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       // Add request ID header if enabled
       if (finalConfig.enableRequestId) {
         config.headers["X-Request-ID"] = requestId;
+      }
+
+      // CRITICAL: Clean query parameters to remove empty strings, null, undefined
+      // This is the FINAL line of defense before axios serializes params
+      if (config.params && typeof config.params === "object") {
+        const cleanedParams: any = {};
+        for (const [key, value] of Object.entries(config.params)) {
+          // Skip empty strings, null, undefined
+          if (value === "" || value === null || value === undefined) {
+            console.log(`[AXIOS INTERCEPTOR] Removing empty param: ${key}="${value}"`);
+            continue;
+          }
+
+          // SPECIAL: Skip similarColor if it's the default black or empty
+          if (key === "similarColor" && (value === "#000000" || value === "")) {
+            console.log(`[AXIOS INTERCEPTOR] Removing invalid similarColor: "${value}"`);
+            continue;
+          }
+
+          // SPECIAL: Skip similarColorThreshold if there's no similarColor
+          if (key === "similarColorThreshold" && (!config.params.similarColor || config.params.similarColor === "#000000" || config.params.similarColor === "")) {
+            console.log(`[AXIOS INTERCEPTOR] Removing orphaned similarColorThreshold`);
+            continue;
+          }
+
+          cleanedParams[key] = value;
+        }
+
+        // Replace params with cleaned version
+        config.params = cleanedParams;
+
+        if (finalConfig.enableLogging && config.url?.includes("/paints")) {
+          console.log(`[AXIOS INTERCEPTOR] Final cleaned params for ${config.url}:`, config.params);
+        }
       }
 
       // Handle FormData - remove Content-Type to let browser set it with boundary

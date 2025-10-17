@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../types";
-import { isImageFile, isVideoFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension } from "../../utils";
+import { isImageFile, isVideoFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension } from "../../utils/file";
 
 // Types for touch gestures and zoom
 interface TouchState {

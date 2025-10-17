@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Sheet,
   SheetContent,
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Badge } from "@/components/ui/badge";
-import { usePositions, useSectors } from "../../../../hooks";
+import { getPositions, getSectors } from "../../../../api-client";
 import { USER_STATUS_LABELS } from "../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
 import { IconFilter, IconUser, IconBriefcase, IconBuilding, IconCalendar, IconX } from "@tabler/icons-react";
@@ -24,10 +24,9 @@ interface UserFiltersProps {
 }
 
 export function UserFilters({ open, onOpenChange, filters, onFilterChange }: UserFiltersProps) {
-
-  // Load positions and sectors for dropdowns
-  const { data: positions } = usePositions({ limit: 100 });
-  const { data: sectors } = useSectors({ limit: 100 });
+  // Cache refs for selected items in multiple mode
+  const positionCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+  const sectorCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
 
   // Local state for immediate UI updates
   const [localFilters, setLocalFilters] = useState(filters);
@@ -65,27 +64,95 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
     setLocalFilters({ ...localFilters, positionId: positions.length > 0 ? positions : undefined });
   };
 
-  const handleSectorChange = (sectors: Set<string>) => {
-    const sectorArray = Array.from(sectors);
-    setLocalFilters({ ...localFilters, sectorId: sectorArray.length > 0 ? sectorArray : undefined });
+  const handleSectorChange = (sectors: string[]) => {
+    setLocalFilters({ ...localFilters, sectorId: sectors.length > 0 ? sectors : undefined });
   };
 
+  // Status options (static, no async needed)
   const statusOptions = Object.entries(USER_STATUS_LABELS).map(([value, label]) => ({
     value,
     label,
   }));
 
-  const positionOptions =
-    positions?.data?.map((position) => ({
-      value: position.id,
-      label: position.name,
-    })) || [];
+  // Async query function for positions
+  const queryPositions = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+      };
 
-  const sectorOptions =
-    sectors?.data?.map((sector) => ({
-      value: sector.id,
-      label: sector.name,
-    })) || [];
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      const response = await getPositions(queryParams);
+      const positions = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = positions.map((position) => {
+        const option = {
+          value: position.id,
+          label: position.name,
+        };
+        // Add to cache for multiple mode
+        positionCacheRef.current.set(position.id, option);
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching positions:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
+
+  // Async query function for sectors
+  const querySectors = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+      };
+
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      const response = await getSectors(queryParams);
+      const sectors = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = sectors.map((sector) => {
+        const option = {
+          value: sector.id,
+          label: sector.name,
+        };
+        // Add to cache for multiple mode
+        sectorCacheRef.current.set(sector.id, option);
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching sectors:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
 
   // Count active filters
   const activeFilterCount = Object.entries(localFilters).filter(([key, value]) => {
@@ -119,7 +186,15 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                 <IconUser className="h-4 w-4" />
                 Status
               </Label>
-              <Combobox mode="multiple" options={statusOptions} value={selectedStatuses} onValueChange={handleStatusChange} placeholder="Selecione os status" />
+              <Combobox
+                mode="multiple"
+                options={statusOptions}
+                value={selectedStatuses}
+                onValueChange={handleStatusChange}
+                placeholder="Selecione os status"
+                searchable={true}
+                minSearchLength={0}
+              />
             </div>
 
             <div>
@@ -127,7 +202,20 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                 <IconBriefcase className="h-4 w-4" />
                 Cargo
               </Label>
-              <Combobox mode="multiple" options={positionOptions} value={selectedPositions} onValueChange={handlePositionChange} placeholder="Selecione os cargos" />
+              <Combobox
+                async={true}
+                mode="multiple"
+                queryKey={["positions"]}
+                queryFn={queryPositions}
+                initialOptions={[]}
+                value={selectedPositions}
+                onValueChange={handlePositionChange}
+                placeholder="Selecione os cargos"
+                searchable={true}
+                minSearchLength={0}
+                pageSize={50}
+                debounceMs={300}
+              />
             </div>
 
             <div>
@@ -136,11 +224,18 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                 Setor
               </Label>
               <Combobox
+                async={true}
                 mode="multiple"
-                options={sectorOptions}
+                queryKey={["sectors"]}
+                queryFn={querySectors}
+                initialOptions={[]}
                 value={selectedSectors}
-                onValueChange={(sectors) => handleSectorChange(new Set(sectors))}
+                onValueChange={handleSectorChange}
                 placeholder="Selecione os setores"
+                searchable={true}
+                minSearchLength={0}
+                pageSize={50}
+                debounceMs={300}
               />
             </div>
 
@@ -152,44 +247,50 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                   Data de Nascimento
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <DateTimeInput
-                    mode="date"
-                    value={localFilters.birth?.gte}
-                    onChange={(date: Date | null) => {
-                      if (!date && !localFilters.birth?.lte) {
-                        setLocalFilters({ ...localFilters, birth: undefined });
-                      } else {
-                        setLocalFilters({
-                          ...localFilters,
-                          birth: {
-                            ...(date && { gte: date }),
-                            ...(localFilters.birth?.lte && { lte: localFilters.birth.lte }),
-                          },
-                        });
-                      }
-                    }}
-                    label="De"
-                    placeholder="Selecionar data inicial..."
-                  />
-                  <DateTimeInput
-                    mode="date"
-                    value={localFilters.birth?.lte}
-                    onChange={(date: Date | null) => {
-                      if (!date && !localFilters.birth?.gte) {
-                        setLocalFilters({ ...localFilters, birth: undefined });
-                      } else {
-                        setLocalFilters({
-                          ...localFilters,
-                          birth: {
-                            ...(localFilters.birth?.gte && { gte: localFilters.birth.gte }),
-                            ...(date && { lte: date }),
-                          },
-                        });
-                      }
-                    }}
-                    label="Até"
-                    placeholder="Selecionar data final..."
-                  />
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.birth?.gte}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.birth?.lte) {
+                          setLocalFilters({ ...localFilters, birth: undefined });
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            birth: {
+                              ...(date && { gte: date }),
+                              ...(localFilters.birth?.lte && { lte: localFilters.birth.lte }),
+                            },
+                          });
+                        }
+                      }}
+                      hideLabel
+                      placeholder="Selecionar data inicial..."
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.birth?.lte}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.birth?.gte) {
+                          setLocalFilters({ ...localFilters, birth: undefined });
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            birth: {
+                              ...(localFilters.birth?.gte && { gte: localFilters.birth.gte }),
+                              ...(date && { lte: date }),
+                            },
+                          });
+                        }
+                      }}
+                      hideLabel
+                      placeholder="Selecionar data final..."
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -200,44 +301,50 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                   Data de Demissão
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <DateTimeInput
-                    mode="date"
-                    value={localFilters.dismissedAt?.gte}
-                    onChange={(date: Date | null) => {
-                      if (!date && !localFilters.dismissedAt?.lte) {
-                        setLocalFilters({ ...localFilters, dismissedAt: undefined });
-                      } else {
-                        setLocalFilters({
-                          ...localFilters,
-                          dismissedAt: {
-                            ...(date && { gte: date }),
-                            ...(localFilters.dismissedAt?.lte && { lte: localFilters.dismissedAt.lte }),
-                          },
-                        });
-                      }
-                    }}
-                    label="De"
-                    placeholder="Selecionar data inicial..."
-                  />
-                  <DateTimeInput
-                    mode="date"
-                    value={localFilters.dismissedAt?.lte}
-                    onChange={(date: Date | null) => {
-                      if (!date && !localFilters.dismissedAt?.gte) {
-                        setLocalFilters({ ...localFilters, dismissedAt: undefined });
-                      } else {
-                        setLocalFilters({
-                          ...localFilters,
-                          dismissedAt: {
-                            ...(localFilters.dismissedAt?.gte && { gte: localFilters.dismissedAt.gte }),
-                            ...(date && { lte: date }),
-                          },
-                        });
-                      }
-                    }}
-                    label="Até"
-                    placeholder="Selecionar data final..."
-                  />
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.dismissedAt?.gte}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.dismissedAt?.lte) {
+                          setLocalFilters({ ...localFilters, dismissedAt: undefined });
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            dismissedAt: {
+                              ...(date && { gte: date }),
+                              ...(localFilters.dismissedAt?.lte && { lte: localFilters.dismissedAt.lte }),
+                            },
+                          });
+                        }
+                      }}
+                      hideLabel
+                      placeholder="Selecionar data inicial..."
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.dismissedAt?.lte}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.dismissedAt?.gte) {
+                          setLocalFilters({ ...localFilters, dismissedAt: undefined });
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            dismissedAt: {
+                              ...(localFilters.dismissedAt?.gte && { gte: localFilters.dismissedAt.gte }),
+                              ...(date && { lte: date }),
+                            },
+                          });
+                        }
+                      }}
+                      hideLabel
+                      placeholder="Selecionar data final..."
+                    />
+                  </div>
                 </div>
               </div>
             </div>

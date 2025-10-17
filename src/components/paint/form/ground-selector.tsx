@@ -1,68 +1,99 @@
-import { useMemo } from "react";
+import { useMemo, useCallback, useRef } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import type { PaintCreateFormData, PaintUpdateFormData } from "../../../schemas";
 import { getPaints } from "../../../api-client";
 import { PAINT_BRAND_LABELS, PAINT_FINISH_LABELS } from "../../../constants";
 import { IconLayersIntersect } from "@tabler/icons-react";
+import type { Paint } from "../../../types";
 
 interface GroundSelectorProps {
   control: any;
   disabled?: boolean;
   required?: boolean;
+  initialPaints?: Paint[];
 }
 
-export function GroundSelector({ control, disabled, required }: GroundSelectorProps) {
-  // Async query function for the combobox
-  const queryPaints = useMemo(
-    () => async (searchTerm: string, page = 1) => {
-      try {
-        // Build query parameters
-        const queryParams: any = {
-          orderBy: { name: "asc" },
-          take: 50, // Load 50 items at a time
-          skip: (page - 1) * 50,
-          include: {
-            paintBrand: true,
-          },
-        };
+export function GroundSelector({ control, disabled, required, initialPaints }: GroundSelectorProps) {
+  // Create a stable cache for fetched items
+  const cacheRef = useRef<Map<string, { label: string; value: string; description?: string; metadata?: any }>>(new Map());
 
-        // Only add searchingFor if there's a search term
-        if (searchTerm && searchTerm.trim()) {
-          queryParams.searchingFor = searchTerm.trim();
-        }
+  // Create stable dependency for initialPaints array
+  const initialPaintIds = useMemo(
+    () => (initialPaints || []).map(p => p.id).sort().join(','),
+    [initialPaints]
+  );
 
-        const response = await getPaints(queryParams);
-        const paints = response.data?.data || [];
+  // Memoize initialOptions with stable dependency
+  const initialOptions = useMemo(() => {
+    if (!initialPaints || initialPaints.length === 0) return [];
 
-        // Convert paints to options format
-        const options = paints.map((paint) => ({
+    return initialPaints.map((paint) => {
+      const option = {
+        value: paint.id,
+        label: paint.name,
+        description: paint.paintBrand?.name && paint.finish ? `${paint.paintBrand?.name} - ${PAINT_FINISH_LABELS[paint.finish]}` : undefined,
+        metadata: {
+          hex: paint.hex || undefined,
+        },
+      };
+      // Add to cache
+      cacheRef.current.set(paint.id, option);
+      return option;
+    });
+  }, [initialPaintIds, initialPaints]);
+
+  // Async query function for the combobox - memoized with useCallback
+  const queryPaints = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      // Build query parameters
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        include: {
+          paintBrand: true,
+        },
+      };
+
+      // Only add searchingFor if there's a search term
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      const response = await getPaints(queryParams);
+      const paints = response.data?.data || [];
+      const hasMore = response.data?.meta?.hasNextPage || false;
+
+      // Convert paints to options format and add to cache
+      const options = paints.map((paint) => {
+        const option = {
           value: paint.id,
           label: paint.name,
           description: paint.paintBrand?.name && paint.finish ? `${paint.paintBrand?.name} - ${PAINT_FINISH_LABELS[paint.finish]}` : undefined,
           metadata: {
             hex: paint.hex || undefined,
           },
-        }));
-
-        console.log(`Ground Paints Query - Page ${page}, Search: "${searchTerm}", Found: ${options.length} paints`);
-
-        return {
-          data: options,
-          hasMore: response.data?.meta?.hasNextPage || false,
-          total: response.data?.meta?.totalRecords || 0,
         };
-      } catch (error) {
-        console.error("Error fetching paints:", error);
-        return {
-          data: [],
-          hasMore: false,
-          total: 0,
-        };
-      }
-    },
-    []
-  );
+
+        // Add to cache
+        cacheRef.current.set(paint.id, option);
+
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching paints:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
 
   return (
     <FormField
@@ -80,6 +111,7 @@ export function GroundSelector({ control, disabled, required }: GroundSelectorPr
               async={true}
               queryKey={["ground-paints"]}
               queryFn={queryPaints}
+              initialOptions={initialOptions}
               value={field.value || []}
               onValueChange={field.onChange}
               placeholder="Selecione os fundos"

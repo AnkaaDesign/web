@@ -69,7 +69,7 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
     const params: any = {
       orderBy: { name: "asc" },
       page: page,
-      take: 20,
+      take: 50,
       include: {
         paintType: true,
         paintBrand: true,
@@ -195,6 +195,8 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
                   getOptionValue={getOptionValue}
                   renderOption={(paint, isSelected) => renderPaintItem(paint, isSelected)}
                   minSearchLength={0}
+                  pageSize={50}
+                  debounceMs={300}
                   showCount={true}
                   singleMode={false}
                   clearable={true}

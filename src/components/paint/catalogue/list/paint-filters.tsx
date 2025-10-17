@@ -5,11 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { Combobox } from "@/components/ui/combobox";
-import { IconFilter, IconPalette, IconPaint, IconTag, IconBrush, IconTruck, IconSparkles, IconX } from "@tabler/icons-react";
+import { IconFilter, IconPalette, IconPaint, IconTag, IconBrush, IconTruck, IconSparkles, IconX, IconColorPicker } from "@tabler/icons-react";
 import type { PaintGetManyFormData } from "../../../../schemas";
 import { PAINT_FINISH, COLOR_PALETTE, PAINT_FINISH_LABELS, COLOR_PALETTE_LABELS, TRUCK_MANUFACTURER, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
 import { usePaintTypes, usePaintBrands } from "../../../../hooks";
+import { AdvancedColorPicker } from "../../form/advanced-color-picker";
 
 interface PaintFiltersProps {
   open: boolean;
@@ -35,6 +37,7 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
     if (localFilters.manufacturers?.length) count++;
     if (localFilters.palettes?.length) count++;
     if (localFilters.hasFormulas !== undefined) count++;
+    if (localFilters.similarColor && localFilters.similarColor !== "#000000") count++;
     return count;
   }, [localFilters]);
 
@@ -47,15 +50,47 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
 
   // Handle filter changes
   const handleChange = (key: keyof PaintGetManyFormData, value: unknown) => {
-    setLocalFilters((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+    setLocalFilters((prev) => {
+      // Remove the key if value is undefined, null, or empty string
+      if (value === undefined || value === null || value === "") {
+        const { [key]: _, ...rest } = prev;
+        return rest;
+      }
+      return {
+        ...prev,
+        [key]: value,
+      };
+    });
   };
 
   // Apply filters
   const handleApply = () => {
-    onFilterChange(localFilters);
+    // Clean up the filters before applying
+    const cleanedFilters = { ...localFilters };
+
+    // CRITICAL: Remove similarColor if it's empty, undefined, or the default black color
+    if (!cleanedFilters.similarColor || cleanedFilters.similarColor === "#000000" || cleanedFilters.similarColor === "") {
+      delete cleanedFilters.similarColor;
+      delete cleanedFilters.similarColorThreshold;
+    }
+
+    // Remove any empty string values
+    Object.keys(cleanedFilters).forEach((key) => {
+      const value = cleanedFilters[key as keyof PaintGetManyFormData];
+      if (value === "" || value === null || value === undefined) {
+        delete cleanedFilters[key as keyof PaintGetManyFormData];
+      }
+    });
+
+    // Debug logging (remove after fixing)
+    if (cleanedFilters.similarColor || localFilters.similarColor) {
+      console.log("[Filter Modal] Applying filters:", {
+        before: { similarColor: localFilters.similarColor, threshold: localFilters.similarColorThreshold },
+        after: { similarColor: cleanedFilters.similarColor, threshold: cleanedFilters.similarColorThreshold }
+      });
+    }
+
+    onFilterChange(cleanedFilters);
     onOpenChange(false);
   };
 
@@ -232,6 +267,54 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
                 Apenas com fórmulas
               </Label>
               <Switch id="hasFormulas" checked={hasFormulas === true} onCheckedChange={(checked) => handleChange("hasFormulas", checked ? true : undefined)} />
+            </div>
+
+            {/* Color Similarity Filter */}
+            <div className="space-y-4 pt-4 border-t">
+              <div className="space-y-2">
+                <Label htmlFor="similarColor" className="flex items-center gap-2">
+                  <IconColorPicker className="h-4 w-4" />
+                  Filtrar por Similaridade de Cor
+                </Label>
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1">
+                    <AdvancedColorPicker
+                      color={localFilters.similarColor || "#000000"}
+                      onChange={(color) => handleChange("similarColor", color)}
+                      popoverSide="left"
+                      popoverAlign="start"
+                    />
+                  </div>
+                  {localFilters.similarColor && localFilters.similarColor !== "#000000" && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleChange("similarColor", undefined)}
+                      className="shrink-0"
+                    >
+                      <IconX className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {localFilters.similarColor && localFilters.similarColor !== "#000000" && (
+                <div className="space-y-2">
+                  <Label htmlFor="similarColorThreshold" className="flex items-center justify-between">
+                    <span>Limiar de Similaridade</span>
+                    <span className="text-sm text-muted-foreground">{localFilters.similarColorThreshold || 15}</span>
+                  </Label>
+                  <Slider
+                    id="similarColorThreshold"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={[localFilters.similarColorThreshold || 15]}
+                    onValueChange={(values) => handleChange("similarColorThreshold", values[0])}
+                    className="w-full"
+                  />
+                </div>
+              )}
             </div>
 
           {/* Action Buttons */}

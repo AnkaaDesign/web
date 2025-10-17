@@ -1,23 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useObservation, useObservationMutations } from "../../../../hooks";
+import { z } from "zod";
+import { useObservation, useObservationMutations, useTasks } from "../../../../hooks";
 import type { ObservationCreateFormData, ObservationUpdateFormData } from "../../../../schemas";
 import { observationCreateSchema, observationUpdateSchema } from "../../../../schemas";
 import { routes, FAVORITE_PAGES } from "../../../../constants";
 import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { FileUploadField, type FileWithPreview } from "@/components/file";
 import { TaskSelector } from "./task-selector";
-import { IconAlertCircle, IconPaperclip, IconArrowLeft, IconCheck, IconX } from "@tabler/icons-react";
+import { FormSteps } from "@/components/ui/form-steps";
+import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { IconAlertCircle, IconPaperclip, IconArrowLeft, IconArrowRight, IconCheck, IconX, IconFile } from "@tabler/icons-react";
 import { cn, backendFileToFileWithPreview } from "@/lib/utils";
 import { toast } from "sonner";
+import { createObservationFormData } from "@/utils/form-data-helper";
+import { formatDate } from "../../../../utils";
 
 // Helper function for file size formatting
 const formatFileSize = (bytes: number): string => {
@@ -26,6 +33,37 @@ const formatFileSize = (bytes: number): string => {
   const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
+
+// Define steps for the multi-step form
+const steps = [
+  {
+    id: 1,
+    name: "Detalhes da Observação",
+    description: "Descrição e arquivos",
+  },
+  {
+    id: 2,
+    name: "Seleção de Tarefa",
+    description: "Escolha a tarefa relacionada",
+  },
+  {
+    id: 3,
+    name: "Revisão",
+    description: "Confirme os dados",
+  },
+];
+
+// Simple URL step management
+const getStepFromUrl = (searchParams: URLSearchParams): number => {
+  const step = parseInt(searchParams.get("step") || "1", 10);
+  return Math.max(1, Math.min(3, step));
+};
+
+const setStepInUrl = (searchParams: URLSearchParams, step: number): URLSearchParams => {
+  const params = new URLSearchParams(searchParams);
+  params.set("step", step.toString());
+  return params;
 };
 
 interface ObservationFormProps {
@@ -39,11 +77,13 @@ interface ObservationFormProps {
 
 export function ObservationForm({ observationId, mode, initialTaskId, onSuccess, onCancel, className }: ObservationFormProps) {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Initialize state from URL parameters (only for create mode)
+  const [currentStep, setCurrentStep] = useState(mode === "create" ? getStepFromUrl(searchParams) : 1);
 
   // State for task selection
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set(initialTaskId ? [initialTaskId] : []));
-  const [isTaskSelectorOpen, setIsTaskSelectorOpen] = useState(!initialTaskId);
 
   // State for file uploads
   const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>([]);
@@ -65,12 +105,37 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
   const observation = observationResponse?.data;
 
+  // Fetch selected task details for review step
+  const selectedTaskId = Array.from(selectedTasks)[0];
+  const { data: selectedTaskResponse } = useTasks({
+    where: selectedTaskId ? { id: selectedTaskId } : undefined,
+    include: {
+      customer: true,
+      sector: true,
+    },
+    enabled: !!selectedTaskId,
+  });
+  const selectedTask = selectedTaskResponse?.data?.[0];
+
   // Mutations
   const { createAsync, updateAsync } = useObservationMutations();
 
+  // Create a custom schema for the form (without reason field)
+  const formCreateSchema = z.object({
+    description: z.string().min(1, "Descrição é obrigatória"),
+    taskId: z.string().min(1, "Tarefa é obrigatória"),
+    fileIds: z.array(z.string()).optional(),
+  });
+
+  const formUpdateSchema = z.object({
+    description: z.string().min(1, "Descrição é obrigatória").optional(),
+    taskId: z.string().optional(),
+    fileIds: z.array(z.string()).optional(),
+  });
+
   // Set up form with appropriate schema
-  const formSchema = mode === "create" ? observationCreateSchema : observationUpdateSchema;
-  const form = useForm<ObservationCreateFormData | ObservationUpdateFormData>({
+  const formSchema = mode === "create" ? formCreateSchema : formUpdateSchema;
+  const form = useForm<any>({
     resolver: zodResolver(formSchema),
     mode: "onChange",
     defaultValues: {
@@ -91,7 +156,6 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
       // Set selected task
       setSelectedTasks(new Set([observation.taskId]));
-      setIsTaskSelectorOpen(false);
 
       // Set uploaded files
       const files: FileWithPreview[] = observation.files?.map(backendFileToFileWithPreview) || [];
@@ -106,10 +170,82 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
     const taskIdFromUrl = searchParams.get("taskId");
     if (taskIdFromUrl && mode === "create") {
       setSelectedTasks(new Set([taskIdFromUrl]));
-      setIsTaskSelectorOpen(false);
       form.setValue("taskId", taskIdFromUrl);
     }
   }, [searchParams, mode, form]);
+
+  // Keep step in sync with URL (only for create mode)
+  useEffect(() => {
+    if (mode === "create") {
+      const stepFromUrl = getStepFromUrl(searchParams);
+      if (stepFromUrl !== currentStep) {
+        setCurrentStep(stepFromUrl);
+      }
+    }
+  }, [searchParams, mode]);
+
+  // Navigation helpers (only for create mode)
+  const nextStep = useCallback(() => {
+    if (mode === "create" && currentStep < steps.length) {
+      const newStep = currentStep + 1;
+      setCurrentStep(newStep);
+      setSearchParams(setStepInUrl(searchParams, newStep), { replace: true });
+    }
+  }, [mode, currentStep, searchParams, setSearchParams]);
+
+  const prevStep = useCallback(() => {
+    if (mode === "create" && currentStep > 1) {
+      const newStep = currentStep - 1;
+      setCurrentStep(newStep);
+      setSearchParams(setStepInUrl(searchParams, newStep), { replace: true });
+    }
+  }, [mode, currentStep, searchParams, setSearchParams]);
+
+  // Step validation
+  const validateCurrentStep = useCallback((): boolean => {
+    switch (currentStep) {
+      case 1:
+        // Validate observation description
+        const description = form.getValues("description");
+        if (!description?.trim()) {
+          toast.error("Descrição da observação é obrigatória");
+          return false;
+        }
+        if (description.trim().length < 1) {
+          toast.error("Descrição deve ter pelo menos 1 caractere");
+          return false;
+        }
+        if (description.length > 1000) {
+          toast.error("Descrição deve ter no máximo 1000 caracteres");
+          return false;
+        }
+        return true;
+
+      case 2:
+        // Validate task selection
+        if (selectedTasks.size === 0) {
+          toast.error("Uma tarefa deve ser selecionada");
+          return false;
+        }
+        return true;
+
+      case 3:
+        // Final validation - validate all data
+        const finalDescription = form.getValues("description");
+        if (!finalDescription?.trim()) {
+          toast.error("Descrição da observação é obrigatória");
+          return false;
+        }
+        if (selectedTasks.size === 0) {
+          toast.error("Uma tarefa deve ser selecionada");
+          return false;
+        }
+        return true;
+
+      default:
+        return true;
+    }
+  }, [currentStep, form, selectedTasks]);
 
   // Handle task selection
   const handleTaskSelection = (taskId: string) => {
@@ -118,13 +254,14 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
     if (isSelected) {
       // Deselect task
       setSelectedTasks(new Set());
-      form.setValue("taskId", "");
+      form.setValue("taskId", "", { shouldDirty: true, shouldTouch: true, shouldValidate: true });
     } else {
       // Select task (only one can be selected)
       setSelectedTasks(new Set([taskId]));
-      form.setValue("taskId", taskId);
-      setIsTaskSelectorOpen(false);
+      form.setValue("taskId", taskId, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
     }
+    // Trigger form revalidation to update button state
+    form.trigger();
   };
 
   // Handle select all (not really applicable for single selection)
@@ -135,40 +272,108 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
   // Handle file changes
   const handleFilesChange = (files: FileWithPreview[]) => {
     setUploadedFiles(files);
-    const fileIds = files.map((f) => f.id);
+
+    // Filter out files without IDs (newly uploaded files might not have IDs yet)
+    const fileIds = files
+      .map((f) => f.uploadedFileId || f.id)
+      .filter((id): id is string => Boolean(id));
+
     setUploadedFileIds(fileIds);
-    // IMPORTANT: Mark form as dirty when files change to enable submit button
+
+    // Update form with file IDs and trigger validation
     form.setValue("fileIds", fileIds, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+    // Manually trigger form revalidation to update button state
+    form.trigger();
   };
 
   // Handle form submission
-  const handleSubmit = async (data: ObservationCreateFormData | ObservationUpdateFormData) => {
+  const handleSubmit = async (data: any) => {
     try {
+      // For create mode, validate final step
+      if (mode === "create" && !validateCurrentStep()) {
+        return;
+      }
+
+      // Separate existing files from new files
+      const existingFileIds: string[] = [];
+      const newFiles: File[] = [];
+
+      uploadedFiles.forEach((file) => {
+        // Check if this is an existing file (has a UUID id) or a new file (File object)
+        if (file.id && file.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+          // This is an existing file with UUID
+          existingFileIds.push(file.id);
+        } else if (file instanceof File) {
+          // This is a new file to upload
+          newFiles.push(file);
+        }
+      });
+
+      // Prepare submission data
+      const submitData = {
+        description: data.description,
+        taskId: data.taskId,
+        fileIds: existingFileIds,
+        ...(mode === "create" ? { reason: "Observação" } : {}),
+      };
+
       let result;
 
-      if (mode === "create") {
-        result = await createAsync(data as ObservationCreateFormData);
+      // If we have new files to upload, use FormData
+      if (newFiles.length > 0) {
+        // Get customer info for file organization (if available from selected task or observation.task.customer)
+        const customerInfo = selectedTask?.customer || observation?.task?.customer ? {
+          id: selectedTask?.customer?.id || observation?.task?.customer?.id,
+          name: selectedTask?.customer?.fantasyName || selectedTask?.customer?.name || observation?.task?.customer?.fantasyName || observation?.task?.customer?.name,
+        } : undefined;
+
+        const formData = createObservationFormData(
+          submitData,
+          newFiles,
+          customerInfo
+        );
+
+        if (mode === "create") {
+          result = await createAsync(formData as any);
+        } else {
+          result = await updateAsync({
+            id: observationId!,
+            data: formData as any,
+          });
+        }
       } else {
-        result = await updateAsync({
-          id: observationId!,
-          data: data as ObservationUpdateFormData,
-        });
+        // No new files, send as JSON
+        if (mode === "create") {
+          result = await createAsync(submitData);
+        } else {
+          result = await updateAsync({
+            id: observationId!,
+            data: submitData,
+          });
+        }
       }
 
       // Success toast is handled automatically by API client
-
       if (onSuccess && result?.data) {
         onSuccess(result.data);
       } else if (result?.data) {
         navigate(routes.production.observations.details(result.data.id));
       }
     } catch (error) {
+      console.error("Error submitting form:", error);
       toast.error(`Erro ao ${mode === "create" ? "criar" : "atualizar"} observação`);
     }
   };
 
-  // Get selected task for display
-  const selectedTaskId = Array.from(selectedTasks)[0];
+  // Handle next button click
+  const handleNext = useCallback(() => {
+    if (validateCurrentStep()) {
+      nextStep();
+    }
+  }, [validateCurrentStep, nextStep]);
+
+  const isLastStep = currentStep === steps.length;
+  const isFirstStep = currentStep === 1;
 
   // Loading state
   if (mode === "edit" && isLoadingObservation) {
@@ -178,6 +383,386 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       </div>
     );
   }
+
+  // Render different content based on step (only for create mode)
+  const renderStepContent = () => {
+    // For edit mode, show all fields on one page (no steps)
+    if (mode === "edit") {
+      return (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconAlertCircle className="h-5 w-5" />
+                Detalhes da Observação
+              </CardTitle>
+              <CardDescription>
+                Edite a descrição da observação e gerencie arquivos de evidência
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Description Field */}
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">
+                      Descrição da Observação <span className="text-destructive">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Textarea
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                        placeholder="Descreva detalhadamente o problema ou observação identificada na tarefa..."
+                        className="min-h-32 resize-y"
+                        maxLength={1000}
+                      />
+                    </FormControl>
+                    <div className="flex items-center justify-between">
+                      <FormMessage />
+                      {field.value && (
+                        <p className="text-xs text-muted-foreground">
+                          {field.value.length}/1000 caracteres
+                        </p>
+                      )}
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              {/* File Uploads Section */}
+              <div className="space-y-4">
+                <Separator />
+                <div>
+                  <Label className="text-sm font-medium">Arquivos de Evidência (Opcional)</Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Adicione fotos, documentos ou outros arquivos relacionados à observação
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  {/* File Upload Area */}
+                  <div className="border-2 border-dashed rounded-lg p-6 bg-muted/10 hover:bg-muted/20 transition-colors">
+                    <FormItem>
+                      <FormControl>
+                        <FileUploadField
+                          onFilesChange={handleFilesChange}
+                          existingFiles={uploadedFiles}
+                          maxFiles={10}
+                          maxSize={10 * 1024 * 1024}
+                          showPreview={false}
+                          showFiles={false}
+                          variant="compact"
+                          placeholder="Arraste arquivos aqui ou clique para selecionar"
+                          label=""
+                        />
+                      </FormControl>
+                    </FormItem>
+                  </div>
+
+                  {/* File List */}
+                  {uploadedFiles.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">
+                        Arquivos Selecionados ({uploadedFiles.length})
+                      </Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {uploadedFiles.map((file, index) => (
+                          <div
+                            key={file.id || `file-${index}`}
+                            className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border hover:bg-muted/70 transition-colors"
+                          >
+                            <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center">
+                              <IconFile className="h-5 w-5 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate" title={file.name}>
+                                {file.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(file.size)}
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 flex-shrink-0 hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => {
+                                const newFiles = uploadedFiles.filter((_, i) => i !== index);
+                                handleFilesChange(newFiles);
+                              }}
+                            >
+                              <IconX className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Task Display for Edit Mode */}
+              {observation?.task && (
+                <>
+                  <Separator />
+                  <div>
+                    <Label className="text-sm font-medium mb-2 block">Tarefa Relacionada</Label>
+                    <div className="p-4 border rounded-lg bg-muted/50">
+                      <div className="flex items-center gap-3">
+                        <IconCheck className="h-5 w-5 text-green-600" />
+                        <div>
+                          <div className="font-medium">{observation.task.name}</div>
+                          {observation.task.customer && (
+                            <div className="text-sm text-muted-foreground">
+                              Cliente: {observation.task.customer.fantasyName || observation.task.customer.name}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    // For create mode, show multi-step wizard
+    switch (currentStep) {
+      case 1:
+        // Step 1: Observation Details and Files
+        return (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <IconAlertCircle className="h-5 w-5" />
+                  Detalhes da Observação
+                </CardTitle>
+                <CardDescription>
+                  Descreva o problema ou observação identificada e adicione arquivos de evidência
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Description Field */}
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium">
+                        Descrição da Observação <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          name={field.name}
+                          ref={field.ref}
+                          placeholder="Descreva detalhadamente o problema ou observação identificada na tarefa..."
+                          className="min-h-32 resize-y"
+                          maxLength={1000}
+                        />
+                      </FormControl>
+                      <div className="flex items-center justify-between">
+                        <FormMessage />
+                        {field.value && (
+                          <p className="text-xs text-muted-foreground">
+                            {field.value.length}/1000 caracteres
+                          </p>
+                        )}
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                {/* File Uploads Section */}
+                <div className="space-y-4">
+                  <Separator />
+                  <div>
+                    <Label className="text-sm font-medium">Arquivos de Evidência (Opcional)</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Adicione fotos, documentos ou outros arquivos relacionados à observação
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* File Upload Area */}
+                    <div className="border-2 border-dashed rounded-lg p-6 bg-muted/10 hover:bg-muted/20 transition-colors">
+                      <FormItem>
+                        <FormControl>
+                          <FileUploadField
+                            onFilesChange={handleFilesChange}
+                            existingFiles={uploadedFiles}
+                            maxFiles={10}
+                            maxSize={10 * 1024 * 1024}
+                            showPreview={false}
+                            showFiles={false}
+                            variant="compact"
+                            placeholder="Arraste arquivos aqui ou clique para selecionar"
+                            label=""
+                          />
+                        </FormControl>
+                      </FormItem>
+                    </div>
+
+                    {/* File List */}
+                    {uploadedFiles.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">
+                          Arquivos Selecionados ({uploadedFiles.length})
+                        </Label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {uploadedFiles.map((file, index) => (
+                            <div
+                              key={file.id || `file-${index}`}
+                              className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border hover:bg-muted/70 transition-colors"
+                            >
+                              <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center">
+                                <IconFile className="h-5 w-5 text-primary" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate" title={file.name}>
+                                  {file.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatFileSize(file.size)}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 flex-shrink-0 hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => {
+                                  const newFiles = uploadedFiles.filter((_, i) => i !== index);
+                                  handleFilesChange(newFiles);
+                                }}
+                              >
+                                <IconX className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      case 2:
+        // Step 2: Task Selection
+        return (
+          <div className="space-y-4">
+            <div className="rounded-lg overflow-hidden" style={{ height: "540px" }}>
+              <TaskSelector
+                selectedTasks={selectedTasks}
+                onSelectTask={handleTaskSelection}
+                onSelectAll={handleSelectAll}
+                className="h-full"
+              />
+            </div>
+          </div>
+        );
+
+      case 3:
+        // Step 3: Review
+        return (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <IconAlertCircle className="h-5 w-5" />
+                  Detalhes da Observação
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-1">Descrição</div>
+                  <div className="p-3 bg-muted/50 rounded-md">
+                    {form.getValues("description") || "Nenhuma descrição fornecida"}
+                  </div>
+                </div>
+
+                {uploadedFiles.length > 0 && (
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground mb-1">
+                      Arquivos ({uploadedFiles.length})
+                    </div>
+                    <div className="space-y-2">
+                      {uploadedFiles.map((file, index) => (
+                        <div
+                          key={file.id || `file-${index}`}
+                          className="flex items-center gap-2 p-2 bg-muted/50 rounded-md"
+                        >
+                          <IconFile className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate" title={file.name}>
+                              {file.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(file.size)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <IconCheck className="h-5 w-5" />
+                  Tarefa Selecionada
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {selectedTask ? (
+                  <div className="space-y-2">
+                    <div>
+                      <div className="text-sm font-medium text-muted-foreground">Nome da Tarefa</div>
+                      <div className="text-lg font-semibold">{selectedTask.name}</div>
+                    </div>
+                    {selectedTask.customer && (
+                      <div>
+                        <div className="text-sm font-medium text-muted-foreground">Cliente</div>
+                        <div>{selectedTask.customer.fantasyName || selectedTask.customer.name}</div>
+                      </div>
+                    )}
+                    {selectedTask.sector && (
+                      <div>
+                        <div className="text-sm font-medium text-muted-foreground">Setor</div>
+                        <div>{selectedTask.sector.name}</div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground">Nenhuma tarefa selecionada</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -200,24 +785,54 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
               onClick: onCancel || (() => navigate(routes.production.observations.root)),
               variant: "outline",
             },
-            {
-              key: "submit",
-              label: mode === "create" ? "Cadastrar" : "Salvar",
-              icon: IconCheck,
-              onClick: () => {
-                const formElement = document.getElementById("observation-form") as HTMLFormElement;
-                if (formElement) {
-                  formElement.requestSubmit();
-                }
-              },
-              variant: "default",
-              disabled: !form.formState.isValid || form.formState.isSubmitting,
-            },
+            // Show different actions based on mode and step
+            ...(mode === "create"
+              ? [
+                  // Previous button (only show if not first step)
+                  ...(!isFirstStep
+                    ? [
+                        {
+                          key: "prev",
+                          label: "Anterior",
+                          icon: IconArrowLeft,
+                          onClick: prevStep,
+                          variant: "outline" as const,
+                        },
+                      ]
+                    : []),
+                  // Next/Submit button
+                  {
+                    key: isLastStep ? "submit" : "next",
+                    label: isLastStep ? "Cadastrar" : "Próximo",
+                    icon: isLastStep ? IconCheck : IconArrowRight,
+                    onClick: isLastStep ? form.handleSubmit(handleSubmit) : handleNext,
+                    variant: "default" as const,
+                    disabled: form.formState.isSubmitting,
+                  },
+                ]
+              : [
+                  // Edit mode: just show submit button
+                  {
+                    key: "submit",
+                    label: "Salvar",
+                    icon: IconCheck,
+                    onClick: form.handleSubmit(handleSubmit),
+                    variant: "default" as const,
+                    disabled: form.formState.isSubmitting || !form.watch("description"),
+                  },
+                ]),
           ]}
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      {/* Form Steps Indicator (only show in create mode) */}
+      {mode === "create" && (
+        <div className="flex-shrink-0 px-4">
+          <FormSteps steps={steps} currentStep={currentStep} />
+        </div>
+      )}
+
+      <div className="flex-1 min-h-0 overflow-y-auto px-4">
         <Card className={cn("h-full shadow-sm border border-border", className)}>
           {mode === "edit" && observation?.task && (
             <CardHeader className="pb-4">
@@ -231,123 +846,8 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
           <CardContent className="flex-1 flex flex-col overflow-hidden">
             <Form {...form}>
-              <form id="observation-form" onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-hidden space-y-6">
-                {/* First Row: Description and File Upload Section - Horizontal layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-shrink-0">
-                  {/* Description Field */}
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Descrição da Observação</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            value={field.value}
-                            onChange={field.onChange}
-                            onBlur={field.onBlur}
-                            name={field.name}
-                            ref={field.ref}
-                            placeholder="Descreva detalhadamente a observação sobre a tarefa..."
-                            className="min-h-[120px] resize-none"
-                            maxLength={1000}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* File Upload Section with horizontal layout */}
-                  <FormItem className="flex flex-col">
-                    <FormLabel className="flex items-center gap-2">
-                      <IconPaperclip className="h-4 w-4" />
-                      Arquivos de Evidência (Opcional)
-                    </FormLabel>
-                    <FormControl>
-                      <div className="flex gap-4">
-                        {/* Upload area on the left */}
-                        <div className="flex-shrink-0 w-1/2">
-                          <FileUploadField
-                            onFilesChange={handleFilesChange}
-                            existingFiles={[]}
-                            maxFiles={10}
-                            showPreview={false}
-                            showFiles={false} // Disable built-in file display
-                            variant="compact"
-                            placeholder="Adicione arquivos"
-                            label=""
-                          />
-                        </div>
-
-                        {/* File list on the right - compact custom display */}
-                        {uploadedFiles.length > 0 && (
-                          <div className="flex-1 border-2 border-dashed rounded-lg p-3 bg-green-50/50 dark:bg-green-950/20 max-h-[120px] overflow-y-auto border-green-200 dark:border-green-800">
-                            <div className="flex items-center gap-2 mb-2">
-                              <IconPaperclip className="h-4 w-4 text-green-600" />
-                              <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                                {uploadedFiles.length} arquivo{uploadedFiles.length > 1 ? "s" : ""} selecionado{uploadedFiles.length > 1 ? "s" : ""}
-                              </span>
-                            </div>
-                            <div className="space-y-1">
-                              {uploadedFiles.map((file, index) => (
-                                <div key={file.id || index} className="flex items-center gap-2 text-xs bg-white/60 dark:bg-black/20 rounded px-2 py-1">
-                                  <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
-                                  <span className="truncate flex-1 text-foreground/80" title={file.name}>
-                                    {file.name}
-                                  </span>
-                                  <span className="text-muted-foreground text-[10px] flex-shrink-0">{formatFileSize(file.size)}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const newFiles = uploadedFiles.filter((f) => f.id !== file.id);
-                                      handleFilesChange(newFiles);
-                                    }}
-                                    className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
-                                  >
-                                    <IconX className="h-3 w-3" />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </FormControl>
-                  </FormItem>
-                </div>
-
-                {/* Second Row: Task Selection Section */}
-                {mode === "create" && (
-                  <div className="mt-6">
-                    {!isTaskSelectorOpen && selectedTaskId ? (
-                      <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-                        <div className="flex items-center gap-3">
-                          <IconCheck className="h-5 w-5 text-green-600" />
-                          <div>
-                            <div className="font-medium">Tarefa selecionada</div>
-                            <div className="text-sm text-muted-foreground">Clique em "Alterar Tarefa" para escolher uma tarefa diferente</div>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedTasks(new Set()); // Clear selection when reopening
-                            form.setValue("taskId", "");
-                            setIsTaskSelectorOpen(true);
-                          }}
-                        >
-                          Alterar Tarefa
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="rounded-lg overflow-hidden" style={{ height: "540px" }}>
-                        <TaskSelector selectedTasks={selectedTasks} onSelectTask={handleTaskSelection} onSelectAll={handleSelectAll} className="h-full" />
-                      </div>
-                    )}
-                  </div>
-                )}
+              <form id="observation-form" onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-hidden">
+                {renderStepContent()}
               </form>
             </Form>
           </CardContent>

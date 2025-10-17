@@ -73,6 +73,7 @@ export function SectorFilters({ open, onOpenChange, onApply, currentPrivilege }:
               placeholder="Selecione um privilégio"
               searchable={true}
               clearable={false}
+              minSearchLength={0}
               name="privileges"
             />
           </div>

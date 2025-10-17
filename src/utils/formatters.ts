@@ -1,5 +1,24 @@
 // packages/utils/src/formatters.ts
 
+export const formatChassis = (chassis: string): string => {
+  // Remove all non-alphanumeric characters and convert to uppercase
+  const cleaned = chassis.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+
+  // Format as: XXX XXXXX XX XXXXXX (3-5-2-6 groups)
+  if (cleaned.length <= 3) {
+    return cleaned;
+  } else if (cleaned.length <= 8) {
+    return cleaned.replace(/([A-Z0-9]{3})([A-Z0-9]{1,5})/, "$1 $2");
+  } else if (cleaned.length <= 10) {
+    return cleaned.replace(/([A-Z0-9]{3})([A-Z0-9]{5})([A-Z0-9]{1,2})/, "$1 $2 $3");
+  } else if (cleaned.length <= 17) {
+    return cleaned.replace(/([A-Z0-9]{3})([A-Z0-9]{5})([A-Z0-9]{2})([A-Z0-9]{1,6})/, "$1 $2 $3 $4");
+  }
+
+  // Limit to 17 characters
+  return cleaned.substring(0, 17).replace(/([A-Z0-9]{3})([A-Z0-9]{5})([A-Z0-9]{2})([A-Z0-9]{6})/, "$1 $2 $3 $4");
+};
+
 export const formatCPF = (cpf: string): string => {
   const cleaned = cpf.replace(/\D/g, "");
 

@@ -9,7 +9,7 @@ export interface FileOrganizationConfig {
 
 export interface FileContext {
   // Entity identifiers
-  entityType: 'task' | 'customer' | 'supplier' | 'warning' | 'cut' | 'airbrushing' | 'order' | 'withdrawal' | 'entry' | 'exit';
+  entityType: 'task' | 'customer' | 'supplier' | 'warning' | 'cut' | 'airbrushing' | 'order' | 'withdrawal';
   entityId?: string;
 
   // Related entities
@@ -17,11 +17,12 @@ export interface FileContext {
   customerFantasyName?: string;
   supplierName?: string;
   supplierFantasyName?: string;
+  withdrawerName?: string;
   userName?: string;
   userId?: string;
 
   // File metadata
-  fileType?: 'logo' | 'budget' | 'receipt' | 'invoice' | 'artwork' | 'cut' | 'attachment' | 'document';
+  fileType?: 'logo' | 'budget' | 'receipt' | 'invoice' | 'invoiceReimbursement' | 'reimbursement' | 'artwork' | 'cut' | 'attachment' | 'document';
   fileExtension?: string;
   isImage?: boolean;
   isPdf?: boolean;
@@ -70,7 +71,7 @@ export const FILE_ORGANIZATION: FileOrganizationConfig[] = [
       if (ctx.cutType === 'vinyl') {
         return `Plotter/${customerDir}/Adesivos/`;
       } else if (ctx.cutType === 'stencil') {
-        return `Plotter/${customerDir}/Estencis/`;
+        return `Plotter/${customerDir}/Espovo/`;
       }
       return `Plotter/${customerDir}/Outros/`;
     }
@@ -91,8 +92,18 @@ export const FILE_ORGANIZATION: FileOrganizationConfig[] = [
   },
   {
     entity: 'task',
+    fileType: 'reimbursement',
+    getPath: (ctx) => `Reembolsos/Tarefas/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+  },
+  {
+    entity: 'task',
     fileType: 'invoice',
-    getPath: (ctx) => `NFs/Tarefas/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+    getPath: (ctx) => `Notas Fiscais/Tarefas/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+  },
+  {
+    entity: 'task',
+    fileType: 'invoiceReimbursement',
+    getPath: (ctx) => `Notas Fiscais Reembolso/Tarefas/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
   },
   {
     entity: 'task',
@@ -100,7 +111,7 @@ export const FILE_ORGANIZATION: FileOrganizationConfig[] = [
     getPath: (ctx) => {
       const customerDir = ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente';
       if (ctx.isImage) {
-        return `Projetos/${customerDir}/Images/`;
+        return `Projetos/${customerDir}/Imagens/`;
       } else if (ctx.isPdf) {
         return `Projetos/${customerDir}/Pdfs/`;
       }
@@ -114,22 +125,40 @@ export const FILE_ORGANIZATION: FileOrganizationConfig[] = [
   {
     entity: 'airbrushing',
     fileType: 'budget',
-    getPath: (ctx) => `Orcamentos/Aerografia/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+    getPath: (ctx) => `Orcamentos/Aerografias/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
   },
   {
     entity: 'airbrushing',
     fileType: 'receipt',
-    getPath: (ctx) => `Comprovantes/Aerografia/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+    getPath: (ctx) => `Comprovantes/Aerografias/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+  },
+  {
+    entity: 'airbrushing',
+    fileType: 'reimbursement',
+    getPath: (ctx) => `Reembolsos/Aerografias/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
   },
   {
     entity: 'airbrushing',
     fileType: 'invoice',
-    getPath: (ctx) => `NFs/Aerografia/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+    getPath: (ctx) => `Notas Fiscais/Aerografias/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+  },
+  {
+    entity: 'airbrushing',
+    fileType: 'invoiceReimbursement',
+    getPath: (ctx) => `Notas Fiscais Reembolso/Aerografias/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
   },
   {
     entity: 'airbrushing',
     fileType: 'artwork',
-    getPath: (ctx) => `Auxiliares/Aerografia/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+    getPath: (ctx) => {
+      const customerDir = ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente';
+      if (ctx.isImage) {
+        return `Aerografias/${customerDir}/Imagens/`;
+      } else if (ctx.isPdf) {
+        return `Aerografias/${customerDir}/Pdfs/`;
+      }
+      return `Aerografias/${customerDir}/Outros/`;
+    }
   },
 
   // ==================
@@ -138,17 +167,27 @@ export const FILE_ORGANIZATION: FileOrganizationConfig[] = [
   {
     entity: 'order',
     fileType: 'budget',
-    getPath: (ctx) => `Orcamentos/Pedidos/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+    getPath: (ctx) => `Orcamentos/Pedidos/${ctx.supplierFantasyName || ctx.supplierName || 'Sem-Fornecedor'}/`
   },
   {
     entity: 'order',
     fileType: 'receipt',
-    getPath: (ctx) => `Comprovantes/Pedidos/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+    getPath: (ctx) => `Comprovantes/Pedidos/${ctx.supplierFantasyName || ctx.supplierName || 'Sem-Fornecedor'}/`
+  },
+  {
+    entity: 'order',
+    fileType: 'reimbursement',
+    getPath: (ctx) => `Reembolsos/Pedidos/${ctx.supplierFantasyName || ctx.supplierName || 'Sem-Fornecedor'}/`
   },
   {
     entity: 'order',
     fileType: 'invoice',
-    getPath: (ctx) => `NFs/Pedidos/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+    getPath: (ctx) => `Notas Fiscais/Pedidos/${ctx.supplierFantasyName || ctx.supplierName || 'Sem-Fornecedor'}/`
+  },
+  {
+    entity: 'order',
+    fileType: 'invoiceReimbursement',
+    getPath: (ctx) => `Notas Fiscais Reembolso/Pedidos/${ctx.supplierFantasyName || ctx.supplierName || 'Sem-Fornecedor'}/`
   },
 
   // ==================
@@ -156,42 +195,29 @@ export const FILE_ORGANIZATION: FileOrganizationConfig[] = [
   // ==================
   {
     entity: 'withdrawal',
+    fileType: 'budget',
+    getPath: (ctx) => `Orcamentos/RetiradasExternas/${ctx.withdrawerName || 'Sem-Retirador'}/`
+  },
+  {
+    entity: 'withdrawal',
     fileType: 'receipt',
-    getPath: (ctx) => `Comprovantes/Retiradas/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
+    getPath: (ctx) => `Comprovantes/RetiradasExternas/${ctx.withdrawerName || 'Sem-Retirador'}/`
+  },
+  {
+    entity: 'withdrawal',
+    fileType: 'reimbursement',
+    getPath: (ctx) => `Reembolsos/RetiradasExternas/${ctx.withdrawerName || 'Sem-Retirador'}/`
   },
   {
     entity: 'withdrawal',
     fileType: 'invoice',
-    getPath: (ctx) => `NFs/Retiradas/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
-  },
-
-  // ==================
-  // STOCK ENTRY FILES
-  // ==================
-  {
-    entity: 'entry',
-    fileType: 'invoice',
-    getPath: (ctx) => `NFs/Fornecedores/${ctx.supplierFantasyName || ctx.supplierName || 'Sem-Fornecedor'}/`
+    getPath: (ctx) => `Notas Fiscais/RetiradasExternas/${ctx.withdrawerName || 'Sem-Retirador'}/`
   },
   {
-    entity: 'entry',
-    fileType: 'document',
-    getPath: (ctx) => `NFs/Fornecedores/${ctx.supplierFantasyName || ctx.supplierName || 'Sem-Fornecedor'}/`
-  },
-
-  // ==================
-  // STOCK EXIT FILES
-  // ==================
-  {
-    entity: 'exit',
-    fileType: 'invoice',
-    getPath: (ctx) => `NFs/Clientes/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
-  },
-  {
-    entity: 'exit',
-    fileType: 'document',
-    getPath: (ctx) => `NFs/Clientes/${ctx.customerFantasyName || ctx.customerName || 'Sem-Cliente'}/`
-  },
+    entity: 'withdrawal',
+    fileType: 'invoiceReimbursement',
+    getPath: (ctx) => `Notas Fiscais Reembolso/RetiradasExternas/${ctx.withdrawerName || 'Sem-Retirador'}/`
+  }
 ];
 
 // Helper function to get the correct path for a file
@@ -208,9 +234,8 @@ export function getFileOrganizationPath(context: FileContext): string {
   return config.getPath(context);
 }
 
-// Helper function to determine file type from mimetype or extension
-export function determineFileType(file: File | { mimetype?: string; filename?: string }): {
-  fileType: string;
+// Helper function to get file metadata from mimetype or extension
+export function getFileMetadata(file: File | { mimetype?: string; filename?: string }): {
   isImage: boolean;
   isPdf: boolean;
   fileExtension: string;
@@ -230,28 +255,7 @@ export function determineFileType(file: File | { mimetype?: string; filename?: s
   const isImage = mimetype.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(extension);
   const isPdf = mimetype === 'application/pdf' || extension === 'pdf';
 
-  // Determine file type based on common patterns
-  let fileType = 'document'; // default
-
-  if (isImage && ['logo', 'logotipo'].some(term => filename.toLowerCase().includes(term))) {
-    fileType = 'logo';
-  } else if (['orcamento', 'budget', 'cotacao'].some(term => filename.toLowerCase().includes(term))) {
-    fileType = 'budget';
-  } else if (['comprovante', 'receipt', 'recibo'].some(term => filename.toLowerCase().includes(term))) {
-    fileType = 'receipt';
-  } else if (['nf', 'nota', 'invoice', 'nfe', 'nfse'].some(term => filename.toLowerCase().includes(term))) {
-    fileType = 'invoice';
-  } else if (['arte', 'artwork', 'design', 'projeto'].some(term => filename.toLowerCase().includes(term))) {
-    fileType = 'artwork';
-  } else if (['corte', 'cut', 'plotter', 'eps', 'cdr', 'ai'].some(term => filename.toLowerCase().includes(term)) ||
-             ['eps', 'ai', 'cdr', 'svg', 'dxf'].includes(extension)) {
-    fileType = 'cut';
-  } else if (isImage) {
-    fileType = 'artwork'; // Default images to artwork
-  }
-
   return {
-    fileType,
     isImage,
     isPdf,
     fileExtension: extension
@@ -261,10 +265,9 @@ export function determineFileType(file: File | { mimetype?: string; filename?: s
 // Special directories that should not be used for file storage
 export const SPECIAL_DIRECTORIES = [
   'Thumbnails',     // Auto-generated thumbnails
-  'Temporario',     // Temporary files
-  'Uploads',        // Old upload approach
   'Lixeira',        // Trash
   '.recycle',       // Recycle bin
+  'Auxiliares',     // Auxiliary files (direct WebDAV access only)
   'Rascunhos',      // Drafts (for another project)
   'Fotos',          // Photos (for another project)
   'Artes',          // Arts (for another project)
@@ -298,7 +301,7 @@ export const FILE_ORGANIZATION_CONFIG = {
   specialDirectories: SPECIAL_DIRECTORIES,
   helpers: {
     getPath: getFileOrganizationPath,
-    determineType: determineFileType,
+    getMetadata: getFileMetadata,
     sanitizeName: sanitizeDirectoryName,
     buildPath: buildFilePath,
   }

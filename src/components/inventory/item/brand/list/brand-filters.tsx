@@ -58,50 +58,56 @@ export function BrandFilters({ open, onOpenChange, filters, onFilterChange }: Br
           <div className="space-y-3">
             <div className="text-sm font-medium">Data de criação</div>
             <div className="grid grid-cols-2 gap-3">
-              <DateTimeInput
-                mode="date"
-                value={localFilters.createdAt?.gte}
-                onChange={(date: Date | null) => {
-                  if (!date && !localFilters.createdAt?.lte) {
-                    setLocalFilters({
-                      ...localFilters,
-                      createdAt: undefined,
-                    });
-                  } else {
-                    setLocalFilters({
-                      ...localFilters,
-                      createdAt: {
-                        ...(date && { gte: date }),
-                        ...(localFilters.createdAt?.lte && { lte: localFilters.createdAt.lte }),
-                      },
-                    });
-                  }
-                }}
-                label="De"
-                placeholder="Selecionar data inicial..."
-              />
-              <DateTimeInput
-                mode="date"
-                value={localFilters.createdAt?.lte}
-                onChange={(date: Date | null) => {
-                  if (!date && !localFilters.createdAt?.gte) {
-                    setLocalFilters({
-                      ...localFilters,
-                      createdAt: undefined,
-                    });
-                  } else {
-                    setLocalFilters({
-                      ...localFilters,
-                      createdAt: {
-                        ...(localFilters.createdAt?.gte && { gte: localFilters.createdAt.gte }),
-                        ...(date && { lte: date }),
-                      },
-                    });
-                  }
-                }}
-                label="Até"
-                placeholder="Selecionar data final..."
-              />
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localFilters.createdAt?.gte}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localFilters.createdAt?.lte) {
+                      setLocalFilters({
+                        ...localFilters,
+                        createdAt: undefined,
+                      });
+                    } else {
+                      setLocalFilters({
+                        ...localFilters,
+                        createdAt: {
+                          ...(date && { gte: date }),
+                          ...(localFilters.createdAt?.lte && { lte: localFilters.createdAt.lte }),
+                        },
+                      });
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data inicial..."
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                <DateTimeInput
+                  mode="date"
+                  value={localFilters.createdAt?.lte}
+                  onChange={(date: Date | null) => {
+                    if (!date && !localFilters.createdAt?.gte) {
+                      setLocalFilters({
+                        ...localFilters,
+                        createdAt: undefined,
+                      });
+                    } else {
+                      setLocalFilters({
+                        ...localFilters,
+                        createdAt: {
+                          ...(localFilters.createdAt?.gte && { gte: localFilters.createdAt.gte }),
+                          ...(date && { lte: date }),
+                        },
+                      });
+                    }
+                  }}
+                  hideLabel
+                  placeholder="Selecionar data final..."
+                />
+              </div>
             </div>
           </div>
         </div>

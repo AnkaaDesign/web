@@ -5,6 +5,7 @@ import { getCustomers, quickCreateCustomer } from "../../../../api-client";
 import type { Customer } from "../../../../types";
 import { formatCNPJ } from "../../../../utils";
 import { cn } from "@/lib/utils";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 
 interface CustomerSelectorProps {
   control: any;
@@ -36,7 +37,7 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
     const params: any = {
       orderBy: { fantasyName: "asc" },
       page: page,
-      take: 20,
+      take: 50,
     };
 
     // Only add search filter if there's a search term
@@ -122,25 +123,36 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
               getOptionLabel={getOptionLabel}
               getOptionValue={getOptionValue}
               renderOption={(customer, isSelected) => (
-                <div className="flex flex-col gap-1">
-                  <div className="font-medium">{customer.fantasyName}</div>
-                  <div className={cn(
-                    "flex items-center gap-2 text-sm",
-                    isSelected ? "text-accent-foreground/80" : "text-muted-foreground group-hover:text-accent-foreground/80"
-                  )}>
-                    {customer.corporateName && <span>{customer.corporateName}</span>}
-                    {customer.cnpj && (
-                      <>
-                        {customer.corporateName && <span>•</span>}
-                        <span>{formatCNPJ(customer.cnpj)}</span>
-                      </>
-                    )}
+                <div className="flex items-center gap-3">
+                  <CustomerLogoDisplay
+                    logo={customer.logo}
+                    customerName={customer.fantasyName}
+                    size="sm"
+                    shape="rounded"
+                    className="flex-shrink-0"
+                  />
+                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                    <div className="font-medium truncate">{customer.fantasyName}</div>
+                    <div className={cn(
+                      "flex items-center gap-2 text-sm truncate",
+                      isSelected ? "text-accent-foreground/80" : "text-muted-foreground group-hover:text-accent-foreground/80"
+                    )}>
+                      {customer.corporateName && <span className="truncate">{customer.corporateName}</span>}
+                      {customer.cnpj && (
+                        <>
+                          {customer.corporateName && <span>•</span>}
+                          <span>{formatCNPJ(customer.cnpj)}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
               loadMoreText="Carregar mais clientes"
               loadingMoreText="Carregando..."
               minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
             />
           </FormControl>
           <FormMessage />

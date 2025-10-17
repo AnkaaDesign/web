@@ -1,6 +1,8 @@
+import { useMemo, useCallback, useRef } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import { usePaints } from "../../../../hooks";
+import { getPaints } from "../../../../api-client";
+import type { Paint } from "../../../../types";
 import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
 import { Badge } from "@/components/ui/badge";
 import { COLOR_PALETTE_LABELS } from "../../../../constants";
@@ -8,6 +10,7 @@ import { COLOR_PALETTE_LABELS } from "../../../../constants";
 interface PaintSelectorProps {
   control: any;
   disabled?: boolean;
+  initialPaints?: Paint[];
 }
 
 const paletteColors: Record<string, string> = {
@@ -27,25 +30,70 @@ const paletteColors: Record<string, string> = {
   BEIGE: "#F5F5DC",
 };
 
-export function PaintSelector({ control, disabled }: PaintSelectorProps) {
-  // Fetch paints
-  const { data: paints, isLoading } = usePaints({
-    orderBy: { name: "asc" },
-    take: 100,
-  });
+export function PaintSelector({ control, disabled, initialPaints }: PaintSelectorProps) {
+  // Create a stable cache for fetched paints
+  const cacheRef = useRef<Map<string, Paint>>(new Map());
 
-  const paintOptions =
-    paints?.data?.map((paint) => ({
-      value: paint.id,
-      label: paint.name,
-      metadata: paint, // Store full paint object for rendering
-    })) || [];
+  // Create stable dependency for initialPaints array
+  const initialPaintIds = useMemo(
+    () => (initialPaints || []).map(p => p.id).sort().join(','),
+    [initialPaints]
+  );
+
+  // Memoize initialOptions with stable dependency
+  const initialOptions = useMemo(() => {
+    if (!initialPaints || initialPaints.length === 0) return [];
+
+    // Add initial paints to cache
+    initialPaints.forEach(paint => {
+      cacheRef.current.set(paint.id, paint);
+    });
+
+    return initialPaints;
+  }, [initialPaintIds, initialPaints]);
+
+  // Memoize callbacks to prevent infinite loop
+  const getOptionLabel = useCallback((paint: Paint) => paint.name, []);
+  const getOptionValue = useCallback((paint: Paint) => paint.id, []);
+
+  // Async query function for the combobox
+  const queryPaints = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+      };
+
+      // Only add searchingFor if there's a search term
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      const response = await getPaints(queryParams);
+      const paints = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      // Add to cache
+      paints.forEach(paint => {
+        cacheRef.current.set(paint.id, paint);
+      });
+
+      return {
+        data: paints,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching paints:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
 
   // Custom render for paint option to show color
-  const renderOption = (option: { value: string; label: string; metadata?: any }, isSelected: boolean) => {
-    const paint = option.metadata;
-    if (!paint) return <span>{option.label}</span>;
-
+  const renderOption = useCallback((paint: Paint, isSelected: boolean) => {
     return (
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2">
@@ -56,7 +104,7 @@ export function PaintSelector({ control, disabled }: PaintSelectorProps) {
               title={COLOR_PALETTE_LABELS[paint.palette]}
             />
           )}
-          <span>{option.label}</span>
+          <span>{paint.name}</span>
         </div>
         {paint.palette && (
           <Badge variant="secondary" className="ml-2 shrink-0 text-xs">
@@ -65,7 +113,7 @@ export function PaintSelector({ control, disabled }: PaintSelectorProps) {
         )}
       </div>
     );
-  };
+  }, []);
 
   return (
     <FormField
@@ -75,17 +123,25 @@ export function PaintSelector({ control, disabled }: PaintSelectorProps) {
         <FormItem>
           <FormLabel>Tintas do Logo</FormLabel>
           <FormControl>
-            <Combobox
+            <Combobox<Paint>
               value={field.value || []}
               onValueChange={field.onChange}
-              options={paintOptions}
+              async={true}
+              queryKey={["paints", "task-selector"]}
+              queryFn={queryPaints}
+              initialOptions={initialOptions}
+              getOptionLabel={getOptionLabel}
+              getOptionValue={getOptionValue}
               mode="multiple"
               placeholder="Selecione as tintas..."
-              emptyText="Nenhuma tinta disponível"
+              emptyText="Nenhuma tinta encontrada"
               searchPlaceholder="Pesquisar por código ou nome..."
-              disabled={disabled || isLoading}
+              disabled={disabled}
               className="w-full"
               renderOption={renderOption}
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
             />
           </FormControl>
           <FormMessage />

@@ -3,6 +3,7 @@ export * from "./accordion";
 export * from "./address-input";
 export * from "./alert";
 export * from "./avatar";
+export * from "./avatar-display";
 export * from "./badge";
 export * from "./batch-operation-result-dialog";
 // export * from "./badge-example" // Example component, not for export

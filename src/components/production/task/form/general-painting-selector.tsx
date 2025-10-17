@@ -64,7 +64,7 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
     const params: any = {
       orderBy: { name: "asc" },
       page: page,
-      take: 20,
+      take: 50,
       include: {
         paintType: true,
         paintBrand: true,
@@ -186,6 +186,8 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
                   getOptionValue={getOptionValue}
                   renderOption={(paint, isSelected) => renderPaintItem(paint, isSelected)}
                   minSearchLength={0}
+                  pageSize={50}
+                  debounceMs={300}
                   clearable={true}
                   initialOptions={initialOptions}
                 />

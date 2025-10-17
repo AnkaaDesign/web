@@ -252,8 +252,8 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
                         min="1"
                         max="100"
                         value={cut.quantity}
-                        onChange={(e) => {
-                          const num = parseInt(e.target.value, 10);
+                        onChange={(value) => {
+                          const num = typeof value === 'string' ? parseInt(value, 10) : value as number;
                           updateCut(cut.id, { quantity: isNaN(num) || num < 1 ? 1 : num });
                         }}
                         disabled={disabled}

@@ -90,8 +90,6 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
     const activeTasks = tasks.filter((task) => task.status !== TASK_STATUS.CANCELLED && task.status !== TASK_STATUS.COMPLETED).length;
     const completedTasks = tasks.filter((task) => task.status === TASK_STATUS.COMPLETED).length;
 
-    const totalValue = tasks.reduce((sum, task) => sum + (task.price || 0), 0);
-
     const statusCounts = tasks.reduce(
       (acc, task) => {
         acc[task.status] = (acc[task.status] || 0) + 1;
@@ -104,7 +102,6 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
       totalTasks,
       activeTasks,
       completedTasks,
-      totalValue,
       statusCounts,
     };
   }, [tasks]);
@@ -277,8 +274,6 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
 
                             <span className="font-medium tabular-nums text-sm">{formatDate(task.createdAt)}</span>
                           </div>
-
-                          {task.price && task.price > 0 && <p className="text-xs text-muted-foreground font-medium">{formatCurrency(task.price)}</p>}
                         </div>
                       </div>
                     </div>

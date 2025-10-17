@@ -32,7 +32,7 @@ const DEFAULT_PAGE_SIZE = 40;
 
 export function TaskHistoryList({
   className,
-  statusFilter = [TASK_STATUS.COMPLETED],
+  statusFilter = [TASK_STATUS.COMPLETED, TASK_STATUS.INVOICED, TASK_STATUS.SETTLED],
   storageKey = "task-history-visible-columns",
   searchPlaceholder = "Buscar por nome, cliente, setor...",
   navigationRoute = 'history',
@@ -66,9 +66,9 @@ export function TaskHistoryList({
       if (users) filters.assigneeIds = users.split(",");
 
       // Status filter
-      const includeInProgress = params.get("includeInProgress");
-      if (includeInProgress === "true") {
-        filters.status = [TASK_STATUS.COMPLETED, TASK_STATUS.PENDING, TASK_STATUS.IN_PRODUCTION, TASK_STATUS.ON_HOLD];
+      const statusParam = params.get("status");
+      if (statusParam) {
+        filters.status = statusParam.split(",") as TASK_STATUS[];
       } else {
         filters.status = statusFilter;
       }
@@ -146,10 +146,9 @@ export function TaskHistoryList({
     if (filters.assigneeIds?.length) params.users = filters.assigneeIds.join(",");
 
     // Status filter
-    const includesInProgress = filters.status?.some(s =>
-      s === TASK_STATUS.PENDING || s === TASK_STATUS.IN_PRODUCTION || s === TASK_STATUS.ON_HOLD
-    );
-    if (includesInProgress) params.includeInProgress = "true";
+    if (filters.status?.length) {
+      params.status = filters.status.join(",");
+    }
 
     // Date filters
     if (filters.finishedDateRange?.from) params.finishedFrom = filters.finishedDateRange.from.toISOString();
@@ -237,6 +236,9 @@ export function TaskHistoryList({
     };
 
     console.log("[TaskHistoryList] Query filters prepared:", {
+      searchingFor: searchingFor,
+      baseSearchingFor: baseQueryFilters.searchingFor,
+      resultSearchingFor: result.searchingFor,
       baseQueryFilters,
       filterWithoutOrderBy,
       result,

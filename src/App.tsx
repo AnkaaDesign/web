@@ -4,6 +4,7 @@ import { routes } from "./constants";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { AuthProvider } from "@/contexts/auth-context";
 import { FavoritesProvider } from "@/contexts/favorites-context";
+import { FileViewerProvider } from "@/components/file/file-viewer";
 import { AutoPrivilegeRoute } from "@/components/navigation/auto-privilege-route";
 import { MainLayout } from "@/layouts/main-layout";
 import { AuthLayout } from "@/layouts/auth-layout";
@@ -32,6 +33,9 @@ const HomePage = lazy(() => import("@/pages/home").then((module) => ({ default: 
 
 // Favorites
 const FavoritesPage = lazy(() => import("@/pages/favorites").then((module) => ({ default: module.FavoritesPage })));
+
+// Profile
+const ProfilePage = lazy(() => import("@/pages/profile").then((module) => ({ default: module.ProfilePage })));
 
 // Administration
 const Administration = lazy(() => import("@/pages/administration/root").then((module) => ({ default: module.AdministrationRootPage })));
@@ -293,8 +297,9 @@ function App() {
       <ThemeProvider defaultTheme="light" storageKey="ankaa-ui-theme">
         <AuthProvider>
           <FavoritesProvider>
-            <Toaster />
-            <Routes>
+            <FileViewerProvider>
+              <Toaster />
+              <Routes>
               {/* Auth routes */}
               <Route element={<AuthLayout />}>
                 <Route path={routes.authentication.login} element={<LoginPage />} />
@@ -328,6 +333,16 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <FavoritesPage />
+                    </Suspense>
+                  }
+                />
+
+                {/* Profile route */}
+                <Route
+                  path="/perfil"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProfilePage />
                     </Suspense>
                   }
                 />
@@ -2072,6 +2087,7 @@ function App() {
               {/* 404 Not Found route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </FileViewerProvider>
           </FavoritesProvider>
         </AuthProvider>
       </ThemeProvider>

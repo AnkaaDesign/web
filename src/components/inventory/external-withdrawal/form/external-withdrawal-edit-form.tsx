@@ -2,15 +2,17 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconUser, IconArrowBack, IconPackage, IconPackageExport, IconDownload } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconUser, IconArrowBack, IconPackage, IconPackageExport, IconDownload, IconFileInvoice, IconReceipt } from "@tabler/icons-react";
 import type { ExternalWithdrawalCreateFormData } from "../../../../schemas";
 import type { ExternalWithdrawal, ExternalWithdrawalItem, Item } from "../../../../types";
 import { externalWithdrawalCreateSchema } from "../../../../schemas";
 import { useExternalWithdrawalMutations, useItems } from "../../../../hooks";
 import { routes } from "../../../../constants";
 import { toast } from "sonner";
+import { FileUploadField, type FileWithPreview } from "@/components/file";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Form } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -24,6 +26,7 @@ import { ExternalWithdrawalItemSelector } from "./external-withdrawal-item-selec
 import { useExternalWithdrawalFormUrlState } from "@/hooks/use-external-withdrawal-form-url-state";
 import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
 import { MEASURE_UNIT_LABELS } from "../../../../constants";
+import { createWithdrawalFormData } from "@/utils/form-data-helper";
 
 interface ExternalWithdrawalEditFormProps {
   withdrawal: ExternalWithdrawal & {
@@ -67,6 +70,10 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
 
   // Initialize state from URL parameters
   const [currentStep, setCurrentStep] = useState(getStepFromUrl(searchParams));
+
+  // File upload state
+  const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
+  const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>([]);
 
   // Convert existing withdrawal data to initial state
   const initialSelectedItems = useMemo(() => new Set(withdrawal.items.map((item: ExternalWithdrawalItem) => item.itemId)), [withdrawal.items]);
@@ -277,6 +284,17 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
     }
   }, [currentStep, withdrawerName, selectionCount, selectedItems, quantities, willReturn, prices, notes]);
 
+  // Handle file changes
+  const handleReceiptFilesChange = useCallback((files: FileWithPreview[]) => {
+    setReceiptFiles(files);
+    form.setValue("receiptId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
+  }, [form]);
+
+  const handleNfeFilesChange = useCallback((files: FileWithPreview[]) => {
+    setNfeFiles(files);
+    form.setValue("nfeId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
+  }, [form]);
+
   // Handle navigation with validation
   const handleNext = useCallback(() => {
     if (validateCurrentStep()) {
@@ -293,16 +311,45 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
     if (!validateCurrentStep()) return;
 
     try {
-      // For update, we only send the fields that can be updated
-      // Note: items cannot be updated according to the schema
-      await updateAsync({
-        id: withdrawal.id,
-        data: {
-          withdrawerName: withdrawerName?.trim() || "",
-          willReturn,
-          notes: notes?.trim() || null,
-        },
+      // Check if there are new files to upload
+      const newReceiptFiles = receiptFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
+      const newNfeFiles = nfeFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
+      const hasNewFiles = newReceiptFiles.length > 0 || newNfeFiles.length > 0;
+
+      console.log('[EXTERNAL WITHDRAWAL EDIT] Submission data:', {
+        hasNewFiles,
+        receiptFilesCount: newReceiptFiles.length,
+        nfeFilesCount: newNfeFiles.length,
       });
+
+      const updateData = {
+        withdrawerName: withdrawerName?.trim() || "",
+        willReturn,
+        notes: notes?.trim() || null,
+      };
+
+      if (hasNewFiles) {
+        console.log('[EXTERNAL WITHDRAWAL EDIT] Creating FormData with files');
+        const formData = createWithdrawalFormData(
+          updateData,
+          {
+            receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
+            invoices: newNfeFiles.length > 0 ? newNfeFiles as File[] : undefined,
+          },
+          undefined // No customer context for external withdrawals
+        );
+
+        await updateAsync({
+          id: withdrawal.id,
+          data: formData as any,
+        });
+      } else {
+        console.log('[EXTERNAL WITHDRAWAL EDIT] Submitting without files');
+        await updateAsync({
+          id: withdrawal.id,
+          data: updateData,
+        });
+      }
 
       // Success notification is handled by API client
       navigate(routes.inventory.externalWithdrawals?.list || "/inventory/external-withdrawals");
@@ -310,7 +357,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
       console.error("Error updating external withdrawal:", error);
       // Error is handled by the mutation hook
     }
-  }, [validateCurrentStep, selectedItems, quantities, prices, withdrawerName, willReturn, notes, updateAsync, withdrawal.id, navigate]);
+  }, [validateCurrentStep, selectedItems, quantities, prices, withdrawerName, willReturn, notes, updateAsync, withdrawal.id, navigate, receiptFiles, nfeFiles]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === steps.length;
@@ -783,6 +830,57 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                           />
                           {notes && notes.length > 500 && <p className="text-sm text-destructive">Observações devem ter no máximo 500 caracteres</p>}
                           {notes && <p className="text-xs text-muted-foreground">{notes.length}/500 caracteres</p>}
+                        </div>
+
+                        {/* File uploads */}
+                        <div className="space-y-4">
+                          <Separator />
+                          <Label className="text-sm font-medium">Documentos (Opcional)</Label>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Receipt File */}
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <IconReceipt className="h-4 w-4" />
+                                Recibo
+                              </Label>
+                              <FileUploadField
+                                onFilesChange={handleReceiptFilesChange}
+                                existingFiles={receiptFiles}
+                                maxFiles={1}
+                                maxSize={10 * 1024 * 1024}
+                                acceptedFileTypes={{
+                                  "application/pdf": [".pdf"],
+                                  "image/*": [".jpg", ".jpeg", ".png"],
+                                }}
+                                showPreview={true}
+                                variant="compact"
+                                placeholder="Adicionar recibo"
+                              />
+                            </div>
+
+                            {/* NFE File */}
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <IconFileInvoice className="h-4 w-4" />
+                                Nota Fiscal
+                              </Label>
+                              <FileUploadField
+                                onFilesChange={handleNfeFilesChange}
+                                existingFiles={nfeFiles}
+                                maxFiles={1}
+                                maxSize={10 * 1024 * 1024}
+                                acceptedFileTypes={{
+                                  "application/pdf": [".pdf"],
+                                  "application/xml": [".xml"],
+                                  "image/*": [".jpg", ".jpeg", ".png"],
+                                }}
+                                showPreview={true}
+                                variant="compact"
+                                placeholder="Adicionar NF-e"
+                              />
+                            </div>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>

@@ -8,9 +8,12 @@ export { FileUploader } from "./file-uploader";
 export { FileUploadField } from "./file-upload-field";
 export { FileItem } from "./file-item";
 export { VideoPlayer } from "./video-player";
+export { PDFViewer } from "./pdf-viewer";
 export { FileList } from "./file-list";
 export { SearchDemo } from "./search-demo";
 export { FileViewerProvider, FileViewerContext, useFileViewer, useFileViewerStandalone, FileViewerButton } from "./file-viewer";
+export { FileViewerCard, detectFileType, getFileTypeIcon, generateThumbnailUrl, formatFileSize, getFileTypeLabel, canPreviewFile } from "./file-viewer-card";
+export { FileViewerCardDemo } from "./file-viewer-card-demo";
 
 export type { FilePreviewCardProps } from "./file-preview-card";
 export type { FilePreviewGridProps } from "./file-preview-grid";
@@ -23,3 +26,5 @@ export type { FileUploadFieldProps } from "./file-upload-field";
 export type { FileItemProps, FileViewMode } from "./file-item";
 export type { VideoPlayerProps } from "./video-player";
 export type { FileViewerProps, FileViewerState, FileViewerButtonProps } from "./file-viewer";
+export type { PDFViewerProps } from "./pdf-viewer";
+export type { FileViewerCardProps, FileType } from "./file-viewer-card";

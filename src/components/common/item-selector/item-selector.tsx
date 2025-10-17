@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { IconSearch, IconFilter, IconChevronUp, IconChevronDown, IconRefresh, IconSelector } from "@tabler/icons-react";
-import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../hooks";
+import { useItems } from "../../../hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,8 @@ import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-st
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { useDebounce } from "@/hooks/use-debounce";
+import { getItemCategories, getItemBrands, getSuppliers } from "../../../api-client";
+import type { ItemCategory, ItemBrand, Supplier } from "../../../types";
 
 // Type definitions for better type safety
 
@@ -220,36 +222,118 @@ export const ItemSelector = ({
     }
   }, [apiTotalRecords, onTotalRecordsChange, currentTotalRecords]);
 
-  // Get filter options - filter categories by item type if specified
-  const categoryFilters = useMemo(() => {
-    const filters: Record<string, any> = {
-      orderBy: { name: "asc" },
-      where: { status: "ACTIVE" },
-    };
-    if (itemTypeFilter) {
-      filters.where.type = itemTypeFilter;
-    }
-    return filters;
-  }, [itemTypeFilter]);
-
-  const { data: categoriesResponse } = useItemCategories(categoryFilters);
-  const { data: brandsResponse } = useItemBrands({
-    orderBy: { name: "asc" },
-    where: { status: "ACTIVE" },
-  });
-  const { data: suppliersResponse } = useSuppliers({
-    orderBy: { fantasyName: "asc" },
-    where: { status: "ACTIVE" },
-  });
-
-  const categories = categoriesResponse?.data || [];
-  const brands = brandsResponse?.data || [];
-  const suppliers = suppliersResponse?.data || [];
+  // No longer loading filter data via hooks - now using async comboboxes
 
   // Get current page item IDs for selection
   const currentPageItemIds = useMemo(() => {
     return items.map((item) => item.id);
   }, [items]);
+
+  // Create caches for filter comboboxes
+  const categoryCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+  const brandCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+  const supplierCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+
+  // Query function for categories filter
+  const queryCategoriesFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        where: { status: "ACTIVE" },
+      };
+
+      if (itemTypeFilter) {
+        queryParams.where.type = itemTypeFilter;
+      }
+
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.where.name = { contains: searchTerm.trim(), mode: "insensitive" };
+      }
+
+      const response = await getItemCategories(queryParams);
+      const categories = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = categories.map((category: ItemCategory) => {
+        const option = { label: category.name, value: category.id };
+        categoryCacheRef.current.set(category.id, option);
+        return option;
+      });
+
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      return { data: [], hasMore: false };
+    }
+  }, [itemTypeFilter]);
+
+  // Query function for brands filter
+  const queryBrandsFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        where: { status: "ACTIVE" },
+      };
+
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.where.name = { contains: searchTerm.trim(), mode: "insensitive" };
+      }
+
+      const response = await getItemBrands(queryParams);
+      const brands = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = brands.map((brand: ItemBrand) => {
+        const option = { label: brand.name, value: brand.id };
+        brandCacheRef.current.set(brand.id, option);
+        return option;
+      });
+
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching brands:", error);
+      return { data: [], hasMore: false };
+    }
+  }, []);
+
+  // Query function for suppliers filter
+  const querySuppliersFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { fantasyName: "asc" },
+        page: page,
+        take: 50,
+        where: { status: "ACTIVE" },
+      };
+
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.where.OR = [
+          { fantasyName: { contains: searchTerm.trim(), mode: "insensitive" } },
+          { corporateName: { contains: searchTerm.trim(), mode: "insensitive" } },
+        ];
+      }
+
+      const response = await getSuppliers(queryParams);
+      const suppliers = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = suppliers.map((supplier: Supplier) => {
+        const label = supplier.fantasyName || supplier.corporateName || "Sem nome";
+        const option = { label, value: supplier.id };
+        supplierCacheRef.current.set(supplier.id, option);
+        return option;
+      });
+
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+      return { data: [], hasMore: false };
+    }
+  }, []);
 
   // Debounced callback for parent updates
   const debouncedOnSearchTermChange = useMemo(() => {
@@ -401,15 +485,18 @@ export const ItemSelector = ({
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Categorias</Label>
                     <Combobox
+                      async={true}
+                      queryKey={["item-categories", "item-selector-filter", itemTypeFilter || "all"]}
+                      queryFn={queryCategoriesFn}
+                      initialOptions={[]}
                       mode="multiple"
                       placeholder="Todas as categorias"
-                      options={categories.map((cat) => ({
-                        value: cat.id,
-                        label: cat.name,
-                      }))}
                       value={categoryIds}
                       onValueChange={onCategoryIdsChange || (() => {})}
                       className="h-10"
+                      minSearchLength={0}
+                      pageSize={50}
+                      debounceMs={300}
                     />
                   </div>
 
@@ -417,15 +504,18 @@ export const ItemSelector = ({
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Marcas</Label>
                     <Combobox
+                      async={true}
+                      queryKey={["item-brands", "item-selector-filter"]}
+                      queryFn={queryBrandsFn}
+                      initialOptions={[]}
                       mode="multiple"
                       placeholder="Todas as marcas"
-                      options={brands.map((brand) => ({
-                        value: brand.id,
-                        label: brand.name,
-                      }))}
                       value={brandIds}
                       onValueChange={onBrandIdsChange || (() => {})}
                       className="h-10"
+                      minSearchLength={0}
+                      pageSize={50}
+                      debounceMs={300}
                     />
                   </div>
 
@@ -433,15 +523,18 @@ export const ItemSelector = ({
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Fornecedores</Label>
                     <Combobox
+                      async={true}
+                      queryKey={["suppliers", "item-selector-filter"]}
+                      queryFn={querySuppliersFn}
+                      initialOptions={[]}
                       mode="multiple"
                       placeholder="Todos os fornecedores"
-                      options={suppliers.map((supplier) => ({
-                        value: supplier.id,
-                        label: supplier.fantasyName || supplier.corporateName || "Sem nome",
-                      }))}
                       value={supplierIds}
                       onValueChange={onSupplierIdsChange || (() => {})}
                       className="h-10"
+                      minSearchLength={0}
+                      pageSize={50}
+                      debounceMs={300}
                     />
                   </div>
                 </div>

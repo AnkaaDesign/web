@@ -13,47 +13,49 @@
     },
     "cut": {
       "vinyl": "Plotter/{customerFantasyName}/Adesivos/",
-      "stencil": "Plotter/{customerFantasyName}/Estencis/",
+      "stencil": "Plotter/{customerFantasyName}/Espovo/",
       "default": "Plotter/{customerFantasyName}/Outros/"
     },
     "task": {
       "budget": "Orcamentos/Tarefas/{customerFantasyName}/",
       "receipt": "Comprovantes/Tarefas/{customerFantasyName}/",
-      "invoice": "NFs/Tarefas/{customerFantasyName}/",
-      "artwork_image": "Projetos/{customerFantasyName}/Images/",
+      "reimbursement": "Reembolsos/Tarefas/{customerFantasyName}/",
+      "invoice": "Notas Fiscais/Tarefas/{customerFantasyName}/",
+      "invoiceReimbursement": "Notas Fiscais Reembolso/Tarefas/{customerFantasyName}/",
+      "artwork_image": "Projetos/{customerFantasyName}/Imagens/",
       "artwork_pdf": "Projetos/{customerFantasyName}/Pdfs/",
       "artwork_other": "Projetos/{customerFantasyName}/Outros/"
     },
     "airbrushing": {
-      "budget": "Orcamentos/Aerografia/{customerFantasyName}/",
-      "receipt": "Comprovantes/Aerografia/{customerFantasyName}/",
-      "invoice": "NFs/Aerografia/{customerFantasyName}/",
-      "artwork": "Auxiliares/Aerografia/{customerFantasyName}/"
+      "budget": "Orcamentos/Aerografias/{customerFantasyName}/",
+      "receipt": "Comprovantes/Aerografias/{customerFantasyName}/",
+      "reimbursement": "Reembolsos/Aerografias/{customerFantasyName}/",
+      "invoice": "Notas Fiscais/Aerografias/{customerFantasyName}/",
+      "invoiceReimbursement": "Notas Fiscais Reembolso/Aerografias/{customerFantasyName}/",
+      "artwork_image": "Aerografias/{customerFantasyName}/Imagens/",
+      "artwork_pdf": "Aerografias/{customerFantasyName}/Pdfs/",
+      "artwork_other": "Aerografias/{customerFantasyName}/Outros/"
     },
     "order": {
-      "budget": "Orcamentos/Pedidos/{customerFantasyName}/",
-      "receipt": "Comprovantes/Pedidos/{customerFantasyName}/",
-      "invoice": "NFs/Pedidos/{customerFantasyName}/"
+      "budget": "Orcamentos/Pedidos/{supplierFantasyName}/",
+      "receipt": "Comprovantes/Pedidos/{supplierFantasyName}/",
+      "reimbursement": "Reembolsos/Pedidos/{supplierFantasyName}/",
+      "invoice": "Notas Fiscais/Pedidos/{supplierFantasyName}/",
+      "invoiceReimbursement": "Notas Fiscais Reembolso/Pedidos/{supplierFantasyName}/"
     },
     "withdrawal": {
-      "receipt": "Comprovantes/Retiradas/{customerFantasyName}/",
-      "invoice": "NFs/Retiradas/{customerFantasyName}/"
-    },
-    "entry": {
-      "invoice": "NFs/Fornecedores/{supplierFantasyName}/",
-      "document": "NFs/Fornecedores/{supplierFantasyName}/"
-    },
-    "exit": {
-      "invoice": "NFs/Clientes/{customerFantasyName}/",
-      "document": "NFs/Clientes/{customerFantasyName}/"
+      "budget": "Orcamentos/RetiradasExternas/{withdrawerName}/",
+      "receipt": "Comprovantes/RetiradasExternas/{withdrawerName}/",
+      "reimbursement": "Reembolsos/RetiradasExternas/{withdrawerName}/",
+      "invoice": "Notas Fiscais/RetiradasExternas/{withdrawerName}/",
+      "invoiceReimbursement": "Notas Fiscais Reembolso/RetiradasExternas/{withdrawerName}/"
     }
   },
   "specialDirectories": {
     "thumbnails": "Thumbnails/",
-    "temporary": "Temporario/",
-    "uploads": "Uploads/",
     "trash": "Lixeira/",
     "recycle": ".recycle/",
+    "auxiliares": "Auxiliares/",
     "drafts": "Rascunhos/",
     "photos": "Fotos/",
     "arts": "Artes/",
@@ -63,23 +65,30 @@
   "contextFieldMapping": {
     "customerFantasyName": ["customer.fantasyName", "customer.name", "customerId"],
     "supplierFantasyName": ["supplier.fantasyName", "supplier.name", "supplierId"],
-    "userName": ["user.name", "user.fullName", "userId"]
+    "userName": ["user.name", "user.fullName", "userId"],
+    "withdrawerName": ["withdrawer.name", "withdrawerName", "withdrawerId"]
   },
-  "fileTypeDetection": {
-    "patterns": {
-      "logo": ["logo", "logotipo"],
-      "budget": ["orcamento", "budget", "cotacao", "quote"],
-      "receipt": ["comprovante", "receipt", "recibo"],
-      "invoice": ["nf", "nota", "invoice", "nfe", "nfse", "fiscal"],
-      "artwork": ["arte", "artwork", "design", "projeto", "art"],
-      "cut": ["corte", "cut", "plotter", "eps", "cdr", "ai", "svg", "dxf"]
+  "fileTypeMapping": {
+    "fieldToFileType": {
+      "logo": "logo",
+      "budgets": "budget",
+      "orcamentos": "budget",
+      "invoices": "invoice",
+      "notasFiscais": "invoice",
+      "receipts": "receipt",
+      "comprovantes": "receipt",
+      "reimbursements": "reimbursement",
+      "reembolsos": "reimbursement",
+      "invoiceReimbursements": "invoiceReimbursement",
+      "notasFiscaisReembolso": "invoiceReimbursement",
+      "artworks": "artwork",
+      "artes": "artwork",
+      "cuts": "cut",
+      "plotter": "cut",
+      "attachments": "attachment",
+      "documents": "document"
     },
-    "extensions": {
-      "image": ["jpg", "jpeg", "png", "gif", "svg", "webp", "bmp"],
-      "pdf": ["pdf"],
-      "cut": ["eps", "ai", "cdr", "svg", "dxf"],
-      "document": ["doc", "docx", "xls", "xlsx", "txt", "csv"]
-    }
+    "description": "File type is determined by the field being uploaded to, not by filename patterns"
   },
   "nameSanitization": {
     "invalidChars": "[<>:\"/\\\\|?*\\x00-\\x1f]",
@@ -88,12 +97,13 @@
     "fallbackName": "Sem-Nome"
   },
   "implementationNotes": {
-    "1": "The backend should read the '_context' field from FormData to get entity metadata",
-    "2": "Each file field should have a corresponding '{fieldName}_metadata' field with file type info",
-    "3": "Directory paths should be created if they don't exist",
-    "4": "Variables in paths (e.g., {customerFantasyName}) should be replaced with actual values",
-    "5": "All directory and file names should be sanitized before use",
-    "6": "If context data is missing, use fallback directories or reject the upload",
-    "7": "Thumbnails should be generated in the Thumbnails directory with proper organization"
+    "1": "File type is determined by the field name being uploaded to (e.g., 'budgets' field = budget file type)",
+    "2": "The backend should read the '_context' field from FormData to get entity metadata (entityType, customerId, etc.)",
+    "3": "Each file field should have a corresponding '{fieldName}_fileType' field specifying the file type",
+    "4": "Directory paths should be created if they don't exist",
+    "5": "Variables in paths (e.g., {customerFantasyName}) should be replaced with actual values from context",
+    "6": "All directory and file names should be sanitized before use",
+    "7": "If context data is missing, use fallback directories or reject the upload",
+    "8": "Never rely on filename patterns to determine file type - always use field context"
   }
 }

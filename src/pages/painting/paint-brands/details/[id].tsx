@@ -155,22 +155,22 @@ export function PaintBrandDetailsPage() {
       {/* Content wrapper with proper height management */}
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-6">
-          {/* Top section with fixed height */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[560px]">
+          {/* Top section - Specifications and Related Paints */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left column - Specifications */}
-            <div className="lg:col-span-1 min-h-0">
+            <div className="lg:col-span-1">
               <PaintBrandSpecificationsCard paintBrand={paintBrand} />
             </div>
 
-            {/* Right column - Components */}
-            <div className="lg:col-span-2 min-h-0">
-              <PaintBrandComponentsCard paintBrand={paintBrand} />
+            {/* Right column - Related paints */}
+            <div className="lg:col-span-2">
+              <PaintBrandRelatedPaintsCard paintBrand={paintBrand} />
             </div>
           </div>
 
-          {/* Bottom section - Related paints */}
+          {/* Bottom section - Components (Full Width) */}
           <div>
-            <PaintBrandRelatedPaintsCard paintBrand={paintBrand} />
+            <PaintBrandComponentsCard paintBrand={paintBrand} />
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Combobox } from "@/components/ui/combobox";
 import { IconPlus, IconX, IconClipboardList, IconHome, IconTruck } from "@tabler/icons-react";
 import { TRUCK_MANUFACTURER, TRUCK_MANUFACTURER_LABELS } from "../../../../../constants";
-import { useTasks, useGarages } from "../../../../../hooks";
+import { getTasks, getGarages } from "../../../../../api-client";
 
 interface TruckEntitySelectorsProps {
   taskIds: string[];
@@ -37,31 +37,109 @@ export function TruckEntitySelectors({
   const [newPlate, setNewPlate] = useState("");
   const [newModel, setNewModel] = useState("");
 
-  // Load entity data
-  const { data: tasksData } = useTasks({
-    include: { customer: true },
-    orderBy: { createdAt: "desc" },
-    limit: 100,
-  });
+  // Create stable caches for fetched items
+  const taskCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+  const garageCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
 
-  const { data: garagesData } = useGarages({
-    orderBy: { name: "asc" },
-  });
+  // Async query function for tasks
+  const queryTasks = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { createdAt: "desc" },
+        page: page,
+        take: 50,
+        include: {
+          customer: true,
+        },
+      };
 
-  const tasks = tasksData?.data || [];
-  const garages = garagesData?.data || [];
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
 
-  // Transform tasks for combobox
-  const taskOptions = tasks.map((task) => ({
-    value: task.id,
-    label: `${task.plate || task.name || "Sem nome"} - ${task.customer?.fantasyName || task.customer?.corporateName || "Sem cliente"}`,
-  }));
+      const response = await getTasks(queryParams);
+      const tasks = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
 
-  // Transform garages for combobox
-  const garageOptions = garages.map((garage) => ({
-    value: garage.id,
-    label: garage.name,
-  }));
+      const options = tasks.map((task) => {
+        const plate = task.plate || task.name || "Sem nome";
+        const customer = task.customer?.fantasyName || task.customer?.corporateName || "Sem cliente";
+        const label = `${plate} - ${customer}`;
+
+        const option = {
+          label,
+          value: task.id,
+        };
+
+        taskCacheRef.current.set(task.id, option);
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
+
+  // Async query function for garages
+  const queryGarages = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+      };
+
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      const response = await getGarages(queryParams);
+      const garages = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = garages.map((garage) => {
+        const option = {
+          label: garage.name,
+          value: garage.id,
+        };
+
+        garageCacheRef.current.set(garage.id, option);
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching garages:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
+
+  // Get initial options from cache for selected items
+  const taskInitialOptions = useMemo(() => {
+    return taskIds
+      .map((id) => taskCacheRef.current.get(id))
+      .filter((option): option is { label: string; value: string } => option !== undefined);
+  }, [taskIds]);
+
+  const garageInitialOptions = useMemo(() => {
+    return garageIds
+      .map((id) => garageCacheRef.current.get(id))
+      .filter((option): option is { label: string; value: string } => option !== undefined);
+  }, [garageIds]);
 
   // Transform manufacturers for combobox
   const manufacturerOptions = Object.values(TRUCK_MANUFACTURER).map((manufacturer) => ({
@@ -100,19 +178,29 @@ export function TruckEntitySelectors({
           <div>
             <Label>Tarefas Selecionadas</Label>
             <Combobox
-              options={taskOptions}
-              selectedValues={taskIds}
-              onSelectionChange={onTaskIdsChange}
+              async={true}
+              queryKey={["tasks-selector"]}
+              queryFn={queryTasks}
+              initialOptions={taskInitialOptions}
+              value={taskIds}
+              onValueChange={onTaskIdsChange}
               placeholder="Selecione tarefas..."
               searchPlaceholder="Buscar tarefa..."
-              multiple
+              emptyText="Nenhuma tarefa encontrada"
+              mode="multiple"
+              searchable={true}
+              clearable={true}
+              pageSize={50}
+              minSearchLength={0}
+              debounceMs={300}
+              className="w-full"
             />
           </div>
           {taskIds.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {taskIds.map((taskId) => {
-                const task = tasks.find((t) => t.id === taskId);
-                const label = task ? `${task.plate || task.name || "Sem nome"}` : taskId;
+                const cachedTask = taskCacheRef.current.get(taskId);
+                const label = cachedTask ? cachedTask.label : taskId;
                 return (
                   <Badge key={taskId} variant="secondary" className="flex items-center gap-1">
                     {label}
@@ -140,19 +228,29 @@ export function TruckEntitySelectors({
           <div>
             <Label>Garagens Selecionadas</Label>
             <Combobox
-              options={garageOptions}
-              selectedValues={garageIds}
-              onSelectionChange={onGarageIdsChange}
+              async={true}
+              queryKey={["garages-selector"]}
+              queryFn={queryGarages}
+              initialOptions={garageInitialOptions}
+              value={garageIds}
+              onValueChange={onGarageIdsChange}
               placeholder="Selecione garagens..."
               searchPlaceholder="Buscar garagem..."
-              multiple
+              emptyText="Nenhuma garagem encontrada"
+              mode="multiple"
+              searchable={true}
+              clearable={true}
+              pageSize={50}
+              minSearchLength={0}
+              debounceMs={300}
+              className="w-full"
             />
           </div>
           {garageIds.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {garageIds.map((garageId) => {
-                const garage = garages.find((g) => g.id === garageId);
-                const label = garage ? garage.name : garageId;
+                const cachedGarage = garageCacheRef.current.get(garageId);
+                const label = cachedGarage ? cachedGarage.label : garageId;
                 return (
                   <Badge key={garageId} variant="secondary" className="flex items-center gap-1">
                     {label}
@@ -181,11 +279,15 @@ export function TruckEntitySelectors({
             <Label>Fabricantes Selecionados</Label>
             <Combobox
               options={manufacturerOptions}
-              selectedValues={manufacturers}
-              onSelectionChange={onManufacturersChange}
+              value={manufacturers}
+              onValueChange={onManufacturersChange}
               placeholder="Selecione fabricantes..."
               searchPlaceholder="Buscar fabricante..."
-              multiple
+              emptyText="Nenhum fabricante encontrado"
+              mode="multiple"
+              searchable={true}
+              clearable={true}
+              className="w-full"
             />
           </div>
           {manufacturers.length > 0 && (

@@ -11,6 +11,7 @@ import {
   COMMISSION_STATUS,
   COMMISSION_STATUS_LABELS,
   TASK_STATUS,
+  TASK_STATUS_LABELS,
   getBadgeVariant
 } from "../../../../constants";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -166,6 +167,26 @@ export const createTaskHistoryColumns = (): TaskColumn[] => [
     },
   },
   {
+    id: "status",
+    header: "STATUS",
+    accessorKey: "status",
+    sortable: true,
+    filterable: true,
+    defaultVisible: true,
+    width: "140px",
+    formatter: (value: string | null) => {
+      if (!value) return <span className="text-muted-foreground">-</span>;
+      const status = value as TASK_STATUS;
+      const variant = getBadgeVariant(status, "TASK");
+      const label = TASK_STATUS_LABELS[status] || status;
+      return (
+        <Badge variant={variant as any}>
+          {label}
+        </Badge>
+      );
+    },
+  },
+  {
     id: "serialNumber",
     header: "Nº SÉRIE",
     accessorKey: "serialNumber",
@@ -189,6 +210,19 @@ export const createTaskHistoryColumns = (): TaskColumn[] => [
     formatter: (value: string | null) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
       return <span className="font-mono uppercase truncate">{value}</span>;
+    },
+  },
+  {
+    id: "chassisNumber",
+    header: "Nº CHASSI",
+    accessorKey: "chassisNumber",
+    sortable: true,
+    filterable: true,
+    defaultVisible: false,
+    width: "140px",
+    formatter: (value: string | null) => {
+      if (!value) return <span className="text-muted-foreground">-</span>;
+      return <span className="font-mono truncate">{value}</span>;
     },
   },
   {

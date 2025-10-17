@@ -182,9 +182,9 @@ export const getApiBaseUrl = (): string => {
     return (globalThis.window as any).__ANKAA_API_URL__;
   }
 
-  // Check for process.env in Node/React environments
-  if (typeof process !== "undefined" && process.env?.VITE_API_URL) {
-    return process.env.VITE_API_URL;
+  // Check for import.meta.env (Vite build-time replacement)
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
   }
 
   // Default fallback

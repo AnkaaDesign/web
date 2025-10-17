@@ -1,12 +1,16 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { IconPackage, IconUser, IconCalendar, IconCalendarCheck, IconCurrencyReal, IconFileText, IconNotes, IconHash, IconArrowBack } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
+import { IconPackage, IconUser, IconCalendar, IconCalendarCheck, IconCurrencyReal, IconFileText, IconNotes, IconHash, IconArrowBack, IconFileInvoice, IconReceipt, IconLayoutGrid, IconList } from "@tabler/icons-react";
 import type { ExternalWithdrawal } from "../../../../types";
 import { EXTERNAL_WITHDRAWAL_STATUS } from "../../../../constants";
 import { formatDateTime } from "../../../../utils";
 import { ExternalWithdrawalStatusBadge } from "../common/external-withdrawal-status-badge";
 import { WillReturnBadge } from "../common/will-return-badge";
 import { cn } from "@/lib/utils";
+import { FileItem, type FileViewMode } from "@/components/file";
+import { useFileViewer } from "@/components/file/file-viewer";
 
 interface ExternalWithdrawalInfoCardProps {
   withdrawal: ExternalWithdrawal;
@@ -14,9 +18,31 @@ interface ExternalWithdrawalInfoCardProps {
 }
 
 export function ExternalWithdrawalInfoCard({ withdrawal, className }: ExternalWithdrawalInfoCardProps) {
+  const [viewMode, setViewMode] = useState<FileViewMode>("list");
+
+  // Try to get file viewer context (optional)
+  let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
+  try {
+    fileViewerContext = useFileViewer();
+  } catch {
+    // Context not available
+  }
+
   const isFullyReturned = withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED;
   const isCharged = withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.CHARGED;
   const isCancelled = withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.CANCELLED;
+
+  const handlePreview = (file: any) => {
+    if (fileViewerContext) {
+      fileViewerContext.actions.viewFile(file);
+    }
+  };
+
+  const handleDownload = (file: any) => {
+    if (fileViewerContext) {
+      fileViewerContext.actions.downloadFile(file);
+    }
+  };
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
@@ -148,25 +174,61 @@ export function ExternalWithdrawalInfoCard({ withdrawal, className }: ExternalWi
           {/* File Attachments Section */}
           {(withdrawal.nfe || withdrawal.receipt) && (
             <div className="pt-6 border-t border-border/50">
-              <h3 className="text-base font-semibold mb-4 text-foreground">Arquivos Anexos</h3>
-              <div className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-foreground">Documentos Anexados</h3>
+                <div className="flex gap-1">
+                  <Button
+                    variant={viewMode === "list" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setViewMode("list")}
+                    className="h-7 w-7 p-0"
+                  >
+                    <IconList className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "grid" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setViewMode("grid")}
+                    className="h-7 w-7 p-0"
+                  >
+                    <IconLayoutGrid className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-6">
                 {withdrawal.nfe && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconFileText className="h-4 w-4" />
-                      Nota Fiscal
-                    </span>
-                    <Badge variant="secondary">Anexado</Badge>
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
+                      <h4 className="text-sm font-semibold">Nota Fiscal</h4>
+                    </div>
+                    <div className={cn(viewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                      <FileItem
+                        file={withdrawal.nfe}
+                        viewMode={viewMode}
+                        onPreview={handlePreview}
+                        onDownload={handleDownload}
+                        showActions
+                      />
+                    </div>
                   </div>
                 )}
 
                 {withdrawal.receipt && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconFileText className="h-4 w-4" />
-                      Recibo
-                    </span>
-                    <Badge variant="secondary">Anexado</Badge>
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <IconReceipt className="h-4 w-4 text-muted-foreground" />
+                      <h4 className="text-sm font-semibold">Recibo</h4>
+                    </div>
+                    <div className={cn(viewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                      <FileItem
+                        file={withdrawal.receipt}
+                        viewMode={viewMode}
+                        onPreview={handlePreview}
+                        onDownload={handleDownload}
+                        showActions
+                      />
+                    </div>
                   </div>
                 )}
               </div>

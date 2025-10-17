@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { customerCreateSchema, customerUpdateSchema, type CustomerCreateFormData, type CustomerUpdateFormData } from "../../../../schemas";
 import { serializeCustomerFormToUrlParams, getDefaultCustomerFormValues, debounce } from "@/utils/url-form-state";
 import { createCustomerFormData } from "@/utils/form-data-helper";
+import { useCnpjLookup } from "@/hooks/use-cnpj-lookup";
+import { getEconomicActivities, createEconomicActivity } from "@/api-client/economic-activity";
 
 // Import all form components
 import { FantasyNameInput } from "./fantasy-name-input";
@@ -23,6 +25,9 @@ import { StateSelector } from "@/components/ui/form-state-selector";
 import { FormInput } from "@/components/ui/form-input";
 import { LogoInput } from "./logo-input";
 import { TagsInput } from "./tags-input";
+import { SituacaoCadastralSelect } from "./situacao-cadastral-select";
+import { LogradouroTypeSelect } from "./logradouro-type-select";
+import { EconomicActivitySelect } from "./economic-activity-select";
 
 interface BaseCustomerFormProps {
   isSubmitting?: boolean;
@@ -80,6 +85,7 @@ export function CustomerForm(props: CustomerFormProps) {
       phones: [],
       tags: [],
       logoId: null,
+      situacaoCadastral: null,
       ...defaultValues,
     };
   }, [mode, searchParams, defaultValues]);
@@ -93,6 +99,80 @@ export function CustomerForm(props: CustomerFormProps) {
     shouldFocusError: true, // Focus on first error field when validation fails
     criteriaMode: "firstError", // Stop at first error per field for better performance
   });
+
+  // CNPJ lookup hook
+  const { lookupCnpj } = useCnpjLookup({
+    onSuccess: async (data) => {
+      // Autofill fields with data from Brasil API
+      form.setValue("fantasyName", data.fantasyName, { shouldDirty: true, shouldValidate: true });
+      if (data.corporateName) {
+        form.setValue("corporateName", data.corporateName, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.email) {
+        form.setValue("email", data.email, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.zipCode) {
+        form.setValue("zipCode", data.zipCode, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.logradouroType) {
+        form.setValue("logradouro", data.logradouroType, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.address) {
+        form.setValue("address", data.address, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.addressNumber) {
+        form.setValue("addressNumber", data.addressNumber, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.addressComplement) {
+        form.setValue("addressComplement", data.addressComplement, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.neighborhood) {
+        form.setValue("neighborhood", data.neighborhood, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.city) {
+        form.setValue("city", data.city, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.state) {
+        form.setValue("state", data.state, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.phones && data.phones.length > 0) {
+        // Add all phones to the phones array, avoiding duplicates
+        const currentPhones = form.getValues("phones") || [];
+        const newPhones = data.phones.filter(phone => !currentPhones.includes(phone));
+        if (newPhones.length > 0) {
+          form.setValue("phones", [...currentPhones, ...newPhones], { shouldDirty: true, shouldValidate: true });
+        }
+      }
+      if (data.situacaoCadastral) {
+        form.setValue("situacaoCadastral", data.situacaoCadastral, { shouldDirty: true, shouldValidate: true });
+      }
+
+      // Handle economic activity (CNAE)
+      if (data.economicActivityCode && data.economicActivityDescription) {
+        try {
+          // Create or get existing activity (API is idempotent)
+          const response = await createEconomicActivity({
+            code: data.economicActivityCode,
+            description: data.economicActivityDescription,
+          });
+          form.setValue("economicActivityId", response.data.id, { shouldDirty: true, shouldValidate: true });
+        } catch (error) {
+          console.error("Error handling economic activity:", error);
+          // Don't fail the whole process if economic activity fails
+        }
+      }
+    },
+  });
+
+  // Watch CNPJ field and trigger lookup when complete
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      if (name === "cnpj" && value.cnpj) {
+        lookupCnpj(value.cnpj);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, lookupCnpj]);
 
   // Initialize form only once for update mode
   useEffect(() => {
@@ -256,12 +336,25 @@ export function CustomerForm(props: CustomerFormProps) {
                 <CorporateNameInput disabled={isSubmitting} />
               </div>
 
-              <FormDocumentInput<CustomerCreateFormData | CustomerUpdateFormData> cpfFieldName="cpf" cnpjFieldName="cnpj" disabled={isSubmitting} required />
+              <FormDocumentInput<CustomerCreateFormData | CustomerUpdateFormData> cpfFieldName="cpf" cnpjFieldName="cnpj" defaultDocumentType="cnpj" disabled={isSubmitting} required />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormInput<CustomerCreateFormData | CustomerUpdateFormData> name="email" type="email" label="E-mail" placeholder="cliente@exemplo.com" disabled={isSubmitting} />
                 <WebsiteInput disabled={isSubmitting} />
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <SituacaoCadastralSelect />
+                <FormInput<CustomerCreateFormData | CustomerUpdateFormData>
+                  name="inscricaoEstadual"
+                  type="inscricao-estadual"
+                  label="Inscrição Estadual"
+                  placeholder="Ex: 123.456.789.012"
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <EconomicActivitySelect />
             </CardContent>
           </Card>
 
@@ -294,6 +387,7 @@ export function CustomerForm(props: CustomerFormProps) {
               <CardDescription>Localização do cliente</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* First row: CEP, cidade, estado */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormInput<CustomerCreateFormData | CustomerUpdateFormData>
                   type="cep"
@@ -304,19 +398,29 @@ export function CustomerForm(props: CustomerFormProps) {
                   neighborhoodFieldName="neighborhood"
                   cityFieldName="city"
                   stateFieldName="state"
+                  logradouroFieldName="logradouro"
                 />
-                <AddressInput disabled={isSubmitting} useGooglePlaces={!!import.meta.env.VITE_GOOGLE_MAPS_API_KEY} required={false} />
-                <AddressNumberInput disabled={isSubmitting} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <AddressComplementInput disabled={isSubmitting} />
-                <NeighborhoodInput disabled={isSubmitting} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <CityInput disabled={isSubmitting} required={false} />
                 <StateSelector disabled={isSubmitting} />
+              </div>
+
+              {/* Second row: logradouro type (2/6), address (3/6), number (1/6) */}
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
+                <div className="md:col-span-2">
+                  <LogradouroTypeSelect />
+                </div>
+                <div className="md:col-span-3">
+                  <AddressInput disabled={isSubmitting} useGooglePlaces={!!import.meta.env.VITE_GOOGLE_MAPS_API_KEY} required={false} />
+                </div>
+                <div className="md:col-span-1">
+                  <AddressNumberInput disabled={isSubmitting} />
+                </div>
+              </div>
+
+              {/* Third row: bairro, complemento */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <NeighborhoodInput disabled={isSubmitting} />
+                <AddressComplementInput disabled={isSubmitting} />
               </div>
             </CardContent>
           </Card>

@@ -363,10 +363,9 @@ export function ServiceOrderList({ className }: ServiceOrderListProps) {
               variant={hasActiveFilterCount ? "default" : "outline"}
               size="default"
               onClick={() => setShowFilterModal(true)}
-              className="group"
             >
-              <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">
+              <IconFilter className="h-4 w-4" />
+              <span>
                 Filtros
                 {hasActiveFilterCount ? ` (${totalFilterCount})` : ""}
               </span>

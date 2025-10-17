@@ -22,7 +22,7 @@ export function FormDocumentInput<T extends Record<string, any>>({
   disabled = false,
   required = false,
   className,
-  defaultDocumentType = "cpf",
+  defaultDocumentType = "cnpj",
 }: FormDocumentInputProps<T>) {
   const form = useFormContext<T>();
   const [documentType, setDocumentType] = useState<"cpf" | "cnpj">(defaultDocumentType);
@@ -45,9 +45,11 @@ export function FormDocumentInput<T extends Record<string, any>>({
 
     // Clear the other field when switching document types
     if (newType === "cpf") {
-      form.setValue(cnpjFieldName, null as any);
+      form.setValue(cnpjFieldName, null as any, { shouldValidate: true });
+      form.clearErrors(cnpjFieldName);
     } else {
-      form.setValue(cpfFieldName, null as any);
+      form.setValue(cpfFieldName, null as any, { shouldValidate: true });
+      form.clearErrors(cpfFieldName);
     }
   };
 

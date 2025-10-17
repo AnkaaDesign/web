@@ -1,8 +1,10 @@
-import { useItemBrands, useItemCategories, useSuppliers } from "../../../../../hooks";
+import { useCallback, useMemo, useRef } from "react";
 import { ITEM_CATEGORY_TYPE } from "../../../../../constants";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { IconCategory, IconBrandAsana, IconTruck } from "@tabler/icons-react";
+import { getItemCategories, getItemBrands, getSuppliers } from "../../../../../api-client";
+import type { ItemCategory, ItemBrand, Supplier } from "../../../../../types";
 
 interface EntitySelectorsProps {
   categoryIds?: string[];
@@ -11,47 +13,175 @@ interface EntitySelectorsProps {
   onBrandIdsChange: (ids: string[]) => void;
   supplierIds?: string[];
   onSupplierIdsChange: (ids: string[]) => void;
+  initialCategories?: ItemCategory[];
+  initialBrands?: ItemBrand[];
+  initialSuppliers?: Supplier[];
 }
 
-export function EntitySelectors({ categoryIds = [], onCategoryIdsChange, brandIds = [], onBrandIdsChange, supplierIds = [], onSupplierIdsChange }: EntitySelectorsProps) {
-  // Load entity data
-  const { data: categories, isLoading: loadingCategories } = useItemCategories({
-    orderBy: { name: "asc" },
-  });
-  const { data: brands, isLoading: loadingBrands } = useItemBrands({
-    orderBy: { name: "asc" },
-  });
-  const { data: suppliers, isLoading: loadingSuppliers } = useSuppliers({
-    orderBy: { fantasyName: "asc" },
-  });
+export function EntitySelectors({
+  categoryIds = [],
+  onCategoryIdsChange,
+  brandIds = [],
+  onBrandIdsChange,
+  supplierIds = [],
+  onSupplierIdsChange,
+  initialCategories = [],
+  initialBrands = [],
+  initialSuppliers = []
+}: EntitySelectorsProps) {
+  // Create caches for fetched items
+  const categoryCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+  const brandCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+  const supplierCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
 
-  // Transform data for combobox
-  const categoryOptions = [
-    // Add "Sem categoria" option first
-    { value: "null", label: "Sem categoria" },
-    ...(categories?.data?.map((category) => ({
-      value: category.id,
-      label: `${category.name}${(category as any).type === ITEM_CATEGORY_TYPE.PPE ? " (EPI)" : ""}`,
-    })) || []),
-  ];
+  // Memoize initial options for categories
+  const initialCategoryOptions = useMemo(() => {
+    const options = initialCategories.map((category) => {
+      const label = `${category.name}${category.type === ITEM_CATEGORY_TYPE.PPE ? " (EPI)" : ""}`;
+      const option = { label, value: category.id };
+      categoryCacheRef.current.set(category.id, option);
+      return option;
+    });
+    // Add "Sem categoria" option
+    return [{ value: "null", label: "Sem categoria" }, ...options];
+  }, [initialCategories]);
 
-  const brandOptions = [
-    // Add "Sem marca" option first
-    { value: "null", label: "Sem marca" },
-    ...(brands?.data?.map((brand) => ({
-      value: brand.id,
-      label: brand.name,
-    })) || []),
-  ];
+  // Memoize initial options for brands
+  const initialBrandOptions = useMemo(() => {
+    const options = initialBrands.map((brand) => {
+      const option = { label: brand.name, value: brand.id };
+      brandCacheRef.current.set(brand.id, option);
+      return option;
+    });
+    // Add "Sem marca" option
+    return [{ value: "null", label: "Sem marca" }, ...options];
+  }, [initialBrands]);
 
-  const supplierOptions = [
-    // Add "Sem fornecedor" option first
-    { value: "null", label: "Sem fornecedor" },
-    ...(suppliers?.data?.map((supplier) => ({
-      value: supplier.id,
-      label: supplier.fantasyName,
-    })) || []),
-  ];
+  // Memoize initial options for suppliers
+  const initialSupplierOptions = useMemo(() => {
+    const options = initialSuppliers.map((supplier) => {
+      const option = { label: supplier.fantasyName, value: supplier.id };
+      supplierCacheRef.current.set(supplier.id, option);
+      return option;
+    });
+    // Add "Sem fornecedor" option
+    return [{ value: "null", label: "Sem fornecedor" }, ...options];
+  }, [initialSuppliers]);
+
+  // Query function for categories
+  const queryCategoriesFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+      };
+
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.where = {
+          name: { contains: searchTerm.trim(), mode: "insensitive" },
+        };
+      }
+
+      const response = await getItemCategories(queryParams);
+      const categories = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = categories.map((category) => {
+        const label = `${category.name}${category.type === ITEM_CATEGORY_TYPE.PPE ? " (EPI)" : ""}`;
+        const option = { label, value: category.id };
+        categoryCacheRef.current.set(category.id, option);
+        return option;
+      });
+
+      // Add "Sem categoria" option to first page
+      if (page === 1) {
+        options.unshift({ value: "null", label: "Sem categoria" });
+      }
+
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      return { data: [], hasMore: false };
+    }
+  }, []);
+
+  // Query function for brands
+  const queryBrandsFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+      };
+
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.where = {
+          name: { contains: searchTerm.trim(), mode: "insensitive" },
+        };
+      }
+
+      const response = await getItemBrands(queryParams);
+      const brands = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = brands.map((brand) => {
+        const option = { label: brand.name, value: brand.id };
+        brandCacheRef.current.set(brand.id, option);
+        return option;
+      });
+
+      // Add "Sem marca" option to first page
+      if (page === 1) {
+        options.unshift({ value: "null", label: "Sem marca" });
+      }
+
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching brands:", error);
+      return { data: [], hasMore: false };
+    }
+  }, []);
+
+  // Query function for suppliers
+  const querySuppliersFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { fantasyName: "asc" },
+        page: page,
+        take: 50,
+      };
+
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.where = {
+          OR: [
+            { fantasyName: { contains: searchTerm.trim(), mode: "insensitive" } },
+            { corporateName: { contains: searchTerm.trim(), mode: "insensitive" } },
+          ],
+        };
+      }
+
+      const response = await getSuppliers(queryParams);
+      const suppliers = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = suppliers.map((supplier) => {
+        const option = { label: supplier.fantasyName, value: supplier.id };
+        supplierCacheRef.current.set(supplier.id, option);
+        return option;
+      });
+
+      // Add "Sem fornecedor" option to first page
+      if (page === 1) {
+        options.unshift({ value: "null", label: "Sem fornecedor" });
+      }
+
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+      return { data: [], hasMore: false };
+    }
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -62,14 +192,19 @@ export function EntitySelectors({ categoryIds = [], onCategoryIdsChange, brandId
           Categorias
         </Label>
         <Combobox
-          options={categoryOptions}
+          async={true}
+          queryKey={["item-categories", "filter"]}
+          queryFn={queryCategoriesFn}
+          initialOptions={initialCategoryOptions}
           value={categoryIds}
           onValueChange={onCategoryIdsChange}
           placeholder="Selecione categorias..."
           emptyText="Nenhuma categoria encontrada"
           searchPlaceholder="Buscar categorias..."
           mode="multiple"
-          disabled={loadingCategories}
+          minSearchLength={0}
+          pageSize={50}
+          debounceMs={300}
         />
         {categoryIds.length > 0 && (
           <div className="text-xs text-muted-foreground">
@@ -85,14 +220,19 @@ export function EntitySelectors({ categoryIds = [], onCategoryIdsChange, brandId
           Marcas
         </Label>
         <Combobox
-          options={brandOptions}
+          async={true}
+          queryKey={["item-brands", "filter"]}
+          queryFn={queryBrandsFn}
+          initialOptions={initialBrandOptions}
           value={brandIds}
           onValueChange={onBrandIdsChange}
           placeholder="Selecione marcas..."
           emptyText="Nenhuma marca encontrada"
           searchPlaceholder="Buscar marcas..."
           mode="multiple"
-          disabled={loadingBrands}
+          minSearchLength={0}
+          pageSize={50}
+          debounceMs={300}
         />
         {brandIds.length > 0 && (
           <div className="text-xs text-muted-foreground">
@@ -108,14 +248,19 @@ export function EntitySelectors({ categoryIds = [], onCategoryIdsChange, brandId
           Fornecedores
         </Label>
         <Combobox
-          options={supplierOptions}
+          async={true}
+          queryKey={["suppliers", "filter"]}
+          queryFn={querySuppliersFn}
+          initialOptions={initialSupplierOptions}
           value={supplierIds}
           onValueChange={onSupplierIdsChange}
           placeholder="Selecione fornecedores..."
           emptyText="Nenhum fornecedor encontrado"
           searchPlaceholder="Buscar fornecedores..."
           mode="multiple"
-          disabled={loadingSuppliers}
+          minSearchLength={0}
+          pageSize={50}
+          debounceMs={300}
         />
         {supplierIds.length > 0 && (
           <div className="text-xs text-muted-foreground">

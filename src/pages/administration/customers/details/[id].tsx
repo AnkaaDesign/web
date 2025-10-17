@@ -7,7 +7,7 @@ import { useCustomer, useCustomerMutations } from "../../../../hooks";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { BasicInfoCard, ContactDetailsCard, AddressInfoCard, RelatedInvoicesCard, CustomerTasksTable } from "@/components/administration/customer/detail";
+import { BasicInfoCard, ContactDetailsCard, AddressInfoCard, RelatedInvoicesCard, CustomerTasksList, DocumentsCard } from "@/components/administration/customer/detail";
 import { CustomerDetailSkeleton } from "@/components/administration/customer/detail/customer-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
@@ -138,48 +138,20 @@ export const CustomerDetailsPage = () => {
               <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.CUSTOMER} entityId={id} maxHeight="400px" />
             </div>
 
-            {/* Customer Tasks Table - Full Width */}
-            <Card className="shadow-sm border border-border" level={1}>
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-3 text-xl">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <IconChecklist className="h-5 w-5 text-primary" />
-                    </div>
-                    Tarefas do Cliente
-                  </CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate(`${routes.production.schedule.list}?customerId=${customer.id}&customerName=${encodeURIComponent(customer.fantasyName || "")}`)}
-                  >
-                    Ver todas as tarefas
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <CustomerTasksTable
-                  visibleColumns={new Set([
-                    "name",
-                    "customer.fantasyName",
-                    "generalPainting",
-                    "sector.name",
-                    "serialNumber",
-                    "finishedAt",
-                  ])}
-                  filters={{
-                    where: {
-                      customerId: customer.id,
-                    },
-                  }}
-                  navigationRoute="schedule"
-                  className="h-[600px]"
-                />
-              </CardContent>
-            </Card>
+            {/* Documents and Empty Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <DocumentsCard customer={customer} />
+            </div>
 
             {/* Related Invoices */}
             <RelatedInvoicesCard customer={customer} />
+
+            {/* Customer Tasks - Full Width at Bottom */}
+            <CustomerTasksList
+              customerId={customer.id}
+              customerName={customer.fantasyName}
+              navigationRoute="schedule"
+            />
           </div>
         </div>
 

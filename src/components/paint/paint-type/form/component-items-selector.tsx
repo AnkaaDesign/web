@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useRef } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import type { PaintTypeCreateFormData, PaintTypeUpdateFormData } from "../../../../schemas";
@@ -12,9 +12,12 @@ interface ComponentItemsSelectorProps {
 }
 
 export function ComponentItemsSelector({ control, disabled, initialItems }: ComponentItemsSelectorProps) {
+  // Create a stable cache for fetched items
+  const cacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+
   // Create stable dependency for initialItems array
-  const initialItemsKey = useMemo(
-    () => initialItems?.map(i => i.id).sort().join(',') || '',
+  const initialItemIds = useMemo(
+    () => (initialItems || []).map(i => i.id).sort().join(','),
     [initialItems]
   );
 
@@ -28,63 +31,68 @@ export function ComponentItemsSelector({ control, disabled, initialItems }: Comp
       const brand = item.brand?.name || "";
       const label = `${unicode} - ${name} - ${brand}`.replace(/^\s*-\s*/, "").replace(/\s*-\s*$/, "");
 
-      return {
-        label,
-        value: item.id,
-      };
+      const option = { label, value: item.id };
+      // Add to cache
+      cacheRef.current.set(item.id, option);
+      return option;
     });
-  }, [initialItemsKey]);
+  }, [initialItemIds, initialItems]);
 
-  // Async query function for the combobox
+  // Async query function for the combobox - memoized with useCallback
   const queryItems = useCallback(async (searchTerm: string, page = 1) => {
-      try {
-        // Build query parameters - same structure as paint selector
-        const queryParams: any = {
-          orderBy: { name: "asc" },
-          page: page,
-          take: 50,
-          include: {
-            measures: true,
-            category: true,
-            brand: true,
-          },
-        };
+    try {
+      // Build query parameters - same structure as paint selector
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        include: {
+          measures: true,
+          category: true,
+          brand: true,
+        },
+      };
 
-        // Only add searchingFor if there's a search term
-        if (searchTerm && searchTerm.trim()) {
-          queryParams.searchingFor = searchTerm.trim();
-        }
-
-        const response = await getItems(queryParams);
-        const items = response.data || [];
-        const hasMore = response.meta?.hasNextPage || false;
-
-        // Convert items to options format - NO client-side filtering
-        const options = items.map((item) => {
-          // Format: unicode - name - brand
-          const unicode = item.uniCode || "";
-          const name = item.name || "";
-          const brand = item.brand?.name || "";
-          const label = `${unicode} - ${name} - ${brand}`.replace(/^\s*-\s*/, "").replace(/\s*-\s*$/, "");
-
-          return {
-            label,
-            value: item.id,
-          };
-        });
-
-        return {
-          data: options,
-          hasMore: hasMore,
-        };
-      } catch (error) {
-        console.error("Error fetching items:", error);
-        return {
-          data: [],
-          hasMore: false,
-        };
+      // Only add searchingFor if there's a search term
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
       }
-    }, []);
+
+      const response = await getItems(queryParams);
+      const items = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      // Convert items to options format and add to cache
+      const options = items.map((item) => {
+        // Format: unicode - name - brand
+        const unicode = item.uniCode || "";
+        const name = item.name || "";
+        const brand = item.brand?.name || "";
+        const label = `${unicode} - ${name} - ${brand}`.replace(/^\s*-\s*/, "").replace(/\s*-\s*$/, "");
+
+        const option = {
+          label,
+          value: item.id,
+        };
+
+        // Add to cache
+        cacheRef.current.set(item.id, option);
+
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching items:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
 
   return (
     <FormField

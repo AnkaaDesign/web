@@ -76,7 +76,9 @@ type BadgeVariant =
   | "completed"
   | "cancelled"
   | "onHold"
-  | "inProgress";
+  | "inProgress"
+  | "invoiced"
+  | "settled";
 
 /**
  * Badge Color Definitions
@@ -188,6 +190,18 @@ export const BADGE_COLORS: Record<
     text: "text-white",
     hover: "hover:bg-gray-600",
   },
+
+  // Financial variants (Purple/Indigo tones - financial states)
+  invoiced: {
+    bg: "bg-purple-700",
+    text: "text-white",
+    hover: "hover:bg-purple-800",
+  },
+  settled: {
+    bg: "bg-indigo-700",
+    text: "text-white",
+    hover: "hover:bg-indigo-800",
+  },
 };
 
 /**
@@ -212,6 +226,8 @@ export const ENTITY_BADGE_CONFIG = {
     [TASK_STATUS.IN_PRODUCTION]: "inProgress" as BadgeVariant,
     [TASK_STATUS.ON_HOLD]: "onHold" as BadgeVariant,
     [TASK_STATUS.COMPLETED]: "completed" as BadgeVariant,
+    [TASK_STATUS.INVOICED]: "invoiced" as BadgeVariant,
+    [TASK_STATUS.SETTLED]: "settled" as BadgeVariant,
     [TASK_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
 

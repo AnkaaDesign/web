@@ -34,6 +34,7 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
     },
   },
   { id: "serialNumberOrPlate", label: "Nº Série/Placa", getValue: (task: Task) => task.serialNumber || task.plate || "" },
+  { id: "chassisNumber", label: "Nº Chassi", getValue: (task: Task) => task.chassisNumber || "" },
   { id: "sector.name", label: "Setor", getValue: (task: Task) => task.sector?.name || "" },
   { id: "entryDate", label: "Entrada", getValue: (task: Task) => (task.entryDate ? formatDate(task.entryDate) : "") },
   { id: "startedAt", label: "Iniciado Em", getValue: (task: Task) => (task.startedAt ? formatDate(task.startedAt) : "") },
@@ -64,7 +65,6 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
     },
   },
   { id: "status", label: "Status", getValue: (task: Task) => TASK_STATUS_LABELS[task.status as keyof typeof TASK_STATUS_LABELS] || task.status },
-  { id: "price", label: "Preço", getValue: (task: Task) => (task.price ? formatCurrency(task.price) : "") },
   { id: "details", label: "Detalhes", getValue: (task: Task) => task.details || "" },
   { id: "createdBy.name", label: "Criado Por", getValue: (task: Task) => task.createdBy?.name || "" },
   { id: "createdAt", label: "Criado em", getValue: (task: Task) => formatDate(new Date(task.createdAt)) },
@@ -339,6 +339,9 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
                 case "serialNumberOrPlate":
                   width = "120px";
                   break;
+                case "chassisNumber":
+                  width = "140px";
+                  break;
                 case "sector.name":
                   width = "100px";
                   break;
@@ -353,9 +356,6 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
                   break;
                 case "status":
                   width = "80px";
-                  break;
-                case "price":
-                  width = "90px";
                   break;
                 case "details":
                   width = columnCount <= 6 ? "200px" : "150px";
@@ -454,7 +454,7 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
                   .map((col) => {
                     // Get column alignment
                     let alignment = "text-left";
-                    if (["price", "remainingTime"].includes(col.id)) {
+                    if (["remainingTime"].includes(col.id)) {
                       alignment = "text-right";
                     } else if (["status"].includes(col.id)) {
                       alignment = "text-center";
@@ -488,6 +488,9 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
                           case "serialNumberOrPlate":
                             className = "font-mono text-left";
                             break;
+                          case "chassisNumber":
+                            className = "font-mono text-left";
+                            break;
                           case "sector.name":
                             className = "text-left";
                             break;
@@ -510,9 +513,6 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
                             else if (task.status === TASK_STATUS.IN_PRODUCTION) className += " status-production";
                             else if (task.status === TASK_STATUS.COMPLETED) className += " status-completed";
                             else if (task.status === TASK_STATUS.CANCELLED) className += " status-cancelled";
-                            break;
-                          case "price":
-                            className = "text-right font-medium";
                             break;
                           case "details":
                             className = "text-left text-muted";

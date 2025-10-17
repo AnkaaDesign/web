@@ -65,17 +65,6 @@ export function CustomerTasksTable({
     removeFromSelection,
   } = tableState;
 
-  // Log table state
-  React.useEffect(() => {
-    console.log("[CustomerTasksTable] Table state updated:", {
-      page,
-      pageSize,
-      selectedIds: selectedIds.length,
-      sortConfigs,
-      showSelectedOnly,
-      currentURL: window.location.search
-    });
-  }, [page, pageSize, selectedIds, sortConfigs, showSelectedOnly]);
 
   // Memoize include configuration to prevent re-renders
   const includeConfig = React.useMemo(
@@ -103,23 +92,14 @@ export function CustomerTasksTable({
 
   // Build query parameters
   const queryParams = React.useMemo(() => {
-    console.log("[CustomerTasksTable] Building query params:", {
-      filters,
-      page,
-      pageSize,
-      showSelectedOnly,
-      selectedIdsCount: selectedIds.length,
-      sortConfigs
-    });
-
     // Determine status to use
     const statusToUse = (!filters.status || (Array.isArray(filters.status) && filters.status.length === 0))
       ? [TASK_STATUS.COMPLETED]
       : filters.status;
 
     const params = {
-      // When showSelectedOnly is true, don't apply filters
-      ...(showSelectedOnly ? {} : { ...filters, status: statusToUse }),
+      // When showSelectedOnly is true, don't apply filters (except searchingFor which should always apply)
+      ...(showSelectedOnly ? { searchingFor: filters.searchingFor } : { ...filters, status: statusToUse }),
       page: page + 1, // Convert 0-based to 1-based for API
       limit: pageSize,
       include: includeConfig,
@@ -136,16 +116,6 @@ export function CustomerTasksTable({
         }),
     };
 
-    console.log("[CustomerTasksTable] Query params built:", {
-      page: params.page,
-      limit: params.limit,
-      status: params.status,
-      hasOrderBy: !!params.orderBy,
-      hasWhere: !!params.where,
-      hasFinishedDateRange: !!params.finishedDateRange,
-      finishedDateRange: params.finishedDateRange,
-      allParamKeys: Object.keys(params),
-    });
 
     return params;
   }, [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds]);
@@ -157,21 +127,6 @@ export function CustomerTasksTable({
   const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;
   const totalRecords = response?.meta?.totalRecords || 0;
 
-  // Log response data
-  React.useEffect(() => {
-    console.log("[CustomerTasksTable] Data response:", {
-      isLoading,
-      error: error?.message,
-      tasksCount: tasks.length,
-      totalRecords,
-      totalPages,
-      currentPage: page,
-      metaPage: response?.meta?.page,
-      hasNextPage: response?.meta?.hasNextPage,
-      firstTaskName: tasks[0]?.name,
-      lastTaskName: tasks[tasks.length - 1]?.name
-    });
-  }, [isLoading, error, tasks, totalRecords, totalPages, page, response]);
 
 
   // Define all available columns
@@ -274,9 +229,9 @@ export function CustomerTasksTable({
   }
 
   return (
-    <div className={cn("rounded-lg flex flex-col overflow-hidden", className)}>
-      {/* Fixed Header Table */}
-      <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden">
+    <div className={cn("rounded-lg flex flex-col min-h-[400px] max-h-[800px]", className)}>
+      {/* Fixed Header Table - Remove overflow-hidden to prevent header cutoff */}
+      <div className="border-l border-r border-t border-border rounded-t-lg flex-shrink-0">
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">

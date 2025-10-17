@@ -17,7 +17,6 @@ import { SortSelector, type SortOption } from "./sort-selector";
 import { FilterIndicators } from "@/components/ui/filter-indicator";
 import { extractActiveFilters, createFilterRemover } from "./filter-utils";
 import { cn } from "@/lib/utils";
-import { getColorSortValue } from "./color-utils";
 import { ContextMenuProvider } from "@/components/ui/context-menu";
 import { useTableFilters } from "@/hooks/use-table-filters";
 import { PaintSelectionProvider, usePaintSelection } from "./paint-selection-context";
@@ -98,8 +97,17 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
 
   // View state
   const [isMinimized, setIsMinimized] = useState(() => {
+    // Check URL params first, then localStorage
     const view = searchParams.get("view");
-    return view !== "maximized";
+    if (view) {
+      return view !== "maximized";
+    }
+    const savedView = localStorage.getItem("paintCatalogueView");
+    return savedView !== "maximized";
+  });
+  const [hasManualViewPreference, setHasManualViewPreference] = useState(() => {
+    // Check if there's a saved preference in localStorage
+    return localStorage.getItem("paintCatalogueView") !== null;
   });
 
   // Effects state
@@ -111,6 +119,7 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
   // Color order state
   const [hasOrderChanges, setHasOrderChanges] = useState(false);
   const [reorderedPaints, setReorderedPaints] = useState<Paint[]>([]);
+  const [gridResetKey, setGridResetKey] = useState(0);
 
   // Ref for scrolling
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -170,6 +179,17 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
       filters.hasFormulas = hasFormulas === "true";
     }
 
+    // Parse color similarity filters
+    const similarColor = params.get("similarColor");
+    if (similarColor && similarColor.trim() !== "" && similarColor !== "#000000") {
+      filters.similarColor = similarColor;
+    }
+
+    const similarColorThreshold = params.get("similarColorThreshold");
+    if (similarColorThreshold && !isNaN(Number(similarColorThreshold))) {
+      filters.similarColorThreshold = Number(similarColorThreshold);
+    }
+
     // Parse date range filters
     const createdAfter = params.get("createdAfter");
     const createdBefore = params.get("createdBefore");
@@ -195,6 +215,14 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
     if (filters.paintTypeIds?.length) params.paintTypeIds = filters.paintTypeIds.join(",");
     if (filters.tags?.length) params.tags = filters.tags.join(",");
     if (typeof filters.hasFormulas === "boolean") params.hasFormulas = String(filters.hasFormulas);
+
+    // Color similarity filters
+    if (filters.similarColor && filters.similarColor.trim() !== "" && filters.similarColor !== "#000000") {
+      params.similarColor = filters.similarColor;
+    }
+    if (typeof filters.similarColorThreshold === "number") {
+      params.similarColorThreshold = String(filters.similarColorThreshold);
+    }
 
     // Date filters
     if (filters.createdAt?.gte) params.createdAfter = filters.createdAt.gte.toISOString();
@@ -326,36 +354,10 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
   const sortedPaints = useMemo(() => {
     if (!paintsData?.data) return [];
 
-    // If color sort is selected, check if we should use manual order or algorithm
+    // If color sort is selected, use colorOrder (all paints have it now)
     if (currentSort === "color") {
-      // Check if any paint has a colorOrder value
-      const hasColorOrder = paintsData.data.some(paint => paint.colorOrder !== null);
-
-      if (hasColorOrder) {
-        // Use manual colorOrder if available, falling back to algorithm for paints without it
-        const sorted = [...paintsData.data].sort((a, b) => {
-          // If both have colorOrder, use that
-          if (a.colorOrder !== null && b.colorOrder !== null) {
-            return a.colorOrder - b.colorOrder;
-          }
-          // If only one has colorOrder, it comes first
-          if (a.colorOrder !== null) return -1;
-          if (b.colorOrder !== null) return 1;
-          // If neither has colorOrder, use algorithm
-          const aValue = getColorSortValue(a);
-          const bValue = getColorSortValue(b);
-          return aValue - bValue;
-        });
-        return sorted;
-      } else {
-        // Use algorithm if no colorOrder values exist
-        const sorted = [...paintsData.data].sort((a, b) => {
-          const aValue = getColorSortValue(a);
-          const bValue = getColorSortValue(b);
-          return aValue - bValue;
-        });
-        return sorted;
-      }
+      const sorted = [...paintsData.data].sort((a, b) => a.colorOrder - b.colorOrder);
+      return sorted;
     }
 
     // For other sorts, the API already sorted them
@@ -403,10 +405,11 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
     [selectedPaintIds, mergePaints, clearSelection],
   );
 
-  // Automatically switch to maximized view if less than 8 results
+  // Automatically switch to maximized view if less than 8 results (only if user hasn't manually set preference)
   useEffect(() => {
-    if (sortedPaints.length > 0 && sortedPaints.length < 8 && isMinimized) {
+    if (!hasManualViewPreference && sortedPaints.length > 0 && sortedPaints.length < 8 && isMinimized) {
       setIsMinimized(false);
+      localStorage.setItem("paintCatalogueView", "maximized");
       setSearchParams(
         (prev) => {
           const params = new URLSearchParams(prev);
@@ -416,7 +419,7 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
         { replace: true },
       );
     }
-  }, [sortedPaints.length, isMinimized, setSearchParams]);
+  }, [sortedPaints.length, isMinimized, setSearchParams, hasManualViewPreference]);
 
   // Handle filter changes
   const handleFilterChange = useCallback(
@@ -468,6 +471,7 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
     if (filters.manufacturers?.length) count++;
     if (filters.palettes?.length) count++;
     if (filters.hasFormulas !== undefined) count++;
+    if (filters.similarColor && filters.similarColor.trim() !== "" && filters.similarColor !== "#000000") count++;
     return count > 0;
   }, [filters]);
 
@@ -479,6 +483,7 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
     if (filters.manufacturers?.length) count += filters.manufacturers.length;
     if (filters.palettes?.length) count += filters.palettes.length;
     if (filters.hasFormulas !== undefined) count++;
+    if (filters.similarColor && filters.similarColor.trim() !== "" && filters.similarColor !== "#000000") count++;
     return count;
   }, [filters]);
 
@@ -497,7 +502,11 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
 
   // Toggle view
   const toggleView = () => {
-    setIsMinimized(!isMinimized);
+    const newIsMinimized = !isMinimized;
+    setIsMinimized(newIsMinimized);
+    setHasManualViewPreference(true);
+    // Save to localStorage
+    localStorage.setItem("paintCatalogueView", newIsMinimized ? "minimized" : "maximized");
   };
 
   // Handle order change from drag-and-drop
@@ -516,6 +525,7 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
       (window as any).__resetPaintOrder = () => {
         setReorderedPaints(sortedPaints);
         setHasOrderChanges(false);
+        setGridResetKey(prev => prev + 1); // Force grid remount to reset positions
         if (onOrderStateChange) {
           onOrderStateChange(false, sortedPaints);
         }
@@ -591,7 +601,7 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
           {/* Paint display with smooth transitions */}
           <div ref={scrollContainerRef} className="flex-1 min-h-0 relative overflow-auto w-full">
             {isMinimized ? (
-              <PaintGrid paints={sortedPaints} isLoading={isLoading} onPaintClick={handlePaintClick} showEffects={showEffects} onOrderChange={handleOrderChange} />
+              <PaintGrid key={gridResetKey} paints={sortedPaints} isLoading={isLoading} onPaintClick={handlePaintClick} showEffects={showEffects} onOrderChange={handleOrderChange} />
             ) : (
               <PaintCardGridVirtualized paints={sortedPaints} isLoading={isLoading} onFilterChange={handleFilterChange} currentFilters={filters} showEffects={showEffects} onMerge={handleMerge} />
             )}

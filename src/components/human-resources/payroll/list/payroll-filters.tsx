@@ -289,6 +289,8 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                     searchPlaceholder="Buscar meses..."
                     emptyText="Nenhum mês encontrado"
                     disabled={!localFilters.year}
+                    searchable={true}
+                    clearable={true}
                   />
                   {localFilters.months && localFilters.months.length > 0 && (
                     <div className="text-xs text-muted-foreground mt-1">
@@ -327,6 +329,8 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 searchPlaceholder="Buscar colaboradores..."
                 emptyText="Nenhum colaborador encontrado"
                 disabled={localFilters.excludeUserIds && localFilters.excludeUserIds.length > 0}
+                searchable={true}
+                clearable={true}
               />
               {localFilters.userIds && localFilters.userIds.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-1">
@@ -360,6 +364,8 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 searchPlaceholder="Buscar colaboradores..."
                 emptyText="Nenhum colaborador encontrado"
                 disabled={localFilters.userIds && localFilters.userIds.length > 0}
+                searchable={true}
+                clearable={true}
               />
               {localFilters.excludeUserIds && localFilters.excludeUserIds.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-1">
@@ -392,6 +398,8 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 placeholder="Selecione setores..."
                 searchPlaceholder="Buscar setores..."
                 emptyText="Nenhum setor encontrado"
+                searchable={true}
+                clearable={true}
               />
               {localFilters.sectorIds && localFilters.sectorIds.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-1">
@@ -419,6 +427,8 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 placeholder="Selecione cargos..."
                 searchPlaceholder="Buscar cargos..."
                 emptyText="Nenhum cargo encontrado"
+                searchable={true}
+                clearable={true}
               />
               {localFilters.positionIds && localFilters.positionIds.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-1">
@@ -450,6 +460,8 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 placeholder="Selecione níveis..."
                 searchPlaceholder="Buscar níveis..."
                 emptyText="Nenhum nível encontrado"
+                searchable={true}
+                clearable={true}
               />
               {localFilters.performanceLevels && localFilters.performanceLevels.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-1">

@@ -1,5 +1,5 @@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { IconPlayerPlay, IconPlayerPause, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconEye, IconTrash, IconEditCircle } from "@tabler/icons-react";
+import { IconPlayerPlay, IconPlayerPause, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconEye, IconTrash, IconEditCircle, IconFileInvoice } from "@tabler/icons-react";
 import { TASK_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
 
@@ -13,7 +13,7 @@ interface TaskTableContextMenuProps {
   onAction: (action: TaskAction, tasks: Task[]) => void;
 }
 
-export type TaskAction = "start" | "finish" | "pause" | "duplicate" | "setSector" | "view" | "edit" | "delete";
+export type TaskAction = "start" | "finish" | "pause" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete";
 
 export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTableContextMenuProps) {
   if (!contextMenu) return null;
@@ -23,6 +23,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
   const hasInProgressTasks = tasks.some((t) => t.status === TASK_STATUS.IN_PRODUCTION);
   const hasPendingTasks = tasks.some((t) => t.status === TASK_STATUS.PENDING);
   const hasOnHoldTasks = tasks.some((t) => t.status === TASK_STATUS.ON_HOLD);
+  const hasCompletedTasks = tasks.some((t) => t.status === TASK_STATUS.COMPLETED);
 
   const handleAction = (action: TaskAction) => {
     onAction(action, tasks);
@@ -92,6 +93,13 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           <IconBuildingFactory2 className="mr-2 h-4 w-4" />
           {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}
         </DropdownMenuItem>
+
+        {hasCompletedTasks && (
+          <DropdownMenuItem onClick={() => handleAction("setStatus")}>
+            <IconFileInvoice className="mr-2 h-4 w-4" />
+            Alterar Status
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuSeparator />
 

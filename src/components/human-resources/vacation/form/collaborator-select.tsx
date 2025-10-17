@@ -24,14 +24,20 @@ export function CollaboratorSelect({ control, disabled, required, initialCollabo
   }, [initialCollaborator?.id]);
 
   // Memoize queryFn callback
-  const queryFn = useCallback(async (search: string) => {
-    const response = await userService.getUsers({
-      searchingFor: search,
-      limit: 20,
+  const queryFn = useCallback(async (search: string, page: number = 1) => {
+    const queryParams: any = {
+      page,
+      take: 50,
       where: { status: { not: USER_STATUS.DISMISSED } },
       include: { position: true },
-    });
-    return { data: response.data || [], hasMore: response.meta?.hasNextPage || false, total: response.meta?.totalRecords || 0 };
+    };
+
+    if (search && search.trim()) {
+      queryParams.searchingFor = search.trim();
+    }
+
+    const response = await userService.getUsers(queryParams);
+    return { data: response.data || [], hasMore: response.meta?.hasNextPage || false };
   }, []);
 
   // Memoize getOptionLabel callback
@@ -82,6 +88,10 @@ export function CollaboratorSelect({ control, disabled, required, initialCollabo
               getOptionValue={getOptionValue}
               renderOption={renderOption}
               initialOptions={initialOptions}
+              pageSize={50}
+              debounceMs={300}
+              searchable={true}
+              clearable={true}
             />
           </FormControl>
           <FormDescription>

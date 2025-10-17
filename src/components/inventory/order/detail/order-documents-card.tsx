@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconFileText, IconFileTypePdf, IconReceipt, IconCurrencyReal, IconFileInvoice } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
+import { IconFileText, IconFileTypePdf, IconReceipt, IconCurrencyReal, IconFileInvoice, IconLayoutGrid, IconList } from "@tabler/icons-react";
 import type { Order } from "../../../../types";
 import type { File as AnkaaFile } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { FileItem } from "@/components/file";
+import { FileItem, type FileViewMode } from "@/components/file";
 import { useFileViewer } from "@/components/file/file-viewer";
 
 interface OrderDocumentsCardProps {
@@ -15,6 +17,8 @@ export function OrderDocumentsCard({
   order,
   className,
 }: OrderDocumentsCardProps) {
+  const [viewMode, setViewMode] = useState<FileViewMode>("list");
+
   // Try to get file viewer context (optional)
   let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
   try {
@@ -47,12 +51,32 @@ export function OrderDocumentsCard({
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconFileText className="h-5 w-5 text-primary" />
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-3 text-xl">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <IconFileText className="h-5 w-5 text-primary" />
+            </div>
+            Documentos
+          </CardTitle>
+          <div className="flex gap-1">
+            <Button
+              variant={viewMode === "list" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="h-8 w-8 p-0"
+            >
+              <IconList className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === "grid" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setViewMode("grid")}
+              className="h-8 w-8 p-0"
+            >
+              <IconLayoutGrid className="h-4 w-4" />
+            </Button>
           </div>
-          Documentos
-        </CardTitle>
+        </div>
       </CardHeader>
       <CardContent className="pt-0 flex-1">
         <div className="space-y-6">
@@ -65,12 +89,12 @@ export function OrderDocumentsCard({
                     <IconCurrencyReal className="h-5 w-5 text-green-500" />
                     Orçamentos
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className={cn(viewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
                     {budgets.map((file) => (
                       <FileItem
                         key={file.id}
                         file={file}
-                        viewMode="list"
+                        viewMode={viewMode}
                         onPreview={handlePreview}
                         onDownload={handleDownload}
                         showActions
@@ -87,12 +111,12 @@ export function OrderDocumentsCard({
                     <IconFileInvoice className="h-5 w-5 text-blue-500" />
                     Notas Fiscais
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className={cn(viewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
                     {invoices.map((file) => (
                       <FileItem
                         key={file.id}
                         file={file}
-                        viewMode="list"
+                        viewMode={viewMode}
                         onPreview={handlePreview}
                         onDownload={handleDownload}
                         showActions
@@ -109,12 +133,12 @@ export function OrderDocumentsCard({
                     <IconReceipt className="h-5 w-5 text-purple-500" />
                     Comprovantes
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className={cn(viewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
                     {receipts.map((file) => (
                       <FileItem
                         key={file.id}
                         file={file}
-                        viewMode="list"
+                        viewMode={viewMode}
                         onPreview={handlePreview}
                         onDownload={handleDownload}
                         showActions
@@ -131,12 +155,12 @@ export function OrderDocumentsCard({
                     <IconCurrencyReal className="h-5 w-5 text-orange-500" />
                     Reembolsos
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className={cn(viewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
                     {reimbursements.map((file) => (
                       <FileItem
                         key={file.id}
                         file={file}
-                        viewMode="list"
+                        viewMode={viewMode}
                         onPreview={handlePreview}
                         onDownload={handleDownload}
                         showActions
@@ -153,12 +177,12 @@ export function OrderDocumentsCard({
                     <IconFileTypePdf className="h-5 w-5 text-red-500" />
                     NFEs de Reembolso
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className={cn(viewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
                     {invoiceReimbursements.map((file) => (
                       <FileItem
                         key={file.id}
                         file={file}
-                        viewMode="list"
+                        viewMode={viewMode}
                         onPreview={handlePreview}
                         onDownload={handleDownload}
                         showActions

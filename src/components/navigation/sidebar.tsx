@@ -886,13 +886,13 @@ export const Sidebar = memo(() => {
             >
               <button
                 onClick={() => {
-                  navigate(routes.personal.myProfile.root);
+                  navigate("/perfil");
                   setShowUserMenu(false);
                 }}
                 className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors"
               >
-                <IconSettings size={16} />
-                <span>Configurações</span>
+                <IconUser size={16} />
+                <span>Perfil</span>
               </button>
               <button onClick={() => logout()} className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-destructive">
                 <IconLogout size={16} />

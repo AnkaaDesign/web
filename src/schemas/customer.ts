@@ -2,8 +2,8 @@
 
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, emailSchema } from "./common";
-import type { Customer } from "../types";
-import { isValidCPF, isValidCNPJ } from "../utils";
+import type { Customer } from '@types';
+import { isValidCPF, isValidCNPJ, cleanCNPJ, cleanCPF } from '@utils';
 
 // =====================
 // Include Schema Based on Prisma Schema
@@ -12,6 +12,7 @@ import { isValidCPF, isValidCNPJ } from "../utils";
 export const customerIncludeSchema = z
   .object({
     logo: z.boolean().optional(),
+    economicActivity: z.boolean().optional(),
     tasks: z
       .union([
         z.boolean(),
@@ -121,6 +122,18 @@ export const customerWhereSchema: z.ZodType<any> = z
       .optional(),
 
     logoId: z
+      .union([
+        z.string().nullable(),
+        z.object({
+          equals: z.string().nullable().optional(),
+          not: z.string().nullable().optional(),
+          in: z.array(z.string()).optional(),
+          notIn: z.array(z.string()).optional(),
+        }),
+      ])
+      .optional(),
+
+    economicActivityId: z
       .union([
         z.string().nullable(),
         z.object({
@@ -377,6 +390,13 @@ export const customerWhereSchema: z.ZodType<any> = z
       })
       .optional(),
 
+    economicActivity: z
+      .object({
+        is: z.lazy(() => z.any()).optional(),
+        isNot: z.lazy(() => z.any()).optional(),
+      })
+      .optional(),
+
     tasks: z
       .object({
         some: z.lazy(() => z.any()).optional(),
@@ -398,6 +418,9 @@ const customerFilters = {
   cities: z.array(z.string()).optional(),
   states: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
+  taskStatus: z.string().optional(),
+  taskStatuses: z.array(z.string()).optional(),
+  taskCreatedBy: z.string().optional(),
 };
 
 // =====================
@@ -417,26 +440,57 @@ const customerTransform = (data: any) => {
   delete data.take;
 
   // Extract convenience filters
-  const { searchingFor, hasTasks, hasLogo, cities, states, tags } = data;
+  const {
+    searchingFor,
+    hasTasks,
+    hasLogo,
+    cities,
+    states,
+    tags,
+    taskStatus,
+    taskStatuses,
+    taskCreatedBy,
+  } = data;
 
   // Build where conditions
   const andConditions: any[] = [];
 
   // Text search (case insensitive)
   if (searchingFor) {
-    andConditions.push({
-      OR: [
-        { fantasyName: { contains: searchingFor, mode: "insensitive" } },
-        { corporateName: { contains: searchingFor, mode: "insensitive" } },
-        { email: { contains: searchingFor, mode: "insensitive" } },
-        { cnpj: { contains: searchingFor } },
-        { cpf: { contains: searchingFor } },
-        { city: { contains: searchingFor, mode: "insensitive" } },
-        { state: { contains: searchingFor, mode: "insensitive" } },
-        { neighborhood: { contains: searchingFor, mode: "insensitive" } },
-        { address: { contains: searchingFor, mode: "insensitive" } },
-      ],
-    });
+    console.log("[CustomerTransform] Processing searchingFor:", searchingFor);
+    // Clean the search term to get just numbers for document searches
+    const cleanedSearch = searchingFor.replace(/\D/g, "");
+    console.log("[CustomerTransform] Cleaned search (numbers only):", cleanedSearch);
+
+    const searchConditions: any[] = [
+      { fantasyName: { contains: searchingFor, mode: "insensitive" } },
+      { corporateName: { contains: searchingFor, mode: "insensitive" } },
+      { email: { contains: searchingFor, mode: "insensitive" } },
+      { city: { contains: searchingFor, mode: "insensitive" } },
+      { state: { contains: searchingFor, mode: "insensitive" } },
+      { neighborhood: { contains: searchingFor, mode: "insensitive" } },
+      { address: { contains: searchingFor, mode: "insensitive" } },
+      { tasks: { some: { plate: { contains: searchingFor, mode: "insensitive" } } } },
+      { tasks: { some: { serialNumber: { contains: searchingFor, mode: "insensitive" } } } },
+    ];
+
+    // Add CNPJ search conditions - search both with original input and cleaned version
+    if (cleanedSearch.length > 0) {
+      // For CNPJ (14 digits when complete)
+      if (cleanedSearch.length <= 14) {
+        searchConditions.push({ cnpj: { contains: searchingFor } }); // Search with original format
+        searchConditions.push({ cnpj: { contains: cleanedSearch } }); // Search with cleaned numbers
+      }
+
+      // For CPF (11 digits when complete)
+      if (cleanedSearch.length <= 11) {
+        searchConditions.push({ cpf: { contains: searchingFor } }); // Search with original format
+        searchConditions.push({ cpf: { contains: cleanedSearch } }); // Search with cleaned numbers
+      }
+    }
+
+    andConditions.push({ OR: searchConditions });
+    console.log("[CustomerTransform] Added search OR conditions, total searchConditions:", searchConditions.length);
   }
 
   // Has tasks filter
@@ -472,6 +526,39 @@ const customerTransform = (data: any) => {
     andConditions.push({ tags: { hasSome: tags } });
   }
 
+  // Task status filter (single status)
+  if (taskStatus) {
+    andConditions.push({
+      tasks: {
+        some: {
+          status: taskStatus
+        }
+      }
+    });
+  }
+
+  // Task statuses filter (multiple statuses)
+  if (taskStatuses?.length) {
+    andConditions.push({
+      tasks: {
+        some: {
+          status: { in: taskStatuses }
+        }
+      }
+    });
+  }
+
+  // Filter customers by task creator
+  if (taskCreatedBy) {
+    andConditions.push({
+      tasks: {
+        some: {
+          createdById: taskCreatedBy
+        }
+      }
+    });
+  }
+
   // Date range filter
   if (data.createdAt) {
     const dateCondition: any = {};
@@ -491,15 +578,37 @@ const customerTransform = (data: any) => {
     }
   }
 
+  // Clean up convenience filter fields from data
+  delete data.searchingFor;
+  delete data.hasTasks;
+  delete data.hasLogo;
+  delete data.cities;
+  delete data.states;
+  delete data.tags;
+  delete data.taskStatus;
+  delete data.taskStatuses;
+  delete data.taskCreatedBy;
+
   // Apply conditions to where clause
+  console.log("[CustomerTransform] andConditions count:", andConditions.length);
+  console.log("[CustomerTransform] Existing data.where:", JSON.stringify(data.where || {}).substring(0, 200));
   if (andConditions.length > 0) {
     if (data.where) {
-      data.where = data.where.AND ? { ...data.where, AND: [...(data.where.AND || []), ...andConditions] } : andConditions.length === 1 ? andConditions[0] : { AND: andConditions };
+      // Merge existing where conditions with new andConditions
+      if (data.where.AND && Array.isArray(data.where.AND)) {
+        // If where already has AND, append to it
+        data.where.AND = [...data.where.AND, ...andConditions];
+      } else {
+        // If where doesn't have AND, wrap both existing conditions and new ones in AND
+        data.where = { AND: [data.where, ...andConditions] };
+      }
     } else {
+      // No existing where clause, create new one
       data.where = andConditions.length === 1 ? andConditions[0] : { AND: andConditions };
     }
   }
 
+  console.log("[CustomerTransform] Final data.where:", JSON.stringify(data.where || {}).substring(0, 300));
   return data;
 };
 
@@ -580,6 +689,8 @@ export const customerCreateSchema = z
     phones: z.array(z.string()).default([]),
     tags: z.array(z.string()).default([]),
     logoId: z.string().uuid("Logo inválido").nullable().optional(),
+    economicActivityId: z.string().uuid("Atividade econômica inválida").nullable().optional(),
+    situacaoCadastral: z.enum(["ATIVA", "SUSPENSA", "INAPTA", "ATIVA_NAO_REGULAR", "BAIXADA"]).nullable().optional(),
   })
   .transform(toFormData)
   .refine(
@@ -626,6 +737,8 @@ export const customerUpdateSchema = z
     phones: z.array(z.string()).optional(),
     tags: z.array(z.string()).optional(),
     logoId: z.string().uuid("Logo inválido").nullable().optional(),
+    economicActivityId: z.string().uuid("Atividade econômica inválida").nullable().optional(),
+    situacaoCadastral: z.enum(["ATIVA", "SUSPENSA", "INAPTA", "ATIVA_NAO_REGULAR", "BAIXADA"]).nullable().optional(),
   })
   .transform(toFormData);
 
@@ -684,6 +797,28 @@ export type CustomerOrderBy = z.infer<typeof customerOrderBySchema>;
 export type CustomerWhere = z.infer<typeof customerWhereSchema>;
 
 // =====================
+// Merge Schema
+// =====================
+
+export const customerMergeConflictsSchema = z
+  .object({
+    // Conflict resolution fields
+  })
+  .optional();
+
+export const customerMergeSchema = z.object({
+  targetCustomerId: z.string().uuid({ message: "ID do cliente principal inválido" }),
+  sourceCustomerIds: z
+    .array(z.string().uuid({ message: "ID de cliente inválido" }))
+    .min(1, { message: "É necessário selecionar pelo menos 1 cliente para mesclar" })
+    .max(10, { message: "Máximo de 10 clientes podem ser mesclados por vez" }),
+  conflictResolutions: z.record(z.any()).optional(),
+});
+
+export type CustomerMergeConflicts = z.infer<typeof customerMergeConflictsSchema>;
+export type CustomerMergeFormData = z.infer<typeof customerMergeSchema>;
+
+// =====================
 // Helper Functions
 // =====================
 
@@ -704,4 +839,6 @@ export const mapCustomerToFormData = createMapToFormDataHelper<Customer, Custome
   phones: customer.phones,
   tags: customer.tags,
   logoId: customer.logoId,
+  economicActivityId: customer.economicActivityId,
+  situacaoCadastral: customer.situacaoCadastral,
 }));

@@ -20,7 +20,6 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
   { id: "status", label: "Status", getValue: (task: Task) => TASK_STATUS_LABELS[task.status] || task.status },
   { id: "customer.fantasyName", label: "Cliente", getValue: (task: Task) => task.customer?.fantasyName || "" },
   { id: "sector.name", label: "Setor", getValue: (task: Task) => task.sector?.name || "" },
-  { id: "price", label: "Valor", getValue: (task: Task) => (task.price ? formatCurrency(task.price) : "") },
   {
     id: "services",
     label: "Serviços",

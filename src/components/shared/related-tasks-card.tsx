@@ -146,9 +146,6 @@ export function RelatedTasksCard({
             case "status":
               comparison = (a.status || "").localeCompare(b.status || "");
               break;
-            case "price":
-              comparison = (a.price || 0) - (b.price || 0);
-              break;
           }
 
           if (comparison !== 0) {
@@ -185,7 +182,6 @@ export function RelatedTasksCard({
       (task) => task.status !== TASK_STATUS.CANCELLED && task.status !== TASK_STATUS.COMPLETED
     ).length;
     const completedTasks = tasks.filter((task) => task.status === TASK_STATUS.COMPLETED).length;
-    const totalValue = tasks.reduce((sum, task) => sum + (task.price || 0), 0);
 
     const statusCounts = tasks.reduce(
       (acc, task) => {
@@ -208,7 +204,6 @@ export function RelatedTasksCard({
       totalTasks,
       activeTasks,
       completedTasks,
-      totalValue,
       statusCounts,
       commissionCounts,
     };
@@ -325,25 +320,6 @@ export function RelatedTasksCard({
       sortable: true,
       className: "w-32",
       align: "center",
-    },
-    {
-      key: "price",
-      header: "Valor",
-      accessor: (task) => (
-        <div className="text-sm font-medium text-right">
-          {task.price ? (
-            <div className="flex items-center justify-end gap-2">
-              <IconCurrencyReal className="h-3 w-3 text-muted-foreground" />
-              <span className="tabular-nums">{formatCurrency(task.price)}</span>
-            </div>
-          ) : (
-            <span className="text-muted-foreground">-</span>
-          )}
-        </div>
-      ),
-      sortable: true,
-      className: "w-32",
-      align: "right",
     },
   ];
 

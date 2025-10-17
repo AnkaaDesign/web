@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileItem } from "@/components/file";
-import { IconBrush, IconCalendar, IconUser, IconTruck, IconFileText, IconCurrency, IconPhoto } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
+import { FileItem, type FileViewMode } from "@/components/file";
+import { useFileViewer } from "@/components/file/file-viewer";
+import { IconBrush, IconCalendar, IconUser, IconTruck, IconFileText, IconCurrency, IconPhoto, IconReceipt, IconFileInvoice, IconLayoutGrid, IconList } from "@tabler/icons-react";
 import { type Airbrushing } from "../../../../types";
 import { formatDate, formatRelativeTime } from "../../../../utils";
 import { TASK_STATUS_LABELS, AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
@@ -56,6 +59,29 @@ interface AirbrushingInfoCardProps {
 }
 
 export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoCardProps) {
+  const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("list");
+  const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("list");
+
+  // Try to get file viewer context (optional)
+  let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
+  try {
+    fileViewerContext = useFileViewer();
+  } catch {
+    // Context not available
+  }
+
+  const handlePreview = (file: any) => {
+    if (fileViewerContext) {
+      fileViewerContext.actions.viewFile(file);
+    }
+  };
+
+  const handleDownload = (file: any) => {
+    if (fileViewerContext) {
+      fileViewerContext.actions.downloadFile(file);
+    }
+  };
+
   const getTaskStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "PENDING":
@@ -240,51 +266,84 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
         </CardContent>
       </Card>
 
-      {/* Receipts Card */}
-      {airbrushing.receipts && airbrushing.receipts.length > 0 && (
+      {/* Documents Card - Receipts and Invoices */}
+      {((airbrushing.receipts && airbrushing.receipts.length > 0) || (airbrushing.invoices && airbrushing.invoices.length > 0)) && (
         <Card className="shadow-sm border border-border">
           <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/20">
-                <IconFileText className="h-5 w-5 text-green-600 dark:text-green-400" />
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-3 text-xl">
+                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
+                  <IconFileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                Documentos
+                <Badge variant="secondary" className="ml-2">
+                  {(airbrushing.receipts?.length || 0) + (airbrushing.invoices?.length || 0)} arquivo{((airbrushing.receipts?.length || 0) + (airbrushing.invoices?.length || 0)) > 1 ? "s" : ""}
+                </Badge>
+              </CardTitle>
+              <div className="flex gap-1">
+                <Button
+                  variant={documentsViewMode === "list" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setDocumentsViewMode("list")}
+                  className="h-7 w-7 p-0"
+                >
+                  <IconList className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant={documentsViewMode === "grid" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setDocumentsViewMode("grid")}
+                  className="h-7 w-7 p-0"
+                >
+                  <IconLayoutGrid className="h-3.5 w-3.5" />
+                </Button>
               </div>
-              Recibos Anexados
-              <Badge variant="secondary" className="ml-auto">
-                {airbrushing.receipts.length} arquivo{airbrushing.receipts.length > 1 ? "s" : ""}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent className="pt-0">
-            <div className="grid grid-cols-1 gap-4">
-              {airbrushing.receipts.map((file) => (
-                <FileItem key={file.id} file={file} showActions={false} className="bg-muted/30" />
-              ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* NFEs Card */}
-      {airbrushing.invoices && airbrushing.invoices.length > 0 && (
-        <Card className="shadow-sm border border-border">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
-                <IconFileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              Notas Fiscais Anexadas
-              <Badge variant="secondary" className="ml-auto">
-                {airbrushing.invoices.length} arquivo{airbrushing.invoices.length > 1 ? "s" : ""}
-              </Badge>
-            </CardTitle>
           </CardHeader>
 
           <CardContent className="pt-0">
-            <div className="grid grid-cols-1 gap-4">
-              {airbrushing.invoices.map((file) => (
-                <FileItem key={file.id} file={file} showActions={false} className="bg-muted/30" />
-              ))}
+            <div className="space-y-6">
+              {airbrushing.receipts && airbrushing.receipts.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <IconReceipt className="h-4 w-4 text-muted-foreground" />
+                    <h4 className="text-sm font-semibold">Recibos</h4>
+                  </div>
+                  <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                    {airbrushing.receipts.map((file) => (
+                      <FileItem
+                        key={file.id}
+                        file={file}
+                        viewMode={documentsViewMode}
+                        onPreview={handlePreview}
+                        onDownload={handleDownload}
+                        showActions
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {airbrushing.invoices && airbrushing.invoices.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
+                    <h4 className="text-sm font-semibold">Notas Fiscais</h4>
+                  </div>
+                  <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                    {airbrushing.invoices.map((file) => (
+                      <FileItem
+                        key={file.id}
+                        file={file}
+                        viewMode={documentsViewMode}
+                        onPreview={handlePreview}
+                        onDownload={handleDownload}
+                        showActions
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -294,21 +353,48 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
       {airbrushing.artworks && airbrushing.artworks.length > 0 && (
         <Card className="shadow-sm border border-border">
           <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20">
-                <IconPhoto className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-3 text-xl">
+                <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20">
+                  <IconPhoto className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                Artes da Aerografia
+                <Badge variant="secondary" className="ml-2">
+                  {airbrushing.artworks.length} arquivo{airbrushing.artworks.length > 1 ? "s" : ""}
+                </Badge>
+              </CardTitle>
+              <div className="flex gap-1">
+                <Button
+                  variant={artworksViewMode === "list" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setArtworksViewMode("list")}
+                  className="h-7 w-7 p-0"
+                >
+                  <IconList className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant={artworksViewMode === "grid" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setArtworksViewMode("grid")}
+                  className="h-7 w-7 p-0"
+                >
+                  <IconLayoutGrid className="h-3.5 w-3.5" />
+                </Button>
               </div>
-              Artes da Aerografia
-              <Badge variant="secondary" className="ml-auto">
-                {airbrushing.artworks.length} arquivo{airbrushing.artworks.length > 1 ? "s" : ""}
-              </Badge>
-            </CardTitle>
+            </div>
           </CardHeader>
 
           <CardContent className="pt-0">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div className={cn(artworksViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
               {airbrushing.artworks.map((file) => (
-                <FileItem key={file.id} file={file} showActions={false} className="bg-muted/30" showThumbnail={true} />
+                <FileItem
+                  key={file.id}
+                  file={file}
+                  viewMode={artworksViewMode}
+                  onPreview={handlePreview}
+                  onDownload={handleDownload}
+                  showActions
+                />
               ))}
             </div>
           </CardContent>

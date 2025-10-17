@@ -15,7 +15,9 @@ import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-norma
 import { TaskTableContextMenu, type TaskAction } from "./task-table-context-menu";
 import { DuplicateTaskModal } from "./duplicate-task-modal";
 import { SetSectorModal } from "./set-sector-modal";
+import { SetStatusModal } from "./set-status-modal";
 import { useTaskMutations } from "../../../../hooks";
+import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -37,6 +39,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
+  const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [taskToDuplicate, setTaskToDuplicate] = useState<Task | null>(null);
   const [tasksToUpdate, setTasksToUpdate] = useState<Task[]>([]);
   const [contextMenu, setContextMenu] = useState<{
@@ -49,7 +52,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
     isBulk: boolean;
   } | null>(null);
 
-  const { updateAsync, createAsync, deleteAsync: deleteTaskAsync } = useTaskMutations();
+  const { updateAsync, createAsync, deleteAsync: deleteTaskAsync, batchUpdateAsync } = useTaskMutations();
 
   // Custom sort function for serialNumberOrPlate (multi-field)
   const sortSerialNumberOrPlate = useCallback((a: TaskRow, b: TaskRow, direction: SortDirection): number => {
@@ -89,6 +92,13 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
         accessor: (task: TaskRow) => task.serialNumber || task.plate || "",
         customSortFunction: sortSerialNumberOrPlate,
         dataType: "custom",
+      },
+      {
+        key: "chassisNumber",
+        header: "Nº CHASSI",
+        sortable: true,
+        accessor: "chassisNumber",
+        dataType: "string",
       },
       {
         key: "sector.name",
@@ -140,6 +150,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
       { id: "customer.fantasyName", header: "CLIENTE", width: "w-[150px]", sortable: true },
       { id: "generalPainting", header: "PINTURA", width: "w-[100px]", sortable: true },
       { id: "serialNumberOrPlate", header: "Nº SÉRIE", width: "w-[120px]", sortable: true },
+      { id: "chassisNumber", header: "Nº CHASSI", width: "w-[140px]", sortable: true },
       { id: "sector.name", header: "SETOR", width: "w-[120px]", sortable: true },
       { id: "entryDate", header: "ENTRADA", width: "w-[110px]", sortable: true },
       { id: "startedAt", header: "INICIADO EM", width: "w-[110px]", sortable: true },
@@ -327,6 +338,11 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
           setSetSectorModalOpen(true);
           break;
 
+        case "setStatus":
+          setTasksToUpdate(tasks);
+          setSetStatusModalOpen(true);
+          break;
+
         case "view":
           if (tasks.length === 1) {
             navigate(routes.production.schedule.details(tasks[0].id));
@@ -395,11 +411,6 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
       receiptId: taskToDuplicate.receiptId,
       commission: taskToDuplicate.commission, // Required field
 
-      // Convert price to number
-      price: typeof taskToDuplicate.price === 'string'
-        ? parseFloat(taskToDuplicate.price)
-        : taskToDuplicate.price,
-
       // Relations - only IDs
       artworkIds: taskToDuplicate.artworks?.map((file) => file.id) || [],
       paintIds: taskToDuplicate.logoPaints?.map((paint) => paint.id) || [],
@@ -437,14 +448,42 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
     setTaskToDuplicate(null);
   };
 
-  const handleSetSectorConfirm = async (sectorId: string) => {
-    for (const task of tasksToUpdate) {
-      await updateAsync({
+  const handleSetSectorConfirm = async (sectorId: string | null) => {
+    await batchUpdateAsync({
+      tasks: tasksToUpdate.map((task) => ({
         id: task.id,
         data: { sectorId },
+      })),
+    });
+    setTasksToUpdate([]);
+  };
+
+  const handleSetStatusConfirm = async (status: typeof TASK_STATUS.INVOICED | typeof TASK_STATUS.SETTLED) => {
+    try {
+      await batchUpdateAsync({
+        tasks: tasksToUpdate.map((task) => ({
+          id: task.id,
+          data: { status },
+        })),
+      });
+
+      const statusLabel = status === TASK_STATUS.INVOICED ? "Faturado" : "Liquidado";
+      const taskCount = tasksToUpdate.length;
+
+      toast.success(
+        `${taskCount} tarefa${taskCount > 1 ? "s" : ""} marcada${taskCount > 1 ? "s" : ""} como ${statusLabel}`,
+        {
+          description: taskCount === 1 ? tasksToUpdate[0].name : `${taskCount} tarefas atualizadas`,
+        }
+      );
+
+      setTasksToUpdate([]);
+      setSelectedTaskIds(new Set());
+    } catch (error) {
+      toast.error("Erro ao atualizar status", {
+        description: "Não foi possível atualizar o status das tarefas. Tente novamente.",
       });
     }
-    setTasksToUpdate([]);
   };
 
   // Close context menu when clicking outside
@@ -576,7 +615,8 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
                             );
                           })()
                         : "-")}
-                    {column.id === "serialNumberOrPlate" && <span className="truncate block">{task.serialNumber || task.plate || "-"}</span>}
+                    {column.id === "serialNumberOrPlate" && <span className="truncate block font-mono">{task.serialNumber || task.plate || "-"}</span>}
+                    {column.id === "chassisNumber" && <span className="truncate block font-mono">{task.chassisNumber || "-"}</span>}
                     {column.id === "sector.name" && <span className="truncate block">{task.sector?.name || "-"}</span>}
                     {column.id === "entryDate" && <span className="truncate block">{task.entryDate ? formatDate(task.entryDate) : "-"}</span>}
                     {column.id === "startedAt" && <span className="truncate block">{task.startedAt ? formatDate(task.startedAt) : "-"}</span>}
@@ -599,6 +639,8 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
       <DuplicateTaskModal open={duplicateModalOpen} onOpenChange={setDuplicateModalOpen} task={taskToDuplicate} onConfirm={handleDuplicateConfirm} />
 
       <SetSectorModal open={setSectorModalOpen} onOpenChange={setSetSectorModalOpen} tasks={tasksToUpdate} onConfirm={handleSetSectorConfirm} />
+
+      <SetStatusModal open={setStatusModalOpen} onOpenChange={setSetStatusModalOpen} tasks={tasksToUpdate} onConfirm={handleSetStatusConfirm} />
 
       <TaskTableContextMenu contextMenu={contextMenu} onClose={() => setContextMenu(null)} onAction={handleAction} />
 

@@ -26,13 +26,18 @@ export function CollaboratorSelect({ control, disabled, required, initialCollabo
 
   // Memoize queryFn
   const queryFn = useCallback(async (search: string, page: number = 1) => {
-    const response = await userService.getUsers({
-      searchingFor: search,
-      limit: 20,
+    const queryParams: any = {
       page,
+      take: 50,
       where: { status: { not: USER_STATUS.DISMISSED } },
       include: { position: true },
-    });
+    };
+
+    if (search && search.trim()) {
+      queryParams.searchingFor = search.trim();
+    }
+
+    const response = await userService.getUsers(queryParams);
 
     return {
       data: response.data || [],
@@ -76,6 +81,10 @@ export function CollaboratorSelect({ control, disabled, required, initialCollabo
               getOptionValue={getOptionValue}
               renderOption={renderOption}
               minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
+              searchable={true}
+              clearable={true}
             />
           </FormControl>
           <FormMessage />

@@ -1,29 +1,78 @@
+import { useCallback, useMemo, useRef } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { useGarages } from "../../../../hooks";
+import { Combobox } from "@/components/ui/combobox";
+import { getGarages } from "../../../../api-client";
 import type { GarageLaneCreateFormData, GarageLaneUpdateFormData } from "../../../../schemas";
 import { IconBuilding } from "@tabler/icons-react";
 
 interface GarageSelectorProps {
   control: any;
   disabled?: boolean;
+  initialGarage?: any; // Initial garage data for editing
 }
 
-export function GarageSelector({ control, disabled }: GarageSelectorProps) {
-  // Fetch garages for selection
-  const { data: garagesResponse, isLoading } = useGarages({
-    orderBy: { name: "asc" },
-    take: 100,
-  });
+export function GarageSelector({ control, disabled, initialGarage }: GarageSelectorProps) {
+  // Create a stable cache for fetched garages
+  const cacheRef = useRef<Map<string, { label: string; value: string; description?: string }>>(new Map());
 
-  const garages = garagesResponse?.data || [];
+  // Memoize initial options
+  const initialOptions = useMemo(() => {
+    if (!initialGarage) return [];
 
-  // Create combobox options with garage info
-  const garageOptions: ComboboxOption[] = garages.map((garage) => ({
-    value: garage.id,
-    label: garage.name,
-    description: `${garage.width}m × ${garage.length}m${garage.location ? ` | ${garage.location}` : ""}`,
-  }));
+    const description = `${initialGarage.width}m × ${initialGarage.length}m${initialGarage.location ? ` | ${initialGarage.location}` : ""}`;
+
+    const option = {
+      label: initialGarage.name,
+      value: initialGarage.id,
+      description,
+    };
+
+    cacheRef.current.set(initialGarage.id, option);
+    return [option];
+  }, [initialGarage]);
+
+  // Async query function for garages
+  const queryGarages = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+      };
+
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      const response = await getGarages(queryParams);
+      const garages = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = garages.map((garage) => {
+        const description = `${garage.width}m × ${garage.length}m${garage.location ? ` | ${garage.location}` : ""}`;
+
+        const option = {
+          label: garage.name,
+          value: garage.id,
+          description,
+        };
+
+        cacheRef.current.set(garage.id, option);
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching garages:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
 
   return (
     <FormField
@@ -38,13 +87,21 @@ export function GarageSelector({ control, disabled }: GarageSelectorProps) {
           </FormLabel>
           <FormControl>
             <Combobox
-              options={garageOptions}
+              async={true}
+              queryKey={["garages-selector"]}
+              queryFn={queryGarages}
+              initialOptions={initialOptions}
               value={field.value || ""}
               onValueChange={field.onChange}
               placeholder="Selecione a garagem..."
               emptyText="Nenhuma garagem encontrada"
-              disabled={disabled || isLoading}
+              searchPlaceholder="Buscar garagem..."
+              disabled={disabled}
               searchable={true}
+              clearable={true}
+              pageSize={50}
+              minSearchLength={0}
+              debounceMs={300}
               className="w-full"
             />
           </FormControl>

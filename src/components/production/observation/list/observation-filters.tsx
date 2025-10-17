@@ -181,6 +181,9 @@ export function ObservationFilters({ open, onOpenChange, filters, onFilterChange
                     }}
                     placeholder="Selecionar tarefas..."
                     searchPlaceholder="Buscar tarefas..."
+                    emptyText="Nenhuma tarefa encontrada"
+                    searchable={true}
+                    clearable={true}
                   />
                 </div>
               </div>
@@ -191,30 +194,36 @@ export function ObservationFilters({ open, onOpenChange, filters, onFilterChange
                 <div className="space-y-3">
                   <div className="text-base font-medium">Data de Criação</div>
                   <div className="grid grid-cols-2 gap-3">
-                    <DateTimeInput
-                      mode="date"
-                      value={localState.createdAfter}
-                      onChange={(date: Date | null) => {
-                        setLocalState((prev) => ({
-                          ...prev,
-                          createdAfter: date || undefined,
-                        }));
-                      }}
-                      label="De"
-                      placeholder="Selecionar data inicial..."
-                    />
-                    <DateTimeInput
-                      mode="date"
-                      value={localState.createdBefore}
-                      onChange={(date: Date | null) => {
-                        setLocalState((prev) => ({
-                          ...prev,
-                          createdBefore: date || undefined,
-                        }));
-                      }}
-                      label="Até"
-                      placeholder="Selecionar data final..."
-                    />
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                      <DateTimeInput
+                        mode="date"
+                        value={localState.createdAfter}
+                        onChange={(date: Date | null) => {
+                          setLocalState((prev) => ({
+                            ...prev,
+                            createdAfter: date || undefined,
+                          }));
+                        }}
+                        hideLabel
+                        placeholder="Selecionar data inicial..."
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                      <DateTimeInput
+                        mode="date"
+                        value={localState.createdBefore}
+                        onChange={(date: Date | null) => {
+                          setLocalState((prev) => ({
+                            ...prev,
+                            createdBefore: date || undefined,
+                          }));
+                        }}
+                        hideLabel
+                        placeholder="Selecionar data final..."
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

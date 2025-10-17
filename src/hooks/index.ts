@@ -103,6 +103,7 @@ export * from "./useNotification";
 export * from "./usePreferences";
 export * from "./useChangelog";
 export * from "./dashboard";
+export * from "./useMediaViewer";
 
 // =====================================================
 // Other Module Hooks
