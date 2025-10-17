@@ -8,6 +8,7 @@ import { orderCreateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useSuppliers } from "../../../../hooks";
 import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { toast } from "sonner";
+import { createOrderFormData } from "@/utils/form-data-helper";
 import { FileUploadField, type FileWithPreview } from "@/components/file";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -365,7 +366,7 @@ export const OrderCreateForm = () => {
       const currentNotes = form.getValues("notes");
 
       // Prepare the complete form data
-      const formData: OrderCreateFormData = {
+      const orderData: OrderCreateFormData = {
         description: currentDescription?.trim() || "",
         status: ORDER_STATUS.CREATED,
         supplierId: currentSupplierId || undefined,
@@ -375,8 +376,8 @@ export const OrderCreateForm = () => {
       };
 
       // Set all form values at once
-      Object.keys(formData).forEach((key) => {
-        form.setValue(key as keyof OrderCreateFormData, formData[key as keyof OrderCreateFormData]);
+      Object.keys(orderData).forEach((key) => {
+        form.setValue(key as keyof OrderCreateFormData, orderData[key as keyof OrderCreateFormData]);
       });
 
       // Trigger validation
@@ -397,7 +398,44 @@ export const OrderCreateForm = () => {
       if (!isStepValid) {
         return;
       }
-      const result = await createAsync(formData);
+
+      // Check if there are files to upload (all files in FileWithPreview arrays are new for create)
+      const newBudgetFiles = budgetFiles.filter(f => f instanceof File);
+      const newReceiptFiles = receiptFiles.filter(f => f instanceof File);
+      const newNfeFiles = nfeFiles.filter(f => f instanceof File);
+
+      const hasFiles = newBudgetFiles.length > 0 || newReceiptFiles.length > 0 || newNfeFiles.length > 0;
+
+      console.log('[SUBMIT] Has files:', hasFiles);
+      console.log('[SUBMIT] Budget files:', newBudgetFiles.length);
+      console.log('[SUBMIT] Receipt files:', newReceiptFiles.length);
+      console.log('[SUBMIT] NFE files:', newNfeFiles.length);
+
+      let result;
+      if (hasFiles) {
+        // Use FormData when there are files to upload
+        const supplier = currentSupplierId ? suppliers.find(s => s.id === currentSupplierId) : undefined;
+        const formDataWithFiles = createOrderFormData(
+          orderData,
+          {
+            budgets: newBudgetFiles.length > 0 ? newBudgetFiles as File[] : undefined,
+            receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
+            invoices: newNfeFiles.length > 0 ? newNfeFiles as File[] : undefined,
+          },
+          supplier ? {
+            id: supplier.id,
+            name: supplier.fantasyName,
+          } : undefined
+        );
+
+        console.log('[SUBMIT] Using FormData with files');
+        result = await createAsync(formDataWithFiles as any);
+      } else {
+        // Use regular JSON payload when no files
+        console.log('[SUBMIT] Using JSON payload (no files)');
+        result = await createAsync(orderData);
+      }
+
       if (result.success && result.data) {
         // Success toast is handled automatically by the API client
         // No need to show it manually here
@@ -420,7 +458,7 @@ export const OrderCreateForm = () => {
       console.error("Submission error:", error);
       // Error is handled by the mutation hook, but let's log it
     }
-  }, [validateCurrentStep, description, supplierId, forecast, notes, selectedItems, quantities, prices, taxes, createAsync, form, clearAllSelections, navigate]);
+  }, [validateCurrentStep, description, supplierId, forecast, notes, selectedItems, quantities, prices, taxes, budgetFiles, receiptFiles, nfeFiles, suppliers, createAsync, form, clearAllSelections, navigate]);
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.orders.root);

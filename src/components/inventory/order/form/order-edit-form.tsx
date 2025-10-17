@@ -3,12 +3,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconDownload, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal } from "@tabler/icons-react";
-import type { OrderCreateFormData } from "../../../../schemas";
+import type { OrderUpdateFormData } from "../../../../schemas";
 import type { Order, OrderItem } from "../../../../types";
-import { orderCreateSchema } from "../../../../schemas";
+import { orderUpdateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems } from "../../../../hooks";
 import { routes } from "../../../../constants";
 import { toast } from "sonner";
+import { createOrderFormData } from "@/utils/form-data-helper";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormMessage } from "@/components/ui/form";
@@ -120,6 +121,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   const [budgetFiles, setBudgetFiles] = useState<FileWithPreview[]>([]);
   const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
   const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>([]);
+  const [hasFileChanges, setHasFileChanges] = useState(false);
 
   // URL state management for item selection (Stage 2) - initialized with existing data
   const {
@@ -164,7 +166,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     defaultTax: 0,
     preserveQuantitiesOnDeselect: false,
     defaultPageSize: 40,
-    // Initialize with existing data
+    // Always provide initial data - URL params will override if present
+    // This ensures fields retain their values when other fields are updated
     initialData: {
       description: order.description,
       supplierId: order.supplierId || undefined,
@@ -178,20 +181,60 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   });
 
   // Form setup with default values from URL state
-  const defaultValues: Partial<OrderCreateFormData> = {
+  const defaultValues: Partial<OrderUpdateFormData> = {
     description: description || order.description,
     supplierId: supplierId || order.supplierId || undefined,
     forecast: forecast || order.forecast || undefined,
     notes: notes || order.notes || "",
-    items: [],
   };
 
-  const form = useForm<OrderCreateFormData>({
-    resolver: zodResolver(orderCreateSchema),
+  const form = useForm<OrderUpdateFormData>({
+    resolver: zodResolver(orderUpdateSchema),
     defaultValues,
-    mode: "onBlur",
+    mode: "onChange",  // Real-time validation as user types
     reValidateMode: "onChange",
   });
+
+  // Sync URL state to form state (prevents value restoration bug)
+  // Note: form is intentionally excluded from dependencies to prevent cascading re-syncs
+  // that could cause race conditions and clear field values when other fields are updated
+  useEffect(() => {
+    console.log('[useEffect DESCRIPTION SYNC] URL state changed to:', description);
+    console.log('[useEffect DESCRIPTION SYNC] Setting form value to:', description || "");
+    form.setValue("description", description || "", {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [description]);
+
+  useEffect(() => {
+    form.setValue("supplierId", supplierId || undefined, {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplierId]);
+
+  useEffect(() => {
+    form.setValue("forecast", forecast || undefined, {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forecast]);
+
+  useEffect(() => {
+    form.setValue("notes", notes || "", {
+      shouldValidate: true,
+      shouldDirty: true,
+      shouldTouch: true
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes]);
 
   // Mutations - use update instead of create
   const { updateAsync, isLoading: isSubmitting } = useOrderMutations();
@@ -204,9 +247,13 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
 
   const suppliers = suppliersResponse?.data || [];
 
+  // Memoize selected items array to prevent unnecessary query key changes
+  const selectedItemsArray = useMemo(() => Array.from(selectedItems), [selectedItems]);
+
   // Fetch selected items data for display
-  const { data: selectedItemsResponse } = useItems({
-    where: selectedItems.size > 0 ? { id: { in: Array.from(selectedItems) } } : undefined,
+  // Always enable query, use empty array when no items selected to get empty result
+  const { data: selectedItemsResponse, isLoading: isLoadingSelectedItems } = useItems({
+    where: selectedItemsArray.length > 0 ? { id: { in: selectedItemsArray } } : { id: { in: [] } },
     include: {
       brand: true,
       category: true,
@@ -216,7 +263,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       },
       measures: true,
     },
-    enabled: selectedItems.size > 0,
   });
 
   const selectedItemsData = selectedItemsResponse?.data || [];
@@ -244,30 +290,74 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     if (currentStep < steps.length) {
       const newStep = currentStep + 1;
       setCurrentStep(newStep);
-      setSearchParams(setStepInUrl(searchParams, newStep), { replace: true });
+      // Use functional form to ensure we have the latest params
+      setSearchParams((prevParams) => setStepInUrl(prevParams, newStep), { replace: true });
     }
-  }, [currentStep, searchParams, setSearchParams]);
+  }, [currentStep, setSearchParams]);
 
   const prevStep = useCallback(() => {
     if (currentStep > 1) {
       const newStep = currentStep - 1;
       setCurrentStep(newStep);
-      setSearchParams(setStepInUrl(searchParams, newStep), { replace: true });
+      // Use functional form to ensure we have the latest params
+      setSearchParams((prevParams) => setStepInUrl(prevParams, newStep), { replace: true });
     }
-  }, [currentStep, searchParams, setSearchParams]);
+  }, [currentStep, setSearchParams]);
 
   // File change handlers
   const handleBudgetFilesChange = useCallback((files: FileWithPreview[]) => {
     setBudgetFiles(files);
+    setHasFileChanges(true);
   }, []);
 
   const handleReceiptFilesChange = useCallback((files: FileWithPreview[]) => {
     setReceiptFiles(files);
+    setHasFileChanges(true);
   }, []);
 
   const handleNfeFilesChange = useCallback((files: FileWithPreview[]) => {
     setNfeFiles(files);
+    setHasFileChanges(true);
   }, []);
+
+  // Detect if form has actual changes from original order
+  const hasFormChanges = useMemo(() => {
+    const descriptionChanged = description?.trim() !== order.description?.trim();
+    const supplierChanged = (supplierId || null) !== (order.supplierId || null);
+    const forecastChanged = (forecast ? new Date(forecast).getTime() : null) !== (order.forecast ? new Date(order.forecast).getTime() : null);
+    const notesChanged = (notes?.trim() || "") !== (order.notes?.trim() || "");
+
+    // Check if selected items have changed
+    const originalItemIds = new Set(order.items.map(item => item.itemId));
+    const itemsChanged = selectedItems.size !== originalItemIds.size ||
+      Array.from(selectedItems).some(id => !originalItemIds.has(id));
+
+    // Check if quantities have changed for existing items
+    const quantitiesChanged = order.items.some(item => {
+      const currentQty = quantities[item.itemId];
+      return currentQty !== undefined && currentQty !== item.quantity;
+    });
+
+    // Check if prices have changed for existing items
+    const pricesChanged = order.items.some(item => {
+      const currentPrice = prices[item.itemId];
+      return currentPrice !== undefined && currentPrice !== item.price;
+    });
+
+    const hasChanges = descriptionChanged || supplierChanged || forecastChanged || notesChanged || itemsChanged || quantitiesChanged || pricesChanged || hasFileChanges;
+    console.log('[hasFormChanges]', {
+      descriptionChanged,
+      supplierChanged,
+      forecastChanged,
+      notesChanged,
+      itemsChanged,
+      quantitiesChanged,
+      pricesChanged,
+      hasFileChanges,
+      hasChanges
+    });
+    return hasChanges;
+  }, [description, supplierId, forecast, notes, selectedItems, quantities, prices, order, hasFileChanges]);
 
   // Stage validation
   const validateCurrentStep = useCallback((): boolean => {
@@ -334,27 +424,81 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     if (!validateCurrentStep()) return;
 
     try {
-      // Build items array from selection (currently not used as items cannot be updated)
+      // Build items array from selected items
+      const items = Array.from(selectedItems).map((itemId) => ({
+        itemId,
+        orderedQuantity: quantities[itemId] || 0,
+        price: prices[itemId] || 0,
+        tax: taxes[itemId] || 0,
+      }));
 
-      // For update, we only send the fields that can be updated
-      // Note: items cannot be updated according to the schema
-      await updateAsync({
-        id: order.id,
-        data: {
-          description: description!.trim(),
-          supplierId: supplierId || undefined,
-          forecast: forecast || undefined,
-          notes: notes?.trim() || undefined,
-        },
-      });
+      const data = {
+        description: description!.trim(),
+        supplierId: supplierId || undefined,
+        forecast: forecast || undefined,
+        notes: notes?.trim() || undefined,
+        items,
+      };
+
+      // Check if there are new files to upload (files without uploadedFileId)
+      const newBudgetFiles = budgetFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
+      const newReceiptFiles = receiptFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
+      const newNfeFiles = nfeFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
+
+      const hasNewFiles = newBudgetFiles.length > 0 || newReceiptFiles.length > 0 || newNfeFiles.length > 0;
+
+      console.log('[SUBMIT] Order ID:', order.id);
+      console.log('[SUBMIT] Description:', description);
+      console.log('[SUBMIT] Items count:', items.length);
+      console.log('[SUBMIT] Has new files:', hasNewFiles);
+      console.log('[SUBMIT] New budget files:', newBudgetFiles.length);
+      console.log('[SUBMIT] New receipt files:', newReceiptFiles.length);
+      console.log('[SUBMIT] New NFE files:', newNfeFiles.length);
+
+      if (hasNewFiles) {
+        // Use FormData when there are files to upload
+        const formData = createOrderFormData(
+          data,
+          {
+            budgets: newBudgetFiles.length > 0 ? newBudgetFiles as File[] : undefined,
+            receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
+            invoices: newNfeFiles.length > 0 ? newNfeFiles as File[] : undefined,
+          },
+          order.supplier ? {
+            id: order.supplier.id,
+            name: order.supplier.fantasyName,
+          } : undefined
+        );
+
+        console.log('[SUBMIT] Using FormData with files');
+
+        await updateAsync({
+          id: order.id,
+          data: formData as any, // FormData is compatible with the API
+        });
+      } else {
+        // Use regular JSON payload when no files
+        console.log('[SUBMIT] Using JSON payload (no files)');
+
+        await updateAsync({
+          id: order.id,
+          data,
+        });
+      }
 
       // Success toast is handled automatically by API client
       navigate(routes.inventory.orders?.list || "/inventory/orders");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating order:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        response: error?.response,
+        data: error?.response?.data,
+        status: error?.response?.status
+      });
       // Error is handled by the mutation hook
     }
-  }, [validateCurrentStep, selectedItems, quantities, prices, taxes, description, supplierId, forecast, notes, updateAsync, order.id, navigate]);
+  }, [validateCurrentStep, selectedItems, quantities, prices, taxes, description, supplierId, forecast, notes, budgetFiles, receiptFiles, nfeFiles, updateAsync, order, navigate]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === steps.length;
@@ -750,7 +894,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       icon: isSubmitting ? IconLoader2 : IconCheck,
       onClick: handleSubmit,
       variant: "default" as const,
-      disabled: isSubmitting || selectionCount === 0 || !form.formState.isValid,
+      disabled: isSubmitting || !hasFormChanges || !form.formState.isValid || !description?.trim(),
       loading: isSubmitting,
     });
   }
@@ -801,10 +945,18 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                           <Input
                             placeholder="Digite a descrição do pedido"
                             value={description}
-                            onChange={(e) => {
-                              updateDescription(e.target.value);
-                              form.setValue("description", e.target.value);
-                              form.trigger("description");
+                            onChange={(value) => {
+                              // Custom Input component passes value directly, not event object
+                              const newValue = value?.toString() || "";
+                              console.log('[DESCRIPTION CHANGE] User typed:', newValue);
+                              console.log('[DESCRIPTION CHANGE] Current URL description:', description);
+                              updateDescription(newValue);
+                              form.setValue("description", newValue, {
+                                shouldValidate: true,
+                                shouldDirty: true,
+                                shouldTouch: true
+                              });
+                              console.log('[DESCRIPTION CHANGE] After update, form value:', form.getValues('description'));
                             }}
                             className={`h-10 w-full ${form.formState.errors.description ? "border-red-500" : ""}`}
                           />
@@ -825,7 +977,15 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   label: supplier.fantasyName,
                                 }))}
                                 value={supplierId}
-                                onValueChange={(value) => updateSupplierId(typeof value === "string" ? value : undefined)}
+                                onValueChange={(value) => {
+                                  const newValue = typeof value === "string" ? value : undefined;
+                                  updateSupplierId(newValue);
+                                  form.setValue("supplierId", newValue, {
+                                    shouldValidate: true,
+                                    shouldDirty: true,
+                                    shouldTouch: true
+                                  });
+                                }}
                                 className="h-10 w-full"
                                 mode="single"
                                 searchable={true}
@@ -847,8 +1007,18 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                     const newDate = new Date(date);
                                     newDate.setHours(13, 0, 0, 0);
                                     updateForecast(newDate);
+                                    form.setValue("forecast", newDate, {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                      shouldTouch: true
+                                    });
                                   } else {
                                     updateForecast(null);
+                                    form.setValue("forecast", undefined, {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                      shouldTouch: true
+                                    });
                                   }
                                 }}
                                 context="delivery"
@@ -865,7 +1035,14 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                             <Textarea
                               placeholder="Observações sobre o pedido (opcional)"
                               value={notes}
-                              onChange={(e) => updateNotes(e.target.value)}
+                              onChange={(e) => {
+                                updateNotes(e.target.value);
+                                form.setValue("notes", e.target.value, {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                  shouldTouch: true
+                                });
+                              }}
                               className="resize-none w-full flex-1"
                               rows={3}
                             />
