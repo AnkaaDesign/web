@@ -6,7 +6,7 @@ import { IconAlertTriangle, IconShoppingCart, IconTrash, IconRefresh, IconEdit, 
 import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/page-header";
 import type { PageAction } from "@/components/ui/page-header";
-import { OrderInfoCard, OrderItemsCard } from "@/components/inventory/order/detail";
+import { OrderInfoCard, OrderItemsCard, OrderDocumentsCard } from "@/components/inventory/order/detail";
 import { OrderDetailSkeleton } from "@/components/inventory/order/detail/order-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { usePrivileges } from "../../../../hooks";
@@ -53,6 +53,11 @@ const OrderDetailsPage = () => {
         },
       },
       supplier: true,
+      budgets: true,
+      invoices: true,
+      receipts: true,
+      reimbursements: true,
+      invoiceReimbursements: true,
     },
     enabled: !!id,
   });
@@ -267,8 +272,11 @@ const OrderDetailsPage = () => {
                 </div>
               </div>
 
-              {/* Bottom Section: Items Full Width */}
+              {/* Bottom Section: Items and Documents */}
               <OrderItemsCard order={order} className="w-full" onOrderUpdate={handleOrderUpdate} />
+
+              {/* Documents Section */}
+              <OrderDocumentsCard order={order} className="w-full" />
             </div>
           </div>
         </div>

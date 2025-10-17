@@ -126,6 +126,11 @@ export interface Order extends BaseEntity {
   budget?: File;
   nfe?: File;
   receipt?: File;
+  budgets?: File[]; // Multiple budget files
+  invoices?: File[]; // Multiple invoice/NFE files (orderInvoices relation)
+  receipts?: File[]; // Multiple receipt files
+  reimbursements?: File[]; // Multiple reimbursement files
+  invoiceReimbursements?: File[]; // Multiple invoice reimbursement files (orderInvoiceReimbursements relation)
   supplier?: Supplier;
   orderSchedule?: OrderSchedule;
   ppeSchedule?: PpeDeliverySchedule;
@@ -155,6 +160,31 @@ export interface OrderIncludes {
         include?: FileIncludes;
       };
   receipt?:
+    | boolean
+    | {
+        include?: FileIncludes;
+      };
+  budgets?:
+    | boolean
+    | {
+        include?: FileIncludes;
+      };
+  invoices?:
+    | boolean
+    | {
+        include?: FileIncludes;
+      };
+  receipts?:
+    | boolean
+    | {
+        include?: FileIncludes;
+      };
+  reimbursements?:
+    | boolean
+    | {
+        include?: FileIncludes;
+      };
+  invoiceReimbursements?:
     | boolean
     | {
         include?: FileIncludes;
