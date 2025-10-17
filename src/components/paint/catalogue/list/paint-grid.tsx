@@ -12,12 +12,13 @@ interface PaintGridProps {
   isLoading: boolean;
   onPaintClick: (paint: Paint) => void;
   showEffects?: boolean;
+  onOrderChange?: (paints: Paint[]) => void;
 }
 
 const SQUARE_SIZE = 64; // Fixed size in pixels
 const GAP = 8; // Gap between squares
 
-export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true }: PaintGridProps) {
+export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true, onOrderChange }: PaintGridProps) {
   // Local state for drag-and-drop reordering
   const [orderedPaints, setOrderedPaints] = useState<Paint[]>(paints);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -48,6 +49,10 @@ export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true 
 
   const handleDragEnd = () => {
     setDraggedIndex(null);
+    // Notify parent of order change
+    if (onOrderChange) {
+      onOrderChange(orderedPaints);
+    }
   };
   if (isLoading) {
     return (

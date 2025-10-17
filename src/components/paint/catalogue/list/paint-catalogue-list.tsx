@@ -4,10 +4,11 @@ import { usePaints, usePaintTypes, usePaintBrands, usePaintMerge } from "../../.
 import type { Paint, PaintOrderBy } from "../../../../types";
 import type { PaintGetManyFormData } from "../../../../schemas";
 import { PAINT_FINISH, COLOR_PALETTE, PAINT_BRAND, TRUCK_MANUFACTURER } from "../../../../constants";
+import { batchUpdatePaintColorOrder } from "../../../../api-client/paint";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { IconFilter, IconMaximize, IconMinimize, IconSparkles, IconTrash } from "@tabler/icons-react";
+import { IconFilter, IconMaximize, IconMinimize, IconSparkles, IconTrash, IconDeviceFloppy } from "@tabler/icons-react";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { PaintFilters } from "./paint-filters";
 import { PaintGrid } from "./paint-grid";
@@ -103,6 +104,11 @@ function PaintCatalogueListContent({ className }: PaintCatalogueListProps) {
     const effects = searchParams.get("effects");
     return effects !== "false";
   });
+
+  // Color order state
+  const [hasOrderChanges, setHasOrderChanges] = useState(false);
+  const [reorderedPaints, setReorderedPaints] = useState<Paint[]>([]);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   // Ref for scrolling
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -470,6 +476,33 @@ function PaintCatalogueListContent({ className }: PaintCatalogueListProps) {
     setIsMinimized(!isMinimized);
   };
 
+  // Handle order change from drag-and-drop
+  const handleOrderChange = useCallback((newOrder: Paint[]) => {
+    setReorderedPaints(newOrder);
+    setHasOrderChanges(true);
+  }, []);
+
+  // Save color order
+  const handleSaveColorOrder = async () => {
+    try {
+      setIsSavingOrder(true);
+      const updates = reorderedPaints.map((paint, index) => ({
+        id: paint.id,
+        colorOrder: index + 1,
+      }));
+
+      await batchUpdatePaintColorOrder({ updates });
+      toast.success("Ordem das tintas salva com sucesso");
+      setHasOrderChanges(false);
+      refetch();
+    } catch (error) {
+      console.error("Erro ao salvar ordem:", error);
+      toast.error("Erro ao salvar ordem das tintas");
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
+
   return (
     <ContextMenuProvider>
       <Card className={cn("h-full w-full flex flex-col shadow-sm border border-border", className)}>
@@ -486,9 +519,9 @@ function PaintCatalogueListContent({ className }: PaintCatalogueListProps) {
             </div>
             <div className="flex gap-2">
               {/* Filter Button */}
-              <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)} className="group">
-                <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                <span className="text-foreground">
+              <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)}>
+                <IconFilter className="h-4 w-4" />
+                <span>
                   Filtros
                   {hasActiveFilters ? ` (${totalFilterCount})` : ""}
                 </span>
@@ -496,6 +529,19 @@ function PaintCatalogueListContent({ className }: PaintCatalogueListProps) {
 
               {/* Sort Selector */}
               <SortSelector currentSort={currentSort} onSortChange={handleSortChange} />
+
+              {/* Save Color Order Button - only show when minimized and has changes */}
+              {isMinimized && hasOrderChanges && (
+                <Button
+                  variant="default"
+                  size="default"
+                  onClick={handleSaveColorOrder}
+                  disabled={isSavingOrder}
+                >
+                  <IconDeviceFloppy className="h-4 w-4 mr-2" />
+                  {isSavingOrder ? "Salvando..." : "Salvar Ordem"}
+                </Button>
+              )}
 
               {/* Effects Toggle Button */}
               <Button
@@ -524,7 +570,7 @@ function PaintCatalogueListContent({ className }: PaintCatalogueListProps) {
           {/* Paint display with smooth transitions */}
           <div ref={scrollContainerRef} className="flex-1 min-h-0 relative overflow-auto w-full">
             {isMinimized ? (
-              <PaintGrid paints={sortedPaints} isLoading={isLoading} onPaintClick={handlePaintClick} showEffects={showEffects} />
+              <PaintGrid paints={sortedPaints} isLoading={isLoading} onPaintClick={handlePaintClick} showEffects={showEffects} onOrderChange={handleOrderChange} />
             ) : (
               <PaintCardGridVirtualized paints={sortedPaints} isLoading={isLoading} onFilterChange={handleFilterChange} currentFilters={filters} showEffects={showEffects} onMerge={handleMerge} />
             )}

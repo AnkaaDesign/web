@@ -35,6 +35,7 @@ export interface Paint extends BaseEntity {
   tags: string[];
   palette: COLOR_PALETTE;
   paletteOrder: number;
+  colorOrder: number | null;
   paintTypeId: string;
   paintBrandId: string | null;
 
@@ -225,6 +226,7 @@ export interface PaintOrderBy {
   manufacturer?: ORDER_BY_DIRECTION;
   palette?: ORDER_BY_DIRECTION;
   paletteOrder?: ORDER_BY_DIRECTION;
+  colorOrder?: ORDER_BY_DIRECTION;
   paintTypeId?: ORDER_BY_DIRECTION;
   paintBrandId?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;

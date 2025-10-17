@@ -9,6 +9,7 @@ import type {
   PaintUpdateFormData,
   PaintBatchCreateFormData,
   PaintBatchUpdateFormData,
+  PaintBatchUpdateColorOrderFormData,
   PaintBatchDeleteFormData,
   PaintFormulaGetManyFormData,
   PaintFormulaGetByIdFormData,
@@ -241,6 +242,12 @@ export class PaintService {
 
   async mergePaints(data: PaintMergeFormData, query?: PaintQueryFormData): Promise<PaintMergeResponse> {
     const response = await apiClient.post<PaintMergeResponse>(`${this.basePath}/merge`, data, { params: query });
+    return response.data;
+  }
+
+  // Paint Batch Update Color Order
+  async batchUpdateColorOrder(data: PaintBatchUpdateColorOrderFormData) {
+    const response = await apiClient.put(`${this.basePath}/batch/color-order`, data);
     return response.data;
   }
 
@@ -735,6 +742,7 @@ export const batchCreatePaints = (data: PaintBatchCreateFormData, query?: PaintQ
 export const batchUpdatePaints = (data: PaintBatchUpdateFormData, query?: PaintQueryFormData) => paintService.batchUpdatePaints(data, query);
 export const batchDeletePaints = (data: PaintBatchDeleteFormData) => paintService.batchDeletePaints(data);
 export const mergePaints = (data: PaintMergeFormData, query?: PaintQueryFormData) => paintService.mergePaints(data, query);
+export const batchUpdatePaintColorOrder = (data: PaintBatchUpdateColorOrderFormData) => paintService.batchUpdateColorOrder(data);
 
 // Component Intersection exports
 export const getAvailableComponents = (paintBrandId: string, paintTypeId: string) => paintService.getAvailableComponents(paintBrandId, paintTypeId);
