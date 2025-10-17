@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import type { Paint } from "../../../../types";
 import { formatHexColor } from "./color-utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +18,37 @@ const SQUARE_SIZE = 64; // Fixed size in pixels
 const GAP = 8; // Gap between squares
 
 export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true }: PaintGridProps) {
+  // Local state for drag-and-drop reordering
+  const [orderedPaints, setOrderedPaints] = useState<Paint[]>(paints);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  // Update ordered paints when paints prop changes
+  useEffect(() => {
+    setOrderedPaints(paints);
+  }, [paints]);
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+
+    if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+    // Reorder the paints array
+    const newPaints = [...orderedPaints];
+    const draggedPaint = newPaints[draggedIndex];
+    newPaints.splice(draggedIndex, 1);
+    newPaints.splice(targetIndex, 0, draggedPaint);
+
+    setOrderedPaints(newPaints);
+    setDraggedIndex(targetIndex);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
   if (isLoading) {
     return (
       <div className="h-full w-full overflow-auto p-4">
@@ -52,8 +84,18 @@ export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true 
           gap: `${GAP}px`,
         }}
       >
-        {paints.map((paint) => (
-          <PaintSquare key={paint.id} paint={paint} onClick={() => onPaintClick(paint)} showEffects={showEffects} />
+        {orderedPaints.map((paint, index) => (
+          <PaintSquare
+            key={paint.id}
+            paint={paint}
+            index={index}
+            onClick={() => onPaintClick(paint)}
+            showEffects={showEffects}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            isDragging={draggedIndex === index}
+          />
         ))}
       </div>
     </div>
@@ -62,11 +104,16 @@ export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true 
 
 interface PaintSquareProps {
   paint: Paint;
+  index: number;
   onClick: () => void;
   showEffects?: boolean;
+  onDragStart: (index: number) => void;
+  onDragOver: (e: React.DragEvent, index: number) => void;
+  onDragEnd: () => void;
+  isDragging: boolean;
 }
 
-function PaintSquare({ paint, onClick, showEffects = true }: PaintSquareProps) {
+function PaintSquare({ paint, index, onClick, showEffects = true, onDragStart, onDragOver, onDragEnd, isDragging }: PaintSquareProps) {
   const backgroundColor = formatHexColor(paint.hex);
 
   const paintFinish = paint.finish as PAINT_FINISH;
@@ -74,11 +121,16 @@ function PaintSquare({ paint, onClick, showEffects = true }: PaintSquareProps) {
   const button = (
     <button
       onClick={onClick}
+      draggable
+      onDragStart={() => onDragStart(index)}
+      onDragOver={(e) => onDragOver(e, index)}
+      onDragEnd={onDragEnd}
       className={cn(
         "rounded-lg transition-all duration-200",
         "hover:scale-110 hover:z-20 hover:shadow-lg",
         "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-        "group cursor-pointer overflow-hidden relative block",
+        "group cursor-move overflow-hidden relative block",
+        isDragging && "opacity-50 scale-95",
       )}
       style={{
         width: SQUARE_SIZE,
