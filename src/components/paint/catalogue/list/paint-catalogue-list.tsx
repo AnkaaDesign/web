@@ -591,10 +591,15 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
   );
 }
 
-export function PaintCatalogueList({ className }: PaintCatalogueListProps) {
+export function PaintCatalogueList({ className, onOrderStateChange, onSaveOrderRequest, onResetOrderRequest }: PaintCatalogueListProps) {
   return (
     <PaintSelectionProvider>
-      <PaintCatalogueListContent className={className} />
+      <PaintCatalogueListContent
+        className={className}
+        onOrderStateChange={onOrderStateChange}
+        onSaveOrderRequest={onSaveOrderRequest}
+        onResetOrderRequest={onResetOrderRequest}
+      />
     </PaintSelectionProvider>
   );
 }
