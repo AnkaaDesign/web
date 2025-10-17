@@ -3,17 +3,89 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
-import { IconPaint, IconPlus } from "@tabler/icons-react";
+import { IconPaint, IconPlus, IconDeviceFloppy, IconRestore } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { batchUpdatePaintColorOrder } from "@/api-client/paint";
+import { toast } from "@/components/ui/sonner";
+import type { Paint } from "@/types";
 
 export function CatalogListPage() {
   const navigate = useNavigate();
+  const [hasOrderChanges, setHasOrderChanges] = useState(false);
+  const [reorderedPaints, setReorderedPaints] = useState<Paint[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Track page access
   usePageTracker({
     title: "Catálogo de Tintas",
     icon: "paint",
   });
+
+  const handleOrderStateChange = (hasChanges: boolean, orderedPaints: Paint[]) => {
+    setHasOrderChanges(hasChanges);
+    setReorderedPaints(orderedPaints);
+  };
+
+  const handleSaveOrder = async () => {
+    try {
+      setIsSaving(true);
+      const updates = reorderedPaints.map((paint, index) => ({
+        id: paint.id,
+        colorOrder: index + 1,
+      }));
+
+      await batchUpdatePaintColorOrder({ updates });
+      toast.success("Ordem das tintas salva com sucesso");
+      setHasOrderChanges(false);
+      // Trigger a refetch by calling the global handler
+      if ((window as any).__paintOrderSaved) {
+        (window as any).__paintOrderSaved();
+      }
+    } catch (error) {
+      console.error("Erro ao salvar ordem:", error);
+      toast.error("Erro ao salvar ordem das tintas");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResetOrder = () => {
+    if ((window as any).__resetPaintOrder) {
+      (window as any).__resetPaintOrder();
+    }
+    setHasOrderChanges(false);
+  };
+
+  const actions = [
+    {
+      key: "create",
+      label: "Nova Tinta",
+      icon: IconPlus,
+      onClick: () => navigate(routes.painting.catalog.create),
+      variant: "default" as const,
+    },
+  ];
+
+  if (hasOrderChanges) {
+    actions.unshift(
+      {
+        key: "reset",
+        label: "Resetar Ordem",
+        icon: IconRestore,
+        onClick: handleResetOrder,
+        variant: "outline" as const,
+      },
+      {
+        key: "save",
+        label: isSaving ? "Salvando..." : "Salvar Ordem",
+        icon: IconDeviceFloppy,
+        onClick: handleSaveOrder,
+        variant: "default" as const,
+        disabled: isSaving,
+      }
+    );
+  }
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.PRODUCTION}>
@@ -24,18 +96,15 @@ export function CatalogListPage() {
             icon={IconPaint}
             favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura", href: routes.painting.root }, { label: "Catálogo" }]}
-            actions={[
-              {
-                key: "create",
-                label: "Nova Tinta",
-                icon: IconPlus,
-                onClick: () => navigate(routes.painting.catalog.create),
-                variant: "default",
-              },
-            ]}
+            actions={actions}
           />
         </div>
-        <PaintCatalogueList className="flex-1 min-h-0" />
+        <PaintCatalogueList
+          className="flex-1 min-h-0"
+          onOrderStateChange={handleOrderStateChange}
+          onSaveOrderRequest={handleSaveOrder}
+          onResetOrderRequest={handleResetOrder}
+        />
       </div>
     </PrivilegeRoute>
   );

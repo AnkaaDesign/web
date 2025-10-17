@@ -8,7 +8,7 @@ import { batchUpdatePaintColorOrder } from "../../../../api-client/paint";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { IconFilter, IconMaximize, IconMinimize, IconSparkles, IconTrash, IconDeviceFloppy } from "@tabler/icons-react";
+import { IconFilter, IconMaximize, IconMinimize, IconSparkles, IconTrash } from "@tabler/icons-react";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { PaintFilters } from "./paint-filters";
 import { PaintGrid } from "./paint-grid";
@@ -27,6 +27,9 @@ import { toast } from "@/components/ui/sonner";
 
 interface PaintCatalogueListProps {
   className?: string;
+  onOrderStateChange?: (hasChanges: boolean, orderedPaints: Paint[]) => void;
+  onSaveOrderRequest?: () => void;
+  onResetOrderRequest?: () => void;
 }
 
 const DEFAULT_PAGE_SIZE = 60; // More items for color grid
@@ -83,7 +86,7 @@ function SelectionInfo({ selectedPaints }: SelectionInfoProps) {
   );
 }
 
-function PaintCatalogueListContent({ className }: PaintCatalogueListProps) {
+function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderRequest, onResetOrderRequest }: PaintCatalogueListProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { selectedPaintIds, clearSelection } = usePaintSelection();
 
@@ -108,7 +111,6 @@ function PaintCatalogueListContent({ className }: PaintCatalogueListProps) {
   // Color order state
   const [hasOrderChanges, setHasOrderChanges] = useState(false);
   const [reorderedPaints, setReorderedPaints] = useState<Paint[]>([]);
-  const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   // Ref for scrolling
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -480,28 +482,38 @@ function PaintCatalogueListContent({ className }: PaintCatalogueListProps) {
   const handleOrderChange = useCallback((newOrder: Paint[]) => {
     setReorderedPaints(newOrder);
     setHasOrderChanges(true);
-  }, []);
-
-  // Save color order
-  const handleSaveColorOrder = async () => {
-    try {
-      setIsSavingOrder(true);
-      const updates = reorderedPaints.map((paint, index) => ({
-        id: paint.id,
-        colorOrder: index + 1,
-      }));
-
-      await batchUpdatePaintColorOrder({ updates });
-      toast.success("Ordem das tintas salva com sucesso");
-      setHasOrderChanges(false);
-      refetch();
-    } catch (error) {
-      console.error("Erro ao salvar ordem:", error);
-      toast.error("Erro ao salvar ordem das tintas");
-    } finally {
-      setIsSavingOrder(false);
+    if (onOrderStateChange) {
+      onOrderStateChange(true, newOrder);
     }
-  };
+  }, [onOrderStateChange]);
+
+  // Expose reset handler
+  useEffect(() => {
+    if (onResetOrderRequest) {
+      // Store the handler to be called from parent
+      (window as any).__resetPaintOrder = () => {
+        setReorderedPaints(sortedPaints);
+        setHasOrderChanges(false);
+        if (onOrderStateChange) {
+          onOrderStateChange(false, sortedPaints);
+        }
+      };
+    }
+    return () => {
+      delete (window as any).__resetPaintOrder;
+    };
+  }, [sortedPaints, onOrderStateChange, onResetOrderRequest]);
+
+  // Expose refetch handler for after save
+  useEffect(() => {
+    (window as any).__paintOrderSaved = () => {
+      refetch();
+      setHasOrderChanges(false);
+    };
+    return () => {
+      delete (window as any).__paintOrderSaved;
+    };
+  }, [refetch]);
 
   return (
     <ContextMenuProvider>
@@ -529,19 +541,6 @@ function PaintCatalogueListContent({ className }: PaintCatalogueListProps) {
 
               {/* Sort Selector */}
               <SortSelector currentSort={currentSort} onSortChange={handleSortChange} />
-
-              {/* Save Color Order Button - only show when minimized and has changes */}
-              {isMinimized && hasOrderChanges && (
-                <Button
-                  variant="default"
-                  size="default"
-                  onClick={handleSaveColorOrder}
-                  disabled={isSavingOrder}
-                >
-                  <IconDeviceFloppy className="h-4 w-4 mr-2" />
-                  {isSavingOrder ? "Salvando..." : "Salvar Ordem"}
-                </Button>
-              )}
 
               {/* Effects Toggle Button */}
               <Button
