@@ -115,9 +115,15 @@ export function ProfilePage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.match(/image\/(jpeg|jpg|png|gif|webp)/)) {
-      toast.error("Formato de arquivo inválido. Use JPG, PNG, GIF ou WEBP.");
+    // Validate file type - check both MIME type and extension
+    const validMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    const validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+    const fileName = file.name.toLowerCase();
+    const hasValidMimeType = validMimeTypes.includes(file.type.toLowerCase());
+    const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+
+    if (!hasValidMimeType && !hasValidExtension) {
+      toast.error("Formato de arquivo inválido. Use JPG, JPEG, PNG, GIF ou WEBP.");
       return;
     }
 
@@ -137,8 +143,8 @@ export function ProfilePage() {
       };
       reader.readAsDataURL(file);
 
-      // Upload photo
-      const response = await uploadPhoto(file);
+      // Upload photo with user name for proper file organization
+      const response = await uploadPhoto(file, user?.name);
 
       if (response.success) {
         toast.success("Foto atualizada com sucesso!");
@@ -239,8 +245,9 @@ export function ProfilePage() {
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-auto px-6">
-        <div className="grid gap-6 md:grid-cols-[300px,1fr]">
+      <div className="flex-1 min-h-0 overflow-auto">
+        <div className="max-w-5xl mx-auto px-4 w-full">
+          <div className="grid gap-6 md:grid-cols-[300px,1fr]">
         {/* Profile Photo Card */}
         <Card>
           <CardHeader>
@@ -278,7 +285,7 @@ export function ProfilePage() {
               <input
                 id="photo-upload"
                 type="file"
-                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/jpg,image/png,image/gif,image/webp"
                 className="hidden"
                 onChange={handlePhotoUpload}
                 disabled={isUploadingPhoto}
@@ -431,6 +438,7 @@ export function ProfilePage() {
             </form>
           </Form>
         </div>
+          </div>
         </div>
       </div>
     </div>

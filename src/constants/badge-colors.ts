@@ -78,7 +78,14 @@ type BadgeVariant =
   | "onHold"
   | "inProgress"
   | "invoiced"
-  | "settled";
+  | "settled"
+  | "purple"
+  | "blue"
+  | "orange"
+  | "green"
+  | "teal"
+  | "indigo"
+  | "pink";
 
 /**
  * Badge Color Definitions
@@ -201,6 +208,43 @@ export const BADGE_COLORS: Record<
     bg: "bg-indigo-700",
     text: "text-white",
     hover: "hover:bg-indigo-800",
+  },
+
+  // Additional color variants for unique sector privileges
+  purple: {
+    bg: "bg-purple-600",
+    text: "text-white",
+    hover: "hover:bg-purple-700",
+  },
+  blue: {
+    bg: "bg-blue-600",
+    text: "text-white",
+    hover: "hover:bg-blue-700",
+  },
+  orange: {
+    bg: "bg-orange-500",
+    text: "text-white",
+    hover: "hover:bg-orange-600",
+  },
+  green: {
+    bg: "bg-green-600",
+    text: "text-white",
+    hover: "hover:bg-green-700",
+  },
+  teal: {
+    bg: "bg-teal-600",
+    text: "text-white",
+    hover: "hover:bg-teal-700",
+  },
+  indigo: {
+    bg: "bg-indigo-600",
+    text: "text-white",
+    hover: "hover:bg-indigo-700",
+  },
+  pink: {
+    bg: "bg-pink-600",
+    text: "text-white",
+    hover: "hover:bg-pink-700",
   },
 };
 
@@ -500,15 +544,19 @@ export const ENTITY_BADGE_CONFIG = {
   },
 
   // Sector Privileges
+  // Sector Privileges - Each privilege has a unique color
   SECTOR_PRIVILEGES: {
-    [SECTOR_PRIVILEGES.BASIC]: "muted" as BadgeVariant,
-    [SECTOR_PRIVILEGES.MAINTENANCE]: "secondary" as BadgeVariant,
-    [SECTOR_PRIVILEGES.WAREHOUSE]: "default" as BadgeVariant,
-    [SECTOR_PRIVILEGES.ADMIN]: "primary" as BadgeVariant,
-    [SECTOR_PRIVILEGES.PRODUCTION]: "info" as BadgeVariant,
-    [SECTOR_PRIVILEGES.LEADER]: "inProgress" as BadgeVariant,
-    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: "warning" as BadgeVariant,
-    [SECTOR_PRIVILEGES.EXTERNAL]: "outline" as BadgeVariant,
+    [SECTOR_PRIVILEGES.ADMIN]: "destructive" as BadgeVariant, // Red - highest privilege
+    [SECTOR_PRIVILEGES.LEADER]: "warning" as BadgeVariant, // Orange/Yellow - leadership role
+    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: "purple" as BadgeVariant, // Purple - HR specific
+    [SECTOR_PRIVILEGES.PRODUCTION]: "blue" as BadgeVariant, // Blue - production role
+    [SECTOR_PRIVILEGES.MAINTENANCE]: "orange" as BadgeVariant, // Dark Orange - maintenance role
+    [SECTOR_PRIVILEGES.WAREHOUSE]: "green" as BadgeVariant, // Green - warehouse role
+    [SECTOR_PRIVILEGES.FINANCIAL]: "teal" as BadgeVariant, // Teal - financial role
+    [SECTOR_PRIVILEGES.LOGISTIC]: "indigo" as BadgeVariant, // Indigo - logistics role
+    [SECTOR_PRIVILEGES.DESIGNER]: "pink" as BadgeVariant, // Pink - designer role
+    [SECTOR_PRIVILEGES.EXTERNAL]: "secondary" as BadgeVariant, // Light Gray - external access
+    [SECTOR_PRIVILEGES.BASIC]: "default" as BadgeVariant, // Gray - basic access
   },
 
   // Commission Status

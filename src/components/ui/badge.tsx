@@ -40,6 +40,9 @@ const badgeVariants = cva(
 
         // Additional color variants
         purple: "border-transparent bg-purple-600 text-white hover:bg-purple-700",
+        teal: "border-transparent bg-teal-600 text-white hover:bg-teal-700",
+        indigo: "border-transparent bg-indigo-600 text-white hover:bg-indigo-700",
+        pink: "border-transparent bg-pink-600 text-white hover:bg-pink-700",
 
         // Inactive variant
         inactive: "border-transparent bg-gray-500 text-white hover:bg-gray-600",

@@ -956,17 +956,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         // Limit to 11 digits for Brazilian phones
         const limitedDigits = digits.slice(0, 11);
 
-        // Format progressively as user types
-        let formatted = "";
-        if (limitedDigits.length > 0) {
-          formatted = "(" + limitedDigits.slice(0, 2);
-          if (limitedDigits.length > 2) {
-            formatted += ") " + limitedDigits.slice(2, 7);
-            if (limitedDigits.length > 7) {
-              formatted += "-" + limitedDigits.slice(7, 11);
-            }
-          }
-        }
+        // Use formatBrazilianPhone for consistent formatting
+        const formatted = formatBrazilianPhone(limitedDigits);
 
         setInternalValue(formatted);
         if (!naturalTyping) {

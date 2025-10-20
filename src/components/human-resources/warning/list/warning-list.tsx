@@ -132,7 +132,14 @@ export function WarningList({ selectedSeverity, onDataUpdate, className }: Warni
   );
 
   const handleFiltersApply = useCallback(
-    (newFilters: { severity?: WARNING_SEVERITY; category?: WARNING_CATEGORY; isActive?: boolean }) => {
+    (newFilters: {
+      severity?: WARNING_SEVERITY;
+      category?: WARNING_CATEGORY;
+      isActive?: boolean;
+      collaboratorIds?: string[];
+      supervisorIds?: string[];
+      witnessIds?: string[];
+    }) => {
       const updatedFilters: Partial<WarningGetManyFormData> = {
         ...filters,
         where: {
@@ -141,6 +148,10 @@ export function WarningList({ selectedSeverity, onDataUpdate, className }: Warni
           ...(newFilters.category && { category: newFilters.category }),
           ...(typeof newFilters.isActive === "boolean" && { isActive: newFilters.isActive }),
         },
+        // Add array filters at the top level (schema transforms them to where clauses)
+        collaboratorIds: newFilters.collaboratorIds,
+        supervisorIds: newFilters.supervisorIds,
+        witnessIds: newFilters.witnessIds,
       };
 
       // Remove undefined values from where clause
@@ -171,6 +182,11 @@ export function WarningList({ selectedSeverity, onDataUpdate, className }: Warni
     (key: string) => {
       if (key === "searchingFor") {
         setSearch("");
+      } else if (key === "collaboratorIds" || key === "supervisorIds" || key === "witnessIds") {
+        // Handle array filters at top level
+        const updatedFilters = { ...filters };
+        delete updatedFilters[key as keyof typeof updatedFilters];
+        handleFilterChange(updatedFilters);
       } else {
         const updatedFilters = { ...filters };
         if (updatedFilters.where) {
@@ -227,8 +243,35 @@ export function WarningList({ selectedSeverity, onDataUpdate, className }: Warni
       });
     }
 
+    if (filters.collaboratorIds && filters.collaboratorIds.length > 0) {
+      activeFiltersArray.push({
+        key: "collaboratorIds",
+        label: "Colaboradores",
+        value: `${filters.collaboratorIds.length} selecionado${filters.collaboratorIds.length > 1 ? "s" : ""}`,
+        onRemove: () => onRemoveFilter("collaboratorIds"),
+      });
+    }
+
+    if (filters.supervisorIds && filters.supervisorIds.length > 0) {
+      activeFiltersArray.push({
+        key: "supervisorIds",
+        label: "Supervisores",
+        value: `${filters.supervisorIds.length} selecionado${filters.supervisorIds.length > 1 ? "s" : ""}`,
+        onRemove: () => onRemoveFilter("supervisorIds"),
+      });
+    }
+
+    if (filters.witnessIds && filters.witnessIds.length > 0) {
+      activeFiltersArray.push({
+        key: "witnessIds",
+        label: "Testemunhas",
+        value: `${filters.witnessIds.length} selecionada${filters.witnessIds.length > 1 ? "s" : ""}`,
+        onRemove: () => onRemoveFilter("witnessIds"),
+      });
+    }
+
     return activeFiltersArray;
-  }, [searchingFor, filters.where, onRemoveFilter]);
+  }, [searchingFor, filters.where, filters.collaboratorIds, filters.supervisorIds, filters.witnessIds, onRemoveFilter]);
 
   // Handle data update
   const handleDataChange = useCallback(
@@ -289,6 +332,9 @@ export function WarningList({ selectedSeverity, onDataUpdate, className }: Warni
         currentSeverity={filters.where?.severity}
         currentCategory={filters.where?.category}
         currentIsActive={filters.where?.isActive}
+        currentCollaboratorIds={filters.collaboratorIds}
+        currentSupervisorIds={filters.supervisorIds}
+        currentWitnessIds={filters.witnessIds}
       />
     </Card>
   );

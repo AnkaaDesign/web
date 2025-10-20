@@ -15,6 +15,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 export interface FormulaFiltersData {
   paintNames?: string[];
   hasComponents?: "all" | "with" | "without";
+  sortBy?: "createdAt" | "pricePerLiter" | "density";
+  sortOrder?: "asc" | "desc";
 }
 
 interface FormulaFiltersProps {
@@ -47,6 +49,8 @@ export function FormulaFilters({
     const clearedFilters: FormulaFiltersData = {
       paintNames: [],
       hasComponents: "all",
+      sortBy: "createdAt",
+      sortOrder: "desc",
     };
     setLocalFilters(clearedFilters);
     onFilterChange(clearedFilters);
@@ -74,6 +78,81 @@ export function FormulaFilters({
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
+          {/* Sort By Filter */}
+          <div className="space-y-2">
+            <Label>Ordenar por</Label>
+            <RadioGroup
+              value={localFilters.sortBy || "createdAt"}
+              onValueChange={(value) =>
+                setLocalFilters({
+                  ...localFilters,
+                  sortBy: value as "createdAt" | "pricePerLiter" | "density",
+                })
+              }
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="createdAt" id="sort-created" />
+                <label
+                  htmlFor="sort-created"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Data de Criação
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="pricePerLiter" id="sort-price" />
+                <label
+                  htmlFor="sort-price"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Preço por Litro
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="density" id="sort-density" />
+                <label
+                  htmlFor="sort-density"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Densidade
+                </label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {/* Sort Order Filter */}
+          <div className="space-y-2">
+            <Label>Ordem</Label>
+            <RadioGroup
+              value={localFilters.sortOrder || "desc"}
+              onValueChange={(value) =>
+                setLocalFilters({
+                  ...localFilters,
+                  sortOrder: value as "asc" | "desc",
+                })
+              }
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="asc" id="order-asc" />
+                <label
+                  htmlFor="order-asc"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Crescente
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="desc" id="order-desc" />
+                <label
+                  htmlFor="order-desc"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Decrescente
+                </label>
+              </div>
+            </RadioGroup>
+          </div>
+
           {/* Components Status Filter */}
           <div className="space-y-2">
             <Label>Status dos Componentes</Label>

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { IconFilter, IconX } from "@tabler/icons-react";
 
 import { WARNING_SEVERITY, WARNING_SEVERITY_LABELS, WARNING_CATEGORY, WARNING_CATEGORY_LABELS } from "../../../../constants";
+import { useUsers } from "../../../../hooks";
 
 import {
   Sheet,
@@ -14,32 +15,66 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 interface WarningFiltersProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onApply: (filters: { severity?: WARNING_SEVERITY; category?: WARNING_CATEGORY; isActive?: boolean }) => void;
+  onApply: (filters: {
+    severity?: WARNING_SEVERITY;
+    category?: WARNING_CATEGORY;
+    isActive?: boolean;
+    collaboratorIds?: string[];
+    supervisorIds?: string[];
+    witnessIds?: string[];
+  }) => void;
   currentSeverity?: WARNING_SEVERITY;
   currentCategory?: WARNING_CATEGORY;
   currentIsActive?: boolean;
+  currentCollaboratorIds?: string[];
+  currentSupervisorIds?: string[];
+  currentWitnessIds?: string[];
 }
 
-export function WarningFilters({ open, onOpenChange, onApply, currentSeverity, currentCategory, currentIsActive }: WarningFiltersProps) {
+export function WarningFilters({
+  open,
+  onOpenChange,
+  onApply,
+  currentSeverity,
+  currentCategory,
+  currentIsActive,
+  currentCollaboratorIds = [],
+  currentSupervisorIds = [],
+  currentWitnessIds = [],
+}: WarningFiltersProps) {
   const [severity, setSeverity] = useState<WARNING_SEVERITY | "">(currentSeverity || "");
   const [category, setCategory] = useState<WARNING_CATEGORY | "">(currentCategory || "");
   const [isActive, setIsActive] = useState<string>(currentIsActive === undefined ? "all" : currentIsActive ? "active" : "resolved");
+  const [collaboratorIds, setCollaboratorIds] = useState<string[]>(currentCollaboratorIds);
+  const [supervisorIds, setSupervisorIds] = useState<string[]>(currentSupervisorIds);
+  const [witnessIds, setWitnessIds] = useState<string[]>(currentWitnessIds);
+
+  // Load users for multi-select
+  const { data: usersData } = useUsers({ limit: 100, orderBy: { name: "asc" } });
+  const users = usersData?.data || [];
 
   useEffect(() => {
     setSeverity(currentSeverity || "");
     setCategory(currentCategory || "");
     setIsActive(currentIsActive === undefined ? "all" : currentIsActive ? "active" : "resolved");
-  }, [currentSeverity, currentCategory, currentIsActive]);
+    setCollaboratorIds(currentCollaboratorIds);
+    setSupervisorIds(currentSupervisorIds);
+    setWitnessIds(currentWitnessIds);
+  }, [currentSeverity, currentCategory, currentIsActive, currentCollaboratorIds, currentSupervisorIds, currentWitnessIds]);
 
   const handleApply = () => {
     onApply({
       severity: severity || undefined,
       category: category || undefined,
       isActive: isActive === "all" ? undefined : isActive === "active",
+      collaboratorIds: collaboratorIds.length > 0 ? collaboratorIds : undefined,
+      supervisorIds: supervisorIds.length > 0 ? supervisorIds : undefined,
+      witnessIds: witnessIds.length > 0 ? witnessIds : undefined,
     });
   };
 
@@ -47,6 +82,9 @@ export function WarningFilters({ open, onOpenChange, onApply, currentSeverity, c
     setSeverity("");
     setCategory("");
     setIsActive("all");
+    setCollaboratorIds([]);
+    setSupervisorIds([]);
+    setWitnessIds([]);
     onApply({});
   };
 
@@ -126,6 +164,39 @@ export function WarningFilters({ open, onOpenChange, onApply, currentSeverity, c
                 </Label>
               </div>
             </RadioGroup>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Colaboradores</Label>
+            <MultiSelect
+              options={users.map((user) => ({ value: user.id, label: user.name }))}
+              selected={collaboratorIds}
+              onChange={setCollaboratorIds}
+              placeholder={users.length === 0 ? "Carregando..." : "Selecione os colaboradores"}
+              disabled={users.length === 0}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Supervisores</Label>
+            <MultiSelect
+              options={users.map((user) => ({ value: user.id, label: user.name }))}
+              selected={supervisorIds}
+              onChange={setSupervisorIds}
+              placeholder={users.length === 0 ? "Carregando..." : "Selecione os supervisores"}
+              disabled={users.length === 0}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Testemunhas</Label>
+            <MultiSelect
+              options={users.map((user) => ({ value: user.id, label: user.name }))}
+              selected={witnessIds}
+              onChange={setWitnessIds}
+              placeholder={users.length === 0 ? "Carregando..." : "Selecione as testemunhas"}
+              disabled={users.length === 0}
+            />
           </div>
         </div>
 

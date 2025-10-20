@@ -76,6 +76,10 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
 
     if (fieldPath.length === 1) {
       // Direct field: { name: "asc" }
+      // Special case: Map "severity" to "severityOrder" for proper sorting
+      if (fieldPath[0] === "severity") {
+        return { severityOrder: config.direction };
+      }
       return { [fieldPath[0]]: config.direction };
     } else if (fieldPath.length === 2) {
       // Nested field

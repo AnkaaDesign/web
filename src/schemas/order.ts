@@ -701,6 +701,8 @@ export const orderScheduleWhereSchema: z.ZodSchema = z.lazy(() =>
 
 const orderFilters = {
   searchingFor: z.string().optional(),
+  hasItems: z.boolean().optional(),
+  isFromSchedule: z.boolean().optional(),
   status: z
     .array(
       z.enum(Object.values(ORDER_STATUS) as [string, ...string[]], {
@@ -710,6 +712,24 @@ const orderFilters = {
     .optional(),
   supplierIds: z.array(z.string()).optional(),
   forecastRange: z
+    .object({
+      gte: z.coerce.date().optional(),
+      lte: z.coerce.date().optional(),
+    })
+    .refine(
+      (data) => {
+        if (data.gte && data.lte) {
+          return data.lte >= data.gte;
+        }
+        return true;
+      },
+      {
+        message: "Data final deve ser posterior ou igual à data inicial",
+        path: ["lte"],
+      },
+    )
+    .optional(),
+  updatedAtRange: z
     .object({
       gte: z.coerce.date().optional(),
       lte: z.coerce.date().optional(),
@@ -809,6 +829,26 @@ const orderTransform = (data: any) => {
     delete data.searchingFor;
   }
 
+  // Handle hasItems filter
+  if (typeof data.hasItems === "boolean") {
+    if (data.hasItems) {
+      andConditions.push({ items: { some: {} } });
+    } else {
+      andConditions.push({ items: { none: {} } });
+    }
+    delete data.hasItems;
+  }
+
+  // Handle isFromSchedule filter
+  if (typeof data.isFromSchedule === "boolean") {
+    if (data.isFromSchedule) {
+      andConditions.push({ orderScheduleId: { not: null } });
+    } else {
+      andConditions.push({ orderScheduleId: null });
+    }
+    delete data.isFromSchedule;
+  }
+
   // Handle status filter
   if (data.status && Array.isArray(data.status) && data.status.length > 0) {
     andConditions.push({ status: { in: data.status } });
@@ -855,6 +895,31 @@ const orderTransform = (data: any) => {
   if (data.updatedAt) {
     andConditions.push({ updatedAt: data.updatedAt });
     delete data.updatedAt;
+  }
+
+  // Handle updatedAtRange filter
+  if (data.updatedAtRange && typeof data.updatedAtRange === "object") {
+    const updatedAtCondition: any = {};
+    if (data.updatedAtRange.gte) {
+      const fromDate = data.updatedAtRange.gte instanceof Date
+        ? data.updatedAtRange.gte
+        : new Date(data.updatedAtRange.gte);
+      // Set to start of day (00:00:00)
+      fromDate.setHours(0, 0, 0, 0);
+      updatedAtCondition.gte = fromDate;
+    }
+    if (data.updatedAtRange.lte) {
+      const toDate = data.updatedAtRange.lte instanceof Date
+        ? data.updatedAtRange.lte
+        : new Date(data.updatedAtRange.lte);
+      // Set to end of day (23:59:59.999)
+      toDate.setHours(23, 59, 59, 999);
+      updatedAtCondition.lte = toDate;
+    }
+    if (Object.keys(updatedAtCondition).length > 0) {
+      andConditions.push({ updatedAt: updatedAtCondition });
+    }
+    delete data.updatedAtRange;
   }
 
   // Merge with existing where conditions

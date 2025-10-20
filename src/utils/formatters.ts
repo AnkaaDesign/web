@@ -92,13 +92,18 @@ export const formatBrazilianPhone = (phone: string): string => {
   } else if (phoneNumber.length <= 10) {
     // Landline or partial mobile: "(11) 9999-9999" or "(11) 99999-999"
     const areaCode = phoneNumber.substring(0, 2);
-    if (phoneNumber.length === 10) {
-      // Complete landline
+    const thirdDigit = phoneNumber.charAt(2);
+
+    // Check if it's a mobile number (third digit is 9)
+    const isMobile = thirdDigit === "9";
+
+    if (phoneNumber.length === 10 && !isMobile) {
+      // Complete landline (doesn't start with 9)
       const firstPart = phoneNumber.substring(2, 6);
       const secondPart = phoneNumber.substring(6);
       return `(${areaCode}) ${firstPart}-${secondPart}`;
     } else {
-      // Partial mobile (7-9 digits)
+      // Partial mobile (7-10 digits starting with 9) or any 7-9 digit number
       const firstPart = phoneNumber.substring(2, 7);
       const secondPart = phoneNumber.substring(7);
       if (secondPart) {

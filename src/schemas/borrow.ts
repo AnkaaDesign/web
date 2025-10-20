@@ -91,9 +91,31 @@ export const borrowOrderBySchema = z
           .object({
             id: orderByDirectionSchema.optional(),
             name: orderByDirectionSchema.optional(),
+            uniCode: orderByDirectionSchema.optional(),
             quantity: orderByDirectionSchema.optional(),
             createdAt: orderByDirectionSchema.optional(),
             updatedAt: orderByDirectionSchema.optional(),
+            // Nested ordering for item's related entities
+            category: z
+              .object({
+                id: orderByDirectionSchema.optional(),
+                name: orderByDirectionSchema.optional(),
+                type: orderByDirectionSchema.optional(),
+                typeOrder: orderByDirectionSchema.optional(),
+                createdAt: orderByDirectionSchema.optional(),
+                updatedAt: orderByDirectionSchema.optional(),
+              })
+              .partial()
+              .optional(),
+            brand: z
+              .object({
+                id: orderByDirectionSchema.optional(),
+                name: orderByDirectionSchema.optional(),
+                createdAt: orderByDirectionSchema.optional(),
+                updatedAt: orderByDirectionSchema.optional(),
+              })
+              .partial()
+              .optional(),
           })
           .partial()
           .optional(),
@@ -123,6 +145,38 @@ export const borrowOrderBySchema = z
           returnedAt: orderByDirectionSchema.optional(),
           createdAt: orderByDirectionSchema.optional(),
           updatedAt: orderByDirectionSchema.optional(),
+          item: z
+            .object({
+              id: orderByDirectionSchema.optional(),
+              name: orderByDirectionSchema.optional(),
+              uniCode: orderByDirectionSchema.optional(),
+              quantity: orderByDirectionSchema.optional(),
+              createdAt: orderByDirectionSchema.optional(),
+              updatedAt: orderByDirectionSchema.optional(),
+              // Nested ordering for item's related entities (array version)
+              category: z
+                .object({
+                  id: orderByDirectionSchema.optional(),
+                  name: orderByDirectionSchema.optional(),
+                  type: orderByDirectionSchema.optional(),
+                  typeOrder: orderByDirectionSchema.optional(),
+                  createdAt: orderByDirectionSchema.optional(),
+                  updatedAt: orderByDirectionSchema.optional(),
+                })
+                .partial()
+                .optional(),
+              brand: z
+                .object({
+                  id: orderByDirectionSchema.optional(),
+                  name: orderByDirectionSchema.optional(),
+                  createdAt: orderByDirectionSchema.optional(),
+                  updatedAt: orderByDirectionSchema.optional(),
+                })
+                .partial()
+                .optional(),
+            })
+            .partial()
+            .optional(),
         })
         .partial(),
     ),

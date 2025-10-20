@@ -9,7 +9,7 @@ export interface FileOrganizationConfig {
 
 export interface FileContext {
   // Entity identifiers
-  entityType: 'task' | 'customer' | 'supplier' | 'warning' | 'cut' | 'airbrushing' | 'order' | 'withdrawal';
+  entityType: 'task' | 'customer' | 'supplier' | 'warning' | 'cut' | 'airbrushing' | 'order' | 'withdrawal' | 'user';
   entityId?: string;
 
   // Related entities
@@ -22,7 +22,7 @@ export interface FileContext {
   userId?: string;
 
   // File metadata
-  fileType?: 'logo' | 'budget' | 'receipt' | 'invoice' | 'invoiceReimbursement' | 'reimbursement' | 'artwork' | 'cut' | 'attachment' | 'document';
+  fileType?: 'logo' | 'budget' | 'receipt' | 'invoice' | 'invoiceReimbursement' | 'reimbursement' | 'artwork' | 'cut' | 'attachment' | 'document' | 'photo';
   fileExtension?: string;
   isImage?: boolean;
   isPdf?: boolean;
@@ -58,6 +58,15 @@ export const FILE_ORGANIZATION: FileOrganizationConfig[] = [
     entity: 'warning',
     fileType: 'attachment',
     getPath: (ctx) => `Advertencias/${ctx.userName || ctx.userId || 'Usuario-Desconhecido'}/`
+  },
+
+  // ==================
+  // USER/EMPLOYEE FILES
+  // ==================
+  {
+    entity: 'user',
+    fileType: 'photo',
+    getPath: (ctx) => `Colaboradores/${ctx.userName || ctx.userId || 'Usuario-Desconhecido'}/`
   },
 
   // ==================

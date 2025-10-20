@@ -303,3 +303,20 @@ export function createObservationFormData(
     }
   );
 }
+
+/**
+ * Helper for User Photo upload
+ */
+export function createUserPhotoFormData(
+  photo: File,
+  user?: FormDataOptions['user']
+): FormData {
+  return createFormDataWithContext(
+    {},
+    { photo: photo },
+    {
+      entityType: 'user',
+      user,
+    }
+  );
+}

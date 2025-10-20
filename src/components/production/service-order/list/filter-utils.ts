@@ -83,17 +83,17 @@ export function extractActiveFilters(
   }
 
   // Date filters
-  if (filters.startedAt?.from || filters.startedAt?.to) {
-    const from = filters.startedAt.from;
-    const to = filters.startedAt.to;
+  if (filters.startedAt?.gte || filters.startedAt?.lte) {
+    const gte = filters.startedAt.gte;
+    const lte = filters.startedAt.lte;
     let value = "";
 
-    if (from && to) {
-      value = `${formatDate(from)} - ${formatDate(to)}`;
-    } else if (from) {
-      value = `≥ ${formatDate(from)}`;
-    } else if (to) {
-      value = `≤ ${formatDate(to)}`;
+    if (gte && lte) {
+      value = `${formatDate(gte)} - ${formatDate(lte)}`;
+    } else if (gte) {
+      value = `≥ ${formatDate(gte)}`;
+    } else if (lte) {
+      value = `≤ ${formatDate(lte)}`;
     }
 
     activeFilters.push({
@@ -105,17 +105,17 @@ export function extractActiveFilters(
     });
   }
 
-  if (filters.finishedAt?.from || filters.finishedAt?.to) {
-    const from = filters.finishedAt.from;
-    const to = filters.finishedAt.to;
+  if (filters.finishedAt?.gte || filters.finishedAt?.lte) {
+    const gte = filters.finishedAt.gte;
+    const lte = filters.finishedAt.lte;
     let value = "";
 
-    if (from && to) {
-      value = `${formatDate(from)} - ${formatDate(to)}`;
-    } else if (from) {
-      value = `≥ ${formatDate(from)}`;
-    } else if (to) {
-      value = `≤ ${formatDate(to)}`;
+    if (gte && lte) {
+      value = `${formatDate(gte)} - ${formatDate(lte)}`;
+    } else if (gte) {
+      value = `≥ ${formatDate(gte)}`;
+    } else if (lte) {
+      value = `≤ ${formatDate(lte)}`;
     }
 
     activeFilters.push({

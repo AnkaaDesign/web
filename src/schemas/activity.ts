@@ -186,6 +186,30 @@ export const activityOrderBySchema = z.union([
         reasonOrder: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
+
+        // Nested relation ordering - Item
+        item: z
+          .object({
+            id: orderByDirectionSchema.optional(),
+            name: orderByDirectionSchema.optional(),
+            uniCode: orderByDirectionSchema.optional(),
+            createdAt: orderByDirectionSchema.optional(),
+            updatedAt: orderByDirectionSchema.optional(),
+          })
+          .optional(),
+
+        // Nested relation ordering - User
+        user: z
+          .object({
+            id: orderByDirectionSchema.optional(),
+            email: orderByDirectionSchema.optional(),
+            name: orderByDirectionSchema.optional(),
+            status: orderByDirectionSchema.optional(),
+            phone: orderByDirectionSchema.optional(),
+            createdAt: orderByDirectionSchema.optional(),
+            updatedAt: orderByDirectionSchema.optional(),
+          })
+          .optional(),
       })
       .partial(),
   ),

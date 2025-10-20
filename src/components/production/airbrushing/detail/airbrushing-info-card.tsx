@@ -209,18 +209,6 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
                       <p className="font-semibold">{airbrushing.task.sector.name}</p>
                     </div>
                   )}
-
-                  {airbrushing.task.price && (
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Preço da Tarefa</p>
-                      <p className="font-semibold">
-                        {new Intl.NumberFormat("pt-BR", {
-                          style: "currency",
-                          currency: "BRL",
-                        }).format(airbrushing.task.price)}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </>
             ) : (
