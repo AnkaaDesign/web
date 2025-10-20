@@ -28,10 +28,23 @@ export function TaskHistoryContextMenu({
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(true);
   const openingModalRef = React.useRef(false);
+  const justOpenedRef = React.useRef(true);
 
   const isBulk = selectedIds.length > 1;
   const taskIds = tasks.map(t => t.id);
   const task = tasks[0];
+
+  // Reset justOpened flag whenever position changes (new right-click)
+  React.useEffect(() => {
+    console.log('[TaskHistoryContextMenu] Position changed, resetting justOpenedRef');
+    justOpenedRef.current = true;
+    setDropdownOpen(true);
+
+    const timer = setTimeout(() => {
+      justOpenedRef.current = false;
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [position.x, position.y]);
 
   // When a modal opens, close the dropdown
   React.useEffect(() => {
@@ -189,6 +202,20 @@ export function TaskHistoryContextMenu({
           }}
           className="w-56"
           onCloseAutoFocus={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => {
+            // Prevent menu from closing on the initial pointer event that opened it
+            if (justOpenedRef.current) {
+              console.log('[TaskHistoryContextMenu] Preventing close on initial pointer down');
+              e.preventDefault();
+            }
+          }}
+          onInteractOutside={(e) => {
+            // Prevent menu from closing on the initial interaction that opened it
+            if (justOpenedRef.current) {
+              console.log('[TaskHistoryContextMenu] Preventing close on initial interact');
+              e.preventDefault();
+            }
+          }}
         >
           {isBulk && (
             <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">

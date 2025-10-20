@@ -183,7 +183,7 @@ export function Painting() {
 
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="flex flex-col h-full space-y-4">
           <PageHeaderWithFavorite
             title="Pintura"
@@ -211,7 +211,7 @@ export function Painting() {
 
   if (error) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="flex flex-col h-full space-y-4">
           <PageHeaderWithFavorite
             title="Pintura"
@@ -238,7 +238,7 @@ export function Painting() {
   const data = dashboard?.data;
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="flex flex-col h-full space-y-4">
         <div className="flex-shrink-0">
           <PageHeaderWithFavorite

@@ -1,4 +1,4 @@
-import { MediaItem, MediaType } from '../types/media';
+import type { MediaItem, MediaType } from '../types/media';
 
 /**
  * Utility functions for media handling

@@ -39,7 +39,33 @@ export const useLayoutsByTruck = (truckId: string, enabled = true) => {
     queryKey: layoutQueryKeys.byTruck(truckId),
     queryFn: async () => {
       const response = await layoutService.getByTruckId(truckId);
-      return response.data.data;
+      const layoutsData = response.data.data;
+
+      // If layouts exist, fetch each one with sections included
+      const fetchWithSections = async (layout: any) => {
+        if (!layout?.id) return layout;
+        try {
+          const detailResponse = await layoutService.getById(layout.id, {
+            include: { layoutSections: true }
+          });
+          return detailResponse.data.data;
+        } catch (error) {
+          console.error('[useLayoutsByTruck] Error fetching layout details:', error);
+          return layout; // Return original if fetch fails
+        }
+      };
+
+      const [leftSideLayout, rightSideLayout, backSideLayout] = await Promise.all([
+        fetchWithSections(layoutsData.leftSideLayout),
+        fetchWithSections(layoutsData.rightSideLayout),
+        fetchWithSections(layoutsData.backSideLayout),
+      ]);
+
+      return {
+        leftSideLayout,
+        rightSideLayout,
+        backSideLayout,
+      };
     },
     enabled: enabled && !!truckId,
     staleTime: 5 * 60 * 1000,
@@ -87,11 +113,13 @@ export const useLayoutMutations = () => {
   const createOrUpdateTruckLayoutMutation = useMutation({
     mutationFn: ({ truckId, side, data }: { truckId: string; side: "left" | "right" | "back"; data: LayoutCreateFormData }) =>
       layoutService.createOrUpdateTruckLayout(truckId, side, data),
-    onSuccess: (response, variables) => {
-      queryClient.invalidateQueries({ queryKey: layoutQueryKeys.all });
-      queryClient.invalidateQueries({
+    onSuccess: async (response, variables) => {
+      // Use refetchQueries to immediately refetch and get fresh data
+      await queryClient.refetchQueries({
         queryKey: layoutQueryKeys.byTruck(variables.truckId),
+        exact: true
       });
+      queryClient.invalidateQueries({ queryKey: layoutQueryKeys.all });
       queryClient.invalidateQueries({
         queryKey: ["trucks", "detail", variables.truckId],
       });

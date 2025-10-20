@@ -209,14 +209,14 @@ const OrderDetailsPage = () => {
         <div className="animate-in fade-in-50 duration-500">
           <PageHeader
             variant="detail"
-            title={`Pedido #${order.id.slice(-8)}`}
+            title={order.description}
             icon={IconShoppingCart}
             className="shadow-lg"
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "Estoque", href: routes.inventory.root },
               { label: "Pedidos", href: routes.inventory.orders.list },
-              { label: `#${order.id.slice(-8)}` },
+              { label: order.description },
             ]}
             actions={[
               {
@@ -252,7 +252,7 @@ const OrderDetailsPage = () => {
                 <ChangelogHistory
                   entityType={CHANGE_LOG_ENTITY_TYPE.ORDER}
                   entityId={order.id}
-                  entityName={`Pedido #${order.id.slice(-8)}`}
+                  entityName={order.description}
                   entityCreatedAt={order.createdAt}
                   className="h-full"
                 />
@@ -265,7 +265,7 @@ const OrderDetailsPage = () => {
                   <ChangelogHistory
                     entityType={CHANGE_LOG_ENTITY_TYPE.ORDER}
                     entityId={order.id}
-                    entityName={`Pedido #${order.id.slice(-8)}`}
+                    entityName={order.description}
                     entityCreatedAt={order.createdAt}
                     className="h-full"
                   />

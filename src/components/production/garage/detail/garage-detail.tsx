@@ -24,9 +24,6 @@ export const GarageDetailPage = () => {
   } = useGarage(id!, {
     include: {
       lanes: {
-        include: {
-          parkingSpots: true,
-        },
         orderBy: { createdAt: "asc" },
       },
       trucks: {
@@ -49,12 +46,6 @@ export const GarageDetailPage = () => {
     if (!garage) return null;
 
     const totalLanes = garage.lanes?.length || 0;
-    const totalSpots = garage.lanes?.reduce((sum, lane) => sum + (lane.parkingSpots?.length || 0), 0) || 0;
-
-    // TODO: Implement truck-parking spot relationship
-    const occupiedSpots = 0; // Placeholder until truck-parking relationship is implemented
-    const availableSpots = totalSpots - occupiedSpots;
-    const occupancyRate = totalSpots > 0 ? (occupiedSpots / totalSpots) * 100 : 0;
 
     // Calculate area
     const area = garage.width * garage.length;
@@ -65,10 +56,6 @@ export const GarageDetailPage = () => {
 
     return {
       totalLanes,
-      totalSpots,
-      occupiedSpots,
-      availableSpots,
-      occupancyRate,
       area,
       avgLaneWidth,
       avgLaneLength,
@@ -277,11 +264,6 @@ export const GarageDetailPage = () => {
                   {garage.lanes && garage.lanes.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {garage.lanes.map((lane, index) => {
-                        const laneSpots = lane.parkingSpots?.length || 0;
-                        // TODO: Calculate occupied spots when truck-parking relationship is implemented
-                        const laneOccupied = 0;
-                        const laneOccupancyRate = laneSpots > 0 ? (laneOccupied / laneSpots) * 100 : 0;
-
                         return (
                           <div
                             key={lane.id}
@@ -295,17 +277,15 @@ export const GarageDetailPage = () => {
 
                             <div className="space-y-2 text-sm">
                               <div className="flex justify-between">
-                                <span className="text-muted-foreground">Vagas:</span>
-                                <span className="font-medium">{laneSpots}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Disponíveis:</span>
-                                <span className="font-medium text-green-600">{laneSpots - laneOccupied}</span>
-                              </div>
-                              <div className="flex justify-between">
                                 <span className="text-muted-foreground">Dimensões:</span>
                                 <span className="font-medium">
                                   {lane.width}×{lane.length}m
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Área:</span>
+                                <span className="font-medium">
+                                  {(lane.width * lane.length).toFixed(1)}m²
                                 </span>
                               </div>
                               <div className="flex justify-between">
@@ -315,18 +295,6 @@ export const GarageDetailPage = () => {
                                 </span>
                               </div>
                             </div>
-
-                            {laneSpots > 0 && (
-                              <div className="mt-3">
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-xs text-muted-foreground">Ocupação</span>
-                                  <span className="text-xs font-medium">{laneOccupancyRate.toFixed(0)}%</span>
-                                </div>
-                                <div className="w-full bg-muted rounded-full h-1.5">
-                                  <div className="bg-primary h-1.5 rounded-full transition-all duration-300" style={{ width: `${laneOccupancyRate}%` }} />
-                                </div>
-                              </div>
-                            )}
                           </div>
                         );
                       })}

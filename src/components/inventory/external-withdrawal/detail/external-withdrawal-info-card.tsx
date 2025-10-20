@@ -10,7 +10,6 @@ import { ExternalWithdrawalStatusBadge } from "../common/external-withdrawal-sta
 import { WillReturnBadge } from "../common/will-return-badge";
 import { cn } from "@/lib/utils";
 import { FileItem, type FileViewMode } from "@/components/file";
-import { useFileViewer } from "@/components/file/file-viewer";
 
 interface ExternalWithdrawalInfoCardProps {
   withdrawal: ExternalWithdrawal;
@@ -20,29 +19,9 @@ interface ExternalWithdrawalInfoCardProps {
 export function ExternalWithdrawalInfoCard({ withdrawal, className }: ExternalWithdrawalInfoCardProps) {
   const [viewMode, setViewMode] = useState<FileViewMode>("list");
 
-  // Try to get file viewer context (optional)
-  let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
-  try {
-    fileViewerContext = useFileViewer();
-  } catch {
-    // Context not available
-  }
-
   const isFullyReturned = withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED;
   const isCharged = withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.CHARGED;
   const isCancelled = withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.CANCELLED;
-
-  const handlePreview = (file: any) => {
-    if (fileViewerContext) {
-      fileViewerContext.actions.viewFile(file);
-    }
-  };
-
-  const handleDownload = (file: any) => {
-    if (fileViewerContext) {
-      fileViewerContext.actions.downloadFile(file);
-    }
-  };
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
@@ -206,9 +185,6 @@ export function ExternalWithdrawalInfoCard({ withdrawal, className }: ExternalWi
                       <FileItem
                         file={withdrawal.nfe}
                         viewMode={viewMode}
-                        onPreview={handlePreview}
-                        onDownload={handleDownload}
-                        showActions
                       />
                     </div>
                   </div>
@@ -224,9 +200,6 @@ export function ExternalWithdrawalInfoCard({ withdrawal, className }: ExternalWi
                       <FileItem
                         file={withdrawal.receipt}
                         viewMode={viewMode}
-                        onPreview={handlePreview}
-                        onDownload={handleDownload}
-                        showActions
                       />
                     </div>
                   </div>

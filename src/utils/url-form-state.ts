@@ -9,7 +9,7 @@ import type {
   SupplierCreateFormData,
 } from "../schemas";
 import type { PaintFormula } from "../types";
-import { PAINT_BRAND, ITEM_CATEGORY_TYPE } from "../constants";
+import { ITEM_CATEGORY_TYPE } from "../constants";
 
 /**
  * Serializes form data to URL-safe parameters
@@ -26,7 +26,7 @@ export function serializeFormToUrlParams(formData: Partial<PaintCreateFormData>,
   if (formData.name && formData.name.trim()) params.set("name", formData.name);
   if (formData.hex && formData.hex !== "#000000") params.set("hex", formData.hex);
   if (formData.finish && formData.finish !== "SOLID") params.set("finish", formData.finish);
-  if (formData.brand && formData.brand !== PAINT_BRAND.FARBEN) params.set("brand", formData.brand);
+  if (formData.paintBrandId) params.set("paintBrandId", formData.paintBrandId);
   if (formData.manufacturer) params.set("manufacturer", formData.manufacturer);
   if (formData.paintTypeId && formData.paintTypeId.trim()) params.set("paintTypeId", formData.paintTypeId);
   if (formData.palette) params.set("palette", formData.palette);
@@ -81,10 +81,8 @@ export function deserializeUrlParamsToForm(searchParams: URLSearchParams): {
   const finish = searchParams.get("finish");
   if (finish) formData.finish = finish as any;
 
-  const brand = searchParams.get("brand");
-  if (brand && Object.values(PAINT_BRAND).includes(brand as any)) {
-    formData.brand = brand as any;
-  }
+  const paintBrandId = searchParams.get("paintBrandId");
+  if (paintBrandId) formData.paintBrandId = paintBrandId;
 
   const manufacturer = searchParams.get("manufacturer");
   if (manufacturer) formData.manufacturer = manufacturer as any;
@@ -146,7 +144,7 @@ export function getDefaultFormValues(searchParams: URLSearchParams, baseDefaults
     name: "",
     hex: "#000000",
     finish: "SOLID" as any,
-    brand: PAINT_BRAND.FARBEN,
+    paintBrandId: null,
     manufacturer: null,
     tags: [],
     palette: undefined,

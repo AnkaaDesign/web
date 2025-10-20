@@ -75,7 +75,10 @@ const getCompletedByUser = (task: Task) => {
 };
 
 // Define columns specific to history view
-export const createTaskHistoryColumns = (): TaskColumn[] => [
+export const createTaskHistoryColumns = (options?: { canViewPrice?: boolean }): TaskColumn[] => {
+  const { canViewPrice = true } = options || {};
+
+  const allColumns: TaskColumn[] = [
   {
     id: "name",
     header: "NOME",
@@ -401,7 +404,11 @@ export const createTaskHistoryColumns = (): TaskColumn[] => [
       return <TruncatedTextWithTooltip text={value} className="text-sm" />;
     },
   },
-];
+  ];
+
+  // Filter out price column if user doesn't have permission
+  return canViewPrice ? allColumns : allColumns.filter(col => col.id !== 'price');
+};
 
 // Helper to get visible columns based on user preferences
 export const getVisibleColumns = (columns: TaskColumn[], visibleColumnIds: Set<string>): TaskColumn[] => {

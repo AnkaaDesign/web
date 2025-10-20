@@ -1,7 +1,8 @@
 // FormData Helper Utilities
 // Helps create FormData with proper context for file organization
 
-import { FileContext, sanitizeDirectoryName } from './file-organization';
+import type { FileContext } from './file-organization';
+import { sanitizeDirectoryName } from './file-organization';
 
 export interface FormDataOptions {
   // Entity context

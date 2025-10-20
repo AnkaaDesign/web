@@ -5,8 +5,7 @@ import { IconFileText, IconFileTypePdf, IconReceipt, IconCurrencyReal, IconFileI
 import type { Order } from "../../../../types";
 import type { File as AnkaaFile } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { FileItem, type FileViewMode } from "@/components/file";
-import { useFileViewer } from "@/components/file/file-viewer";
+import { FileItem, type FileViewMode, useFileViewer } from "@/components/file";
 
 interface OrderDocumentsCardProps {
   order: Order;
@@ -18,14 +17,7 @@ export function OrderDocumentsCard({
   className,
 }: OrderDocumentsCardProps) {
   const [viewMode, setViewMode] = useState<FileViewMode>("list");
-
-  // Try to get file viewer context (optional)
-  let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
-  try {
-    fileViewerContext = useFileViewer();
-  } catch {
-    // Context not available
-  }
+  const { actions } = useFileViewer();
 
   const budgets = order.budgets || [];
   const invoices = order.invoices || [];
@@ -36,16 +28,9 @@ export function OrderDocumentsCard({
   const allDocuments = [...budgets, ...invoices, ...receipts, ...reimbursements, ...invoiceReimbursements];
   const hasDocuments = allDocuments.length > 0;
 
-  const handlePreview = (file: AnkaaFile) => {
-    if (fileViewerContext) {
-      fileViewerContext.actions.viewFile(file);
-    }
-  };
-
-  const handleDownload = (file: AnkaaFile) => {
-    if (fileViewerContext) {
-      fileViewerContext.actions.downloadFile(file);
-    }
+  const handleFileClick = (file: AnkaaFile) => {
+    const index = allDocuments.findIndex(f => f.id === file.id);
+    actions.viewFiles(allDocuments, index);
   };
 
   return (
@@ -95,9 +80,7 @@ export function OrderDocumentsCard({
                         key={file.id}
                         file={file}
                         viewMode={viewMode}
-                        onPreview={handlePreview}
-                        onDownload={handleDownload}
-                        showActions
+                        onPreview={handleFileClick}
                       />
                     ))}
                   </div>
@@ -117,9 +100,7 @@ export function OrderDocumentsCard({
                         key={file.id}
                         file={file}
                         viewMode={viewMode}
-                        onPreview={handlePreview}
-                        onDownload={handleDownload}
-                        showActions
+                        onPreview={handleFileClick}
                       />
                     ))}
                   </div>
@@ -139,9 +120,7 @@ export function OrderDocumentsCard({
                         key={file.id}
                         file={file}
                         viewMode={viewMode}
-                        onPreview={handlePreview}
-                        onDownload={handleDownload}
-                        showActions
+                        onPreview={handleFileClick}
                       />
                     ))}
                   </div>
@@ -161,9 +140,7 @@ export function OrderDocumentsCard({
                         key={file.id}
                         file={file}
                         viewMode={viewMode}
-                        onPreview={handlePreview}
-                        onDownload={handleDownload}
-                        showActions
+                        onPreview={handleFileClick}
                       />
                     ))}
                   </div>
@@ -183,9 +160,7 @@ export function OrderDocumentsCard({
                         key={file.id}
                         file={file}
                         viewMode={viewMode}
-                        onPreview={handlePreview}
-                        onDownload={handleDownload}
-                        showActions
+                        onPreview={handleFileClick}
                       />
                     ))}
                   </div>

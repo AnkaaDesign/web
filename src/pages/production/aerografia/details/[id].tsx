@@ -40,6 +40,7 @@ export const AirbrushingDetails = () => {
       },
       receipts: true,
       invoices: true,
+      artworks: true,
     },
     enabled: !!id,
   });
@@ -113,9 +114,6 @@ export const AirbrushingDetails = () => {
               { label: "Aerografia", href: routes.production.airbrushings.root },
               { label: "Detalhes" },
             ]}
-            backButton={{
-              onClick: () => navigate(routes.production.airbrushings.root),
-            }}
           />
           <div className="flex-1 overflow-y-auto">
             <div className="space-y-6">
@@ -141,18 +139,14 @@ export const AirbrushingDetails = () => {
       <div className="flex flex-col h-full space-y-6">
         <PageHeader
           variant="detail"
-          title={`Aerografia`}
-          subtitle={airbrushing.task ? `Tarefa: ${airbrushing.task.name}` : `ID: ${airbrushing.id.slice(-8)}`}
+          title="Aerografia"
           icon={IconBrush}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Produção", href: routes.production.root },
             { label: "Aerografia", href: routes.production.airbrushings.root },
-            { label: `Aerografia #${airbrushing.id.slice(-8)}` },
+            { label: "Aerografia" },
           ]}
-          backButton={{
-            onClick: () => navigate(routes.production.airbrushings.root),
-          }}
           actions={[
             {
               key: "edit",

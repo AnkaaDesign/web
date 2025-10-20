@@ -17,7 +17,7 @@ const TruckLayoutPreview = ({ truck }: { truck: any }) => {
   const [selectedSide, setSelectedSide] = useState<'left' | 'right' | 'back'>('left');
 
   const generatePreviewSVG = (layout: any, side: string) => {
-    if (!layout || !layout.sections || layout.sections.length === 0) {
+    if (!layout || !layout.layoutSections || layout.layoutSections.length === 0) {
       return `
         <svg width="400" height="200" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
           <text x="200" y="100" text-anchor="middle" fill="#666" font-family="Arial, sans-serif" font-size="14">
@@ -27,7 +27,7 @@ const TruckLayoutPreview = ({ truck }: { truck: any }) => {
       `;
     }
 
-    const sections = layout.sections;
+    const sections = layout.layoutSections;
     const totalWidth = sections.reduce((sum: number, section: any) => sum + (section.width || 0), 0);
     const height = layout.height || 240;
 

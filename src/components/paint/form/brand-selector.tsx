@@ -39,8 +39,8 @@ export function PaintBrandSelector({ control, disabled, required }: BrandSelecto
           <FormControl>
             <Combobox
               options={options}
-              value={field.value || ""}
-              onValueChange={(value) => field.onChange(value || null)}
+              value={field.value}
+              onValueChange={field.onChange}
               placeholder="Selecione a marca"
               disabled={disabled || isLoading}
               searchable={true}

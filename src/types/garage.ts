@@ -8,31 +8,24 @@ import type { Truck, TruckIncludes } from "./truck";
 // Main Entity Interfaces
 // =====================
 
-export interface ParkingSpot extends BaseEntity {
-  name: string;
-  length: number;
-  garageLaneId: string;
-
-  // Relations
-  garageLane?: GarageLane;
-}
-
 export interface GarageLane extends BaseEntity {
+  name?: string;
   width: number;
   length: number;
   xPosition: number;
   yPosition: number;
+  order: number;
   garageId: string;
 
   // Relations
   garage?: Garage;
-  parkingSpots?: ParkingSpot[];
 }
 
 export interface Garage extends BaseEntity {
   name: string;
   width: number;
   length: number;
+  isVirtual: boolean;
 
   // Relations
   lanes?: GarageLane[];
@@ -62,19 +55,6 @@ export interface GarageLaneIncludes {
     | {
         include?: GarageIncludes;
       };
-  parkingSpots?:
-    | boolean
-    | {
-        include?: ParkingSpotIncludes;
-      };
-}
-
-export interface ParkingSpotIncludes {
-  garageLane?:
-    | boolean
-    | {
-        include?: GarageLaneIncludes;
-      };
 }
 
 // =====================
@@ -86,6 +66,7 @@ export interface GarageOrderBy {
   name?: ORDER_BY_DIRECTION;
   width?: ORDER_BY_DIRECTION;
   length?: ORDER_BY_DIRECTION;
+  isVirtual?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
 }
@@ -93,21 +74,11 @@ export interface GarageOrderBy {
 export interface GarageLaneOrderBy {
   id?: ORDER_BY_DIRECTION;
   width?: ORDER_BY_DIRECTION;
-  length?: ORDER_BY_DIRECTION;
-  xPosition?: ORDER_BY_DIRECTION;
   yPosition?: ORDER_BY_DIRECTION;
+  order?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
   garage?: GarageOrderBy;
-}
-
-export interface ParkingSpotOrderBy {
-  id?: ORDER_BY_DIRECTION;
-  name?: ORDER_BY_DIRECTION;
-  length?: ORDER_BY_DIRECTION;
-  createdAt?: ORDER_BY_DIRECTION;
-  updatedAt?: ORDER_BY_DIRECTION;
-  garageLane?: GarageLaneOrderBy;
 }
 
 // =====================
@@ -128,13 +99,6 @@ export interface GarageLaneCreateResponse extends BaseCreateResponse<GarageLane>
 export interface GarageLaneUpdateResponse extends BaseUpdateResponse<GarageLane> {}
 export interface GarageLaneDeleteResponse extends BaseDeleteResponse {}
 
-// ParkingSpot responses
-export interface ParkingSpotGetUniqueResponse extends BaseGetUniqueResponse<ParkingSpot> {}
-export interface ParkingSpotGetManyResponse extends BaseGetManyResponse<ParkingSpot> {}
-export interface ParkingSpotCreateResponse extends BaseCreateResponse<ParkingSpot> {}
-export interface ParkingSpotUpdateResponse extends BaseUpdateResponse<ParkingSpot> {}
-export interface ParkingSpotDeleteResponse extends BaseDeleteResponse {}
-
 // =====================
 // Batch Operation Responses
 // =====================
@@ -148,8 +112,3 @@ export interface GarageBatchDeleteResponse extends BaseBatchResponse<{ id: strin
 export interface GarageLaneBatchCreateResponse<T> extends BaseBatchResponse<GarageLane, T> {}
 export interface GarageLaneBatchUpdateResponse<T> extends BaseBatchResponse<GarageLane, T & { id: string }> {}
 export interface GarageLaneBatchDeleteResponse extends BaseBatchResponse<{ id: string; deleted: boolean }, { id: string }> {}
-
-// ParkingSpot batch operations
-export interface ParkingSpotBatchCreateResponse<T> extends BaseBatchResponse<ParkingSpot, T> {}
-export interface ParkingSpotBatchUpdateResponse<T> extends BaseBatchResponse<ParkingSpot, T & { id: string }> {}
-export interface ParkingSpotBatchDeleteResponse extends BaseBatchResponse<{ id: string; deleted: boolean }, { id: string }> {}

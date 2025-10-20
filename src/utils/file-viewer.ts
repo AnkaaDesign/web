@@ -244,34 +244,13 @@ export const determineFileViewAction = (file: AnkaaFile, config: FileViewerConfi
       };
 
     case "pdfs": {
-      // Enhanced PDF handling with configurable view mode
-      const pdfViewMode = config.pdfViewMode || "new-tab";
-      const pdfValidation = validatePDFFile(file, config);
-
-      // Merge PDF-specific warnings with security warnings
-      const allWarnings = [...security.warnings, ...pdfValidation.warnings];
-
-      // For very large PDFs, always use new-tab regardless of config
-      if (file.size > 100 * 1024 * 1024 && pdfViewMode !== "new-tab") {
-        return {
-          type: "new-tab",
-          url: urls.serve,
-          component: "pdf-viewer",
-          security: {
-            ...security,
-            warnings: [...allWarnings, "Opening large PDF in new tab for better performance"],
-          },
-        };
-      }
-
+      // PDFs should open in image modal showing thumbnail preview
+      // Thumbnails are generated on-demand for all PDFs
       return {
-        type: pdfViewMode,
-        url: urls.serve,
-        component: "pdf-viewer",
-        security: {
-          ...security,
-          warnings: allWarnings,
-        },
+        type: "modal",
+        url: urls.thumbnailLarge, // Use large thumbnail for better preview
+        component: "image-modal",
+        security,
       };
     }
 

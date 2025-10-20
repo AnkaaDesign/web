@@ -5,9 +5,6 @@ import { fileViewerService } from "../../utils/file-viewer";
 import { getPDFThumbnailUrl, isPDFFile } from "../../utils/pdf-thumbnail";
 import { formatRelativeTime } from "../../utils";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { IconDownload, IconTrash, IconEye } from "@tabler/icons-react";
 import { FileTypeIcon } from "@/components/ui/file-type-icon";
 import { useFileViewer } from "./file-viewer";
 
@@ -34,7 +31,9 @@ const isEpsFile = (file: AnkaaFile): boolean => {
 // Removed getFileIcon function - now using FileTypeIcon/FileTypeAvatar components
 
 const getThumbnailUrl = (file: AnkaaFile, size: "small" | "medium" | "large" = "medium"): string => {
-  const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
+  // Get API URL and ensure no trailing slash
+  let apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
+  apiUrl = apiUrl.replace(/\/+$/, ''); // Remove any trailing slashes
 
   // Handle PDF thumbnails
   if (isPDFFile(file)) {
@@ -60,6 +59,7 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
   const [thumbnailError, setThumbnailError] = useState(false);
   const [thumbnailLoading, setThumbnailLoading] = useState(true);
   const [showThumbnail, setShowThumbnail] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const category = getFileCategory(file);
   const isImage = isImageFile(file);
   const isPdf = isPDFFile(file);
@@ -67,13 +67,8 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
   const canPreviewFile = fileViewerService.canPreviewFile(file);
   const hasThumbnail = file.thumbnailUrl || isImage || isPdf;
 
-  // Try to get file viewer context (optional)
-  let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
-  try {
-    fileViewerContext = useFileViewer();
-  } catch {
-    // Context not available, will use fallback behavior
-  }
+  // Get file viewer context - always available since FileViewerProvider wraps the app
+  const { actions } = useFileViewer();
 
   // Only show thumbnail after initial render to prevent flash
   React.useEffect(() => {
@@ -87,14 +82,12 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
   }, [hasThumbnail]);
 
   const handleClick = () => {
-    // Prioritize onPreview prop when provided (for custom handling like gallery navigation)
+    // Prioritize onPreview prop (for collections with next/previous)
     if (onPreview) {
       onPreview(file);
-    } else if (fileViewerContext) {
-      // Use the new file viewer service if available
-      fileViewerContext.actions.viewFile(file);
-    } else if (onDownload) {
-      onDownload(file);
+    } else {
+      // Fall back to default viewer for single files
+      actions.viewFile(file);
     }
   };
 
@@ -109,110 +102,64 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
   };
 
   return (
-    <Card className={cn("group relative transition-all duration-200 hover:shadow-md cursor-pointer", "w-full max-w-[200px]", className)} onClick={handleClick}>
-      <CardContent className="p-4">
-        {/* Thumbnail/Icon Area */}
-        <div className="flex items-center justify-center mb-3 rounded-lg bg-muted/30" style={{ height: "8rem" }}>
-          {showThumbnail && hasThumbnail && !thumbnailError ? (
-            <div className="relative w-full h-full">
-              {thumbnailLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-muted/30 rounded-md">
-                  <FileTypeIcon filename={file.filename} mimeType={file.mimetype} size="lg" />
-                </div>
-              )}
-              <img
-                src={getThumbnailUrl(file, "medium")}
-                alt={file.filename}
-                className={cn(
-                  "w-full h-full object-contain rounded-md transition-all duration-300",
-                  thumbnailLoading ? "opacity-0" : "opacity-100",
-                  isPdf && "border-2 border-red-200",
-                  isEps && "border-2 border-indigo-200",
-                )}
-                onLoad={handleThumbnailLoad}
-                onError={handleThumbnailError}
-              />
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-2">
-              <FileTypeIcon filename={file.filename} mimeType={file.mimetype} size="lg" />
-              <span className="text-xs text-muted-foreground uppercase tracking-wide">{isEps ? "EPS" : category}</span>
-            </div>
-          )}
-        </div>
-
-        {/* File Info */}
-        {(showFilename || showFileSize || showRelativeTime) && (
-          <div className="space-y-1">
-            {showFilename && <h4 className="text-sm font-medium text-foreground leading-tight">{getFileDisplayName(file, 25)}</h4>}
-            {showFileSize && (
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{formatFileSize(file.size)}</span>
+    <div
+      className={cn(
+        "group relative overflow-hidden transition-all duration-300 rounded-lg hover:shadow-md cursor-pointer border border-border",
+        "w-full max-w-[200px]",
+        className
+      )}
+      onClick={handleClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Thumbnail/Icon Area */}
+      <div className="flex items-center justify-center rounded-lg bg-muted/30" style={{ height: "8rem" }}>
+        {showThumbnail && hasThumbnail && !thumbnailError ? (
+          <div className="relative w-full h-full">
+            {thumbnailLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/30 rounded-md">
+                <FileTypeIcon filename={file.filename} mimeType={file.mimetype} size="lg" />
               </div>
             )}
-            {showRelativeTime && file.createdAt && <p className="text-xs text-muted-foreground">{formatRelativeTime(new Date(file.createdAt))}</p>}
+            <img
+              src={getThumbnailUrl(file, "medium")}
+              alt={file.filename}
+              className={cn(
+                "w-full h-full object-contain rounded-md transition-all duration-300",
+                thumbnailLoading ? "opacity-0" : "opacity-100"
+              )}
+              onLoad={handleThumbnailLoad}
+              onError={handleThumbnailError}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <FileTypeIcon filename={file.filename} mimeType={file.mimetype} size="lg" />
           </div>
         )}
 
-        {/* Actions */}
-        {showActions && (
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <div className="flex gap-1">
-              {canPreviewFile && (
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="h-7 w-7 bg-primary/80 backdrop-blur-sm text-white"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (fileViewerContext) {
-                      fileViewerContext.actions.viewFile(file);
-                    } else if (onPreview) {
-                      onPreview(file);
-                    }
-                  }}
-                  title="Visualizar arquivo"
-                >
-                  <IconEye size={14} />
-                </Button>
-              )}
-              {onDownload && (
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className="h-7 w-7 bg-background/80 backdrop-blur-sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (fileViewerContext) {
-                      fileViewerContext.actions.downloadFile(file);
-                    } else {
-                      onDownload(file);
-                    }
-                  }}
-                  title="Baixar arquivo"
-                >
-                  <IconDownload size={14} />
-                </Button>
-              )}
-              {onDelete && (
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="h-7 w-7 bg-destructive/80 backdrop-blur-sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(file);
-                  }}
-                  title="Remover arquivo"
-                >
-                  <IconTrash size={14} />
-                </Button>
-              )}
+        {/* Hover Overlay with File Info */}
+        {isHovered && (showFilename || showFileSize) && (
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-all duration-300">
+            {/* File Information - Bottom */}
+            <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent">
+              <div className="flex items-center justify-between gap-2">
+                {showFilename && (
+                  <p className="text-xs text-white/90 truncate flex-1" title={file.filename}>
+                    {file.filename}
+                  </p>
+                )}
+                {showFileSize && (
+                  <span className="text-[10px] text-white/70 shrink-0">
+                    {formatFileSize(file.size)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 
@@ -227,13 +174,8 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
   const canPreviewFile = fileViewerService.canPreviewFile(file);
   const hasThumbnail = file.thumbnailUrl || isImage || isPdf;
 
-  // Try to get file viewer context (optional)
-  let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
-  try {
-    fileViewerContext = useFileViewer();
-  } catch {
-    // Context not available, will use fallback behavior
-  }
+  // Get file viewer context - always available since FileViewerProvider wraps the app
+  const { actions } = useFileViewer();
 
   // Only show thumbnail after initial render to prevent flash
   React.useEffect(() => {
@@ -247,14 +189,12 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
   }, [hasThumbnail]);
 
   const handleClick = () => {
-    // Prioritize onPreview prop when provided (for custom handling like gallery navigation)
+    // Prioritize onPreview prop (for collections with next/previous)
     if (onPreview) {
       onPreview(file);
-    } else if (fileViewerContext) {
-      // Use the new file viewer service if available
-      fileViewerContext.actions.viewFile(file);
-    } else if (onDownload) {
-      onDownload(file);
+    } else {
+      // Fall back to default viewer for single files
+      actions.viewFile(file);
     }
   };
 
@@ -269,7 +209,7 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
   };
 
   return (
-    <div className={cn("group flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer", className)} onClick={handleClick}>
+    <div className={cn("group relative flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer border border-border", className)} onClick={handleClick}>
       {/* Thumbnail/Icon */}
       <div className="flex items-center justify-center w-10 h-10 rounded bg-muted/30 shrink-0">
         {showThumbnail && hasThumbnail && !thumbnailError ? (
@@ -284,9 +224,7 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
               alt={file.filename}
               className={cn(
                 "w-full h-full object-contain rounded transition-all duration-300",
-                thumbnailLoading ? "opacity-0" : "opacity-100",
-                isPdf && "border border-red-200",
-                isEps && "border border-indigo-200",
+                thumbnailLoading ? "opacity-0" : "opacity-100"
               )}
               onLoad={handleThumbnailLoad}
               onError={handleThumbnailError}
@@ -299,73 +237,14 @@ const FileItemList: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
 
       {/* File Info */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between">
-          {showFilename && <h4 className="text-sm font-medium text-foreground truncate">{getFileDisplayName(file, 40)}</h4>}
-          {(showFileSize || showRelativeTime) && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0 ml-2">
-              {showFileSize && <span>{formatFileSize(file.size)}</span>}
-              {showFileSize && showRelativeTime && file.createdAt && <span className="font-enhanced-unicode">•</span>}
-              {showRelativeTime && file.createdAt && <span>{formatRelativeTime(new Date(file.createdAt))}</span>}
-            </div>
-          )}
-        </div>
-        <div className="flex items-center justify-between mt-1">
-          <p className="text-xs text-muted-foreground capitalize">{category}</p>
-          {showActions && (
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              {canPreviewFile && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-primary hover:text-primary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (fileViewerContext) {
-                      fileViewerContext.actions.viewFile(file);
-                    } else if (onPreview) {
-                      onPreview(file);
-                    }
-                  }}
-                  title="Visualizar arquivo"
-                >
-                  <IconEye size={12} />
-                </Button>
-              )}
-              {onDownload && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (fileViewerContext) {
-                      fileViewerContext.actions.downloadFile(file);
-                    } else {
-                      onDownload(file);
-                    }
-                  }}
-                  title="Baixar arquivo"
-                >
-                  <IconDownload size={12} />
-                </Button>
-              )}
-              {onDelete && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 text-destructive hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(file);
-                  }}
-                  title="Remover arquivo"
-                >
-                  <IconTrash size={12} />
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
+        {showFilename && <h4 className="text-sm font-medium text-foreground truncate">{getFileDisplayName(file, 40)}</h4>}
+        {(showFileSize || showRelativeTime) && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+            {showFileSize && <span>{formatFileSize(file.size)}</span>}
+            {showFileSize && showRelativeTime && file.createdAt && <span className="font-enhanced-unicode">•</span>}
+            {showRelativeTime && file.createdAt && <span>{formatRelativeTime(new Date(file.createdAt))}</span>}
+          </div>
+        )}
       </div>
     </div>
   );

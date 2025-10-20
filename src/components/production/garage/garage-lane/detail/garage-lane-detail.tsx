@@ -23,37 +23,20 @@ export const GarageLaneDetailPage = () => {
   } = useGarageLane(id!, {
     include: {
       garage: true,
-      parkingSpots: {
-        include: {
-          truck: true,
-        },
-        orderBy: { name: "asc" },
-      },
     },
     enabled: !!id,
   });
 
   const garageLane = response?.data;
 
-  // Calculate occupancy metrics
+  // Calculate metrics
   const metrics = useMemo(() => {
     if (!garageLane) return null;
-
-    const totalSpots = garageLane.parkingSpots?.length || 0;
-    // TODO: Implement truck-parking spot relationship
-    // const occupiedSpots = garageLane.parkingSpots?.filter(spot => spot.truck)?.length || 0;
-    const occupiedSpots = 0; // Placeholder until truck-parking relationship is implemented
-    const availableSpots = totalSpots - occupiedSpots;
-    const occupancyRate = totalSpots > 0 ? (occupiedSpots / totalSpots) * 100 : 0;
 
     // Calculate area
     const area = garageLane.width * garageLane.length;
 
     return {
-      totalSpots,
-      occupiedSpots,
-      availableSpots,
-      occupancyRate,
       area,
     };
   }, [garageLane]);
@@ -206,106 +189,8 @@ export const GarageLaneDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Occupancy Metrics Card */}
-              <Card className="shadow-sm border border-border" level={1}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-xl">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <IconPackageExport className="h-5 w-5 text-primary" />
-                    </div>
-                    Ocupação
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-primary">{metrics?.totalSpots}</p>
-                      <p className="text-sm text-muted-foreground">Total de Vagas</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-green-600">{metrics?.availableSpots}</p>
-                      <p className="text-sm text-muted-foreground">Disponíveis</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-3xl font-bold text-orange-600">{metrics?.occupiedSpots}</p>
-                      <p className="text-sm text-muted-foreground">Ocupadas</p>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm text-muted-foreground">Taxa de Ocupação</p>
-                      <p className="text-lg font-semibold">{metrics?.occupancyRate.toFixed(1)}%</p>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2.5">
-                      <div className="bg-primary h-2.5 rounded-full transition-all duration-300" style={{ width: `${metrics?.occupancyRate}%` }} />
-                    </div>
-                  </div>
-
-                  {metrics && metrics.totalSpots === 0 && (
-                    <div className="pt-4 border-t">
-                      <p className="text-sm text-muted-foreground text-center">Nenhuma vaga cadastrada nesta faixa</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
               {/* Layout Preview Card */}
               <GarageLaneLayoutPreview garageLane={garageLane} className="shadow-sm border border-border lg:col-span-2" />
-
-              {/* Parking Spots Card */}
-              <Card className="shadow-sm border border-border lg:col-span-2" level={1}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3 text-xl">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <IconPackageExport className="h-5 w-5 text-primary" />
-                    </div>
-                    Vagas de Estacionamento
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {garageLane.parkingSpots && garageLane.parkingSpots.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                      {garageLane.parkingSpots.map((spot) => (
-                        <div
-                          key={spot.id}
-                          className={`
-                        p-3 rounded-lg border-2 transition-all cursor-pointer
-                        ${
-                          // TODO: Implement truck-parking spot relationship
-                          // spot.truck
-                          false
-                            ? "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 hover:border-orange-300"
-                            : "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 hover:border-green-300"
-                        }
-                      `}
-                          onClick={() => navigate(routes.production.garages.parkingSpots.details(garageLane.garageId, spot.id))}
-                        >
-                          <p className="font-semibold text-sm text-center">{spot.name}</p>
-                          <p className="text-xs text-center text-muted-foreground mt-1">
-                            {/* TODO: Implement truck-parking spot relationship */}
-                            {/* {spot.truck ? "Ocupada" : "Livre"} */}
-                            Livre
-                          </p>
-                          {/* TODO: Implement truck-parking spot relationship */}
-                          {/* {spot.truck && (
-                        <p className="text-xs text-center font-medium mt-1 truncate">
-                          {spot.truck.plate}
-                        </p>
-                      )} */}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-muted-foreground">Nenhuma vaga cadastrada nesta faixa</p>
-                      <Button variant="outline" size="sm" className="mt-4" onClick={() => navigate(routes.production.garages.parkingSpots.create(garageLane.garageId))}>
-                        Cadastrar Vagas
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
 
               {/* Changelog History */}
               <div className="lg:col-span-2">

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { useTaskDetail, useTaskMutations, useServiceOrderMutations, useCutsByTask, useLayoutsByTruck } from "../../../../hooks";
+import { useTaskDetail, useTaskMutations, useServiceOrderMutations, useCutsByTask, useLayoutsByTruck, useCurrentUser } from "../../../../hooks";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,7 @@ import {
   CUT_ORIGIN_LABELS,
   AIRBRUSHING_STATUS_LABELS,
 } from "../../../../constants";
-import { formatDate, formatDateTime, formatCurrency, isValidTaskStatusTransition } from "../../../../utils";
+import { formatDate, formatDateTime, formatCurrency, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
 import { generateBudgetPDF } from "../../../../utils/budget-pdf-generator";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import {
@@ -111,7 +111,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     };
 
     const height = layout.height * 100; // Convert to cm
-    const sections = layout.layoutSections || layout.sections;
+    const sections = layout.layoutSections;
     const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
     const margin = 50;
     // Reduce extra space when not including labels
@@ -177,9 +177,9 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
         <line x1="${doorX}" y1="${doorY}" x2="${doorX + doorWidth}" y2="${doorY}"
               stroke="#000" stroke-width="1"/>`;
       });
-    } else if (layout.layoutSections || layout.sections) {
+    } else if (layout.layoutSections) {
       // Handle both new LayoutSection entity format and old sections format
-      const sections = layout.layoutSections || layout.sections;
+      const sections = layout.layoutSections;
       let currentPos = 0;
       sections.forEach((section: any, index: number) => {
         const sectionWidth = section.width * 100;
@@ -259,7 +259,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     };
 
     const taskPrefix = taskName ? `${taskName}-` : '';
-    const sections = currentLayout.layoutSections || currentLayout.sections;
+    const sections = currentLayout.layoutSections;
     const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
     link.download = `${taskPrefix}layout-${getSideLabel(selectedSide)}-${Math.round(totalWidth)}mm.svg`;
 
@@ -330,6 +330,7 @@ export const TaskDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const { data: currentUser } = useCurrentUser();
   const { update } = useTaskMutations();
   const { update: updateServiceOrder } = useServiceOrderMutations();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -338,10 +339,17 @@ export const TaskDetailsPage = () => {
   const [serviceOrderCompletionDialogOpen, setServiceOrderCompletionDialogOpen] = useState(false);
   const [pendingServiceOrder, setPendingServiceOrder] = useState<any>(null);
   const [nextServiceOrderToStart, setNextServiceOrderToStart] = useState<any>(null);
-  const [filePreviewModalOpen, setFilePreviewModalOpen] = useState(false);
-  const [filePreviewInitialIndex, setFilePreviewInitialIndex] = useState(0);
   const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("list");
   const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("list");
+
+  // Check if user is from Financial sector
+  const isFinancialSector = currentUser ? hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) && currentUser.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL : false;
+
+  // Check if user is from Warehouse sector (should hide documents, budgets, and changelog)
+  const isWarehouseSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
+
+  // Check if user can edit service orders (Admin or Leader only)
+  const canEditServiceOrders = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.LEADER) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN));
 
   // Try to get file viewer context (optional)
   let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
@@ -361,6 +369,14 @@ export const TaskDetailsPage = () => {
     if (fileViewerContext) {
       fileViewerContext.actions.downloadFile(file);
     }
+  };
+
+  // Handler for cuts collection viewing
+  const handleCutFileClick = (file: any) => {
+    if (!fileViewerContext) return;
+    const cutFiles = cuts.map(cut => cut.file).filter(Boolean);
+    const index = cutFiles.findIndex(f => f.id === file.id);
+    fileViewerContext.actions.viewFiles(cutFiles, index);
   };
 
   // Fetch task details with all relations
@@ -449,7 +465,7 @@ export const TaskDetailsPage = () => {
     if (!layout) return null;
 
     const height = Math.round(layout.height * 100); // Convert to cm and round
-    const sections = layout.layoutSections || layout.sections;
+    const sections = layout.layoutSections;
     const totalWidth = Math.round(sections.reduce((sum: number, s: any) => sum + s.width * 100, 0));
 
     return { width: totalWidth, height };
@@ -628,7 +644,7 @@ export const TaskDetailsPage = () => {
   const isOverdue = task.term && new Date(task.term) < new Date() && task.status !== TASK_STATUS.COMPLETED && task.status !== TASK_STATUS.CANCELLED;
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.PRODUCTION}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="flex flex-col h-full space-y-6">
         <div className="animate-in fade-in-50 duration-500">
           <PageHeader
@@ -873,8 +889,8 @@ export const TaskDetailsPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Budget Card */}
-              {task.budget && task.budget.length > 0 && (
+              {/* Budget Card - Hidden for Warehouse sector users */}
+              {!isWarehouseSector && task.budget && task.budget.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-825" level={1}>
                   <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
@@ -927,7 +943,10 @@ export const TaskDetailsPage = () => {
                           <span className="text-base font-bold text-foreground">TOTAL</span>
                           <span className="text-lg font-bold text-primary">
                             {formatCurrency(
-                              task.budget.reduce((sum, item) => sum + item.valor, 0)
+                              task.budget.reduce((sum, item) => {
+                                const value = typeof item.valor === 'number' ? item.valor : Number(item.valor) || 0;
+                                return sum + value;
+                              }, 0)
                             )}
                           </span>
                         </div>
@@ -992,21 +1011,27 @@ export const TaskDetailsPage = () => {
                               )}
                             </div>
 
-                            {/* Status Change Dropdown */}
+                            {/* Status Change Dropdown - Only for Admin and Leader */}
                             <div className="flex items-center">
-                              <Combobox
-                                value={serviceOrder.status || undefined}
-                                onValueChange={(newStatus) => handleServiceOrderStatusChange(serviceOrder.id, newStatus as SERVICE_ORDER_STATUS)}
-                                options={[
-                                  { value: SERVICE_ORDER_STATUS.PENDING, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.PENDING] },
-                                  { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.IN_PROGRESS] },
-                                  { value: SERVICE_ORDER_STATUS.COMPLETED, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.COMPLETED] },
-                                  { value: SERVICE_ORDER_STATUS.CANCELLED, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.CANCELLED] },
-                                ]}
-                                placeholder="Selecione o status"
-                                searchable={false}
-                                className="w-40"
-                              />
+                              {canEditServiceOrders ? (
+                                <Combobox
+                                  value={serviceOrder.status || undefined}
+                                  onValueChange={(newStatus) => handleServiceOrderStatusChange(serviceOrder.id, newStatus as SERVICE_ORDER_STATUS)}
+                                  options={[
+                                    { value: SERVICE_ORDER_STATUS.PENDING, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.PENDING] },
+                                    { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.IN_PROGRESS] },
+                                    { value: SERVICE_ORDER_STATUS.COMPLETED, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.COMPLETED] },
+                                    { value: SERVICE_ORDER_STATUS.CANCELLED, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.CANCELLED] },
+                                  ]}
+                                  placeholder="Selecione o status"
+                                  searchable={false}
+                                  className="w-40"
+                                />
+                              ) : (
+                                <Badge variant={getBadgeVariantFromStatus(serviceOrder.status)}>
+                                  {SERVICE_ORDER_STATUS_LABELS[serviceOrder.status]}
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1016,61 +1041,75 @@ export const TaskDetailsPage = () => {
                 </Card>
               )}
 
-              {/* Cuts Card - Compact Version */}
-              {cuts.length > 0 && (
+              {/* Cuts Card - Hidden for Financial sector users */}
+              {!isFinancialSector && cuts.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-950 lg:col-span-1" level={1}>
                   <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                      <IconCut className="h-5 w-5 text-muted-foreground" />
-                      Recortes
-                      <Badge variant="secondary" className="ml-auto">
-                        {cuts.length}
-                      </Badge>
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2 text-lg font-medium">
+                        <IconCut className="h-5 w-5 text-muted-foreground" />
+                        Recortes
+                        <Badge variant="secondary" className="ml-2">
+                          {cuts.length}
+                        </Badge>
+                      </CardTitle>
+                      {cuts.length > 1 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
+                            const zipFileName = `${task.name}${task.serialNumber ? `-${task.serialNumber}` : ''}-recortes.zip`;
+
+                            // Download files and create zip
+                            const JSZip = (await import('jszip')).default;
+                            const zip = new JSZip();
+
+                            // Fetch all files
+                            const filePromises = cuts.map(async (cut) => {
+                              if (cut.file) {
+                                try {
+                                  const response = await fetch(`${apiUrl}/files/${cut.file.id}/download`);
+                                  const blob = await response.blob();
+                                  zip.file(cut.file.filename, blob);
+                                } catch (error) {
+                                  console.error(`Error downloading file ${cut.file.filename}:`, error);
+                                }
+                              }
+                            });
+
+                            await Promise.all(filePromises);
+
+                            // Generate zip and download
+                            const content = await zip.generateAsync({ type: 'blob' });
+                            const url = URL.createObjectURL(content);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = zipFileName;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                          }}
+                          className="text-xs"
+                        >
+                          <IconDownload className="h-3 w-3 mr-1" />
+                          Baixar Todos
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent className="pt-0 flex-1">
-                    <div className="space-y-3">
+                    <div className="flex flex-wrap gap-3">
                       {cuts.map((cut) => (
-                        <div
-                          key={cut.id}
-                          className="border rounded-lg p-3 cursor-pointer hover:bg-muted/30 transition-colors flex items-center gap-3"
-                          onClick={() => navigate(routes.production.cutting.details(cut.id))}
-                        >
-                          {/* Cut Info */}
-                          <div className="flex-1 min-w-0 space-y-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <h4 className="text-sm font-semibold truncate min-w-0 flex-1">{cut.file?.filename || "Arquivo de recorte"}</h4>
-                              <Badge variant={ENTITY_BADGE_CONFIG.CUT[cut.status] || "default"} className="text-xs flex-shrink-0">
-                                {CUT_STATUS_LABELS[cut.status]}
-                              </Badge>
-                            </div>
-
-                            <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Tipo:</span>
-                                <span>{CUT_TYPE_LABELS[cut.type]}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <span className="font-medium">Origem:</span>
-                                <span>{CUT_ORIGIN_LABELS[cut.origin]}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Squared File Preview on Right */}
-                          {cut.file && (
-                            <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <FileItem
-                                file={cut.file}
-                                viewMode="list"
-                                onPreview={handlePreview}
-                                onDownload={handleDownload}
-                                showActions
-                                className="w-20 h-20"
-                              />
-                            </div>
-                          )}
-                        </div>
+                        cut.file && (
+                          <FileItem
+                            key={cut.id}
+                            file={cut.file}
+                            viewMode="grid"
+                            onPreview={handleCutFileClick}
+                          />
+                        )
                       ))}
                     </div>
                   </CardContent>
@@ -1151,8 +1190,8 @@ export const TaskDetailsPage = () => {
                 </Card>
               )}
 
-              {/* Documents Card - Budget, NFE, Receipt */}
-              {((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0)) && (
+              {/* Documents Card - Budget, NFE, Receipt - Hidden for Warehouse sector users */}
+              {!isWarehouseSector && ((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0)) && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1050" level={1}>
                   <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
@@ -1444,12 +1483,16 @@ export const TaskDetailsPage = () => {
                               key={file.id}
                               file={file}
                               viewMode="grid"
-                              onPreview={(f) => {
-                                setFilePreviewInitialIndex(index);
-                                setFilePreviewModalOpen(true);
+                              onPreview={() => {
+                                if (fileViewerContext) {
+                                  fileViewerContext.actions.viewFiles(task.observation.files || [], index);
+                                }
                               }}
-                              onDownload={handleDownload}
-                              showActions
+                              showActions={false}
+                              showFilename={false}
+                              showFileSize={false}
+                              showRelativeTime={false}
+                              className="bg-muted/30"
                             />
                           ))}
                         </div>
@@ -1461,71 +1504,80 @@ export const TaskDetailsPage = () => {
 
               {/* Airbrushings Card - Only show if task has airbrushings */}
               {airbrushings.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1250" level={1}>
+                <Card className="border flex flex-col animate-in fade-in-50 duration-1250 lg:col-span-1" level={1}>
                   <CardHeader className="pb-4">
                     <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                      <IconSpray className="h-5 w-5 text-blue-500" />
+                      <IconSpray className="h-5 w-5 text-muted-foreground" />
                       Aerografias
-                      <Badge variant="secondary" className="ml-auto">
+                      <Badge variant="secondary" className="ml-2">
                         {airbrushings.length}
                       </Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0 flex-1">
                     <div className="space-y-3">
-                      {airbrushings.map((airbrushing) => (
-                        <div key={airbrushing.id} className="bg-muted/50 rounded-lg p-4">
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Badge variant={ENTITY_BADGE_CONFIG.AIRBRUSHING[airbrushing.status] || "default"} className="text-xs">
-                                  {AIRBRUSHING_STATUS_LABELS[airbrushing.status]}
-                                </Badge>
-                                {airbrushing.price && <span className="text-sm font-semibold text-primary">{formatCurrency(airbrushing.price)}</span>}
-                              </div>
+                      {airbrushings.map((airbrushing, index) => (
+                        <div key={airbrushing.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <IconBrush className="h-4 w-4 text-muted-foreground" />
+                              <h4 className="font-semibold text-sm">
+                                {airbrushing.price ? formatCurrency(airbrushing.price) : `Aerografia #${index + 1}`}
+                              </h4>
+                            </div>
+                            <Badge variant={ENTITY_BADGE_CONFIG.AIRBRUSHING[airbrushing.status] || "default"} className="text-xs">
+                              {AIRBRUSHING_STATUS_LABELS[airbrushing.status]}
+                            </Badge>
+                          </div>
 
-                              {(airbrushing.startDate || airbrushing.finishDate) && (
-                                <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                                  {airbrushing.startDate && (
-                                    <div className="flex items-center gap-1">
-                                      <IconClock className="h-3 w-3" />
-                                      <span>Iniciado: {formatDateTime(airbrushing.startDate)}</span>
-                                    </div>
-                                  )}
-                                  {airbrushing.finishDate && (
-                                    <div className="flex items-center gap-1">
-                                      <IconCheck className="h-3 w-3 text-green-600" />
-                                      <span>Finalizado: {formatDateTime(airbrushing.finishDate)}</span>
-                                    </div>
-                                  )}
+                          {(airbrushing.startDate || airbrushing.finishDate || airbrushing.createdAt) && (
+                            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
+                              {airbrushing.startDate && (
+                                <div className="flex items-center gap-1">
+                                  <IconClock className="h-3 w-3" />
+                                  <span>Iniciado: {formatDate(airbrushing.startDate)}</span>
                                 </div>
                               )}
-
-                              {/* Files count */}
-                              {((airbrushing.receipts?.length ?? 0) > 0 || (airbrushing.invoices?.length ?? 0) > 0 || (airbrushing.artworks?.length ?? 0) > 0) && (
-                                <div className="flex gap-2 text-xs text-muted-foreground">
-                                  {(airbrushing.receipts?.length ?? 0) > 0 && (
-                                    <div className="flex items-center gap-1">
-                                      <IconFile className="h-3 w-3" />
-                                      <span>{airbrushing.receipts?.length ?? 0} recibo(s)</span>
-                                    </div>
-                                  )}
-                                  {(airbrushing.invoices?.length ?? 0) > 0 && (
-                                    <div className="flex items-center gap-1">
-                                      <IconFileText className="h-3 w-3" />
-                                      <span>{airbrushing.invoices?.length ?? 0} NFe(s)</span>
-                                    </div>
-                                  )}
-                                  {(airbrushing.artworks?.length ?? 0) > 0 && (
-                                    <div className="flex items-center gap-1">
-                                      <IconFiles className="h-3 w-3" />
-                                      <span>{airbrushing.artworks?.length ?? 0} arte(s)</span>
-                                    </div>
-                                  )}
+                              {airbrushing.finishDate && (
+                                <div className="flex items-center gap-1">
+                                  <IconCheck className="h-3 w-3 text-green-600" />
+                                  <span>Finalizado: {formatDate(airbrushing.finishDate)}</span>
+                                </div>
+                              )}
+                              {!airbrushing.startDate && !airbrushing.finishDate && airbrushing.createdAt && (
+                                <div className="flex items-center gap-1">
+                                  <IconCalendar className="h-3 w-3" />
+                                  <span>Criado: {formatDate(airbrushing.createdAt)}</span>
                                 </div>
                               )}
                             </div>
-                          </div>
+                          )}
+
+                          {/* Files count */}
+                          {((airbrushing.receipts?.length ?? 0) > 0 || (airbrushing.invoices?.length ?? 0) > 0 || (airbrushing.artworks?.length ?? 0) > 0) && (
+                            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
+                              <div className="flex gap-3">
+                                {(airbrushing.artworks?.length ?? 0) > 0 && (
+                                  <div className="flex items-center gap-1">
+                                    <IconFiles className="h-3 w-3" />
+                                    <span>{airbrushing.artworks?.length ?? 0} arte(s)</span>
+                                  </div>
+                                )}
+                                {(airbrushing.receipts?.length ?? 0) > 0 && (
+                                  <div className="flex items-center gap-1">
+                                    <IconFile className="h-3 w-3" />
+                                    <span>{airbrushing.receipts?.length ?? 0} recibo(s)</span>
+                                  </div>
+                                )}
+                                {(airbrushing.invoices?.length ?? 0) > 0 && (
+                                  <div className="flex items-center gap-1">
+                                    <IconFileText className="h-3 w-3" />
+                                    <span>{airbrushing.invoices?.length ?? 0} NFe(s)</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1533,10 +1585,12 @@ export const TaskDetailsPage = () => {
                 </Card>
               )}
 
-              {/* Changelog History */}
-              <Card className="border flex flex-col animate-in fade-in-50 duration-1300" level={1}>
-                <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.TASK} entityId={task.id} entityName={task.name} entityCreatedAt={task.createdAt} className="h-full" />
-              </Card>
+              {/* Changelog History - Hidden for Financial and Warehouse sector users */}
+              {!isFinancialSector && !isWarehouseSector && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-1300" level={1}>
+                  <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.TASK} entityId={task.id} entityName={task.name} entityCreatedAt={task.createdAt} className="h-full" />
+                </Card>
+              )}
             </div>
           </div>
         </div>
@@ -1606,16 +1660,6 @@ export const TaskDetailsPage = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        {/* File Preview Modal for Observation Files */}
-        {task?.observation?.files && task.observation.files.length > 0 && (
-          <FilePreviewModal
-            files={task.observation.files}
-            initialFileIndex={filePreviewInitialIndex}
-            open={filePreviewModalOpen}
-            onOpenChange={setFilePreviewModalOpen}
-          />
-        )}
       </div>
     </PrivilegeRoute>
   );

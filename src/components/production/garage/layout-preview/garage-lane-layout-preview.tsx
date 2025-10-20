@@ -1,11 +1,10 @@
 import React, { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconLayout2 } from "@tabler/icons-react";
-import type { GarageLane, ParkingSpot, Garage } from "../../../../types";
+import type { GarageLane, Garage } from "../../../../types";
 
 interface GarageLaneLayoutPreviewProps {
   garageLane: GarageLane & {
-    parkingSpots?: ParkingSpot[];
     garage?: Garage;
   };
   className?: string;
@@ -182,53 +181,6 @@ export const GarageLaneLayoutPreview: React.FC<GarageLaneLayoutPreviewProps> = (
               Faixa
             </text>
 
-            {/* Parking spots */}
-            {garageLane.parkingSpots?.map((spot, spotIndex) => {
-              // Calculate spot position within the lane
-              // Arrange spots in a grid within the lane
-              const spotsPerRow = Math.floor(scaledWidth / 35); // 35px per spot for better visibility
-              const spotsPerColumn = Math.floor(scaledLength / 35);
-              const maxSpots = spotsPerRow * spotsPerColumn;
-
-              // Only show spots that fit
-              if (spotIndex >= maxSpots) return null;
-
-              const rowIndex = Math.floor(spotIndex / spotsPerRow);
-              const colIndex = spotIndex % spotsPerRow;
-
-              const spotSize = Math.min(30, Math.min(scaledWidth / spotsPerRow - 3, scaledLength / spotsPerColumn - 3));
-              const spotX = laneX + (colIndex * (spotSize + 3)) + 3;
-              const spotY = laneY + (rowIndex * (spotSize + 3)) + 3;
-
-              return (
-                <g key={spot.id}>
-                  <rect
-                    x={spotX}
-                    y={spotY}
-                    width={spotSize}
-                    height={spotSize}
-                    fill="#c8e6c9"
-                    stroke="#4caf50"
-                    strokeWidth="1"
-                    className="fill-green-100 stroke-green-500 dark:fill-green-900/30 dark:stroke-green-400"
-                  />
-
-                  {/* Spot name if space allows */}
-                  {spotSize > 20 && (
-                    <text
-                      x={spotX + spotSize / 2}
-                      y={spotY + spotSize / 2}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      className="fill-green-700 dark:fill-green-300 text-xs font-medium"
-                    >
-                      {spot.name.slice(-2)} {/* Show last 2 characters of name */}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-
             {/* Dimensions */}
             <DimensionLine
               x1={laneX}
@@ -274,10 +226,6 @@ export const GarageLaneLayoutPreview: React.FC<GarageLaneLayoutPreviewProps> = (
               <span className="text-muted-foreground">Faixa</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-100 border border-green-500 rounded dark:bg-green-900/30 dark:border-green-400"></div>
-              <span className="text-muted-foreground">Vagas</span>
-            </div>
-            <div className="flex items-center gap-2">
               <div className="w-4 h-1 bg-[#0066cc] rounded"></div>
               <span className="text-muted-foreground">Dimensões</span>
             </div>
@@ -285,23 +233,14 @@ export const GarageLaneLayoutPreview: React.FC<GarageLaneLayoutPreviewProps> = (
         </div>
 
         {/* Stats */}
-        <div className="mt-4 grid grid-cols-3 gap-4 text-center text-sm">
-          <div>
-            <p className="font-semibold text-lg">{garageLane.parkingSpots?.length || 0}</p>
-            <p className="text-muted-foreground">Vagas</p>
-          </div>
+        <div className="mt-4 grid grid-cols-2 gap-4 text-center text-sm">
           <div>
             <p className="font-semibold text-lg">{(garageLane.width * garageLane.length).toFixed(1)}</p>
             <p className="text-muted-foreground">m² área</p>
           </div>
           <div>
-            <p className="font-semibold text-lg">
-              {garageLane.parkingSpots && garageLane.parkingSpots.length > 0
-                ? (garageLane.width * garageLane.length / garageLane.parkingSpots.length).toFixed(1)
-                : '0'
-              }
-            </p>
-            <p className="text-muted-foreground">m²/vaga</p>
+            <p className="font-semibold text-lg">{garageLane.width.toFixed(1)} x {garageLane.length.toFixed(1)}</p>
+            <p className="text-muted-foreground">Dimensões (L x C)</p>
           </div>
         </div>
       </CardContent>

@@ -591,6 +591,7 @@ export const truckCreateSchema = z.object({
 
   // Optional relations
   garageId: z.string().uuid("Garagem inválida").nullable().optional(),
+  laneId: z.string().uuid("Faixa inválida").nullable().optional(),
   leftSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
   rightSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
   backSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
@@ -621,6 +622,7 @@ export const truckUpdateSchema = z.object({
   // Optional relations
   taskId: z.string().uuid("Tarefa inválida").optional(),
   garageId: z.string().uuid("Garagem inválida").nullable().optional(),
+  laneId: z.string().uuid("Faixa inválida").nullable().optional(),
   leftSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
   rightSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
   backSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),

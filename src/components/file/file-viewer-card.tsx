@@ -19,7 +19,6 @@ import React, { useState, useCallback, useMemo } from "react";
 import type { File as AnkaaFile } from "../../types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   IconPhoto,
   IconVideo,
@@ -406,9 +405,9 @@ export const FileViewerCard: React.FC<FileViewerCardProps> = ({
   // =====================
 
   return (
-    <Card
+    <div
       className={cn(
-        "group relative overflow-hidden transition-all duration-200",
+        "group relative overflow-hidden transition-all duration-200 rounded-lg",
         enableHover && !disabled && "hover:shadow-lg hover:scale-105 cursor-pointer",
         disabled && "opacity-50 cursor-not-allowed",
         className
@@ -417,56 +416,73 @@ export const FileViewerCard: React.FC<FileViewerCardProps> = ({
       onMouseLeave={() => setIsHovered(false)}
       onClick={handleClick}
     >
-      <CardContent className="p-0">
-        {/* Thumbnail Container */}
-        <div
-          className={cn(
-            "relative flex items-center justify-center bg-muted/30 overflow-hidden",
-            sizeConfig.container
-          )}
-        >
-          {/* Thumbnail Image or Icon */}
-          {thumbnailUrl && !thumbnailError ? (
-            <>
-              {/* Loading Skeleton */}
-              {thumbnailLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-muted/50 animate-pulse">
-                  {getFileTypeIcon(fileType, sizeConfig.icon)}
-                </div>
-              )}
+      {/* Thumbnail Container */}
+      <div
+        className={cn(
+          "relative flex items-center justify-center bg-muted/30 overflow-hidden",
+          sizeConfig.container
+        )}
+      >
+        {/* Thumbnail Image or Icon */}
+        {thumbnailUrl && !thumbnailError ? (
+          <>
+            {/* Loading Skeleton */}
+            {thumbnailLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-muted/50 animate-pulse">
+                {getFileTypeIcon(fileType, sizeConfig.icon)}
+              </div>
+            )}
 
-              {/* Actual Thumbnail */}
-              <img
-                src={thumbnailUrl}
-                alt={file.filename}
+            {/* Actual Thumbnail */}
+            <img
+              src={thumbnailUrl}
+              alt={file.filename}
+              className={cn(
+                "w-full h-full object-cover transition-opacity duration-300",
+                thumbnailLoading ? "opacity-0" : "opacity-100",
+                fileType === "pdf" && "object-contain bg-white p-2",
+                fileType === "document" && "object-contain bg-white p-2"
+              )}
+              onLoad={handleThumbnailLoad}
+              onError={handleThumbnailError}
+              loading="lazy"
+            />
+          </>
+        ) : (
+          /* Fallback Icon */
+          <div className="flex items-center justify-center p-4">
+            {thumbnailError ? (
+              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <IconAlertCircle size={sizeConfig.icon} className="text-yellow-500" />
+                <span className="text-xs">Sem preview</span>
+              </div>
+            ) : (
+              getFileTypeIcon(fileType, sizeConfig.icon)
+            )}
+          </div>
+        )}
+
+        {/* Hover Overlay with Actions and File Information */}
+        {enableHover && isHovered && !disabled && (
+          <div className="absolute inset-0 bg-black/75 backdrop-blur-sm flex flex-col items-center justify-center gap-3 transition-all duration-200 p-4">
+            {/* File Information */}
+            <div className="text-center space-y-1 max-w-full px-2">
+              <p
                 className={cn(
-                  "w-full h-full object-cover transition-opacity duration-300",
-                  thumbnailLoading ? "opacity-0" : "opacity-100",
-                  fileType === "pdf" && "object-contain bg-white p-2",
-                  fileType === "document" && "object-contain bg-white p-2"
+                  "font-medium text-white truncate w-full",
+                  sizeConfig.text
                 )}
-                onLoad={handleThumbnailLoad}
-                onError={handleThumbnailError}
-                loading="lazy"
-              />
-            </>
-          ) : (
-            /* Fallback Icon */
-            <div className="flex items-center justify-center p-4">
-              {thumbnailError ? (
-                <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                  <IconAlertCircle size={sizeConfig.icon} className="text-yellow-500" />
-                  <span className="text-xs">Sem preview</span>
-                </div>
-              ) : (
-                getFileTypeIcon(fileType, sizeConfig.icon)
-              )}
+                title={file.filename}
+              >
+                {file.filename}
+              </p>
+              <p className="text-xs text-white/80">
+                {formatFileSize(file.size)}
+              </p>
             </div>
-          )}
 
-          {/* Hover Overlay with Actions */}
-          {enableHover && isHovered && !disabled && (
-            <div className="absolute inset-0 bg-black/60 flex items-center justify-center gap-2 transition-opacity duration-200">
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2">
               {canPreview && (
                 <Button
                   variant="secondary"
@@ -488,37 +504,6 @@ export const FileViewerCard: React.FC<FileViewerCardProps> = ({
                 <IconDownload size={18} />
               </Button>
             </div>
-          )}
-
-          {/* File Type Badge */}
-          {showType && (
-            <div className="absolute top-2 right-2 px-2 py-1 rounded-full bg-black/70 backdrop-blur-sm">
-              <span className="text-xs font-medium text-white uppercase">
-                {getFileTypeLabel(fileType)}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* File Information */}
-        {(showName || showSize) && (
-          <div className="p-3 space-y-1">
-            {showName && (
-              <p
-                className={cn(
-                  "font-medium text-foreground truncate",
-                  sizeConfig.text
-                )}
-                title={file.filename}
-              >
-                {file.filename}
-              </p>
-            )}
-            {showSize && (
-              <p className="text-xs text-muted-foreground">
-                {formatFileSize(file.size)}
-              </p>
-            )}
           </div>
         )}
 
@@ -528,8 +513,8 @@ export const FileViewerCard: React.FC<FileViewerCardProps> = ({
             <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

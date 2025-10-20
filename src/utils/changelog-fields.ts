@@ -185,7 +185,6 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     entryDate: "Data de Entrada",
     term: "Prazo",
     commission: "Comissão",
-    price: "Preço",
     statusOrder: "Ordem do Status",
     customerId: "Cliente",
     sectorId: "Setor",
@@ -426,14 +425,6 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     yPosition: "Posição Y",
     garageId: "Garagem",
     "garage.name": "Nome da Garagem",
-  },
-  [CHANGE_LOG_ENTITY_TYPE.PARKING_SPOT]: {
-    name: "Número",
-    length: "Comprimento",
-    garageLaneId: "Faixa da Garagem",
-    "garageLane.id": "ID da Faixa",
-    "garageLane.xPosition": "Posição X da Faixa",
-    "garageLane.yPosition": "Posição Y da Faixa",
   },
   [CHANGE_LOG_ENTITY_TYPE.MAINTENANCE]: {
     type: "Tipo",

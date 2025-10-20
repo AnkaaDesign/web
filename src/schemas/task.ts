@@ -1068,7 +1068,9 @@ export const taskGetManySchema = z
 // Observation schema without taskId (will be auto-linked)
 const taskObservationCreateSchema = z.object({
   description: z.string().min(1, "Descrição é obrigatória"),
-  artworkIds: z.array(z.string().uuid("Arquivo inválido")).optional(),
+  // Accept any string for fileIds to support temporary file IDs (e.g., "1760878145245-xdmtocbjn")
+  // These will be replaced with actual UUIDs after upload
+  fileIds: z.array(z.string().min(1, "ID do arquivo inválido")).optional(),
 });
 
 // ServiceOrder schema without taskId (will be auto-linked)

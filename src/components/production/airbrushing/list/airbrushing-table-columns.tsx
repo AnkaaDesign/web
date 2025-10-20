@@ -1,7 +1,7 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { IconPhoto } from "@tabler/icons-react";
-import { formatDate, formatRelativeTime, formatCurrency } from "../../../../utils";
+import { formatDate, formatCurrency } from "../../../../utils";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
@@ -93,12 +93,9 @@ export function createAirbrushingColumns(): AirbrushingColumn[] {
       key: "startDate",
       header: "DATA INÍCIO",
       accessor: (airbrushing) => (
-        <div className="space-y-1">
+        <div>
           {airbrushing.startDate ? (
-            <>
-              <div className="text-sm">{formatDate(airbrushing.startDate)}</div>
-              <div className="text-xs text-muted-foreground">{formatRelativeTime(airbrushing.startDate)}</div>
-            </>
+            <div className="text-sm">{formatDate(airbrushing.startDate)}</div>
           ) : (
             <span className="text-sm text-muted-foreground">-</span>
           )}
@@ -112,12 +109,9 @@ export function createAirbrushingColumns(): AirbrushingColumn[] {
       key: "finishDate",
       header: "DATA FINALIZAÇÃO",
       accessor: (airbrushing) => (
-        <div className="space-y-1">
+        <div>
           {airbrushing.finishDate ? (
-            <>
-              <div className="text-sm">{formatDate(airbrushing.finishDate)}</div>
-              <div className="text-xs text-muted-foreground">{formatRelativeTime(airbrushing.finishDate)}</div>
-            </>
+            <div className="text-sm">{formatDate(airbrushing.finishDate)}</div>
           ) : (
             <span className="text-sm text-muted-foreground">-</span>
           )}

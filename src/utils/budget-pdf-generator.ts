@@ -1,17 +1,7 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import type { Task } from '@types';
 import type { Budget } from '../types/budget';
-
-// Extend jsPDF type to include autoTable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-    lastAutoTable?: {
-      finalY: number;
-    };
-  }
-}
 
 export interface BudgetPDFData {
   task: Pick<Task, 'id' | 'name' | 'serialNumber' | 'customer'> & {
@@ -96,16 +86,22 @@ export function generateBudgetPDF(data: BudgetPDFData): void {
   yPosition += 5;
 
   // Prepare table data
-  const tableData = task.budget.map((item) => [
-    item.referencia,
-    `R$ ${item.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-  ]);
+  const tableData = task.budget.map((item) => {
+    const value = typeof item.valor === 'number' ? item.valor : Number(item.valor) || 0;
+    return [
+      item.referencia,
+      `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    ];
+  });
 
-  // Calculate total
-  const total = task.budget.reduce((sum, item) => sum + item.valor, 0);
+  // Calculate total - match UI logic for consistency
+  const total = task.budget.reduce((sum, item) => {
+    const value = typeof item.valor === 'number' ? item.valor : Number(item.valor) || 0;
+    return sum + value;
+  }, 0);
 
   // Add budget table
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPosition,
     head: [['Referência', 'Valor']],
     body: tableData,
@@ -137,7 +133,7 @@ export function generateBudgetPDF(data: BudgetPDFData): void {
   });
 
   // Total row
-  const finalY = doc.lastAutoTable?.finalY || yPosition + 50;
+  const finalY = (doc as any).lastAutoTable?.finalY || yPosition + 50;
 
   doc.setFillColor(241, 245, 249); // Light gray background
   doc.rect(margin, finalY + 2, pageWidth - 2 * margin, 12, 'F');

@@ -29,6 +29,10 @@ export const TaskEditPage = () => {
       services: true,
       generalPainting: true,
       artworks: true,
+      budget: true,
+      budgets: true,
+      invoices: true,
+      receipts: true,
       cuts: {
         include: {
           file: true,
@@ -75,7 +79,7 @@ export const TaskEditPage = () => {
   }
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.LEADER}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full">
         <TaskEditForm task={task} />
       </div>

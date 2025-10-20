@@ -9,9 +9,12 @@ import { useState } from "react";
 import { batchUpdatePaintColorOrder } from "@/api-client/paint";
 import { toast } from "@/components/ui/sonner";
 import type { Paint } from "@/types";
+import { useAuth } from "@/contexts/auth-context";
+import { hasAnyPrivilege } from "@/utils";
 
 export function CatalogListPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [hasOrderChanges, setHasOrderChanges] = useState(false);
   const [reorderedPaints, setReorderedPaints] = useState<Paint[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -21,6 +24,9 @@ export function CatalogListPage() {
     title: "Catálogo de Tintas",
     icon: "paint",
   });
+
+  // Check if user can create paints (WAREHOUSE or ADMIN only)
+  const canCreatePaint = hasAnyPrivilege(user, [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]);
 
   const handleOrderStateChange = (hasChanges: boolean, orderedPaints: Paint[]) => {
     setHasOrderChanges(hasChanges);
@@ -57,15 +63,18 @@ export function CatalogListPage() {
     setHasOrderChanges(false);
   };
 
-  const actions = [
-    {
+  const actions = [];
+
+  // Only WAREHOUSE and ADMIN can create paints
+  if (canCreatePaint) {
+    actions.push({
       key: "create",
       label: "Nova Tinta",
       icon: IconPlus,
       onClick: () => navigate(routes.painting.catalog.create),
       variant: "default" as const,
-    },
-  ];
+    });
+  }
 
   if (hasOrderChanges) {
     actions.unshift(
@@ -88,7 +97,7 @@ export function CatalogListPage() {
   }
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.PRODUCTION}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="flex flex-col h-full space-y-4">
         <div className="flex-shrink-0">
           <PageHeaderWithFavorite

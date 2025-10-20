@@ -98,7 +98,6 @@ export interface User extends BaseEntity {
     items?: number;
     maintenances?: number;
     productionBatches?: number;
-    parkingRecords?: number;
     files?: number;
     changeLogs?: number;
     seenNotification?: number;

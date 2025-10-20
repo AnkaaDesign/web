@@ -81,6 +81,9 @@ const VALID_ROUTES = [
   routes.administration.notifications.edit(":id"),
   routes.administration.notifications.details(":id"),
 
+  // Financeiro routes
+  "/financeiro/clientes",
+
   // Statistics routes
   routes.statistics.root,
   routes.statistics.production,
@@ -317,6 +320,15 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/recursos-humanos/vagas/cadastrar": "/recursos-humanos/vagas/cadastrar",
   "/recursos-humanos/ppe/configuracoes": "/recursos-humanos/epi",
   "/recursos-humanos/ppe/configuracoes/cadastrar": "/recursos-humanos/epi/cadastrar",
+
+  // Financial sector route mappings - redirect production routes to main production
+  "/financeiro/producao": "/producao",
+  "/financeiro/producao/aerografia": "/producao/aerografia/listar",
+  "/financeiro/producao/cronograma": "/producao/cronograma",
+  "/financeiro/producao/em-espera": "/producao/em-espera",
+  "/financeiro/producao/historico-tarefas": "/producao/historico",
+
+  // Designer sector routes - no redirects needed, they use regular production/painting routes directly
 
   // Legacy route mappings
   "/personal/absences": "/pessoal",

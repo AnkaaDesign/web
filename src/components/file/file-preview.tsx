@@ -1,11 +1,13 @@
 import * as React from "react";
 import { IconArrowLeft, IconArrowRight, IconX, IconZoomIn, IconZoomOut, IconDownload, IconExternalLink, IconVectorBezier } from "@tabler/icons-react";
-import { Dialog, DialogContent, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogPortal, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../types";
-import { isImageFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension } from "../../utils/file";
+import { isImageFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension, getApiBaseUrl } from "../../utils/file";
+import { isPDFFile } from "../../utils/pdf-thumbnail";
 
 const isEpsFile = (file: AnkaaFile): boolean => {
   const epsMimeTypes = ["application/postscript", "application/x-eps", "application/eps", "image/eps", "image/x-eps"];
@@ -28,16 +30,19 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
   const imageRef = React.useRef<HTMLImageElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  // Filter images and EPS files with thumbnails for gallery navigation
+  // Filter images, PDFs, and EPS files with thumbnails for gallery navigation
   const imageFiles = React.useMemo(
-    () => files.map((file, index) => ({ file, originalIndex: index })).filter(({ file }) => isImageFile(file) || (isEpsFile(file) && file.thumbnailUrl)),
+    () => files.map((file, index) => ({ file, originalIndex: index })).filter(({ file }) =>
+      isImageFile(file) || isPDFFile(file) || (isEpsFile(file) && file.thumbnailUrl)
+    ),
     [files],
   );
 
   const currentFile = files[currentIndex];
   const isCurrentFileImage = currentFile && isImageFile(currentFile);
   const isCurrentFileEps = currentFile && isEpsFile(currentFile);
-  const isCurrentFilePreviewable = isCurrentFileImage || (isCurrentFileEps && currentFile.thumbnailUrl);
+  const isCurrentFilePdf = currentFile && isPDFFile(currentFile);
+  const isCurrentFilePreviewable = isCurrentFileImage || isCurrentFilePdf || (isCurrentFileEps && currentFile.thumbnailUrl);
 
   // Find current image index within image files
   const currentImageIndex = React.useMemo(() => {
@@ -138,9 +143,9 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
       const container = containerRef.current;
 
       // Get available space considering fixed UI elements
-      const topPadding = 80; // Header space
-      const bottomPadding = totalImages > 1 ? 80 : 20; // Thumbnail strip or minimal padding
-      const sidePadding = 40; // Side padding
+      const topPadding = 60; // Header space (reduced from 80)
+      const bottomPadding = totalImages > 1 ? 100 : 40; // Thumbnail strip or minimal padding
+      const sidePadding = 100; // Side padding for arrow buttons
 
       const availableWidth = container.clientWidth - sidePadding;
       const availableHeight = container.clientHeight - topPadding - bottomPadding;
@@ -148,7 +153,7 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
       // Calculate scale to fit both width and height
       const scaleX = availableWidth / img.naturalWidth;
       const scaleY = availableHeight / img.naturalHeight;
-      const optimalScale = Math.min(scaleX, scaleY, 1); // Don't scale up beyond 100%
+      const optimalScale = Math.min(scaleX, scaleY, 1.5); // Allow scaling up to 150% for small images
 
       // Apply the calculated dimensions to the image
       const scaledWidth = img.naturalWidth * optimalScale;
@@ -167,7 +172,8 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
   const handleDownload = () => {
     if (!currentFile) return;
 
-    const downloadUrl = `${baseUrl}/files/${currentFile.id}/download`;
+    const apiUrl = baseUrl || getApiBaseUrl();
+    const downloadUrl = `${apiUrl}/files/${currentFile.id}/download`;
     window.open(downloadUrl, "_blank");
   };
 
@@ -185,12 +191,27 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogOverlay className="bg-black/90 backdrop-blur-sm" />
-      <DialogContent className="max-w-[100vw] max-h-[100vh] w-full h-full p-0 border-0 bg-transparent shadow-none" aria-describedby="file-preview-description">
-        <VisuallyHidden>
-          <DialogTitle>Visualizador de Arquivo: {currentFile.filename}</DialogTitle>
-        </VisuallyHidden>
-        <div className="relative w-full h-full">
+      <DialogPortal>
+        <DialogOverlay
+          className="bg-black/90 backdrop-blur-sm"
+          onClick={() => onOpenChange(false)}
+        />
+        <DialogPrimitive.Content
+          className="fixed inset-0 z-50 w-full h-full outline-none"
+          aria-describedby="file-preview-description"
+        >
+          <VisuallyHidden>
+            <DialogTitle>Visualizador de Arquivo: {currentFile.filename}</DialogTitle>
+          </VisuallyHidden>
+          <div
+            className="relative w-full h-full"
+            onClick={(e) => {
+              // Only close if clicking directly on the background, not on children
+              if (e.target === e.currentTarget) {
+                onOpenChange(false);
+              }
+            }}
+          >
           {/* Fixed Header - Always visible */}
           <div className="fixed top-4 left-4 right-4 z-[100] flex items-center justify-between pointer-events-none">
             <div className="flex items-center gap-3 bg-black/80 backdrop-blur-md rounded-lg px-4 py-2 pointer-events-auto border border-white/10">
@@ -289,17 +310,22 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
                 <img
                   ref={imageRef}
                   src={
-                    isCurrentFileEps && currentFile.thumbnailUrl
+                    // For EPS and PDF, use thumbnail
+                    (isCurrentFileEps || isCurrentFilePdf) && currentFile.thumbnailUrl
                       ? currentFile.thumbnailUrl.startsWith("http")
                         ? currentFile.thumbnailUrl
-                        : `${baseUrl || (typeof window !== 'undefined' && (window as any).__ANKAA_API_URL__) || ''}/files/thumbnail/${currentFile.id}?size=large`
+                        : `${baseUrl || getApiBaseUrl()}/files/thumbnail/${currentFile.id}?size=large`
+                      // For PDF without thumbnailUrl in DB, generate on-demand
+                      : isCurrentFilePdf
+                        ? `${baseUrl || getApiBaseUrl()}/files/thumbnail/${currentFile.id}?size=large`
+                      // For images, use full resolution
                       : getFileUrl(currentFile, baseUrl)
                   }
                   alt={currentFile.filename}
                   className={cn(
                     "transition-transform duration-200 cursor-pointer rounded-lg shadow-2xl",
                     zoom > fitZoom && "cursor-zoom-out",
-                    isCurrentFileEps && "border-2 border-indigo-400",
+                    (isCurrentFileEps || isCurrentFilePdf) && "border-2 border-indigo-400",
                   )}
                   style={{
                     transform: `scale(${zoom})`,
@@ -311,20 +337,6 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
                   draggable={false}
                 />
               </>
-            ) : isPDF ? (
-              <div className="flex flex-col items-center justify-center gap-4 bg-white/10 backdrop-blur-sm rounded-lg p-8 max-w-md">
-                <div className="text-6xl">📄</div>
-                <div className="text-center">
-                  <h3 className="text-white text-lg font-medium mb-2">{currentFile.filename}</h3>
-                  <p className="text-white/70 text-sm mb-4">
-                    Documento PDF <span className="font-enhanced-unicode">•</span> {formatFileSize(currentFile.size)}
-                  </p>
-                  <Button variant="outline" onClick={handleOpenPDF} className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                    <IconExternalLink className="h-4 w-4 mr-2" />
-                    Abrir PDF
-                  </Button>
-                </div>
-              </div>
             ) : isEPS && !currentFile.thumbnailUrl ? (
               <div className="flex flex-col items-center justify-center gap-4 bg-white/10 backdrop-blur-sm rounded-lg p-8 max-w-md">
                 <IconVectorBezier className="h-16 w-16 text-indigo-400" />
@@ -361,6 +373,22 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
               <div className="flex items-center gap-2 bg-black/80 backdrop-blur-md rounded-lg p-2 max-w-[90vw] overflow-x-auto border border-white/10">
                 {imageFiles.map(({ file, originalIndex }, index) => {
                   const isActive = originalIndex === currentIndex;
+                  const isFilePdf = isPDFFile(file);
+                  const isFileEps = isEpsFile(file);
+
+                  // Determine thumbnail URL
+                  let thumbnailSrc: string;
+                  if (isFilePdf || (isFileEps && file.thumbnailUrl)) {
+                    // For PDFs and EPS with thumbnails, use the thumbnail endpoint
+                    const apiUrl = baseUrl || getApiBaseUrl();
+                    thumbnailSrc = file.thumbnailUrl && file.thumbnailUrl.startsWith("http")
+                      ? file.thumbnailUrl
+                      : `${apiUrl}/files/thumbnail/${file.id}?size=small`;
+                  } else {
+                    // For regular images
+                    thumbnailSrc = getFileThumbnailUrl(file, "small", baseUrl) || getFileUrl(file, baseUrl);
+                  }
+
                   return (
                     <button
                       key={file.id}
@@ -371,7 +399,7 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
                       )}
                     >
                       <img
-                        src={getFileThumbnailUrl(file, "small", baseUrl) || getFileUrl(file, baseUrl)}
+                        src={thumbnailSrc}
                         alt={`Thumbnail ${index + 1}`}
                         className="absolute inset-0 w-full h-full object-contain transition-opacity duration-200"
                         loading="lazy"
@@ -384,10 +412,11 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
           )}
         </div>
 
-        <div id="file-preview-description" className="sr-only">
-          Visualizador de arquivo. Use as setas do teclado para navegar, + e - para zoom, 0 para resetar zoom, ESC para fechar.
-        </div>
-      </DialogContent>
+          <div id="file-preview-description" className="sr-only">
+            Visualizador de arquivo. Use as setas do teclado para navegar, + e - para zoom, 0 para resetar zoom, ESC para fechar.
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPortal>
     </Dialog>
   );
 }

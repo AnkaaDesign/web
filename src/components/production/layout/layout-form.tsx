@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { LayoutCreateFormData } from "../../../schemas";
 
 interface LayoutFormProps {
@@ -28,6 +29,7 @@ interface LayoutFormProps {
   taskName?: string;
   previewMode?: boolean;
   onSideChange?: (side: 'left' | 'right' | 'back') => void;
+  validationError?: string | null;
 }
 
 interface Door {
@@ -293,10 +295,14 @@ export const LayoutForm = ({
   disabled = false,
   taskName,
   previewMode = false,
-  onSideChange
+  onSideChange,
+  validationError
 }: LayoutFormProps) => {
   // Store photo state for back side only
   const [photoState, setPhotoState] = useState<PhotoState>({});
+
+  // Track if we're currently saving to prevent state reset during save
+  const isSavingRef = useRef(false);
 
   // Store state for all three sides
   const [sideStates, setSideStates] = useState<Record<'left' | 'right' | 'back', SideState>>(() => {
@@ -314,15 +320,16 @@ export const LayoutForm = ({
         doors: []
       };
 
-      if (layout.sections && layout.sections.length > 0) {
-        const total = layout.sections.reduce((sum, s) => sum + s.width * 100, 0);
+      if (layout.layoutSections && layout.layoutSections.length > 0) {
+        const sections = layout.layoutSections;
+        const total = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
         state.totalWidth = total || 800;
 
         // Extract doors from sections
         const extractedDoors: Door[] = [];
         let currentPos = 0;
 
-        layout.sections.forEach((section, idx) => {
+        sections.forEach((section: any, idx: number) => {
           if (section.isDoor) {
             extractedDoors.push({
               id: `door-${selectedSide}-${idx}-${Date.now()}-${Math.random()}`,
@@ -350,15 +357,16 @@ export const LayoutForm = ({
             doors: []
           };
 
-          if (layoutData.sections && layoutData.sections.length > 0) {
-            const total = layoutData.sections.reduce((sum, s) => sum + s.width * 100, 0);
+          if (layoutData.layoutSections && layoutData.layoutSections.length > 0) {
+            const sections = layoutData.layoutSections;
+            const total = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
             state.totalWidth = total || 800;
 
             // Extract doors from sections
             const extractedDoors: Door[] = [];
             let currentPos = 0;
 
-            layoutData.sections.forEach((section, idx) => {
+            sections.forEach((section: any, idx: number) => {
               if (section.isDoor) {
                 extractedDoors.push({
                   id: `door-${side}-${idx}-${Date.now()}-${Math.random()}`,
@@ -381,43 +389,93 @@ export const LayoutForm = ({
     return initialStates;
   });
 
+  // Keep track of the last layout data we received for each side to detect actual changes
+  const lastLayoutRef = useRef<Record<string, any>>({});
+
   // Sync layout prop changes with internal state
+  // Only sync when layout data actually changes, not when just switching sides
   useEffect(() => {
-    if (layout) {
-      const state: SideState = {
-        height: (layout.height || 2.4) * 100,
-        totalWidth: 800,
-        doors: []
-      };
+    console.log('[LayoutForm] useEffect triggered', { selectedSide, isSaving: isSavingRef.current, hasLayout: !!layout });
 
-      if (layout.sections && layout.sections.length > 0) {
-        const total = layout.sections.reduce((sum, s) => sum + s.width * 100, 0);
-        state.totalWidth = total || 800;
+    // Don't sync if we're in the middle of saving
+    if (isSavingRef.current) {
+      console.log('[LayoutForm] Skipping sync - currently saving');
+      return;
+    }
 
-        // Extract doors from sections
-        const extractedDoors: Door[] = [];
-        let currentPos = 0;
+    if (!layout) {
+      console.log('[LayoutForm] Skipping sync - no layout prop');
+      return;
+    }
 
-        layout.sections.forEach((section, idx) => {
-          if (section.isDoor) {
-            extractedDoors.push({
-              id: `door-${selectedSide}-${idx}-${Date.now()}-${Math.random()}`,
-              position: currentPos,
-              width: section.width * 100,
-              offsetTop: (section.doorOffset || 0.5) * 100
-            });
-          }
-          currentPos += section.width * 100;
-        });
+    // Don't reset state if backend returns incomplete data (layoutSections: null)
+    // This happens when the backend doesn't include layoutSections in the response
+    if (layout.layoutSections === null || layout.layoutSections === undefined) {
+      console.log('[LayoutForm] Skipping sync - backend returned incomplete data (layoutSections: null)');
+      return;
+    }
 
-        state.doors = extractedDoors;
-      }
+    // Create a key for this side's layout to detect actual data changes
+    const layoutKey = `${selectedSide}-${JSON.stringify(layout)}`;
+    const lastKey = lastLayoutRef.current[selectedSide];
 
-      setSideStates(prev => ({
+    console.log('[LayoutForm] Checking if should sync', {
+      selectedSide,
+      layoutKey: layoutKey.substring(0, 100) + '...',
+      lastKey: lastKey?.substring(0, 100) + '...',
+      isSame: layoutKey === lastKey,
+      currentDoors: sideStates[selectedSide]?.doors?.length || 0,
+      layoutSections: layout.layoutSections?.length
+    });
+
+    // Only update if the layout data actually changed (not just selectedSide)
+    if (layoutKey === lastKey) {
+      console.log('[LayoutForm] Layout data unchanged - skipping sync');
+      return;
+    }
+
+    // Store this layout as the last seen for this side
+    lastLayoutRef.current[selectedSide] = layoutKey;
+
+    const state: SideState = {
+      height: (layout.height || 2.4) * 100,
+      totalWidth: 800,
+      doors: []
+    };
+
+    if (layout.layoutSections && layout.layoutSections.length > 0) {
+      const sections = layout.layoutSections;
+      const total = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
+      state.totalWidth = total || 800;
+
+      // Extract doors from sections
+      const extractedDoors: Door[] = [];
+      let currentPos = 0;
+
+      sections.forEach((section: any, idx: number) => {
+        if (section.isDoor) {
+          extractedDoors.push({
+            id: `door-${selectedSide}-${idx}-${Date.now()}-${Math.random()}`,
+            position: currentPos,
+            width: section.width * 100,
+            offsetTop: (section.doorOffset || 0.5) * 100
+          });
+        }
+        currentPos += section.width * 100;
+      });
+
+      state.doors = extractedDoors;
+    }
+
+    console.log('[LayoutForm] RESETTING state for side', selectedSide, 'with', state.doors.length, 'doors');
+
+    setSideStates(prev => {
+      console.log('[LayoutForm] Previous state before reset', { selectedSide, previousDoors: prev[selectedSide]?.doors?.length || 0 });
+      return {
         ...prev,
         [selectedSide]: state
-      }));
-    }
+      };
+    });
   }, [layout, selectedSide]);
 
   // Get current side's state
@@ -426,6 +484,8 @@ export const LayoutForm = ({
 
   // Update state for current side
   const updateCurrentSide = useCallback((updates: Partial<SideState>) => {
+    console.log('[LayoutForm] updateCurrentSide called', { selectedSide, updates });
+
     setSideStates(prev => {
       const newState = {
         ...prev,
@@ -434,6 +494,8 @@ export const LayoutForm = ({
           ...updates
         }
       };
+
+      console.log('[LayoutForm] New state after update', { selectedSide, doors: newState[selectedSide].doors.length });
 
       // Emit changes for current side
       const state = newState[selectedSide];
@@ -452,11 +514,38 @@ export const LayoutForm = ({
         photoId: null,
       };
 
+      console.log('[LayoutForm] Calling save callback', { selectedSide, sections: sections.length, doors: sections.filter(s => s.isDoor).length });
+
+      // Set saving flag to prevent state reset during save
+      isSavingRef.current = true;
+
       // Support both callback patterns
       if (onChange) {
         onChange(selectedSide, layoutData);
       } else if (onSave) {
-        onSave(layoutData);
+        // Call onSave and handle the promise
+        const saveResult = onSave(layoutData);
+
+        // If onSave returns a promise, wait for it to complete
+        if (saveResult && typeof saveResult.then === 'function') {
+          saveResult.finally(() => {
+            console.log('[LayoutForm] Save completed, resetting flag after delay');
+            // Reset the flag after a delay to allow the backend to process
+            setTimeout(() => {
+              console.log('[LayoutForm] isSavingRef reset to false');
+              isSavingRef.current = false;
+            }, 500);
+          });
+        } else {
+          // If not a promise, reset after a delay
+          setTimeout(() => {
+            console.log('[LayoutForm] isSavingRef reset to false (no promise)');
+            isSavingRef.current = false;
+          }, 500);
+        }
+      } else {
+        // No callback, reset immediately
+        isSavingRef.current = false;
       }
 
       return newState;
@@ -1077,6 +1166,13 @@ export const LayoutForm = ({
           </div>
         </div>
       </div>
+
+      {/* Validation Error Display */}
+      {validationError && (
+        <Alert variant="destructive" className="mt-4">
+          <AlertDescription>{validationError}</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 };

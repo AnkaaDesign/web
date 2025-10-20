@@ -1,7 +1,9 @@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { IconPlayerPlay, IconCheck, IconScissors, IconEye, IconTrash } from "@tabler/icons-react";
-import { CUT_STATUS } from "../../../../constants";
+import { CUT_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Cut } from "../../../../types";
+import { useAuth } from "../../../../hooks";
+import { hasPrivilege } from "../../../../utils";
 
 interface CutTableContextMenuProps {
   contextMenu: {
@@ -19,8 +21,15 @@ export type CutAction = "start" | "finish" | "request" | "view" | "delete";
 export function CutTableContextMenu({ contextMenu, onClose, onAction }: CutTableContextMenuProps) {
   if (!contextMenu) return null;
 
+  const { data: currentUser } = useAuth();
   const { items } = contextMenu;
   const isMultiSelection = items.length > 1;
+
+  // Check if user can request new cuts (Leader or Admin only)
+  const canRequestNewCut = currentUser && (
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.LEADER) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN)
+  );
 
   // Status checks
   const hasPendingCuts = items.some((c) => c.status === CUT_STATUS.PENDING);
@@ -68,8 +77,8 @@ export function CutTableContextMenu({ contextMenu, onClose, onAction }: CutTable
           </DropdownMenuItem>
         )}
 
-        {/* Request new cut (single selection only) */}
-        {!isMultiSelection && !hasCompletedCuts && (
+        {/* Request new cut (single selection only, Leader and Admin only) */}
+        {!isMultiSelection && !hasCompletedCuts && canRequestNewCut && (
           <DropdownMenuItem onClick={() => handleAction("request")}>
             <IconScissors className="mr-2 h-4 w-4" />
             Solicitar novo corte
@@ -77,7 +86,7 @@ export function CutTableContextMenu({ contextMenu, onClose, onAction }: CutTable
         )}
 
         {/* Separator if we have status actions */}
-        {(hasPendingCuts || hasCuttingCuts || (!isMultiSelection && !hasCompletedCuts)) && <DropdownMenuSeparator />}
+        {(hasPendingCuts || hasCuttingCuts || (!isMultiSelection && !hasCompletedCuts && canRequestNewCut)) && <DropdownMenuSeparator />}
 
         {/* Delete action */}
         <DropdownMenuItem onClick={() => handleAction("delete")} className="text-destructive">

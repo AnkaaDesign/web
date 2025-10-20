@@ -1,13 +1,11 @@
 import React, { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconLayout2 } from "@tabler/icons-react";
-import type { Garage, GarageLane, ParkingSpot } from "../../../../types";
+import type { Garage, GarageLane } from "../../../../types";
 
 interface GarageLayoutPreviewProps {
   garage: Garage & {
-    lanes?: (GarageLane & {
-      parkingSpots?: ParkingSpot[];
-    })[];
+    lanes?: GarageLane[];
   };
   className?: string;
 }
@@ -213,37 +211,6 @@ export const GarageLayoutPreview: React.FC<GarageLayoutPreviewProps> = ({
                   >
                     Faixa {index + 1}
                   </text>
-
-                  {/* Parking spots */}
-                  {lane.parkingSpots?.map((spot, spotIndex) => {
-                    // Calculate spot position within the lane
-                    // Assume spots are arranged in a grid within the lane
-                    const spotsPerRow = Math.floor(laneWidth / 30); // Assume 30px per spot
-                    const rowIndex = Math.floor(spotIndex / spotsPerRow);
-                    const colIndex = spotIndex % spotsPerRow;
-
-                    const spotSize = Math.min(25, laneWidth / spotsPerRow - 2);
-                    const spotX = laneX + (colIndex * (spotSize + 2)) + 1;
-                    const spotY = laneY + (rowIndex * (spotSize + 2)) + 1;
-
-                    // Only draw spot if it fits within the lane
-                    if (spotX + spotSize <= laneX + laneWidth && spotY + spotSize <= laneY + laneLength) {
-                      return (
-                        <rect
-                          key={spot.id}
-                          x={spotX}
-                          y={spotY}
-                          width={spotSize}
-                          height={spotSize}
-                          fill="#c8e6c9"
-                          stroke="#4caf50"
-                          strokeWidth="1"
-                          className="fill-green-100 stroke-green-500 dark:fill-green-900/30 dark:stroke-green-400"
-                        />
-                      );
-                    }
-                    return null;
-                  })}
                 </g>
               );
             })}

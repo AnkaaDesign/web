@@ -230,7 +230,7 @@ export const getFileDownloadUrl = (file: File, baseUrl?: string): string => {
 export const getFileThumbnailUrl = (file: File, size: "small" | "medium" | "large" = "medium", baseUrl?: string): string => {
   if (!isImageFile(file)) return "";
   const apiUrl = baseUrl || getApiBaseUrl();
-  return `${apiUrl}/files/${file.id}/thumbnail/${size}`;
+  return `${apiUrl}/files/thumbnail/${file.id}?size=${size}`;
 };
 
 // =====================

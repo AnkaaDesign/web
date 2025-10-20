@@ -11,7 +11,7 @@ export function PaintProductionsPage() {
   });
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.PRODUCTION}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]}>
       <ProductionsListPage />
     </PrivilegeRoute>
   );

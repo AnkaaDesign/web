@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy } from "./common";
-import type { Garage, GarageLane, ParkingSpot } from "../types";
+import type { Garage, GarageLane } from "../types";
 
 // =====================
 // Include Schemas
@@ -14,11 +14,7 @@ export const garageIncludeSchema = z
       .union([
         z.boolean(),
         z.object({
-          include: z
-            .object({
-              parkingSpots: z.boolean().optional(),
-            })
-            .optional(),
+          include: z.object({}).optional(),
         }),
       ])
       .optional(),
@@ -47,20 +43,6 @@ export const garageLaneIncludeSchema = z
         }),
       ])
       .optional(),
-    parkingSpots: z.boolean().optional(),
-  })
-  .optional();
-
-export const parkingSpotIncludeSchema = z
-  .object({
-    garageLane: z
-      .union([
-        z.boolean(),
-        z.object({
-          include: garageLaneIncludeSchema.optional(),
-        }),
-      ])
-      .optional(),
   })
   .optional();
 
@@ -76,6 +58,7 @@ export const garageOrderBySchema = z
         name: orderByDirectionSchema.optional(),
         width: orderByDirectionSchema.optional(),
         length: orderByDirectionSchema.optional(),
+        isVirtual: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
       })
@@ -87,6 +70,7 @@ export const garageOrderBySchema = z
           name: orderByDirectionSchema.optional(),
           width: orderByDirectionSchema.optional(),
           length: orderByDirectionSchema.optional(),
+          isVirtual: orderByDirectionSchema.optional(),
           createdAt: orderByDirectionSchema.optional(),
           updatedAt: orderByDirectionSchema.optional(),
         })
@@ -100,11 +84,11 @@ export const garageLaneOrderBySchema = z
     z
       .object({
         id: orderByDirectionSchema.optional(),
-        name: orderByDirectionSchema.optional(),
         width: orderByDirectionSchema.optional(),
         length: orderByDirectionSchema.optional(),
         xPosition: orderByDirectionSchema.optional(),
         yPosition: orderByDirectionSchema.optional(),
+        order: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
       })
@@ -113,36 +97,11 @@ export const garageLaneOrderBySchema = z
       z
         .object({
           id: orderByDirectionSchema.optional(),
-          name: orderByDirectionSchema.optional(),
           width: orderByDirectionSchema.optional(),
           length: orderByDirectionSchema.optional(),
           xPosition: orderByDirectionSchema.optional(),
           yPosition: orderByDirectionSchema.optional(),
-          createdAt: orderByDirectionSchema.optional(),
-          updatedAt: orderByDirectionSchema.optional(),
-        })
-        .partial(),
-    ),
-  ])
-  .optional();
-
-export const parkingSpotOrderBySchema = z
-  .union([
-    z
-      .object({
-        id: orderByDirectionSchema.optional(),
-        name: orderByDirectionSchema.optional(),
-        length: orderByDirectionSchema.optional(),
-        createdAt: orderByDirectionSchema.optional(),
-        updatedAt: orderByDirectionSchema.optional(),
-      })
-      .partial(),
-    z.array(
-      z
-        .object({
-          id: orderByDirectionSchema.optional(),
-          name: orderByDirectionSchema.optional(),
-          length: orderByDirectionSchema.optional(),
+          order: orderByDirectionSchema.optional(),
           createdAt: orderByDirectionSchema.optional(),
           updatedAt: orderByDirectionSchema.optional(),
         })
@@ -243,6 +202,17 @@ export const garageWhereSchema: z.ZodSchema = z.lazy(() =>
             gte: z.number().optional(),
             lt: z.number().optional(),
             lte: z.number().optional(),
+          }),
+        ])
+        .optional(),
+
+      // Boolean fields
+      isVirtual: z
+        .union([
+          z.boolean(),
+          z.object({
+            equals: z.boolean().optional(),
+            not: z.boolean().optional(),
           }),
         ])
         .optional(),
@@ -401,69 +371,7 @@ export const garageLaneWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      // Relations
-      garage: garageWhereSchema.optional(),
-      parkingSpots: z
-        .object({
-          some: parkingSpotWhereSchema.optional(),
-          every: parkingSpotWhereSchema.optional(),
-          none: parkingSpotWhereSchema.optional(),
-        })
-        .optional(),
-    })
-    .strict()
-    .optional(),
-);
-
-export const parkingSpotWhereSchema: z.ZodSchema = z.lazy(() =>
-  z
-    .object({
-      // Boolean operators
-      AND: z.array(parkingSpotWhereSchema).optional(),
-      OR: z.array(parkingSpotWhereSchema).optional(),
-      NOT: parkingSpotWhereSchema.optional(),
-
-      // UUID fields
-      id: z
-        .union([
-          z.string(),
-          z.object({
-            equals: z.string().optional(),
-            not: z.string().optional(),
-            in: z.array(z.string()).optional(),
-            notIn: z.array(z.string()).optional(),
-          }),
-        ])
-        .optional(),
-
-      garageLaneId: z
-        .union([
-          z.string(),
-          z.object({
-            equals: z.string().optional(),
-            not: z.string().optional(),
-            in: z.array(z.string()).optional(),
-            notIn: z.array(z.string()).optional(),
-          }),
-        ])
-        .optional(),
-
-      // String fields
-      name: z
-        .union([
-          z.string(),
-          z.object({
-            equals: z.string().optional(),
-            not: z.string().optional(),
-            contains: z.string().optional(),
-            startsWith: z.string().optional(),
-            endsWith: z.string().optional(),
-          }),
-        ])
-        .optional(),
-
-      // Numeric fields
-      length: z
+      order: z
         .union([
           z.number(),
           z.object({
@@ -478,7 +386,7 @@ export const parkingSpotWhereSchema: z.ZodSchema = z.lazy(() =>
         .optional(),
 
       // Relations
-      garageLane: garageLaneWhereSchema.optional(),
+      garage: garageWhereSchema.optional(),
     })
     .strict()
     .optional(),
@@ -535,13 +443,9 @@ const garageLaneFilters = {
   // Search filter
   searchingFor: z.string().optional(),
 
-  // Boolean filters
-  hasSpots: z.boolean().optional(),
-
   // Array filters
   laneIds: z.array(z.string()).optional(),
   garageIds: z.array(z.string()).optional(),
-  names: z.array(z.string()).optional(),
 
   // Range filters
   widthRange: z
@@ -571,19 +475,8 @@ const garageLaneFilters = {
       max: z.number().optional(),
     })
     .optional(),
-};
 
-const parkingSpotFilters = {
-  // Search filter
-  searchingFor: z.string().optional(),
-
-  // Array filters
-  spotIds: z.array(z.string()).optional(),
-  laneIds: z.array(z.string()).optional(),
-  names: z.array(z.string()).optional(),
-
-  // Range filters
-  lengthRange: z
+  orderRange: z
     .object({
       min: z.number().optional(),
       max: z.number().optional(),
@@ -734,16 +627,6 @@ const garageLaneTransform = (data: any): any => {
     delete data.searchingFor;
   }
 
-  // Boolean filters
-  if (data.hasSpots !== undefined) {
-    if (data.hasSpots) {
-      andConditions.push({ parkingSpots: { some: {} } });
-    } else {
-      andConditions.push({ parkingSpots: { none: {} } });
-    }
-    delete data.hasSpots;
-  }
-
   // Array filters
   if (data.laneIds) {
     andConditions.push({ id: { in: data.laneIds } });
@@ -753,11 +636,6 @@ const garageLaneTransform = (data: any): any => {
   if (data.garageIds) {
     andConditions.push({ garageId: { in: data.garageIds } });
     delete data.garageIds;
-  }
-
-  if (data.names) {
-    andConditions.push({ name: { in: data.names } });
-    delete data.names;
   }
 
   // Range filters
@@ -801,76 +679,14 @@ const garageLaneTransform = (data: any): any => {
     delete data.yPositionRange;
   }
 
-  // Date filters
-  if (data.createdAt) {
-    andConditions.push({ createdAt: data.createdAt });
-    delete data.createdAt;
-  }
-
-  if (data.updatedAt) {
-    andConditions.push({ updatedAt: data.updatedAt });
-    delete data.updatedAt;
-  }
-
-  // Merge with existing where conditions
-  if (andConditions.length > 0) {
-    if (data.where) {
-      data.where = data.where.AND ? { ...data.where, AND: [...(data.where.AND || []), ...andConditions] } : andConditions.length === 1 ? andConditions[0] : { AND: andConditions };
-    } else {
-      data.where = andConditions.length === 1 ? andConditions[0] : { AND: andConditions };
-    }
-  }
-
-  return data;
-};
-
-const parkingSpotTransform = (data: any): any => {
-  // Normalize orderBy to Prisma format
-  if (data.orderBy) {
-    data.orderBy = normalizeOrderBy(data.orderBy);
-  }
-
-  // Handle take/limit alias
-  if (data.take && !data.limit) {
-    data.limit = data.take;
-  }
-  delete data.take;
-
-  const andConditions: any[] = [];
-
-  // Search filter
-  if (data.searchingFor) {
-    andConditions.push({
-      OR: [{ name: { contains: data.searchingFor, mode: "insensitive" } }],
-    });
-    delete data.searchingFor;
-  }
-
-  // Array filters
-  if (data.spotIds) {
-    andConditions.push({ id: { in: data.spotIds } });
-    delete data.spotIds;
-  }
-
-  if (data.laneIds) {
-    andConditions.push({ garageLaneId: { in: data.laneIds } });
-    delete data.laneIds;
-  }
-
-  if (data.names) {
-    andConditions.push({ name: { in: data.names } });
-    delete data.names;
-  }
-
-  // Range filters
-  if (data.lengthRange) {
+  if (data.orderRange) {
     const condition: any = {};
-    if (data.lengthRange.min !== undefined) condition.gte = data.lengthRange.min;
-    if (data.lengthRange.max !== undefined) condition.lte = data.lengthRange.max;
+    if (data.orderRange.min !== undefined) condition.gte = data.orderRange.min;
+    if (data.orderRange.max !== undefined) condition.lte = data.orderRange.max;
     if (Object.keys(condition).length > 0) {
-      andConditions.push({ length: condition });
+      andConditions.push({ order: condition });
     }
-    delete data.lengthRange;
+    delete data.orderRange;
   }
 
   // Date filters
@@ -964,38 +780,6 @@ export const garageLaneGetManySchema = z
   })
   .transform(garageLaneTransform);
 
-export const parkingSpotGetManySchema = z
-  .object({
-    // Pagination
-    page: z.coerce.number().int().min(0).default(1).optional(),
-    limit: z.coerce.number().int().positive().max(100).default(20).optional(),
-    take: z.coerce.number().int().positive().max(100).optional(),
-    skip: z.coerce.number().int().min(0).optional(),
-
-    // Direct Prisma clauses
-    where: parkingSpotWhereSchema.optional(),
-    orderBy: parkingSpotOrderBySchema.optional(),
-    include: parkingSpotIncludeSchema.optional(),
-
-    // Convenience filters
-    ...parkingSpotFilters,
-
-    // Date filters
-    createdAt: z
-      .object({
-        gte: z.coerce.date().optional(),
-        lte: z.coerce.date().optional(),
-      })
-      .optional(),
-    updatedAt: z
-      .object({
-        gte: z.coerce.date().optional(),
-        lte: z.coerce.date().optional(),
-      })
-      .optional(),
-  })
-  .transform(parkingSpotTransform);
-
 // =====================
 // CRUD Schemas
 // =====================
@@ -1008,6 +792,7 @@ export const garageCreateSchema = z
     name: z.string().min(1, "Nome é obrigatório").max(255),
     width: z.number().positive("Largura deve ser positiva"),
     length: z.number().positive("Comprimento deve ser positivo"),
+    isVirtual: z.boolean().default(false),
     description: z.string().optional(),
     location: z.string().optional(),
     metadata: z.any().optional(),
@@ -1019,6 +804,7 @@ export const garageUpdateSchema = z
     name: z.string().min(1).max(255).optional(),
     width: z.number().positive().optional(),
     length: z.number().positive().optional(),
+    isVirtual: z.boolean().optional(),
     description: z.string().optional(),
     location: z.string().optional(),
     metadata: z.any().optional(),
@@ -1034,36 +820,21 @@ export const garageLaneCreateSchema = z
     length: z.number().positive("Comprimento deve ser positivo"),
     xPosition: z.number().min(0, "Posição X deve ser não-negativa"),
     yPosition: z.number().min(0, "Posição Y deve ser não-negativa"),
+    order: z.number().int().min(0, "Ordem deve ser não-negativa"),
     metadata: z.any().optional(),
   })
   .transform(toFormData);
 
 export const garageLaneUpdateSchema = z
   .object({
-    garageId: z.string().uuid("Garagem inválida"),
+    garageId: z.string().uuid("Garagem inválida").optional(),
     name: z.string().optional(),
     width: z.number().positive().optional(),
     length: z.number().positive().optional(),
     xPosition: z.number().min(0).optional(),
     yPosition: z.number().min(0).optional(),
+    order: z.number().int().min(0).optional(),
     metadata: z.any().optional(),
-  })
-  .transform(toFormData);
-
-// ParkingSpot CRUD
-export const parkingSpotCreateSchema = z
-  .object({
-    garageLaneId: z.string().uuid("Faixa da garagem inválida"),
-    name: z.string().min(1, "Nome é obrigatório"),
-    length: z.number().positive("Comprimento deve ser positivo"),
-  })
-  .transform(toFormData);
-
-export const parkingSpotUpdateSchema = z
-  .object({
-    garageLaneId: z.string().uuid("Faixa da garagem inválida"),
-    name: z.string().min(1).optional(),
-    length: z.number().positive().optional(),
   })
   .transform(toFormData);
 
@@ -1079,11 +850,6 @@ export const garageGetByIdSchema = z.object({
 export const garageLaneGetByIdSchema = z.object({
   include: garageLaneIncludeSchema.optional(),
   id: z.string().uuid("Faixa inválida"),
-});
-
-export const parkingSpotGetByIdSchema = z.object({
-  include: parkingSpotIncludeSchema.optional(),
-  id: z.string().uuid("Vaga inválida"),
 });
 
 // =====================
@@ -1140,31 +906,6 @@ export const garageLaneQuerySchema = z.object({
   include: garageLaneIncludeSchema.optional(),
 });
 
-// ParkingSpot batch operations
-export const parkingSpotBatchCreateSchema = z.object({
-  parkingSpots: z.array(parkingSpotCreateSchema),
-});
-
-export const parkingSpotBatchUpdateSchema = z.object({
-  parkingSpots: z
-    .array(
-      z.object({
-        id: z.string().uuid("Vaga de estacionamento inválida"),
-        data: parkingSpotUpdateSchema,
-      }),
-    )
-    .min(1, "Pelo menos uma vaga de estacionamento deve ser fornecida"),
-});
-
-export const parkingSpotBatchDeleteSchema = z.object({
-  parkingSpotIds: z.array(z.string().uuid("Vaga inválida")).min(1, "Pelo menos um ID deve ser fornecido"),
-});
-
-// Query schema for single operations (create/update)
-export const parkingSpotQuerySchema = z.object({
-  include: parkingSpotIncludeSchema.optional(),
-});
-
 // =====================
 // Type Inference (FormData types)
 // =====================
@@ -1202,22 +943,6 @@ export type GarageLaneInclude = z.infer<typeof garageLaneIncludeSchema>;
 export type GarageLaneOrderBy = z.infer<typeof garageLaneOrderBySchema>;
 export type GarageLaneWhere = z.infer<typeof garageLaneWhereSchema>;
 
-// ParkingSpot types
-export type ParkingSpotGetManyFormData = z.infer<typeof parkingSpotGetManySchema>;
-export type ParkingSpotGetByIdFormData = z.infer<typeof parkingSpotGetByIdSchema>;
-export type ParkingSpotQueryFormData = z.infer<typeof parkingSpotQuerySchema>;
-
-export type ParkingSpotCreateFormData = z.infer<typeof parkingSpotCreateSchema>;
-export type ParkingSpotUpdateFormData = z.infer<typeof parkingSpotUpdateSchema>;
-
-export type ParkingSpotBatchCreateFormData = z.infer<typeof parkingSpotBatchCreateSchema>;
-export type ParkingSpotBatchUpdateFormData = z.infer<typeof parkingSpotBatchUpdateSchema>;
-export type ParkingSpotBatchDeleteFormData = z.infer<typeof parkingSpotBatchDeleteSchema>;
-
-export type ParkingSpotInclude = z.infer<typeof parkingSpotIncludeSchema>;
-export type ParkingSpotOrderBy = z.infer<typeof parkingSpotOrderBySchema>;
-export type ParkingSpotWhere = z.infer<typeof parkingSpotWhereSchema>;
-
 // =====================
 // Helper Functions
 // =====================
@@ -1226,18 +951,15 @@ export const mapGarageToFormData = createMapToFormDataHelper<Garage, GarageUpdat
   name: garage.name,
   width: garage.width,
   length: garage.length,
+  isVirtual: garage.isVirtual,
 }));
 
 export const mapGarageLaneToFormData = createMapToFormDataHelper<GarageLane, GarageLaneUpdateFormData>((lane) => ({
+  name: lane.name,
   width: lane.width,
   length: lane.length,
   xPosition: lane.xPosition,
   yPosition: lane.yPosition,
+  order: lane.order,
   garageId: lane.garageId,
-}));
-
-export const mapParkingSpotToFormData = createMapToFormDataHelper<ParkingSpot, ParkingSpotUpdateFormData>((spot) => ({
-  name: spot.name,
-  length: spot.length,
-  garageLaneId: spot.garageLaneId,
 }));

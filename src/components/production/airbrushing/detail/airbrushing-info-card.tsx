@@ -1,13 +1,25 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileItem, type FileViewMode } from "@/components/file";
-import { useFileViewer } from "@/components/file/file-viewer";
-import { IconBrush, IconCalendar, IconUser, IconTruck, IconFileText, IconCurrency, IconPhoto, IconReceipt, IconFileInvoice, IconLayoutGrid, IconList } from "@tabler/icons-react";
+import { Separator } from "@/components/ui/separator";
+import { FileItem } from "@/components/file";
+import {
+  IconBrush,
+  IconCalendar,
+  IconUser,
+  IconFileText,
+  IconCurrency,
+  IconPhoto,
+  IconReceipt,
+  IconFileInvoice,
+  IconClipboardList,
+  IconBuildingFactory,
+  IconClock,
+} from "@tabler/icons-react";
 import { type Airbrushing } from "../../../../types";
-import { formatDate, formatRelativeTime } from "../../../../utils";
-import { TASK_STATUS_LABELS, AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
+import { formatDate, formatDateTime } from "../../../../utils";
+import { TASK_STATUS_LABELS, AIRBRUSHING_STATUS_LABELS, ENTITY_BADGE_CONFIG } from "../../../../constants";
 import { cn } from "@/lib/utils";
 
 interface AirbrushingInfoCardProps {
@@ -59,347 +71,254 @@ interface AirbrushingInfoCardProps {
 }
 
 export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoCardProps) {
-  const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("list");
-  const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("list");
-
-  // Try to get file viewer context (optional)
-  let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
-  try {
-    fileViewerContext = useFileViewer();
-  } catch {
-    // Context not available
-  }
-
-  const handlePreview = (file: any) => {
-    if (fileViewerContext) {
-      fileViewerContext.actions.viewFile(file);
-    }
-  };
-
-  const handleDownload = (file: any) => {
-    if (fileViewerContext) {
-      fileViewerContext.actions.downloadFile(file);
-    }
-  };
-
-  const getTaskStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "PENDING":
-        return "secondary";
-      case "IN_PRODUCTION":
-        return "default";
-      case "ON_HOLD":
-        return "warning";
-      case "COMPLETED":
-        return "success";
-      case "CANCELLED":
-        return "destructive";
-      default:
-        return "secondary";
-    }
-  };
-
   const getAirbrushingStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "PENDING":
-        return "secondary";
-      case "IN_PRODUCTION":
-        return "default";
-      case "COMPLETED":
-        return "success";
-      case "CANCELLED":
-        return "destructive";
-      default:
-        return "secondary";
-    }
+    return (ENTITY_BADGE_CONFIG.AIRBRUSHING[status] || "default") as any;
   };
 
   return (
     <div className={cn("space-y-6", className)}>
-      {/* Basic Information Card */}
-      <Card className="shadow-sm border border-border">
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20">
-              <IconBrush className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+      {/* Main Information Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Basic Info Card */}
+        <Card className="border-2 shadow-lg animate-in fade-in-50 duration-700">
+          <CardHeader className="pb-6">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                  <IconBrush className="h-6 w-6 text-primary" />
+                  Informações Básicas
+                </CardTitle>
+                <CardDescription>Detalhes da aerografia</CardDescription>
+              </div>
+              <Badge variant={getAirbrushingStatusBadgeVariant(airbrushing.status)} className="text-sm px-3 py-1">
+                {AIRBRUSHING_STATUS_LABELS[airbrushing.status] || airbrushing.status}
+              </Badge>
             </div>
-            Detalhes da Aerografia
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent className="pt-0">
-          <div className="space-y-6">
-            {/* Airbrushing Information */}
-            <div>
-              <h3 className="text-lg font-semibold text-foreground mb-3">Informações da Aerografia</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground">Status</span>
-                  <Badge variant={getAirbrushingStatusBadgeVariant(airbrushing.status)}>{AIRBRUSHING_STATUS_LABELS[airbrushing.status] || airbrushing.status}</Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Price */}
+              {airbrushing.price && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <IconCurrency className="h-4 w-4" />
+                    <span>Preço</span>
+                  </div>
+                  <p className="font-semibold text-lg">
+                    {new Intl.NumberFormat("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    }).format(airbrushing.price)}
+                  </p>
                 </div>
+              )}
 
-                {airbrushing.startDate && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconCalendar className="h-4 w-4" />
-                      Data de Início
-                    </span>
-                    <div className="text-right">
-                      <span className="text-sm font-semibold text-foreground">{formatDate(new Date(airbrushing.startDate))}</span>
-                      <div className="text-xs text-muted-foreground">{formatRelativeTime(new Date(airbrushing.startDate))}</div>
-                    </div>
+              {/* Start Date */}
+              {airbrushing.startDate && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <IconClock className="h-4 w-4" />
+                    <span>Data de Início</span>
                   </div>
-                )}
+                  <p className="font-semibold">{formatDateTime(airbrushing.startDate)}</p>
+                </div>
+              )}
 
-                {airbrushing.finishDate && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconCalendar className="h-4 w-4" />
-                      Data de Término
-                    </span>
-                    <div className="text-right">
-                      <span className="text-sm font-semibold text-foreground">{formatDate(new Date(airbrushing.finishDate))}</span>
-                      <div className="text-xs text-muted-foreground">{formatRelativeTime(new Date(airbrushing.finishDate))}</div>
-                    </div>
+              {/* Finish Date */}
+              {airbrushing.finishDate && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <IconCalendar className="h-4 w-4" />
+                    <span>Data de Término</span>
                   </div>
-                )}
+                  <p className="font-semibold">{formatDateTime(airbrushing.finishDate)}</p>
+                </div>
+              )}
 
-                {airbrushing.price && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconCurrency className="h-4 w-4" />
-                      Preço
-                    </span>
-                    <span className="text-sm font-semibold text-foreground">
-                      {new Intl.NumberFormat("pt-BR", {
-                        style: "currency",
-                        currency: "BRL",
-                      }).format(airbrushing.price)}
-                    </span>
+              <Separator />
+
+              {/* Created At */}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <IconCalendar className="h-4 w-4" />
+                  <span>Criada em</span>
+                </div>
+                <p className="font-semibold">{formatDateTime(airbrushing.createdAt)}</p>
+              </div>
+
+              {/* Updated At */}
+              {airbrushing.updatedAt !== airbrushing.createdAt && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <IconCalendar className="h-4 w-4" />
+                    <span>Atualizada em</span>
                   </div>
-                )}
+                  <p className="font-semibold">{formatDateTime(airbrushing.updatedAt)}</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Task Information Card */}
+        <Card className="border-2 shadow-lg animate-in fade-in-50 duration-800">
+          <CardHeader className="pb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                  <IconClipboardList className="h-6 w-6 text-primary" />
+                  Informações da Tarefa
+                </CardTitle>
+                <CardDescription>Detalhes da tarefa relacionada</CardDescription>
               </div>
             </div>
-
-            {/* Task Information */}
-            {airbrushing.task && (
-              <div className="pt-4 border-t border-border/50">
-                <h4 className="text-sm font-semibold mb-3 text-foreground">Tarefa Relacionada</h4>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {airbrushing.task ? (
+              <>
+                {/* Task Details */}
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconTruck className="h-4 w-4" />
-                      Nome da Tarefa
-                    </span>
-                    <div className="text-right">
-                      <span className="text-sm font-semibold text-foreground">{airbrushing.task.name}</span>
-                    </div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Nome da Tarefa</p>
+                    <p className="font-semibold text-lg">{airbrushing.task.name}</p>
                   </div>
 
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground">Status da Tarefa</span>
-                    <Badge variant={getTaskStatusBadgeVariant(airbrushing.task.status)}>{TASK_STATUS_LABELS[airbrushing.task.status] || airbrushing.task.status}</Badge>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Status da Tarefa</p>
+                    <Badge variant="secondary">
+                      {TASK_STATUS_LABELS[airbrushing.task.status] || airbrushing.task.status}
+                    </Badge>
                   </div>
 
                   {airbrushing.task.customer && (
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <IconUser className="h-4 w-4" />
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <IconUser className="h-3 w-3" />
                         Cliente
-                      </span>
-                      <span className="text-sm font-semibold text-foreground">{airbrushing.task.customer.fantasyName}</span>
+                      </p>
+                      <p className="font-semibold">{airbrushing.task.customer.fantasyName}</p>
                     </div>
                   )}
 
                   {airbrushing.task.sector && (
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                      <span className="text-sm font-medium text-muted-foreground">Setor</span>
-                      <span className="text-sm font-semibold text-foreground">{airbrushing.task.sector.name}</span>
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <IconBuildingFactory className="h-3 w-3" />
+                        Setor
+                      </p>
+                      <p className="font-semibold">{airbrushing.task.sector.name}</p>
                     </div>
                   )}
 
                   {airbrushing.task.price && (
-                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                      <span className="text-sm font-medium text-muted-foreground">Preço da Tarefa</span>
-                      <span className="text-sm font-semibold text-foreground">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Preço da Tarefa</p>
+                      <p className="font-semibold">
                         {new Intl.NumberFormat("pt-BR", {
                           style: "currency",
                           currency: "BRL",
                         }).format(airbrushing.task.price)}
-                      </span>
+                      </p>
                     </div>
                   )}
                 </div>
+              </>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <IconClipboardList className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>Nenhuma tarefa associada</p>
               </div>
             )}
+          </CardContent>
+        </Card>
+      </div>
 
-            {/* Date Information */}
-            <div className="pt-4 border-t border-border/50">
-              <h4 className="text-sm font-semibold mb-3 text-foreground">Datas do Sistema</h4>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconCalendar className="h-4 w-4" />
-                    Criada em
-                  </span>
-                  <div className="text-right">
-                    <span className="text-sm font-semibold text-foreground">{formatDate(new Date(airbrushing.createdAt))}</span>
-                    <div className="text-xs text-muted-foreground">{formatRelativeTime(new Date(airbrushing.createdAt))}</div>
+      {/* Documents and Artworks Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Documents Card - Receipts and Invoices */}
+        {((airbrushing.receipts && airbrushing.receipts.length > 0) || (airbrushing.invoices && airbrushing.invoices.length > 0)) && (
+          <Card className="border shadow-md animate-in fade-in-50 duration-900">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <IconFileText className="h-5 w-5 text-primary" />
+                Documentos
+                <Badge variant="secondary" className="ml-2">
+                  {(airbrushing.receipts?.length || 0) + (airbrushing.invoices?.length || 0)}
+                </Badge>
+              </CardTitle>
+              <CardDescription>Recibos e notas fiscais</CardDescription>
+            </CardHeader>
+
+            <CardContent>
+              <div className="space-y-6">
+                {airbrushing.receipts && airbrushing.receipts.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <IconReceipt className="h-4 w-4 text-muted-foreground" />
+                      <h4 className="text-sm font-semibold">Recibos</h4>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {airbrushing.receipts.map((file) => (
+                        <FileItem
+                          key={file.id}
+                          file={file}
+                          viewMode="list"
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {airbrushing.updatedAt !== airbrushing.createdAt && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconCalendar className="h-4 w-4" />
-                      Atualizada em
-                    </span>
-                    <div className="text-right">
-                      <span className="text-sm font-semibold text-foreground">{formatDate(new Date(airbrushing.updatedAt))}</span>
-                      <div className="text-xs text-muted-foreground">{formatRelativeTime(new Date(airbrushing.updatedAt))}</div>
+                {airbrushing.invoices && airbrushing.invoices.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
+                      <h4 className="text-sm font-semibold">Notas Fiscais</h4>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {airbrushing.invoices.map((file) => (
+                        <FileItem
+                          key={file.id}
+                          file={file}
+                          viewMode="list"
+                        />
+                      ))}
                     </div>
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Documents Card - Receipts and Invoices */}
-      {((airbrushing.receipts && airbrushing.receipts.length > 0) || (airbrushing.invoices && airbrushing.invoices.length > 0)) && (
-        <Card className="shadow-sm border border-border">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-3 text-xl">
-                <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
-                  <IconFileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                Documentos
-                <Badge variant="secondary" className="ml-2">
-                  {(airbrushing.receipts?.length || 0) + (airbrushing.invoices?.length || 0)} arquivo{((airbrushing.receipts?.length || 0) + (airbrushing.invoices?.length || 0)) > 1 ? "s" : ""}
-                </Badge>
-              </CardTitle>
-              <div className="flex gap-1">
-                <Button
-                  variant={documentsViewMode === "list" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setDocumentsViewMode("list")}
-                  className="h-7 w-7 p-0"
-                >
-                  <IconList className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant={documentsViewMode === "grid" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setDocumentsViewMode("grid")}
-                  className="h-7 w-7 p-0"
-                >
-                  <IconLayoutGrid className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="pt-0">
-            <div className="space-y-6">
-              {airbrushing.receipts && airbrushing.receipts.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <IconReceipt className="h-4 w-4 text-muted-foreground" />
-                    <h4 className="text-sm font-semibold">Recibos</h4>
-                  </div>
-                  <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                    {airbrushing.receipts.map((file) => (
-                      <FileItem
-                        key={file.id}
-                        file={file}
-                        viewMode={documentsViewMode}
-                        onPreview={handlePreview}
-                        onDownload={handleDownload}
-                        showActions
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {airbrushing.invoices && airbrushing.invoices.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                    <h4 className="text-sm font-semibold">Notas Fiscais</h4>
-                  </div>
-                  <div className={cn(documentsViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                    {airbrushing.invoices.map((file) => (
-                      <FileItem
-                        key={file.id}
-                        file={file}
-                        viewMode={documentsViewMode}
-                        onPreview={handlePreview}
-                        onDownload={handleDownload}
-                        showActions
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Artworks Card */}
-      {airbrushing.artworks && airbrushing.artworks.length > 0 && (
-        <Card className="shadow-sm border border-border">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-3 text-xl">
-                <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/20">
-                  <IconPhoto className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                </div>
+        {/* Artworks Card */}
+        {airbrushing.artworks && airbrushing.artworks.length > 0 && (
+          <Card className="border shadow-md animate-in fade-in-50 duration-900">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold flex items-center gap-2">
+                <IconPhoto className="h-5 w-5 text-primary" />
                 Artes da Aerografia
                 <Badge variant="secondary" className="ml-2">
-                  {airbrushing.artworks.length} arquivo{airbrushing.artworks.length > 1 ? "s" : ""}
+                  {airbrushing.artworks.length}
                 </Badge>
               </CardTitle>
-              <div className="flex gap-1">
-                <Button
-                  variant={artworksViewMode === "list" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setArtworksViewMode("list")}
-                  className="h-7 w-7 p-0"
-                >
-                  <IconList className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant={artworksViewMode === "grid" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setArtworksViewMode("grid")}
-                  className="h-7 w-7 p-0"
-                >
-                  <IconLayoutGrid className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
+              <CardDescription>Arquivos de arte</CardDescription>
+            </CardHeader>
 
-          <CardContent className="pt-0">
-            <div className={cn(artworksViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-              {airbrushing.artworks.map((file) => (
-                <FileItem
-                  key={file.id}
-                  file={file}
-                  viewMode={artworksViewMode}
-                  onPreview={handlePreview}
-                  onDownload={handleDownload}
-                  showActions
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            <CardContent>
+              <div className="flex flex-wrap gap-3">
+                {airbrushing.artworks.map((file) => (
+                  <FileItem
+                    key={file.id}
+                    file={file}
+                    viewMode="grid"
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,5 +1,5 @@
-import { UnderConstruction } from "@/components/under-construction";
+import { GarageOverview } from "./garage-overview";
 
 export const GarageListPage = () => {
-  return <UnderConstruction />;
+  return <GarageOverview />;
 };

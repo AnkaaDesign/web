@@ -70,14 +70,24 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
     const [airbrushings, setAirbrushings] = useState<AirbrushingItem[]>(() => {
       if (field.value && Array.isArray(field.value) && field.value.length > 0) {
         return field.value.map((airbrushing: any, index: number) => ({
-          id: `airbrushing-${Date.now()}-${index}`,
+          id: airbrushing.id || `airbrushing-${Date.now()}-${index}`,
           status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
           price: airbrushing.price || null,
           startDate: airbrushing.startDate || null,
           finishDate: airbrushing.finishDate || null,
-          receiptFiles: convertFilesToFileWithPreview(airbrushing.receipts),
-          nfeFiles: convertFilesToFileWithPreview(airbrushing.invoices),
-          artworkFiles: convertFilesToFileWithPreview(airbrushing.artworks),
+          // Merge existing uploaded files (from API as 'receipts') and newly selected files (as 'receiptFiles')
+          receiptFiles: [
+            ...convertFilesToFileWithPreview(airbrushing.receipts || []),
+            ...(airbrushing.receiptFiles || [])
+          ],
+          nfeFiles: [
+            ...convertFilesToFileWithPreview(airbrushing.invoices || []),
+            ...(airbrushing.nfeFiles || [])
+          ],
+          artworkFiles: [
+            ...convertFilesToFileWithPreview(airbrushing.artworks || []),
+            ...(airbrushing.artworkFiles || [])
+          ],
           receiptIds: airbrushing.receiptIds || [],
           invoiceIds: airbrushing.invoiceIds || [],
           artworkIds: airbrushing.artworkIds || [],
@@ -94,34 +104,68 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
 
     // Sync FROM form field TO local state when form resets (form → local)
     useEffect(() => {
+      console.log('[Form→Local Sync] ========== TRIGGERED ==========');
+      console.log('[Form→Local Sync] isSyncingToForm:', isSyncingToForm.current);
+      console.log('[Form→Local Sync] field.value:', field.value);
+
       // Skip if we're currently syncing to form
-      if (isSyncingToForm.current) return;
+      if (isSyncingToForm.current) {
+        console.log('[Form→Local Sync] SKIPPED - currently syncing to form');
+        return;
+      }
 
       const fieldValueStr = JSON.stringify(field.value);
 
       // Skip if value hasn't changed
-      if (fieldValueStr === lastFieldValueRef.current) return;
+      if (fieldValueStr === lastFieldValueRef.current) {
+        console.log('[Form→Local Sync] SKIPPED - value unchanged');
+        return;
+      }
 
+      console.log('[Form→Local Sync] Processing field value:', field.value);
       lastFieldValueRef.current = fieldValueStr;
 
       if (field.value && Array.isArray(field.value) && field.value.length > 0) {
-        const newAirbrushings = field.value.map((airbrushing: any, index: number) => ({
-          id: `airbrushing-${Date.now()}-${index}`,
-          status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
-          price: airbrushing.price || null,
-          startDate: airbrushing.startDate || null,
-          finishDate: airbrushing.finishDate || null,
-          receiptFiles: convertFilesToFileWithPreview(airbrushing.receipts),
-          nfeFiles: convertFilesToFileWithPreview(airbrushing.invoices),
-          artworkFiles: convertFilesToFileWithPreview(airbrushing.artworks),
-          receiptIds: airbrushing.receiptIds || [],
-          invoiceIds: airbrushing.invoiceIds || [],
-          artworkIds: airbrushing.artworkIds || [],
-        }));
+        const wasEmpty = airbrushings.length === 0;
+        console.log('[Form→Local Sync] Found', field.value.length, 'airbrushings, wasEmpty:', wasEmpty);
+
+        const newAirbrushings = field.value.map((airbrushing: any, index: number) => {
+          console.log(`[Form→Local Sync] Processing airbrushing ${index}:`, airbrushing);
+          return {
+            id: airbrushing.id || `airbrushing-${Date.now()}-${index}`, // Preserve ID from form data
+            status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
+            price: airbrushing.price || null,
+            startDate: airbrushing.startDate || null,
+            finishDate: airbrushing.finishDate || null,
+            // Merge existing uploaded files (from API as 'receipts') and newly selected files (as 'receiptFiles')
+            receiptFiles: [
+              ...convertFilesToFileWithPreview(airbrushing.receipts || []),
+              ...(airbrushing.receiptFiles || [])
+            ],
+            nfeFiles: [
+              ...convertFilesToFileWithPreview(airbrushing.invoices || []),
+              ...(airbrushing.nfeFiles || [])
+            ],
+            artworkFiles: [
+              ...convertFilesToFileWithPreview(airbrushing.artworks || []),
+              ...(airbrushing.artworkFiles || [])
+            ],
+            receiptIds: airbrushing.receiptIds || [],
+            invoiceIds: airbrushing.invoiceIds || [],
+            artworkIds: airbrushing.artworkIds || [],
+          };
+        });
+        console.log('[Form→Local Sync] Setting airbrushings:', newAirbrushings);
         setAirbrushings(newAirbrushings);
+        // Only auto-expand all items on initial load (when transitioning from empty to populated)
+        if (wasEmpty) {
+          setExpandedItems(newAirbrushings.map((a) => a.id));
+        }
       } else if (!field.value || (Array.isArray(field.value) && field.value.length === 0)) {
         // Clear airbrushings if field value is empty
+        console.log('[Form→Local Sync] Clearing airbrushings');
         setAirbrushings([]);
+        setExpandedItems([]);
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [field.value]);
@@ -131,19 +175,29 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       // Mark that we're syncing
       isSyncingToForm.current = true;
 
-      const formValue = airbrushings.map((airbrushing) => ({
-        status: airbrushing.status,
-        price: airbrushing.price,
-        startDate: airbrushing.startDate,
-        finishDate: airbrushing.finishDate,
-        receiptIds: airbrushing.receiptIds || [],
-        invoiceIds: airbrushing.invoiceIds || [],
-        artworkIds: airbrushing.artworkIds || [],
-        // Include the actual files for submission with the form
-        receiptFiles: airbrushing.receiptFiles.filter(f => !f.uploaded && f instanceof File),
-        nfeFiles: airbrushing.nfeFiles.filter(f => !f.uploaded && f instanceof File),
-        artworkFiles: airbrushing.artworkFiles.filter(f => !f.uploaded && f instanceof File),
-      }));
+      const formValue = airbrushings.map((airbrushing) => {
+        console.log('[MultiAirbrushingSelector] Syncing airbrushing to form:', {
+          id: airbrushing.id,
+          price: airbrushing.price,
+          priceType: typeof airbrushing.price,
+          status: airbrushing.status,
+        });
+        return {
+          id: airbrushing.id, // Preserve ID for sync back
+          status: airbrushing.status,
+          price: airbrushing.price,
+          startDate: airbrushing.startDate,
+          finishDate: airbrushing.finishDate,
+          receiptIds: airbrushing.receiptIds || [],
+          invoiceIds: airbrushing.invoiceIds || [],
+          artworkIds: airbrushing.artworkIds || [],
+          // Include the actual files for submission with the form
+          receiptFiles: airbrushing.receiptFiles,
+          nfeFiles: airbrushing.nfeFiles,
+          artworkFiles: airbrushing.artworkFiles,
+        };
+      });
+      console.log('[MultiAirbrushingSelector] Form value being set:', formValue);
       field.onChange(formValue);
 
       // Notify parent about count change
@@ -183,7 +237,19 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
     }, []);
 
     const updateAirbrushing = useCallback((id: string, updates: Partial<AirbrushingItem>) => {
-      setAirbrushings((prev) => prev.map((airbrushing) => (airbrushing.id === id ? { ...airbrushing, ...updates } : airbrushing)));
+      console.log('[updateAirbrushing] Called with id:', id, 'updates:', updates);
+      setAirbrushings((prev) => {
+        const updated = prev.map((airbrushing) => {
+          if (airbrushing.id === id) {
+            const merged = { ...airbrushing, ...updates };
+            console.log('[updateAirbrushing] Merging airbrushing:', airbrushing, 'with updates:', updates, 'result:', merged);
+            return merged;
+          }
+          return airbrushing;
+        });
+        console.log('[updateAirbrushing] New airbrushings array:', updated);
+        return updated;
+      });
     }, []);
 
     const handleReceiptFilesChange = useCallback(
@@ -245,15 +311,6 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
 
     return (
       <div className="space-y-4">
-        {/* Info Badge */}
-        {airbrushings.length > 0 && (
-          <div className="flex justify-start">
-            <Badge variant="secondary" className="font-medium">
-              {airbrushings.length} {airbrushings.length === 1 ? "aerografia" : "aerografias"}
-            </Badge>
-          </div>
-        )}
-
         {/* Airbrushings List */}
         {airbrushings.length > 0 && (
           <Accordion type="multiple" value={expandedItems} onValueChange={setExpandedItems} className="space-y-2">
@@ -268,19 +325,15 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       {airbrushing.price && <Badge variant="outline">{formatCurrency(airbrushing.price)}</Badge>}
                       {airbrushing.startDate && <span className="text-sm text-muted-foreground">{formatDate(airbrushing.startDate)}</span>}
                     </div>
-                    <Button
-                      type="button"
+                    <div
                       onClick={(e) => {
                         e.stopPropagation();
                         removeAirbrushing(airbrushing.id);
                       }}
-                      disabled={disabled}
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8"
+                      className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer"
                     >
                       <IconTrash className="h-4 w-4 text-destructive" />
-                    </Button>
+                    </div>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
@@ -309,13 +362,16 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                         <Input
                           type="currency"
                           value={airbrushing.price || undefined}
-                          onChange={(e) =>
+                          onChange={(value) => {
+                            // Currency Input passes value directly, not an event object
+                            console.log('[Price Input] Currency value received:', value, 'type:', typeof value);
                             updateAirbrushing(airbrushing.id, {
-                              price: e.target.value ? parseFloat(e.target.value.replace(/[^\d,]/g, "").replace(",", ".")) : null,
-                            })
-                          }
+                              price: value,
+                            });
+                          }}
                           disabled={disabled}
                           placeholder="R$ 0,00"
+                          className="bg-transparent"
                         />
                       </div>
 
@@ -351,7 +407,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                     {/* File Uploads */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Receipts */}
-                      <div className="space-y-2">
+                      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                         <FormLabel className="flex items-center gap-2">
                           <IconPaperclip className="h-4 w-4" />
                           Recibos
@@ -368,7 +424,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       </div>
 
                       {/* NFEs */}
-                      <div className="space-y-2">
+                      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                         <FormLabel className="flex items-center gap-2">
                           <IconFileInvoice className="h-4 w-4" />
                           Notas Fiscais
@@ -385,7 +441,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       </div>
 
                       {/* Artworks */}
-                      <div className="space-y-2">
+                      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                         <FormLabel className="flex items-center gap-2">
                           <IconPhoto className="h-4 w-4" />
                           Artes

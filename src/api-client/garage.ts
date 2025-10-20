@@ -19,20 +19,11 @@ import type {
   GarageLaneBatchUpdateFormData,
   GarageLaneBatchDeleteFormData,
   GarageLaneQueryFormData,
-  ParkingSpotGetManyFormData,
-  ParkingSpotGetByIdFormData,
-  ParkingSpotCreateFormData,
-  ParkingSpotUpdateFormData,
-  ParkingSpotBatchCreateFormData,
-  ParkingSpotBatchUpdateFormData,
-  ParkingSpotBatchDeleteFormData,
-  ParkingSpotQueryFormData,
 } from "../schemas";
 import type {
   // Interface types (for responses)
   Garage,
   GarageLane,
-  ParkingSpot,
   GarageGetUniqueResponse,
   GarageGetManyResponse,
   GarageCreateResponse,
@@ -49,14 +40,6 @@ import type {
   GarageLaneBatchCreateResponse,
   GarageLaneBatchUpdateResponse,
   GarageLaneBatchDeleteResponse,
-  ParkingSpotGetUniqueResponse,
-  ParkingSpotGetManyResponse,
-  ParkingSpotCreateResponse,
-  ParkingSpotUpdateResponse,
-  ParkingSpotDeleteResponse,
-  ParkingSpotBatchCreateResponse,
-  ParkingSpotBatchUpdateResponse,
-  ParkingSpotBatchDeleteResponse,
 } from "../types";
 
 // =====================
@@ -198,73 +181,6 @@ export class GarageService {
     });
     return response.data;
   }
-
-  // =====================
-  // ParkingSpot Query Operations
-  // =====================
-
-  async getParkingSpots(params?: ParkingSpotGetManyFormData): Promise<ParkingSpotGetManyResponse> {
-    const response = await apiClient.get<ParkingSpotGetManyResponse>(`${this.basePath}/spots`, {
-      params,
-    });
-    return response.data;
-  }
-
-  async getParkingSpotById(params: ParkingSpotGetByIdFormData): Promise<ParkingSpotGetUniqueResponse> {
-    const { id, ...queryParams } = params;
-    const response = await apiClient.get<ParkingSpotGetUniqueResponse>(`${this.basePath}/spots/${id}`, {
-      params: queryParams,
-    });
-    return response.data;
-  }
-
-  // =====================
-  // ParkingSpot CRUD Operations
-  // =====================
-
-  async createParkingSpot(data: ParkingSpotCreateFormData, params?: ParkingSpotQueryFormData): Promise<ParkingSpotCreateResponse> {
-    const response = await apiClient.post<ParkingSpotCreateResponse>(`${this.basePath}/spots`, data, {
-      params,
-    });
-    return response.data;
-  }
-
-  async updateParkingSpot(id: string, data: ParkingSpotUpdateFormData, params?: ParkingSpotQueryFormData): Promise<ParkingSpotUpdateResponse> {
-    const response = await apiClient.put<ParkingSpotUpdateResponse>(`${this.basePath}/spots/${id}`, data, {
-      params,
-    });
-    return response.data;
-  }
-
-  async deleteParkingSpot(id: string): Promise<ParkingSpotDeleteResponse> {
-    const response = await apiClient.delete<ParkingSpotDeleteResponse>(`${this.basePath}/spots/${id}`);
-    return response.data;
-  }
-
-  // =====================
-  // ParkingSpot Batch Operations
-  // =====================
-
-  async batchCreateParkingSpots(data: ParkingSpotBatchCreateFormData, params?: ParkingSpotQueryFormData): Promise<ParkingSpotBatchCreateResponse<ParkingSpot>> {
-    const response = await apiClient.post<ParkingSpotBatchCreateResponse<ParkingSpot>>(`${this.basePath}/spots/batch`, data, {
-      params,
-    });
-    return response.data;
-  }
-
-  async batchUpdateParkingSpots(data: ParkingSpotBatchUpdateFormData, params?: ParkingSpotQueryFormData): Promise<ParkingSpotBatchUpdateResponse<ParkingSpot>> {
-    const response = await apiClient.put<ParkingSpotBatchUpdateResponse<ParkingSpot>>(`${this.basePath}/spots/batch`, data, {
-      params,
-    });
-    return response.data;
-  }
-
-  async batchDeleteParkingSpots(data: ParkingSpotBatchDeleteFormData): Promise<ParkingSpotBatchDeleteResponse> {
-    const response = await apiClient.delete<ParkingSpotBatchDeleteResponse>(`${this.basePath}/spots/batch`, {
-      data,
-    });
-    return response.data;
-  }
 }
 
 // =====================
@@ -296,13 +212,3 @@ export const deleteGarageLane = (id: string) => garageService.deleteGarageLane(i
 export const batchCreateGarageLanes = (data: GarageLaneBatchCreateFormData, params?: GarageLaneQueryFormData) => garageService.batchCreateGarageLanes(data, params);
 export const batchUpdateGarageLanes = (data: GarageLaneBatchUpdateFormData, params?: GarageLaneQueryFormData) => garageService.batchUpdateGarageLanes(data, params);
 export const batchDeleteGarageLanes = (data: GarageLaneBatchDeleteFormData) => garageService.batchDeleteGarageLanes(data);
-
-// ParkingSpot functions
-export const getParkingSpots = (params?: ParkingSpotGetManyFormData) => garageService.getParkingSpots(params);
-export const getParkingSpotById = (id: string, params?: Omit<ParkingSpotGetByIdFormData, "id">) => garageService.getParkingSpotById({ id, ...params });
-export const createParkingSpot = (data: ParkingSpotCreateFormData, params?: ParkingSpotQueryFormData) => garageService.createParkingSpot(data, params);
-export const updateParkingSpot = (id: string, data: ParkingSpotUpdateFormData, params?: ParkingSpotQueryFormData) => garageService.updateParkingSpot(id, data, params);
-export const deleteParkingSpot = (id: string) => garageService.deleteParkingSpot(id);
-export const batchCreateParkingSpots = (data: ParkingSpotBatchCreateFormData, params?: ParkingSpotQueryFormData) => garageService.batchCreateParkingSpots(data, params);
-export const batchUpdateParkingSpots = (data: ParkingSpotBatchUpdateFormData, params?: ParkingSpotQueryFormData) => garageService.batchUpdateParkingSpots(data, params);
-export const batchDeleteParkingSpots = (data: ParkingSpotBatchDeleteFormData) => garageService.batchDeleteParkingSpots(data);

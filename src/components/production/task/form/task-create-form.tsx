@@ -216,6 +216,58 @@ export const TaskCreateForm = () => {
           return cut;
         });
 
+        // Handle airbrushing files
+        const airbrushings = data.airbrushings as any[] || [];
+        const airbrushingFiles: Record<string, File[]> = {};
+
+        console.log('[TaskCreateForm] ========== AIRBRUSHINGS BEFORE FILE EXTRACTION ==========');
+        console.log('[TaskCreateForm] Airbrushings count:', airbrushings.length);
+        airbrushings.forEach((airbrushing, index) => {
+          console.log(`[TaskCreateForm] Airbrushing ${index}:`, {
+            id: airbrushing.id,
+            status: airbrushing.status,
+            price: airbrushing.price,
+            priceType: typeof airbrushing.price,
+            startDate: airbrushing.startDate,
+            finishDate: airbrushing.finishDate,
+          });
+        });
+
+        if (airbrushings.length > 0) {
+          airbrushings.forEach((airbrushing, index) => {
+            // Extract files from airbrushing objects
+            if (airbrushing.receiptFiles && Array.isArray(airbrushing.receiptFiles)) {
+              const receipts = airbrushing.receiptFiles.filter((f: any) => f instanceof File);
+              if (receipts.length > 0) {
+                airbrushingFiles[`airbrushings[${index}].receipts`] = receipts;
+              }
+              // Remove file objects from airbrushing data
+              delete airbrushing.receiptFiles;
+            }
+
+            if (airbrushing.nfeFiles && Array.isArray(airbrushing.nfeFiles)) {
+              const invoices = airbrushing.nfeFiles.filter((f: any) => f instanceof File);
+              if (invoices.length > 0) {
+                airbrushingFiles[`airbrushings[${index}].invoices`] = invoices;
+              }
+              // Remove file objects from airbrushing data
+              delete airbrushing.nfeFiles;
+            }
+
+            if (airbrushing.artworkFiles && Array.isArray(airbrushing.artworkFiles)) {
+              const artworks = airbrushing.artworkFiles.filter((f: any) => f instanceof File);
+              if (artworks.length > 0) {
+                airbrushingFiles[`airbrushings[${index}].artworks`] = artworks;
+              }
+              // Remove file objects from airbrushing data
+              delete airbrushing.artworkFiles;
+            }
+          });
+        }
+
+        console.log('[TaskCreateForm] ========== AIRBRUSHINGS AFTER FILE EXTRACTION ==========');
+        console.log('[TaskCreateForm] Airbrushings for FormData:', JSON.stringify(airbrushings, null, 2));
+
         // Backend doesn't support 'cuts' (plural) field - remove it from data
         // Cuts will be created separately after task creation
         console.log('[SUBMIT] Before deleting cuts:', 'cuts' in data ? 'PRESENT' : 'NOT PRESENT');
@@ -225,7 +277,7 @@ export const TaskCreateForm = () => {
         // Create FormData with proper context
         const formData = createFormDataWithContext(
           data,
-          { ...files, cuts: cutFiles },
+          { ...files, cuts: cutFiles, ...airbrushingFiles },
           {
             entityType: 'task',
             customer: customer ? {

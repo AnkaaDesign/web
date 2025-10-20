@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/ui/page-header";
-import { routes, FAVORITE_PAGES } from "../../../../constants";
+import { PrivilegeRoute } from "@/components/navigation/privilege-route";
+import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../../constants";
 import { usePpeDeliveryScheduleMutations } from "../../../../hooks";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { IconCalendar, IconX, IconCheck, IconLoader2 } from "@tabler/icons-react";
@@ -47,33 +48,35 @@ export const PPEScheduleCreatePage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-5xl mx-auto">
-          <PageHeader
-            variant="form"
-            title="Novo Agendamento de EPI"
-            icon={IconCalendar}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Estoque", href: routes.inventory.root },
-              { label: "EPIs", href: routes.inventory.ppe.root },
-              { label: "Agendamentos", href: routes.inventory.ppe.schedules.root },
-              { label: "Criar" },
-            ]}
-            actions={actions}
-            favoritePage={FAVORITE_PAGES.ESTOQUE_EPI_AGENDAMENTOS_CADASTRAR}
-          />
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+      <div className="h-full flex flex-col space-y-4">
+        {/* Fixed Header */}
+        <div className="flex-shrink-0">
+          <div className="max-w-5xl mx-auto">
+            <PageHeader
+              variant="form"
+              title="Novo Agendamento de EPI"
+              icon={IconCalendar}
+              breadcrumbs={[
+                { label: "Início", href: routes.home },
+                { label: "Estoque", href: routes.inventory.root },
+                { label: "EPIs", href: routes.inventory.ppe.root },
+                { label: "Agendamentos", href: routes.inventory.ppe.schedules.root },
+                { label: "Criar" },
+              ]}
+              actions={actions}
+              favoritePage={FAVORITE_PAGES.ESTOQUE_EPI_AGENDAMENTOS_CADASTRAR}
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Scrollable Form Container */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="max-w-5xl mx-auto h-full">
-          <PpeScheduleForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
+        {/* Scrollable Form Container */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="max-w-5xl mx-auto h-full">
+            <PpeScheduleForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
+          </div>
         </div>
       </div>
-    </div>
+    </PrivilegeRoute>
   );
 };

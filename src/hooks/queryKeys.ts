@@ -13,7 +13,6 @@ import type {
   FileGetManyFormData,
   GarageGetManyFormData,
   GarageLaneGetManyFormData,
-  ParkingSpotGetManyFormData,
   ItemGetManyFormData,
   ItemBrandGetManyFormData,
   ItemCategoryGetManyFormData,
@@ -344,7 +343,6 @@ export const artworkKeys = fileKeys;
 
 export const garageKeys = createQueryKeyStore<GarageGetManyFormData>("garages");
 export const garageLaneKeys = createQueryKeyStore<GarageLaneGetManyFormData>("garageLanes");
-export const parkingSpotKeys = createQueryKeyStore<ParkingSpotGetManyFormData>("parkingSpots");
 
 // =====================================================
 // Item Query Keys

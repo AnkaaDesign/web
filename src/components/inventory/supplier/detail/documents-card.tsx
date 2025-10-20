@@ -5,7 +5,6 @@ import type { File as AnkaaFile } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { maskCNPJ } from "../../../../utils";
 import { FileItem } from "@/components/file";
-import { useFileViewer } from "@/components/file/file-viewer";
 
 interface DocumentsCardProps {
   supplier: Supplier;
@@ -23,28 +22,8 @@ export function DocumentsCard({
   certificates = [],
   otherDocuments = []
 }: DocumentsCardProps) {
-  // Try to get file viewer context (optional)
-  let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
-  try {
-    fileViewerContext = useFileViewer();
-  } catch {
-    // Context not available
-  }
-
   const allDocuments = [...contracts, ...certificates, ...otherDocuments];
   const hasDocuments = supplier.cnpj || allDocuments.length > 0;
-
-  const handlePreview = (file: AnkaaFile) => {
-    if (fileViewerContext) {
-      fileViewerContext.actions.viewFile(file);
-    }
-  };
-
-  const handleDownload = (file: AnkaaFile) => {
-    if (fileViewerContext) {
-      fileViewerContext.actions.downloadFile(file);
-    }
-  };
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
@@ -89,9 +68,6 @@ export function DocumentsCard({
                         key={file.id}
                         file={file}
                         viewMode="list"
-                        onPreview={handlePreview}
-                        onDownload={handleDownload}
-                        showActions
                       />
                     ))}
                   </div>
@@ -111,9 +87,6 @@ export function DocumentsCard({
                         key={file.id}
                         file={file}
                         viewMode="list"
-                        onPreview={handlePreview}
-                        onDownload={handleDownload}
-                        showActions
                       />
                     ))}
                   </div>
@@ -133,9 +106,6 @@ export function DocumentsCard({
                         key={file.id}
                         file={file}
                         viewMode="list"
-                        onPreview={handlePreview}
-                        onDownload={handleDownload}
-                        showActions
                       />
                     ))}
                   </div>

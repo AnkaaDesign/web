@@ -34,7 +34,6 @@ export interface Task extends BaseEntity {
   paintId: string | null;
   customerId: string | null;
   sectorId: string | null;
-  price: number | null;
   createdById: string | null;
   priority?: string | null;
 
@@ -167,7 +166,6 @@ export interface TaskOrderBy {
   paintId?: ORDER_BY_DIRECTION;
   customerId?: ORDER_BY_DIRECTION;
   sectorId?: ORDER_BY_DIRECTION;
-  price?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
   sector?: SectorOrderBy;

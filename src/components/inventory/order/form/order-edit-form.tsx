@@ -97,7 +97,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     () =>
       order.items.reduce(
         (acc, item) => {
-          acc[item.itemId] = item.price;
+          // Round to 2 decimal places to ensure compliance with moneySchema validation
+          acc[item.itemId] = Math.round(item.price * 100) / 100;
           return acc;
         },
         {} as Record<string, number>,
@@ -117,11 +118,67 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     [order.items],
   );
 
+  // Initialize file state with existing files from order
+  const initialBudgetFiles = useMemo(() => {
+    const files = (order.budgets || []).map(file => ({
+      id: file.id,
+      name: file.filename || file.originalName,
+      size: file.size || 0,
+      type: file.mimetype || 'application/octet-stream',
+      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+      uploaded: true,
+      uploadProgress: 100,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl,
+    } as FileWithPreview));
+    console.log('[OrderEditForm] Initialized budget files:', files.length, files);
+    return files;
+  }, [order.budgets]);
+
+  const initialReceiptFiles = useMemo(() => {
+    const files = (order.receipts || []).map(file => ({
+      id: file.id,
+      name: file.filename || file.originalName,
+      size: file.size || 0,
+      type: file.mimetype || 'application/octet-stream',
+      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+      uploaded: true,
+      uploadProgress: 100,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl,
+    } as FileWithPreview));
+    console.log('[OrderEditForm] Initialized receipt files:', files.length, files);
+    return files;
+  }, [order.receipts]);
+
+  const initialNfeFiles = useMemo(() => {
+    const files = (order.invoices || []).map(file => ({
+      id: file.id,
+      name: file.filename || file.originalName,
+      size: file.size || 0,
+      type: file.mimetype || 'application/octet-stream',
+      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+      uploaded: true,
+      uploadProgress: 100,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl,
+    } as FileWithPreview));
+    console.log('[OrderEditForm] Initialized invoice files:', files.length, files);
+    return files;
+  }, [order.invoices]);
+
   // File upload state
-  const [budgetFiles, setBudgetFiles] = useState<FileWithPreview[]>([]);
-  const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
-  const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>([]);
+  const [budgetFiles, setBudgetFiles] = useState<FileWithPreview[]>(initialBudgetFiles);
+  const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>(initialReceiptFiles);
+  const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>(initialNfeFiles);
   const [hasFileChanges, setHasFileChanges] = useState(false);
+
+  // Sync file state when order files change
+  useEffect(() => {
+    setBudgetFiles(initialBudgetFiles);
+    setReceiptFiles(initialReceiptFiles);
+    setNfeFiles(initialNfeFiles);
+  }, [initialBudgetFiles, initialReceiptFiles, initialNfeFiles]);
 
   // URL state management for item selection (Stage 2) - initialized with existing data
   const {
@@ -335,7 +392,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     // Check if quantities have changed for existing items
     const quantitiesChanged = order.items.some(item => {
       const currentQty = quantities[item.itemId];
-      return currentQty !== undefined && currentQty !== item.quantity;
+      return currentQty !== undefined && currentQty !== item.orderedQuantity;
     });
 
     // Check if prices have changed for existing items
@@ -901,13 +958,21 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       disabled: isSubmitting,
     });
   } else {
+    const submitDisabled = isSubmitting || !hasFormChanges || !form.formState.isValid || !description?.trim();
+    console.log('[Submit Button State]', {
+      isSubmitting,
+      hasFormChanges,
+      isValid: form.formState.isValid,
+      hasDescription: !!description?.trim(),
+      submitDisabled,
+    });
     navigationActions.push({
       key: "submit",
       label: "Salvar Alterações",
       icon: isSubmitting ? IconLoader2 : IconCheck,
       onClick: handleSubmit,
       variant: "default" as const,
-      disabled: isSubmitting || !hasFormChanges || !form.formState.isValid || !description?.trim(),
+      disabled: submitDisabled,
       loading: isSubmitting,
     });
   }

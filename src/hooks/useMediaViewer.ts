@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { MediaItem } from '../types/media';
+import type { MediaItem } from '../types/media';
 
 interface UseMediaViewerReturn {
   isOpen: boolean;

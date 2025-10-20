@@ -71,9 +71,49 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
   // Initialize state from URL parameters
   const [currentStep, setCurrentStep] = useState(getStepFromUrl(searchParams));
 
+  // Initialize file state with existing files from withdrawal
+  const initialReceiptFiles = useMemo(() => {
+    const files = (withdrawal.receipts || []).map(file => ({
+      id: file.id,
+      name: file.filename || file.originalName,
+      size: file.size || 0,
+      type: file.mimetype || 'application/octet-stream',
+      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+      uploaded: true,
+      uploadProgress: 100,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl,
+    } as FileWithPreview));
+    console.log('[ExternalWithdrawalEditForm] Initialized receipt files:', files.length, files);
+    return files;
+  }, [withdrawal.receipts]);
+
+  const initialNfeFiles = useMemo(() => {
+    const files = (withdrawal.invoices || []).map(file => ({
+      id: file.id,
+      name: file.filename || file.originalName,
+      size: file.size || 0,
+      type: file.mimetype || 'application/octet-stream',
+      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+      uploaded: true,
+      uploadProgress: 100,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl,
+    } as FileWithPreview));
+    console.log('[ExternalWithdrawalEditForm] Initialized invoice files:', files.length, files);
+    return files;
+  }, [withdrawal.invoices]);
+
   // File upload state
-  const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
-  const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>([]);
+  const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>(initialReceiptFiles);
+  const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>(initialNfeFiles);
+  const [hasFileChanges, setHasFileChanges] = useState(false);
+
+  // Sync file state when withdrawal files change
+  useEffect(() => {
+    setReceiptFiles(initialReceiptFiles);
+    setNfeFiles(initialNfeFiles);
+  }, [initialReceiptFiles, initialNfeFiles]);
 
   // Convert existing withdrawal data to initial state
   const initialSelectedItems = useMemo(() => new Set(withdrawal.items.map((item: ExternalWithdrawalItem) => item.itemId)), [withdrawal.items]);
@@ -287,11 +327,13 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
   // Handle file changes
   const handleReceiptFilesChange = useCallback((files: FileWithPreview[]) => {
     setReceiptFiles(files);
+    setHasFileChanges(true);
     form.setValue("receiptId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
   }, [form]);
 
   const handleNfeFilesChange = useCallback((files: FileWithPreview[]) => {
     setNfeFiles(files);
+    setHasFileChanges(true);
     form.setValue("nfeId", files.length > 0 ? "pending" : undefined, { shouldDirty: true, shouldTouch: true });
   }, [form]);
 
@@ -698,6 +740,43 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
     [withdrawerName, willReturn, notes, selectionCount, selectedItemsData, quantities, prices, totalPrice, withdrawal.id],
   );
 
+  // Detect if form has actual changes from original withdrawal
+  const hasFormChanges = useMemo(() => {
+    const withdrawerNameChanged = (withdrawerName?.trim() || "") !== (withdrawal.withdrawerName?.trim() || "");
+    const willReturnChanged = willReturn !== withdrawal.willReturn;
+    const notesChanged = (notes?.trim() || "") !== (withdrawal.notes?.trim() || "");
+
+    // Check if selected items have changed
+    const originalItemIds = new Set(withdrawal.items.map(item => item.itemId));
+    const itemsChanged = selectedItems.size !== originalItemIds.size ||
+      Array.from(selectedItems).some(id => !originalItemIds.has(id));
+
+    // Check if quantities have changed for existing items
+    const quantitiesChanged = withdrawal.items.some(item => {
+      const currentQty = quantities[item.itemId];
+      return currentQty !== undefined && currentQty !== item.withdrawedQuantity;
+    });
+
+    // Check if prices have changed for existing items
+    const pricesChanged = withdrawal.items.some(item => {
+      const currentPrice = prices[item.itemId];
+      return currentPrice !== undefined && currentPrice !== item.price;
+    });
+
+    const hasChanges = withdrawerNameChanged || willReturnChanged || notesChanged || itemsChanged || quantitiesChanged || pricesChanged || hasFileChanges;
+    console.log('[ExternalWithdrawalEditForm] hasFormChanges:', {
+      withdrawerNameChanged,
+      willReturnChanged,
+      notesChanged,
+      itemsChanged,
+      quantitiesChanged,
+      pricesChanged,
+      hasFileChanges,
+      hasChanges
+    });
+    return hasChanges;
+  }, [withdrawerName, willReturn, notes, selectedItems, quantities, prices, withdrawal, hasFileChanges]);
+
   // Generate navigation actions based on current step
   const navigationActions = [];
 
@@ -733,13 +812,20 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
       disabled: isSubmitting,
     });
   } else {
+    const submitDisabled = isSubmitting || !hasFormChanges || selectionCount === 0;
+    console.log('[ExternalWithdrawalEditForm] Submit Button State:', {
+      isSubmitting,
+      hasFormChanges,
+      selectionCount,
+      submitDisabled,
+    });
     navigationActions.push({
       key: "submit",
       label: "Salvar Alterações",
       icon: isSubmitting ? IconLoader2 : IconCheck,
       onClick: handleSubmit,
       variant: "default" as const,
-      disabled: isSubmitting || selectionCount === 0,
+      disabled: submitDisabled,
       loading: isSubmitting,
     });
   }

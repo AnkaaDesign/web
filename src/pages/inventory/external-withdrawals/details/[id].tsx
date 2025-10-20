@@ -238,14 +238,14 @@ const ExternalWithdrawalDetailsPage = () => {
         {/* Hero Section - Enhanced Header with Actions */}
         <PageHeader
           variant="detail"
-          title={`Retirada #${withdrawal.id.slice(-8)}`}
+          title={withdrawal.withdrawerName}
           icon={IconPackage}
           className="shadow-lg"
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Estoque", href: routes.inventory.root },
             { label: "Retiradas Externas", href: routes.inventory.externalWithdrawals?.list || "/inventory/external-withdrawals" },
-            { label: `#${withdrawal.id.slice(-8)}` },
+            { label: withdrawal.withdrawerName },
           ]}
           actions={[
             {
@@ -281,7 +281,7 @@ const ExternalWithdrawalDetailsPage = () => {
                 <ChangelogHistory
                   entityType={CHANGE_LOG_ENTITY_TYPE.EXTERNAL_WITHDRAWAL}
                   entityId={withdrawal.id}
-                  entityName={`Retirada #${withdrawal.id.slice(-8)}`}
+                  entityName={withdrawal.withdrawerName}
                   entityCreatedAt={withdrawal.createdAt}
                   className="h-full"
                 />
@@ -294,7 +294,7 @@ const ExternalWithdrawalDetailsPage = () => {
                   <ChangelogHistory
                     entityType={CHANGE_LOG_ENTITY_TYPE.EXTERNAL_WITHDRAWAL}
                     entityId={withdrawal.id}
-                    entityName={`Retirada #${withdrawal.id.slice(-8)}`}
+                    entityName={withdrawal.withdrawerName}
                     entityCreatedAt={withdrawal.createdAt}
                     className="h-full"
                   />

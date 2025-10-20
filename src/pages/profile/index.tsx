@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, Camera, Trash2, User as UserIcon, Mail, Phone, MapPin, Briefcase, Save } from "lucide-react";
+import { Loader2, Camera, Trash2, User as UserIcon, Mail, Phone, MapPin, Briefcase, Save, RefreshCw } from "lucide-react";
 import { getProfile, updateProfile, uploadPhoto, deletePhoto } from "@/api-client";
 import type { User } from "@/types";
 import type { UserUpdateFormData } from "@/schemas";
@@ -14,13 +14,16 @@ import { FormInput } from "@/components/ui/form-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PageHeader } from "@/components/ui/page-header";
 import { routes } from "@/constants";
+import { useAuth } from "@/contexts/auth-context";
 
 export function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const { refreshUser } = useAuth();
 
   const form = useForm<UserUpdateFormData>({
     resolver: zodResolver(userUpdateSchema),
@@ -39,6 +42,19 @@ export function ProfilePage() {
 
   const handleSave = () => {
     form.handleSubmit(onSubmit)();
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      await refreshUser(); // Refresh auth context user data
+      await loadProfile(); // Reload profile data
+      toast.success("Dados atualizados com sucesso!");
+    } catch (error: any) {
+      toast.error("Erro ao atualizar dados");
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Load user profile
@@ -201,6 +217,15 @@ export function ProfilePage() {
             { label: "Meu Perfil" }
           ]}
           actions={[
+            {
+              key: "refresh",
+              label: "Atualizar Dados",
+              icon: RefreshCw,
+              onClick: handleRefresh,
+              variant: "outline",
+              disabled: isRefreshing,
+              loading: isRefreshing,
+            },
             {
               key: "save",
               label: "Salvar Alterações",

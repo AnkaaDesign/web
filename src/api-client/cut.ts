@@ -52,19 +52,17 @@ export class CutService {
   // =====================
 
   async createCut(data: CutCreateFormData | FormData, query?: CutQueryFormData): Promise<CutCreateResponse> {
-    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    // Don't manually set Content-Type for FormData - axios handles it with proper boundary
     const response = await apiClient.post<CutCreateResponse>(this.basePath, data, {
       params: query,
-      headers,
     });
     return response.data;
   }
 
   async updateCut(id: string, data: CutUpdateFormData | FormData, query?: CutQueryFormData): Promise<CutUpdateResponse> {
-    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    // Don't manually set Content-Type for FormData - axios handles it with proper boundary
     const response = await apiClient.put<CutUpdateResponse>(`${this.basePath}/${id}`, data, {
       params: query,
-      headers,
     });
     return response.data;
   }

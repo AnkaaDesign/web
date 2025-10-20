@@ -223,7 +223,7 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     switch (currentStep) {
       case 1:
         // Validate basic information fields
-        const step1Valid = await form.trigger(["name", "paintTypeId", "brand", "finish", "hex"]);
+        const step1Valid = await form.trigger(["name", "paintTypeId", "paintBrandId", "finish", "hex"]);
 
         if (!step1Valid) {
           // Form will show field-specific errors automatically

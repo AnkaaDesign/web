@@ -125,20 +125,20 @@ export function FileUploadField({
   const [files, setFiles] = useState<FileWithPreview[]>(existingFiles);
   const [thumbnailErrors, setThumbnailErrors] = useState<Record<string, boolean>>({});
 
-  // Sync with external file changes - only if content actually changed
+  // Sync with external file changes - only when existingFiles reference changes externally
+  // Don't sync if the change came from our own onFilesChange callback
   React.useEffect(() => {
-    // Check if the content actually changed (not just the reference)
-    const hasChanged =
-      existingFiles.length !== files.length ||
-      existingFiles.some((file, index) => {
-        const currentFile = files[index];
-        return !currentFile || file.id !== currentFile.id || file.name !== currentFile.name;
-      });
+    // Only update if existingFiles truly came from external source
+    // Compare by creating a sorted string of IDs to avoid order issues
+    const existingIds = [...existingFiles].sort((a, b) => a.id.localeCompare(b.id)).map(f => f.id).join(',');
+    const currentIds = [...files].sort((a, b) => a.id.localeCompare(b.id)).map(f => f.id).join(',');
 
-    if (hasChanged) {
+    if (existingIds !== currentIds) {
       setFiles(existingFiles);
     }
-  }, [existingFiles, files]);
+    // Only depend on existingFiles, not on files
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingFiles]);
 
   const onDrop = useCallback(
     (acceptedFiles: File[], rejectedFiles: any[]) => {
@@ -258,7 +258,7 @@ export function FileUploadField({
 
   if (variant === "compact") {
     return (
-      <div className={cn("space-y-3", className)}>
+      <div className={cn("space-y-3 w-full", className)}>
         {/* Compact Rectangle Upload Area */}
         <div
           {...getRootProps()}
@@ -305,7 +305,7 @@ export function FileUploadField({
 
         {/* Compact File List */}
         {showFiles && files.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-2 w-full">
             {label && (
               <div className="flex items-center gap-2">
                 <IconPaperclip className="h-4 w-4 text-muted-foreground" />
@@ -316,96 +316,71 @@ export function FileUploadField({
               </div>
             )}
 
-            <ScrollArea className="max-h-[400px]">
-              <div className="space-y-1">
-                {files.map((file) => {
-                  const IconComponent = getFileIcon(file);
-                  const hasError = !!file.error;
-                  const isUploaded = !!file.uploaded;
-                  const isUploading = file.uploadProgress !== undefined && file.uploadProgress > 0 && file.uploadProgress < 100 && !isUploaded && !hasError;
+            <div className="space-y-1 max-h-[400px] overflow-y-auto pr-2">
+              {files.map((file) => {
+                const IconComponent = getFileIcon(file);
+                const hasError = !!file.error;
+                const isUploaded = !!file.uploaded;
+                const isUploading = file.uploadProgress !== undefined && file.uploadProgress > 0 && file.uploadProgress < 100 && !isUploaded && !hasError;
 
-                  const thumbnailError = thumbnailErrors[file.id] || false;
-                  const shouldShowThumbnail = showPreview && !thumbnailError && (file.preview || (isUploaded && file.thumbnailUrl));
+                const thumbnailError = thumbnailErrors[file.id] || false;
+                const shouldShowThumbnail = showPreview && !thumbnailError && (file.preview || (isUploaded && file.thumbnailUrl));
 
-                  const getThumbnailSrc = () => {
-                    const apiBaseUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
-                    if (file.thumbnailUrl) {
-                      if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
-                      if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;
-                      return file.thumbnailUrl;
-                    }
-                    if (file.preview) return file.preview;
-                    if (file.uploadedFileId) return `${apiBaseUrl}/files/thumbnail/${file.uploadedFileId}`;
-                    return "";
-                  };
+                const getThumbnailSrc = () => {
+                  const apiBaseUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
+                  if (file.thumbnailUrl) {
+                    if (file.thumbnailUrl.startsWith("/api")) return `${apiBaseUrl}${file.thumbnailUrl}`;
+                    if (file.thumbnailUrl.startsWith("http")) return file.thumbnailUrl;
+                    return file.thumbnailUrl;
+                  }
+                  if (file.preview) return file.preview;
+                  if (file.uploadedFileId) return `${apiBaseUrl}/files/thumbnail/${file.uploadedFileId}`;
+                  return "";
+                };
 
-                  return (
-                    <div key={file.id} className="flex items-center gap-3 p-3 min-h-16 border rounded-lg bg-card hover:bg-muted/30 transition-colors">
-                      {/* Thumbnail or Icon */}
-                      <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded border bg-muted overflow-hidden">
-                        {isUploading ? (
-                          <div className="w-5 h-5 border border-primary/30 border-t-primary animate-spin rounded-full" />
-                        ) : shouldShowThumbnail ? (
-                          <img
-                            src={getThumbnailSrc()}
-                            alt={file.name}
-                            className="w-full h-full object-cover"
-                            onError={() => setThumbnailErrors(prev => ({ ...prev, [file.id]: true }))}
-                          />
-                        ) : (
-                          <IconComponent className={cn("w-5 h-5", isUploaded ? "text-primary" : "text-muted-foreground")} />
-                        )}
-                      </div>
-
-                      {/* File Info */}
-                      <div className="flex-1 min-w-0 overflow-hidden">
-                        <p className="text-sm font-medium text-foreground truncate max-w-full" title={file.name}>
-                          {file.name}
-                        </p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-xs text-muted-foreground">{formatFileSize(file.size || 0)}</p>
-                          {isUploaded && (
-                            <Badge variant="success" className="text-[10px] px-1.5 py-0 h-4">
-                              Enviado
-                            </Badge>
-                          )}
-                          {hasError && (
-                            <Badge variant="destructive" className="text-xs">
-                              <IconAlertCircle className="w-3 h-3 mr-1" />
-                              Erro
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Progress bar */}
-                        {isUploading && (
-                          <div className="h-1 mt-1">
-                            <Progress value={file.uploadProgress || 0} />
-                          </div>
-                        )}
-
-                        {/* Error message */}
-                        {hasError && <p className="text-xs text-destructive mt-1 truncate" title={file.error}>{file.error}</p>}
-                      </div>
-
-                      {/* Remove button */}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeFile(file.id);
-                        }}
-                        disabled={disabled}
-                        className="flex-shrink-0 h-6 w-6 p-0 hover:bg-destructive hover:text-white rounded-full"
-                      >
-                        <IconX className="w-3 h-3" />
-                      </Button>
+                return (
+                  <div key={file.id} className="flex items-center gap-1.5 p-2.5 min-h-14 border rounded-lg bg-card hover:bg-muted/30 transition-colors">
+                    {/* Thumbnail or Icon */}
+                    <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded border bg-muted overflow-hidden">
+                      {isUploading ? (
+                        <div className="w-4 h-4 border border-primary/30 border-t-primary animate-spin rounded-full" />
+                      ) : shouldShowThumbnail ? (
+                        <img
+                          src={getThumbnailSrc()}
+                          alt={file.name}
+                          className="w-full h-full object-cover"
+                          onError={() => setThumbnailErrors(prev => ({ ...prev, [file.id]: true }))}
+                        />
+                      ) : (
+                        <IconComponent className={cn("w-4 h-4", isUploaded ? "text-primary" : "text-muted-foreground")} />
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
+
+                    {/* File Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-foreground truncate" title={file.name}>
+                        {file.name}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">{formatFileSize(file.size || 0)}</p>
+                    </div>
+
+                    {/* Remove button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFile(file.id);
+                      }}
+                      disabled={disabled}
+                      className="flex-shrink-0 h-7 w-7 p-0 hover:bg-destructive hover:text-white rounded-full"
+                    >
+                      <IconX className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -490,9 +465,9 @@ export function FileUploadField({
                 };
 
                 return (
-                  <div key={file.id} className="flex flex-col min-w-0">
+                  <div key={file.id} className="flex flex-col min-w-0 w-full">
                     {/* File card */}
-                    <div className="flex flex-col items-center p-3 border border-border/50 rounded-lg bg-card overflow-hidden">
+                    <div className="flex flex-col items-center p-3 border border-border/50 rounded-lg bg-card">
                       {/* Thumbnail or Icon */}
                       <div className="relative w-full h-24 mb-2 overflow-hidden rounded border flex-shrink-0">
                         {isUploading ? (
@@ -521,9 +496,9 @@ export function FileUploadField({
                             removeFile(file.id);
                           }}
                           disabled={disabled}
-                          className="absolute top-1 right-1 h-6 w-6 p-0 flex-shrink-0 bg-background/90 hover:bg-destructive hover:text-white rounded-full shadow-sm z-10"
+                          className="absolute top-1 right-1 h-8 w-8 min-w-[2rem] min-h-[2rem] p-0 flex-shrink-0 bg-background/90 hover:bg-destructive hover:text-white rounded-full shadow-sm z-10"
                         >
-                          <IconX className="w-3.5 h-3.5" />
+                          <IconX className="w-4 h-4" />
                         </Button>
 
                         {/* Status indicator */}
@@ -540,12 +515,12 @@ export function FileUploadField({
                       </div>
 
                       {/* File name */}
-                      <p className="text-xs font-medium text-foreground text-center truncate w-full px-1 max-w-full" title={file.name}>
+                      <p className="text-xs font-medium text-foreground text-center truncate w-full px-1" title={file.name}>
                         {file.name}
                       </p>
 
                       {/* File size */}
-                      <p className="text-xs text-muted-foreground mt-0.5 flex-shrink-0">{formatFileSize(file.size || 0)}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 whitespace-nowrap">{formatFileSize(file.size || 0)}</p>
                     </div>
 
                     {/* Progress bar */}
@@ -559,7 +534,7 @@ export function FileUploadField({
                     )}
 
                     {/* Error message */}
-                    {hasError && <p className="text-xs text-destructive text-center mt-1 px-1 truncate max-w-full" title={file.error}>{file.error}</p>}
+                    {hasError && <p className="text-xs text-destructive text-center mt-1 px-1 truncate w-full" title={file.error}>{file.error}</p>}
                   </div>
                 );
               })}

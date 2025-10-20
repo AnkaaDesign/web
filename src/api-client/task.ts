@@ -108,6 +108,64 @@ export class TaskService {
     const response = await apiClient.post<TaskUpdateResponse>(`${this.basePath}/rollback-field`, data);
     return response.data;
   }
+
+  // =====================
+  // Positioning Operations
+  // =====================
+
+  async getInProductionTasks(query?: TaskQueryFormData): Promise<TaskGetManyResponse> {
+    const response = await apiClient.get<TaskGetManyResponse>(`${this.basePath}/in-production`, {
+      params: query,
+    });
+    return response.data;
+  }
+
+  async updateTaskPosition(
+    id: string,
+    data: {
+      xPosition?: number | null;
+      yPosition?: number | null;
+      garageId?: string | null;
+      laneId?: string | null;
+    },
+    query?: TaskQueryFormData
+  ): Promise<TaskUpdateResponse> {
+    const response = await apiClient.put<TaskUpdateResponse>(`${this.basePath}/${id}/position`, data, {
+      params: query,
+    });
+    return response.data;
+  }
+
+  async bulkUpdatePositions(
+    data: {
+      updates: Array<{
+        taskId: string;
+        xPosition?: number | null;
+        yPosition?: number | null;
+        garageId?: string | null;
+        laneId?: string | null;
+      }>;
+    },
+    query?: TaskQueryFormData
+  ): Promise<TaskBatchUpdateResponse<Task>> {
+    const response = await apiClient.post<TaskBatchUpdateResponse<Task>>(`${this.basePath}/bulk-position`, data, {
+      params: query,
+    });
+    return response.data;
+  }
+
+  async swapTaskPositions(
+    id: string,
+    targetTaskId: string,
+    query?: TaskQueryFormData
+  ): Promise<{ success: boolean; message: string; data: { task1: Task; task2: Task } }> {
+    const response = await apiClient.post<{ success: boolean; message: string; data: { task1: Task; task2: Task } }>(
+      `${this.basePath}/${id}/swap`,
+      { targetTaskId },
+      { params: query }
+    );
+    return response.data;
+  }
 }
 
 // =====================
@@ -137,3 +195,25 @@ export const batchDeleteTasks = (data: TaskBatchDeleteFormData, query?: TaskQuer
 // Special operation exports
 export const duplicateTask = (data: TaskDuplicateFormData, query?: TaskQueryFormData) => taskService.duplicateTask(data, query);
 export const rollbackFieldChange = (data: { changeLogId: string }) => taskService.rollbackFieldChange(data);
+
+// Positioning operation exports
+export const getInProductionTasks = (query?: TaskQueryFormData) => taskService.getInProductionTasks(query);
+export const updateTaskPosition = (
+  id: string,
+  data: { xPosition?: number | null; yPosition?: number | null; garageId?: string | null; laneId?: string | null },
+  query?: TaskQueryFormData
+) => taskService.updateTaskPosition(id, data, query);
+export const bulkUpdatePositions = (
+  data: {
+    updates: Array<{
+      taskId: string;
+      xPosition?: number | null;
+      yPosition?: number | null;
+      garageId?: string | null;
+      laneId?: string | null;
+    }>;
+  },
+  query?: TaskQueryFormData
+) => taskService.bulkUpdatePositions(data, query);
+export const swapTaskPositions = (id: string, targetTaskId: string, query?: TaskQueryFormData) =>
+  taskService.swapTaskPositions(id, targetTaskId, query);

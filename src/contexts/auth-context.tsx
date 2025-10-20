@@ -43,6 +43,7 @@ interface AuthContextType {
   login: (contact: string, password: string) => Promise<{ success: boolean }>;
   logout: () => void;
   updateUser: (user: AuthUser) => void;
+  refreshUser: () => Promise<void>;
   register: (data: { name: string; contact: string; password: string }) => Promise<{ requiresVerification: boolean; phone?: string; userId?: string }>;
   recoverPassword: (contact: string) => Promise<void>;
   verifyCode: (contact: string, code: string) => Promise<void>;
@@ -365,6 +366,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const updateUser = (updatedUser: AuthUser) => {
     setUser(updatedUser);
+    setUserData(updatedUser); // Also update cached data
+  };
+
+  const refreshUser = async () => {
+    try {
+      const token = getLocalStorage("token");
+      if (!token) return;
+
+      const response = await authService.me();
+      const userData = response?.data || response;
+      if (userData) {
+        setUser(userData as AuthUser);
+        setUserData(userData); // Update cache
+      }
+    } catch (error) {
+      console.error("Error refreshing user data:", error);
+    }
   };
 
   const value = {
@@ -374,6 +392,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     logout,
     updateUser,
+    refreshUser,
     register,
     recoverPassword,
     verifyCode,

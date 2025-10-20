@@ -12,8 +12,8 @@ export const PpeDeliveryListPage = () => {
   const navigate = useNavigate();
   const { data: currentUser } = useAuth();
 
-  // Check if user is admin (only admins can create PPE deliveries)
-  const isAdmin = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN);
+  // Check if user can create PPE deliveries (HR or Admin only)
+  const canCreate = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.HUMAN_RESOURCES) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN));
 
   // Track page access
   usePageTracker({
@@ -22,7 +22,7 @@ export const PpeDeliveryListPage = () => {
   });
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="flex flex-col h-full space-y-4">
         <div className="flex-shrink-0">
           <PageHeader
@@ -37,8 +37,8 @@ export const PpeDeliveryListPage = () => {
               { label: "Entregas" },
             ]}
             actions={[
-              // Only show create button for admins
-              ...(isAdmin
+              // Only show create button for HR and Admin
+              ...(canCreate
                 ? [
                     {
                       key: "create",

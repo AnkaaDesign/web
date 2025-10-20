@@ -1,13 +1,12 @@
 import { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { useController } from "react-hook-form";
-import { IconScissors, IconPlus, IconTrash, IconFile, IconUpload, IconAlertCircle, IconGripVertical } from "@tabler/icons-react";
+import { IconScissors, IconPlus, IconTrash, IconFile, IconUpload, IconGripVertical } from "@tabler/icons-react";
 import { FormLabel } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
 import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
 import { CUT_TYPE, CUT_TYPE_LABELS, CUT_ORIGIN } from "../../../../constants";
 import { FileUploadField } from "@/components/file";
@@ -97,12 +96,35 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
   // Handle file change for a specific cut - no longer uploads immediately
   const handleFileChange = useCallback(
     (cutId: string, files: FileWithPreview[]) => {
+      console.log('[MultiCutSelector] ========== FILE CHANGE ==========');
+      console.log('[MultiCutSelector] Cut ID:', cutId);
+      console.log('[MultiCutSelector] Files received:', files.length);
+      console.log('[MultiCutSelector] Files data:', files.map(f => ({
+        id: f.id,
+        name: f.name,
+        size: f.size,
+        type: f.type,
+        isFile: f instanceof File,
+        uploaded: f.uploaded,
+        uploadedFileId: f.uploadedFileId,
+      })));
+
       if (files.length === 0) {
+        console.log('[MultiCutSelector] No files - clearing file from cut');
         updateCut(cutId, { file: undefined, fileId: undefined });
         return;
       }
 
       const file = files[0];
+      console.log('[MultiCutSelector] Updating cut with file:', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        isFileInstance: file instanceof File,
+        hasUploadedFileId: !!file.uploadedFileId,
+        uploaded: file.uploaded,
+      });
+
       // Store the file in the cut item - it will be uploaded when the form is submitted
       updateCut(cutId, {
         file: file,
@@ -110,14 +132,20 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
         uploading: false,
         error: undefined,
       });
+
+      console.log('[MultiCutSelector] Cut updated with file');
     },
     [updateCut],
   );
 
   // Sync Local→Form (SINGLE SOURCE OF TRUTH)
   useEffect(() => {
+    console.log('[MultiCutSelector] ========== SYNC LOCAL TO FORM ==========');
+    console.log('[MultiCutSelector] Cuts count:', cuts.length);
+
     // Skip if no cuts
     if (cuts.length === 0) {
+      console.log('[MultiCutSelector] No cuts - clearing form field');
       field.onChange([]);
       return;
     }
@@ -126,13 +154,31 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
     isSyncingToForm.current = true;
 
     // Transform cuts to the format expected by the form
-    const formData = cuts.map((cut) => ({
-      type: cut.type,
-      quantity: cut.quantity,
-      fileId: cut.fileId,
-      file: cut.file, // Include the file object for submission
-      origin: CUT_ORIGIN.PLAN, // Always PLAN for task-created cuts
-    }));
+    const formData = cuts.map((cut, index) => {
+      const cutFormData = {
+        id: cut.id, // Preserve ID for sync back
+        type: cut.type,
+        quantity: cut.quantity,
+        fileId: cut.fileId,
+        file: cut.file, // Include the file object for submission
+        origin: CUT_ORIGIN.PLAN, // Always PLAN for task-created cuts
+      };
+
+      console.log(`[MultiCutSelector] Cut ${index + 1} form data:`, {
+        id: cutFormData.id,
+        type: cutFormData.type,
+        quantity: cutFormData.quantity,
+        hasFile: !!cutFormData.file,
+        hasFileId: !!cutFormData.fileId,
+        fileName: cutFormData.file?.name,
+        fileIsInstance: cutFormData.file instanceof File,
+        origin: cutFormData.origin,
+      });
+
+      return cutFormData;
+    });
+
+    console.log('[MultiCutSelector] Updating form field with', formData.length, 'cuts');
 
     // Update form field
     field.onChange(formData);
@@ -159,6 +205,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
 
     // Initialize from form value if exists
     if (fieldValue && Array.isArray(fieldValue) && fieldValue.length > 0) {
+      const wasEmpty = cuts.length === 0;
       const newCuts: CutItem[] = fieldValue.map((item: any, index: number) => ({
         id: item.id || `cut-${Date.now()}-${index}`,
         type: item.type || CUT_TYPE.VINYL,
@@ -167,13 +214,16 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
         file: item.file,
       }));
       setCuts(newCuts);
-      setExpandedItems(newCuts.map((c) => c.id));
+      // Only auto-expand all items on initial load (when transitioning from empty to populated)
+      if (wasEmpty) {
+        setExpandedItems(newCuts.map((c) => c.id));
+      }
     } else if (fieldValue === null || (Array.isArray(fieldValue) && fieldValue.length === 0)) {
       // Clear cuts if form field is empty/null
       setCuts([]);
       setExpandedItems([]);
     }
-  }, [field.value]);
+  }, [field.value, cuts.length]);
 
   return (
     <div className="space-y-4">
@@ -189,14 +239,27 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
                     <span className="font-medium">Corte #{index + 1}</span>
                     <Badge variant="secondary">{CUT_TYPE_LABELS[cut.type as keyof typeof CUT_TYPE_LABELS] || cut.type}</Badge>
                     <Badge variant="outline">Qtd: {cut.quantity}</Badge>
+                    {cut.file && <Badge variant="success">Arquivo anexado</Badge>}
                   </div>
-                  {cut.file && <Badge variant="success">Arquivo anexado</Badge>}
+                  <Button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeCut(cut.id);
+                    }}
+                    disabled={disabled}
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                  >
+                    <IconTrash className="h-4 w-4 text-destructive" />
+                  </Button>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="px-4 pt-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Left Column - File Upload */}
-                  <div className="space-y-2">
+                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                     <FormLabel className="flex items-center gap-2">
                       <IconUpload className="h-4 w-4" />
                       Arquivo de Corte
@@ -226,7 +289,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
                   </div>
 
                   {/* Right Column - Type and Quantity */}
-                  <div className="space-y-4">
+                  <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
                     {/* Cut Type */}
                     <div className="space-y-2">
                       <FormLabel>Tipo de Corte</FormLabel>
@@ -262,14 +325,6 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
                     </div>
                   </div>
                 </div>
-
-                <Separator className="my-4" />
-                <div className="flex justify-end">
-                  <Button type="button" variant="ghost" size="sm" onClick={() => removeCut(cut.id)} disabled={disabled}>
-                    <IconTrash className="h-4 w-4 mr-1" />
-                    Remover
-                  </Button>
-                </div>
               </AccordionContent>
             </AccordionItem>
           ))}
@@ -277,8 +332,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
       )}
 
       {cuts.length > 0 && cuts.some((c) => !c.file) && (
-        <Alert>
-          <IconAlertCircle className="h-4 w-4" />
+        <Alert variant="destructive">
           <AlertDescription>Alguns cortes não possuem arquivos anexados. Adicione os arquivos antes de enviar o formulário.</AlertDescription>
         </Alert>
       )}

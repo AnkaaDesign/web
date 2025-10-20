@@ -23,6 +23,7 @@ export interface Truck extends BaseEntity {
   // Relations
   taskId: string;
   garageId: string | null;
+  laneId: string | null;
   leftSideLayoutId: string | null;
   rightSideLayoutId: string | null;
   backSideLayoutId: string | null;
@@ -78,6 +79,7 @@ export interface TruckOrderBy {
   yPosition?: ORDER_BY_DIRECTION;
   taskId?: ORDER_BY_DIRECTION;
   garageId?: ORDER_BY_DIRECTION;
+  laneId?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
   task?: TaskOrderBy;

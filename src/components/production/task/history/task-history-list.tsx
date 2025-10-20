@@ -1,8 +1,8 @@
 import React from "react";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
-import { useSectors, useCustomers, useUsers } from "../../../../hooks";
-import { TASK_STATUS } from "../../../../constants";
+import { useSectors, useCustomers, useUsers, useCurrentUser } from "../../../../hooks";
+import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useTableFilters } from "@/hooks/use-table-filters";
 import { useTableState } from "@/hooks/use-table-state";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +19,7 @@ import { extractActiveFilters, createFilterRemover } from "./filter-utils";
 import { IconFilter } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { hasPrivilege } from "../../../../utils";
 
 interface TaskHistoryListProps {
   className?: string;
@@ -41,6 +42,13 @@ export function TaskHistoryList({
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" } });
   const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" } });
   const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
+  const { data: currentUser } = useCurrentUser();
+
+  // Check if user can view price (Admin or Leader only)
+  const canViewPrice = currentUser && (
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.LEADER)
+  );
 
   // Get table state for selected tasks functionality
   const { selectionCount, showSelectedOnly, toggleShowSelectedOnly } = useTableState({
@@ -225,7 +233,7 @@ export function TaskHistoryList({
   });
 
   // Get all columns for visibility manager
-  const allColumns = React.useMemo(() => createTaskHistoryColumns(), []);
+  const allColumns = React.useMemo(() => createTaskHistoryColumns({ canViewPrice }), [canViewPrice]);
 
   // Prepare final query filters
   const queryFilters = React.useMemo(() => {
@@ -338,6 +346,7 @@ export function TaskHistoryList({
           onOpenChange={setShowFilterModal}
           filters={filters}
           onFilterChange={handleFilterChange}
+          canViewPrice={canViewPrice}
         />
       </CardContent>
     </Card>

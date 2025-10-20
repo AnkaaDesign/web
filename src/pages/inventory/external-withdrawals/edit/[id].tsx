@@ -37,6 +37,9 @@ export const ExternalWithdrawalEditPage = () => {
           },
         },
       },
+      budgets: true,
+      receipts: true,
+      invoices: true,
     },
     enabled: !!id,
   });

@@ -456,11 +456,6 @@ export const routes = {
         edit: (_garageId: string, laneId: string) => `/producao/garagens/${_garageId}/lanes/editar/${laneId}`,
       },
       list: "/producao/garagens",
-      parkingSpots: {
-        create: (_garageId: string) => `/producao/garagens/${_garageId}/parking-spots/cadastrar`,
-        details: (_garageId: string, spotId: string) => `/producao/garagens/parking-spots/detalhes/${spotId}`,
-        edit: (_garageId: string, spotId: string) => `/producao/garagens/${_garageId}/parking-spots/editar/${spotId}`,
-      },
       root: "/producao/garagens",
     },
     history: {

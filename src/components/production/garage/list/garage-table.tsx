@@ -55,11 +55,7 @@ export function GarageTable({ filters = {}, onDataChange, className }: GarageTab
   // Memoize include configuration to prevent re-renders
   const includeConfig = React.useMemo(
     () => ({
-      lanes: {
-        include: {
-          parkingSpots: true,
-        },
-      },
+      lanes: true,
     }),
     [],
   );
@@ -151,15 +147,11 @@ export function GarageTable({ filters = {}, onDataChange, className }: GarageTab
 
   const calculateMetrics = (garage: Garage) => {
     const totalLanes = garage.lanes?.length || 0;
-    const totalSpots = garage.lanes?.reduce((sum, lane) => sum + (lane.parkingSpots?.length || 0), 0) || 0;
     const totalTrucks = garage.trucks?.length || 0;
-    const occupancyRate = totalSpots > 0 ? (totalTrucks / totalSpots) * 100 : 0;
 
     return {
       totalLanes,
-      totalSpots,
       totalTrucks,
-      occupancyRate,
       area: garage.width * garage.length,
     };
   };

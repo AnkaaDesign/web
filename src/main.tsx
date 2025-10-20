@@ -1,6 +1,46 @@
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { z } from "zod";
 import "./index.css";
+
+// Configure Zod error messages in Portuguese
+z.setErrorMap((issue, ctx) => {
+  if (issue.code === z.ZodIssueCode.invalid_type) {
+    if (issue.expected === "number" && issue.received === "string") {
+      return { message: "Esperado número, recebido texto" };
+    }
+    if (issue.expected === "string" && issue.received === "number") {
+      return { message: "Esperado texto, recebido número" };
+    }
+    return { message: `Tipo inválido: esperado ${issue.expected}, recebido ${issue.received}` };
+  }
+  if (issue.code === z.ZodIssueCode.invalid_string) {
+    return { message: "Formato inválido" };
+  }
+  if (issue.code === z.ZodIssueCode.too_small) {
+    if (issue.type === "string") {
+      return { message: `Mínimo de ${issue.minimum} caracteres` };
+    }
+    if (issue.type === "number") {
+      return { message: `Valor deve ser maior ou igual a ${issue.minimum}` };
+    }
+    if (issue.type === "array") {
+      return { message: `Deve ter no mínimo ${issue.minimum} itens` };
+    }
+  }
+  if (issue.code === z.ZodIssueCode.too_big) {
+    if (issue.type === "string") {
+      return { message: `Máximo de ${issue.maximum} caracteres` };
+    }
+    if (issue.type === "number") {
+      return { message: `Valor deve ser menor ou igual a ${issue.maximum}` };
+    }
+    if (issue.type === "array") {
+      return { message: `Deve ter no máximo ${issue.maximum} itens` };
+    }
+  }
+  return { message: ctx.defaultError };
+});
 
 // Initialize API client with environment-specific URL FIRST
 import { initializeApiClient } from "./config/api";

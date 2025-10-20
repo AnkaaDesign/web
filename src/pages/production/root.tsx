@@ -39,7 +39,6 @@ import {
   IconFileReport,
   IconUsers,
   IconGauge,
-  IconParking,
   IconGitBranch,
   IconCurrencyDollar,
 } from "@tabler/icons-react";
@@ -242,10 +241,7 @@ export const ProductionRootPage = () => {
           value: value || 0,
         })) || [],
       productionWeekly: productionByDay,
-      garagesByStatus: [
-        { label: "Vagas Ocupadas", value: data.garageUtilization?.occupiedSpots?.value || 0 },
-        { label: "Vagas Livres", value: (data.garageUtilization?.totalParkingSpots?.value || 0) - (data.garageUtilization?.occupiedSpots?.value || 0) },
-      ],
+      garagesByStatus: [],
       productivityShift: data.productivityMetrics?.tasksByShift?.datasets?.[0]?.data?.map((value, index) => ({
         label: data.productivityMetrics.tasksByShift.labels[index] || `Turno ${index + 1}`,
         value: value || 0,
@@ -268,7 +264,7 @@ export const ProductionRootPage = () => {
 
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="flex flex-col h-full space-y-6">
           <PageHeaderWithFavorite
             title="Produção"
@@ -342,7 +338,7 @@ export const ProductionRootPage = () => {
 
   if (error) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="flex flex-col h-full space-y-4">
           <PageHeaderWithFavorite
             title="Produção"
@@ -374,7 +370,7 @@ export const ProductionRootPage = () => {
   const activityPatterns = getActivityPatterns();
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="flex flex-col h-full space-y-4">
         <div className="flex-shrink-0">
           <PageHeaderWithFavorite
@@ -479,7 +475,7 @@ export const ProductionRootPage = () => {
                       time: "Taxa de uso",
                     },
                   ]}
-                  icon={IconParking}
+                  icon={IconGauge}
                   color="purple"
                 />
               </div>
@@ -540,7 +536,6 @@ export const ProductionRootPage = () => {
                   icon={IconCalendar}
                   color="green"
                 />
-                <ActivityPatternCard title="Status das Vagas" data={activityPatterns.garagesByStatus} icon={IconParking} color="purple" />
               </div>
             </div>
 

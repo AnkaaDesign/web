@@ -22,9 +22,10 @@ interface TaskHistoryFiltersProps {
   onOpenChange: (open: boolean) => void;
   filters: Partial<TaskGetManyFormData>;
   onFilterChange: (filters: Partial<TaskGetManyFormData>) => void;
+  canViewPrice?: boolean;
 }
 
-export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange }: TaskHistoryFiltersProps) {
+export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange, canViewPrice = true }: TaskHistoryFiltersProps) {
   // Load data for selectors
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" } });
   const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" } });
@@ -227,29 +228,31 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
             />
           </div>
 
-          {/* Price Range */}
-          <div className="space-y-2">
-            <Label>Faixa de Valor</Label>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Mínimo</Label>
-                <Input type="number" placeholder="0,00" value={priceMin} onChange={(value) => setPriceMin(value as string)} min="0" step="0.01" />
+          {/* Price Range - Only for Admin and Leader */}
+          {canViewPrice && (
+            <div className="space-y-2">
+              <Label>Faixa de Valor</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Mínimo</Label>
+                  <Input type="number" placeholder="0,00" value={priceMin} onChange={(value) => setPriceMin(value as string)} min="0" step="0.01" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm text-muted-foreground">Máximo</Label>
+                  <Input type="number" placeholder="0,00" value={priceMax} onChange={(value) => setPriceMax(value as string)} min="0" step="0.01" />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label className="text-sm text-muted-foreground">Máximo</Label>
-                <Input type="number" placeholder="0,00" value={priceMax} onChange={(value) => setPriceMax(value as string)} min="0" step="0.01" />
-              </div>
+              {(priceMin || priceMax) && (
+                <p className="text-sm text-muted-foreground">
+                  {priceMin && priceMax
+                    ? `Entre ${formatCurrency(Number(priceMin))} e ${formatCurrency(Number(priceMax))}`
+                    : priceMin
+                      ? `Acima de ${formatCurrency(Number(priceMin))}`
+                      : `Até ${formatCurrency(Number(priceMax))}`}
+                </p>
+              )}
             </div>
-            {(priceMin || priceMax) && (
-              <p className="text-sm text-muted-foreground">
-                {priceMin && priceMax
-                  ? `Entre ${formatCurrency(Number(priceMin))} e ${formatCurrency(Number(priceMax))}`
-                  : priceMin
-                    ? `Acima de ${formatCurrency(Number(priceMin))}`
-                    : `Até ${formatCurrency(Number(priceMax))}`}
-              </p>
-            )}
-          </div>
+          )}
         </div>
 
         {/* Action Buttons */}

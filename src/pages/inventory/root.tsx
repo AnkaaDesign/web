@@ -1,6 +1,6 @@
 import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, ORDER_STATUS_LABELS } from "../../constants";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, ORDER_STATUS_LABELS, STOCK_LEVEL } from "../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { useInventoryDashboard, useOrders, useBorrows, usePpeDeliveries, useItems, useSuppliers, useActivities } from "../../hooks";
 import { useNavigate } from "react-router-dom";
@@ -291,49 +291,67 @@ export const InventoryRootPage = () => {
   };
 
   // Get stock status distribution
+  // Uses the same logic as item table (web/src/utils/stock-level.ts)
   const getStockStatus = () => {
     if (!dashboard?.data?.overview) return [];
 
-    const { totalItems, criticalItems, lowStockItems, overstockedItems, itemsNeedingReorder } = dashboard.data.overview;
+    const { totalItems, outOfStockItems, criticalItems, lowStockItems, optimalItems, overstockedItems } = dashboard.data.overview;
     const total = totalItems.value;
 
     return [
       {
+        status: "Sem Estoque",
+        quantity: outOfStockItems.value,
+        total,
+        icon: IconPackage, // OUT_OF_STOCK icon
+        color: "red" as const, // RED - matches OUT_OF_STOCK
+      },
+      {
         status: "Crítico",
         quantity: criticalItems.value,
         total,
-        icon: IconExclamationCircle,
-        color: "red" as const,
+        icon: IconAlertTriangle, // CRITICAL icon
+        color: "orange" as const, // ORANGE - matches CRITICAL
       },
       {
         status: "Baixo",
         quantity: lowStockItems.value,
         total,
-        icon: IconArrowDown,
-        color: "orange" as const,
+        icon: IconTrendingDown, // LOW icon
+        color: "yellow" as const, // YELLOW - matches LOW
       },
       {
         status: "Normal",
-        quantity: total - criticalItems.value - lowStockItems.value - overstockedItems.value,
+        quantity: optimalItems.value,
         total,
-        icon: IconPackage,
-        color: "green" as const,
+        icon: IconPackage, // OPTIMAL icon
+        color: "green" as const, // GREEN - matches OPTIMAL
       },
       {
         status: "Excesso",
         quantity: overstockedItems.value,
         total,
-        icon: IconArrowUp,
-        color: "blue" as const,
-      },
-      {
-        status: "Reordenar",
-        quantity: itemsNeedingReorder.value,
-        total,
-        icon: IconRefresh,
-        color: "purple" as const,
+        icon: IconTrendingUp, // OVERSTOCKED icon
+        color: "purple" as const, // PURPLE - matches OVERSTOCKED
       },
     ];
+  };
+
+  // Handle stock status card click - navigate to items page with filter
+  const handleStockStatusClick = (statusName: string) => {
+    const stockLevelMap: Record<string, STOCK_LEVEL[]> = {
+      "Sem Estoque": [STOCK_LEVEL.OUT_OF_STOCK],
+      Crítico: [STOCK_LEVEL.CRITICAL],
+      Baixo: [STOCK_LEVEL.LOW],
+      Normal: [STOCK_LEVEL.OPTIMAL],
+      Excesso: [STOCK_LEVEL.OVERSTOCKED],
+    };
+
+    const stockLevels = stockLevelMap[statusName];
+    if (stockLevels) {
+      const filterParam = JSON.stringify(stockLevels);
+      navigate(`${routes.inventory.products.list}?stockLevels=${encodeURIComponent(filterParam)}`);
+    }
   };
 
   // Get ABC analysis data
@@ -627,7 +645,7 @@ export const InventoryRootPage = () => {
               <h3 className="text-lg font-semibold text-foreground mb-4">Status do Estoque</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {getStockStatus().map((status, index) => (
-                  <StatusCard key={index} status={status.status} quantity={status.quantity} total={status.total} icon={status.icon} color={status.color} unit="itens" />
+                  <StatusCard key={index} status={status.status} quantity={status.quantity} total={status.total} icon={status.icon} color={status.color} unit="itens" onClick={() => handleStockStatusClick(status.status)} />
                 ))}
               </div>
             </div>

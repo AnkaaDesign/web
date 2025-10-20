@@ -21,7 +21,7 @@ import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { CutItemListSkeleton } from "./cut-item-list-skeleton";
 import { CutTableContextMenu, type CutAction } from "./cut-table-context-menu";
-import { FilePreviewCard } from "@/components/file";
+import { useFileViewer } from "@/components/file";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +58,25 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
+
+  // Try to get file viewer context (optional)
+  let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
+  try {
+    fileViewerContext = useFileViewer();
+  } catch {
+    // Context not available
+  }
+
+  const getThumbnailUrl = (file: any) => {
+    const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
+    return `${apiUrl}/files/thumbnail/${file.id}?size=small`;
+  };
+
+  const handleFileClick = (file: any) => {
+    if (fileViewerContext) {
+      fileViewerContext.actions.viewFile(file);
+    }
+  };
 
   const {
     page,
@@ -520,8 +539,18 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
                     <TableCell className="w-20 p-0 !border-r-0">
                       <div className="flex items-center justify-center px-2 py-2">
                         {item.file ? (
-                          <div onClick={(e) => e.stopPropagation()}>
-                            <FilePreviewCard file={item.file} size="xs" className="w-12 h-12" />
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleFileClick(item.file);
+                            }}
+                            className="w-12 h-12 rounded-md overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                          >
+                            <img
+                              src={getThumbnailUrl(item.file)}
+                              alt={item.file.filename}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
                         ) : (
                           <div className="w-12 h-12 rounded-md bg-muted/20 flex items-center justify-center">

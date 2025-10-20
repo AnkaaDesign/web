@@ -33,6 +33,9 @@ export const EditOrderPage = () => {
         },
       },
       supplier: true,
+      budgets: true,
+      receipts: true,
+      invoices: true,
     },
     enabled: !!id,
   });

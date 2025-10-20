@@ -41,6 +41,9 @@ const ProfilePage = lazy(() => import("@/pages/profile").then((module) => ({ def
 const Administration = lazy(() => import("@/pages/administration/root").then((module) => ({ default: module.AdministrationRootPage })));
 
 const AdministrationCustomers = lazy(() => import("@/pages/administration/customers/list").then((module) => ({ default: module.CustomerListPage })));
+
+// Financeiro
+const FinanceiroClientesList = lazy(() => import("@/pages/financeiro/clientes/list").then((module) => ({ default: module.FinanceiroClientesListPage })));
 const AdministrationCustomersCreate = lazy(() => import("@/pages/administration/customers/create").then((module) => ({ default: module.CreateCustomerPage })));
 const AdministrationCustomersEdit = lazy(() => import("@/pages/administration/customers/edit/[id]").then((module) => ({ default: module.EditCustomerPage })));
 const AdministrationCustomersDetails = lazy(() => import("@/pages/administration/customers/details/[id]").then((module) => ({ default: module.CustomerDetailsPage })));
@@ -199,7 +202,7 @@ const ProductionObservationsDetails = lazy(() => import("@/pages/production/obse
 const ProductionAirbrushing = lazy(() => import("@/pages/production/aerografia/list").then((module) => ({ default: module.AirbrushingListPage })));
 const ProductionAirbrushingCreate = lazy(() => import("@/pages/production/aerografia/cadastrar").then((module) => ({ default: module.AirbrushingCreate })));
 const ProductionAirbrushingEdit = lazy(() => import("@/pages/production/aerografia/edit/[id]").then((module) => ({ default: module.AirbrushingEdit })));
-const ProductionAirbrushingDetails = lazy(() => import("@/pages/production/aerografia/detalhes/[id]").then((module) => ({ default: module.AirbrushingDetails })));
+const ProductionAirbrushingDetails = lazy(() => import("@/pages/production/aerografia/details/[id]").then((module) => ({ default: module.AirbrushingDetails })));
 const ProductionServiceOrders = lazy(() => import("@/pages/production/service-orders/list").then((module) => ({ default: module.ServiceOrderListPage })));
 const ProductionServiceOrdersCreate = lazy(() => import("@/pages/production/service-orders/create").then((module) => ({ default: module.ServiceOrderCreatePage })));
 const ProductionGarages = lazy(() => import("@/pages/production/garages/list").then((module) => ({ default: module.GarageListPage })));
@@ -773,6 +776,16 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <AdministrationChangeLogsDetails />
+                    </Suspense>
+                  }
+                />
+
+                {/* Financeiro routes */}
+                <Route
+                  path="/financeiro/clientes"
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinanceiroClientesList />
                     </Suspense>
                   }
                 />

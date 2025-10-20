@@ -40,6 +40,7 @@ export const FileViewerContext = React.createContext<{
     openPdfModal: (file: AnkaaFile, url: string) => void;
     closePdfModal: () => void;
     viewFile: (file: AnkaaFile) => void;
+    viewFiles: (files: AnkaaFile[], initialIndex: number) => void;
     downloadFile: (file: AnkaaFile) => void;
   };
 } | null>(null);
@@ -66,117 +67,153 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
     [config, baseUrl],
   );
 
-  const actions = React.useMemo(
-    () => ({
-      openImageModal: (files: AnkaaFile[], initialIndex: number = 0) => {
-        setState((prev) => ({
-          ...prev,
-          isImageModalOpen: true,
-          currentFiles: files,
-          currentFileIndex: initialIndex,
-        }));
-      },
+  const actionsRef = React.useRef<any>(null);
 
-      closeImageModal: () => {
-        setState((prev) => ({
-          ...prev,
-          isImageModalOpen: false,
-          currentFiles: [],
-          currentFileIndex: 0,
-        }));
-      },
+  // Create actions without circular dependencies
+  const openImageModal = React.useCallback((files: AnkaaFile[], initialIndex: number = 0) => {
+    setState((prev) => ({
+      ...prev,
+      isImageModalOpen: true,
+      currentFiles: files,
+      currentFileIndex: initialIndex,
+    }));
+  }, []);
 
-      openVideoModal: (file: AnkaaFile, url: string) => {
-        setState((prev) => ({
-          ...prev,
-          isVideoModalOpen: true,
-          currentVideoFile: file,
-          currentVideoUrl: url,
-        }));
-      },
+  const closeImageModal = React.useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      isImageModalOpen: false,
+      currentFiles: [],
+      currentFileIndex: 0,
+    }));
+  }, []);
 
-      closeVideoModal: () => {
-        setState((prev) => ({
-          ...prev,
-          isVideoModalOpen: false,
-          currentVideoFile: null,
-          currentVideoUrl: null,
-        }));
-      },
+  const openVideoModal = React.useCallback((file: AnkaaFile, url: string) => {
+    setState((prev) => ({
+      ...prev,
+      isVideoModalOpen: true,
+      currentVideoFile: file,
+      currentVideoUrl: url,
+    }));
+  }, []);
 
-      openPdfModal: (file: AnkaaFile, url: string) => {
-        setState((prev) => ({
-          ...prev,
-          isPdfModalOpen: true,
-          currentPdfFile: file,
-          currentPdfUrl: url,
-        }));
-      },
+  const closeVideoModal = React.useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      isVideoModalOpen: false,
+      currentVideoFile: null,
+      currentVideoUrl: null,
+    }));
+  }, []);
 
-      closePdfModal: () => {
-        setState((prev) => ({
-          ...prev,
-          isPdfModalOpen: false,
-          currentPdfFile: null,
-          currentPdfUrl: null,
-        }));
-      },
+  const openPdfModal = React.useCallback((file: AnkaaFile, url: string) => {
+    setState((prev) => ({
+      ...prev,
+      isPdfModalOpen: true,
+      currentPdfFile: file,
+      currentPdfUrl: url,
+    }));
+  }, []);
 
-      viewFile: (file: AnkaaFile) => {
-        const action = fileViewerService.determineFileViewAction(file, viewerConfig);
+  const closePdfModal = React.useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      isPdfModalOpen: false,
+      currentPdfFile: null,
+      currentPdfUrl: null,
+    }));
+  }, []);
 
-        fileViewerService.executeFileViewAction(action, {
-          onModalOpen: (component, url, _targetFile) => {
-            if (component === "image-modal") {
-              actions.openImageModal([file], 0);
-            } else if (component === "video-player") {
-              actions.openVideoModal(file, url);
-            } else if (component === "pdf-viewer") {
-              actions.openPdfModal(file, url);
-            }
-          },
-          onInlinePlayer: (url, _targetFile) => {
-            // For inline players, you might want to emit an event or use a callback
-          },
-          onDownload: (url, _targetFile) => {
-            if (onDownload) {
-              onDownload(file, url);
-            }
-          },
-          onSecurityWarning: (warnings) => {
-            if (onSecurityWarning) {
-              onSecurityWarning(warnings, file);
-            } else {
-              // Default warning handling
-              toast.warning(`Aviso de segurança: ${warnings.join(", ")}`, {
-                description: `Arquivo: ${file.filename}`,
-                duration: 5000,
-              });
-            }
-          },
-        });
-      },
+  const downloadFile = React.useCallback((file: AnkaaFile) => {
+    const urls = fileViewerService.generateFileUrls(file, viewerConfig.baseUrl);
 
-      downloadFile: (file: AnkaaFile) => {
-        const urls = fileViewerService.generateFileUrls(file, viewerConfig.baseUrl);
+    if (onDownload) {
+      onDownload(file, urls.download);
+    } else {
+      // Default download
+      const link = document.createElement("a");
+      link.href = urls.download;
+      link.download = file.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
-        if (onDownload) {
-          onDownload(file, urls.download);
-        } else {
-          // Default download
-          const link = document.createElement("a");
-          link.href = urls.download;
-          link.download = file.filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+      toast.success(`Download iniciado: ${file.filename}`);
+    }
+  }, [viewerConfig, onDownload]);
 
-          toast.success(`Download iniciado: ${file.filename}`);
+  const viewFile = React.useCallback((file: AnkaaFile) => {
+    const action = fileViewerService.determineFileViewAction(file, viewerConfig);
+
+    fileViewerService.executeFileViewAction(action, {
+      onModalOpen: (component, url, _targetFile) => {
+        if (component === "image-modal") {
+          openImageModal([file], 0);
+        } else if (component === "video-player") {
+          openVideoModal(file, url);
+        } else if (component === "pdf-viewer") {
+          openPdfModal(file, url);
         }
       },
+      onInlinePlayer: (url, _targetFile) => {
+        // For inline players, you might want to emit an event or use a callback
+      },
+      onDownload: (url, _targetFile) => {
+        if (onDownload) {
+          onDownload(file, url);
+        }
+      },
+      onSecurityWarning: (warnings) => {
+        if (onSecurityWarning) {
+          onSecurityWarning(warnings, file);
+        } else {
+          // Default warning handling
+          toast.warning(`Aviso de segurança: ${warnings.join(", ")}`, {
+            description: `Arquivo: ${file.filename}`,
+            duration: 5000,
+          });
+        }
+      },
+    });
+  }, [viewerConfig, onDownload, onSecurityWarning, openImageModal, openVideoModal, openPdfModal]);
+
+  const viewFiles = React.useCallback((files: AnkaaFile[], initialIndex: number) => {
+    // Filter to only files that can be previewed in image modal
+    const previewableFiles = files.filter(f => fileViewerService.canPreviewFile(f));
+
+    if (previewableFiles.length === 0) {
+      // No previewable files, try to download the first one
+      if (files[initialIndex]) {
+        downloadFile(files[initialIndex]);
+      }
+      return;
+    }
+
+    // Find the index of the initial file in the filtered array
+    const targetFile = files[initialIndex];
+    const adjustedIndex = previewableFiles.findIndex(f => f.id === targetFile?.id);
+    const finalIndex = adjustedIndex >= 0 ? adjustedIndex : 0;
+
+    // Open image modal with all previewable files
+    openImageModal(previewableFiles, finalIndex);
+  }, [downloadFile, openImageModal]);
+
+  const actions = React.useMemo(
+    () => ({
+      openImageModal,
+      closeImageModal,
+      openVideoModal,
+      closeVideoModal,
+      openPdfModal,
+      closePdfModal,
+      viewFile,
+      viewFiles,
+      downloadFile,
     }),
-    [viewerConfig, onDownload, onSecurityWarning],
+    [openImageModal, closeImageModal, openVideoModal, closeVideoModal, openPdfModal, closePdfModal, viewFile, viewFiles, downloadFile],
   );
+
+  actionsRef.current = actions;
 
   const contextValue = React.useMemo(
     () => ({

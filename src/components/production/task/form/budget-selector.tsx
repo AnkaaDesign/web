@@ -7,7 +7,7 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { useFieldArray } from "react-hook-form";
+import { useFieldArray, useWatch } from "react-hook-form";
 import {
   FormControl,
   FormField,
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { FormMoneyInput } from "@/components/ui/form-money-input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type {
   TaskCreateFormData,
   TaskUpdateFormData,
@@ -45,6 +46,21 @@ export const BudgetSelector = forwardRef<
     control,
     name: "budget",
   });
+
+  // Watch budget values to check for incomplete entries
+  const budgetValues = useWatch({
+    control,
+    name: "budget",
+  });
+
+  // Check if any budget is incomplete
+  const hasIncompleteBudgets = useMemo(() => {
+    if (!budgetValues || budgetValues.length === 0) return false;
+    return budgetValues.some((budget: any) =>
+      !budget.referencia || budget.referencia.trim() === "" ||
+      !budget.valor || budget.valor === 0
+    );
+  }, [budgetValues]);
 
   // Initialize with no rows by default (optional field)
   useEffect(() => {
@@ -94,7 +110,7 @@ export const BudgetSelector = forwardRef<
             <div
               key={field.id}
               ref={index === fields.length - 1 ? lastRowRef : null}
-              className="flex items-end gap-2 p-4 border rounded-lg bg-card"
+              className="flex items-end gap-2"
             >
               <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Referencia Field */}
@@ -103,7 +119,7 @@ export const BudgetSelector = forwardRef<
                   name={`budget.${index}.referencia`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Referência (Serviços)</FormLabel>
+                      {index === 0 && <FormLabel>Referência (Serviços)</FormLabel>}
                       <FormControl>
                         <Input
                           {...field}
@@ -119,23 +135,11 @@ export const BudgetSelector = forwardRef<
                 />
 
                 {/* Valor Field */}
-                <FormField
-                  control={control}
+                <FormMoneyInput
                   name={`budget.${index}.valor`}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <FormMoneyInput
-                          {...field}
-                          name={`budget.${index}.valor`}
-                          label="Valor"
-                          placeholder="R$ 0,00"
-                          disabled={disabled}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  {...(index === 0 ? { label: "Valor" } : { label: "" })}
+                  placeholder="R$ 0,00"
+                  disabled={disabled}
                 />
               </div>
 
@@ -156,6 +160,11 @@ export const BudgetSelector = forwardRef<
         </div>
       )}
 
+      {hasIncompleteBudgets && (
+        <Alert variant="destructive">
+          <AlertDescription>Alguns orçamentos estão incompletos. Preencha a referência e o valor antes de enviar o formulário.</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 });

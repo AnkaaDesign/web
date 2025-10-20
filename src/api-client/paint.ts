@@ -459,6 +459,26 @@ export class PaintFormulaComponentService {
     const response = await apiClient.delete<PaintFormulaComponentBatchDeleteResponse>(`${this.basePath}/batch`, { data });
     return response.data;
   }
+
+  // =====================
+  // Formulation Test Operations
+  // =====================
+
+  async deductForFormulationTest(data: {
+    itemId: string;
+    weight: number;
+    formulaPaintId?: string;
+  }): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      unitsDeducted: number;
+      remainingQuantity: number;
+    };
+  }> {
+    const response = await apiClient.post(`${this.basePath}/deduct-for-test`, data);
+    return response.data;
+  }
 }
 
 // =====================
