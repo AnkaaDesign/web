@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useUsers, useItems, useMarkPpeDeliveryAsDelivered, useAuth, useBatchApprovePpeDeliveries, useBatchRejectPpeDeliveries, usePpeDeliveryMutations } from "../../../../hooks";
+import { useUsers, useItems, useMarkPpeDeliveryAsDelivered, useAuth, useBatchApprovePpeDeliveries, useBatchRejectPpeDeliveries, usePpeDeliveryMutations, useBatchDeletePpeDeliveries } from "../../../../hooks";
 import type { PpeDelivery } from "../../../../types";
 import type { PpeDeliveryGetManyFormData } from "../../../../schemas";
 import { routes, PPE_DELIVERY_STATUS, ITEM_CATEGORY_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { createPpeDeliveryColumns, getDefaultVisibleColumns } from "./ppe-delivery-table-columns";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
 interface PpeDeliveryListProps {
   className?: string;
@@ -47,8 +48,10 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   const markAsDeliveredMutation = useMarkPpeDeliveryAsDelivered();
   const batchApproveMutation = useBatchApprovePpeDeliveries();
   const batchRejectMutation = useBatchRejectPpeDeliveries();
+  const batchDeleteMutation = useBatchDeletePpeDeliveries();
   const { updateAsync } = usePpeDeliveryMutations();
   const { data: currentUser } = useAuth();
+  const [deleteDialog, setDeleteDialog] = useState<{ items: PpeDelivery[]; isBulk: boolean } | null>(null);
 
   // State to hold current page items and table state from the table component
   const [tableData, setTableData] = useState<{
@@ -417,8 +420,8 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
       const count = deliveriesToMark.length;
       toast.success(count === 1 ? "Entrega marcada como entregue com sucesso" : `${count} entregas marcadas como entregues com sucesso`);
     } catch (error) {
+      // Error is handled by the API client with detailed message
       console.error("Error marking deliveries as delivered:", error);
-      toast.error("Erro ao marcar entregas como entregues");
     }
   };
 
@@ -472,8 +475,31 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     }
   };
 
-  const handleBulkDelete = async (deliveries: PpeDelivery[]) => {
-    // Implement batch delete logic
+  const handleBulkDelete = (deliveries: PpeDelivery[]) => {
+    setDeleteDialog({
+      items: deliveries,
+      isBulk: deliveries.length > 1,
+    });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteDialog) return;
+
+    try {
+      const ids = deleteDialog.items.map((delivery) => delivery.id);
+      await batchDeleteMutation.mutateAsync({ ppeDeliveryIds: ids });
+
+      toast.success(
+        deleteDialog.isBulk && deleteDialog.items.length > 1
+          ? `${deleteDialog.items.length} entregas deletadas com sucesso`
+          : "Entrega deletada com sucesso"
+      );
+    } catch (error) {
+      // Error is handled by the API client with detailed message
+      console.error("Error deleting delivery(ies):", error);
+    } finally {
+      setDeleteDialog(null);
+    }
   };
 
   return (
@@ -525,6 +551,26 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
 
       {/* Enhanced Filter Modal */}
       <PpeDeliveryFilters open={showFilterModal} onOpenChange={setShowFilterModal} filters={filters} onFilterChange={handleFilterChange} />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteDialog?.isBulk && deleteDialog.items.length > 1
+                ? `Tem certeza que deseja deletar ${deleteDialog.items.length} entregas? Esta ação não pode ser desfeita.`
+                : `Tem certeza que deseja deletar a entrega do item "${deleteDialog?.items[0]?.item?.name}" para o usuário "${deleteDialog?.items[0]?.user?.name}"? Esta ação não pode ser desfeita.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Deletar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

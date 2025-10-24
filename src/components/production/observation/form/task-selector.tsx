@@ -45,11 +45,11 @@ interface TaskSelectorProps {
   toggleSort?: (column: string) => void;
   getSortDirection?: (column: string) => "asc" | "desc" | null;
   getSortOrder?: (column: string) => number | null;
-  // Pagination props
-  page?: number; // 0-based from useTableState
+  // Pagination props (all 0-based for SimplePaginationAdvanced compatibility)
+  page?: number;
   pageSize?: number;
   totalRecords?: number;
-  onPageChange?: (page: number) => void; // Expects 0-based
+  onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
   onTotalRecordsChange?: (total: number) => void;
 }
@@ -123,12 +123,28 @@ export const TaskSelector = ({
     }
   }, [isFilterModalOpen]); // Only depend on modal open state
 
+  // Internal pagination state when no props provided
+  const [internalPage, setInternalPage] = useState(0); // 0-based for SimplePaginationAdvanced
+
   // Get page size - use prop or default to 20
   const currentPageSize = pageSizeProp || 20;
 
-  // Use props directly for pagination and sorting
-  // pageProp is 0-based from useTableState, convert to 1-based for internal use
-  const page = pageProp !== undefined ? pageProp + 1 : 1;
+  // Use props or internal state for pagination
+  // currentPage is 0-based for SimplePaginationAdvanced component
+  const currentPage = pageProp !== undefined ? pageProp : internalPage;
+
+  // API expects 1-based page numbers
+  const apiPage = currentPage + 1;
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    if (onPageChange) {
+      onPageChange(newPage); // Pass 0-based to parent if provided
+    } else {
+      setInternalPage(newPage); // Update internal state if no parent handler
+    }
+  };
+
   const sortConfigs = sortConfigsProp || [{ column: "name", direction: "asc" as const }];
 
   // Debounce search term with longer delay
@@ -138,7 +154,7 @@ export const TaskSelector = ({
   const taskQuery = useMemo(() => {
     const query: any = {
       searchingFor: debouncedSearchTerm || undefined,
-      page: page - 1, // Convert from 1-based (UI) to 0-based (API)
+      page: apiPage,
       limit: currentPageSize,
       status: [TASK_STATUS.COMPLETED], // Only show completed tasks
       include: {
@@ -174,7 +190,7 @@ export const TaskSelector = ({
     }
 
     return query;
-  }, [debouncedSearchTerm, page, currentPageSize, statusIds, customerIds, userIds, sectorIds, sortConfigs]);
+  }, [debouncedSearchTerm, apiPage, currentPageSize, statusIds, customerIds, userIds, sectorIds, sortConfigs]);
 
   // Fetch tasks
   const { data: taskResponse, isLoading } = useTasks(taskQuery);
@@ -476,14 +492,9 @@ export const TaskSelector = ({
           {/* Pagination Footer */}
           <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50">
             <SimplePaginationAdvanced
-              currentPage={page - 1} // SimplePaginationAdvanced expects 0-based, convert from internal 1-based
+              currentPage={currentPage}
               totalPages={Math.ceil(totalRecords / currentPageSize)}
-              onPageChange={(newPage) => {
-                // SimplePaginationAdvanced provides 0-based, onPageChange expects 0-based (useTableState.setPage)
-                if (onPageChange) {
-                  onPageChange(newPage);
-                }
-              }}
+              onPageChange={handlePageChange}
               pageSize={currentPageSize}
               totalItems={totalRecords}
               pageSizeOptions={[20, 40, 60, 100]}

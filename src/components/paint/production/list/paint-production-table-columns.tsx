@@ -39,7 +39,7 @@ export function createPaintProductionColumns(): PaintProductionColumn[] {
         const paintInfo = getPaintInfo(production.formula);
         return (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md border border-border flex-shrink-0 overflow-hidden">
+            <div className="w-8 h-8 rounded-md ring-1 ring-border/50 shadow-sm flex-shrink-0 overflow-hidden">
               {paintInfo.finish ? (
                 <CanvasNormalMapRenderer baseColor={paintInfo.hex} finish={paintInfo.finish as PAINT_FINISH} width={32} height={32} quality="low" className="w-full h-full" />
               ) : (

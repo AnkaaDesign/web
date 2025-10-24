@@ -17,12 +17,18 @@ import {
   IconCurrencyReal,
   IconReceipt,
   IconFileInvoice,
+  IconFileText,
+  IconHash,
+  IconLicense,
+  IconId,
+  IconNotes,
+  IconStatusChange,
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
 import { useTaskMutations, useCutsByTask, useCutMutations } from "../../../../hooks";
 import { cutService } from "../../../../api-client/cut";
-import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { useAuth } from "../../../../contexts/auth-context";
 import { Button } from "@/components/ui/button";
@@ -240,7 +246,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
             fileId: fileId || "",
             type,
             quantity: 1,
-            file: cut.file,
+            file: cut.file ? convertToFileWithPreview(cut.file)[0] : undefined,
           });
         }
       }
@@ -568,6 +574,27 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
           console.log('[TaskEditForm] FormData prepared with', fieldCount, 'changed fields and', Object.keys(files).length, 'file types');
 
+          // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
+          // Extract IDs of uploaded (existing) files
+          const currentArtworkIds = uploadedFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentInvoiceIds = nfeFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+
+          // Always send file IDs arrays when any file operation occurs
+          // Backend will replace all files with these IDs + newly uploaded files
+          dataForFormData.artworkIds = currentArtworkIds;
+          dataForFormData.budgetIds = currentBudgetIds;
+          dataForFormData.invoiceIds = currentInvoiceIds;
+          dataForFormData.receiptIds = currentReceiptIds;
+
+          console.log('[TaskEditForm] Setting file IDs to keep:', {
+            artworks: currentArtworkIds.length,
+            budgets: currentBudgetIds.length,
+            invoices: currentInvoiceIds.length,
+            receipts: currentReceiptIds.length,
+          });
+
           // Use the helper to create FormData with proper context
           const formData = createFormDataWithContext(
             dataForFormData,
@@ -598,6 +625,28 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
         } else {
           // Use regular JSON when no files are present
           const submitData = { ...changedData };
+
+          // Even if no new files, check for deleted files
+          // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
+          // Extract IDs of uploaded (existing) files
+          const currentArtworkIds = uploadedFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentInvoiceIds = nfeFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+
+          // Always send file IDs arrays when any file operation occurs
+          // Backend will replace all files with these IDs
+          submitData.artworkIds = currentArtworkIds;
+          submitData.budgetIds = currentBudgetIds;
+          submitData.invoiceIds = currentInvoiceIds;
+          submitData.receiptIds = currentReceiptIds;
+
+          console.log('[TaskEditForm] Setting file IDs to keep (JSON):', {
+            artworks: currentArtworkIds.length,
+            budgets: currentBudgetIds.length,
+            invoices: currentInvoiceIds.length,
+            receipts: currentReceiptIds.length,
+          });
 
           console.log('[TaskEditForm] Using JSON submission (no files)');
           console.log('[TaskEditForm] submitData keys:', Object.keys(submitData));
@@ -946,7 +995,8 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                         name="name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconFileText className="h-4 w-4" />
                               Nome da Tarefa <span className="text-destructive">*</span>
                             </FormLabel>
                             <FormControl>
@@ -980,7 +1030,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                         name="serialNumber"
                         render={({ field }) => (
                           <FormItem className="md:col-span-1">
-                            <FormLabel>Número de Série</FormLabel>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconHash className="h-4 w-4" />
+                              Número de Série
+                            </FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
@@ -1002,7 +1055,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                         name="plate"
                         render={({ field }) => (
                           <FormItem className="md:col-span-1">
-                            <FormLabel>Placa</FormLabel>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconLicense className="h-4 w-4" />
+                              Placa
+                            </FormLabel>
                             <FormControl>
                               <Input type="plate" {...field} value={field.value || ""} disabled={isSubmitting || isWarehouseUser || isDesignerUser} className="bg-transparent" />
                             </FormControl>
@@ -1017,7 +1073,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                         name="chassisNumber"
                         render={({ field }) => (
                           <FormItem className="md:col-span-2">
-                            <FormLabel>Número do Chassi (17 caracteres)</FormLabel>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconId className="h-4 w-4" />
+                              Número do Chassi (17 caracteres)
+                            </FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
@@ -1045,7 +1104,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                         name="status"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Status</FormLabel>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconStatusChange className="h-4 w-4" />
+                              Status
+                            </FormLabel>
                             <FormControl>
                               <Combobox
                                 value={field.value}
@@ -1065,13 +1127,44 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                       />
                     </div>
 
+                    {/* Commission Status */}
+                    <FormField
+                      control={form.control}
+                      name="commission"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <IconCurrencyReal className="h-4 w-4" />
+                            Status de Comissão
+                          </FormLabel>
+                          <FormControl>
+                            <Combobox
+                              value={field.value || COMMISSION_STATUS.FULL_COMMISSION}
+                              onValueChange={field.onChange}
+                              disabled={isSubmitting}
+                              options={Object.values(COMMISSION_STATUS).map((status) => ({
+                                value: status,
+                                label: COMMISSION_STATUS_LABELS[status],
+                              }))}
+                              placeholder="Selecione o status de comissão"
+                              searchable={false}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     {/* Details */}
                     <FormField
                       control={form.control}
                       name="details"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Detalhes</FormLabel>
+                          <FormLabel className="flex items-center gap-2">
+                            <IconNotes className="h-4 w-4" />
+                            Detalhes
+                          </FormLabel>
                           <FormControl>
                             <Textarea {...field} value={field.value || ""} placeholder="Detalhes adicionais sobre a tarefa..." rows={4} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} className="bg-transparent" />
                           </FormControl>
@@ -1464,7 +1557,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                           name="observation"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Descrição da Observação</FormLabel>
+                              <FormLabel className="flex items-center gap-2">
+                                <IconNotes className="h-4 w-4" />
+                                Descrição da Observação
+                              </FormLabel>
                               <FormControl>
                                 <Textarea
                                   value={field.value?.description || ""}

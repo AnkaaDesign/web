@@ -346,7 +346,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
         {loadState.supportsInlineViewing !== false && (
           <iframe
             ref={iframeRef}
-            src={`${url}#view=FitH&zoom=${zoom}`}
+            src={`${url}#toolbar=0&navpanes=0&view=FitH&zoom=${zoom}`}
             className="w-full h-full border-0"
             title={file.filename}
             onLoad={handleIframeLoad}

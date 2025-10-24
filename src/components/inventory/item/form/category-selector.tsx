@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { IconCategory } from "@tabler/icons-react";
 import { useFormContext } from "react-hook-form";
-import { useItemCategories, useItemCategoryMutations } from "../../../../hooks";
+import { useItemCategoryMutations } from "../../../../hooks";
+import { getItemCategories } from "../../../../api-client";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
+import type { ItemCategory } from "../../../../types";
 import { ITEM_CATEGORY_TYPE } from "../../../../constants";
 import { toast } from "@/components/ui/sonner";
 
@@ -14,27 +16,76 @@ interface CategorySelectorProps {
   disabled?: boolean;
   required?: boolean;
   onCategoryChange?: (categoryId: string | undefined) => void;
+  initialCategory?: ItemCategory;
 }
 
-export function CategorySelector({ disabled, required, onCategoryChange }: CategorySelectorProps) {
+export function CategorySelector({ disabled, required, onCategoryChange, initialCategory }: CategorySelectorProps) {
   const form = useFormContext<FormData>();
   const [isCreating, setIsCreating] = useState(false);
-
-  const {
-    data: categories,
-    isLoading,
-    refetch,
-  } = useItemCategories({
-    orderBy: { name: "asc" },
-  });
-
   const { createMutation } = useItemCategoryMutations();
 
-  const categoryOptions =
-    categories?.data?.map((category) => ({
-      value: category.id,
-      label: category.name,
-    })) || [];
+  // Create memoized initialOptions with stable dependency
+  const initialOptions = useMemo(
+    () =>
+      initialCategory
+        ? [
+            {
+              value: initialCategory.id,
+              label: initialCategory.name,
+            },
+          ]
+        : [],
+    [initialCategory?.id]
+  );
+
+  // Initialize cache with initial category
+  const cacheRef = useRef<Map<string, ItemCategory>>(new Map());
+
+  // Add initial category to cache on mount or when it changes
+  useMemo(() => {
+    if (initialCategory) {
+      cacheRef.current.set(initialCategory.id, initialCategory);
+    }
+  }, [initialCategory?.id]);
+
+  const fetchCategories = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const response = await getItemCategories({
+        page: page,
+        take: 50,
+        orderBy: { name: "asc" },
+        where: searchTerm && searchTerm.trim()
+          ? {
+              name: { contains: searchTerm.trim(), mode: "insensitive" },
+            }
+          : undefined,
+      });
+
+      const categories = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      // Add fetched categories to cache
+      const options = categories.map((category: ItemCategory) => {
+        const option = {
+          value: category.id,
+          label: category.name,
+        };
+        cacheRef.current.set(category.id, category);
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
 
   const handleCreateCategory = async (name: string) => {
     setIsCreating(true);
@@ -48,9 +99,6 @@ export function CategorySelector({ disabled, required, onCategoryChange }: Categ
 
       if (result.success && result.data) {
         toast.success("Categoria criada", `A categoria "${name}" foi criada com sucesso.`);
-
-        // Refetch categories to update the list
-        await refetch();
 
         // Set the newly created category as selected
         const newCategoryId = result.data.id;
@@ -76,16 +124,22 @@ export function CategorySelector({ disabled, required, onCategoryChange }: Categ
           </FormLabel>
           <FormControl>
             <Combobox
-              value={field.value || undefined}
+              value={field.value || ""}
               onValueChange={(value) => {
                 field.onChange(value);
-                const category = categories?.data?.find((c) => c.id === value);
-                onCategoryChange?.(category?.id);
+                onCategoryChange?.(value || undefined);
               }}
-              options={categoryOptions}
-              placeholder="Selecione (opcional)"
+              async={true}
+              queryKey={["item-categories", "selector"]}
+              queryFn={fetchCategories}
+              initialOptions={initialOptions}
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
+              placeholder="Pesquisar categoria..."
               emptyText="Nenhuma categoria encontrada"
-              disabled={disabled || isLoading || isCreating}
+              searchPlaceholder="Digite o nome da categoria..."
+              disabled={disabled || isCreating}
               allowCreate={true}
               createLabel={(value) => `Criar categoria "${value}"`}
               onCreate={async (name) => {

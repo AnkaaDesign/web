@@ -1,7 +1,7 @@
 import type { Task } from "../../../../types";
 import type { TaskColumn } from "../list/types";
 import { Badge } from "@/components/ui/badge";
-import { formatDate, formatDateTime, formatCurrency, getDurationBetweenDates } from "../../../../utils";
+import { formatDate, formatDateTime, formatCurrency, getDurationBetweenDates, calculateTaskMeasures, formatTaskMeasures } from "../../../../utils";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import {
   PAINT_FINISH,
@@ -100,6 +100,18 @@ export const createTaskHistoryColumns = (options?: { canViewPrice?: boolean }): 
     formatter: (value: string, row: Task) => {
       if (!row.customer) return <span className="text-muted-foreground">-</span>;
       return <TruncatedTextWithTooltip text={value} className="truncate" />;
+    },
+  },
+  {
+    id: "measures",
+    header: "MEDIDAS",
+    accessorFn: (row) => calculateTaskMeasures(row) || 0,
+    sortable: true,
+    filterable: false,
+    defaultVisible: false,
+    width: "120px",
+    formatter: (_: any, row: Task) => {
+      return <span>{formatTaskMeasures(row)}</span>;
     },
   },
   {

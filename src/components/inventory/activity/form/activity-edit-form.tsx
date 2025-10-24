@@ -134,13 +134,17 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
   // Track form state changes for submit button in parent
   useEffect(() => {
     if (onFormStateChange) {
+      // Use getChangedFields to determine if form has actual changes
+      const changedFields = form.getChangedFields();
+      const hasChanges = Object.keys(changedFields).length > 0;
+
       onFormStateChange({
         isValid: form.formState.isValid,
-        isDirty: form.formState.isDirty,
+        isDirty: hasChanges,
         isSubmitting: isSubmitting,
       });
     }
-  }, [form.formState.isValid, form.formState.isDirty, isSubmitting, onFormStateChange]);
+  }, [form.formState.isValid, form.formState.isDirty, isSubmitting, onFormStateChange, form]);
 
   return (
     <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
@@ -180,12 +184,12 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
                   )}
                 />
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <FormField
                     control={form.control}
                     name="quantity"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="md:col-span-1">
                         <FormLabel>
                           Quantidade <span className="text-destructive">*</span>
                         </FormLabel>
@@ -197,6 +201,7 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
                             max={999999}
                             step={0.01}
                             placeholder="0,01"
+                            className="bg-transparent"
                           />
                         </FormControl>
                         <FormMessage />
@@ -208,7 +213,7 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
                     control={form.control}
                     name="operation"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="md:col-span-1">
                         <FormLabel>Tipo de Operação</FormLabel>
                         <FormControl>
                           <Combobox
@@ -226,6 +231,32 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name="reason"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel>Motivo (opcional)</FormLabel>
+                        <FormControl>
+                          <Combobox
+                            value={field.value || ""}
+                            onValueChange={(value) => field.onChange(value || undefined)}
+                            options={[
+                              { label: "Sem motivo específico", value: "" },
+                              ...Object.values(ACTIVITY_REASON).map((reason) => ({
+                                label: ACTIVITY_REASON_LABELS[reason],
+                                value: reason,
+                              })),
+                            ]}
+                            placeholder="Selecione o motivo"
+                            searchPlaceholder="Buscar motivo..."
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 <FormField
@@ -234,43 +265,15 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Usuário Responsável
-                        {operationValue === ACTIVITY_OPERATION.OUTBOUND && <span className="text-destructive"> *</span>}
-                        {operationValue === ACTIVITY_OPERATION.INBOUND && <span className="text-gray-500 text-xs ml-1">(opcional)</span>}
+                        Usuário Responsável <span className="text-gray-500 text-xs ml-1">(opcional)</span>
                       </FormLabel>
                       <FormControl>
                         <ActivityUserSelector
                           value={field.value || undefined}
                           onChange={(value) => field.onChange(value)}
                           users={users}
-                          placeholder={operationValue === ACTIVITY_OPERATION.INBOUND ? "Selecione o usuário responsável (opcional)" : "Selecione o usuário responsável"}
+                          placeholder="Selecione o usuário responsável (opcional)"
                           disabled={isSubmitting}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="reason"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Motivo (opcional)</FormLabel>
-                      <FormControl>
-                        <Combobox
-                          value={field.value || ""}
-                          onValueChange={(value) => field.onChange(value || undefined)}
-                          options={[
-                            { label: "Sem motivo específico", value: "" },
-                            ...Object.values(ACTIVITY_REASON).map((reason) => ({
-                              label: ACTIVITY_REASON_LABELS[reason],
-                              value: reason,
-                            })),
-                          ]}
-                          placeholder="Selecione o motivo"
-                          searchPlaceholder="Buscar motivo..."
                         />
                       </FormControl>
                       <FormMessage />

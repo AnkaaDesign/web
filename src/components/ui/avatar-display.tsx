@@ -96,7 +96,7 @@ export const AvatarDisplay: React.FC<AvatarDisplayProps> = ({
       className={cn(
         SIZE_CLASSES[size],
         SHAPE_CLASSES[shape],
-        bordered && "border-2 border-border/50",
+        bordered && "border border-border/50",
         className,
       )}
     >

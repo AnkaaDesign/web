@@ -33,7 +33,6 @@ import { useChangeLogs } from "../../hooks";
 import { cn } from "@/lib/utils";
 import { useEntityDetails } from "@/hooks/use-entity-details";
 import { rollbackFieldChange } from "@/api-client/task";
-import { toast } from "sonner";
 
 interface ChangelogHistoryProps {
   entityType: CHANGE_LOG_ENTITY_TYPE;
@@ -195,57 +194,62 @@ const renderCutsCards = (cuts: any[]) => {
 
   return (
     <div className="space-y-2 mt-2">
-      {cuts.map((cut: any, index: number) => (
-        <div key={index} className="border rounded-lg px-2.5 py-1.5 flex items-center gap-2.5 bg-card">
-          {/* Cut Info */}
-          <div className="flex-1 min-w-0 space-y-1">
-            <div className="flex items-center gap-2 min-w-0">
-              <h4 className="text-xs font-semibold truncate min-w-0 flex-1">
-                {cut.file?.filename || cut.file?.name || "Arquivo de recorte"}
-              </h4>
-              {cut.status && (
-                <Badge variant={ENTITY_BADGE_CONFIG.CUT?.[cut.status] || "default"} className="text-[10px] h-4 px-1.5 flex-shrink-0">
-                  {CUT_STATUS_LABELS[cut.status] || cut.status}
-                </Badge>
-              )}
+      {cuts.map((cut: any, index: number) => {
+        // Ensure we have a proper file object for FilePreviewCard
+        const fileObject = cut.file || (cut.fileId ? {
+          id: cut.fileId,
+          filename: 'Arquivo de recorte',
+          mimetype: 'application/octet-stream',
+          size: 0,
+          thumbnailUrl: null,
+        } : null);
+
+        return (
+          <div key={index} className="border rounded-lg px-2.5 py-1.5 flex items-center gap-2.5 bg-card">
+            {/* Cut Info */}
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <h4 className="text-xs font-semibold truncate min-w-0 flex-1">
+                  {cut.file?.filename || cut.file?.name || "Arquivo de recorte"}
+                </h4>
+                {cut.status && (
+                  <Badge variant={ENTITY_BADGE_CONFIG.CUT?.[cut.status] || "default"} className="text-[10px] h-4 px-1.5 flex-shrink-0">
+                    {CUT_STATUS_LABELS[cut.status] || cut.status}
+                  </Badge>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+                {cut.type && (
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium">Tipo:</span>
+                    <span>{CUT_TYPE_LABELS[cut.type] || cut.type}</span>
+                  </div>
+                )}
+                {cut.quantity && (
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium">Qtd:</span>
+                    <span>{cut.quantity}</span>
+                  </div>
+                )}
+                {cut.origin && (
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium">Origem:</span>
+                    <span>{CUT_ORIGIN_LABELS[cut.origin] || cut.origin}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
-              {cut.type && (
-                <div className="flex items-center gap-1">
-                  <span className="font-medium">Tipo:</span>
-                  <span>{CUT_TYPE_LABELS[cut.type] || cut.type}</span>
-                </div>
-              )}
-              {cut.quantity && (
-                <div className="flex items-center gap-1">
-                  <span className="font-medium">Qtd:</span>
-                  <span>{cut.quantity}</span>
-                </div>
-              )}
-              {cut.origin && (
-                <div className="flex items-center gap-1">
-                  <span className="font-medium">Origem:</span>
-                  <span>{CUT_ORIGIN_LABELS[cut.origin] || cut.origin}</span>
-                </div>
-              )}
-            </div>
+            {/* File Preview on Right */}
+            {fileObject && (
+              <div className="flex-shrink-0">
+                <FilePreviewCard file={fileObject} size="sm" className="w-12 h-12" showActions={false} showMetadata={false} />
+              </div>
+            )}
           </div>
-
-          {/* File Preview on Right */}
-          {(cut.file || cut.fileId) && (
-            <div className="flex-shrink-0">
-              {cut.file ? (
-                <FilePreviewCard file={cut.file} size="sm" className="w-12 h-12" />
-              ) : (
-                <div className="w-12 h-12 border rounded-md bg-muted flex items-center justify-center text-[10px] text-muted-foreground">
-                  Arquivo
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
@@ -794,17 +798,15 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
     try {
       await rollbackFieldChange({ changeLogId });
 
-      // Show success message
-      toast.success(`Campo "${fieldName}" revertido com sucesso`);
+      // Success toast is handled by axios interceptor - no need to show duplicate toast
 
       // Refresh changelog data
       await refetch();
     } catch (error: any) {
       console.error("Rollback error:", error);
 
-      // Show error message
-      const errorMessage = error?.response?.data?.message || error?.message || "Erro ao reverter campo";
-      toast.error(errorMessage);
+      // Error toast is also handled by axios interceptor
+      // Only log the error for debugging
     } finally {
       setRollbackLoading(null);
     }

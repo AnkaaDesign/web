@@ -4,7 +4,8 @@ import type { Paint } from "../../../../types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { formatHexColor, getContrastingTextColor } from "./color-utils";
 import { routes, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH, TRUCK_MANUFACTURER } from "../../../../constants";
 import { IconFlask, IconTag, IconTruckLoading, IconSparkles, IconEdit, IconTrash, IconCheck, IconX, IconGitMerge, IconEye } from "@tabler/icons-react";
@@ -36,6 +37,8 @@ export function PaintCard({ paint, onFilterChange, currentFilters, showEffects =
     y: number;
   } | null>(null);
 
+  // Use viewport boundary checking hook
+  
   // Get labels
   const paintTypeLabel = paint.paintType?.name || "";
   const finishLabel = PAINT_FINISH_LABELS[paint.finish] || paint.finish;
@@ -281,13 +284,11 @@ export function PaintCard({ paint, onFilterChange, currentFilters, showEffects =
 
       {/* Context Menu */}
       <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
-        <DropdownMenuContent
-          style={{
-            position: "fixed",
-            left: contextMenu?.x,
-            top: contextMenu?.y,
-          }}
-          onClick={(e) => e.stopPropagation()}
+        <PositionedDropdownMenuContent
+        position={contextMenu}
+        isOpen={!!contextMenu}
+        className="w-56 ![position:fixed]"
+        onClick={(e) => e.stopPropagation()}
         >
           {selectedCount >= 2 && selected && (
             <DropdownMenuItem onClick={handleMerge}>
@@ -317,7 +318,7 @@ export function PaintCard({ paint, onFilterChange, currentFilters, showEffects =
             <IconTrash className="mr-2 h-4 w-4" />
             Excluir
           </DropdownMenuItem>
-        </DropdownMenuContent>
+        </PositionedDropdownMenuContent>
       </DropdownMenu>
     </>
   );

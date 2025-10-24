@@ -7,7 +7,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconUsers, IconPlus, IconUserCheck, IconUserX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { useUsers, useUserMutations, useUserBatchMutations } from "../../../../hooks";
 import { toast } from "sonner";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
@@ -143,6 +144,8 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
     isBulk: boolean;
   } | null>(null);
 
+  // Use viewport boundary checking hook
+  
   // Define all available columns
   const allColumns: UserColumn[] = createUserColumns();
 
@@ -503,14 +506,11 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
 
       {/* Context Menu */}
       <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
-        <DropdownMenuContent
-          style={{
-            position: "fixed",
-            left: contextMenu?.x,
-            top: contextMenu?.y,
-          }}
-          className="w-56"
-          onCloseAutoFocus={(e) => e.preventDefault()}
+        <PositionedDropdownMenuContent
+        position={contextMenu}
+        isOpen={!!contextMenu}
+        className="w-56 ![position:fixed]"
+        onCloseAutoFocus={(e) => e.preventDefault()}
         >
           {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.users.length} usuários selecionados</div>}
 
@@ -550,7 +550,7 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             <IconTrash className="mr-2 h-4 w-4" />
             {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Deletar selecionados" : "Deletar"}
           </DropdownMenuItem>
-        </DropdownMenuContent>
+        </PositionedDropdownMenuContent>
       </DropdownMenu>
     </div>
   );

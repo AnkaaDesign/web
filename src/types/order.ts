@@ -1,7 +1,7 @@
 // packages/interfaces/src/order.ts
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
-import type { ORDER_STATUS, SCHEDULE_FREQUENCY, WEEK_DAY, MONTH, ORDER_TRIGGER_TYPE, ORDER_BY_DIRECTION, RESCHEDULE_REASON } from "../constants";
+import type { ORDER_STATUS, SCHEDULE_FREQUENCY, WEEK_DAY, MONTH, ORDER_TRIGGER_TYPE, ORDER_BY_DIRECTION, RESCHEDULE_REASON } from '@constants';
 import type { Supplier, SupplierIncludes, SupplierOrderBy } from "./supplier";
 import type { Item, ItemIncludes, ItemOrderBy, ItemWhere } from "./item";
 import type { File, FileIncludes } from "./file";
@@ -89,7 +89,8 @@ export interface OrderRule extends BaseEntity {
 
 export interface OrderItem extends BaseEntity {
   orderId: string;
-  itemId: string;
+  itemId: string | null;
+  temporaryItemDescription: string | null;
   orderedQuantity: number;
   receivedQuantity: number;
   price: number;
@@ -113,9 +114,11 @@ export interface Order extends BaseEntity {
   forecast: Date | null;
   status: ORDER_STATUS;
   statusOrder: number; // Status numeric order for sorting: 1=Created, 2=PartiallyFulfilled, 3=Fulfilled, 4=Overdue, 5=PartiallyReceived, 6=Received, 7=Cancelled
-  budgetId: string | null;
-  nfeId: string | null;
-  receiptId: string | null;
+  budgetIds?: string[];
+  invoiceIds?: string[];
+  receiptIds?: string[];
+  reimbursementIds?: string[];
+  reimbursementInvoiceIds?: string[];
   supplierId: string | null;
   orderScheduleId: string | null;
   orderRuleId: string | null;
@@ -123,14 +126,11 @@ export interface Order extends BaseEntity {
   notes: string | null;
 
   // Relations (optional, populated based on query)
-  budget?: File;
-  nfe?: File;
-  receipt?: File;
-  budgets?: File[]; // Multiple budget files
-  invoices?: File[]; // Multiple invoice/NFE files (orderInvoices relation)
-  receipts?: File[]; // Multiple receipt files
-  reimbursements?: File[]; // Multiple reimbursement files
-  invoiceReimbursements?: File[]; // Multiple invoice reimbursement files (orderInvoiceReimbursements relation)
+  budgets?: File[];
+  invoices?: File[];
+  receipts?: File[];
+  reimbursements?: File[];
+  invoiceReimbursements?: File[];
   supplier?: Supplier;
   orderSchedule?: OrderSchedule;
   ppeSchedule?: PpeDeliverySchedule;
@@ -149,21 +149,6 @@ export interface Order extends BaseEntity {
 // =====================
 
 export interface OrderIncludes {
-  budget?:
-    | boolean
-    | {
-        include?: FileIncludes;
-      };
-  nfe?:
-    | boolean
-    | {
-        include?: FileIncludes;
-      };
-  receipt?:
-    | boolean
-    | {
-        include?: FileIncludes;
-      };
   budgets?:
     | boolean
     | {

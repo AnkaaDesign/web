@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconDownload, IconX, IconAlertTriangle, IconFileInvoice, IconReceipt, IconCurrencyReal } from "@tabler/icons-react";
+import { useNavigate } from "react-router-dom";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, IconShoppingCart, IconCalendar, IconDownload, IconX, IconAlertTriangle, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconTruck, IconNotes, IconClipboardList } from "@tabler/icons-react";
 import type { OrderCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useSuppliers } from "../../../../hooks";
@@ -24,57 +24,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
 import { OrderItemSelector } from "./order-item-selector";
+import { TemporaryItemsInput } from "./temporary-items-input";
 import { useOrderFormUrlState } from "@/hooks/use-order-form-url-state";
 import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
-
-const steps = [
-  {
-    id: 1,
-    name: "Informações Básicas",
-    description: "Fornecedor e detalhes do pedido",
-  },
-  {
-    id: 2,
-    name: "Seleção de Itens",
-    description: "Escolha os itens e quantidades",
-  },
-  {
-    id: 3,
-    name: "Revisão",
-    description: "Confirme os dados do pedido",
-  },
-];
-
-// Simple URL step management
-const getStepFromUrl = (searchParams: URLSearchParams): number => {
-  const step = parseInt(searchParams.get("step") || "1", 10);
-  return Math.max(1, Math.min(3, step));
-};
-
-const setStepInUrl = (searchParams: URLSearchParams, step: number): URLSearchParams => {
-  const params = new URLSearchParams(searchParams);
-  params.set("step", step.toString());
-  return params;
-};
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 export const OrderCreateForm = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  // Initialize state from URL parameters
-  const [currentStep, setCurrentStep] = useState(getStepFromUrl(searchParams));
 
   // File upload state
   const [budgetFiles, setBudgetFiles] = useState<FileWithPreview[]>([]);
   const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
   const [nfeFiles, setNfeFiles] = useState<FileWithPreview[]>([]);
 
-  // URL state management for item selection (Stage 2)
+  // URL state management for item selection and form navigation (includes step)
   const {
+    step: currentStep,
+    setStep: setCurrentStep,
     selectedItems,
     quantities,
     prices,
     taxes,
+    orderItemMode,
+    temporaryItems,
     description,
     supplierId,
     forecast,
@@ -83,6 +56,12 @@ export const OrderCreateForm = () => {
     updateSupplierId,
     updateForecast,
     updateNotes,
+    setOrderItemMode,
+    addTemporaryItem,
+    updateTemporaryItem,
+    removeTemporaryItem,
+    clearTemporaryItems,
+    setTemporaryItems,
     showSelectedOnly,
     searchTerm,
     showInactive,
@@ -115,6 +94,41 @@ export const OrderCreateForm = () => {
     defaultPageSize: 40,
   });
 
+  // Dynamic steps based on mode
+  const steps = useMemo(() => {
+    if (orderItemMode === "temporary") {
+      return [
+        {
+          id: 1,
+          name: "Informações Básicas",
+          description: "Fornecedor e detalhes do pedido",
+        },
+        {
+          id: 3,
+          name: "Revisão",
+          description: "Confirme os dados do pedido",
+        },
+      ];
+    }
+    return [
+      {
+        id: 1,
+        name: "Informações Básicas",
+        description: "Fornecedor e detalhes do pedido",
+      },
+      {
+        id: 2,
+        name: "Seleção de Itens",
+        description: "Escolha os itens e quantidades",
+      },
+      {
+        id: 3,
+        name: "Revisão",
+        description: "Confirme os dados do pedido",
+      },
+    ];
+  }, [orderItemMode]);
+
   // Form setup with default values from URL state
   const form = useForm<OrderCreateFormData>({
     resolver: zodResolver(orderCreateSchema),
@@ -125,30 +139,47 @@ export const OrderCreateForm = () => {
       notes: notes || "",
       items: [],
     },
-    mode: "onChange", // Validate on every change for real-time feedback
-    reValidateMode: "onChange", // Re-validate on every change
+    mode: "onTouched", // Only validate after user touches a field
+    reValidateMode: "onChange", // Re-validate on change after initial validation
     criteriaMode: "all", // Show all errors
     shouldFocusError: true, // Focus on first error field when validation fails
   });
 
-  // Sync URL state changes back to form and trigger validation
+  // Sync URL state changes back to form (validate only if field was already touched)
   useEffect(() => {
-    form.setValue("description", description || "", { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+    const isTouched = form.formState.touchedFields.description;
+    form.setValue("description", description || "", {
+      shouldValidate: isTouched,
+      shouldDirty: true
+    });
   }, [description, form]);
 
   useEffect(() => {
-    form.setValue("supplierId", supplierId || undefined, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+    const isTouched = form.formState.touchedFields.supplierId;
+    form.setValue("supplierId", supplierId || undefined, {
+      shouldValidate: isTouched,
+      shouldDirty: true
+    });
   }, [supplierId, form]);
 
   useEffect(() => {
-    form.setValue("forecast", forecast || undefined, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+    const isTouched = form.formState.touchedFields.forecast;
+    form.setValue("forecast", forecast || undefined, {
+      shouldValidate: isTouched,
+      shouldDirty: true
+    });
   }, [forecast, form]);
 
   useEffect(() => {
-    form.setValue("notes", notes || "", { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+    const isTouched = form.formState.touchedFields.notes;
+    form.setValue("notes", notes || "", {
+      shouldValidate: isTouched,
+      shouldDirty: true
+    });
   }, [notes, form]);
 
-  // Sync selected items to form for validation
+
+  // Sync selected items to form (validate only if items field was already touched)
   useEffect(() => {
     const items = Array.from(selectedItems).map((itemId) => ({
       itemId,
@@ -156,7 +187,11 @@ export const OrderCreateForm = () => {
       price: prices[itemId] || 0,
       tax: taxes[itemId] || 0,
     }));
-    form.setValue("items", items, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+    const isTouched = form.formState.touchedFields.items;
+    form.setValue("items", items, {
+      shouldValidate: isTouched,
+      shouldDirty: true
+    });
   }, [selectedItems, quantities, prices, taxes, form]);
 
   // Mutations
@@ -166,6 +201,7 @@ export const OrderCreateForm = () => {
   const { data: suppliersResponse } = useSuppliers({
     orderBy: { fantasyName: "asc" },
     take: 100,
+    include: { logo: true },
   });
 
   const suppliers = suppliersResponse?.data || []; // Fetch selected items data for display
@@ -185,14 +221,6 @@ export const OrderCreateForm = () => {
 
   const selectedItemsData = selectedItemsResponse?.data || [];
 
-  // Keep step in sync with URL
-  useEffect(() => {
-    const stepFromUrl = getStepFromUrl(searchParams);
-    if (stepFromUrl !== currentStep) {
-      setCurrentStep(stepFromUrl);
-    }
-  }, [searchParams]); // Removed currentStep to prevent circular dependency
-
   // Calculate total price
   const totalPrice = Array.from(selectedItems).reduce((total: number, itemId: string) => {
     const quantity = Number(quantities[itemId]) || 1;
@@ -203,47 +231,75 @@ export const OrderCreateForm = () => {
     return total + subtotal + taxAmount;
   }, 0);
 
-  // Navigation helpers
+  // Navigation helpers - use the hook's setStep which properly manages URL state
   const nextStep = useCallback(() => {
     if (currentStep < steps.length) {
-      const newStep = currentStep + 1;
-      setCurrentStep(newStep);
-      setSearchParams(setStepInUrl(searchParams, newStep), { replace: true });
+      // Skip step 2 (item selection) when in temporary mode
+      if (currentStep === 1 && orderItemMode === "temporary") {
+        setCurrentStep(3); // Jump directly to review
+      } else {
+        setCurrentStep(currentStep + 1);
+      }
     }
-  }, [currentStep, searchParams, setSearchParams]);
+  }, [currentStep, setCurrentStep, orderItemMode]);
 
   const prevStep = useCallback(() => {
     if (currentStep > 1) {
-      const newStep = currentStep - 1;
-      setCurrentStep(newStep);
-      setSearchParams(setStepInUrl(searchParams, newStep), { replace: true });
+      // Skip step 2 (item selection) when in temporary mode
+      if (currentStep === 3 && orderItemMode === "temporary") {
+        setCurrentStep(1); // Jump back to step 1
+      } else {
+        setCurrentStep(currentStep - 1);
+      }
     }
-  }, [currentStep, searchParams, setSearchParams]);
+  }, [currentStep, setCurrentStep, orderItemMode]);
 
   // Stage validation
   const validateCurrentStep = useCallback(async (): Promise<boolean> => {
     switch (currentStep) {
       case 1:
-        // Additional validation for description
+        // Trigger form validation for step 1 fields first to show errors in UI
+        const step1Valid = await form.trigger(["description", "supplierId", "forecast", "notes"]);
+
+        // Get the description value for additional checks
         const formDescription = form.getValues("description");
-        if (!formDescription || formDescription.trim().length === 0) {
-          toast.error("Descrição é obrigatória");
+
+        // Check if validation failed or description is empty
+        if (!step1Valid || !formDescription || formDescription.trim().length === 0) {
+          // Get the first error message from form errors
+          const errors = form.formState.errors;
+          if (errors.description) {
+            toast.error(errors.description.message || "Descrição é obrigatória");
+          } else if (!formDescription || formDescription.trim().length === 0) {
+            toast.error("Descrição é obrigatória");
+          }
           return false;
         }
+
         if (formDescription.trim().length > 500) {
           toast.error("Descrição deve ter no máximo 500 caracteres");
           return false;
         }
 
-        // Trigger form validation for step 1 fields
-        const step1Valid = await form.trigger(["description", "supplierId", "forecast", "notes"]);
-        if (!step1Valid) {
-          // Get the first error message from form errors
-          const errors = form.formState.errors;
-          if (errors.description) {
-            toast.error(errors.description.message || "Erro na descrição");
+        // In temporary mode, validate temporary items
+        if (orderItemMode === "temporary") {
+          const tempItems = form.getValues("temporaryItems") || [];
+          if (tempItems.length === 0) {
+            toast.error("Pelo menos um item temporário deve ser adicionado");
+            return false;
           }
-          return false;
+
+          // Validate each temporary item
+          const hasIncomplete = tempItems.some((item: any) =>
+            !item.temporaryItemDescription || item.temporaryItemDescription.trim() === "" ||
+            !item.orderedQuantity || item.orderedQuantity <= 0 ||
+            item.price === undefined || item.price === null || item.price < 0
+          );
+
+          if (hasIncomplete) {
+            toast.error("Todos os itens temporários devem ter descrição, quantidade e preço");
+            return false;
+          }
         }
 
         return true;
@@ -264,17 +320,38 @@ export const OrderCreateForm = () => {
         return true;
 
       case 3:
-        // Additional checks
-        if (selectedItems.size === 0) {
-          toast.error("Pelo menos um item deve ser selecionado");
-          return false;
-        }
+        // Additional checks based on mode
+        if (orderItemMode === "inventory") {
+          if (selectedItems.size === 0) {
+            toast.error("Pelo menos um item deve ser selecionado");
+            return false;
+          }
 
-        // Validate prices
-        const itemsWithoutPriceFinal = Array.from(selectedItems).filter((itemId) => !prices[itemId] || Number(prices[itemId]) <= 0);
-        if (itemsWithoutPriceFinal.length > 0) {
-          toast.error("Todos os itens selecionados devem ter preço definido");
-          return false;
+          // Validate prices
+          const itemsWithoutPriceFinal = Array.from(selectedItems).filter((itemId) => !prices[itemId] || Number(prices[itemId]) <= 0);
+          if (itemsWithoutPriceFinal.length > 0) {
+            toast.error("Todos os itens selecionados devem ter preço definido");
+            return false;
+          }
+        } else {
+          // Temporary mode - validate temporary items
+          const tempItems = form.getValues("temporaryItems") || [];
+          if (tempItems.length === 0) {
+            toast.error("Pelo menos um item temporário deve ser adicionado");
+            return false;
+          }
+
+          // Validate each temporary item
+          const hasIncomplete = tempItems.some((item: any) =>
+            !item.temporaryItemDescription || item.temporaryItemDescription.trim() === "" ||
+            !item.orderedQuantity || item.orderedQuantity <= 0 ||
+            item.price === undefined || item.price === null || item.price < 0
+          );
+
+          if (hasIncomplete) {
+            toast.error("Todos os itens temporários devem ter descrição, quantidade e preço");
+            return false;
+          }
         }
 
         // Trigger full form validation
@@ -297,7 +374,7 @@ export const OrderCreateForm = () => {
       default:
         return true;
     }
-  }, [currentStep, form, selectedItems, prices]);
+  }, [currentStep, form, selectedItems, prices, orderItemMode]);
 
   // Handle file changes
   const handleBudgetFilesChange = useCallback((files: FileWithPreview[]) => {
@@ -351,13 +428,27 @@ export const OrderCreateForm = () => {
   // Handle form submission
   const handleSubmit = useCallback(async () => {
     try {
-      // Prepare items for validation
-      const itemsData = Array.from(selectedItems).map((itemId) => ({
-        itemId: String(itemId),
-        orderedQuantity: Number(quantities[itemId]) || 1,
-        price: Number(prices[itemId]) || 0,
-        tax: Number(taxes[itemId]) || 0,
-      }));
+      // Prepare items based on mode
+      let itemsData: any[] = [];
+
+      if (orderItemMode === "inventory") {
+        // Inventory items
+        itemsData = Array.from(selectedItems).map((itemId) => ({
+          itemId: String(itemId),
+          orderedQuantity: Number(quantities[itemId]) || 1,
+          price: Number(prices[itemId]) || 0,
+          tax: Number(taxes[itemId]) || 0,
+        }));
+      } else {
+        // Temporary items
+        const tempItems = form.getValues("temporaryItems") || [];
+        itemsData = tempItems.map((item: any) => ({
+          temporaryItemDescription: item.temporaryItemDescription,
+          orderedQuantity: Number(item.orderedQuantity) || 1,
+          price: Number(item.price) || 0,
+          tax: Number(item.tax) || 0,
+        }));
+      }
 
       // Get form values to ensure we have the latest data
       const currentDescription = form.getValues("description");
@@ -458,7 +549,7 @@ export const OrderCreateForm = () => {
       console.error("Submission error:", error);
       // Error is handled by the mutation hook, but let's log it
     }
-  }, [validateCurrentStep, description, supplierId, forecast, notes, selectedItems, quantities, prices, taxes, budgetFiles, receiptFiles, nfeFiles, suppliers, createAsync, form, clearAllSelections, navigate]);
+  }, [validateCurrentStep, description, supplierId, forecast, notes, selectedItems, quantities, prices, taxes, orderItemMode, budgetFiles, receiptFiles, nfeFiles, suppliers, createAsync, form, clearAllSelections, navigate]);
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.orders.root);
@@ -1030,7 +1121,10 @@ export const OrderCreateForm = () => {
       <Card className="flex-1 min-h-0 flex flex-col w-full shadow-sm border border-border">
         <CardContent className="flex-1 flex flex-col p-6 overflow-hidden min-h-0">
           <Form {...form}>
-            <form className="flex flex-col h-full">
+            <form
+              className="flex flex-col h-full"
+              onSubmit={(e) => e.preventDefault()}
+            >
               {/* Step Indicator */}
               <div className="flex-shrink-0 mb-6">
                 <FormSteps steps={steps} currentStep={currentStep} />
@@ -1051,7 +1145,8 @@ export const OrderCreateForm = () => {
                         <div className="space-y-6">
                           {/* Description - Full width */}
                           <div className="space-y-2">
-                            <Label className="text-sm font-medium">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <IconFileText className="h-4 w-4" />
                               Descrição <span className="text-red-500">*</span>
                             </Label>
                             <Input
@@ -1060,9 +1155,8 @@ export const OrderCreateForm = () => {
                               onChange={(value) => {
                                 // The custom Input component passes the cleaned value directly
                                 const stringValue = value !== null && value !== undefined ? String(value) : "";
-                                // Update form state with validation
+                                // Update form state (validation will happen onBlur or when touched)
                                 form.setValue("description", stringValue, {
-                                  shouldValidate: true,
                                   shouldDirty: true,
                                   shouldTouch: true,
                                 });
@@ -1070,9 +1164,53 @@ export const OrderCreateForm = () => {
                                 updateDescription(stringValue);
                               }}
                               onBlur={() => form.trigger("description")}
-                              className={`h-10 w-full ${form.formState.errors.description ? "border-red-500" : ""}`}
+                              className={`h-10 w-full bg-transparent ${form.formState.errors.description ? "border-red-500" : ""}`}
                             />
                             <FormMessage className="text-sm text-red-500">{form.formState.errors.description?.message}</FormMessage>
+                          </div>
+
+                          {/* Mode Switch */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <IconClipboardList className="h-4 w-4" />
+                              Tipo de Itens
+                            </Label>
+                            <RadioGroup
+                              value={orderItemMode}
+                              onValueChange={(value) => setOrderItemMode(value as "inventory" | "temporary")}
+                              className="grid grid-cols-1 md:grid-cols-2 gap-3"
+                            >
+                              <div
+                                className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
+                                onClick={() => setOrderItemMode("inventory")}
+                              >
+                                <RadioGroupItem value="inventory" id="mode-inventory" className="mt-0.5" />
+                                <div className="flex-1 space-y-1">
+                                  <Label htmlFor="mode-inventory" className="flex items-center gap-2 font-medium cursor-pointer group-hover:text-white">
+                                    <IconShoppingCart className="h-4 w-4" />
+                                    Itens do Estoque
+                                  </Label>
+                                  <p className="text-sm text-muted-foreground group-hover:text-white/90">
+                                    Selecione itens do inventário
+                                  </p>
+                                </div>
+                              </div>
+                              <div
+                                className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
+                                onClick={() => setOrderItemMode("temporary")}
+                              >
+                                <RadioGroupItem value="temporary" id="mode-temporary" className="mt-0.5" />
+                                <div className="flex-1 space-y-1">
+                                  <Label htmlFor="mode-temporary" className="flex items-center gap-2 font-medium cursor-pointer group-hover:text-white">
+                                    <IconFileInvoice className="h-4 w-4" />
+                                    Itens Temporários
+                                  </Label>
+                                  <p className="text-sm text-muted-foreground group-hover:text-white/90">
+                                    Compras únicas sem inventário
+                                  </p>
+                                </div>
+                              </div>
+                            </RadioGroup>
                           </div>
 
                           {/* Supplier, Date and Observations in the same row */}
@@ -1081,7 +1219,10 @@ export const OrderCreateForm = () => {
                             <div className="space-y-6">
                               {/* Supplier Selection */}
                               <div className="space-y-2">
-                                <Label className="text-sm font-medium">Fornecedor</Label>
+                                <Label className="text-sm font-medium flex items-center gap-2">
+                                  <IconTruck className="h-4 w-4" />
+                                  Fornecedor
+                                </Label>
                                 <Combobox
                                   value={form.watch("supplierId") || ""}
                                   onValueChange={(value) => {
@@ -1095,11 +1236,26 @@ export const OrderCreateForm = () => {
                                       : suppliers.map((supplier) => ({
                                           value: supplier.id,
                                           label: supplier.fantasyName,
+                                          logo: supplier.logo,
                                         }))
                                   }
                                   placeholder="Selecione um fornecedor (opcional)"
                                   emptyText="Nenhum fornecedor encontrado"
                                   className="w-full"
+                                  renderOption={(option, isSelected) => (
+                                    <div className="flex items-center gap-3 w-full">
+                                      <SupplierLogoDisplay
+                                        logo={(option as any).logo}
+                                        supplierName={option.label}
+                                        size="sm"
+                                        shape="rounded"
+                                        className="flex-shrink-0"
+                                      />
+                                      <div className="flex flex-col gap-1 min-w-0 flex-1">
+                                        <div className="font-medium truncate">{option.label}</div>
+                                      </div>
+                                    </div>
+                                  )}
                                 />
                               </div>
 
@@ -1135,7 +1291,10 @@ export const OrderCreateForm = () => {
 
                             {/* Right Column: Observations */}
                             <div className="space-y-2 flex flex-col">
-                              <Label className="text-sm font-medium">Observações</Label>
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <IconNotes className="h-4 w-4" />
+                                Observações
+                              </Label>
                               <Textarea
                                 placeholder="Observações sobre o pedido (opcional)"
                                 value={form.watch("notes") || ""}
@@ -1143,7 +1302,6 @@ export const OrderCreateForm = () => {
                                   const value = e.target.value;
                                   // Update form state
                                   form.setValue("notes", value, {
-                                    shouldValidate: true,
                                     shouldDirty: true,
                                     shouldTouch: true,
                                   });
@@ -1155,6 +1313,23 @@ export const OrderCreateForm = () => {
                               />
                             </div>
                           </div>
+
+                          {/* Temporary Items Input (shown only in temporary mode) */}
+                          {orderItemMode === "temporary" && (
+                            <div className="space-y-4">
+                              <Separator />
+                              <div className="space-y-3">
+                                <Label className="text-sm font-medium flex items-center gap-2">
+                                  <IconFileInvoice className="h-4 w-4" />
+                                  Itens Temporários
+                                </Label>
+                                <TemporaryItemsInput
+                                  control={form.control}
+                                  disabled={isSubmitting}
+                                />
+                              </div>
+                            </div>
+                          )}
 
                           {/* File uploads */}
                           <div className="space-y-4">
@@ -1235,7 +1410,7 @@ export const OrderCreateForm = () => {
                   </div>
                 )}
 
-                {currentStep === 2 && (
+                {currentStep === 2 && orderItemMode === "inventory" && (
                   <OrderItemSelector
                     selectedItems={selectedItems}
                     onSelectItem={handleSelectItem}
@@ -1322,7 +1497,9 @@ export const OrderCreateForm = () => {
                               <IconShoppingCart className="h-4 w-4 text-muted-foreground" />
                               <p className="text-xs font-medium text-muted-foreground">ITENS</p>
                             </div>
-                            <p className="text-2xl font-semibold text-foreground">{selectionCount}</p>
+                            <p className="text-2xl font-semibold text-foreground">
+                              {orderItemMode === "inventory" ? selectionCount : (form.watch("temporaryItems") || []).length}
+                            </p>
                           </div>
 
                           <div>
@@ -1331,7 +1508,9 @@ export const OrderCreateForm = () => {
                               <p className="text-xs font-medium text-muted-foreground">UNIDADES</p>
                             </div>
                             <p className="text-2xl font-semibold text-foreground">
-                              {Array.from(selectedItems).reduce((total: number, itemId: string) => total + (Number(quantities[itemId]) || 1), 0)}
+                              {orderItemMode === "inventory"
+                                ? Array.from(selectedItems).reduce((total: number, itemId: string) => total + (Number(quantities[itemId]) || 1), 0)
+                                : (form.watch("temporaryItems") || []).reduce((total: number, item: any) => total + (Number(item.orderedQuantity) || 0), 0)}
                             </p>
                           </div>
 
@@ -1340,7 +1519,20 @@ export const OrderCreateForm = () => {
                               <IconBuilding className="h-4 w-4 text-muted-foreground" />
                               <p className="text-xs font-medium text-muted-foreground">TOTAL</p>
                             </div>
-                            <p className="text-2xl font-semibold text-primary">{formatCurrency(totalPrice)}</p>
+                            <p className="text-2xl font-semibold text-primary">
+                              {formatCurrency(
+                                orderItemMode === "inventory"
+                                  ? totalPrice
+                                  : (form.watch("temporaryItems") || []).reduce((total: number, item: any) => {
+                                      const quantity = Number(item.orderedQuantity) || 0;
+                                      const price = Number(item.price) || 0;
+                                      const tax = Number(item.tax) || 0;
+                                      const subtotal = quantity * price;
+                                      const taxAmount = subtotal * (tax / 100);
+                                      return total + subtotal + taxAmount;
+                                    }, 0)
+                              )}
+                            </p>
                           </div>
                         </div>
 
@@ -1361,26 +1553,27 @@ export const OrderCreateForm = () => {
                     <Card className="w-full">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                          <IconShoppingCart className="h-5 w-5" />
-                          Itens Selecionados
+                          {orderItemMode === "inventory" ? <IconShoppingCart className="h-5 w-5" /> : <IconFileInvoice className="h-5 w-5" />}
+                          {orderItemMode === "inventory" ? "Itens Selecionados" : "Itens Temporários"}
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="rounded-md border overflow-hidden w-full">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="bg-muted/50">
-                                <TableHead className="font-semibold">Código</TableHead>
-                                <TableHead className="font-semibold">Nome</TableHead>
-                                <TableHead className="font-semibold">Marca</TableHead>
-                                <TableHead className="font-semibold">Medida</TableHead>
-                                <TableHead className="text-right font-semibold">Quantidade</TableHead>
-                                <TableHead className="text-right font-semibold">Preço Unit.</TableHead>
-                                <TableHead className="text-right font-semibold">Total</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {selectedItemsData.map((item, index) => {
+                        {orderItemMode === "inventory" ? (
+                          <div className="rounded-md border overflow-hidden w-full">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-muted/50">
+                                  <TableHead className="font-semibold">Código</TableHead>
+                                  <TableHead className="font-semibold">Nome</TableHead>
+                                  <TableHead className="font-semibold">Marca</TableHead>
+                                  <TableHead className="font-semibold">Medida</TableHead>
+                                  <TableHead className="text-right font-semibold">Quantidade</TableHead>
+                                  <TableHead className="text-right font-semibold">Preço Unit.</TableHead>
+                                  <TableHead className="text-right font-semibold">Total</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {selectedItemsData.map((item, index) => {
                                 const quantity = Number(quantities[item.id]) || 1;
                                 const price = Number(prices[item.id]) || 0;
                                 const total = quantity * price;
@@ -1428,6 +1621,60 @@ export const OrderCreateForm = () => {
                             </TableBody>
                           </Table>
                         </div>
+                        ) : (
+                          <div className="rounded-md border overflow-hidden w-full">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-muted/50">
+                                  <TableHead className="font-semibold">Descrição</TableHead>
+                                  <TableHead className="text-right font-semibold">Quantidade</TableHead>
+                                  <TableHead className="text-right font-semibold">Preço Unit.</TableHead>
+                                  <TableHead className="text-right font-semibold">Taxa (%)</TableHead>
+                                  <TableHead className="text-right font-semibold">Subtotal</TableHead>
+                                  <TableHead className="text-right font-semibold">Total</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {(form.watch("temporaryItems") || []).map((item: any, index: number) => {
+                                  const quantity = Number(item.orderedQuantity) || 0;
+                                  const price = Number(item.price) || 0;
+                                  const tax = Number(item.tax) || 0;
+                                  const subtotal = quantity * price;
+                                  const taxAmount = subtotal * (tax / 100);
+                                  const total = subtotal + taxAmount;
+
+                                  return (
+                                    <TableRow key={index} className={cn("transition-colors", index % 2 === 1 && "bg-muted/10")}>
+                                      <TableCell className="font-medium">{item.temporaryItemDescription || "-"}</TableCell>
+                                      <TableCell className="text-right font-medium">{quantity.toLocaleString("pt-BR")}</TableCell>
+                                      <TableCell className="text-right">{formatCurrency(price)}</TableCell>
+                                      <TableCell className="text-right">{tax.toFixed(2)}%</TableCell>
+                                      <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
+                                      <TableCell className="text-right font-semibold">{formatCurrency(total)}</TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                                <TableRow className="bg-muted/30 font-semibold">
+                                  <TableCell colSpan={5} className="text-right">
+                                    Total Geral:
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {formatCurrency(
+                                      (form.watch("temporaryItems") || []).reduce((total: number, item: any) => {
+                                        const quantity = Number(item.orderedQuantity) || 0;
+                                        const price = Number(item.price) || 0;
+                                        const tax = Number(item.tax) || 0;
+                                        const subtotal = quantity * price;
+                                        const taxAmount = subtotal * (tax / 100);
+                                        return total + subtotal + taxAmount;
+                                      }, 0)
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { IconFilter, IconPackage, IconUser, IconCategory, IconTag, IconCircleCheck, IconCalendarEvent, IconCalendarCheck, IconX } from "@tabler/icons-react";
-import { useItems, useUsers, useItemBrands, useItemCategories } from "../../../../hooks";
+import { getItems, getUsers, getItemBrands, getItemCategories } from "../../../../api-client";
 import type { BorrowGetManyFormData } from "../../../../schemas";
 import { BORROW_STATUS, BORROW_STATUS_LABELS, ITEM_CATEGORY_TYPE } from "../../../../constants";
 
@@ -19,10 +19,11 @@ interface BorrowFiltersProps {
 }
 
 export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: BorrowFiltersProps) {
-  const { data: itemsData } = useItems({ orderBy: { name: "asc" } });
-  const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
-  const { data: brandsData } = useItemBrands({ orderBy: { name: "asc" } });
-  const { data: categoriesData } = useItemCategories({ orderBy: { name: "asc" } });
+  // Create stable caches for fetched data
+  const itemsCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+  const usersCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+  const brandsCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+  const categoriesCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
 
   const [localFilters, setLocalFilters] = React.useState<Partial<BorrowGetManyFormData>>(filters);
 
@@ -57,30 +58,133 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
     onFilterChange(clearedFilters);
   };
 
-  // Transform data for comboboxes
-  const itemOptions =
-    itemsData?.data?.map((item) => ({
-      value: item.id,
-      label: `${item.name} ${item.uniCode ? `(${item.uniCode})` : ""}`,
-    })) || [];
+  // Async query function for items
+  const queryItemsFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const response = await getItems({
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        where: searchTerm
+          ? {
+              OR: [
+                { name: { contains: searchTerm, mode: "insensitive" } },
+                { uniCode: { contains: searchTerm, mode: "insensitive" } },
+              ],
+            }
+          : undefined,
+      });
 
-  const userOptions =
-    usersData?.data?.map((user) => ({
-      value: user.id,
-      label: user.name,
-    })) || [];
+      const items = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
 
-  const brandOptions =
-    brandsData?.data?.map((brand) => ({
-      value: brand.id,
-      label: brand.name,
-    })) || [];
+      const options = items.map((item) => {
+        const label = item.uniCode ? `${item.uniCode} - ${item.name}` : item.name;
+        const option = { label, value: item.id };
+        itemsCacheRef.current.set(item.id, option);
+        return option;
+      });
 
-  const categoryOptions =
-    categoriesData?.data?.map((category) => ({
-      value: category.id,
-      label: `${category.name}${category.type === ITEM_CATEGORY_TYPE.PPE ? " (EPI)" : ""}`,
-    })) || [];
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching items:", error);
+      return { data: [], hasMore: false };
+    }
+  }, []);
+
+  // Async query function for users
+  const queryUsersFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const response = await getUsers({
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        where: searchTerm
+          ? {
+              OR: [
+                { name: { contains: searchTerm, mode: "insensitive" } },
+                { email: { contains: searchTerm, mode: "insensitive" } },
+              ],
+            }
+          : undefined,
+      });
+
+      const users = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = users.map((user) => {
+        const option = { label: user.name, value: user.id };
+        usersCacheRef.current.set(user.id, option);
+        return option;
+      });
+
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      return { data: [], hasMore: false };
+    }
+  }, []);
+
+  // Async query function for brands
+  const queryBrandsFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const response = await getItemBrands({
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        where: searchTerm
+          ? {
+              name: { contains: searchTerm, mode: "insensitive" },
+            }
+          : undefined,
+      });
+
+      const brands = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = brands.map((brand) => {
+        const option = { label: brand.name, value: brand.id };
+        brandsCacheRef.current.set(brand.id, option);
+        return option;
+      });
+
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching brands:", error);
+      return { data: [], hasMore: false };
+    }
+  }, []);
+
+  // Async query function for categories
+  const queryCategoriesFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const response = await getItemCategories({
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        where: searchTerm
+          ? {
+              name: { contains: searchTerm, mode: "insensitive" },
+            }
+          : undefined,
+      });
+
+      const categories = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = categories.map((category) => {
+        const label = `${category.name}${category.type === ITEM_CATEGORY_TYPE.PPE ? " (EPI)" : ""}`;
+        const option = { label, value: category.id };
+        categoriesCacheRef.current.set(category.id, option);
+        return option;
+      });
+
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      return { data: [], hasMore: false };
+    }
+  }, []);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -115,8 +219,11 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               Itens
             </Label>
             <Combobox
+              async={true}
+              queryKey={["items", "borrow-filter"]}
+              queryFn={queryItemsFn}
+              initialOptions={[]}
               mode="multiple"
-              options={itemOptions}
               value={localFilters.itemIds || []}
               onValueChange={(value) =>
                 setLocalFilters({
@@ -127,8 +234,9 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               placeholder="Selecione itens..."
               emptyText="Nenhum item encontrado"
               searchPlaceholder="Buscar itens..."
-              formatDisplay="brand"
-              showCount={true}
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
             />
             {localFilters.itemIds && localFilters.itemIds.length > 0 && (
               <div className="text-xs text-muted-foreground">
@@ -144,8 +252,11 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               Usuários
             </Label>
             <Combobox
+              async={true}
+              queryKey={["users", "borrow-filter"]}
+              queryFn={queryUsersFn}
+              initialOptions={[]}
               mode="multiple"
-              options={userOptions}
               value={localFilters.userIds || []}
               onValueChange={(value) =>
                 setLocalFilters({
@@ -156,7 +267,9 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               placeholder="Selecione usuários..."
               emptyText="Nenhum usuário encontrado"
               searchPlaceholder="Buscar usuários..."
-              showCount={true}
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
             />
             {localFilters.userIds && localFilters.userIds.length > 0 && (
               <div className="text-xs text-muted-foreground">
@@ -172,8 +285,11 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               Categorias
             </Label>
             <Combobox
+              async={true}
+              queryKey={["item-categories", "borrow-filter"]}
+              queryFn={queryCategoriesFn}
+              initialOptions={[]}
               mode="multiple"
-              options={categoryOptions}
               value={localFilters.categoryIds || []}
               onValueChange={(value) =>
                 setLocalFilters({
@@ -184,6 +300,9 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               placeholder="Selecione categorias..."
               emptyText="Nenhuma categoria encontrada"
               searchPlaceholder="Buscar categorias..."
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
             />
             {localFilters.categoryIds && localFilters.categoryIds.length > 0 && (
               <div className="text-xs text-muted-foreground">
@@ -199,8 +318,11 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               Marcas
             </Label>
             <Combobox
+              async={true}
+              queryKey={["item-brands", "borrow-filter"]}
+              queryFn={queryBrandsFn}
+              initialOptions={[]}
               mode="multiple"
-              options={brandOptions}
               value={localFilters.brandIds || []}
               onValueChange={(value) =>
                 setLocalFilters({
@@ -211,6 +333,9 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               placeholder="Selecione marcas..."
               emptyText="Nenhuma marca encontrada"
               searchPlaceholder="Buscar marcas..."
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
             />
             {localFilters.brandIds && localFilters.brandIds.length > 0 && (
               <div className="text-xs text-muted-foreground">

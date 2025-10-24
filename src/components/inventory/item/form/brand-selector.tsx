@@ -1,38 +1,89 @@
-import { useState } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { IconCertificate } from "@tabler/icons-react";
 import { useFormContext } from "react-hook-form";
-import { useItemBrands, useItemBrandMutations } from "../../../../hooks";
+import { useItemBrandMutations } from "../../../../hooks";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
+import type { ItemBrand } from "../../../../types";
 import { toast } from "@/components/ui/sonner";
+import { getItemBrands } from "../../../../api-client";
 
 type FormData = ItemCreateFormData | ItemUpdateFormData;
 
 interface BrandSelectorProps {
   disabled?: boolean;
   required?: boolean;
+  initialBrand?: ItemBrand;
 }
 
-export function ItemBrandSelector({ disabled, required }: BrandSelectorProps) {
+export function ItemBrandSelector({ disabled, required, initialBrand }: BrandSelectorProps) {
   const form = useFormContext<FormData>();
   const [isCreating, setIsCreating] = useState(false);
-
-  const {
-    data: brands,
-    isLoading,
-    refetch,
-  } = useItemBrands({
-    orderBy: { name: "asc" },
-  });
-
   const { createMutation } = useItemBrandMutations();
 
-  const brandOptions =
-    brands?.data?.map((brand) => ({
-      value: brand.id,
-      label: brand.name,
-    })) || [];
+  // Create memoized initialOptions with stable dependency
+  const initialOptions = useMemo(
+    () =>
+      initialBrand
+        ? [
+            {
+              value: initialBrand.id,
+              label: initialBrand.name,
+            },
+          ]
+        : [],
+    [initialBrand?.id]
+  );
+
+  // Initialize cache with initial brand
+  const cacheRef = useRef<Map<string, ItemBrand>>(new Map());
+
+  // Add initial brand to cache on mount or when it changes
+  useMemo(() => {
+    if (initialBrand) {
+      cacheRef.current.set(initialBrand.id, initialBrand);
+    }
+  }, [initialBrand?.id]);
+
+  const fetchBrands = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const response = await getItemBrands({
+        page: page,
+        take: 50,
+        orderBy: { name: "asc" },
+        where: searchTerm && searchTerm.trim()
+          ? {
+              name: { contains: searchTerm.trim(), mode: "insensitive" },
+            }
+          : undefined,
+      });
+
+      const brands = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      // Add fetched brands to cache
+      const options = brands.map((brand: ItemBrand) => {
+        const option = {
+          value: brand.id,
+          label: brand.name,
+        };
+        cacheRef.current.set(brand.id, brand);
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching brands:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
 
   const handleCreateBrand = async (name: string) => {
     setIsCreating(true);
@@ -45,11 +96,6 @@ export function ItemBrandSelector({ disabled, required }: BrandSelectorProps) {
 
       if (result.success && result.data) {
         toast.success("Marca criada", `A marca "${name}" foi criada com sucesso.`);
-
-        // Refetch brands to update the list
-        await refetch();
-
-        // Return the newly created brand ID
         return result.data.id;
       }
     } catch (error) {
@@ -72,12 +118,19 @@ export function ItemBrandSelector({ disabled, required }: BrandSelectorProps) {
           </FormLabel>
           <FormControl>
             <Combobox
-              value={field.value || undefined}
+              value={field.value || ""}
               onValueChange={field.onChange}
-              options={brandOptions}
-              placeholder="Selecione (opcional)"
+              async={true}
+              queryKey={["item-brands", "selector"]}
+              queryFn={fetchBrands}
+              initialOptions={initialOptions}
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
+              placeholder="Pesquisar marca..."
               emptyText="Nenhuma marca encontrada"
-              disabled={disabled || isLoading || isCreating}
+              searchPlaceholder="Digite o nome da marca..."
+              disabled={disabled || isCreating}
               allowCreate={true}
               createLabel={(value) => `Criar marca "${value}"`}
               onCreate={async (name) => {

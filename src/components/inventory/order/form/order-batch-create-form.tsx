@@ -18,6 +18,7 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import { PageHeader } from "@/components/ui/page-header";
 import { OrderItemSelector } from "./order-item-selector";
 import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
+import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 export const OrderBatchCreateForm = () => {
   const navigate = useNavigate();
@@ -58,6 +59,7 @@ export const OrderBatchCreateForm = () => {
   const { data: suppliersResponse } = useSuppliers({
     orderBy: { fantasyName: "asc" },
     take: 100,
+    include: { logo: true },
   });
 
   const suppliers = suppliersResponse?.data || [];
@@ -737,11 +739,31 @@ export const OrderBatchCreateForm = () => {
                               : suppliers.map((supplier) => ({
                                   label: supplier.fantasyName,
                                   value: supplier.id,
+                                  logo: supplier.logo,
                                 }))
                           }
                           placeholder="Selecione um fornecedor"
                           searchPlaceholder="Buscar fornecedor..."
                           className={`${!form.watch("supplierId") ? "border-red-500" : ""}`}
+                          renderOption={(option, isSelected) => {
+                            if (option.value === "no-suppliers") {
+                              return <span className="text-foreground/60 italic">{option.label}</span>;
+                            }
+                            return (
+                              <div className="flex items-center gap-3 w-full">
+                                <SupplierLogoDisplay
+                                  logo={(option as any).logo}
+                                  supplierName={option.label}
+                                  size="sm"
+                                  shape="rounded"
+                                  className="flex-shrink-0"
+                                />
+                                <div className="flex flex-col gap-1 min-w-0 flex-1">
+                                  <div className="font-medium truncate">{option.label}</div>
+                                </div>
+                              </div>
+                            );
+                          }}
                         />
                         {!form.watch("supplierId") && <p className="text-sm text-red-500">Fornecedor é obrigatório para pedidos em lote</p>}
                       </div>

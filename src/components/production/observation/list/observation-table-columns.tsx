@@ -71,10 +71,7 @@ export function createObservationColumns(): ObservationColumn[] {
       key: "createdAt",
       header: "CRIADO EM",
       accessor: (observation) => (
-        <div className="space-y-1">
-          <div className="text-sm">{formatDate(observation.createdAt)}</div>
-          <div className="text-xs text-muted-foreground">{formatRelativeTime(observation.createdAt)}</div>
-        </div>
+        <div className="text-sm">{formatDate(observation.createdAt)}</div>
       ),
       sortable: true,
       className: "w-40",
@@ -84,10 +81,7 @@ export function createObservationColumns(): ObservationColumn[] {
       key: "updatedAt",
       header: "ATUALIZADO EM",
       accessor: (observation) => (
-        <div className="space-y-1">
-          <div className="text-sm">{formatDate(observation.updatedAt)}</div>
-          <div className="text-xs text-muted-foreground">{formatRelativeTime(observation.updatedAt)}</div>
-        </div>
+        <div className="text-sm">{formatDate(observation.updatedAt)}</div>
       ),
       sortable: true,
       className: "w-40",

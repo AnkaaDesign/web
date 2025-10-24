@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { IconEdit, IconTrash } from "@tabler/icons-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,12 +72,9 @@ export function HolidaysContextMenu({ contextMenu, onClose, onEdit }: HolidaysCo
     <>
       {contextMenu && (
         <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && onClose()}>
-          <DropdownMenuContent
-            style={{
-              position: "fixed",
-              left: contextMenu.x,
-              top: contextMenu.y,
-            }}
+          <PositionedDropdownMenuContent
+            position={contextMenu}
+            isOpen={!!contextMenu}
             className="w-56"
             onCloseAutoFocus={(e) => e.preventDefault()}
           >
@@ -89,7 +87,7 @@ export function HolidaysContextMenu({ contextMenu, onClose, onEdit }: HolidaysCo
               <IconTrash className="mr-2 h-4 w-4" />
               Excluir
             </DropdownMenuItem>
-          </DropdownMenuContent>
+          </PositionedDropdownMenuContent>
         </DropdownMenu>
       )}
 

@@ -25,11 +25,11 @@ interface ContextMenuProviderProps {
 export function ContextMenuProvider({ children }: ContextMenuProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [adjustedPosition, setAdjustedPosition] = useState({ x: 0, y: 0 });
   const [items, setItems] = useState<ContextMenuItem[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const openMenu = (x: number, y: number, menuItems: ContextMenuItem[]) => {
-    // Simple positioning without complex calculations
     setPosition({ x, y });
     setItems(menuItems);
     setIsOpen(true);
@@ -39,6 +39,40 @@ export function ContextMenuProvider({ children }: ContextMenuProviderProps) {
     setIsOpen(false);
     setItems([]);
   };
+
+  // Viewport boundary checking with 8px padding
+  useEffect(() => {
+    if (!isOpen || !menuRef.current) return;
+
+    const menu = menuRef.current;
+    const menuRect = menu.getBoundingClientRect();
+    const padding = 8;
+
+    let adjustedX = position.x;
+    let adjustedY = position.y;
+
+    // Check right edge
+    if (position.x + menuRect.width > window.innerWidth - padding) {
+      adjustedX = window.innerWidth - menuRect.width - padding;
+    }
+
+    // Check left edge
+    if (adjustedX < padding) {
+      adjustedX = padding;
+    }
+
+    // Check bottom edge
+    if (position.y + menuRect.height > window.innerHeight - padding) {
+      adjustedY = window.innerHeight - menuRect.height - padding;
+    }
+
+    // Check top edge
+    if (adjustedY < padding) {
+      adjustedY = padding;
+    }
+
+    setAdjustedPosition({ x: adjustedX, y: adjustedY });
+  }, [isOpen, position]);
 
   // Close menu on outside click or escape
   useEffect(() => {
@@ -73,8 +107,8 @@ export function ContextMenuProvider({ children }: ContextMenuProviderProps) {
           ref={menuRef}
           className="fixed z-50 min-w-32 rounded-md border bg-white dark:bg-gray-800 shadow-lg"
           style={{
-            left: position.x,
-            top: position.y,
+            left: adjustedPosition.x,
+            top: adjustedPosition.y,
           }}
         >
           <div className="py-1">

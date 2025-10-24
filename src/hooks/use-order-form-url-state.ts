@@ -35,16 +35,30 @@ interface UseOrderFormUrlStateOptions {
     supplierId?: string;
     forecast?: Date | null;
     notes?: string;
+    orderItemMode?: "inventory" | "temporary";
     selectedItems?: Set<string>;
     quantities?: Record<string, number>;
     prices?: Record<string, number>;
     taxes?: Record<string, number>;
     criticalItems?: Set<string>;
+    temporaryItems?: Array<{
+      temporaryItemDescription: string;
+      orderedQuantity: number;
+      price: number;
+      tax: number;
+    }>;
   };
 }
 
 // Filter schemas for order form
 const orderFormFilterConfig = {
+  // Form step (for multi-step forms)
+  step: {
+    schema: z.coerce.number().int().min(1).max(3).default(1),
+    defaultValue: 1,
+    debounceMs: 0, // Immediate update for step changes
+  },
+
   // Selection state
   selectedItems: {
     schema: z.array(z.string()).default([]),
@@ -70,6 +84,32 @@ const orderFormFilterConfig = {
     schema: z.array(z.string()).default([]),
     defaultValue: [] as string[],
     debounceMs: 0, // Immediate update for critical items
+  },
+
+  // Order item mode (inventory vs temporary items)
+  orderItemMode: {
+    schema: z.enum(["inventory", "temporary"]).default("inventory"),
+    defaultValue: "inventory" as "inventory" | "temporary",
+    debounceMs: 0, // Immediate update
+  },
+
+  // Temporary items state
+  temporaryItems: {
+    schema: z.array(
+      z.object({
+        temporaryItemDescription: z.string(),
+        orderedQuantity: z.number().positive(),
+        price: z.number().min(0),
+        tax: z.number().min(0).max(100).default(0),
+      })
+    ).default([]),
+    defaultValue: [] as Array<{
+      temporaryItemDescription: string;
+      orderedQuantity: number;
+      price: number;
+      tax: number;
+    }>,
+    debounceMs: 0, // Immediate update
   },
 
   // Form data state (persisted in URL)
@@ -229,6 +269,18 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
           defaultValue: Array.from(initialData.criticalItems),
         };
       }
+      if (initialData.orderItemMode !== undefined) {
+        config.orderItemMode = {
+          ...config.orderItemMode,
+          defaultValue: initialData.orderItemMode,
+        };
+      }
+      if (initialData.temporaryItems !== undefined) {
+        config.temporaryItems = {
+          ...config.temporaryItems,
+          defaultValue: initialData.temporaryItems,
+        };
+      }
     }
 
     return config;
@@ -254,18 +306,28 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
   const supplierId = filters.supplierId;
   const forecast = filters.forecast;
   const notes = filters.notes || "";
+  const orderItemMode = filters.orderItemMode || "inventory";
+  const temporaryItems = filters.temporaryItems || [];
   const showSelectedOnly = filters.showSelectedOnly !== undefined ? filters.showSelectedOnly : false;
   const searchTerm = filters.searchTerm || "";
   const showInactive = filters.showInactive !== undefined ? filters.showInactive : false;
   const categoryIds = filters.categoryIds || [];
   const brandIds = filters.brandIds || [];
   const supplierIds = filters.supplierIds || [];
+  const step = filters.step || 1;
   const page = filters.page || 1;
   const pageSize = filters.pageSize || defaultPageSize;
   const totalRecords = filters.totalRecords || 0;
   const sortConfigs = filters.sortConfigs || [];
 
   // Update functions using the standardized hook
+  const setStep = useCallback(
+    (newStep: number) => {
+      const validStep = Math.max(1, Math.min(3, newStep));
+      setFilter("step", validStep === 1 ? undefined : validStep);
+    },
+    [setFilter],
+  );
   const updateSelectedItems = useCallback(
     (newSelected: Set<string>) => {
       const selectedArray = Array.from(newSelected);
@@ -737,6 +799,86 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     return description.trim() !== "" || supplierId !== undefined || forecast !== undefined || notes.trim() !== "" || selectedItems.size > 0;
   }, [description, supplierId, forecast, notes, selectedItems.size]);
 
+  // Helper to set order item mode
+  const setOrderItemMode = useCallback(
+    (mode: "inventory" | "temporary") => {
+      setFilters({ orderItemMode: mode });
+    },
+    [setFilters]
+  );
+
+  // Helper to add temporary item
+  const addTemporaryItem = useCallback(
+    (item: {
+      temporaryItemDescription: string;
+      orderedQuantity: number;
+      price: number;
+      tax?: number;
+    }) => {
+      const newTemporaryItems = [
+        ...temporaryItems,
+        {
+          temporaryItemDescription: item.temporaryItemDescription,
+          orderedQuantity: item.orderedQuantity,
+          price: item.price,
+          tax: item.tax ?? 0,
+        },
+      ];
+      setFilters({ temporaryItems: newTemporaryItems });
+    },
+    [temporaryItems, setFilters]
+  );
+
+  // Helper to update temporary item
+  const updateTemporaryItem = useCallback(
+    (
+      index: number,
+      updates: Partial<{
+        temporaryItemDescription: string;
+        orderedQuantity: number;
+        price: number;
+        tax: number;
+      }>
+    ) => {
+      const newTemporaryItems = [...temporaryItems];
+      if (index >= 0 && index < newTemporaryItems.length) {
+        newTemporaryItems[index] = {
+          ...newTemporaryItems[index],
+          ...updates,
+        };
+        setFilters({ temporaryItems: newTemporaryItems });
+      }
+    },
+    [temporaryItems, setFilters]
+  );
+
+  // Helper to remove temporary item
+  const removeTemporaryItem = useCallback(
+    (index: number) => {
+      const newTemporaryItems = temporaryItems.filter((_, i) => i !== index);
+      setFilters({ temporaryItems: newTemporaryItems });
+    },
+    [temporaryItems, setFilters]
+  );
+
+  // Helper to clear all temporary items
+  const clearTemporaryItems = useCallback(() => {
+    setFilters({ temporaryItems: [] });
+  }, [setFilters]);
+
+  // Helper to set temporary items array
+  const setTemporaryItems = useCallback(
+    (items: Array<{
+      temporaryItemDescription: string;
+      orderedQuantity: number;
+      price: number;
+      tax: number;
+    }>) => {
+      setFilters({ temporaryItems: items });
+    },
+    [setFilters]
+  );
+
   return {
     // Core Form State
     selectedItems,
@@ -744,6 +886,8 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     prices,
     taxes,
     criticalItems,
+    orderItemMode,
+    temporaryItems,
     description,
     supplierId,
     forecast,
@@ -751,6 +895,7 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     validation,
 
     // Filter and Pagination State
+    step,
     showSelectedOnly,
     searchTerm,
     showInactive,
@@ -763,6 +908,7 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     sortConfigs,
 
     // Form Data Update Functions
+    setStep,
     updateSelectedItems,
     updateDescription,
     updateSupplierId,
@@ -795,6 +941,16 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     setItemPrice,
     setItemTax,
     getSelectedItemsWithData,
+
+    // Order Item Mode Management
+    setOrderItemMode,
+
+    // Temporary Items Management
+    addTemporaryItem,
+    updateTemporaryItem,
+    removeTemporaryItem,
+    clearTemporaryItems,
+    setTemporaryItems,
 
     // Form Management Helper Functions
     getFormData,

@@ -175,10 +175,16 @@ export const ExternalWithdrawalItemSelector = ({
   });
 
   // Use props if provided, otherwise fall back to local state
-  const currentPage = pageProp !== undefined ? pageProp : localPage;
+  // IMPORTANT: URL state uses 1-based pages, pagination component uses 0-based
+  // Keep separate variables for API (1-based) and component (0-based)
+  const apiPage = pageProp !== undefined ? pageProp : (localPage + 1); // API always uses 1-based
+  const currentPage = pageProp !== undefined ? Math.max(0, pageProp - 1) : localPage; // Component uses 0-based
   const pageSize = pageSizeProp !== undefined ? pageSizeProp : localPageSize;
   const currentTotalRecords = totalRecordsProp || 0;
-  const setPage = onPageChange || setLocalPage;
+  // Wrap setPage to convert from 0-based (component) to 1-based (URL state)
+  const setPage = onPageChange
+    ? (page0Based: number) => onPageChange(Math.max(1, page0Based + 1))
+    : setLocalPage;
   const setPageSize = onPageSizeChange || setLocalPageSize;
   const sortConfigs = sortConfigsProp || localSortConfigs;
   const toggleSort = toggleSortProp || localToggleSort;
@@ -224,7 +230,7 @@ export const ExternalWithdrawalItemSelector = ({
               ...(supplierIds.length && { supplierId: { in: supplierIds } }),
             }),
       },
-      page: currentPage,
+      page: apiPage,
       limit: pageSize,
       include: includeConfig,
       // Convert sortConfigs to orderBy format for API
@@ -232,7 +238,7 @@ export const ExternalWithdrawalItemSelector = ({
         orderBy: convertSortConfigsToOrderBy(sortConfigs),
       }),
     }),
-    [debouncedSearchTerm, showInactive, categoryIds, brandIds, supplierIds, showSelectedOnly, selectedItems, currentPage, pageSize, includeConfig, sortConfigs],
+    [debouncedSearchTerm, showInactive, categoryIds, brandIds, supplierIds, showSelectedOnly, selectedItems, apiPage, pageSize, includeConfig, sortConfigs],
   );
 
   // Get items with filtering
@@ -429,7 +435,7 @@ export const ExternalWithdrawalItemSelector = ({
           {/* Search Input */}
           <div className="relative flex-1">
             <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Pesquisar por nome, código, marca ou categoria..." value={searchTerm} onChange={(e) => handleSearch(e.target.value)} className="pl-10 bg-transparent" />
+            <Input placeholder="Pesquisar por nome, código, marca ou categoria..." value={searchTerm} onChange={(value) => handleSearch(String(value || ""))} className="pl-10 bg-transparent" />
           </div>
 
           {/* Action buttons row */}

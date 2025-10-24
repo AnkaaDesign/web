@@ -5,7 +5,8 @@ import { usePageTracker } from "@/hooks/use-page-tracker";
 import { useProductionDashboard } from "../../hooks";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency, formatNumber } from "../../utils";
-import { useState } from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { useState, useEffect } from "react";
 import {
   IconTool,
   IconPlus,
@@ -60,7 +61,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export const ProductionRootPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [timePeriod, setTimePeriod] = useState(DASHBOARD_TIME_PERIOD.THIS_MONTH);
+
+  // Only ADMIN and FINANCIAL users can access the production dashboard
+  // All others should be redirected to the schedule page
+  useEffect(() => {
+    if (user?.sector?.privileges &&
+        user.sector.privileges !== SECTOR_PRIVILEGES.ADMIN &&
+        user.sector.privileges !== SECTOR_PRIVILEGES.FINANCIAL) {
+      navigate(routes.production.schedule.root, { replace: true });
+    }
+  }, [user, navigate]);
 
   // Track page access
   usePageTracker({
@@ -264,7 +276,7 @@ export const ProductionRootPage = () => {
 
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="flex flex-col h-full space-y-6">
           <PageHeaderWithFavorite
             title="Produção"
@@ -277,6 +289,13 @@ export const ProductionRootPage = () => {
                 label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
                 variant: "ghost",
                 className: "p-0 hover:bg-transparent",
+              },
+              {
+                key: "create-task",
+                label: "Nova Tarefa",
+                icon: IconPlus,
+                onClick: () => navigate(routes.production.schedule.create),
+                variant: "default",
               },
             ]}
           />
@@ -338,7 +357,7 @@ export const ProductionRootPage = () => {
 
   if (error) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="flex flex-col h-full space-y-4">
           <PageHeaderWithFavorite
             title="Produção"
@@ -351,6 +370,13 @@ export const ProductionRootPage = () => {
                 label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
                 variant: "ghost",
                 className: "p-0 hover:bg-transparent",
+              },
+              {
+                key: "create-task",
+                label: "Nova Tarefa",
+                icon: IconPlus,
+                onClick: () => navigate(routes.production.schedule.create),
+                variant: "default",
               },
             ]}
           />
@@ -370,7 +396,7 @@ export const ProductionRootPage = () => {
   const activityPatterns = getActivityPatterns();
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="flex flex-col h-full space-y-4">
         <div className="flex-shrink-0">
           <PageHeaderWithFavorite

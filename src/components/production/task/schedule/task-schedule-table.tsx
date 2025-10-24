@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Task } from "../../../../types";
 import { routes, TASK_STATUS } from "../../../../constants";
-import { formatDate, getHoursBetween, isDateInPast } from "../../../../utils";
+import { formatDate, getHoursBetween, isDateInPast, calculateTaskMeasures, formatTaskMeasures } from "../../../../utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { DeadlineCountdown } from "./deadline-countdown";
@@ -16,7 +16,7 @@ import { TaskTableContextMenu, type TaskAction } from "./task-table-context-menu
 import { DuplicateTaskModal } from "./duplicate-task-modal";
 import { SetSectorModal } from "./set-sector-modal";
 import { SetStatusModal } from "./set-status-modal";
-import { useTaskMutations } from "../../../../hooks";
+import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
@@ -52,7 +52,8 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
     isBulk: boolean;
   } | null>(null);
 
-  const { updateAsync, createAsync, deleteAsync: deleteTaskAsync, batchUpdateAsync } = useTaskMutations();
+  const { updateAsync, createAsync, deleteAsync: deleteTaskAsync } = useTaskMutations();
+  const { batchUpdateAsync } = useTaskBatchMutations();
 
   // Custom sort function for serialNumberOrPlate (multi-field)
   const sortSerialNumberOrPlate = useCallback((a: TaskRow, b: TaskRow, direction: SortDirection): number => {
@@ -135,6 +136,13 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
         accessor: "term",
         dataType: "date",
       },
+      {
+        key: "measures",
+        header: "MEDIDAS",
+        sortable: true,
+        accessor: (task: TaskRow) => calculateTaskMeasures(task) || 0,
+        dataType: "number",
+      },
     ],
     [sortSerialNumberOrPlate],
   );
@@ -148,6 +156,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
       { id: "select", header: "", width: TABLE_LAYOUT.checkbox.className, sortable: false },
       { id: "name", header: "LOGOMARCA", width: "w-[180px]", sortable: true },
       { id: "customer.fantasyName", header: "CLIENTE", width: "w-[150px]", sortable: true },
+      { id: "measures", header: "MEDIDAS", width: "w-[110px]", sortable: true },
       { id: "generalPainting", header: "PINTURA", width: "w-[100px]", sortable: true },
       { id: "serialNumberOrPlate", header: "Nº SÉRIE", width: "w-[120px]", sortable: true },
       { id: "chassisNumber", header: "Nº CHASSI", width: "w-[140px]", sortable: true },
@@ -622,6 +631,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
                     {column.id === "startedAt" && <span className="truncate block">{task.startedAt ? formatDate(task.startedAt) : "-"}</span>}
                     {column.id === "finishedAt" && <span className="truncate block">{task.finishedAt ? formatDate(task.finishedAt) : "-"}</span>}
                     {column.id === "term" && (task.term ? <span className="truncate block">{formatDate(task.term)}</span> : "-")}
+                    {column.id === "measures" && <span className="truncate block">{formatTaskMeasures(task)}</span>}
                     {column.id === "remainingTime" &&
                       (task.term && task.status !== TASK_STATUS.COMPLETED && task.status !== TASK_STATUS.CANCELLED ? (
                         <DeadlineCountdown deadline={task.term} isOverdue={task.isOverdue} />

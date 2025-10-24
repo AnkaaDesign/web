@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2 } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
-import { routes, TASK_STATUS } from "../../../../constants";
+import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
 import { SetStatusModal } from "../schedule/set-status-modal";
 import { SetSectorModal } from "../schedule/set-sector-modal";
+import { useAuth } from "@/contexts/auth-context";
 
 interface TaskHistoryContextMenuProps {
   tasks: Task[];
@@ -21,6 +23,7 @@ export function TaskHistoryContextMenu({
   onClose,
   selectedIds
 }: TaskHistoryContextMenuProps) {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { update, remove } = useTaskMutations();
   const { batchUpdate, batchDelete } = useTaskBatchMutations();
@@ -33,6 +36,9 @@ export function TaskHistoryContextMenu({
   const isBulk = selectedIds.length > 1;
   const taskIds = tasks.map(t => t.id);
   const task = tasks[0];
+
+  // FINANCIAL users should only see View and Edit options
+  const isFinancialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
 
   // Reset justOpened flag whenever position changes (new right-click)
   React.useEffect(() => {
@@ -184,6 +190,11 @@ export function TaskHistoryContextMenu({
 
   if (!position || taskIds.length === 0) return null;
 
+  // WAREHOUSE users should not see any context menu
+  if (user?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE) {
+    return null;
+  }
+
   console.log('[TaskHistoryContextMenu] Rendering with states:', {
     dropdownOpen,
     setStatusModalOpen,
@@ -194,12 +205,9 @@ export function TaskHistoryContextMenu({
   return (
     <>
       <DropdownMenu open={dropdownOpen} onOpenChange={(open) => !open && setDropdownOpen(false)}>
-        <DropdownMenuContent
-          style={{
-            position: "fixed",
-            left: position.x,
-            top: position.y,
-          }}
+        <PositionedDropdownMenuContent
+          position={position}
+          isOpen={dropdownOpen}
           className="w-56"
           onCloseAutoFocus={(e) => e.preventDefault()}
           onPointerDownOutside={(e) => {
@@ -237,34 +245,39 @@ export function TaskHistoryContextMenu({
             {isBulk ? "Editar selecionadas" : "Editar"}
           </DropdownMenuItem>
 
-          <DropdownMenuSeparator />
+          {/* Additional actions - not available for FINANCIAL users */}
+          {!isFinancialUser && (
+            <>
+              <DropdownMenuSeparator />
 
-          {/* Set Sector action */}
-          <DropdownMenuItem
-            onClick={handleSetSector}
-            onSelect={(e) => e.preventDefault()}
-          >
-            <IconBuildingFactory2 className="mr-2 h-4 w-4" />
-            {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}
-          </DropdownMenuItem>
+              {/* Set Sector action */}
+              <DropdownMenuItem
+                onClick={handleSetSector}
+                onSelect={(e) => e.preventDefault()}
+              >
+                <IconBuildingFactory2 className="mr-2 h-4 w-4" />
+                {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}
+              </DropdownMenuItem>
 
-          {/* Set Status action - includes option to put back in production */}
-          <DropdownMenuItem
-            onClick={handleSetStatus}
-            onSelect={(e) => e.preventDefault()}
-          >
-            <IconFileInvoice className="mr-2 h-4 w-4" />
-            Definir Status
-          </DropdownMenuItem>
+              {/* Set Status action - includes option to put back in production */}
+              <DropdownMenuItem
+                onClick={handleSetStatus}
+                onSelect={(e) => e.preventDefault()}
+              >
+                <IconFileInvoice className="mr-2 h-4 w-4" />
+                Definir Status
+              </DropdownMenuItem>
 
-          <DropdownMenuSeparator />
+              <DropdownMenuSeparator />
 
-          {/* Delete action */}
-          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-            <IconTrash className="mr-2 h-4 w-4" />
-            {isBulk ? "Deletar selecionadas" : "Deletar"}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
+              {/* Delete action */}
+              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                <IconTrash className="mr-2 h-4 w-4" />
+                {isBulk ? "Deletar selecionadas" : "Deletar"}
+              </DropdownMenuItem>
+            </>
+          )}
+        </PositionedDropdownMenuContent>
       </DropdownMenu>
 
       {/* Set Sector Modal */}

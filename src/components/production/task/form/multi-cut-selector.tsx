@@ -14,6 +14,29 @@ import type { FileWithPreview } from "@/components/file";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { getApiBaseUrl } from "@/utils/file";
 
+// Helper function to convert database File entity to FileWithPreview
+const convertToFileWithPreview = (file: any | undefined | null): FileWithPreview | undefined => {
+  if (!file) return undefined;
+
+  // If it's already a FileWithPreview (new file being uploaded), return as-is
+  if (file instanceof File && file.id) {
+    return file as FileWithPreview;
+  }
+
+  // Convert database file entity to FileWithPreview format
+  return {
+    id: file.id,
+    name: file.filename || file.name || 'file',
+    size: file.size || 0,
+    type: file.mimetype || file.type || 'application/octet-stream',
+    lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+    uploaded: true,
+    uploadProgress: 100,
+    uploadedFileId: file.id,
+    thumbnailUrl: file.thumbnailUrl,
+  } as FileWithPreview;
+};
+
 interface MultiCutSelectorProps {
   control: any;
   disabled?: boolean;
@@ -211,7 +234,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
         type: item.type || CUT_TYPE.VINYL,
         quantity: item.quantity || 1,
         fileId: item.fileId,
-        file: item.file,
+        file: convertToFileWithPreview(item.file), // Convert database file to FileWithPreview format
       }));
       setCuts(newCuts);
       // Only auto-expand all items on initial load (when transitioning from empty to populated)
@@ -321,6 +344,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
                         }}
                         disabled={disabled}
                         placeholder="1"
+                        className="bg-transparent"
                       />
                     </div>
                   </div>

@@ -9,6 +9,8 @@ import { getSuppliers } from "../../../../api-client";
 import { supplierKeys } from "../../../../hooks";
 import type { Supplier } from "../../../../types";
 import { IconTruck } from "@tabler/icons-react";
+import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
+import { formatCNPJ } from "../../../../utils";
 
 type FormData = ItemCreateFormData | ItemUpdateFormData;
 
@@ -31,6 +33,7 @@ export function ItemSupplierSelector({ disabled, initialSupplier }: SupplierSele
               value: initialSupplier.id,
               label: initialSupplier.fantasyName,
               description: initialSupplier.corporateName || undefined,
+              logo: initialSupplier.logo,
             },
           ]
         : [],
@@ -53,37 +56,51 @@ export function ItemSupplierSelector({ disabled, initialSupplier }: SupplierSele
   // Memoize getOptionValue callback
   const getOptionValue = useCallback((supplier: Supplier) => supplier.id, []);
 
-  const fetchSuppliers = async (searchTerm: string) => {
-    const response = await getSuppliers({
-      page: 1,
-      limit: 20,
-      orderBy: { fantasyName: "asc" },
-      where: searchTerm
-        ? {
-            OR: [
-              { fantasyName: { contains: searchTerm, mode: "insensitive" } },
-              { corporateName: { contains: searchTerm, mode: "insensitive" } },
-              { cnpj: { contains: searchTerm } },
-            ],
-          }
-        : undefined,
-    });
-
-    if (response.success && response.data) {
-      // Add fetched suppliers to cache
-      response.data.forEach((supplier: Supplier) => {
-        cacheRef.current.set(supplier.id, supplier);
+  const fetchSuppliers = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const response = await getSuppliers({
+        page: page,
+        take: 50,
+        orderBy: { fantasyName: "asc" },
+        include: { logo: true },
+        where: searchTerm && searchTerm.trim()
+          ? {
+              OR: [
+                { fantasyName: { contains: searchTerm.trim(), mode: "insensitive" } },
+                { corporateName: { contains: searchTerm.trim(), mode: "insensitive" } },
+                { cnpj: { contains: searchTerm.trim() } },
+              ],
+            }
+          : undefined,
       });
 
-      return response.data.map((supplier: Supplier) => ({
-        value: supplier.id,
-        label: supplier.fantasyName,
-        description: supplier.corporateName || undefined,
-      }));
-    }
+      const suppliers = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
 
-    return [];
-  };
+      // Add fetched suppliers to cache
+      const options = suppliers.map((supplier: Supplier) => {
+        const option = {
+          value: supplier.id,
+          label: supplier.fantasyName,
+          description: supplier.corporateName || undefined,
+          logo: supplier.logo,
+        };
+        cacheRef.current.set(supplier.id, supplier);
+        return option;
+      });
+
+      return {
+        data: options,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
+  }, []);
 
   const handleCreateSupplier = async (fantasyName: string) => {
     setIsCreating(true);
@@ -127,6 +144,8 @@ export function ItemSupplierSelector({ disabled, initialSupplier }: SupplierSele
               queryFn={fetchSuppliers}
               initialOptions={initialOptions}
               minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
               placeholder="Pesquisar fornecedor..."
               emptyText="Nenhum fornecedor encontrado"
               searchPlaceholder="Digite o nome ou CNPJ..."
@@ -141,6 +160,25 @@ export function ItemSupplierSelector({ disabled, initialSupplier }: SupplierSele
               }}
               isCreating={isCreating}
               queryKeysToInvalidate={[supplierKeys.all]}
+              renderOption={(option, isSelected) => (
+                <div className="flex items-center gap-3 w-full">
+                  <SupplierLogoDisplay
+                    logo={(option as any).logo}
+                    supplierName={option.label}
+                    size="sm"
+                    shape="rounded"
+                    className="flex-shrink-0"
+                  />
+                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                    <div className="font-medium truncate">{option.label}</div>
+                    {option.description && (
+                      <div className="flex items-center gap-2 text-sm truncate group-hover:text-white transition-colors">
+                        <span className="truncate">{option.description}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             />
           </FormControl>
           <FormMessage />

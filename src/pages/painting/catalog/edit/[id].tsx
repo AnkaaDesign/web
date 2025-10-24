@@ -70,8 +70,8 @@ export default function CatalogEditPage() {
         for (const formula of newFormulas) {
           const validComponents =
             formula.components?.filter((c) => {
-              const ratio = c.ratio || 0;
-              return c.itemId && ratio > 0;
+              const weightInGrams = c.weightInGrams || 0;
+              return c.itemId && weightInGrams > 0;
             }) ?? [];
 
           if (validComponents.length === 0) {
@@ -85,7 +85,7 @@ export default function CatalogEditPage() {
             description: formula.description || "Fórmula Principal",
             components: validComponents.map((c) => ({
               itemId: c.itemId,
-              ratio: c.ratio || 0,
+              weightInGrams: c.weightInGrams || 0,
             })),
           };
 

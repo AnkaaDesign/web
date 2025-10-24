@@ -322,7 +322,9 @@ export function TaskHistoryList({
               <span>Filtros{activeFilters.length > 0 ? ` (${activeFilters.length})` : ''}</span>
             </Button>
             <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
-            <TaskExport filters={queryFilters} currentItems={tableData.items} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
+            {currentUser?.sector?.privileges !== SECTOR_PRIVILEGES.WAREHOUSE && (
+              <TaskExport filters={queryFilters} currentItems={tableData.items} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
+            )}
           </div>
         </div>
 

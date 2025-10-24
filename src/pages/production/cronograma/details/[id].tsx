@@ -27,6 +27,7 @@ import {
   CUT_TYPE_LABELS,
   CUT_ORIGIN_LABELS,
   AIRBRUSHING_STATUS_LABELS,
+  COMMISSION_STATUS_LABELS,
 } from "../../../../constants";
 import { formatDate, formatDateTime, formatCurrency, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
 import { generateBudgetPDF } from "../../../../utils/budget-pdf-generator";
@@ -76,6 +77,7 @@ import {
   IconPlayerPause,
   IconBarcode,
   IconList,
+  IconCoin,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -369,6 +371,22 @@ export const TaskDetailsPage = () => {
     if (fileViewerContext) {
       fileViewerContext.actions.downloadFile(file);
     }
+  };
+
+  // Handler for artworks collection viewing
+  const handleArtworkFileClick = (file: any) => {
+    if (!fileViewerContext) return;
+    const artworkFiles = task?.artworks || [];
+    const index = artworkFiles.findIndex(f => f.id === file.id);
+    fileViewerContext.actions.viewFiles(artworkFiles, index);
+  };
+
+  // Handler for documents collection viewing (budgets, invoices, receipts)
+  const handleDocumentFileClick = (file: any) => {
+    if (!fileViewerContext) return;
+    const allDocuments = [...(task?.budgets || []), ...(task?.invoices || []), ...(task?.receipts || [])];
+    const index = allDocuments.findIndex(f => f.id === file.id);
+    fileViewerContext.actions.viewFiles(allDocuments, index);
   };
 
   // Handler for cuts collection viewing
@@ -746,6 +764,19 @@ export const TaskDetailsPage = () => {
                           <div className="flex-1">
                             <p className="text-sm font-medium text-muted-foreground">Setor</p>
                             <p className="text-sm font-semibold">{task.sector.name}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Commission Status */}
+                      {task.commission && (
+                        <div className="flex items-start gap-3">
+                          <IconCoin className="h-5 w-5 text-muted-foreground mt-0.5" />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-muted-foreground">Comissão</p>
+                            <Badge variant={ENTITY_BADGE_CONFIG.COMMISSION_STATUS?.[task.commission] || "default"} className="mt-1">
+                              {COMMISSION_STATUS_LABELS[task.commission]}
+                            </Badge>
                           </div>
                         </div>
                       )}
@@ -1180,7 +1211,7 @@ export const TaskDetailsPage = () => {
                           key={file.id}
                           file={file}
                           viewMode={artworksViewMode}
-                          onPreview={handlePreview}
+                          onPreview={handleArtworkFileClick}
                           onDownload={handleDownload}
                           showActions
                         />
@@ -1236,7 +1267,7 @@ export const TaskDetailsPage = () => {
                                 key={budget.id}
                                 file={budget}
                                 viewMode={documentsViewMode}
-                                onPreview={handlePreview}
+                                onPreview={handleDocumentFileClick}
                                 onDownload={handleDownload}
                                 showActions
                               />
@@ -1257,7 +1288,7 @@ export const TaskDetailsPage = () => {
                                 key={nfe.id}
                                 file={nfe}
                                 viewMode={documentsViewMode}
-                                onPreview={handlePreview}
+                                onPreview={handleDocumentFileClick}
                                 onDownload={handleDownload}
                                 showActions
                               />
@@ -1278,7 +1309,7 @@ export const TaskDetailsPage = () => {
                                 key={receipt.id}
                                 file={receipt}
                                 viewMode={documentsViewMode}
-                                onPreview={handlePreview}
+                                onPreview={handleDocumentFileClick}
                                 onDownload={handleDownload}
                                 showActions
                               />

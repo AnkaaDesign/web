@@ -174,10 +174,16 @@ export const BorrowItemSelector = ({
   });
 
   // Use props if provided, otherwise fall back to local state
-  const currentPage = pageProp !== undefined ? pageProp : localPage;
+  // IMPORTANT: URL state uses 1-based pages, pagination component uses 0-based
+  // Keep separate variables for API (1-based) and component (0-based)
+  const apiPage = pageProp !== undefined ? pageProp : (localPage + 1); // API always uses 1-based
+  const currentPage = pageProp !== undefined ? Math.max(0, pageProp - 1) : localPage; // Component uses 0-based
   const pageSize = pageSizeProp !== undefined ? pageSizeProp : localPageSize;
   const currentTotalRecords = totalRecordsProp || 0;
-  const setPage = onPageChange || setLocalPage;
+  // Wrap setPage to convert from 0-based (component) to 1-based (URL state)
+  const setPage = onPageChange
+    ? (page0Based: number) => onPageChange(Math.max(1, page0Based + 1))
+    : setLocalPage;
   const setPageSize = onPageSizeChange || setLocalPageSize;
 
   // Use sorting from props if provided, otherwise use local table state
@@ -235,7 +241,7 @@ export const BorrowItemSelector = ({
               ...(supplierIds.length && { supplierId: { in: supplierIds } }),
             }),
       },
-      page: currentPage,
+      page: apiPage,
       limit: pageSize,
       include: includeConfig,
       // Convert sortConfigs to orderBy format for API
@@ -243,7 +249,7 @@ export const BorrowItemSelector = ({
         orderBy: convertSortConfigsToOrderBy(sortConfigs),
       }),
     }),
-    [debouncedSearchTerm, showInactive, categoryIds, brandIds, supplierIds, showSelectedOnlyProp, selectedItems, currentPage, pageSize, includeConfig, sortConfigs],
+    [debouncedSearchTerm, showInactive, categoryIds, brandIds, supplierIds, showSelectedOnlyProp, selectedItems, apiPage, pageSize, includeConfig, sortConfigs],
   );
 
   // Get items with filtering
@@ -746,26 +752,41 @@ export const BorrowItemSelector = ({
                               {itemIsSelected ? (
                                 <Input
                                   type="number"
-                                  min="0.01"
+                                  min="1"
                                   max={item.availableStock}
-                                  step="0.01"
+                                  step="1"
                                   value={quantity}
                                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                     const inputValue = e.target.value;
+
+                                    // If empty, don't update (will be handled on blur)
                                     if (inputValue === "") {
-                                      onQuantityChange?.(item.id, 0.01);
                                       return;
                                     }
 
-                                    const numericValue = parseFloat(inputValue);
-                                    if (isNaN(numericValue) || numericValue <= 0) {
-                                      onQuantityChange?.(item.id, 0.01);
+                                    const numericValue = parseInt(inputValue, 10);
+
+                                    // If invalid, don't update
+                                    if (isNaN(numericValue) || numericValue < 1) {
                                       return;
                                     }
 
                                     // Ensure quantity doesn't exceed available stock
                                     const validQuantity = Math.min(numericValue, item.availableStock);
                                     onQuantityChange?.(item.id, validQuantity);
+                                  }}
+                                  onBlur={(e) => {
+                                    const inputValue = e.target.value;
+                                    const numericValue = parseInt(inputValue, 10);
+
+                                    // If empty or invalid, default to 1
+                                    if (inputValue === "" || isNaN(numericValue) || numericValue < 1) {
+                                      onQuantityChange?.(item.id, 1);
+                                    } else {
+                                      // Ensure it's within bounds
+                                      const validQuantity = Math.min(numericValue, item.availableStock);
+                                      onQuantityChange?.(item.id, validQuantity);
+                                    }
                                   }}
                                   className="w-full h-8 text-sm"
                                 />

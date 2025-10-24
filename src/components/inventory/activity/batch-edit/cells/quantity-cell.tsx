@@ -14,7 +14,7 @@ export function QuantityCell({ control, index }: QuantityCellProps) {
       render={({ field }) => (
         <FormItem>
           <FormControl>
-            <Input type="decimal" decimals={2} min={0} className="h-8 text-sm" value={field.value} onChange={(value) => field.onChange(value || 0.01)} />
+            <Input type="decimal" decimals={2} min={0} className="h-8 text-sm bg-transparent" value={field.value} onChange={(value) => field.onChange(value || 0.01)} />
           </FormControl>
           <FormMessage className="text-xs" />
         </FormItem>

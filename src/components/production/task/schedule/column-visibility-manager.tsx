@@ -19,6 +19,7 @@ interface TaskScheduleColumn {
 const TASK_SCHEDULE_COLUMNS: TaskScheduleColumn[] = [
   { id: "name", header: "LOGOMARCA", sortable: true, width: "w-[180px]" },
   { id: "customer.fantasyName", header: "CLIENTE", sortable: true, width: "w-[150px]" },
+  { id: "measures", header: "MEDIDAS", sortable: true, width: "w-[110px]" },
   { id: "generalPainting", header: "PINTURA", sortable: true, width: "w-[100px]" },
   { id: "serialNumberOrPlate", header: "Nº SÉRIE", sortable: true, width: "w-[120px]" },
   { id: "chassisNumber", header: "Nº CHASSI", sortable: true, width: "w-[140px]" },

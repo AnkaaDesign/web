@@ -59,7 +59,31 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
       customer: true,
       createdBy: true,
       services: true,
-      generalPainting: true,
+      generalPainting: {
+        include: {
+          paintType: true,
+          paintBrand: true,
+        },
+      },
+      truck: {
+        include: {
+          leftSideLayout: {
+            include: {
+              layoutSections: true,
+            },
+          },
+          rightSideLayout: {
+            include: {
+              layoutSections: true,
+            },
+          },
+          backSideLayout: {
+            include: {
+              layoutSections: true,
+            },
+          },
+        },
+      },
     },
     orderBy: {
       term: "asc", // Sort by deadline

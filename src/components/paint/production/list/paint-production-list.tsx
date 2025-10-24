@@ -11,9 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { useTableFilters } from "@/hooks/use-table-filters";
-import { IconFilter, IconFlask, IconExternalLink, IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, IconAlertTriangle } from "@tabler/icons-react";
+import { IconFilter, IconFlask, IconExternalLink, IconChevronDown, IconChevronUp, IconSelector, IconTrash, IconAlertTriangle } from "@tabler/icons-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { cn } from "@/lib/utils";
 import { PaintProductionFilters } from "@/components/paint/production/filters/paint-production-filters";
 import { FilterIndicators } from "@/components/paint/production/filters/filter-indicator";
@@ -82,6 +83,8 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
     production: PaintProduction;
   } | null>(null);
 
+  // Use viewport boundary checking hook
+  
   // Delete confirmation dialog state
   const [deleteDialog, setDeleteDialog] = useState<{ production: PaintProduction } | null>(null);
 
@@ -179,7 +182,7 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
     },
-    searchDebounceMs: 500,
+    searchDebounceMs: 300,
     searchParamName: "search",
     serializeToUrl: serializePaintProductionFilters,
     deserializeFromUrl: deserializePaintProductionFilters,
@@ -191,7 +194,12 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
     () => ({
       formula: {
         include: {
-          paint: true, // Include all paint fields including finish
+          paint: {
+            include: {
+              paintType: true, // Include paint type for display
+              paintBrand: true, // Include paint brand for display
+            },
+          },
         },
       },
     }),
@@ -253,14 +261,6 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
       y: e.clientY,
       production,
     });
-  };
-
-  const handleEdit = () => {
-    if (contextMenu) {
-      // Navigate to edit page when implemented
-      toast.info("Edição de produção ainda não implementada");
-      setContextMenu(null);
-    }
   };
 
   const handleDelete = () => {
@@ -566,29 +566,22 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
 
       {/* Context Menu */}
       <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
-        <DropdownMenuContent
-          style={{
-            position: "fixed",
-            left: contextMenu?.x,
-            top: contextMenu?.y,
-          }}
-          className="w-56"
-          onCloseAutoFocus={(e) => e.preventDefault()}
+        <PositionedDropdownMenuContent
+        position={contextMenu}
+        isOpen={!!contextMenu}
+        className="w-56 ![position:fixed]"
+        onCloseAutoFocus={(e) => e.preventDefault()}
         >
           <DropdownMenuItem onClick={() => contextMenu && handleViewDetails(contextMenu.production)}>
             <IconExternalLink className="mr-2 h-4 w-4" />
             Ver Detalhes
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleEdit}>
-            <IconEdit className="mr-2 h-4 w-4" />
-            Editar
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleDelete} className="text-destructive">
             <IconTrash className="mr-2 h-4 w-4" />
             Deletar
           </DropdownMenuItem>
-        </DropdownMenuContent>
+        </PositionedDropdownMenuContent>
       </DropdownMenu>
 
       {/* Delete Confirmation Dialog */}

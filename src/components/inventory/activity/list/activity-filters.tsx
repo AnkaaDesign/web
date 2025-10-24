@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import type { ActivityGetManyFormData } from "../../../../schemas";
 import { ACTIVITY_OPERATION, ACTIVITY_REASON, ACTIVITY_REASON_LABELS } from "../../../../constants";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { IconFilter, IconUserCheck, IconArrowsExchange, IconListDetails, IconUser, IconPackage, IconNumbers, IconCalendar, IconX } from "@tabler/icons-react";
-import { useUsers, useItems } from "../../../../hooks";
+import { getUsers, getItems } from "../../../../api-client";
 
 interface ActivityFiltersProps {
   open: boolean;
@@ -24,9 +24,9 @@ interface ActivityFiltersProps {
 export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset }: ActivityFiltersProps) => {
   const [localFilters, setLocalFilters] = useState<Partial<ActivityGetManyFormData>>(filters);
 
-  // Load data for comboboxes
-  const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
-  const { data: itemsData } = useItems({ orderBy: { name: "asc" } });
+  // Create stable caches for fetched data
+  const usersCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
+  const itemsCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
 
   // Count active filters
   const activeFilterCount = useMemo(() => {
@@ -63,18 +63,72 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
     onReset();
   };
 
-  // Transform data for comboboxes
-  const userOptions =
-    usersData?.data?.map((user: { id: string; name: string }) => ({
-      value: user.id,
-      label: user.name,
-    })) || [];
+  // Async query function for users
+  const queryUsersFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const response = await getUsers({
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        where: searchTerm
+          ? {
+              OR: [
+                { name: { contains: searchTerm, mode: "insensitive" } },
+                { email: { contains: searchTerm, mode: "insensitive" } },
+              ],
+            }
+          : undefined,
+      });
 
-  const itemOptions =
-    itemsData?.data?.map((item: { id: string; name: string; uniCode: string | null }) => ({
-      value: item.id,
-      label: item.uniCode ? `${item.uniCode} - ${item.name}` : item.name,
-    })) || [];
+      const users = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = users.map((user) => {
+        const option = { label: user.name, value: user.id };
+        usersCacheRef.current.set(user.id, option);
+        return option;
+      });
+
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      return { data: [], hasMore: false };
+    }
+  }, []);
+
+  // Async query function for items
+  const queryItemsFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const response = await getItems({
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        where: searchTerm
+          ? {
+              OR: [
+                { name: { contains: searchTerm, mode: "insensitive" } },
+                { uniCode: { contains: searchTerm, mode: "insensitive" } },
+              ],
+            }
+          : undefined,
+      });
+
+      const items = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = items.map((item) => {
+        const label = item.uniCode ? `${item.uniCode} - ${item.name}` : item.name;
+        const option = { label, value: item.id };
+        itemsCacheRef.current.set(item.id, option);
+        return option;
+      });
+
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching items:", error);
+      return { data: [], hasMore: false };
+    }
+  }, []);
 
   const reasonOptions = Object.values(ACTIVITY_REASON).map((reason: ACTIVITY_REASON) => ({
     value: reason,
@@ -242,8 +296,11 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
               Usuários
             </Label>
             <Combobox
+              async={true}
+              queryKey={["users", "activity-filter"]}
+              queryFn={queryUsersFn}
+              initialOptions={[]}
               mode="multiple"
-              options={userOptions}
               value={localFilters.userIds || []}
               onValueChange={(value) =>
                 setLocalFilters({
@@ -254,6 +311,9 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
               placeholder="Selecione usuários..."
               emptyText="Nenhum usuário encontrado"
               searchPlaceholder="Buscar usuários..."
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
             />
             {localFilters.userIds && localFilters.userIds.length > 0 && (
               <div className="text-xs text-muted-foreground">
@@ -269,8 +329,11 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
               Itens
             </Label>
             <Combobox
+              async={true}
+              queryKey={["items", "activity-filter"]}
+              queryFn={queryItemsFn}
+              initialOptions={[]}
               mode="multiple"
-              options={itemOptions}
               value={localFilters.itemIds || []}
               onValueChange={(value) =>
                 setLocalFilters({
@@ -281,6 +344,9 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
               placeholder="Selecione itens..."
               emptyText="Nenhum item encontrado"
               searchPlaceholder="Buscar itens..."
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
             />
             {localFilters.itemIds && localFilters.itemIds.length > 0 && (
               <div className="text-xs text-muted-foreground">

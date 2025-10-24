@@ -16,7 +16,8 @@ import {
   IconEye,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { useObservations, useObservationMutations } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { ObservationGetManyFormData } from "../../../../schemas";
@@ -160,6 +161,8 @@ export function ObservationTable({ visibleColumns, className, filters = {}, onDa
     isBulk: boolean;
   } | null>(null);
 
+  // Use viewport boundary checking hook
+  
   // Get column definitions
   const columns = React.useMemo(() => createObservationColumns(), []);
 
@@ -481,14 +484,11 @@ export function ObservationTable({ visibleColumns, className, filters = {}, onDa
 
       {/* Context Menu */}
       <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
-        <DropdownMenuContent
-          style={{
-            position: "fixed",
-            left: contextMenu?.x,
-            top: contextMenu?.y,
-          }}
-          className="w-56"
-          onCloseAutoFocus={(e) => e.preventDefault()}
+        <PositionedDropdownMenuContent
+        position={contextMenu}
+        isOpen={!!contextMenu}
+        className="w-56 ![position:fixed]"
+        onCloseAutoFocus={(e) => e.preventDefault()}
         >
           {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.items.length} observações selecionadas</div>}
 
@@ -513,7 +513,7 @@ export function ObservationTable({ visibleColumns, className, filters = {}, onDa
             <IconTrash className="h-4 w-4 mr-2" />
             Deletar
           </DropdownMenuItem>
-        </DropdownMenuContent>
+        </PositionedDropdownMenuContent>
       </DropdownMenu>
 
       {/* Delete Confirmation Dialog */}

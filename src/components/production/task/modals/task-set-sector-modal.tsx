@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { useTaskBatchMutations, useSectors } from "../../../../hooks";
+import { useTaskBatchMutations } from "../../../../hooks/useTask";
+import { useSectors } from "../../../../hooks/useSector";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
@@ -28,7 +29,15 @@ interface TaskSetSectorModalProps {
 
 export const TaskSetSectorModal = ({ tasks, open, onOpenChange, onSuccess }: TaskSetSectorModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { batchUpdateAsync: batchUpdate } = useTaskBatchMutations();
+  const batchMutations = useTaskBatchMutations();
+  const { batchUpdateAsync: batchUpdate } = batchMutations;
+
+  // Debug log to verify hook returns correctly
+  console.log('[TaskSetSectorModal] Hook result:', {
+    hasBatchMutations: !!batchMutations,
+    hasBatchUpdateAsync: !!batchMutations?.batchUpdateAsync,
+    batchUpdateType: typeof batchUpdate,
+  });
 
   // Load production sectors only
   const { data: sectorsData, isLoading: sectorsLoading } = useSectors({
@@ -78,6 +87,15 @@ export const TaskSetSectorModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
 
     try {
       setIsSubmitting(true);
+
+      // Defensive check for batchUpdate function
+      if (!batchUpdate || typeof batchUpdate !== 'function') {
+        console.error('[TaskSetSectorModal] ERROR: batchUpdate is not a function!', {
+          batchUpdate,
+          type: typeof batchUpdate
+        });
+        throw new Error('batchUpdate is not available');
+      }
 
       // Prepare batch update data
       const updates = updatableTasks.map((task) => ({

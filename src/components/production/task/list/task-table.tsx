@@ -9,7 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { IconChevronUp, IconChevronDown, IconRefresh, IconEdit, IconTrash, IconSelector, IconPlayerPlay, IconCheck, IconPlayerPause, IconX, IconEye } from "@tabler/icons-react";
 import { TaskListSkeleton } from "./task-list-skeleton";
 import { cn } from "@/lib/utils";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { useTaskMutations, useTaskBatchMutations, useTasks } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { TaskGetManyFormData } from "../../../../schemas";
@@ -160,6 +161,8 @@ export function TaskTable({
     isBulk: boolean;
   } | null>(null);
 
+  // Use viewport boundary checking hook
+  
   // Duplicate modal state
   const [duplicateTask, setDuplicateTask] = useState<Task | null>(null);
 
@@ -630,14 +633,11 @@ export function TaskTable({
         <DropdownMenuTrigger asChild>
           <div className="hidden" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          style={{
-            position: "fixed",
-            left: contextMenu?.x,
-            top: contextMenu?.y,
-          }}
-          className="w-56"
-          onCloseAutoFocus={(e) => e.preventDefault()}
+        <PositionedDropdownMenuContent
+        position={contextMenu}
+        isOpen={!!contextMenu}
+        className="w-56 ![position:fixed]"
+        onCloseAutoFocus={(e) => e.preventDefault()}
         >
           {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.items.length} tarefas selecionadas</div>}
 
@@ -708,7 +708,7 @@ export function TaskTable({
             <IconTrash className="h-4 w-4 mr-2" />
             Deletar
           </DropdownMenuItem>
-        </DropdownMenuContent>
+        </PositionedDropdownMenuContent>
       </DropdownMenu>
 
       {/* Duplicate Modal */}

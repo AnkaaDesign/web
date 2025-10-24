@@ -28,7 +28,7 @@ const borrowBatchFormSchema = z
       .array(
         z.object({
           itemId: z.string().uuid(),
-          quantity: z.number().positive("Quantidade deve ser maior que zero"),
+          quantity: z.number().int("Quantidade deve ser um número inteiro").positive("Quantidade deve ser maior que zero"),
         }),
       )
       .min(1, "Pelo menos um item deve ser selecionado")
@@ -158,7 +158,8 @@ export const BorrowBatchCreateForm = () => {
   // Handle quantity change
   const handleQuantityChange = useCallback(
     (itemId: string, quantity: number) => {
-      const validQuantity = Math.max(0.01, quantity);
+      // Ensure quantity is an integer >= 1
+      const validQuantity = Math.max(1, Math.floor(quantity));
       setItemQuantity(itemId, validQuantity);
     },
     [setItemQuantity],

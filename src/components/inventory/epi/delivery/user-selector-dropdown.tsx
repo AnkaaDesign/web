@@ -1,7 +1,6 @@
 import { useCallback } from "react";
 import { getUsers } from "../../../../api-client";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { Badge } from "@/components/ui/badge";
 import { USER_STATUS } from "../../../../constants";
 import type { User } from "../../../../types";
 
@@ -10,10 +9,9 @@ interface UserSelectorDropdownProps {
   onChange: (value: string | undefined) => void;
   placeholder?: string;
   disabled?: boolean;
-  showPosition?: boolean;
 }
 
-export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione um funcionário", disabled = false, showPosition = true }: UserSelectorDropdownProps) {
+export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione um funcionário", disabled = false }: UserSelectorDropdownProps) {
   // Async query function for the combobox
   const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
     try {
@@ -49,7 +47,6 @@ export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione
       const options: ComboboxOption[] = users.map((user: User) => ({
         value: user.id,
         label: user.name,
-        description: showPosition && user.position ? user.position.name : undefined,
         metadata: {
           department: user.sector?.name,
           position: user.position?.name,
@@ -67,7 +64,7 @@ export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione
         hasMore: false,
       };
     }
-  }, [showPosition]);
+  }, []);
 
   return (
     <Combobox
@@ -89,13 +86,8 @@ export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione
         <div className="flex items-center justify-between w-full">
           <div className="flex flex-col">
             <span className="font-medium">{option.label}</span>
-            {option.metadata?.department && <span className="text-xs text-muted-foreground">{option.metadata.department}</span>}
+            {option.metadata?.department && <span className="text-xs text-muted-foreground group-hover:text-white">{option.metadata.department}</span>}
           </div>
-          {option.description && (
-            <Badge variant="outline" className="text-xs">
-              {option.description}
-            </Badge>
-          )}
         </div>
       )}
     />

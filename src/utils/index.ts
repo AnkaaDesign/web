@@ -48,6 +48,7 @@ export * from "./formatters";
 export * from "./garage";
 export * from "./item";
 export * from "./maintenance";
+export * from "./task-measures";
 export * from "./measure";
 export * from "./maskings";
 export * from "./validators";

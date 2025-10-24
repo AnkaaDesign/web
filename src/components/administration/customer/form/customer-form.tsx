@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { customerCreateSchema, customerUpdateSchema, type CustomerCreateFormData, type CustomerUpdateFormData } from "../../../../schemas";
@@ -52,6 +53,7 @@ type CustomerFormProps = CreateCustomerFormProps | UpdateCustomerFormProps;
 export function CustomerForm(props: CustomerFormProps) {
   const { isSubmitting, defaultValues, mode, onDirtyChange, onFormStateChange } = props;
   const [searchParams, setSearchParams] = useSearchParams();
+  const queryClient = useQueryClient();
 
   // Create a custom resolver for update mode that skips validation for unchanged fields
   const customResolver = useMemo(() => {
@@ -156,6 +158,8 @@ export function CustomerForm(props: CustomerFormProps) {
             description: data.economicActivityDescription,
           });
           form.setValue("economicActivityId", response.data.id, { shouldDirty: true, shouldValidate: true });
+          // Invalidate the query cache so the combobox refetches and includes the new activity
+          queryClient.invalidateQueries({ queryKey: ["economic-activities"] });
         } catch (error) {
           console.error("Error handling economic activity:", error);
           // Don't fail the whole process if economic activity fails

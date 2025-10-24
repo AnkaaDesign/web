@@ -9,7 +9,7 @@ import { itemCreateSchema, itemUpdateSchema, type ItemCreateFormData, type ItemU
 import { useItemCategories } from "../../../../hooks";
 import { ITEM_CATEGORY_TYPE } from "../../../../constants";
 import { serializeItemFormToUrlParams, debounce } from "@/utils/url-form-state";
-import type { Supplier } from "../../../../types";
+import type { Supplier, ItemBrand, ItemCategory } from "../../../../types";
 // import { FormValidationDebugger } from "@/components/debug/form-validation-debugger"; // Debug component removed
 
 // Import all form components
@@ -34,6 +34,8 @@ interface BaseItemFormProps {
   onDirtyChange?: (isDirty: boolean) => void;
   onFormStateChange?: (formState: { isValid: boolean; isDirty: boolean }) => void;
   initialSupplier?: Supplier;
+  initialBrand?: ItemBrand;
+  initialCategory?: ItemCategory;
 }
 
 interface CreateItemFormProps extends BaseItemFormProps {
@@ -51,7 +53,7 @@ interface UpdateItemFormProps extends BaseItemFormProps {
 type ItemFormProps = CreateItemFormProps | UpdateItemFormProps;
 
 export function ItemForm(props: ItemFormProps) {
-  const { isSubmitting, defaultValues, mode, onFormStateChange, onDirtyChange, initialSupplier } = props;
+  const { isSubmitting, defaultValues, mode, onFormStateChange, onDirtyChange, initialSupplier, initialBrand, initialCategory } = props;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(defaultValues?.categoryId || undefined);
@@ -292,8 +294,8 @@ export function ItemForm(props: ItemFormProps) {
               <Separator />
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <CategorySelector disabled={isSubmitting} onCategoryChange={setSelectedCategoryId} />
-                  <ItemBrandSelector disabled={isSubmitting} />
+                  <CategorySelector disabled={isSubmitting} onCategoryChange={setSelectedCategoryId} initialCategory={initialCategory} />
+                  <ItemBrandSelector disabled={isSubmitting} initialBrand={initialBrand} />
                 </div>
                 <ItemSupplierSelector disabled={isSubmitting} initialSupplier={initialSupplier} />
               </div>

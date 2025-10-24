@@ -49,8 +49,10 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
     };
   }, [item]);
 
-  // Memoize the supplier to pass to the form
+  // Memoize the supplier, brand, and category to pass to the form
   const initialSupplier = React.useMemo(() => item.supplier, [item.supplier]);
+  const initialBrand = React.useMemo(() => item.brand, [item.brand]);
+  const initialCategory = React.useMemo(() => item.category, [item.category]);
 
   // Track original values to determine what changed (only set once on mount)
   const originalValuesRef = React.useRef(defaultValues);
@@ -97,6 +99,8 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
       onDirtyChange={onDirtyChange}
       onFormStateChange={onFormStateChange}
       initialSupplier={initialSupplier}
+      initialBrand={initialBrand}
+      initialCategory={initialCategory}
     />
   );
 }

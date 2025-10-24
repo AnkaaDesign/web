@@ -414,15 +414,27 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                     </TableCell>
                     <TableCell className="py-2">
                       <div className="flex items-center gap-2">
-                        <TruncatedTextWithTooltip
-                          text={item.item ? (item.item.uniCode ? `${item.item.uniCode} - ${item.item.name}` : item.item.name) : "-"}
-                          className="font-medium text-sm"
-                        />
+                        {item.temporaryItemDescription ? (
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">Temporário</Badge>
+                            <TruncatedTextWithTooltip
+                              text={item.temporaryItemDescription}
+                              className="font-medium text-sm"
+                            />
+                          </div>
+                        ) : (
+                          <TruncatedTextWithTooltip
+                            text={item.item ? (item.item.uniCode ? `${item.item.uniCode} - ${item.item.name}` : item.item.name) : "-"}
+                            className="font-medium text-sm"
+                          />
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-center py-2">
                       {item.item ? (
                         <StockStatusIndicator item={item.item} showQuantity={true} />
+                      ) : item.temporaryItemDescription ? (
+                        <span className="text-sm text-muted-foreground">N/A</span>
                       ) : (
                         <span className="text-sm text-muted-foreground">-</span>
                       )}

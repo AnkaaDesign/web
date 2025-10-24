@@ -39,35 +39,53 @@ export function QuantityInput({ control, name = "quantity", label, disabled, sel
               placeholder="1"
               {...field}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                const value = e.target.value === "" ? "" : Number(e.target.value);
+                const inputValue = e.target.value;
+
+                // If empty, set to undefined (will be handled by default value or onBlur)
+                if (inputValue === "" || inputValue === null || inputValue === undefined) {
+                  field.onChange(undefined);
+                  return;
+                }
+
+                const numericValue = Number(inputValue);
 
                 // Validate input immediately
-                if (value && typeof value === "number") {
-                  if (value > availableQuantity && availableQuantity > 0) {
+                if (!isNaN(numericValue) && typeof numericValue === "number") {
+                  if (numericValue > availableQuantity && availableQuantity > 0) {
                     // Don't allow input beyond available quantity
                     field.onChange(availableQuantity);
                     return;
                   }
-                  if (value < 1) {
+                  if (numericValue < 1) {
                     // Don't allow negative or zero values
                     field.onChange(1);
                     return;
                   }
+                  // Set the valid numeric value
+                  field.onChange(numericValue);
+                } else {
+                  // Invalid number, set to undefined
+                  field.onChange(undefined);
                 }
-
-                field.onChange(value);
               }}
               onBlur={(e) => {
                 // Ensure we have a valid number on blur
-                const value = Number(e.target.value);
-                if (isNaN(value) || value <= 0) {
+                const inputValue = e.target.value;
+                const numericValue = Number(inputValue);
+
+                if (inputValue === "" || isNaN(numericValue) || numericValue <= 0) {
+                  // If empty or invalid, default to 1
                   field.onChange(1);
-                } else if (value > availableQuantity && availableQuantity > 0) {
+                } else if (numericValue > availableQuantity && availableQuantity > 0) {
+                  // If exceeds available, cap at available quantity
                   field.onChange(availableQuantity);
+                } else {
+                  // Ensure the value is set as a number
+                  field.onChange(numericValue);
                 }
                 field.onBlur();
               }}
-              value={field.value || ""}
+              value={field.value ?? ""}
               disabled={disabled || !selectedItemId}
               className={fieldState.error ? "border-destructive" : ""}
             />

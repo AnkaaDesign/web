@@ -20,6 +20,7 @@ import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { useDebounce } from "@/hooks/use-debounce";
 import { getItemCategories, getItemBrands, getSuppliers } from "../../../api-client";
 import type { ItemCategory, ItemBrand, Supplier } from "../../../types";
+import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 // Type definitions for better type safety
 
@@ -307,6 +308,7 @@ export const ItemSelector = ({
         orderBy: { fantasyName: "asc" },
         page: page,
         take: 50,
+        include: { logo: true },
         where: { status: "ACTIVE" },
       };
 
@@ -323,7 +325,7 @@ export const ItemSelector = ({
 
       const options = suppliers.map((supplier: Supplier) => {
         const label = supplier.fantasyName || supplier.corporateName || "Sem nome";
-        const option = { label, value: supplier.id };
+        const option = { label, value: supplier.id, logo: supplier.logo };
         supplierCacheRef.current.set(supplier.id, option);
         return option;
       });
@@ -535,6 +537,20 @@ export const ItemSelector = ({
                       minSearchLength={0}
                       pageSize={50}
                       debounceMs={300}
+                      renderOption={(option, isSelected) => (
+                        <div className="flex items-center gap-3 w-full">
+                          <SupplierLogoDisplay
+                            logo={(option as any).logo}
+                            supplierName={option.label}
+                            size="sm"
+                            shape="rounded"
+                            className="flex-shrink-0"
+                          />
+                          <div className="flex flex-col gap-1 min-w-0 flex-1">
+                            <div className="font-medium truncate">{option.label}</div>
+                          </div>
+                        </div>
+                      )}
                     />
                   </div>
                 </div>

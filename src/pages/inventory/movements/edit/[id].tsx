@@ -1,17 +1,17 @@
-import { usePageTracker } from "@/hooks/use-page-tracker";
-import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES } from "../../../../constants";
-import { ActivityEditWrapper } from "@/components/inventory/activity/form";
+import { useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { routes } from "../../../../constants";
 
 export const EditMovementPage = () => {
-  usePageTracker({
-    title: "Editar Movimentação",
-    icon: "edit",
-  });
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
-  return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]}>
-      <ActivityEditWrapper />
-    </PrivilegeRoute>
-  );
+  useEffect(() => {
+    // Redirect to batch edit with single ID
+    if (id) {
+      navigate(`${routes.inventory.movements.batchEdit}?ids=${id}`, { replace: true });
+    }
+  }, [id, navigate]);
+
+  return null;
 };

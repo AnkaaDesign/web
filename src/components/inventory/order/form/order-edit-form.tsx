@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconDownload, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconDownload, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconNotes, IconClipboardList } from "@tabler/icons-react";
 import type { OrderUpdateFormData } from "../../../../schemas";
 import type { Order, OrderItem } from "../../../../types";
 import { orderUpdateSchema } from "../../../../schemas";
@@ -23,6 +23,8 @@ import { FormSteps } from "@/components/ui/form-steps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { OrderItemSelector } from "./order-item-selector";
+import { TemporaryItemsInput } from "./temporary-items-input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useOrderFormUrlState } from "@/hooks/use-order-form-url-state";
 import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
@@ -30,6 +32,7 @@ import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { useSuppliers } from "../../../../hooks";
 import { FileUploadField, type FileWithPreview } from "@/components/file";
 import { Separator } from "@/components/ui/separator";
+import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 interface OrderEditFormProps {
   order: Order & {
@@ -78,44 +81,67 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   // Initialize state from URL parameters
   const [currentStep, setCurrentStep] = useState(getStepFromUrl(searchParams));
 
-  // Convert existing order data to initial state
-  const initialSelectedItems = useMemo(() => new Set(order.items.map((item) => item.itemId)), [order.items]);
+  // Detect order mode based on existing items
+  // If order has any temporary items (itemId is null), it's in temporary mode
+  const hasTemporaryItems = useMemo(() =>
+    order.items.some(item => !item.itemId && item.temporaryItemDescription),
+    [order.items]
+  );
+
+  // Separate inventory items from temporary items
+  const inventoryItems = useMemo(() =>
+    order.items.filter(item => item.itemId),
+    [order.items]
+  );
+
+  const temporaryItems = useMemo(() =>
+    order.items.filter(item => !item.itemId && item.temporaryItemDescription).map(item => ({
+      temporaryItemDescription: item.temporaryItemDescription!,
+      orderedQuantity: item.orderedQuantity,
+      price: item.price,
+      tax: item.tax,
+    })),
+    [order.items]
+  );
+
+  // Convert existing order data to initial state (only inventory items)
+  const initialSelectedItems = useMemo(() => new Set(inventoryItems.map((item) => item.itemId!)), [inventoryItems]);
 
   const initialQuantities = useMemo(
     () =>
-      order.items.reduce(
+      inventoryItems.reduce(
         (acc, item) => {
-          acc[item.itemId] = item.orderedQuantity;
+          acc[item.itemId!] = item.orderedQuantity;
           return acc;
         },
         {} as Record<string, number>,
       ),
-    [order.items],
+    [inventoryItems],
   );
 
   const initialPrices = useMemo(
     () =>
-      order.items.reduce(
+      inventoryItems.reduce(
         (acc, item) => {
           // Round to 2 decimal places to ensure compliance with moneySchema validation
-          acc[item.itemId] = Math.round(item.price * 100) / 100;
+          acc[item.itemId!] = Math.round(item.price * 100) / 100;
           return acc;
         },
         {} as Record<string, number>,
       ),
-    [order.items],
+    [inventoryItems],
   );
 
   const initialTaxes = useMemo(
     () =>
-      order.items.reduce(
+      inventoryItems.reduce(
         (acc, item) => {
-          acc[item.itemId] = item.tax;
+          acc[item.itemId!] = item.tax;
           return acc;
         },
         {} as Record<string, number>,
       ),
-    [order.items],
+    [inventoryItems],
   );
 
   // Initialize file state with existing files from order
@@ -190,6 +216,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     supplierId,
     forecast,
     notes,
+    orderItemMode,
+    temporaryItems: temporaryItemsState,
+    setOrderItemMode,
+    setTemporaryItems,
     updateDescription,
     updateSupplierId,
     updateForecast,
@@ -230,10 +260,12 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       supplierId: order.supplierId || undefined,
       forecast: order.forecast,
       notes: order.notes || "",
+      orderItemMode: hasTemporaryItems ? "temporary" : "inventory",
       selectedItems: initialSelectedItems,
       quantities: initialQuantities,
       prices: initialPrices,
       taxes: initialTaxes,
+      temporaryItems: temporaryItems,
     },
   });
 
@@ -300,6 +332,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   const { data: suppliersResponse } = useSuppliers({
     orderBy: { fantasyName: "asc" },
     take: 100,
+    include: { logo: true },
   });
 
   const suppliers = suppliersResponse?.data || [];
@@ -332,34 +365,61 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     }
   }, [searchParams]); // Removed currentStep to prevent circular dependency
 
-  // Calculate total price
-  const totalPrice = Array.from(selectedItems).reduce((total, itemId) => {
-    const quantity = quantities[itemId] || 1;
-    const price = prices[itemId] || 0;
-    const tax = taxes[itemId] || 0;
-    const itemTotal = quantity * price;
-    const taxAmount = itemTotal * (tax / 100);
-    return total + itemTotal + taxAmount;
-  }, 0);
+  // Calculate total price based on mode
+  const totalPrice = useMemo(() => {
+    if (orderItemMode === "inventory") {
+      return Array.from(selectedItems).reduce((total, itemId) => {
+        const quantity = quantities[itemId] || 1;
+        const price = prices[itemId] || 0;
+        const tax = taxes[itemId] || 0;
+        const itemTotal = quantity * price;
+        const taxAmount = itemTotal * (tax / 100);
+        return total + itemTotal + taxAmount;
+      }, 0);
+    } else {
+      // Temporary mode
+      const tempItems = form.getValues("temporaryItems") || temporaryItemsState || [];
+      return tempItems.reduce((total: number, item: any) => {
+        const quantity = Number(item.orderedQuantity) || 1;
+        const price = Number(item.price) || 0;
+        const tax = Number(item.tax) || 0;
+        const itemTotal = quantity * price;
+        const taxAmount = itemTotal * (tax / 100);
+        return total + itemTotal + taxAmount;
+      }, 0);
+    }
+  }, [orderItemMode, selectedItems, quantities, prices, taxes, form, temporaryItemsState]);
+
+  // Calculate item count based on mode
+  const itemCount = useMemo(() => {
+    if (orderItemMode === "inventory") {
+      return selectionCount;
+    } else {
+      const tempItems = form.getValues("temporaryItems") || temporaryItemsState || [];
+      return tempItems.length;
+    }
+  }, [orderItemMode, selectionCount, form, temporaryItemsState]);
 
   // Navigation helpers
   const nextStep = useCallback(() => {
     if (currentStep < steps.length) {
-      const newStep = currentStep + 1;
+      // Skip Step 2 (Item Selection) if in temporary mode
+      const newStep = currentStep === 1 && orderItemMode === "temporary" ? 3 : currentStep + 1;
       setCurrentStep(newStep);
       // Use functional form to ensure we have the latest params
       setSearchParams((prevParams) => setStepInUrl(prevParams, newStep), { replace: true });
     }
-  }, [currentStep, setSearchParams]);
+  }, [currentStep, orderItemMode, setSearchParams]);
 
   const prevStep = useCallback(() => {
     if (currentStep > 1) {
-      const newStep = currentStep - 1;
+      // Skip Step 2 (Item Selection) if in temporary mode and coming from Step 3
+      const newStep = currentStep === 3 && orderItemMode === "temporary" ? 1 : currentStep - 1;
       setCurrentStep(newStep);
       // Use functional form to ensure we have the latest params
       setSearchParams((prevParams) => setStepInUrl(prevParams, newStep), { replace: true });
     }
-  }, [currentStep, setSearchParams]);
+  }, [currentStep, orderItemMode, setSearchParams]);
 
   // File change handlers
   const handleBudgetFilesChange = useCallback((files: FileWithPreview[]) => {
@@ -433,25 +493,49 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
           toast.error("Descrição deve ter no máximo 500 caracteres");
           return false;
         }
+
+        // If in temporary mode, validate temporary items
+        if (orderItemMode === "temporary") {
+          const tempItems = form.getValues("temporaryItems") || temporaryItemsState || [];
+          if (tempItems.length === 0) {
+            toast.error("Pelo menos um item temporário deve ser adicionado");
+            return false;
+          }
+
+          // Validate each temporary item
+          const hasInvalidItems = tempItems.some((item: any) =>
+            !item.temporaryItemDescription || item.temporaryItemDescription.trim() === "" ||
+            !item.orderedQuantity || item.orderedQuantity <= 0 ||
+            item.price === undefined || item.price === null || item.price < 0
+          );
+
+          if (hasInvalidItems) {
+            toast.error("Preencha todos os campos dos itens temporários (descrição, quantidade e preço)");
+            return false;
+          }
+        }
+
         return true;
 
       case 2:
-        // Validate item selection
-        if (selectionCount === 0) {
-          toast.error("Selecione pelo menos um item");
-          return false;
-        }
+        // Validate item selection (only for inventory mode)
+        if (orderItemMode === "inventory") {
+          if (selectionCount === 0) {
+            toast.error("Selecione pelo menos um item");
+            return false;
+          }
 
-        // Validate quantities and prices
-        const invalidItems = Array.from(selectedItems).filter((itemId) => {
-          const quantity = quantities[itemId];
-          const price = prices[itemId];
-          return !quantity || quantity <= 0 || price === undefined || price < 0;
-        });
+          // Validate quantities and prices
+          const invalidItems = Array.from(selectedItems).filter((itemId) => {
+            const quantity = quantities[itemId];
+            const price = prices[itemId];
+            return !quantity || quantity <= 0 || price === undefined || price < 0;
+          });
 
-        if (invalidItems.length > 0) {
-          toast.error(`Defina quantidade e preço válidos para todos os itens`);
-          return false;
+          if (invalidItems.length > 0) {
+            toast.error(`Defina quantidade e preço válidos para todos os itens`);
+            return false;
+          }
         }
 
         return true;
@@ -463,7 +547,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       default:
         return false;
     }
-  }, [currentStep, description, selectionCount, selectedItems, quantities, prices]);
+  }, [currentStep, description, orderItemMode, selectionCount, selectedItems, quantities, prices, form, temporaryItemsState]);
 
   // Handle navigation with validation
   const handleNext = useCallback(() => {
@@ -481,13 +565,25 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     if (!validateCurrentStep()) return;
 
     try {
-      // Build items array from selected items
-      const items = Array.from(selectedItems).map((itemId) => ({
-        itemId,
-        orderedQuantity: quantities[itemId] || 0,
-        price: prices[itemId] || 0,
-        tax: taxes[itemId] || 0,
-      }));
+      // Build items array based on mode
+      let items: any[] = [];
+      if (orderItemMode === "inventory") {
+        items = Array.from(selectedItems).map((itemId) => ({
+          itemId,
+          orderedQuantity: quantities[itemId] || 0,
+          price: prices[itemId] || 0,
+          tax: taxes[itemId] || 0,
+        }));
+      } else {
+        // Temporary mode - get items from form state
+        const tempItems = form.getValues("temporaryItems") || temporaryItemsState || [];
+        items = tempItems.map((item: any) => ({
+          temporaryItemDescription: item.temporaryItemDescription,
+          orderedQuantity: Number(item.orderedQuantity) || 1,
+          price: Number(item.price) || 0,
+          tax: Number(item.tax) || 0,
+        }));
+      }
 
       const data = {
         description: description!.trim(),
@@ -519,6 +615,22 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
           name: order.supplier.fantasyName,
         } : undefined;
 
+        // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
+        const currentBudgetIds = budgetFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+        const currentReceiptIds = receiptFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+        const currentInvoiceIds = nfeFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+
+        // Always send file IDs arrays when any file operation occurs
+        (data as any).budgetIds = currentBudgetIds;
+        (data as any).receiptIds = currentReceiptIds;
+        (data as any).invoiceIds = currentInvoiceIds;
+
+        console.log('[SUBMIT] Setting file IDs to keep:', {
+          budgets: currentBudgetIds.length,
+          receipts: currentReceiptIds.length,
+          invoices: currentInvoiceIds.length,
+        });
+
         console.log('[SUBMIT] Creating FormData with:');
         console.log('[SUBMIT] - Data:', data);
         console.log('[SUBMIT] - Budget files:', newBudgetFiles.length, newBudgetFiles);
@@ -548,6 +660,23 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         });
       } else {
         // Use regular JSON payload when no files
+        // But still check for deleted files
+        // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
+        const currentBudgetIds = budgetFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+        const currentReceiptIds = receiptFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+        const currentInvoiceIds = nfeFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+
+        // Always send file IDs arrays when any file operation occurs
+        (data as any).budgetIds = currentBudgetIds;
+        (data as any).receiptIds = currentReceiptIds;
+        (data as any).invoiceIds = currentInvoiceIds;
+
+        console.log('[SUBMIT] Setting file IDs to keep (JSON):', {
+          budgets: currentBudgetIds.length,
+          receipts: currentReceiptIds.length,
+          invoices: currentInvoiceIds.length,
+        });
+
         console.log('[SUBMIT] Using JSON payload (no files)');
 
         await updateAsync({
@@ -568,7 +697,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       });
       // Error is handled by the mutation hook
     }
-  }, [validateCurrentStep, selectedItems, quantities, prices, taxes, description, supplierId, forecast, notes, budgetFiles, receiptFiles, nfeFiles, updateAsync, order, navigate]);
+  }, [validateCurrentStep, orderItemMode, selectedItems, quantities, prices, taxes, description, supplierId, forecast, notes, budgetFiles, receiptFiles, nfeFiles, updateAsync, order, navigate, form, temporaryItemsState]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === steps.length;
@@ -1017,7 +1146,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                       <CardContent className="space-y-6">
                         {/* Description - Full width */}
                         <div className="space-y-2">
-                          <Label className="text-sm font-medium">
+                          <Label className="text-sm font-medium flex items-center gap-2">
+                            <IconFileText className="h-4 w-4" />
                             Descrição <span className="text-red-500">*</span>
                           </Label>
                           <Input
@@ -1041,18 +1171,63 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                           <FormMessage className="text-sm text-red-500">{form.formState.errors.description?.message}</FormMessage>
                         </div>
 
+                        {/* Mode Switch - Read-only */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-medium flex items-center gap-2">
+                            <IconClipboardList className="h-4 w-4" />
+                            Tipo de Itens
+                          </Label>
+                          <RadioGroup
+                            value={orderItemMode}
+                            disabled={true}
+                            className="grid grid-cols-1 md:grid-cols-2 gap-3 opacity-60 pointer-events-none"
+                          >
+                            <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 group">
+                              <RadioGroupItem value="inventory" id="edit-mode-inventory" className="mt-0.5" />
+                              <div className="flex-1 space-y-1">
+                                <Label htmlFor="edit-mode-inventory" className="flex items-center gap-2 font-medium group-hover:text-white">
+                                  <IconShoppingCart className="h-4 w-4" />
+                                  Itens do Estoque
+                                </Label>
+                                <p className="text-sm text-muted-foreground group-hover:text-white/90">
+                                  Itens do inventário
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 group">
+                              <RadioGroupItem value="temporary" id="edit-mode-temporary" className="mt-0.5" />
+                              <div className="flex-1 space-y-1">
+                                <Label htmlFor="edit-mode-temporary" className="flex items-center gap-2 font-medium group-hover:text-white">
+                                  <IconFileInvoice className="h-4 w-4" />
+                                  Itens Temporários
+                                </Label>
+                                <p className="text-sm text-muted-foreground group-hover:text-white/90">
+                                  Compras únicas
+                                </p>
+                              </div>
+                            </div>
+                          </RadioGroup>
+                          <p className="text-xs text-muted-foreground text-center">
+                            Não é possível alterar o tipo de itens durante a edição
+                          </p>
+                        </div>
+
                         {/* Supplier, Date and Observations in the same row */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {/* Left Column: Supplier and Date */}
                           <div className="space-y-6">
                             {/* Supplier */}
                             <div className="space-y-2">
-                              <Label className="text-sm font-medium">Fornecedor</Label>
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <IconTruck className="h-4 w-4" />
+                                Fornecedor
+                              </Label>
                               <Combobox<ComboboxOption>
                                 placeholder="Selecione um fornecedor (opcional)"
                                 options={suppliers.map((supplier) => ({
                                   value: supplier.id,
                                   label: supplier.fantasyName,
+                                  logo: supplier.logo,
                                 }))}
                                 value={supplierId}
                                 onValueChange={(value) => {
@@ -1068,6 +1243,20 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 mode="single"
                                 searchable={true}
                                 clearable={true}
+                                renderOption={(option, isSelected) => (
+                                  <div className="flex items-center gap-3 w-full">
+                                    <SupplierLogoDisplay
+                                      logo={(option as any).logo}
+                                      supplierName={option.label}
+                                      size="sm"
+                                      shape="rounded"
+                                      className="flex-shrink-0"
+                                    />
+                                    <div className="flex flex-col gap-1 min-w-0 flex-1">
+                                      <div className="font-medium truncate">{option.label}</div>
+                                    </div>
+                                  </div>
+                                )}
                               />
                             </div>
 
@@ -1109,7 +1298,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
 
                           {/* Right Column: Observations */}
                           <div className="space-y-2 flex flex-col">
-                            <Label className="text-sm font-medium">Observações</Label>
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <IconNotes className="h-4 w-4" />
+                              Observações
+                            </Label>
                             <Textarea
                               placeholder="Observações sobre o pedido (opcional)"
                               value={notes}
@@ -1126,6 +1318,20 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                             />
                           </div>
                         </div>
+
+                        {/* Temporary Items Input (only shown in temporary mode) */}
+                        {orderItemMode === "temporary" && (
+                          <div className="space-y-4">
+                            <Separator />
+                            <div className="space-y-3">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <IconFileInvoice className="h-4 w-4" />
+                                Itens Temporários
+                              </Label>
+                              <TemporaryItemsInput control={form.control} />
+                            </div>
+                          </div>
+                        )}
 
                         {/* File uploads */}
                         <div className="space-y-4">
@@ -1204,7 +1410,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                   </div>
                 )}
 
-                {currentStep === 2 && (
+                {currentStep === 2 && orderItemMode === "inventory" && (
                   <OrderItemSelector
                     selectedItems={selectedItems}
                     onSelectItem={toggleItemSelection}
@@ -1278,7 +1484,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                           <div>
                             <span className="text-sm font-medium text-muted-foreground">Quantidade de Itens:</span>
                             <p className="mt-1 font-medium">
-                              {selectionCount} {selectionCount === 1 ? "item" : "itens"}
+                              {itemCount} {itemCount === 1 ? "item" : "itens"}
                             </p>
                           </div>
                           <div>
@@ -1305,57 +1511,103 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                       </CardHeader>
                       <CardContent>
                         <div className="rounded-md border overflow-hidden w-full">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>Código</TableHead>
-                                <TableHead>Item</TableHead>
-                                <TableHead>Categoria</TableHead>
-                                <TableHead>Marca</TableHead>
-                                <TableHead className="text-right">Quantidade</TableHead>
-                                <TableHead className="text-right">Preço Unit.</TableHead>
-                                <TableHead className="text-right">Taxa %</TableHead>
-                                <TableHead className="text-right">Subtotal</TableHead>
-                                <TableHead className="text-right">Taxa</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {selectedItemsData.map((item) => {
-                                const quantity = quantities[item.id] || 1;
-                                const price = prices[item.id] || 0;
-                                const tax = taxes[item.id] || 0;
-                                const subtotal = quantity * price;
-                                const taxAmount = subtotal * (tax / 100);
-                                const itemTotal = subtotal + taxAmount;
+                          {orderItemMode === "inventory" ? (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Código</TableHead>
+                                  <TableHead>Item</TableHead>
+                                  <TableHead>Categoria</TableHead>
+                                  <TableHead>Marca</TableHead>
+                                  <TableHead className="text-right">Quantidade</TableHead>
+                                  <TableHead className="text-right">Preço Unit.</TableHead>
+                                  <TableHead className="text-right">Taxa %</TableHead>
+                                  <TableHead className="text-right">Subtotal</TableHead>
+                                  <TableHead className="text-right">Taxa</TableHead>
+                                  <TableHead className="text-right">Total</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {selectedItemsData.map((item) => {
+                                  const quantity = quantities[item.id] || 1;
+                                  const price = prices[item.id] || 0;
+                                  const tax = taxes[item.id] || 0;
+                                  const subtotal = quantity * price;
+                                  const taxAmount = subtotal * (tax / 100);
+                                  const itemTotal = subtotal + taxAmount;
 
-                                return (
-                                  <TableRow key={item.id}>
-                                    <TableCell className="font-mono">{item.uniCode}</TableCell>
-                                    <TableCell>{item.name}</TableCell>
-                                    <TableCell>{item.category?.name || "-"}</TableCell>
-                                    <TableCell>{item.brand?.name || "-"}</TableCell>
-                                    <TableCell className="text-right">
-                                      {quantity} {getMeasureUnitDisplay(item.measures)}
-                                    </TableCell>
-                                    <TableCell className="text-right">{formatCurrency(price)}</TableCell>
-                                    <TableCell className="text-right">{tax}%</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(taxAmount)}</TableCell>
-                                    <TableCell className="text-right font-medium">{formatCurrency(itemTotal)}</TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                            <TableFooter>
-                              <TableRow>
-                                <TableCell colSpan={9} className="text-right font-medium">
-                                  Total Geral
-                                </TableCell>
-                                <TableCell className="text-right font-bold text-base">{formatCurrency(totalPrice)}</TableCell>
-                              </TableRow>
-                            </TableFooter>
-                          </Table>
+                                  return (
+                                    <TableRow key={item.id}>
+                                      <TableCell className="font-mono">{item.uniCode}</TableCell>
+                                      <TableCell>{item.name}</TableCell>
+                                      <TableCell>{item.category?.name || "-"}</TableCell>
+                                      <TableCell>{item.brand?.name || "-"}</TableCell>
+                                      <TableCell className="text-right">
+                                        {quantity} {getMeasureUnitDisplay(item.measures)}
+                                      </TableCell>
+                                      <TableCell className="text-right">{formatCurrency(price)}</TableCell>
+                                      <TableCell className="text-right">{tax}%</TableCell>
+                                      <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
+                                      <TableCell className="text-right">{formatCurrency(taxAmount)}</TableCell>
+                                      <TableCell className="text-right font-medium">{formatCurrency(itemTotal)}</TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                              <TableFooter>
+                                <TableRow>
+                                  <TableCell colSpan={9} className="text-right font-medium">
+                                    Total Geral
+                                  </TableCell>
+                                  <TableCell className="text-right font-bold text-base">{formatCurrency(totalPrice)}</TableCell>
+                                </TableRow>
+                              </TableFooter>
+                            </Table>
+                          ) : (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Descrição do Item</TableHead>
+                                  <TableHead className="text-right">Quantidade</TableHead>
+                                  <TableHead className="text-right">Preço Unit.</TableHead>
+                                  <TableHead className="text-right">Taxa %</TableHead>
+                                  <TableHead className="text-right">Subtotal</TableHead>
+                                  <TableHead className="text-right">Taxa</TableHead>
+                                  <TableHead className="text-right">Total</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {(form.getValues("temporaryItems") || temporaryItemsState || []).map((item: any, index: number) => {
+                                  const quantity = Number(item.orderedQuantity) || 1;
+                                  const price = Number(item.price) || 0;
+                                  const tax = Number(item.tax) || 0;
+                                  const subtotal = quantity * price;
+                                  const taxAmount = subtotal * (tax / 100);
+                                  const itemTotal = subtotal + taxAmount;
+
+                                  return (
+                                    <TableRow key={index}>
+                                      <TableCell>{item.temporaryItemDescription}</TableCell>
+                                      <TableCell className="text-right">{quantity}</TableCell>
+                                      <TableCell className="text-right">{formatCurrency(price)}</TableCell>
+                                      <TableCell className="text-right">{tax}%</TableCell>
+                                      <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
+                                      <TableCell className="text-right">{formatCurrency(taxAmount)}</TableCell>
+                                      <TableCell className="text-right font-medium">{formatCurrency(itemTotal)}</TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                              <TableFooter>
+                                <TableRow>
+                                  <TableCell colSpan={6} className="text-right font-medium">
+                                    Total Geral
+                                  </TableCell>
+                                  <TableCell className="text-right font-bold text-base">{formatCurrency(totalPrice)}</TableCell>
+                                </TableRow>
+                              </TableFooter>
+                            </Table>
+                          )}
                         </div>
                       </CardContent>
                     </Card>

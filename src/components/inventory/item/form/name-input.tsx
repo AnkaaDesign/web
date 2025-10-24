@@ -28,12 +28,12 @@ export function NameInput({ disabled, required }: NameInputProps) {
           <FormControl>
             <Input
               {...field}
+              type="text"
               placeholder="Digite o nome do item"
               disabled={disabled}
               className="bg-transparent transition-all duration-200"
               typewriterPlaceholder={false}
               naturalTyping={false}
-              typingSpeed={35}
             />
           </FormControl>
           <FormMessage />

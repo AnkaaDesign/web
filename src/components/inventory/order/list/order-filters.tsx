@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { OrderGetManyFormData } from "../../../../schemas";
 import {
   Sheet,
@@ -15,7 +15,8 @@ import { IconFilter, IconX } from "@tabler/icons-react";
 import { ORDER_STATUS, ORDER_STATUS_LABELS } from "../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { useSuppliers } from "../../../../hooks";
+import { getSuppliers } from "../../../../api-client";
+import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 interface OrderFiltersProps {
   open: boolean;
@@ -35,8 +36,8 @@ interface FilterState {
 export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: OrderFiltersProps) {
   const [localState, setLocalState] = useState<FilterState>({});
 
-  // Load suppliers for filter
-  const { data: suppliersData } = useSuppliers({ orderBy: { fantasyName: "asc" } });
+  // Create stable cache for fetched suppliers
+  const suppliersCacheRef = useRef<Map<string, { label: string; value: string }>>(new Map());
 
   // Initialize local state from filters only when dialog opens
   useEffect(() => {
@@ -115,11 +116,39 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
     label: ORDER_STATUS_LABELS[status],
   }));
 
-  const supplierOptions: ComboboxOption[] =
-    suppliersData?.data?.map((supplier) => ({
-      value: supplier.id,
-      label: supplier.fantasyName,
-    })) || [];
+  // Async query function for suppliers
+  const querySuppliersFn = useCallback(async (searchTerm: string, page = 1) => {
+    try {
+      const response = await getSuppliers({
+        orderBy: { fantasyName: "asc" },
+        page: page,
+        take: 50,
+        include: { logo: true },
+        where: searchTerm
+          ? {
+              OR: [
+                { fantasyName: { contains: searchTerm, mode: "insensitive" } },
+                { corporateName: { contains: searchTerm, mode: "insensitive" } },
+              ],
+            }
+          : undefined,
+      });
+
+      const suppliers = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      const options = suppliers.map((supplier) => {
+        const option = { label: supplier.fantasyName, value: supplier.id, logo: supplier.logo };
+        suppliersCacheRef.current.set(supplier.id, option);
+        return option;
+      });
+
+      return { data: options, hasMore };
+    } catch (error) {
+      console.error("Error fetching suppliers:", error);
+      return { data: [], hasMore: false };
+    }
+  }, []);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -161,13 +190,33 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
           <div className="space-y-2">
             <Label className="text-sm font-medium">Fornecedores</Label>
             <Combobox<ComboboxOption>
-              options={supplierOptions}
+              async={true}
+              queryKey={["suppliers", "order-filter"]}
+              queryFn={querySuppliersFn}
+              initialOptions={[]}
               value={localState.supplierIds || []}
               onValueChange={(values) => setLocalState((prev) => ({ ...prev, supplierIds: Array.isArray(values) ? values : [] }))}
               placeholder="Selecione os fornecedores"
               emptyText="Nenhum fornecedor encontrado"
               mode="multiple"
               searchable={true}
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
+              renderOption={(option, isSelected) => (
+                <div className="flex items-center gap-3 w-full">
+                  <SupplierLogoDisplay
+                    logo={(option as any).logo}
+                    supplierName={option.label}
+                    size="sm"
+                    shape="rounded"
+                    className="flex-shrink-0"
+                  />
+                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                    <div className="font-medium truncate">{option.label}</div>
+                  </div>
+                </div>
+              )}
             />
           </div>
 

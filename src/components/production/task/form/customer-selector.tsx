@@ -38,6 +38,7 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
       orderBy: { fantasyName: "asc" },
       page: page,
       take: 50,
+      include: { logo: true },
     };
 
     // Only add search filter if there's a search term
@@ -133,10 +134,7 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
                   />
                   <div className="flex flex-col gap-1 min-w-0 flex-1">
                     <div className="font-medium truncate">{customer.fantasyName}</div>
-                    <div className={cn(
-                      "flex items-center gap-2 text-sm truncate",
-                      isSelected ? "text-accent-foreground/80" : "text-muted-foreground group-hover:text-accent-foreground/80"
-                    )}>
+                    <div className="flex items-center gap-2 text-sm truncate group-hover:text-white transition-colors">
                       {customer.corporateName && <span className="truncate">{customer.corporateName}</span>}
                       {customer.cnpj && (
                         <>

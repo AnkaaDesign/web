@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useFormContext, useWatch, type UseFieldArrayReturn } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -63,13 +63,12 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
 
   // Get existing measure types to avoid duplicates
   const { getValues } = useFormContext<ItemCreateFormData | ItemUpdateFormData>();
-  const existingMeasureTypes = fields
-    .map((field: any) => {
-      const fieldIndex = fields.indexOf(field);
-      const formValues = getValues();
-      return formValues.measures?.[fieldIndex]?.measureType;
-    })
-    .filter(Boolean);
+  const existingMeasureTypes = useMemo(() => {
+    const formValues = getValues();
+    return (formValues.measures || [])
+      .map((measure: any) => measure?.measureType)
+      .filter(Boolean);
+  }, [fields.length, getValues]);
 
   const addMeasure = () => {
     // SIZE type is handled only in PPE config, not here
@@ -215,21 +214,21 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
           />
 
           {/* Value */}
-          <Input
-            type="decimal"
+          <input
+            type="number"
             min={0}
-            decimals={2}
+            step="any"
             placeholder="0"
-            value={newMeasure.value}
-            onChange={(value) => {
+            value={newMeasure.value || ""}
+            onChange={(e) => {
+              const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
               setNewMeasure((prev: any) => ({
                 ...prev,
-                value: value || 0,
+                value: isNaN(value) ? 0 : value,
               }));
             }}
             disabled={disabled}
-            transparent={true}
-            className="w-full md:w-32"
+            className="flex h-10 w-full md:w-32 rounded-md border border-border bg-transparent px-2 py-2 text-sm placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200"
           />
 
           {/* Unit */}

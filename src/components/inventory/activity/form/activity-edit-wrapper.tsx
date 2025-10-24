@@ -35,9 +35,9 @@ export const ActivityEditWrapper = () => {
 
   // Submit action
   const handleFormSubmit = () => {
-    const form = document.getElementById("activity-form-submit") as HTMLFormElement;
-    if (form) {
-      form.requestSubmit();
+    const submitButton = document.getElementById("activity-form-submit") as HTMLButtonElement;
+    if (submitButton) {
+      submitButton.click();
     }
   };
 
@@ -57,9 +57,6 @@ export const ActivityEditWrapper = () => {
                 { label: "Movimentações", href: routes.inventory.movements.list },
                 { label: "Editar" },
               ]}
-              backButton={{
-                onClick: () => navigate(routes.inventory.movements.root),
-              }}
             />
           </div>
         </div>
@@ -95,9 +92,6 @@ export const ActivityEditWrapper = () => {
                 { label: "Movimentações", href: routes.inventory.movements.list },
                 { label: "Editar" },
               ]}
-              backButton={{
-                onClick: () => navigate(routes.inventory.movements.root),
-              }}
             />
           </div>
         </div>
@@ -132,7 +126,7 @@ export const ActivityEditWrapper = () => {
       icon: formState.isSubmitting ? IconLoader2 : IconCheck,
       onClick: handleFormSubmit,
       variant: "default" as const,
-      disabled: formState.isSubmitting || !formState.isValid,
+      disabled: formState.isSubmitting || !formState.isValid || !formState.isDirty,
       loading: formState.isSubmitting,
     },
   ];
@@ -152,9 +146,6 @@ export const ActivityEditWrapper = () => {
               { label: "Movimentações", href: routes.inventory.movements.list },
               { label: "Editar" },
             ]}
-            backButton={{
-              onClick: () => navigate(routes.inventory.movements.root),
-            }}
             actions={actions}
           />
         </div>

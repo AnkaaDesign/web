@@ -32,62 +32,64 @@ export function FormQuantityInput({
 }: FormQuantityInputProps) {
   const form = useFormContext();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-
-    if (value === "") {
-      form.setValue(name, null);
-      return;
-    }
-
-    const numericValue = integer ? parseInt(value, 10) : parseFloat(value);
-
-    if (isNaN(numericValue)) {
-      return;
-    }
-
-    // Apply min/max constraints
-    let constrainedValue = numericValue;
-    if (min !== undefined && constrainedValue < min) {
-      constrainedValue = min;
-    }
-    if (max !== undefined && constrainedValue > max) {
-      constrainedValue = max;
-    }
-
-    form.setValue(name, constrainedValue);
-  };
-
   return (
     <FormField
       control={form.control}
       name={name}
-      render={({ field }) => (
-        <FormItem className={className}>
-          <FormLabel className="flex items-center gap-2">
-            <IconHash className="h-4 w-4 text-muted-foreground" />
-            {label}
-            {required && <span className="text-destructive">*</span>}
-          </FormLabel>
-          <FormControl>
-            <Input
-              {...field}
-              value={field.value ?? ""}
-              onChange={handleChange}
-              type="number"
-              placeholder={placeholder}
-              disabled={disabled}
-              min={min}
-              max={max}
-              step={step}
-              inputMode={integer ? "numeric" : "decimal"}
-              transparent={transparent}
-              className="transition-all duration-200"
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
+      render={({ field }) => {
+        const handleChange = (value: string | number | null) => {
+          if (value === null || value === "" || value === undefined) {
+            field.onChange(null);
+            return;
+          }
+
+          const numericValue = integer ? parseInt(String(value), 10) : parseFloat(String(value));
+
+          if (isNaN(numericValue)) {
+            return;
+          }
+
+          // Apply min/max constraints
+          let constrainedValue = numericValue;
+          if (min !== undefined && constrainedValue < min) {
+            constrainedValue = min;
+          }
+          if (max !== undefined && constrainedValue > max) {
+            constrainedValue = max;
+          }
+
+          field.onChange(constrainedValue);
+        };
+
+        return (
+          <FormItem className={className}>
+            <FormLabel className="flex items-center gap-2">
+              <IconHash className="h-4 w-4 text-muted-foreground" />
+              {label}
+              {required && <span className="text-destructive">*</span>}
+            </FormLabel>
+            <FormControl>
+              <Input
+                name={field.name}
+                ref={field.ref}
+                value={field.value ?? ""}
+                onChange={handleChange}
+                onBlur={field.onBlur}
+                type="number"
+                placeholder={placeholder}
+                disabled={disabled}
+                min={min}
+                max={max}
+                step={step}
+                inputMode={integer ? "numeric" : "decimal"}
+                transparent={transparent}
+                className="transition-all duration-200"
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        );
+      }}
     />
   );
 }

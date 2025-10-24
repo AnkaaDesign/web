@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useTaskMutations, useTaskBatchMutations, useSectors, useCustomers } from "../../../../hooks";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
-import { routes, TASK_STATUS } from "../../../../constants";
+import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -29,6 +30,7 @@ interface TaskListProps {
 const DEFAULT_PAGE_SIZE = 40;
 
 export function TaskList({ className }: TaskListProps) {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { update } = useTaskMutations();
   const { batchDelete, batchUpdate } = useTaskBatchMutations();
@@ -434,7 +436,9 @@ export function TaskList({ className }: TaskListProps) {
               </span>
             </Button>
             <ColumnVisibilityManager columns={columns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
-            <TaskExport filters={filters} currentItems={tableData.items} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
+            {user?.sector?.privileges !== SECTOR_PRIVILEGES.WAREHOUSE && (
+              <TaskExport filters={filters} currentItems={tableData.items} totalRecords={tableData.totalRecords} visibleColumns={visibleColumns} />
+            )}
           </div>
         </div>
 

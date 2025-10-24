@@ -372,6 +372,11 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
     headers: finalConfig.defaultHeaders,
     paramsSerializer: {
       serialize: (params) => {
+        // TEMPORARY DEBUG: Log include params in production to debug measures issue
+        if (params?.include) {
+          console.log("[AxiosClient PROD DEBUG] include param:", JSON.stringify(params.include, null, 2));
+        }
+
         // Log params for debugging in development
         if (finalConfig.enableLogging && process.env.NODE_ENV === "development") {
           console.log("[AxiosClient] Serializing params:", JSON.stringify(params, null, 2));
@@ -383,12 +388,18 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
           serializeDate: (date: Date) => date.toISOString(),
           skipNulls: true,
           addQueryPrefix: false,
-          // Use bracket notation for nested objects (e.g., orderBy[name]=asc)
-          allowDots: false,
+          // CRITICAL: Use dot notation for deeply nested objects (e.g., include.truck.include.leftSideLayout=true)
+          // Bracket notation has issues with 3+ levels of nesting in the backend parser
+          allowDots: true,
           strictNullHandling: true,
-          // Use indices for arrays to produce orderBy[0][name]=asc instead of orderBy[][name]=asc
+          // Use indices for arrays to produce orderBy[0].name=asc instead of orderBy[].name=asc
           indices: true,
         });
+
+        // TEMPORARY DEBUG: Log query string in production for include params
+        if (params?.include) {
+          console.log("[AxiosClient PROD DEBUG] Serialized query string:", queryString);
+        }
 
         // Log serialized query string for debugging
         if (finalConfig.enableLogging && process.env.NODE_ENV === "development") {

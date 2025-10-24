@@ -26,7 +26,7 @@ const borrowFormFilterConfig = {
     debounceMs: 0, // Immediate update for selected items
   },
   quantities: {
-    schema: z.record(z.string(), z.number().min(0.01)).default({}),
+    schema: z.record(z.string(), z.number().int().min(1)).default({}),
     defaultValue: {} as Record<string, number>,
     debounceMs: 0, // Immediate update for quantities
   },
@@ -130,7 +130,10 @@ export function useBorrowFormUrlState(options: UseBorrowFormUrlStateOptions = {}
 
   const updateQuantities = useCallback(
     (newQuantities: Record<string, number>) => {
-      const filtered = Object.fromEntries(Object.entries(newQuantities).filter(([_, v]) => v >= 0.01));
+      const filtered = Object.fromEntries(
+        Object.entries(newQuantities)
+          .filter(([_, v]) => v >= 1 && Number.isInteger(v))
+      );
 
       setFilter("quantities", Object.keys(filtered).length > 0 ? filtered : undefined);
     },
@@ -264,8 +267,8 @@ export function useBorrowFormUrlState(options: UseBorrowFormUrlStateOptions = {}
   // Helper to set quantity for an item
   const setItemQuantity = useCallback(
     (itemId: string, quantity: number) => {
-      // Validate quantity is at least 0.01
-      if (quantity < 0.01) {
+      // Validate quantity is at least 1 and is an integer
+      if (quantity < 1 || !Number.isInteger(quantity)) {
         return;
       }
 

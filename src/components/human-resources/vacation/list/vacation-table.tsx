@@ -10,7 +10,8 @@ import { useVacationMutations, useVacations } from "../../../../hooks";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -49,6 +50,8 @@ export function VacationTable({ filters, onDataChange, className }: VacationTabl
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ items: Vacation[]; isBulk: boolean } | null>(null);
 
+  // Use viewport boundary checking hook
+  
   // Use URL state management for pagination and selection
   const {
     page,
@@ -452,12 +455,17 @@ export function VacationTable({ filters, onDataChange, className }: VacationTabl
 
       {/* Context Menu */}
       {contextMenu && (
-        <div className="fixed z-50" style={{ left: contextMenu.x, top: contextMenu.y }}>
-          <DropdownMenu open={true} onOpenChange={() => setContextMenu(null)}>
-            <DropdownMenuTrigger asChild>
-              <div className="w-0 h-0" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
+        <DropdownMenu open={true} onOpenChange={() => setContextMenu(null)}>
+          <DropdownMenuTrigger asChild>
+            <div className="w-0 h-0" />
+          </DropdownMenuTrigger>
+          <PositionedDropdownMenuContent
+            position={contextMenu}
+            isOpen={!!contextMenu}
+            align="start"
+            className="w-48"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
               {contextMenu.vacations.length === 1 ? (
                 <>
                   <DropdownMenuItem onClick={() => handleView(contextMenu.vacations[0])}>
@@ -495,9 +503,8 @@ export function VacationTable({ filters, onDataChange, className }: VacationTabl
                   </DropdownMenuItem>
                 </>
               )}
-            </DropdownMenuContent>
+            </PositionedDropdownMenuContent>
           </DropdownMenu>
-        </div>
       )}
 
       {/* Delete Confirmation Dialog */}

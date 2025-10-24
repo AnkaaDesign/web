@@ -10,7 +10,8 @@ import { useSectorMutations, useSectors } from "../../../../hooks";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -92,6 +93,8 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
     isBulk: boolean;
   } | null>(null);
 
+  // Use viewport boundary checking hook
+  
   // Delete confirmation dialog state
   const [deleteDialog, setDeleteDialog] = useState<{ items: Sector[]; isBulk: boolean } | null>(null);
 
@@ -534,14 +537,11 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
 
       {/* Context Menu */}
       <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
-        <DropdownMenuContent
-          style={{
-            position: "fixed",
-            left: contextMenu?.x,
-            top: contextMenu?.y,
-          }}
-          className="w-56"
-          onCloseAutoFocus={(e) => e.preventDefault()}
+        <PositionedDropdownMenuContent
+        position={contextMenu}
+        isOpen={!!contextMenu}
+        className="w-56 ![position:fixed]"
+        onCloseAutoFocus={(e) => e.preventDefault()}
         >
           {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.sectors.length} setores selecionados</div>}
 
@@ -563,7 +563,7 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
             <IconTrash className="mr-2 h-4 w-4" />
             {contextMenu?.isBulk && contextMenu.sectors.length > 1 ? "Excluir selecionados" : "Excluir"}
           </DropdownMenuItem>
-        </DropdownMenuContent>
+        </PositionedDropdownMenuContent>
       </DropdownMenu>
 
       {/* Delete Confirmation Dialog */}

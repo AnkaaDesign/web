@@ -1,7 +1,9 @@
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { IconPlayerPlay, IconPlayerPause, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconEye, IconTrash, IconEditCircle, IconFileInvoice } from "@tabler/icons-react";
-import { TASK_STATUS } from "../../../../constants";
+import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
+import { useAuth } from "@/contexts/auth-context";
 
 interface TaskTableContextMenuProps {
   contextMenu: {
@@ -16,7 +18,14 @@ interface TaskTableContextMenuProps {
 export type TaskAction = "start" | "finish" | "pause" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete";
 
 export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTableContextMenuProps) {
+  const { user } = useAuth();
+
   if (!contextMenu) return null;
+
+  // WAREHOUSE users should not see any context menu
+  if (user?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE) {
+    return null;
+  }
 
   const { tasks } = contextMenu;
   const isMultiSelection = tasks.length > 1;
@@ -25,6 +34,9 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
   const hasOnHoldTasks = tasks.some((t) => t.status === TASK_STATUS.ON_HOLD);
   const hasCompletedTasks = tasks.some((t) => t.status === TASK_STATUS.COMPLETED);
 
+  // FINANCIAL users should only see View and Edit options
+  const isFinancialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
+
   const handleAction = (action: TaskAction) => {
     onAction(action, tasks);
     onClose();
@@ -32,12 +44,9 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
 
   return (
     <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && onClose()}>
-      <DropdownMenuContent
-        style={{
-          position: "fixed",
-          left: contextMenu.x,
-          top: contextMenu.y,
-        }}
+      <PositionedDropdownMenuContent
+        position={contextMenu}
+        isOpen={!!contextMenu}
         className="w-56"
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
@@ -51,30 +60,30 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           </DropdownMenuItem>
         )}
 
-        {/* Status actions */}
-        {(hasPendingTasks || hasOnHoldTasks) && (
+        {/* Status actions - not available for FINANCIAL users */}
+        {!isFinancialUser && (hasPendingTasks || hasOnHoldTasks) && (
           <DropdownMenuItem onClick={() => handleAction("start")} className="text-green-700 hover:text-white">
             <IconPlayerPlay className="mr-2 h-4 w-4" />
             Iniciar
           </DropdownMenuItem>
         )}
 
-        {(hasInProgressTasks || hasOnHoldTasks || hasPendingTasks) && (
+        {!isFinancialUser && (hasInProgressTasks || hasOnHoldTasks || hasPendingTasks) && (
           <DropdownMenuItem onClick={() => handleAction("pause")} className="text-blue-600 hover:text-white">
             <IconPlayerPause className="mr-2 h-4 w-4" />
             {hasPendingTasks && !hasInProgressTasks ? "Colocar em Espera" : "Pausar"}
           </DropdownMenuItem>
         )}
 
-        {hasInProgressTasks && (
+        {!isFinancialUser && hasInProgressTasks && (
           <DropdownMenuItem onClick={() => handleAction("finish")} className="text-green-700 hover:text-white">
             <IconCheck className="mr-2 h-4 w-4" />
             Finalizar
           </DropdownMenuItem>
         )}
 
-        {/* Separator if we have status actions */}
-        {(hasPendingTasks || hasOnHoldTasks || hasInProgressTasks) && <DropdownMenuSeparator />}
+        {/* Separator if we have status actions - not for FINANCIAL users */}
+        {!isFinancialUser && (hasPendingTasks || hasOnHoldTasks || hasInProgressTasks) && <DropdownMenuSeparator />}
 
         {/* Edit actions */}
         <DropdownMenuItem onClick={() => handleAction("edit")}>
@@ -82,33 +91,38 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           {isMultiSelection ? "Editar em lote" : "Editar"}
         </DropdownMenuItem>
 
-        {!isMultiSelection && (
+        {/* Additional actions - not available for FINANCIAL users */}
+        {!isFinancialUser && !isMultiSelection && (
           <DropdownMenuItem onClick={() => handleAction("duplicate")}>
             <IconCopy className="mr-2 h-4 w-4" />
             Duplicar
           </DropdownMenuItem>
         )}
 
-        <DropdownMenuItem onClick={() => handleAction("setSector")}>
-          <IconBuildingFactory2 className="mr-2 h-4 w-4" />
-          {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}
-        </DropdownMenuItem>
+        {!isFinancialUser && (
+          <DropdownMenuItem onClick={() => handleAction("setSector")}>
+            <IconBuildingFactory2 className="mr-2 h-4 w-4" />
+            {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}
+          </DropdownMenuItem>
+        )}
 
-        {hasCompletedTasks && (
+        {!isFinancialUser && hasCompletedTasks && (
           <DropdownMenuItem onClick={() => handleAction("setStatus")}>
             <IconFileInvoice className="mr-2 h-4 w-4" />
             Alterar Status
           </DropdownMenuItem>
         )}
 
-        <DropdownMenuSeparator />
+        {!isFinancialUser && <DropdownMenuSeparator />}
 
-        {/* Delete action */}
-        <DropdownMenuItem onClick={() => handleAction("delete")} className="text-destructive">
-          <IconTrash className="mr-2 h-4 w-4" />
-          {isMultiSelection ? "Excluir selecionadas" : "Excluir"}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
+        {/* Delete action - not available for FINANCIAL users */}
+        {!isFinancialUser && (
+          <DropdownMenuItem onClick={() => handleAction("delete")} className="text-destructive">
+            <IconTrash className="mr-2 h-4 w-4" />
+            {isMultiSelection ? "Excluir selecionadas" : "Excluir"}
+          </DropdownMenuItem>
+        )}
+      </PositionedDropdownMenuContent>
     </DropdownMenu>
   );
 }

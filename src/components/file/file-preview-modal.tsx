@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../types";
 import { isImageFile, isVideoFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension } from "../../utils/file";
+// No PDF.js imports needed - using native browser PDF viewer
 
 // Types for touch gestures and zoom
 interface TouchState {
@@ -43,9 +44,10 @@ const isEpsFile = (file: AnkaaFile): boolean => {
   return epsMimeTypes.includes(file.mimetype.toLowerCase());
 };
 
-// Check if file can be previewed (images, videos, or EPS with thumbnails)
+// Check if file can be previewed (images, videos, PDFs, or EPS with thumbnails)
 const isPreviewableFile = (file: AnkaaFile): boolean => {
-  return isImageFile(file) || isVideoFile(file) || (isEpsFile(file) && !!file.thumbnailUrl);
+  const isPdf = getFileExtension(file.filename).toLowerCase() === "pdf";
+  return isImageFile(file) || isVideoFile(file) || isPdf || (isEpsFile(file) && !!file.thumbnailUrl);
 };
 
 export interface FilePreviewModalProps {
@@ -83,6 +85,8 @@ export function FilePreviewModal({
   const [panX, setPanX] = React.useState(0);
   const [panY, setPanY] = React.useState(0);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [pdfIframeHeight, setPdfIframeHeight] = React.useState<number>(0);
+  const [pdfBlobUrl, setPdfBlobUrl] = React.useState<string | null>(null);
 
   // Touch and gesture states
   const [touchState, setTouchState] = React.useState<TouchState | null>(null);
@@ -117,6 +121,54 @@ export function FilePreviewModal({
     setImageLoading(true);
     setImageError(false);
   }, [currentIndex, fitZoom]);
+
+  // Fetch PDF as blob to bypass X-Frame-Options
+  React.useEffect(() => {
+    const currentFile = files[currentIndex];
+    const isPdfFile = currentFile && getFileExtension(currentFile.filename).toLowerCase() === "pdf";
+
+    if (isPdfFile) {
+      const fetchPdfBlob = async () => {
+        try {
+          const response = await fetch(getFileUrl(currentFile, baseUrl));
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          setPdfBlobUrl(blobUrl);
+        } catch (error) {
+          console.error("Error fetching PDF:", error);
+          setPdfBlobUrl(null);
+        }
+      };
+      fetchPdfBlob();
+
+      // Cleanup blob URL when component unmounts or file changes
+      return () => {
+        if (pdfBlobUrl) {
+          URL.revokeObjectURL(pdfBlobUrl);
+        }
+      };
+    } else {
+      setPdfBlobUrl(null);
+    }
+  }, [currentIndex, files, baseUrl]);
+
+  // Calculate PDF iframe height
+  React.useEffect(() => {
+    const currentFile = files[currentIndex];
+    const isPdfFile = currentFile && getFileExtension(currentFile.filename).toLowerCase() === "pdf";
+
+    if (containerRef.current && isPdfFile) {
+      const updateHeight = () => {
+        if (containerRef.current) {
+          const height = containerRef.current.clientHeight - 160;
+          setPdfIframeHeight(Math.max(height, 600));
+        }
+      };
+      updateHeight();
+      window.addEventListener('resize', updateHeight);
+      return () => window.removeEventListener('resize', updateHeight);
+    }
+  }, [currentIndex, files]);
 
   // Initialize current index
   React.useEffect(() => {
@@ -457,7 +509,7 @@ export function FilePreviewModal({
 
             <div className="flex items-center gap-2 pointer-events-auto">
               {/* Zoom and Tools for Images */}
-              {isCurrentFilePreviewable && (
+              {isCurrentFilePreviewable && !isPDF && (
                 <div className="flex items-center gap-1 bg-black/90 backdrop-blur-xl rounded-xl p-1 border border-white/20 shadow-2xl">
                   <Button
                     variant="ghost"
@@ -508,6 +560,7 @@ export function FilePreviewModal({
                   )}
                 </div>
               )}
+
 
               {/* Action Buttons */}
               <div className="flex items-center gap-1 bg-black/90 backdrop-blur-xl rounded-xl p-1 border border-white/20 shadow-2xl">
@@ -581,7 +634,29 @@ export function FilePreviewModal({
             onWheel={handleWheel}
           >
             {isCurrentFilePreviewable ? (
-              isVideo ? (
+              isPDF ? (
+                // Native PDF Viewer using blob URL to bypass X-Frame-Options
+                <div className="w-full h-full flex items-center justify-center">
+                  {pdfBlobUrl ? (
+                    <iframe
+                      src={`${pdfBlobUrl}#toolbar=1&navpanes=1&scrollbar=1`}
+                      className="w-full rounded-lg shadow-2xl bg-white"
+                      style={{
+                        height: `${pdfIframeHeight > 0 ? pdfIframeHeight : 600}px`,
+                        maxHeight: '85vh',
+                        border: 'none'
+                      }}
+                      title={currentFile.filename}
+                      onLoad={() => setImageLoading(false)}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-4">
+                      <div className="animate-spin rounded-full h-12 w-12 border-2 border-white border-t-transparent" />
+                      <span className="text-white text-sm">Carregando PDF...</span>
+                    </div>
+                  )}
+                </div>
+              ) : isVideo ? (
                 <div className="w-full max-w-5xl mx-auto">
                   <video
                     key={currentFile.id}
@@ -660,24 +735,6 @@ export function FilePreviewModal({
                   )}
                 </>
               )
-            ) : isPDF ? (
-              <div className="flex flex-col items-center justify-center gap-6 bg-white/10 backdrop-blur-sm rounded-xl p-8 max-w-md">
-                <div className="text-8xl">📄</div>
-                <div className="text-center">
-                  <h3 className="text-white text-xl font-medium mb-3">{currentFile.filename}</h3>
-                  <p className="text-white/70 text-sm mb-6">Documento PDF • {formatFileSize(currentFile.size)}</p>
-                  <div className="flex gap-3">
-                    <Button variant="outline" onClick={handleOpenExternal} className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                      <IconExternalLink className="h-4 w-4 mr-2" />
-                      Abrir PDF
-                    </Button>
-                    <Button variant="outline" onClick={handleDownload} className="bg-white/10 border-white/20 text-white hover:bg-white/20">
-                      <IconDownload className="h-4 w-4 mr-2" />
-                      Baixar
-                    </Button>
-                  </div>
-                </div>
-              </div>
             ) : isEPS && !currentFile.thumbnailUrl ? (
               <div className="flex flex-col items-center justify-center gap-6 bg-white/10 backdrop-blur-sm rounded-xl p-8 max-w-md">
                 <IconVectorBezier className="h-20 w-20 text-indigo-400" />

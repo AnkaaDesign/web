@@ -64,6 +64,7 @@ export function FormulaManager({ formulas, onFormulasChange, paintId, availableI
                 id: formulas[0].components?.[index]?.id || `temp-comp-${Date.now()}-${index}`,
                 itemId: c?.itemId || "",
                 formulaPaintId: formulas[0].id || "",
+                weightInGrams: c?.weightInGrams || 0, // Preserve the original weight
                 ratio: ratio,
                 createdAt: formulas[0].components?.[index]?.createdAt || new Date(),
                 updatedAt: new Date(),

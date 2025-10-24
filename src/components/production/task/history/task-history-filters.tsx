@@ -16,6 +16,8 @@ import { useSectors, useCustomers, useUsers } from "../../../../hooks";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
 import { formatCurrency } from "../../../../utils";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
+import type { Customer } from "../../../../types";
 
 interface TaskHistoryFiltersProps {
   open: boolean;
@@ -28,7 +30,7 @@ interface TaskHistoryFiltersProps {
 export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange, canViewPrice = true }: TaskHistoryFiltersProps) {
   // Load data for selectors
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" } });
-  const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" } });
+  const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" }, include: { logo: true } });
   const { data: usersData } = useUsers({
     orderBy: { name: "asc" },
     where: {
@@ -205,8 +207,23 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
                 customersData?.data?.map((customer) => ({
                   value: customer.id,
                   label: customer.fantasyName,
+                  logo: customer.logo,
                 })) || []
               }
+              renderOption={(option, isSelected) => (
+                <div className="flex items-center gap-3 w-full">
+                  <CustomerLogoDisplay
+                    logo={(option as any).logo}
+                    customerName={option.label}
+                    size="sm"
+                    shape="rounded"
+                    className="flex-shrink-0"
+                  />
+                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                    <div className="font-medium truncate">{option.label}</div>
+                  </div>
+                </div>
+              )}
             />
           </div>
 

@@ -152,7 +152,8 @@ export const FileViewerProvider: React.FC<React.PropsWithChildren<FileViewerProp
         } else if (component === "video-player") {
           openVideoModal(file, url);
         } else if (component === "pdf-viewer") {
-          openPdfModal(file, url);
+          // Route PDFs to the FilePreview modal (which now supports inline PDF viewing)
+          openImageModal([file], 0);
         }
       },
       onInlinePlayer: (url, _targetFile) => {

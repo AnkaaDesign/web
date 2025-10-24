@@ -6,7 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { IconChevronUp, IconChevronDown, IconSelector, IconEdit, IconTrash, IconEye, IconAlertTriangle, IconTag } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { usePaintBrandMutations, usePaintBrandBatchMutations, usePaintBrands } from "../../../../hooks";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { PaintBrandGetManyFormData } from "../../../../schemas";
@@ -78,6 +79,8 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
     isBulk: boolean;
   } | null>(null);
 
+  // Use viewport boundary checking hook
+  
   // Delete confirmation dialog state
   const [deleteDialog, setDeleteDialog] = useState<{ items: PaintBrand[]; isBulk: boolean } | null>(null);
 
@@ -460,14 +463,11 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
 
       {/* Context Menu */}
       <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
-        <DropdownMenuContent
-          style={{
-            position: "fixed",
-            left: contextMenu?.x,
-            top: contextMenu?.y,
-          }}
-          className="w-56"
-          onCloseAutoFocus={(e) => e.preventDefault()}
+        <PositionedDropdownMenuContent
+        position={contextMenu}
+        isOpen={!!contextMenu}
+        className="w-56 ![position:fixed]"
+        onCloseAutoFocus={(e) => e.preventDefault()}
         >
           {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.paintBrands.length} marcas de tinta selecionadas</div>}
 
@@ -489,7 +489,7 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
             <IconTrash className="mr-2 h-4 w-4" />
             {contextMenu?.isBulk && contextMenu.paintBrands.length > 1 ? "Excluir selecionados" : "Excluir"}
           </DropdownMenuItem>
-        </DropdownMenuContent>
+        </PositionedDropdownMenuContent>
       </DropdownMenu>
 
       {/* Delete Confirmation Dialog */}

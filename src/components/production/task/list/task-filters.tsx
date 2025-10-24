@@ -15,6 +15,7 @@ import type { TaskGetManyFormData } from "../../../../schemas";
 import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
 import { IconChevronDown, IconChevronRight, IconFilter, IconX } from "@tabler/icons-react";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 
 interface TaskFiltersProps {
   open: boolean;
@@ -40,7 +41,7 @@ const filterSections: FilterSection[] = [
 export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: TaskFiltersProps) {
   // Load entity data
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" } });
-  const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" } });
+  const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" }, include: { logo: true } });
   const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
 
   const sectors = sectorsData?.data || [];
@@ -315,6 +316,12 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
                         {customers.map((customer) => (
                           <label key={customer.id} className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded">
                             <Checkbox checked={localFilters.customerIds?.includes(customer.id) || false} onCheckedChange={() => handleCustomerToggle(customer.id)} />
+                            <CustomerLogoDisplay
+                              logo={customer.logo}
+                              customerName={customer.fantasyName}
+                              size="xs"
+                              shape="rounded"
+                            />
                             <span className="text-sm truncate">{customer.fantasyName}</span>
                           </label>
                         ))}

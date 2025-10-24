@@ -18,6 +18,7 @@ export function CustomerCell({ control, index }: CustomerCellProps) {
     const params: any = {
       orderBy: { fantasyName: "asc" },
       take: 50,
+      include: { logo: true },
     };
 
     if (search && search.trim()) {
@@ -60,7 +61,7 @@ export function CustomerCell({ control, index }: CustomerCellProps) {
                   <div className="flex flex-col min-w-0 flex-1">
                     <span className="font-medium truncate">{customer.fantasyName}</span>
                     {customer.cnpj && (
-                      <span className="text-xs text-muted-foreground">{formatCNPJ(customer.cnpj)}</span>
+                      <span className="text-xs text-foreground/60">{formatCNPJ(customer.cnpj)}</span>
                     )}
                   </div>
                 </div>

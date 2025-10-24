@@ -35,7 +35,7 @@ export const createOrderColumns = (): OrderColumn[] => [
     className: "w-56",
   },
   {
-    key: "status",
+    key: "statusOrder",
     header: "STATUS",
     accessor: (order) => <OrderStatusBadge status={order.status} />,
     sortable: true,
@@ -97,5 +97,5 @@ export const createOrderColumns = (): OrderColumn[] => [
 
 // Default visible columns
 export const getDefaultVisibleColumns = (): Set<string> => {
-  return new Set(["description", "supplier.fantasyName", "status", "itemCount", "total", "forecast"]);
+  return new Set(["description", "supplier.fantasyName", "statusOrder", "itemCount", "total", "forecast"]);
 };

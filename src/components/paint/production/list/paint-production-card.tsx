@@ -71,7 +71,7 @@ export function PaintProductionCard({ production }: PaintProductionCardProps) {
       {/* Header with paint color preview */}
       <div className="flex items-center gap-3 p-4 border-b border-neutral-200 dark:border-neutral-700">
         {/* Color preview with finish effect */}
-        <div className="w-12 h-12 rounded-md border border-border flex-shrink-0 overflow-hidden">
+        <div className="w-12 h-12 rounded-md ring-1 ring-border/50 shadow-sm flex-shrink-0 overflow-hidden">
           {paint?.finish ? (
             <CanvasNormalMapRenderer baseColor={paintColor} finish={paint.finish as PAINT_FINISH} width={48} height={48} quality="medium" className="w-full h-full" />
           ) : (

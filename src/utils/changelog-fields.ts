@@ -1634,7 +1634,19 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return value.toLocaleString("pt-BR");
   }
 
-  // Handle date formatting
+  // Handle date formatting - first check for ISO date strings generically
+  if (typeof value === "string") {
+    // Match ISO 8601 date format (e.g., "2025-10-20T03:00:00.000Z")
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
+    if (isoDateRegex.test(value)) {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        return formatDateTime(date);
+      }
+    }
+  }
+
+  // Handle date formatting for known date fields
   if (
     field === "createdAt" ||
     field === "updatedAt" ||
@@ -1676,9 +1688,9 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     }
   }
 
-  // Handle empty strings
+  // Handle empty strings - show same as null/undefined
   if (value === "") {
-    return "Vazio";
+    return "—";
   }
 
   // Handle objects

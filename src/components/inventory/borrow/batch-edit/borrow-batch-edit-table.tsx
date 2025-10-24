@@ -9,17 +9,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
+import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { formatDate, formatDateTime } from "../../../../utils";
 import { cn } from "@/lib/utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
+import { UserCell } from "./cells/user-cell";
 
-// Schema for batch edit form - only status editing
+// Schema for batch edit form - status, quantity, and user editing
 const borrowBatchEditSchema = z.object({
   borrows: z.array(
     z.object({
       id: z.string(),
       data: z.object({
+        quantity: z.number().positive().min(0.01),
+        userId: z.string().optional(),
         status: z.enum([BORROW_STATUS.ACTIVE, BORROW_STATUS.RETURNED, BORROW_STATUS.LOST]),
         statusOrder: z.number().int().positive().optional(),
         returnedAt: z.date().nullable().optional(),
@@ -49,6 +53,8 @@ export function BorrowBatchEditTable({ borrows, onCancel, onSubmit }: BorrowBatc
       borrows: borrows.map((borrow) => ({
         id: borrow.id,
         data: {
+          quantity: borrow.quantity,
+          userId: borrow.userId,
           status: borrow.status,
           statusOrder: borrow.statusOrder || BORROW_STATUS_ORDER[borrow.status] || 1,
           returnedAt: borrow.returnedAt,
@@ -138,7 +144,7 @@ export function BorrowBatchEditTable({ borrows, onCancel, onSubmit }: BorrowBatc
                       <span className="truncate">Item</span>
                     </div>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-60">
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-80">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
                       <span className="truncate">Usuário</span>
                     </div>
@@ -150,12 +156,12 @@ export function BorrowBatchEditTable({ borrows, onCancel, onSubmit }: BorrowBatc
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-40">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                      <span className="truncate">Emprestado</span>
+                      <span className="truncate">Status</span>
                     </div>
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-40">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                      <span className="truncate">Status</span>
+                      <span className="truncate">Emprestado</span>
                     </div>
                   </TableHead>
                 </TableRow>
@@ -177,34 +183,28 @@ export function BorrowBatchEditTable({ borrows, onCancel, onSubmit }: BorrowBatc
                     >
                       <TableCell className="w-96 p-0 !border-r-0">
                         <div className="px-4 py-2">
-                          <div>
-                            <p className="font-medium">{borrow.item?.uniCode ? `${borrow.item.uniCode} - ${borrow.item.name}` : borrow.item?.name || "Item não encontrado"}</p>
-                            <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                              {borrow.item?.brand && <span>Marca: {borrow.item.brand.name}</span>}
-                              {borrow.item?.category && <span>Categoria: {borrow.item.category.name}</span>}
-                            </div>
-                          </div>
+                          <p className="font-medium">{borrow.item?.uniCode ? `${borrow.item.uniCode} - ${borrow.item.name}` : borrow.item?.name || "Item não encontrado"}</p>
                         </div>
                       </TableCell>
-                      <TableCell className="w-60 p-0 !border-r-0">
+                      <TableCell className="w-80 p-0 !border-r-0">
                         <div className="px-4 py-2">
-                          <div>
-                            <p className="font-medium">{borrow.user?.name || "Usuário não encontrado"}</p>
-                            {borrow.user?.sector && <p className="text-sm text-muted-foreground">{borrow.user.sector.name}</p>}
-                          </div>
+                          <UserCell control={form.control} index={index} />
                         </div>
                       </TableCell>
                       <TableCell className="w-32 p-0 !border-r-0">
-                        <div className="px-4 py-2 text-center">
-                          <span className="font-mono">{borrow.quantity}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="w-40 p-0 !border-r-0">
                         <div className="px-4 py-2">
-                          <div className="text-sm">
-                            <p>{formatDate(borrow.createdAt)}</p>
-                            <p className="text-muted-foreground text-xs">{formatDateTime(borrow.createdAt).split(" ")[1]}</p>
-                          </div>
+                          <FormField
+                            control={form.control}
+                            name={`borrows.${index}.data.quantity`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <Input type="decimal" decimals={2} min={0.01} className="h-8 text-sm bg-transparent" value={field.value} onChange={(value) => field.onChange(value || 0.01)} />
+                                </FormControl>
+                                <FormMessage className="text-xs" />
+                              </FormItem>
+                            )}
+                          />
                         </div>
                       </TableCell>
                       <TableCell className="w-40 p-0 !border-r-0">
@@ -233,6 +233,11 @@ export function BorrowBatchEditTable({ borrows, onCancel, onSubmit }: BorrowBatc
                               </FormItem>
                             )}
                           />
+                        </div>
+                      </TableCell>
+                      <TableCell className="w-40 p-0 !border-r-0">
+                        <div className="px-4 py-2">
+                          <p className="text-sm">{formatDateTime(borrow.createdAt)}</p>
                         </div>
                       </TableCell>
                     </TableRow>

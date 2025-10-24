@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,20 +8,16 @@ import { useActivityBatchMutations } from "../../../../hooks";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Form } from "@/components/ui/form";
-import { Label } from "@/components/ui/label";
-import { Combobox } from "@/components/ui/combobox";
-import { PageHeader } from "@/components/ui/page-header";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { routes, ACTIVITY_OPERATION } from "../../../../constants";
-import { IconLoader, IconDeviceFloppy, IconX } from "@tabler/icons-react";
-import { IconWand, IconArrowUp, IconArrowDown, IconPackage } from "@tabler/icons-react";
+import { routes } from "../../../../constants";
 import { QuantityCell } from "./cells/quantity-cell";
 import { UserCell } from "./cells/user-cell";
 import { OperationCell } from "./cells/operation-cell";
+import { ReasonCell } from "./cells/reason-cell";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { cn } from "@/lib/utils";
-import { formatDate } from "../../../../utils";
+import { formatDateTime } from "../../../../utils";
 
 // Schema for batch edit form
 const activityBatchEditSchema = z.object({
@@ -43,8 +39,6 @@ interface ActivityBatchEditTableProps {
 export function ActivityBatchEditTable({ activities, onCancel }: ActivityBatchEditTableProps) {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [globalOperation, setGlobalOperation] = useState<string | null>(null);
-  const [originalOperations, setOriginalOperations] = useState<(string | undefined)[]>([]);
   const { batchUpdateAsync } = useActivityBatchMutations();
 
   const form = useForm<ActivityBatchEditFormData>({
@@ -62,12 +56,6 @@ export function ActivityBatchEditTable({ activities, onCancel }: ActivityBatchEd
       })),
     },
   });
-
-  // Initialize original operations on mount
-  useEffect(() => {
-    const operations = activities.map((activity) => activity.operation);
-    setOriginalOperations(operations);
-  }, [activities]);
 
   const { fields } = useFieldArray({
     control: form.control,
@@ -119,92 +107,19 @@ export function ActivityBatchEditTable({ activities, onCancel }: ActivityBatchEd
 
   return (
     <Form {...form}>
-      <div className="space-y-4">
-        <PageHeader
-          title="Editar Movimentações em Lote"
-          icon={IconPackage}
-          variant="batch"
-          breadcrumbs={[
-            { label: "Home", href: "/" },
-            { label: "Estoque", href: "/estoque" },
-            { label: "Movimentações", href: routes.inventory.movements.list },
-            { label: "Editar em Lote" },
-          ]}
-          selection={{
-            count: activities.length,
-            entityName: "movimentações",
-            onClearSelection: onCancel,
-          }}
-          actions={[
-            {
-              key: "cancel",
-              label: "Cancelar",
-              icon: IconX,
-              onClick: onCancel,
-              variant: "outline",
-              disabled: isSubmitting,
-            },
-            {
-              key: "save",
-              label: "Salvar Alterações",
-              icon: isSubmitting ? IconLoader : IconDeviceFloppy,
-              onClick: form.handleSubmit(handleSubmit),
-              variant: "default",
-              disabled: isSubmitting || !form.formState.isValid,
-              loading: isSubmitting,
-            },
-          ]}
-        />
-
-        <Card className="h-full flex flex-col">
-          <CardContent className="p-6 flex-1 overflow-hidden flex flex-col">
-            {/* Global Operation Controls */}
-            <div className="mb-4 p-4 bg-background rounded-lg border border-border">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <IconWand className="h-4 w-4 text-primary" />
-                  <Label htmlFor="global-operation" className="text-sm font-medium">
-                    Operação Global:
-                  </Label>
-                </div>
-                <div className="flex-1 max-w-xs">
-                  <Combobox
-                    value={globalOperation || "none"}
-                    onValueChange={(value) => {
-                      const newOperation = value === "none" ? null : value;
-                      setGlobalOperation(newOperation);
-
-                      if (newOperation && Object.values(ACTIVITY_OPERATION).includes(newOperation as ACTIVITY_OPERATION)) {
-                        // Apply global operation to all activities
-                        activities.forEach((_, index) => {
-                          form.setValue(`activities.${index}.data.operation`, newOperation as ACTIVITY_OPERATION);
-                        });
-                      } else {
-                        // Restore original operations when global control is disabled
-                        activities.forEach((_, index) => {
-                          const originalOperation = originalOperations[index] || activities[index].operation;
-                          form.setValue(`activities.${index}.data.operation`, originalOperation as ACTIVITY_OPERATION);
-                        });
-                      }
-                    }}
-                    options={[
-                      { value: "none", label: "Manter individuais" },
-                      { value: ACTIVITY_OPERATION.INBOUND, label: "Entrada (todas)" },
-                      { value: ACTIVITY_OPERATION.OUTBOUND, label: "Saída (todas)" },
-                    ]}
-                    placeholder="Selecione operação para todas"
-                    className="h-9"
-                    searchable={false}
-                  />
-                </div>
-                {globalOperation && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></div>
-                    Aplicada a todas as movimentações
-                  </div>
-                )}
-              </div>
+      <Card className="h-full flex flex-col">
+        {/* Hidden submit button for page header to trigger */}
+        <button id="activity-batch-form-submit" type="button" onClick={form.handleSubmit(handleSubmit)} style={{ display: "none" }} disabled={isSubmitting} />
+        <CardContent className="p-6 flex-1 overflow-hidden flex flex-col">
+          <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+              <h3 className="text-sm font-medium text-foreground">
+                Editando {activities.length} {activities.length === 1 ? "movimentação selecionada" : "movimentações selecionadas"}
+              </h3>
             </div>
+            <p className="text-xs text-muted-foreground">As alterações serão aplicadas a todas as movimentações listadas abaixo</p>
+          </div>
 
             {/* Single scrollable container for both header and body */}
             <div className="border border-border rounded-lg overflow-x-auto overflow-y-auto flex-1">
@@ -213,12 +128,22 @@ export function ActivityBatchEditTable({ activities, onCancel }: ActivityBatchEd
                   <TableRow className="bg-muted hover:bg-muted even:bg-muted">
                     <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-80">
                       <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                        <span className="truncate">Item (Somente Leitura)</span>
+                        <span className="truncate">Item</span>
                       </div>
                     </TableHead>
-                    <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-32">
+                    <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-80">
+                      <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
+                        <span className="truncate">Usuário</span>
+                      </div>
+                    </TableHead>
+                    <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-40">
                       <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
                         <span className="truncate">Operação</span>
+                      </div>
+                    </TableHead>
+                    <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-60">
+                      <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
+                        <span className="truncate">Motivo</span>
                       </div>
                     </TableHead>
                     <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-32">
@@ -226,12 +151,7 @@ export function ActivityBatchEditTable({ activities, onCancel }: ActivityBatchEd
                         <span className="truncate">Quantidade</span>
                       </div>
                     </TableHead>
-                    <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-52">
-                      <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                        <span className="truncate">Usuário</span>
-                      </div>
-                    </TableHead>
-                    <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-40">
+                    <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-48">
                       <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
                         <span className="truncate">Data</span>
                       </div>
@@ -254,19 +174,23 @@ export function ActivityBatchEditTable({ activities, onCancel }: ActivityBatchEd
                         )}
                       >
                         <TableCell className="p-0 !border-r-0 w-80">
-                          <div className="px-4 py-2 text-sm">
-                            {activity.item ? (
-                              <div className="whitespace-nowrap text-foreground truncate">
-                                {activity.item.uniCode ? `${activity.item.uniCode} - ${activity.item.name}` : activity.item.name}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">Item não encontrado</span>
-                            )}
+                          <div className="px-4 py-2">
+                            <p className="font-medium">{activity.item?.uniCode ? `${activity.item.uniCode} - ${activity.item.name}` : activity.item?.name || "Item não encontrado"}</p>
                           </div>
                         </TableCell>
-                        <TableCell className="w-32 p-0 !border-r-0">
+                        <TableCell className="w-80 p-0 !border-r-0">
+                          <div className="px-4 py-2">
+                            <UserCell control={form.control} index={index} />
+                          </div>
+                        </TableCell>
+                        <TableCell className="w-40 p-0 !border-r-0">
                           <div className="px-4 py-2">
                             <OperationCell form={form} index={index} />
+                          </div>
+                        </TableCell>
+                        <TableCell className="w-60 p-0 !border-r-0">
+                          <div className="px-4 py-2">
+                            <ReasonCell control={form.control} index={index} />
                           </div>
                         </TableCell>
                         <TableCell className="w-32 p-0 !border-r-0">
@@ -274,13 +198,8 @@ export function ActivityBatchEditTable({ activities, onCancel }: ActivityBatchEd
                             <QuantityCell control={form.control} index={index} />
                           </div>
                         </TableCell>
-                        <TableCell className="w-52 p-0 !border-r-0">
-                          <div className="px-4 py-2">
-                            <UserCell control={form.control} index={index} />
-                          </div>
-                        </TableCell>
-                        <TableCell className="w-40 p-0 !border-r-0">
-                          <div className="px-4 py-2 text-sm text-muted-foreground">{formatDate(activity.createdAt)}</div>
+                        <TableCell className="w-48 p-0 !border-r-0">
+                          <div className="px-4 py-2 text-sm">{formatDateTime(activity.createdAt)}</div>
                         </TableCell>
                       </TableRow>
                     );
@@ -288,9 +207,8 @@ export function ActivityBatchEditTable({ activities, onCancel }: ActivityBatchEd
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+        </CardContent>
+      </Card>
     </Form>
   );
 }

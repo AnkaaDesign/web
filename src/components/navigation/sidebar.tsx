@@ -11,8 +11,10 @@ import { getFilteredMenuForUser, getTablerIcon } from "../../utils";
 import { maskPhone, getPageIconName, isPageCadastrar } from "../../utils";
 import { fixNavigationPath } from "@/utils/route-validation";
 import { useAuth } from "@/contexts/auth-context";
-import { IconLogout, IconUser, IconSettings, IconChevronRight, IconMenu2, IconStarFilled, IconServer } from "@tabler/icons-react";
+import { IconLogout, IconUser, IconSettings, IconChevronRight, IconMenu2, IconStarFilled, IconServer, IconExternalLink } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 
 import {
   IconDashboard,
@@ -229,7 +231,7 @@ const renderFavoriteIcon = (fav: any, size: number = 20) => {
 export const Sidebar = memo(() => {
   const { isOpen } = useSidebar();
   const { user, logout } = useAuth();
-  const { favorites } = useFavorites();
+  const { favorites, toggleFavorite, isFavorite } = useFavorites();
   const navigate = useNavigate();
   const location = useLocation();
   const { theme } = useTheme();
@@ -246,6 +248,7 @@ export const Sidebar = memo(() => {
     const stored = localStorage.getItem("ankaa-sidebar-show-favorites");
     return stored !== null ? stored === "true" : true;
   });
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: any } | null>(null);
 
   // Refs
   const timeoutRef = useRef<number | null>(null);
@@ -610,6 +613,8 @@ export const Sidebar = memo(() => {
     clearNavigationTimeout();
   }, [location.pathname, clearNavigationTimeout]);
 
+  // Context menu positioning is now handled by PositionedDropdownMenuContent
+
   // Handle popover mouse events
   const handleMouseEnter = useCallback(
     (itemId: string, item: any, element: HTMLElement) => {
@@ -623,9 +628,46 @@ export const Sidebar = memo(() => {
 
       const rect = element.getBoundingClientRect();
       setHoveredItemId(itemId);
+
+      // Calculate initial position
+      let top = rect.top;
+      let left = rect.right + 8;
+
+      // Add viewport boundary checking for popover
+      // Estimate popover dimensions (will be adjusted after render if needed)
+      const estimatedPopoverWidth = 250; // Increased for better safety
+      const estimatedPopoverHeight = 400; // Increased conservative estimate
+      const minPadding = 8;
+      const viewport = {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      };
+
+      // Adjust if popover would go off the right edge
+      if (left + estimatedPopoverWidth > viewport.width - minPadding) {
+        // Try to show on the left side of the sidebar instead
+        left = Math.max(minPadding, rect.left - estimatedPopoverWidth - 8);
+
+        // If still off-screen, constrain to viewport
+        if (left < minPadding) {
+          left = viewport.width - estimatedPopoverWidth - minPadding;
+        }
+      }
+
+      // Adjust if popover would go off the bottom edge
+      if (top + estimatedPopoverHeight > viewport.height - minPadding) {
+        top = Math.max(minPadding, viewport.height - estimatedPopoverHeight - minPadding);
+      }
+
+      // Ensure minimum padding from top edge
+      top = Math.max(minPadding, top);
+
+      // Ensure minimum padding from left edge
+      left = Math.max(minPadding, left);
+
       setPopoverPosition({
-        top: rect.top,
-        left: rect.right + 8,
+        top,
+        left,
         item,
       });
 
@@ -671,6 +713,15 @@ export const Sidebar = memo(() => {
     const isNavigating = navigatingItemId === item.id;
 
     const handleItemClick = (e: React.MouseEvent) => {
+      // Check if Ctrl (or Cmd on Mac) is pressed or if it's a middle-click
+      const shouldOpenInNewTab = e.ctrlKey || e.metaKey || e.button === 1;
+
+      if (shouldOpenInNewTab && item.path) {
+        e.preventDefault();
+        window.open(fixNavigationPath(item.path), '_blank');
+        return;
+      }
+
       e.preventDefault();
 
       // If we have a path
@@ -691,6 +742,13 @@ export const Sidebar = memo(() => {
       }
     };
 
+    const handleContextMenu = (e: React.MouseEvent) => {
+      if (item.path) {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, item });
+      }
+    };
+
     const handleChevronClick = (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -708,6 +766,7 @@ export const Sidebar = memo(() => {
             !isNavigating && !isActive && !hasActive && !isPathUnderItem(item) && "hover:bg-muted/50",
           )}
           onClick={handleItemClick}
+          onContextMenu={handleContextMenu}
           onMouseEnter={(e) => handleMouseEnter(item.id, item, e.currentTarget)}
           onMouseLeave={handleMouseLeave}
         >
@@ -769,6 +828,10 @@ export const Sidebar = memo(() => {
                 onClick={() => {
                   startNavigation("favorites", routes.favorites);
                 }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu({ x: e.clientX, y: e.clientY, item: { path: routes.favorites, title: "Favoritos" } });
+                }}
                 className={cn(
                   "w-full px-3 py-2 text-sm font-medium border-b border-border truncate flex items-center gap-2 rounded-md transition-colors",
                   location.pathname === routes.favorites ? "bg-primary text-primary-foreground" : "hover:bg-muted",
@@ -782,8 +845,18 @@ export const Sidebar = memo(() => {
                   {favorites.map((fav: any) => (
                     <button
                       key={fav.id}
-                      onClick={() => {
-                        startNavigation(fav.id, fav.path, true);
+                      onClick={(e) => {
+                        const shouldOpenInNewTab = e.ctrlKey || e.metaKey || e.button === 1;
+                        if (shouldOpenInNewTab) {
+                          e.preventDefault();
+                          window.open(fav.path, '_blank');
+                        } else {
+                          startNavigation(fav.id, fav.path, true);
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({ x: e.clientX, y: e.clientY, item: fav });
                       }}
                       className={cn(
                         "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
@@ -803,10 +876,22 @@ export const Sidebar = memo(() => {
               {item.children.map((child: any) => (
                 <button
                   key={child.id || child.path}
-                  onClick={() => {
+                  onClick={(e) => {
                     if (child.path) {
-                      navigationSourceRef.current = "menu";
-                      startNavigation(child.id, fixNavigationPath(child.path));
+                      const shouldOpenInNewTab = e.ctrlKey || e.metaKey || e.button === 1;
+                      if (shouldOpenInNewTab) {
+                        e.preventDefault();
+                        window.open(fixNavigationPath(child.path), '_blank');
+                      } else {
+                        navigationSourceRef.current = "menu";
+                        startNavigation(child.id, fixNavigationPath(child.path));
+                      }
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    if (child.path) {
+                      e.preventDefault();
+                      setContextMenu({ x: e.clientX, y: e.clientY, item: child });
                     }
                   }}
                   className={cn(
@@ -914,7 +999,19 @@ export const Sidebar = memo(() => {
                     location.pathname === routes.favorites ? "bg-primary text-primary-foreground" : "hover:bg-muted/50",
                     showFavorites && location.pathname !== routes.favorites && "bg-muted/30",
                   )}
-                  onClick={() => navigate(routes.favorites)}
+                  onClick={(e) => {
+                    const shouldOpenInNewTab = e.ctrlKey || e.metaKey || e.button === 1;
+                    if (shouldOpenInNewTab) {
+                      e.preventDefault();
+                      window.open(routes.favorites, '_blank');
+                    } else {
+                      navigate(routes.favorites);
+                    }
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({ x: e.clientX, y: e.clientY, item: { path: routes.favorites, title: "Favoritos" } });
+                  }}
                   onMouseEnter={(e) => !isOpen && handleMouseEnter("favorites", { id: "favorites", title: "Favoritos", children: favorites }, e.currentTarget)}
                   onMouseLeave={handleMouseLeave}
                 >
@@ -948,9 +1045,19 @@ export const Sidebar = memo(() => {
                           "flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors text-sm",
                           location.pathname === fav.path ? "bg-primary text-primary-foreground" : "hover:bg-muted/50",
                         )}
-                        onClick={() => {
-                          navigationSourceRef.current = "favorite";
-                          navigate(fav.path);
+                        onClick={(e) => {
+                          const shouldOpenInNewTab = e.ctrlKey || e.metaKey || e.button === 1;
+                          if (shouldOpenInNewTab) {
+                            e.preventDefault();
+                            window.open(fav.path, '_blank');
+                          } else {
+                            navigationSourceRef.current = "favorite";
+                            navigate(fav.path);
+                          }
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setContextMenu({ x: e.clientX, y: e.clientY, item: fav });
                         }}
                       >
                         <div className="w-5 flex-shrink-0">{renderFavoriteIcon(fav)}</div>
@@ -976,6 +1083,48 @@ export const Sidebar = memo(() => {
       </aside>
 
       <PopoverPortal />
+
+      {/* Navigation Context Menu */}
+      <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
+        <PositionedDropdownMenuContent
+          position={contextMenu}
+          isOpen={!!contextMenu}
+          className="w-56"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          {contextMenu?.item && (
+            <>
+              <DropdownMenuItem
+                onClick={() => {
+                  window.open(fixNavigationPath(contextMenu.item.path), '_blank');
+                  setContextMenu(null);
+                }}
+              >
+                <IconExternalLink className="mr-2 h-4 w-4" />
+                Abrir em nova aba
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem
+                onClick={() => {
+                  toggleFavorite({
+                    path: contextMenu.item.path,
+                    title: contextMenu.item.title,
+                    icon: contextMenu.item.icon,
+                  });
+                  setContextMenu(null);
+                }}
+              >
+                <IconStarFilled
+                  className={cn("mr-2 h-4 w-4", isFavorite(contextMenu.item.path) ? "text-yellow-500" : "text-muted-foreground")}
+                />
+                {isFavorite(contextMenu.item.path) ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+              </DropdownMenuItem>
+            </>
+          )}
+        </PositionedDropdownMenuContent>
+      </DropdownMenu>
     </>
   );
 });

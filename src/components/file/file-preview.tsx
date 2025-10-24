@@ -1,5 +1,5 @@
 import * as React from "react";
-import { IconArrowLeft, IconArrowRight, IconX, IconZoomIn, IconZoomOut, IconDownload, IconExternalLink, IconVectorBezier } from "@tabler/icons-react";
+import { IconArrowLeft, IconArrowRight, IconX, IconZoomIn, IconZoomOut, IconDownload, IconExternalLink, IconVectorBezier, IconChevronLeft, IconChevronRight, IconMaximize } from "@tabler/icons-react";
 import { Dialog, DialogPortal, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { VisuallyHidden } from "@/components/ui/visually-hidden";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../types";
 import { isImageFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension, getApiBaseUrl } from "../../utils/file";
 import { isPDFFile } from "../../utils/pdf-thumbnail";
+// No PDF.js imports needed - using native browser PDF viewer
 
 const isEpsFile = (file: AnkaaFile): boolean => {
   const epsMimeTypes = ["application/postscript", "application/x-eps", "application/eps", "image/eps", "image/x-eps"];
@@ -29,6 +30,10 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
   const [imageLoading, setImageLoading] = React.useState(true);
   const imageRef = React.useRef<HTMLImageElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+
+  // PDF iframe height state
+  const [pdfIframeHeight, setPdfIframeHeight] = React.useState<number>(0);
+  const [pdfBlobUrl, setPdfBlobUrl] = React.useState<string | null>(null);
 
   // Filter images, PDFs, and EPS files with thumbnails for gallery navigation
   const imageFiles = React.useMemo(
@@ -60,6 +65,54 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
   React.useEffect(() => {
     setImageLoading(true);
   }, [currentIndex]);
+
+  // Fetch PDF as blob to bypass X-Frame-Options
+  React.useEffect(() => {
+    const currentFile = files[currentIndex];
+    const isPdfFile = currentFile && getFileExtension(currentFile.filename).toLowerCase() === "pdf";
+
+    if (isPdfFile) {
+      const fetchPdfBlob = async () => {
+        try {
+          const response = await fetch(getFileUrl(currentFile, baseUrl));
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          setPdfBlobUrl(blobUrl);
+        } catch (error) {
+          console.error("Error fetching PDF:", error);
+          setPdfBlobUrl(null);
+        }
+      };
+      fetchPdfBlob();
+
+      // Cleanup blob URL when component unmounts or file changes
+      return () => {
+        if (pdfBlobUrl) {
+          URL.revokeObjectURL(pdfBlobUrl);
+        }
+      };
+    } else {
+      setPdfBlobUrl(null);
+    }
+  }, [currentIndex, files, baseUrl]);
+
+  // Calculate PDF iframe height based on container
+  React.useEffect(() => {
+    const currentFile = files[currentIndex];
+    const isPdfFile = currentFile && getFileExtension(currentFile.filename).toLowerCase() === "pdf";
+
+    if (containerRef.current && isPdfFile) {
+      const updateHeight = () => {
+        if (containerRef.current) {
+          const height = containerRef.current.clientHeight - 160; // Account for header/padding
+          setPdfIframeHeight(Math.max(height, 400));
+        }
+      };
+      updateHeight();
+      window.addEventListener('resize', updateHeight);
+      return () => window.removeEventListener('resize', updateHeight);
+    }
+  }, [currentIndex, files]);
 
   // Update image dimensions when zoom changes
   React.useEffect(() => {
@@ -225,8 +278,8 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
             </div>
 
             <div className="flex items-center gap-2 pointer-events-auto">
-              {/* Zoom Controls for Images and EPS with thumbnails */}
-              {isCurrentFilePreviewable && (
+              {/* Image Zoom Controls (not needed for PDF - iframe has native controls) */}
+              {isCurrentFilePreviewable && !isPDF && (
                 <div className="flex items-center gap-1 bg-black/80 backdrop-blur-md rounded-lg p-1 border border-white/10">
                   <Button
                     variant="ghost"
@@ -301,42 +354,65 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
             onClick={zoom > fitZoom ? handleResetZoom : undefined}
           >
             {isCurrentFilePreviewable ? (
-              <>
-                {imageLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg z-10">
-                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent" />
-                  </div>
-                )}
-                <img
-                  ref={imageRef}
-                  src={
-                    // For EPS and PDF, use thumbnail
-                    (isCurrentFileEps || isCurrentFilePdf) && currentFile.thumbnailUrl
-                      ? currentFile.thumbnailUrl.startsWith("http")
-                        ? currentFile.thumbnailUrl
-                        : `${baseUrl || getApiBaseUrl()}/files/thumbnail/${currentFile.id}?size=large`
-                      // For PDF without thumbnailUrl in DB, generate on-demand
-                      : isCurrentFilePdf
-                        ? `${baseUrl || getApiBaseUrl()}/files/thumbnail/${currentFile.id}?size=large`
-                      // For images, use full resolution
-                      : getFileUrl(currentFile, baseUrl)
-                  }
-                  alt={currentFile.filename}
-                  className={cn(
-                    "transition-transform duration-200 cursor-pointer rounded-lg shadow-2xl",
-                    zoom > fitZoom && "cursor-zoom-out",
-                    (isCurrentFileEps || isCurrentFilePdf) && "border-2 border-indigo-400",
+              isPDF ? (
+                // Native PDF Viewer using blob URL to bypass X-Frame-Options
+                <div className="w-full h-full flex items-center justify-center">
+                  {imageLoading && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 z-10">
+                      <div className="animate-spin rounded-full h-12 w-12 border-2 border-white border-t-transparent" />
+                      <span className="text-white text-sm">Carregando PDF...</span>
+                    </div>
                   )}
-                  style={{
-                    transform: `scale(${zoom})`,
-                    transformOrigin: "center center",
-                    display: "block",
-                  }}
-                  onLoad={handleImageLoad}
-                  onClick={zoom === fitZoom ? handleZoomIn : handleResetZoom}
-                  draggable={false}
-                />
-              </>
+                  {pdfBlobUrl && (
+                    <iframe
+                      src={`${pdfBlobUrl}#toolbar=0&navpanes=0&scrollbar=1`}
+                      className="w-full rounded-lg shadow-2xl bg-white"
+                      style={{
+                        height: `${pdfIframeHeight > 0 ? pdfIframeHeight : 600}px`,
+                        maxHeight: '80vh',
+                        border: 'none'
+                      }}
+                      title={currentFile.filename}
+                      onLoad={() => setImageLoading(false)}
+                    />
+                  )}
+                </div>
+              ) : (
+                // Image/EPS Viewer
+                <>
+                  {imageLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm rounded-lg z-10">
+                      <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent" />
+                    </div>
+                  )}
+                  <img
+                    ref={imageRef}
+                    src={
+                      // For EPS with thumbnailUrl, use it
+                      isCurrentFileEps && currentFile.thumbnailUrl
+                        ? currentFile.thumbnailUrl.startsWith("http")
+                          ? currentFile.thumbnailUrl
+                          : `${baseUrl || getApiBaseUrl()}/files/thumbnail/${currentFile.id}?size=large`
+                        // For images, use full resolution
+                        : getFileUrl(currentFile, baseUrl)
+                    }
+                    alt={currentFile.filename}
+                    className={cn(
+                      "transition-transform duration-200 cursor-pointer rounded-lg shadow-2xl",
+                      zoom > fitZoom && "cursor-zoom-out",
+                      isCurrentFileEps && "border-2 border-indigo-400",
+                    )}
+                    style={{
+                      transform: `scale(${zoom})`,
+                      transformOrigin: "center center",
+                      display: "block",
+                    }}
+                    onLoad={handleImageLoad}
+                    onClick={zoom === fitZoom ? handleZoomIn : handleResetZoom}
+                    draggable={false}
+                  />
+                </>
+              )
             ) : isEPS && !currentFile.thumbnailUrl ? (
               <div className="flex flex-col items-center justify-center gap-4 bg-white/10 backdrop-blur-sm rounded-lg p-8 max-w-md">
                 <IconVectorBezier className="h-16 w-16 text-indigo-400" />

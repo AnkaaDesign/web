@@ -63,6 +63,7 @@ export function CustomerSelector({
         orderBy: { fantasyName: "asc" },
         page: page,
         take: 50,
+        include: { logo: true },
       };
 
       // Only add searchingFor if there's a search term

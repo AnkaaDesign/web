@@ -665,8 +665,8 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       case 2:
         // Step 2: Task Selection
         return (
-          <div className="space-y-4">
-            <div className="rounded-lg overflow-hidden" style={{ height: "540px" }}>
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 rounded-lg overflow-hidden">
               <TaskSelector
                 selectedTasks={selectedTasks}
                 onSelectTask={handleTaskSelection}
@@ -825,15 +825,8 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
         />
       </div>
 
-      {/* Form Steps Indicator (only show in create mode) */}
-      {mode === "create" && (
-        <div className="flex-shrink-0 px-4">
-          <FormSteps steps={steps} currentStep={currentStep} />
-        </div>
-      )}
-
-      <div className="flex-1 min-h-0 overflow-y-auto px-4">
-        <Card className={cn("h-full shadow-sm border border-border", className)}>
+      <div className={cn("flex-1 min-h-0 px-4", mode === "create" && currentStep === 2 ? "flex flex-col overflow-hidden" : "overflow-y-auto")}>
+        <Card className={cn("shadow-sm border border-border", mode === "create" && currentStep === 2 ? "h-full flex flex-col" : "", className)}>
           {mode === "edit" && observation?.task && (
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-3">
@@ -844,10 +837,19 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
             </CardHeader>
           )}
 
-          <CardContent className="flex-1 flex flex-col overflow-hidden">
+          <CardContent className={cn("flex-1 flex flex-col", mode === "create" && currentStep === 2 ? "overflow-hidden" : "")}>
+            {/* Form Steps Indicator (only show in create mode) */}
+            {mode === "create" && (
+              <div className="flex-shrink-0 mb-6">
+                <FormSteps steps={steps} currentStep={currentStep} />
+              </div>
+            )}
+
             <Form {...form}>
               <form id="observation-form" onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-hidden">
-                {renderStepContent()}
+                <div className={cn("flex-1 min-h-0", mode === "create" && currentStep === 2 ? "flex flex-col overflow-hidden" : "overflow-y-auto")}>
+                  {renderStepContent()}
+                </div>
               </form>
             </Form>
           </CardContent>
