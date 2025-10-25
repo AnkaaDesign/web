@@ -94,8 +94,8 @@ export function ServiceOrderList({ className }: ServiceOrderListProps) {
     const startedTo = params.get("startedTo");
     if (startedFrom || startedTo) {
       filters.startedAt = {
-        ...(startedFrom && { from: new Date(startedFrom) }),
-        ...(startedTo && { to: new Date(startedTo) }),
+        ...(startedFrom && { gte: new Date(startedFrom) }),
+        ...(startedTo && { lte: new Date(startedTo) }),
       };
     }
 
@@ -103,8 +103,8 @@ export function ServiceOrderList({ className }: ServiceOrderListProps) {
     const finishedTo = params.get("finishedTo");
     if (finishedFrom || finishedTo) {
       filters.finishedAt = {
-        ...(finishedFrom && { from: new Date(finishedFrom) }),
-        ...(finishedTo && { to: new Date(finishedTo) }),
+        ...(finishedFrom && { gte: new Date(finishedFrom) }),
+        ...(finishedTo && { lte: new Date(finishedTo) }),
       };
     }
 
@@ -141,10 +141,10 @@ export function ServiceOrderList({ className }: ServiceOrderListProps) {
     if (filters.taskIds?.length) params.tasks = filters.taskIds.join(",");
 
     // Date filters
-    if (filters.startedAt?.from) params.startedFrom = filters.startedAt.from.toISOString();
-    if (filters.startedAt?.to) params.startedTo = filters.startedAt.to.toISOString();
-    if (filters.finishedAt?.from) params.finishedFrom = filters.finishedAt.from.toISOString();
-    if (filters.finishedAt?.to) params.finishedTo = filters.finishedAt.to.toISOString();
+    if (filters.startedAt?.gte) params.startedFrom = filters.startedAt.gte.toISOString();
+    if (filters.startedAt?.lte) params.startedTo = filters.startedAt.lte.toISOString();
+    if (filters.finishedAt?.gte) params.finishedFrom = filters.finishedAt.gte.toISOString();
+    if (filters.finishedAt?.lte) params.finishedTo = filters.finishedAt.lte.toISOString();
     if (filters.createdAt?.gte) params.createdAfter = filters.createdAt.gte.toISOString();
     if (filters.createdAt?.lte) params.createdBefore = filters.createdAt.lte.toISOString();
     if (filters.updatedAt?.gte) params.updatedAfter = filters.updatedAt.gte.toISOString();
@@ -231,8 +231,8 @@ export function ServiceOrderList({ className }: ServiceOrderListProps) {
       (filters.status?.length || 0) +
       (filters.serviceIds?.length || 0) +
       (filters.taskIds?.length || 0) +
-      (filters.startedAt?.from || filters.startedAt?.to ? 1 : 0) +
-      (filters.finishedAt?.from || filters.finishedAt?.to ? 1 : 0) +
+      (filters.startedAt?.gte || filters.startedAt?.lte ? 1 : 0) +
+      (filters.finishedAt?.gte || filters.finishedAt?.lte ? 1 : 0) +
       (filters.createdAt?.gte || filters.createdAt?.lte ? 1 : 0) +
       (filters.updatedAt?.gte || filters.updatedAt?.lte ? 1 : 0)
     );

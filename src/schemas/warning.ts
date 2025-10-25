@@ -156,6 +156,17 @@ export const warningOrderBySchema = z
       updatedAt: orderByDirectionSchema.optional(),
       collaboratorId: orderByDirectionSchema.optional(),
       supervisorId: orderByDirectionSchema.optional(),
+      // Nested relation sorting
+      collaborator: z
+        .object({
+          name: orderByDirectionSchema.optional(),
+        })
+        .optional(),
+      supervisor: z
+        .object({
+          name: orderByDirectionSchema.optional(),
+        })
+        .optional(),
     }),
     z.array(
       z.object({
@@ -173,6 +184,17 @@ export const warningOrderBySchema = z
         updatedAt: orderByDirectionSchema.optional(),
         collaboratorId: orderByDirectionSchema.optional(),
         supervisorId: orderByDirectionSchema.optional(),
+        // Nested relation sorting
+        collaborator: z
+          .object({
+            name: orderByDirectionSchema.optional(),
+          })
+          .optional(),
+        supervisor: z
+          .object({
+            name: orderByDirectionSchema.optional(),
+          })
+          .optional(),
       }),
     ),
   ])

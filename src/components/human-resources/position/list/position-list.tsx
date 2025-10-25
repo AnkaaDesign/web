@@ -157,6 +157,17 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
 
           setFilters(currentFilters);
         }
+      } else if (key === "bonifiable") {
+        const currentFilters = { ...filters };
+        if (currentFilters.where?.bonifiable !== undefined) {
+          const { bonifiable, ...restWhere } = currentFilters.where;
+          currentFilters.where = Object.keys(restWhere).length > 0 ? restWhere : undefined;
+          setFilters(currentFilters);
+        }
+      } else if (key === "hasUsers") {
+        const currentFilters = { ...filters };
+        delete currentFilters.hasUsers;
+        setFilters(currentFilters);
       }
     },
     [filters, setFilters, setSearch],
@@ -179,6 +190,14 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
       return maxCondition?.value?.lte;
     }
     return undefined;
+  }, [filters]);
+
+  const currentBonifiable = useMemo(() => {
+    return filters.where?.bonifiable;
+  }, [filters]);
+
+  const currentHasUsers = useMemo(() => {
+    return filters.hasUsers;
   }, [filters]);
 
   // Build active filters array for display
@@ -212,12 +231,30 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
       });
     }
 
+    if (currentBonifiable !== undefined) {
+      filterArray.push({
+        key: "bonifiable",
+        label: "Bonificáveis",
+        value: "Sim",
+        onRemove: () => onRemoveFilter("bonifiable"),
+      });
+    }
+
+    if (currentHasUsers !== undefined) {
+      filterArray.push({
+        key: "hasUsers",
+        label: "Com usuários",
+        value: currentHasUsers ? "Sim" : "Não",
+        onRemove: () => onRemoveFilter("hasUsers"),
+      });
+    }
+
     return filterArray;
-  }, [searchingFor, currentMinRemuneration, currentMaxRemuneration, onRemoveFilter]);
+  }, [searchingFor, currentMinRemuneration, currentMaxRemuneration, currentBonifiable, currentHasUsers, onRemoveFilter]);
 
   // Handle filters apply from modal
   const handleFiltersApply = useCallback(
-    (filterValues: { minRemuneration?: number; maxRemuneration?: number }) => {
+    (filterValues: { minRemuneration?: number; maxRemuneration?: number; bonifiable?: boolean; hasUsers?: boolean }) => {
       const newFilters: Partial<PositionGetManyFormData> = { ...filters };
 
       // Build the remuneration filter
@@ -244,6 +281,27 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
           const { remunerations, ...restWhere } = newFilters.where;
           newFilters.where = Object.keys(restWhere).length > 0 ? restWhere : undefined;
         }
+      }
+
+      // Add bonifiable filter
+      if (filterValues.bonifiable !== undefined) {
+        newFilters.where = {
+          ...newFilters.where,
+          bonifiable: filterValues.bonifiable,
+        };
+      } else {
+        // Remove bonifiable filter
+        if (newFilters.where?.bonifiable !== undefined) {
+          const { bonifiable, ...restWhere } = newFilters.where;
+          newFilters.where = Object.keys(restWhere).length > 0 ? restWhere : undefined;
+        }
+      }
+
+      // Add hasUsers filter
+      if (filterValues.hasUsers !== undefined) {
+        newFilters.hasUsers = filterValues.hasUsers;
+      } else {
+        delete newFilters.hasUsers;
       }
 
       setFilters(newFilters);
@@ -289,6 +347,8 @@ export function PositionList({ onDataUpdate, className }: PositionListProps) {
         onApply={handleFiltersApply}
         currentMinRemuneration={currentMinRemuneration}
         currentMaxRemuneration={currentMaxRemuneration}
+        currentBonifiable={currentBonifiable}
+        currentHasUsers={currentHasUsers}
       />
     </Card>
   );

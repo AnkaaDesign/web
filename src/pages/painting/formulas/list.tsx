@@ -28,9 +28,13 @@ export default function FormulasList() {
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [openFormulas, setOpenFormulas] = useState<Set<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<"createdAt" | "pricePerLiter" | "density">("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [advancedFilters, setAdvancedFilters] = useState<FormulaFiltersData>({
     paintNames: [],
     hasComponents: "all",
+    sortBy: "createdAt",
+    sortOrder: "desc",
   });
 
   const {
@@ -39,8 +43,19 @@ export default function FormulasList() {
     error,
   } = usePaintFormulas({
     searchingFor: debouncedSearch,
+    orderBy: { [sortBy]: sortOrder },
     include: {
-      paint: true,
+      paint: {
+        include: {
+          paintType: true,
+          paintBrand: true,
+        },
+      },
+      _count: {
+        select: {
+          components: true,
+        },
+      },
       components: {
         include: {
           item: true,
@@ -105,11 +120,19 @@ export default function FormulasList() {
     if (advancedFilters.hasComponents !== "all") {
       count += 1;
     }
+    if (advancedFilters.sortBy && advancedFilters.sortBy !== "createdAt") {
+      count += 1;
+    }
+    if (advancedFilters.sortOrder && advancedFilters.sortOrder !== "desc") {
+      count += 1;
+    }
     return count;
   }, [advancedFilters]);
 
   const handleFilterChange = (filters: FormulaFiltersData) => {
     setAdvancedFilters(filters);
+    if (filters.sortBy) setSortBy(filters.sortBy);
+    if (filters.sortOrder) setSortOrder(filters.sortOrder);
   };
 
   // Calculate component price based on ratio and formula density
@@ -283,7 +306,7 @@ export default function FormulasList() {
                 </Card>
               ) : (
                 filteredFormulas.map((formula) => {
-                  const componentCount = formula.components?.length || 0;
+                  const componentCount = formula._count?.components ?? formula.components?.length ?? 0;
                   const hasValidDensity = formula.density && Number(formula.density) > 0;
                   const hasValidPrice = formula.pricePerLiter && Number(formula.pricePerLiter) > 0;
 
@@ -314,10 +337,22 @@ export default function FormulasList() {
                                         <span className="font-mono">{hasValidDensity ? `${formatNumberWithDecimals(Number(formula.density), 2)} g/ml` : "-"}</span>
                                       </div>
                                     </div>
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                      <Badge variant="secondary" className="text-xs whitespace-nowrap">
+                                        {componentCount} {componentCount === 1 ? "componente" : "componentes"}
+                                      </Badge>
+                                      {formula.paint?.paintBrand && (
+                                        <Badge variant="outline" className="text-xs whitespace-nowrap">
+                                          {formula.paint.paintBrand.name}
+                                        </Badge>
+                                      )}
+                                      {formula.paint?.paintType && (
+                                        <Badge variant="outline" className="text-xs whitespace-nowrap">
+                                          {formula.paint.paintType.name}
+                                        </Badge>
+                                      )}
+                                    </div>
                                   </div>
-                                  <Badge variant="secondary" className="text-xs sm:text-sm whitespace-nowrap">
-                                    {componentCount} {componentCount === 1 ? "componente" : "componentes"}
-                                  </Badge>
                                 </div>
                               </div>
                             </div>

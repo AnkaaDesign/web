@@ -32,9 +32,18 @@ export class ProfileService {
     return response.data;
   }
 
-  async uploadPhoto(photo: File): Promise<UserUpdateResponse> {
+  async uploadPhoto(photo: File, userName?: string): Promise<UserUpdateResponse> {
     const formData = new FormData();
     formData.append('photo', photo);
+
+    // Add context metadata for file organization
+    if (userName) {
+      formData.append('_context', JSON.stringify({
+        entityType: 'user',
+        userName: userName,
+        fileType: 'photo',
+      }));
+    }
 
     const response = await apiClient.put<UserUpdateResponse>(`${this.basePath}/photo`, formData, {
       headers: {
@@ -62,5 +71,5 @@ export const profileService = new ProfileService();
 
 export const getProfile = () => profileService.getProfile();
 export const updateProfile = (data: UserUpdateFormData) => profileService.updateProfile(data);
-export const uploadPhoto = (photo: File) => profileService.uploadPhoto(photo);
+export const uploadPhoto = (photo: File, userName?: string) => profileService.uploadPhoto(photo, userName);
 export const deletePhoto = () => profileService.deletePhoto();

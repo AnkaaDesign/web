@@ -55,28 +55,32 @@ function convertSortConfigsToSectorOrderBy(sortConfigs: Array<{ column: string; 
   return Object.keys(orderBy).length > 0 ? orderBy : undefined;
 }
 
-// Map privileges to badge colors
-const getPrivilegeColor = (privilege: string): "destructive" | "warning" | "purple" | "blue" | "orange" | "green" | "secondary" | "default" => {
+// Map privileges to badge colors - Each privilege has a unique color
+const getPrivilegeColor = (privilege: string): "destructive" | "warning" | "purple" | "blue" | "orange" | "green" | "teal" | "indigo" | "pink" | "secondary" | "default" => {
   switch (privilege) {
     case SECTOR_PRIVILEGES.ADMIN:
       return "destructive"; // Red - highest privilege
     case SECTOR_PRIVILEGES.LEADER:
-      return "warning"; // Yellow/Orange - leadership role
+      return "warning"; // Orange/Yellow - leadership role
     case SECTOR_PRIVILEGES.HUMAN_RESOURCES:
       return "purple"; // Purple - HR specific
     case SECTOR_PRIVILEGES.PRODUCTION:
       return "blue"; // Blue - production role
     case SECTOR_PRIVILEGES.MAINTENANCE:
-      return "orange"; // Orange - maintenance role
+      return "orange"; // Dark Orange - maintenance role
     case SECTOR_PRIVILEGES.WAREHOUSE:
       return "green"; // Green - warehouse role
     case SECTOR_PRIVILEGES.FINANCIAL:
-      return "green"; // Green - financial role
+      return "teal"; // Teal - financial role
+    case SECTOR_PRIVILEGES.LOGISTIC:
+      return "indigo"; // Indigo - logistics role
+    case SECTOR_PRIVILEGES.DESIGNER:
+      return "pink"; // Pink - designer role
     case SECTOR_PRIVILEGES.EXTERNAL:
-      return "secondary"; // Gray - external access
+      return "secondary"; // Light Gray - external access
     case SECTOR_PRIVILEGES.BASIC:
     default:
-      return "default"; // Default gray - basic access
+      return "default"; // Gray - basic access
   }
 };
 
@@ -131,8 +135,10 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
       limit: pageSize,
       include: {
         _count: {
-          users: true,
-          tasks: true,
+          select: {
+            users: true,
+            tasks: true,
+          },
         },
       },
       // Convert sortConfigs to orderBy format for API

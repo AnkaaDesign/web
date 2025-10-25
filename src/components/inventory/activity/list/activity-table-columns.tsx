@@ -102,7 +102,7 @@ export function getActivityColumns(): ActivityColumn[] {
       align: "left",
     },
     {
-      key: "user",
+      key: "user.name",
       header: "USUÁRIO",
       accessor: (activity) => {
         if (!activity.user) {
@@ -137,5 +137,5 @@ export function getActivityColumns(): ActivityColumn[] {
 }
 
 export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["item.uniCode", "item.name", "operation", "quantity", "user", "reason", "createdAt"]);
+  return new Set(["item.uniCode", "item.name", "operation", "quantity", "user.name", "reason", "createdAt"]);
 }

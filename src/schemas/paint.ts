@@ -440,6 +440,19 @@ export const paintIncludeSchema = z
 
 export const paintFormulaIncludeSchema = z
   .object({
+    _count: z
+      .union([
+        z.boolean(),
+        z.object({
+          select: z
+            .object({
+              components: z.boolean().optional(),
+              paintProduction: z.boolean().optional(),
+            })
+            .optional(),
+        }),
+      ])
+      .optional(),
     components: z
       .union([
         z.boolean(),
