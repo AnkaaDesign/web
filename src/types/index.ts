@@ -14,7 +14,6 @@ export * from "./cut";
 export * from "./ppe";
 export * from "./externalWithdrawal";
 export * from "./file";
-export * from "./garage";
 export * from "./holiday";
 export * from "./item";
 export * from "./maintenance";

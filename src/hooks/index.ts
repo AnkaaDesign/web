@@ -112,7 +112,6 @@ export * from "./useCustomer";
 export * from "./useTruck";
 export * from "./useLayout";
 export * from "./useLayoutSection";
-export * from "./useGarage";
 
 // =====================================================
 // Server Management Hooks

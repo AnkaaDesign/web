@@ -12,7 +12,6 @@ import {
   getFileById,
   getObservationById,
   getTruckById,
-  getGarageById,
 } from "../api-client";
 
 interface EntityDetails {
@@ -28,7 +27,6 @@ interface EntityDetails {
   files: Map<string, string>;
   observations: Map<string, string>;
   trucks: Map<string, string>;
-  garages: Map<string, string>;
 }
 
 export function useEntityDetails(entityIds: {
@@ -44,7 +42,6 @@ export function useEntityDetails(entityIds: {
   fileIds?: string[];
   observationIds?: string[];
   truckIds?: string[];
-  garageIds?: string[];
 }) {
   const uniqueCategoryIds = [...new Set(entityIds.categoryIds || [])].filter(Boolean);
   const uniqueBrandIds = [...new Set(entityIds.brandIds || [])].filter(Boolean);
@@ -58,7 +55,6 @@ export function useEntityDetails(entityIds: {
   const uniqueFileIds = [...new Set(entityIds.fileIds || [])].filter(Boolean);
   const uniqueObservationIds = [...new Set(entityIds.observationIds || [])].filter(Boolean);
   const uniqueTruckIds = [...new Set(entityIds.truckIds || [])].filter(Boolean);
-  const uniqueGarageIds = [...new Set(entityIds.garageIds || [])].filter(Boolean);
 
   return useQuery({
     queryKey: [
@@ -75,7 +71,6 @@ export function useEntityDetails(entityIds: {
       uniqueFileIds,
       uniqueObservationIds,
       uniqueTruckIds,
-      uniqueGarageIds,
     ],
     queryFn: async () => {
       const details: EntityDetails = {
@@ -91,7 +86,6 @@ export function useEntityDetails(entityIds: {
         files: new Map(),
         observations: new Map(),
         trucks: new Map(),
-        garages: new Map(),
       };
 
       // Fetch all categories
@@ -238,18 +232,6 @@ export function useEntityDetails(entityIds: {
         }
       });
 
-      // Fetch all garages
-      const garagePromises = uniqueGarageIds.map(async (id) => {
-        try {
-          const response = await getGarageById(id, {});
-          if (response?.success && response.data) {
-            details.garages.set(id, response.data.name || "");
-          }
-        } catch (error) {
-          console.error(`Failed to fetch garage ${id}:`, error);
-        }
-      });
-
       await Promise.all([
         ...categoryPromises,
         ...brandPromises,
@@ -263,7 +245,6 @@ export function useEntityDetails(entityIds: {
         ...filePromises,
         ...observationPromises,
         ...truckPromises,
-        ...garagePromises,
       ]);
 
       return details;
@@ -280,8 +261,7 @@ export function useEntityDetails(entityIds: {
       uniqueItemIds.length > 0 ||
       uniqueFileIds.length > 0 ||
       uniqueObservationIds.length > 0 ||
-      uniqueTruckIds.length > 0 ||
-      uniqueGarageIds.length > 0,
+      uniqueTruckIds.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

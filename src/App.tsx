@@ -205,10 +205,7 @@ const ProductionAirbrushingEdit = lazy(() => import("@/pages/production/aerograf
 const ProductionAirbrushingDetails = lazy(() => import("@/pages/production/aerografia/details/[id]").then((module) => ({ default: module.AirbrushingDetails })));
 const ProductionServiceOrders = lazy(() => import("@/pages/production/service-orders/list").then((module) => ({ default: module.ServiceOrderListPage })));
 const ProductionServiceOrdersCreate = lazy(() => import("@/pages/production/service-orders/create").then((module) => ({ default: module.ServiceOrderCreatePage })));
-const ProductionGarages = lazy(() => import("@/pages/production/garages/list").then((module) => ({ default: module.GarageListPage })));
-const ProductionGaragesCreate = lazy(() => import("@/pages/production/garages/create").then((module) => ({ default: module.GarageCreatePage })));
-const ProductionGaragesEdit = lazy(() => import("@/pages/production/garages/edit/[id]").then((module) => ({ default: module.GarageEditPage })));
-const ProductionGaragesDetails = lazy(() => import("@/pages/production/garages/details/[id]").then((module) => ({ default: module.GarageDetailsPage })));
+const ProductionGarages = lazy(() => import("@/pages/production/garages"));
 const ProductionCutting = lazy(() => import("@/pages/production/cutting/list").then((module) => ({ default: module.default })));
 const ProductionCuttingDetails = lazy(() => import("@/pages/production/cutting/details/[id]").then((module) => ({ default: module.CuttingDetailsPage })));
 
@@ -450,34 +447,10 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.production.garages.root}
+                  path="/production/garages/*"
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ProductionGarages />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.production.garages.create}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ProductionGaragesCreate />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.production.garages.edit(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ProductionGaragesEdit />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.production.garages.details(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ProductionGaragesDetails />
                     </Suspense>
                   }
                 />

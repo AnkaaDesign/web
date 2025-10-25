@@ -45,7 +45,6 @@ export {
 } from "./file-utils";
 export * from "./form";
 export * from "./formatters";
-export * from "./garage";
 export * from "./item";
 export * from "./maintenance";
 export * from "./task-measures";
