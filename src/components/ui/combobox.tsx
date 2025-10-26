@@ -82,6 +82,7 @@ interface ComboboxProps<TData = ComboboxOption> {
   // Multi-select specific
   singleMode?: boolean;
   showCount?: boolean;
+  hideDefaultBadges?: boolean;
 }
 
 export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
@@ -123,6 +124,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   name,
   singleMode = false,
   showCount = true,
+  hideDefaultBadges = false,
 }: ComboboxProps<TData>) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -774,7 +776,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
         </PopoverContent>
       </Popover>
 
-      {isMultiple && selectedOptions.length > 0 && !singleMode && (
+      {!hideDefaultBadges && isMultiple && selectedOptions.length > 0 && !singleMode && (
         <div className="flex flex-wrap gap-1 mt-2">
           {selectedOptions.map((option) => {
             const optionValue = getOptionValue(option);

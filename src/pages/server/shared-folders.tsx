@@ -53,6 +53,254 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useSharedFolders, useSharedFolderContents } from "../../hooks";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/api-client";
+import { FileViewerProvider, useFileViewer } from "@/components/file/file-viewer";
+import { FileItem, type FileViewMode } from "@/components/file";
+import type { File as AnkaaFile } from "@/types";
+
+// Utility function to parse WebDAV size string to bytes
+function parseWebDAVSize(sizeStr: string): number {
+  if (!sizeStr || sizeStr === "-" || sizeStr === "0") return 0;
+
+  // Match pattern like "1.2M", "500K", "1.5G", "100" (bytes)
+  const match = sizeStr.match(/^(\d+\.?\d*)\s*([KMGT]?)B?$/i);
+  if (!match) return 0;
+
+  const [, numStr, unit] = match;
+  const num = parseFloat(numStr);
+
+  const multipliers: Record<string, number> = {
+    "": 1,           // Bytes
+    "K": 1024,       // Kilobytes
+    "M": 1024 * 1024, // Megabytes
+    "G": 1024 * 1024 * 1024, // Gigabytes
+    "T": 1024 * 1024 * 1024 * 1024, // Terabytes
+  };
+
+  return Math.floor(num * (multipliers[unit.toUpperCase()] || 1));
+}
+
+// Utility function to convert WebDAV items to AnkaaFile format for viewer
+function convertWebDAVItemToAnkaaFile(
+  item: {
+    name: string;
+    type: "file" | "directory";
+    size: string;
+    lastModified: Date;
+    webdavUrl?: string;
+  },
+  folderPath: string
+): AnkaaFile {
+  // Detect mime type from extension
+  const extension = item.name.split(".").pop()?.toLowerCase() || "";
+  let mimetype = "application/octet-stream";
+
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(extension)) {
+    mimetype = `image/${extension === "jpg" ? "jpeg" : extension}`;
+  } else if (["mp4", "webm", "ogg", "mov", "avi"].includes(extension)) {
+    mimetype = `video/${extension}`;
+  } else if (extension === "pdf") {
+    mimetype = "application/pdf";
+  } else if (["doc", "docx"].includes(extension)) {
+    mimetype = "application/msword";
+  } else if (["xls", "xlsx"].includes(extension)) {
+    mimetype = "application/vnd.ms-excel";
+  }
+
+  // Use webdavUrl as thumbnailUrl for images
+  // For PDFs, set to webdavUrl too - it will fail to load as image and trigger error fallback to show PDF icon
+  const isImage = ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(extension);
+  const isPdf = extension === "pdf";
+
+  return {
+    id: `webdav-${folderPath}-${item.name}`,
+    filename: item.name,
+    originalName: item.name,
+    mimetype,
+    path: item.webdavUrl || "",
+    size: parseWebDAVSize(item.size), // Parse WebDAV size string to bytes
+    // Set thumbnailUrl to webdavUrl for images and PDFs
+    // For PDFs, the image load will fail (ORB) and FileItem will show icon as fallback
+    thumbnailUrl: (isImage || isPdf) && item.webdavUrl ? item.webdavUrl : null,
+    createdAt: item.lastModified,
+    updatedAt: item.lastModified,
+  };
+}
+
+// Component for file browsing with file viewer integration
+function FileContentsBrowser({
+  folderContents,
+  isLoading,
+  currentSubPath,
+  selectedFolder,
+  fileDisplayMode,
+  handleNavigateToSubfolder,
+}: {
+  folderContents: any;
+  isLoading: boolean;
+  currentSubPath?: string;
+  selectedFolder: string;
+  fileDisplayMode: FileViewMode;
+  handleNavigateToSubfolder: (path: string) => void;
+}) {
+  const fileViewer = useFileViewer();
+
+  const handleFileClick = (file: AnkaaFile, index: number) => {
+    // For WebDAV files, use direct URL instead of API endpoints
+    const webdavUrl = file.path;
+
+    // Check if it's a previewable file
+    const extension = file.filename.split(".").pop()?.toLowerCase() || "";
+    const isImage = ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(extension);
+    const isPdf = extension === "pdf";
+    const isVideo = ["mp4", "webm", "ogg", "mov", "avi"].includes(extension);
+
+    if (isImage) {
+      // For images, open in image modal with all images for gallery navigation
+      const allImageFiles = folderContents?.data?.files
+        ?.filter((item: any) => {
+          const ext = item.name.split(".").pop()?.toLowerCase() || "";
+          return item.type !== "directory" && ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext);
+        })
+        .map((item: any) => convertWebDAVItemToAnkaaFile(item, `${selectedFolder}/${currentSubPath || ""}`)) || [];
+
+      const imageIndex = allImageFiles.findIndex(f => f.id === file.id);
+      if (imageIndex !== -1) {
+        fileViewer?.actions.viewFiles(allImageFiles, imageIndex);
+      }
+    } else if (isPdf || isVideo) {
+      // For PDFs and videos, open directly in new tab (WebDAV doesn't support inline viewing)
+      window.open(webdavUrl, "_blank");
+    } else {
+      // For other files, trigger download
+      const link = document.createElement("a");
+      link.href = webdavUrl;
+      link.download = file.filename;
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleDirectoryClick = (item: any) => {
+    const newPath = currentSubPath ? `${currentSubPath}/${item.name}` : item.name;
+    handleNavigateToSubfolder(newPath);
+  };
+
+  const handleDownload = (file: AnkaaFile) => {
+    // Use webdavUrl directly for download
+    const link = document.createElement("a");
+    link.href = file.path;
+    link.download = file.filename;
+    link.target = "_blank";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  if (isLoading) {
+    return (
+      <div className={fileDisplayMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2"}>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="animate-pulse">
+            {fileDisplayMode === "grid" ? (
+              <div className="w-[200px] h-[180px] bg-gray-200 rounded-lg"></div>
+            ) : (
+              <div className="flex items-center gap-3 p-3 border rounded">
+                <div className="h-12 w-12 bg-gray-200 rounded"></div>
+                <div className="flex-1 space-y-1">
+                  <div className="h-4 bg-gray-200 rounded w-48"></div>
+                  <div className="h-3 bg-gray-200 rounded w-24"></div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (!folderContents?.data?.files || folderContents.data.files.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+        <IconFiles className="h-16 w-16 mb-4 opacity-20" />
+        <p className="text-lg font-medium">Pasta vazia</p>
+        <p className="text-sm">Nenhum arquivo encontrado nesta pasta.</p>
+      </div>
+    );
+  }
+
+  // Separate directories and files
+  const directories = folderContents.data.files.filter((item: any) => item.type === "directory");
+  const files = folderContents.data.files.filter((item: any) => item.type !== "directory");
+
+  // Convert files to AnkaaFile format
+  const ankaaFiles = files.map((item: any) => convertWebDAVItemToAnkaaFile(item, `${selectedFolder}/${currentSubPath || ""}`));
+
+  return (
+    <div className={fileDisplayMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2"}>
+      {/* Render directories first */}
+      {directories.map((dir: any) => (
+        <div
+          key={dir.name}
+          className={
+            fileDisplayMode === "grid"
+              ? "group relative overflow-hidden transition-all duration-300 rounded-lg hover:shadow-md cursor-pointer border border-border w-full max-w-[200px]"
+              : "flex items-center gap-3 p-3 border rounded hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer"
+          }
+          onClick={() => handleDirectoryClick(dir)}
+        >
+          {fileDisplayMode === "grid" ? (
+            <>
+              <div className="flex items-center justify-center rounded-lg bg-muted/30" style={{ height: "8rem" }}>
+                <IconFolder className="h-16 w-16 text-blue-600" />
+              </div>
+              <div className="p-3 border-t">
+                <p className="text-sm font-medium truncate" title={dir.name}>
+                  {dir.name}
+                </p>
+                {(dir.fileCount !== undefined || dir.folderCount !== undefined) && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {dir.folderCount || 0} pastas, {dir.fileCount || 0} arquivos
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex-shrink-0">
+                <IconFolder className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm truncate">{dir.name}</span>
+                  <IconChevronRight className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {dir.fileCount !== undefined || dir.folderCount !== undefined
+                    ? `${dir.folderCount || 0} pastas • ${dir.fileCount || 0} arquivos`
+                    : "Pasta"}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      ))}
+
+      {/* Render files using FileItem component */}
+      {ankaaFiles.map((file: AnkaaFile, index: number) => (
+        <FileItem
+          key={file.id}
+          file={file}
+          viewMode={fileDisplayMode}
+          onPreview={() => handleFileClick(file, index)}
+          onDownload={() => handleDownload(file)}
+          showActions={true}
+        />
+      ))}
+    </div>
+  );
+}
 
 export function ServerSharedFoldersPage() {
   const { user } = useAuth();
@@ -66,7 +314,7 @@ export function ServerSharedFoldersPage() {
   const currentSubPath = pathSegments.slice(1).join("/") || undefined;
   const viewMode = selectedFolder ? "browse" : "folders";
 
-  const [fileDisplayMode, setFileDisplayMode] = useState<"list" | "grid">("list");
+  const [fileDisplayMode, setFileDisplayMode] = useState<FileViewMode>("list");
 
   // Check admin privileges
   const isAdmin = user?.sector?.privileges ? hasPrivilege(user as any, SECTOR_PRIVILEGES.ADMIN) : false;
@@ -242,7 +490,7 @@ export function ServerSharedFoldersPage() {
           const routePath = `/servidor/pastas-compartilhadas/${accumulatedPath}`;
 
           breadcrumbs.push({
-            label: part,
+            label: decodeURIComponent(part),
             href: routePath,
             onClick: (e: React.MouseEvent) => {
               e.preventDefault();
@@ -399,7 +647,8 @@ export function ServerSharedFoldersPage() {
   // Render folder browser or folder list based on view mode
   if (viewMode === "browse" && selectedFolder) {
     return (
-      <div className="flex flex-col h-full space-y-4">
+      <FileViewerProvider baseUrl={apiClient.defaults.baseURL}>
+        <div className="flex flex-col h-full space-y-4">
         {/* Fixed Header */}
         <div className="flex-shrink-0">
           <PageHeader
@@ -461,172 +710,27 @@ export function ServerSharedFoldersPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {isLoadingContents ? (
-                  <div className="space-y-3">
-                    {Array.from({ length: 8 }).map((_, i) => (
-                      <div key={i} className="animate-pulse flex items-center gap-3 p-3 border rounded">
-                        <div className="h-8 w-8 bg-gray-200 rounded"></div>
-                        <div className="flex-1 space-y-1">
-                          <div className="h-4 bg-gray-200 rounded w-48"></div>
-                          <div className="h-3 bg-gray-200 rounded w-24"></div>
-                        </div>
-                        <div className="h-3 bg-gray-200 rounded w-16"></div>
-                      </div>
-                    ))}
-                  </div>
-                ) : folderContents?.data?.files && folderContents.data.files.length > 0 ? (
-                  fileDisplayMode === "list" ? (
-                    // List View
-                    <div className="space-y-2">
-                      {folderContents.data.files.map((item) => (
-                        <div
-                          key={item.name}
-                          className={`flex items-center gap-3 p-3 border rounded hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors ${
-                            item.type === "directory" ? "cursor-pointer" : ""
-                          }`}
-                          onClick={
-                            item.type === "directory"
-                              ? () => {
-                                  const newPath = currentSubPath ? `${currentSubPath}/${item.name}` : item.name;
-                                  handleNavigateToSubfolder(newPath);
-                                }
-                              : undefined
-                          }
-                        >
-                          <div className="flex-shrink-0">
-                            {item.type === "directory" ? (
-                              <IconFolder className="h-6 w-6 text-blue-600" />
-                            ) : (
-                              (() => {
-                                const FileIcon = getFileIcon(item.name);
-                                return <FileIcon className="h-6 w-6 text-gray-600" />;
-                              })()
-                            )}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm truncate">{item.name}</span>
-                              {item.type === "directory" && <IconChevronRight className="h-4 w-4 text-muted-foreground" />}
-                            </div>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                              <span>{formatFileSize(item.size)}</span>
-                              <span>{new Date(item.lastModified).toLocaleDateString("pt-BR")}</span>
-                            </div>
-                          </div>
-
-                          {item.webdavUrl && (
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(item.webdavUrl, "_blank");
-                              }}
-                              variant="ghost"
-                              size="sm"
-                            >
-                              <IconDownload className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    // Grid View
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                      {folderContents.data.files.map((item) => (
-                        <div
-                          key={item.name}
-                          className={`group border rounded-lg p-4 flex flex-col items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-all hover:shadow-md ${
-                            item.type === "directory" ? "cursor-pointer" : ""
-                          }`}
-                          onClick={
-                            item.type === "directory"
-                              ? () => {
-                                  const newPath = currentSubPath ? `${currentSubPath}/${item.name}` : item.name;
-                                  handleNavigateToSubfolder(newPath);
-                                }
-                              : undefined
-                          }
-                        >
-                          <div className="relative">
-                            {item.type === "directory" ? (
-                              <IconFolder className="h-12 w-12 text-blue-600" />
-                            ) : (
-                              (() => {
-                                const thumbnailUrl = getThumbnailUrl(item);
-                                if (thumbnailUrl) {
-                                  // Show image thumbnail
-                                  return (
-                                    <div className="h-16 w-16 relative overflow-hidden rounded-lg border">
-                                      <img
-                                        src={thumbnailUrl}
-                                        alt={item.name}
-                                        className="h-full w-full object-cover"
-                                        onError={(e) => {
-                                          // Fallback to icon if image fails to load
-                                          const target = e.target as HTMLImageElement;
-                                          target.style.display = "none";
-                                          const parent = target.parentElement;
-                                          if (parent) {
-                                            const icon = document.createElement("div");
-                                            icon.innerHTML =
-                                              '<svg class="h-12 w-12 text-gray-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>';
-                                            parent.appendChild(icon.firstChild as Node);
-                                          }
-                                        }}
-                                      />
-                                    </div>
-                                  );
-                                } else {
-                                  // Show file type icon
-                                  const FileIcon = getFileIcon(item.name);
-                                  return <FileIcon className="h-12 w-12 text-gray-600" />;
-                                }
-                              })()
-                            )}
-                            {item.webdavUrl && (
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(item.webdavUrl, "_blank");
-                                }}
-                                variant="ghost"
-                                size="icon"
-                                className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <IconDownload className="h-3 w-3" />
-                              </Button>
-                            )}
-                          </div>
-
-                          <div className="text-center w-full">
-                            <p className="text-xs font-medium truncate" title={item.name}>
-                              {item.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">{formatFileSize(item.size)}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                ) : (
-                  <div className="text-center py-12">
-                    <IconFolder className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-muted-foreground mb-2">Pasta vazia</h3>
-                    <p className="text-sm text-muted-foreground">Esta pasta não contém nenhum arquivo ou subpasta.</p>
-                  </div>
-                )}
+                <FileContentsBrowser
+                  folderContents={folderContents}
+                  isLoading={isLoadingContents}
+                  currentSubPath={currentSubPath}
+                  selectedFolder={selectedFolder || ""}
+                  fileDisplayMode={fileDisplayMode}
+                  handleNavigateToSubfolder={handleNavigateToSubfolder}
+                />
               </CardContent>
             </Card>
           </CardContent>
         </Card>
       </div>
+      </FileViewerProvider>
     );
   }
 
   // Main folder list view
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <FileViewerProvider baseUrl={apiClient.defaults.baseURL}>
+      <div className="flex flex-col h-full space-y-4">
       {/* Fixed Header */}
       <div className="flex-shrink-0">
         <PageHeader
@@ -804,5 +908,6 @@ export function ServerSharedFoldersPage() {
         </CardContent>
       </Card>
     </div>
+    </FileViewerProvider>
   );
 }

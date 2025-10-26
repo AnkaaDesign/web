@@ -103,14 +103,14 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
     }
   }, [watchAssignmentType]);
 
-  // Async query function for users
+  // Async query function for active users
   const queryUsers = useCallback(async (searchTerm: string, page = 1) => {
     try {
       const queryParams: any = {
         orderBy: { name: "asc" },
         page: page,
         take: 50,
-        where: { status: { not: USER_STATUS.DISMISSED } },
+        where: { isActive: true },
       };
 
       // Only add searchingFor if there's a search term

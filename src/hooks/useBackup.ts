@@ -5,7 +5,6 @@ import type {
   ScheduleBackupRequest,
   BackupQueryParams,
 } from "../api-client";
-import { toast } from "sonner";
 
 // Query keys
 export const backupQueryKeys = {
@@ -20,10 +19,11 @@ export const backupQueryKeys = {
 };
 
 // List backups hook
-export function useBackups(params?: BackupQueryParams) {
+export function useBackups(params?: BackupQueryParams, enabled: boolean = true) {
   return useQuery({
     queryKey: backupQueryKeys.list(params),
     queryFn: () => backupApi.getBackups(params),
+    enabled, // Only fetch when enabled (e.g., when user is authenticated)
     staleTime: 30 * 1000, // 30 seconds
   });
 }
@@ -39,10 +39,11 @@ export function useBackup(id: string) {
 }
 
 // Scheduled backups hook
-export function useScheduledBackups() {
+export function useScheduledBackups(enabled: boolean = true) {
   return useQuery({
     queryKey: backupQueryKeys.scheduled(),
     queryFn: () => backupApi.getScheduledBackups(),
+    enabled, // Only fetch when enabled (e.g., when user is authenticated)
     staleTime: 60 * 1000, // 1 minute
   });
 }
@@ -57,10 +58,11 @@ export function useBackupSystemHealth() {
 }
 
 // System health summary hook
-export function useBackupSystemHealthSummary() {
+export function useBackupSystemHealthSummary(enabled: boolean = true) {
   return useQuery({
     queryKey: backupQueryKeys.systemHealthSummary(),
     queryFn: () => backupApi.getSystemHealthSummary(),
+    enabled, // Only fetch when enabled (e.g., when user is authenticated)
     staleTime: 30 * 1000, // 30 seconds
   });
 }
@@ -81,7 +83,7 @@ export function useBackupMutations() {
 
   const createBackup = useMutation({
     mutationFn: (data: CreateBackupRequest) => backupApi.createBackup(data),
-    onSuccess: (result) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: backupQueryKeys.all });
     },
   });
@@ -97,17 +99,13 @@ export function useBackupMutations() {
   const deleteBackup = useMutation({
     mutationFn: (id: string) => backupApi.deleteBackup(id),
     onSuccess: () => {
-      toast.success("Backup excluído com sucesso!");
       queryClient.invalidateQueries({ queryKey: backupQueryKeys.all });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Erro ao excluir backup");
     },
   });
 
   const scheduleBackup = useMutation({
     mutationFn: (data: ScheduleBackupRequest) => backupApi.scheduleBackup(data),
-    onSuccess: (result) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: backupQueryKeys.scheduled() });
     },
   });
@@ -115,26 +113,14 @@ export function useBackupMutations() {
   const removeScheduledBackup = useMutation({
     mutationFn: (id: string) => backupApi.removeScheduledBackup(id),
     onSuccess: () => {
-      toast.success("Agendamento de backup removido com sucesso!");
       queryClient.invalidateQueries({ queryKey: backupQueryKeys.scheduled() });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Erro ao remover agendamento de backup");
     },
   });
 
   const verifyBackup = useMutation({
     mutationFn: (id: string) => backupApi.verifyBackup(id),
     onSuccess: (result, id) => {
-      if (result.fileExists && result.archiveIntegrity && result.sizeMatch) {
-        toast.success("Backup verificado com sucesso!");
-      } else {
-        toast.warning("Backup tem problemas de integridade");
-      }
       queryClient.invalidateQueries({ queryKey: backupQueryKeys.verification(id) });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || "Erro ao verificar backup");
     },
   });
 

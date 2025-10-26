@@ -5,7 +5,7 @@ import { routes, USER_STATUS } from "../../../../constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconUsers, IconPlus, IconUserCheck, IconUserX } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconUsers, IconPlus, IconUserCheck, IconUserX, IconGitMerge } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
@@ -28,11 +28,12 @@ interface UserTableProps {
   onMarkAsContracted?: (users: User[]) => void;
   onMarkAsDismissed?: (users: User[]) => void;
   onDelete?: (users: User[]) => void;
+  onMerge?: (users: User[]) => void;
   filters?: Partial<UserGetManyFormData>;
   onDataChange?: (data: { users: User[]; totalRecords: number }) => void;
 }
 
-export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracted, onMarkAsDismissed, onDelete, filters = {}, onDataChange }: UserTableProps) {
+export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracted, onMarkAsDismissed, onDelete, onMerge, filters = {}, onDataChange }: UserTableProps) {
   const navigate = useNavigate();
   const { delete: deleteUser, updateAsync: updateUser } = useUserMutations();
   const { batchDelete, batchUpdateAsync: batchUpdate } = useUserBatchMutations();
@@ -276,14 +277,14 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             // Bulk mark as dismissed
             const users = contextMenu.users.map((user) => ({
               id: user.id,
-              data: { status: USER_STATUS.DISMISSED, dismissal: new Date() },
+              data: { status: USER_STATUS.DISMISSED, dismissedAt: new Date() },
             }));
             await batchUpdate({ users });
           } else {
             // Single mark as dismissed
             await updateUser({
               id: contextMenu.users[0].id,
-              data: { status: USER_STATUS.DISMISSED, dismissal: new Date() },
+              data: { status: USER_STATUS.DISMISSED, dismissedAt: new Date() },
             });
           }
         }
@@ -525,6 +526,18 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             <IconEdit className="mr-2 h-4 w-4" />
             {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Editar em lote" : "Editar"}
           </DropdownMenuItem>
+
+          {contextMenu?.isBulk && contextMenu.users.length > 1 && onMerge && (
+            <DropdownMenuItem onClick={() => {
+              if (contextMenu) {
+                onMerge(contextMenu.users);
+                setContextMenu(null);
+              }
+            }}>
+              <IconGitMerge className="mr-2 h-4 w-4" />
+              Mesclar usuários
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuSeparator />
 

@@ -175,7 +175,7 @@ export function PerformanceLevelFilters({
       where: {
         // Preserve existing where conditions except the ones we're resetting
         ...filters.where,
-        status: { not: USER_STATUS.DISMISSED },
+        isActive: true,
         performanceLevel: undefined,
         positionId: undefined,
         sectorId: undefined
@@ -193,8 +193,8 @@ export function PerformanceLevelFilters({
         // Preserve existing where conditions
         ...filters.where,
 
-        // Always filter out dismissed users by default
-        status: { not: USER_STATUS.DISMISSED },
+        // Always filter to show only active users by default
+        isActive: true,
 
         // Add performance level filter if not default
         ...(localState.performanceMin > 0 || localState.performanceMax < 5) && {
@@ -292,6 +292,7 @@ export function PerformanceLevelFilters({
               searchPlaceholder="Buscar cargos..."
               searchable={true}
               clearable={true}
+              hideDefaultBadges={true}
             />
           </div>
 
@@ -313,6 +314,7 @@ export function PerformanceLevelFilters({
               searchPlaceholder="Buscar setores..."
               searchable={true}
               clearable={true}
+              hideDefaultBadges={true}
             />
           </div>
 

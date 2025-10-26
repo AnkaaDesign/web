@@ -130,13 +130,13 @@ export function PayrollExport({
       // For payroll export, we need to fetch and process the data similar to the table
       // This is complex because we need to merge user data with payroll bonus data
 
-      // First, fetch users
+      // First, fetch active users
       const usersResponse = await userService.getMany({
         ...filters,
         limit: 100, // Max 100 due to API limit
         where: {
           ...filters?.where,
-          status: { not: USER_STATUS.DISMISSED },
+          isActive: true,
           ...(filters?.userIds?.length ? { id: { in: filters.userIds } } :
              filters?.excludeUserIds?.length ? { id: { notIn: filters.excludeUserIds } } : {}),
           ...(filters?.sectorIds?.length ? { sectorId: { in: filters.sectorIds } } : {}),

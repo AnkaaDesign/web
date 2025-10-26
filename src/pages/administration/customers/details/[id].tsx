@@ -150,7 +150,7 @@ export const CustomerDetailsPage = () => {
             <CustomerTasksList
               customerId={customer.id}
               customerName={customer.fantasyName}
-              navigationRoute="schedule"
+              navigationRoute="history"
             />
           </div>
         </div>

@@ -34,7 +34,11 @@ export const AirbrushingDetails = () => {
     include: {
       task: {
         include: {
-          customer: true,
+          customer: {
+            include: {
+              logo: true,
+            },
+          },
           sector: true,
         },
       },

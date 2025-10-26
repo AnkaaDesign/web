@@ -180,6 +180,9 @@ export function PayrollList({ className }: PayrollListProps) {
   const queryParams = useMemo((): PayrollGetManyParams => {
     const orderBy = convertSortConfigsToOrderBy(sortConfigs) || { createdAt: "desc" };
 
+    // Use default sectors if user hasn't selected any
+    const sectorsToFilter = filters.sectorIds && filters.sectorIds.length > 0 ? filters.sectorIds : defaultSectorIds;
+
     return {
       page: page + 1, // Convert 0-based to 1-based
       limit: pageSize,
@@ -188,9 +191,9 @@ export function PayrollList({ className }: PayrollListProps) {
         year: filters.year,
         month: filters.month,
         ...(filters.userId && { userId: filters.userId }),
-        ...(filters.sectorIds && filters.sectorIds.length > 0 && {
+        ...(sectorsToFilter.length > 0 && {
           user: {
-            sectorId: { in: filters.sectorIds }
+            sectorId: { in: sectorsToFilter }
           }
         }),
         ...(filters.searchTerm && {
@@ -224,7 +227,7 @@ export function PayrollList({ className }: PayrollListProps) {
         },
       },
     };
-  }, [filters, page, pageSize, sortConfigs, showSelectedOnly, selectedIds]);
+  }, [filters, page, pageSize, sortConfigs, showSelectedOnly, selectedIds, defaultSectorIds]);
 
   // Fetch payrolls data
   const {

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useUserBatchMutations, usePositions, useSectors } from "../../../../hooks";
 import type { User } from "../../../../types";
 import type { UserGetManyFormData } from "../../../../schemas";
-import { routes, USER_STATUS, ACTIVE_USER_STATUSES } from "../../../../constants";
+import { routes, USER_STATUS } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -20,6 +20,9 @@ import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/use-table-state";
 import { useTableFilters } from "@/hooks/use-table-filters";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { UserMergeDialog } from "../merge/user-merge-dialog";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { mergeUsers } from "../../../../api-client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +43,7 @@ const DEFAULT_PAGE_SIZE = 40;
 export function UserList({ className }: UserListProps) {
   const navigate = useNavigate();
   const { batchDelete, batchUpdateAsync } = useUserBatchMutations();
+  const queryClient = useQueryClient();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // State to hold current page users and total count from the table
@@ -48,6 +52,15 @@ export function UserList({ className }: UserListProps) {
   const [deleteDialog, setDeleteDialog] = useState<{ items: User[]; isBulk: boolean } | null>(null);
   const [dismissDialog, setDismissDialog] = useState<{ items: User[]; isBulk: boolean } | null>(null);
   const [contractDialog, setContractDialog] = useState<{ items: User[]; isBulk: boolean } | null>(null);
+  const [mergeDialog, setMergeDialog] = useState<{ open: boolean; users: User[] }>({ open: false, users: [] });
+
+  // Merge mutation
+  const { mutate: mergeMutation, isPending: isMerging } = useMutation({
+    mutationFn: mergeUsers,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
 
   // Stable callback for table data updates
   const handleTableDataChange = useCallback((data: { users: User[]; totalRecords: number }) => {
@@ -294,9 +307,9 @@ export function UserList({ className }: UserListProps) {
     if (hasExplicitStatusFilter) {
       // User has explicitly selected statuses - use only those
       result.statuses = [...filterWithoutOrderBy.status!];
-    } else {
+    } else if (result.isActive === undefined) {
       // No explicit filter - default to active users only
-      result.statuses = [...ACTIVE_USER_STATUSES];
+      result.isActive = true;
     }
 
     return result;
@@ -431,7 +444,7 @@ export function UserList({ className }: UserListProps) {
     try {
       const updateUsers = dismissDialog.items.map((user) => ({
         id: user.id,
-        data: { status: USER_STATUS.DISMISSED, dismissal: new Date() },
+        data: { status: USER_STATUS.DISMISSED, dismissedAt: new Date() },
       }));
 
       await batchUpdateAsync({ users: updateUsers });
@@ -441,6 +454,35 @@ export function UserList({ className }: UserListProps) {
       console.error("Error marking user(s) as dismissed:", error);
     }
   };
+
+  // Handle merge action
+  const handleMerge = useCallback((users: User[]) => {
+    if (users.length < 2) {
+      return;
+    }
+    setMergeDialog({ open: true, users });
+  }, []);
+
+  const handleMergeConfirm = useCallback(
+    async (targetId: string, resolutions: Record<string, any>) => {
+      try {
+        // Calculate source IDs from the users in the merge dialog
+        const sourceIds = mergeDialog.users.map(user => user.id).filter(id => id !== targetId);
+
+        mergeMutation({
+          targetUserId: targetId,
+          sourceUserIds: sourceIds,
+          conflictResolutions: resolutions,
+        });
+
+        setMergeDialog({ open: false, users: [] });
+      } catch (error) {
+        // Error is handled by the API client
+        console.error("Error merging users:", error);
+      }
+    },
+    [mergeMutation, mergeDialog.users]
+  );
 
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
@@ -486,6 +528,7 @@ export function UserList({ className }: UserListProps) {
             onMarkAsContracted={handleMarkAsContracted}
             onMarkAsDismissed={handleMarkAsDismissed}
             onDelete={handleBulkDelete}
+            onMerge={handleMerge}
             filters={queryFilters}
             className="h-full"
             onDataChange={handleTableDataChange}
@@ -555,6 +598,14 @@ export function UserList({ className }: UserListProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Merge Dialog */}
+      <UserMergeDialog
+        open={mergeDialog.open}
+        onOpenChange={(open) => setMergeDialog({ open, users: mergeDialog.users })}
+        users={mergeDialog.users}
+        onMerge={handleMergeConfirm}
+      />
     </Card>
   );
 }

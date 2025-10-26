@@ -21,7 +21,7 @@ interface EntityDetails {
   users: Map<string, string>;
   customers: Map<string, string>;
   sectors: Map<string, string>;
-  paints: Map<string, string>;
+  paints: Map<string, any>; // Changed to any to store full paint objects with hex, finish, brand, etc.
   formulas: Map<string, string>;
   items: Map<string, string>;
   files: Map<string, string>;
@@ -160,12 +160,18 @@ export function useEntityDetails(entityIds: {
         }
       });
 
-      // Fetch all paints
+      // Fetch all paints with full details (hex, finish, brand, manufacturer, etc.)
       const paintPromises = uniquePaintIds.map(async (id) => {
         try {
-          const response = await getPaintById(id, {});
+          const response = await getPaintById(id, {
+            include: {
+              paintBrand: true,
+              paintType: true,
+            },
+          });
           if (response?.success && response.data) {
-            details.paints.set(id, response.data.name || "");
+            // Store the full paint object with all properties needed for display
+            details.paints.set(id, response.data);
           }
         } catch (error) {
           console.error(`Failed to fetch paint ${id}:`, error);

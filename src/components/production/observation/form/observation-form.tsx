@@ -20,7 +20,8 @@ import { TaskSelector } from "./task-selector";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { IconAlertCircle, IconPaperclip, IconArrowLeft, IconArrowRight, IconCheck, IconX, IconFile } from "@tabler/icons-react";
+import { IconAlertCircle, IconPaperclip, IconArrowLeft, IconArrowRight, IconCheck, IconX, IconFile, IconUser, IconBuildingFactory, IconHash } from "@tabler/icons-react";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { cn, backendFileToFileWithPreview } from "@/lib/utils";
 import { toast } from "sonner";
 import { createObservationFormData } from "@/utils/form-data-helper";
@@ -95,7 +96,11 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
     include: {
       task: {
         include: {
-          customer: true,
+          customer: {
+            include: {
+              logo: true,
+            },
+          },
           sector: true,
         },
       },
@@ -390,147 +395,168 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
     if (mode === "edit") {
       return (
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconAlertCircle className="h-5 w-5" />
-                Detalhes da Observação
-              </CardTitle>
-              <CardDescription>
-                Edite a descrição da observação e gerencie arquivos de evidência
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Description Field */}
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium">
-                      Descrição da Observação <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <Textarea
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        name={field.name}
-                        ref={field.ref}
-                        placeholder="Descreva detalhadamente o problema ou observação identificada na tarefa..."
-                        className="min-h-32 resize-y"
-                        maxLength={1000}
-                      />
-                    </FormControl>
-                    <div className="flex items-center justify-between">
-                      <FormMessage />
-                      {field.value && (
-                        <p className="text-xs text-muted-foreground">
-                          {field.value.length}/1000 caracteres
-                        </p>
-                      )}
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              {/* File Uploads Section */}
-              <div className="space-y-4">
-                <Separator />
+          {/* Task Display for Edit Mode */}
+          {observation?.task && (
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <Label className="text-sm font-medium text-muted-foreground mb-3 block">Tarefa Relacionada</Label>
+              <div className="space-y-3">
+                {/* Task Name */}
                 <div>
-                  <Label className="text-sm font-medium">Arquivos de Evidência (Opcional)</Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Adicione fotos, documentos ou outros arquivos relacionados à observação
-                  </p>
+                  <div className="font-semibold text-base">{observation.task.name}</div>
                 </div>
 
-                <div className="space-y-4">
-                  {/* File Upload Area */}
-                  <div className="border-2 border-dashed rounded-lg p-6 bg-muted/10 hover:bg-muted/20 transition-colors">
-                    <FormItem>
-                      <FormControl>
-                        <FileUploadField
-                          onFilesChange={handleFilesChange}
-                          existingFiles={uploadedFiles}
-                          maxFiles={10}
-                          maxSize={10 * 1024 * 1024}
-                          showPreview={false}
-                          showFiles={false}
-                          variant="compact"
-                          placeholder="Arraste arquivos aqui ou clique para selecionar"
-                          label=""
-                        />
-                      </FormControl>
-                    </FormItem>
-                  </div>
-
-                  {/* File List */}
-                  {uploadedFiles.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">
-                        Arquivos Selecionados ({uploadedFiles.length})
-                      </Label>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {uploadedFiles.map((file, index) => (
-                          <div
-                            key={file.id || `file-${index}`}
-                            className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border hover:bg-muted/70 transition-colors"
-                          >
-                            <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center">
-                              <IconFile className="h-5 w-5 text-primary" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate" title={file.name}>
-                                {file.name}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatFileSize(file.size)}
-                              </p>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 flex-shrink-0 hover:bg-destructive/10 hover:text-destructive"
-                              onClick={() => {
-                                const newFiles = uploadedFiles.filter((_, i) => i !== index);
-                                handleFilesChange(newFiles);
-                              }}
-                            >
-                              <IconX className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
+                {/* Task Details Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Customer with Logo */}
+                  {observation.task.customer && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                        <IconUser className="h-3.5 w-3.5" />
+                        <span>Cliente</span>
                       </div>
+                      <div className="flex items-center gap-2">
+                        <CustomerLogoDisplay
+                          logo={observation.task.customer.logo}
+                          customerName={observation.task.customer.fantasyName || observation.task.customer.name || "Cliente"}
+                          size="sm"
+                          shape="rounded"
+                        />
+                        <span className="font-medium text-sm">{observation.task.customer.fantasyName || observation.task.customer.name}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sector */}
+                  {observation.task.sector && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                        <IconBuildingFactory className="h-3.5 w-3.5" />
+                        <span>Setor</span>
+                      </div>
+                      <div className="font-medium text-sm">{observation.task.sector.name}</div>
+                    </div>
+                  )}
+
+                  {/* Serial Number */}
+                  {observation.task.serialNumber && (
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                        <IconHash className="h-3.5 w-3.5" />
+                        <span>Número de Série</span>
+                      </div>
+                      <div className="font-medium text-sm">{observation.task.serialNumber}</div>
                     </div>
                   )}
                 </div>
               </div>
+            </div>
+          )}
 
-              {/* Task Display for Edit Mode */}
-              {observation?.task && (
-                <>
-                  <Separator />
-                  <div>
-                    <Label className="text-sm font-medium mb-2 block">Tarefa Relacionada</Label>
-                    <div className="p-4 border rounded-lg bg-muted/50">
-                      <div className="flex items-center gap-3">
-                        <IconCheck className="h-5 w-5 text-green-600" />
-                        <div>
-                          <div className="font-medium">{observation.task.name}</div>
-                          {observation.task.customer && (
-                            <div className="text-sm text-muted-foreground">
-                              Cliente: {observation.task.customer.fantasyName || observation.task.customer.name}
-                            </div>
-                          )}
+          {/* Description Field */}
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-medium">
+                  Descrição da Observação <span className="text-destructive">*</span>
+                </FormLabel>
+                <FormControl>
+                  <Textarea
+                    value={field.value || ""}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref}
+                    placeholder="Descreva detalhadamente o problema ou observação identificada na tarefa..."
+                    className="min-h-32 resize-y"
+                    maxLength={1000}
+                  />
+                </FormControl>
+                <div className="flex items-center justify-between">
+                  <FormMessage />
+                  {field.value && (
+                    <p className="text-xs text-muted-foreground">
+                      {field.value.length}/1000 caracteres
+                    </p>
+                  )}
+                </div>
+              </FormItem>
+            )}
+          />
+
+          {/* File Uploads Section */}
+          <div className="space-y-4">
+            <Separator />
+            <div>
+              <Label className="text-sm font-medium">Arquivos de Evidência (Opcional)</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Adicione fotos, documentos ou outros arquivos relacionados à observação
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* File Upload Area */}
+              <div className="border-2 border-dashed rounded-lg p-6 bg-muted/10 hover:bg-muted/20 transition-colors">
+                <FormItem>
+                  <FormControl>
+                    <FileUploadField
+                      onFilesChange={handleFilesChange}
+                      existingFiles={uploadedFiles}
+                      maxFiles={10}
+                      maxSize={10 * 1024 * 1024}
+                      showPreview={false}
+                      showFiles={false}
+                      variant="compact"
+                      placeholder="Arraste arquivos aqui ou clique para selecionar"
+                      label=""
+                    />
+                  </FormControl>
+                </FormItem>
+              </div>
+
+              {/* File List */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    Arquivos Selecionados ({uploadedFiles.length})
+                  </Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {uploadedFiles.map((file, index) => (
+                      <div
+                        key={file.id || `file-${index}`}
+                        className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border hover:bg-muted/70 transition-colors"
+                      >
+                        <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center">
+                          <IconFile className="h-5 w-5 text-primary" />
                         </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" title={file.name}>
+                            {file.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(file.size)}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 flex-shrink-0 hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => {
+                            const newFiles = uploadedFiles.filter((_, i) => i !== index);
+                            handleFilesChange(newFiles);
+                          }}
+                        >
+                          <IconX className="h-4 w-4" />
+                        </Button>
                       </div>
-                    </div>
+                    ))}
                   </div>
-                </>
+                </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </div>
       );
     }
@@ -825,19 +851,15 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
         />
       </div>
 
-      <div className={cn("flex-1 min-h-0 px-4", mode === "create" && currentStep === 2 ? "flex flex-col overflow-hidden" : "overflow-y-auto")}>
-        <Card className={cn("shadow-sm border border-border", mode === "create" && currentStep === 2 ? "h-full flex flex-col" : "", className)}>
-          {mode === "edit" && observation?.task && (
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-3">
-                <Badge variant="outline" className="ml-auto">
-                  {observation.task.name}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-          )}
+      <div className={cn(
+        "flex-1 min-h-0",
+        mode === "create" ? "px-4" : "",
+        mode === "create" && currentStep === 2 ? "flex flex-col overflow-hidden" : mode === "create" ? "overflow-y-auto" : "",
+        mode === "edit" ? "flex flex-col overflow-hidden" : ""
+      )}>
+        <Card className={cn("shadow-sm border border-border", mode === "create" && currentStep === 2 ? "h-full flex flex-col" : "", mode === "edit" ? "h-full flex flex-col" : "", className)}>
 
-          <CardContent className={cn("flex-1 flex flex-col", mode === "create" && currentStep === 2 ? "overflow-hidden" : "")}>
+          <CardContent className={cn("flex-1 flex flex-col overflow-y-auto", mode === "create" && currentStep === 2 ? "overflow-hidden" : "")}>
             {/* Form Steps Indicator (only show in create mode) */}
             {mode === "create" && (
               <div className="flex-shrink-0 mb-6">
@@ -846,8 +868,8 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
             )}
 
             <Form {...form}>
-              <form id="observation-form" onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-hidden">
-                <div className={cn("flex-1 min-h-0", mode === "create" && currentStep === 2 ? "flex flex-col overflow-hidden" : "overflow-y-auto")}>
+              <form id="observation-form" onSubmit={form.handleSubmit(handleSubmit)} className={cn("flex-1 flex flex-col", mode === "edit" ? "" : "overflow-hidden")}>
+                <div className={cn("flex-1 min-h-0", mode === "create" && currentStep === 2 ? "flex flex-col overflow-hidden" : mode === "create" ? "overflow-y-auto" : "")}>
                   {renderStepContent()}
                 </div>
               </form>

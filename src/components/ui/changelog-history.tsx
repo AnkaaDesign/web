@@ -6,8 +6,9 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FilePreviewCard } from "@/components/file";
-import { CUT_TYPE_LABELS, CUT_STATUS_LABELS, CUT_ORIGIN_LABELS, AIRBRUSHING_STATUS_LABELS } from "@/constants/enum-labels";
-import { ENTITY_BADGE_CONFIG } from "@/constants";
+import { CUT_TYPE_LABELS, CUT_STATUS_LABELS, CUT_ORIGIN_LABELS, AIRBRUSHING_STATUS_LABELS, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS } from "@/constants/enum-labels";
+import { ENTITY_BADGE_CONFIG, PAINT_FINISH } from "@/constants";
+import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-normal-map-renderer";
 import {
   IconHistory,
   IconEdit,
@@ -25,6 +26,9 @@ import {
   IconAlertCircle,
   IconCalendar,
   IconArrowBackUpDouble,
+  IconSparkles,
+  IconTruckLoading,
+  IconDroplet,
 } from "@tabler/icons-react";
 import type { ChangeLog } from "../../types";
 import { CHANGE_LOG_ENTITY_TYPE, CHANGE_LOG_ACTION, CHANGE_TRIGGERED_BY, CHANGE_LOG_ENTITY_TYPE_LABELS } from "../../constants";
@@ -313,6 +317,72 @@ const renderAirbrushingsCards = (airbrushings: any[]) => {
   );
 };
 
+// Render paints as cards
+const renderPaintsCards = (paints: any[]) => {
+  if (!Array.isArray(paints) || paints.length === 0) {
+    return <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>;
+  }
+
+  return (
+    <div className="space-y-2 mt-2">
+      {paints.map((paint: any, index: number) => (
+        <div key={paint.id || index} className="border rounded-lg px-2.5 py-1.5 bg-card">
+          <div className="flex items-start gap-3">
+            {/* Paint preview */}
+            <div className="relative flex-shrink-0">
+              <div className="w-10 h-10 rounded-md overflow-hidden shadow-inner border border-muted">
+                <CanvasNormalMapRenderer
+                  baseColor={paint.hex || "#888888"}
+                  finish={(paint.finish as PAINT_FINISH) || PAINT_FINISH.SOLID}
+                  width={40}
+                  height={40}
+                  quality="medium"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+
+            {/* Paint information */}
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-xs font-semibold truncate">{paint.name}</h4>
+                <span className="text-[10px] font-mono text-muted-foreground">{paint.hex}</span>
+              </div>
+
+              {/* Badges */}
+              <div className="flex flex-wrap gap-1">
+                {paint.paintType?.name && (
+                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                    <IconDroplet className="h-2.5 w-2.5 mr-0.5" />
+                    {paint.paintType.name}
+                  </Badge>
+                )}
+                {paint.finish && (
+                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                    <IconSparkles className="h-2.5 w-2.5 mr-0.5" />
+                    {PAINT_FINISH_LABELS[paint.finish]}
+                  </Badge>
+                )}
+                {paint.paintBrand?.name && (
+                  <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                    {paint.paintBrand.name}
+                  </Badge>
+                )}
+                {paint.manufacturer && (
+                  <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                    <IconTruckLoading className="h-2.5 w-2.5 mr-0.5" />
+                    {TRUCK_MANUFACTURER_LABELS[paint.manufacturer]}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // Timeline item component
 const ChangelogTimelineItem = ({
   changelogGroup,
@@ -355,7 +425,7 @@ const ChangelogTimelineItem = ({
     if (!field) return formatFieldValue(value, field, entityType, metadata);
 
     // Handle null/undefined values
-    if (value === null || value === undefined) return "—";
+    if (value === null || value === undefined) return "Nenhum";
 
     // Parse JSON strings if needed (backend stores as Json type which may come as strings)
     let parsedValue = value;
@@ -395,6 +465,7 @@ const ChangelogTimelineItem = ({
           return entityDetails.sectors.get(value) || "Setor";
         }
         if (field === "paintId" && entityDetails.paints.has(value)) {
+          // Return the full paint object for special rendering
           return entityDetails.paints.get(value) || "Tinta";
         }
         if ((field === "formulaId" || field === "formulaPaintId") && entityDetails.formulas.has(value)) {
@@ -434,7 +505,7 @@ const ChangelogTimelineItem = ({
     }
 
     // Special handling for logoId fields - render as images
-    if ((field === "logoId" || field === "logo") && value && value !== "—") {
+    if ((field === "logoId" || field === "logo") && value && value !== "Nenhum") {
       // Check if value is a UUID
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (typeof value === "string" && uuidRegex.test(value)) {
@@ -647,6 +718,89 @@ const ChangelogTimelineItem = ({
                                 <div className="mt-3">
                                   <span className="text-sm text-muted-foreground">Depois:</span>
                                   {renderAirbrushingsCards(newParsed)}
+                                </div>
+                              </>
+                            );
+                          })()
+                        ) : changelog.field === "paintId" ? (
+                          // Special handling for paintId (general painting) - render as single paint card
+                          (() => {
+                            // Get full paint objects from entityDetails
+                            const getFullPaint = (paintIdValue: any) => {
+                              if (!paintIdValue || typeof paintIdValue !== "string") return null;
+                              const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                              if (!uuidRegex.test(paintIdValue)) return null;
+                              return entityDetails?.paints.get(paintIdValue) || null;
+                            };
+
+                            const oldPaint = getFullPaint(changelog.oldValue);
+                            const newPaint = getFullPaint(changelog.newValue);
+
+                            return (
+                              <>
+                                <div>
+                                  <span className="text-sm text-muted-foreground">Antes:</span>
+                                  {oldPaint ? renderPaintsCards([oldPaint]) : <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>}
+                                </div>
+                                <div className="mt-3">
+                                  <span className="text-sm text-muted-foreground">Depois:</span>
+                                  {newPaint ? renderPaintsCards([newPaint]) : <span className="text-green-600 dark:text-green-400 font-medium ml-1">—</span>}
+                                </div>
+                              </>
+                            );
+                          })()
+                        ) : changelog.field === "logoPaints" || changelog.field === "paints" ? (
+                          // Special handling for paints - render as cards (handles all cases: add, remove, update)
+                          (() => {
+                            const parseValue = (val: any) => {
+                              if (!val) return val;
+                              if (typeof val === "string" && (val.trim().startsWith("[") || val.trim().startsWith("{"))) {
+                                try {
+                                  return JSON.parse(val);
+                                } catch (e) {
+                                  return val;
+                                }
+                              }
+                              return val;
+                            };
+
+                            // Convert array of paint IDs to full paint objects
+                            const getPaintObjects = (paintIds: any) => {
+                              if (!paintIds || !Array.isArray(paintIds)) return null;
+
+                              const paintObjects = paintIds
+                                .map((id: string) => {
+                                  // ID could be a string UUID or already a full object
+                                  if (typeof id === "object" && id !== null) return id;
+                                  if (typeof id !== "string") return null;
+
+                                  // Check if it's a valid UUID
+                                  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                                  if (!uuidRegex.test(id)) return null;
+
+                                  // Look up the full paint object from entityDetails
+                                  return entityDetails?.paints.get(id) || null;
+                                })
+                                .filter(Boolean);
+
+                              return paintObjects.length > 0 ? paintObjects : null;
+                            };
+
+                            const oldParsed = parseValue(changelog.oldValue);
+                            const newParsed = parseValue(changelog.newValue);
+
+                            const oldPaints = getPaintObjects(oldParsed);
+                            const newPaints = getPaintObjects(newParsed);
+
+                            return (
+                              <>
+                                <div>
+                                  <span className="text-sm text-muted-foreground">Antes:</span>
+                                  {renderPaintsCards(oldPaints)}
+                                </div>
+                                <div className="mt-3">
+                                  <span className="text-sm text-muted-foreground">Depois:</span>
+                                  {renderPaintsCards(newPaints)}
                                 </div>
                               </>
                             );
@@ -896,6 +1050,33 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
       } else if (changelog.field === "paintId") {
         if (changelog.oldValue && typeof changelog.oldValue === "string") paintIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string") paintIds.add(changelog.newValue);
+      } else if (changelog.field === "logoPaints" || changelog.field === "paints") {
+        // Extract paint IDs from arrays
+        const extractPaintIds = (val: any) => {
+          if (!val) return;
+          let parsed = val;
+          if (typeof val === "string" && (val.trim().startsWith("[") || val.trim().startsWith("{"))) {
+            try {
+              parsed = JSON.parse(val);
+            } catch (e) {
+              return;
+            }
+          }
+          if (Array.isArray(parsed)) {
+            parsed.forEach((item: any) => {
+              if (typeof item === "string") {
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                if (uuidRegex.test(item)) {
+                  paintIds.add(item);
+                }
+              } else if (item && typeof item === "object" && item.id) {
+                paintIds.add(item.id);
+              }
+            });
+          }
+        };
+        extractPaintIds(changelog.oldValue);
+        extractPaintIds(changelog.newValue);
       } else if (changelog.field === "formulaId" || changelog.field === "formulaPaintId") {
         if (changelog.oldValue && typeof changelog.oldValue === "string") formulaIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string") formulaIds.add(changelog.newValue);

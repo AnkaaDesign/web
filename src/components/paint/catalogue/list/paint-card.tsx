@@ -8,7 +8,7 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/compone
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { formatHexColor, getContrastingTextColor } from "./color-utils";
 import { routes, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH, TRUCK_MANUFACTURER } from "../../../../constants";
-import { IconFlask, IconTag, IconTruckLoading, IconSparkles, IconEdit, IconTrash, IconCheck, IconX, IconGitMerge, IconEye } from "@tabler/icons-react";
+import { IconFlask, IconTag, IconTruckLoading, IconSparkles, IconEdit, IconTrash, IconCheck, IconX, IconGitMerge, IconEye, IconDroplet, IconClipboardList } from "@tabler/icons-react";
 import { usePaintMutations } from "../../../../hooks";
 import type { PaintGetManyFormData } from "../../../../schemas";
 import { CanvasNormalMapRenderer } from "../../effects/canvas-normal-map-renderer";
@@ -221,14 +221,20 @@ export function PaintCard({ paint, onFilterChange, currentFilters, showEffects =
 
         {/* Card content */}
         <div className="p-4 space-y-3 flex-1 flex flex-col">
-          {/* Name and type - Always shown */}
+          {/* Name - Always shown */}
           <div className="flex-1">
             <h3 className="font-semibold text-base line-clamp-2 mb-1">{paint.name}</h3>
-            {paintTypeLabel && <p className="text-sm text-muted-foreground">{paintTypeLabel}</p>}
           </div>
 
           {/* Badges - Always shown */}
           <div className="flex flex-wrap gap-1">
+            {paintTypeLabel && (
+              <Badge variant="secondary" className="text-xs">
+                <IconDroplet className="h-3 w-3 mr-1" />
+                {paintTypeLabel}
+              </Badge>
+            )}
+
             <Badge variant="secondary" className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors" onClick={handleFinishFilter}>
               <IconSparkles className="h-3 w-3 mr-1" />
               {finishLabel}
@@ -277,6 +283,14 @@ export function PaintCard({ paint, onFilterChange, currentFilters, showEffects =
             <IconFlask className={`h-4 w-4 ${paint.formulas && paint.formulas.length > 0 ? "text-green-600" : "text-red-600"}`} />
             <span className={paint.formulas && paint.formulas.length > 0 ? "text-foreground" : "text-muted-foreground"}>
               {paint.formulas?.length || 0} fórmula{(paint.formulas?.length || 0) !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          {/* Task count - Always shown */}
+          <div className="flex items-center gap-2 text-sm">
+            <IconClipboardList className={`h-4 w-4 ${(paint._count?.logoTasks || 0) + (paint._count?.generalPaintings || 0) > 0 ? "text-blue-600" : "text-muted-foreground"}`} />
+            <span className={(paint._count?.logoTasks || 0) + (paint._count?.generalPaintings || 0) > 0 ? "text-foreground" : "text-muted-foreground"}>
+              {(paint._count?.logoTasks || 0) + (paint._count?.generalPaintings || 0)} tarefa{((paint._count?.logoTasks || 0) + (paint._count?.generalPaintings || 0)) !== 1 ? "s" : ""}
             </span>
           </div>
         </div>

@@ -11,7 +11,8 @@ import { CutItemFilters } from "./cut-item-filters";
 import { cn } from "@/lib/utils";
 import { useTableState } from "@/hooks/use-table-state";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
-import { FilterIndicator } from "./filter-indicator";
+import { FilterIndicators } from "./filter-indicator";
+import { buildFilterTags } from "./filter-utils";
 import { useTableFilters } from "@/hooks/use-table-filters";
 
 interface CutListProps {
@@ -159,21 +160,25 @@ export function CutList({ className }: CutListProps) {
     [setFilters],
   );
 
-  // Handle filter removal
-  const onRemoveFilter = useCallback(
-    (key: string) => {
-      if (key === "searchingFor") {
-        setSearch("");
-      } else if (key === "status") {
-        const newFilters = { ...filters };
-        if (newFilters.where) {
-          delete newFilters.where.status;
-        }
-        handleFilterChange(newFilters);
-      }
-    },
-    [filters, handleFilterChange, setSearch],
-  );
+  // Build filter tags from current filters (excluding search)
+  const filterTags = useMemo(() => {
+    return buildFilterTags(filters, handleFilterChange);
+  }, [filters, handleFilterChange]);
+
+  // Combine search and other filters for display
+  const allFilterTags = useMemo(() => {
+    const tags = [...filterTags];
+    if (searchingFor) {
+      tags.unshift({
+        key: "searchingFor",
+        label: "Busca",
+        value: searchingFor,
+        displayValue: searchingFor,
+        onRemove: () => setSearch(""),
+      });
+    }
+    return tags;
+  }, [filterTags, searchingFor, setSearch]);
 
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
@@ -201,9 +206,7 @@ export function CutList({ className }: CutListProps) {
         </div>
 
         {/* Active Filter Indicators */}
-        {hasActiveFilters && (
-          <FilterIndicator hasFilters={hasActiveFilters} onClear={clearAllFilters} searchingFor={searchingFor} status={filters.where?.status} onRemoveFilter={onRemoveFilter} />
-        )}
+        {allFilterTags.length > 0 && <FilterIndicators filters={allFilterTags} onClearAll={clearAllFilters} />}
 
         {/* Paginated table */}
         <div className="flex-1 min-h-0">

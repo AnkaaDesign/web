@@ -2,8 +2,11 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { FileUploadField, type FileWithPreview } from "@/components/file";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import type { AirbrushingCreateFormData, AirbrushingUpdateFormData } from "../../../../schemas";
+import type { FieldErrors } from "react-hook-form";
 import { IconPaperclip, IconFileInvoice, IconPhoto } from "@tabler/icons-react";
+import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
 
 interface AirbrushingFormFieldsProps {
   control: any;
@@ -27,10 +30,16 @@ export function AirbrushingFormFields({
   onNfeFilesChange,
   onArtworkFilesChange,
 }: AirbrushingFormFieldsProps) {
+  const statusOptions: ComboboxOption[] = [
+    { value: AIRBRUSHING_STATUS.PENDING, label: AIRBRUSHING_STATUS_LABELS.PENDING },
+    { value: AIRBRUSHING_STATUS.IN_PRODUCTION, label: AIRBRUSHING_STATUS_LABELS.IN_PRODUCTION },
+    { value: AIRBRUSHING_STATUS.COMPLETED, label: AIRBRUSHING_STATUS_LABELS.COMPLETED },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Price and Dates Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Price, Status, and Dates Row */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Price Field */}
         <FormField
           control={control}
@@ -40,6 +49,28 @@ export function AirbrushingFormFields({
               <FormLabel>Preço do Serviço</FormLabel>
               <FormControl>
                 <Input type="currency" value={field.value || undefined} onChange={field.onChange} placeholder="R$ 0,00" className="bg-transparent" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Status Field */}
+        <FormField
+          control={control}
+          name="status"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Status</FormLabel>
+              <FormControl>
+                <Combobox
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={statusOptions}
+                  placeholder="Selecione o status"
+                  searchable={false}
+                  clearable={false}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

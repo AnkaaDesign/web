@@ -12,6 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,12 +47,23 @@ import {
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { formatDate } from "../../utils/date";
 import type { BackupMetadata, ScheduledBackupJob } from "../../api-client/backup";
+import { backupApi } from "../../api-client/backup";
+import {
+  useBackups,
+  useScheduledBackups,
+  useBackupSystemHealthSummary,
+  useBackupMutations,
+  useBackupUtils,
+} from "@/hooks/useBackup";
+import { useAuth } from "@/contexts/auth-context";
+import { useTableState } from "@/hooks/use-table-state";
 
 // Enhanced form interfaces
 interface NewBackupForm {
   name: string;
-  type: "database" | "files" | "full";
+  type: "database" | "files" | "system" | "full";
   description: string;
   priority: "low" | "medium" | "high" | "critical";
   compressionLevel: number;
@@ -58,11 +71,12 @@ interface NewBackupForm {
   customPaths: string[];
   usePresetPaths: boolean;
   presetPathType: "critical" | "high" | "medium" | "low";
+  webdavFolders: string[];
 }
 
 interface NewScheduleForm {
   name: string;
-  type: "database" | "files" | "full";
+  type: "database" | "files" | "system" | "full";
   frequency: "daily" | "weekly" | "monthly";
   time: string;
   enabled: boolean;
@@ -71,6 +85,7 @@ interface NewScheduleForm {
   encrypted: boolean;
   usePresetPaths: boolean;
   presetPathType: "critical" | "high" | "medium" | "low";
+  webdavFolders: string[];
 }
 
 // Priority options for backups
@@ -89,50 +104,258 @@ const COMPRESSION_OPTIONS = [
   { value: 9, label: "9 - Melhor compressão" },
 ];
 
-// Preset path options for important folders
+// Preset path options for system backups
 const PRESET_PATH_OPTIONS = [
-  { value: "critical", label: "Críticos (Apps principais, configs)", paths: ["/home/kennedy/ankaa", "/home/kennedy/ankaa/.env", "/home/kennedy/ankaa/apps/api/.env"] },
-  { value: "high", label: "Alta prioridade (Apps, nginx, ssl)", paths: ["/home/kennedy/ankaa/apps", "/home/kennedy/ankaa/packages", "/etc/nginx", "/etc/samba", "/etc/ssl"] },
-  { value: "medium", label: "Média prioridade (Docs, logs)", paths: ["/home/kennedy/ankaa/docs", "/var/log/nginx", "/var/www"] },
-  { value: "low", label: "Baixa prioridade (Cache, temporários)", paths: ["/home/kennedy/ankaa/node_modules", "/tmp"] },
+  { value: "critical", label: "Críticos (Configs principais)", paths: ["/etc/nginx", "/etc/ssl", "/home/kennedy/ankaa/.env", "/home/kennedy/ankaa/apps/api/.env"] },
+  { value: "high", label: "Alta prioridade (Sistema completo)", paths: ["/etc/nginx", "/etc/ssl", "/etc/samba", "/etc/systemd/system", "/var/www"] },
+  { value: "medium", label: "Média prioridade (Logs, www)", paths: ["/var/log/nginx", "/var/www"] },
+  { value: "low", label: "Baixa prioridade (Temporários)", paths: ["/tmp"] },
 ];
 
 const BackupManagementPage = () => {
-  // Mock data for backup management
-  const backups: BackupMetadata[] = [];
-  const scheduledBackups: ScheduledBackupJob[] = [];
-  const systemHealth = null;
-  const isLoading = false;
-  const isCreating = false;
-  const isDeleting = false;
-  const isRestoring = false;
-  const isVerifying = false;
-  const createBackup = async () => null;
-  const scheduleBackup = async () => false;
-  const deleteBackup = async () => false;
-  const restoreBackup = async () => false;
-  const removeScheduledBackup = async () => false;
-  const verifyBackup = async () => null;
-  const refreshAll = () => {};
-  const formatBytes = (bytes: number) => `${bytes} bytes`;
-  const getStatusBadgeVariant = () => "default" as const;
-  const getBackupTypeIcon = () => "IconDatabase";
-  const getBackupTypeLabel = () => "Database";
-  const getStatusLabel = () => "Unknown";
-  const getFrequencyLabel = () => "Unknown";
-  const generateCronExpression = () => "0 0 * * *";
-  const parseCronToHuman = () => "Daily";
+  // Authentication state
+  const { isAuthenticated } = useAuth();
+
+  // WebDAV folders state (fetched dynamically from API)
+  const [webdavFolders, setWebdavFolders] = useState<Array<{ value: string; label: string }>>([]);
+  const [loadingFolders, setLoadingFolders] = useState(false);
+
+  // Fetch WebDAV folders on mount
+  useEffect(() => {
+    const fetchWebDAVFolders = async () => {
+      if (!isAuthenticated) return;
+
+      setLoadingFolders(true);
+      try {
+        console.log("Fetching WebDAV folders...");
+        const folders = await backupApi.getWebDAVFolders();
+        console.log("WebDAV folders received:", folders);
+
+        if (folders && folders.length > 0) {
+          const formattedFolders = folders.map(f => ({ value: f, label: f }));
+          console.log("Formatted folders:", formattedFolders);
+          setWebdavFolders(formattedFolders);
+        } else {
+          console.warn("No WebDAV folders found");
+          setWebdavFolders([]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch WebDAV folders:", error);
+        toast.error("Erro ao carregar pastas do WebDAV");
+        setWebdavFolders([]);
+      } finally {
+        setLoadingFolders(false);
+      }
+    };
+
+    fetchWebDAVFolders();
+  }, [isAuthenticated]);
+
+  // Fetch backups data (only when authenticated)
+  const { data: backupsData, isLoading, refetch: refetchBackups } = useBackups(undefined, isAuthenticated);
+  const { data: scheduledBackupsData, refetch: refetchScheduled } = useScheduledBackups(isAuthenticated);
+  const { data: systemHealth, refetch: refetchHealth } = useBackupSystemHealthSummary(isAuthenticated);
+
+  // Mutations
+  const mutations = useBackupMutations();
+  const {
+    create: createBackupMutation,
+    schedule: scheduleBackupMutation,
+    delete: deleteBackupMutation,
+    restore: restoreBackupMutation,
+    removeScheduled: removeScheduledBackupMutation,
+    verify: verifyBackupMutation,
+  } = mutations;
+
+  // Extract data with fallbacks
+  const backups: BackupMetadata[] = backupsData || [];
+  const scheduledBackups: ScheduledBackupJob[] = scheduledBackupsData || [];
+
+  // Loading states from mutations
+  const isCreating = createBackupMutation.isPending || scheduleBackupMutation.isPending;
+  const isDeleting = deleteBackupMutation.isPending;
+  const isRestoring = restoreBackupMutation.isPending;
+  const isVerifying = verifyBackupMutation.isPending;
+
+  // Utility functions
+  const { formatBytes, generateCronExpression, parseCronToHuman } = useBackupUtils();
+
+  // Wrapper functions for mutations with proper typing and error handling
+  const createBackup = async (data: any) => {
+    try {
+      const result = await createBackupMutation.mutateAsync(data);
+      return result.id || null; // API returns { id, message } directly
+    } catch (error: any) {
+      return null;
+    }
+  };
+
+  const scheduleBackup = async (data: any) => {
+    try {
+      await scheduleBackupMutation.mutateAsync(data);
+      // Toast already shown by hook, don't duplicate
+      return true;
+    } catch (error: any) {
+      // Toast already shown by hook, don't duplicate
+      return false;
+    }
+  };
+
+  const deleteBackup = async (id: string) => {
+    try {
+      await deleteBackupMutation.mutateAsync(id);
+      return true;
+    } catch (error: any) {
+      return false;
+    }
+  };
+
+  const restoreBackup = async (id: string, targetPath?: string) => {
+    try {
+      await restoreBackupMutation.mutateAsync({ id, targetPath });
+      return true;
+    } catch (error: any) {
+      return false;
+    }
+  };
+
+  const removeScheduledBackup = async (id: string) => {
+    try {
+      await removeScheduledBackupMutation.mutateAsync(id);
+      return true;
+    } catch (error: any) {
+      return false;
+    }
+  };
+
+  const verifyBackup = async (id: string) => {
+    try {
+      const result = await verifyBackupMutation.mutateAsync(id);
+      return result;
+    } catch (error: any) {
+      return null;
+    }
+  };
+
+  const refreshAll = () => {
+    refetchBackups();
+    refetchScheduled();
+    refetchHealth();
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "success" as const;
+      case "failed":
+        return "destructive" as const;
+      case "in_progress":
+        return "default" as const;
+      case "pending":
+        return "secondary" as const;
+      default:
+        return "default" as const;
+    }
+  };
+
+  const getBackupTypeIcon = (type: string) => {
+    switch (type) {
+      case "database":
+        return "IconDatabase";
+      case "files":
+        return "IconFolder";
+      case "full":
+        return "IconServer";
+      default:
+        return "IconDatabase";
+    }
+  };
+
+  const getBackupTypeLabel = (type: string) => {
+    switch (type) {
+      case "database":
+        return "Banco de Dados";
+      case "files":
+        return "Arquivos";
+      case "system":
+        return "Sistema";
+      case "full":
+        return "Completo";
+      default:
+        return "Desconhecido";
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "Concluído";
+      case "failed":
+        return "Falhou";
+      case "in_progress":
+        return "Em progresso";
+      case "pending":
+        return "Pendente";
+      default:
+        return "Desconhecido";
+    }
+  };
+
+  const getFrequencyLabel = (frequency: string) => {
+    switch (frequency) {
+      case "daily":
+        return "Diariamente";
+      case "weekly":
+        return "Semanalmente";
+      case "monthly":
+        return "Mensalmente";
+      default:
+        return "Desconhecido";
+    }
+  };
 
   // Dialog states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteScheduleDialogOpen, setDeleteScheduleDialogOpen] = useState(false);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+
+  // Context menu state for scheduled backups
+  const [scheduleContextMenu, setScheduleContextMenu] = useState<{
+    x: number;
+    y: number;
+    schedule: ScheduledBackupJob;
+  } | null>(null);
+
+  // Context menu state for existing backups (updated to support bulk operations)
+  const [backupContextMenu, setBackupContextMenu] = useState<{
+    x: number;
+    y: number;
+    backups: BackupMetadata[];
+    isBulk: boolean;
+  } | null>(null);
+
+  // Selection state using table state hook
+  const {
+    selectedIds,
+    toggleSelection,
+    toggleSelectAll,
+    isSelected,
+    isAllSelected,
+    isPartiallySelected,
+    selectionCount,
+    resetSelection,
+  } = useTableState({
+    defaultPageSize: 40,
+    resetSelectionOnPageChange: false,
+  });
 
   // Selected items
   const [selectedBackup, setSelectedBackup] = useState<BackupMetadata | null>(null);
-  const [backupToDelete, setBackupToDelete] = useState<BackupMetadata | null>(null);
+  const [backupToDelete, setBackupToDelete] = useState<BackupMetadata[] | null>(null);
+  const [scheduleToDelete, setScheduleToDelete] = useState<ScheduledBackupJob | null>(null);
 
   // Enhanced form states
   const [newBackup, setNewBackup] = useState<NewBackupForm>({
@@ -145,6 +368,7 @@ const BackupManagementPage = () => {
     customPaths: [],
     usePresetPaths: true,
     presetPathType: "high",
+    webdavFolders: [],
   });
 
   // Custom path input state
@@ -161,6 +385,7 @@ const BackupManagementPage = () => {
     encrypted: false,
     usePresetPaths: true,
     presetPathType: "high",
+    webdavFolders: [],
   });
 
   // Utility functions
@@ -241,6 +466,17 @@ const BackupManagementPage = () => {
   const useSimulatedProgress = (backupId: string, isInProgress: boolean) => {
     const [simulatedProgress, setSimulatedProgress] = useState(15);
 
+    // Poll for real status every 3 seconds when backup is in progress
+    useEffect(() => {
+      if (!isInProgress) return;
+
+      const pollInterval = setInterval(() => {
+        refetchBackups(); // Check if backup completed
+      }, 3000);
+
+      return () => clearInterval(pollInterval);
+    }, [isInProgress, backupId]);
+
     useEffect(() => {
       if (!isInProgress) {
         setSimulatedProgress(15);
@@ -265,7 +501,7 @@ const BackupManagementPage = () => {
         } else {
           // After 1 minute: slowly approach 95%
           progress = 85 + ((elapsed - 60000) / 30000) * 10;
-          progress = Math.min(progress, 95); // Don't go above 95%
+          progress = Math.min(progress, 95); // Don't go above 95% (real status will update to 100%)
         }
 
         setSimulatedProgress(Math.round(progress));
@@ -287,9 +523,15 @@ const BackupManagementPage = () => {
     // Determine paths to use
     let pathsToBackup: string[] | undefined;
 
-    if (newBackup.type === "files" || newBackup.type === "full") {
+    if (newBackup.type === "files") {
+      // Files backup - WebDAV folders
+      if (newBackup.webdavFolders.length > 0) {
+        pathsToBackup = newBackup.webdavFolders;
+      }
+      // If no folders selected, will backup entire WebDAV directory
+    } else if (newBackup.type === "system") {
+      // System backup - System configuration paths
       if (newBackup.usePresetPaths) {
-        // Get preset paths from the API client
         const presetPaths = PRESET_PATH_OPTIONS.find((opt) => opt.value === newBackup.presetPathType)?.paths || [];
         pathsToBackup = presetPaths;
       } else if (newBackup.customPaths.length > 0) {
@@ -319,6 +561,7 @@ const BackupManagementPage = () => {
         customPaths: [],
         usePresetPaths: true,
         presetPathType: "high",
+        webdavFolders: [],
       });
       setCustomPathInput("");
     }
@@ -340,87 +583,167 @@ const BackupManagementPage = () => {
       return;
     }
 
-    setBackupToDelete(backup);
+    setBackupToDelete([backup]);
     setDeleteDialogOpen(true);
   }, []);
 
   const confirmDeleteBackup = useCallback(async () => {
-    if (!backupToDelete) return;
+    if (!backupToDelete || backupToDelete.length === 0) return;
 
-    const success = await deleteBackup(backupToDelete.id);
-    if (success) {
+    const isBulk = backupToDelete.length > 1;
+
+    try {
+      if (isBulk) {
+        // Delete all backups in parallel
+        const promises = backupToDelete.map((b) => deleteBackup(b.id));
+        await Promise.all(promises);
+        resetSelection();
+      } else {
+        // Delete single backup
+        await deleteBackup(backupToDelete[0].id);
+      }
+
+      refetchBackups();
       setDeleteDialogOpen(false);
       setBackupToDelete(null);
+    } catch (error) {
+      // Error handled by mutation
     }
-  }, [backupToDelete, deleteBackup]);
+  }, [backupToDelete, deleteBackup, resetSelection, refetchBackups]);
 
   const handleCreateSchedule = useCallback(async () => {
-    if (!newSchedule.name.trim()) {
-      toast.error("Nome do agendamento é obrigatório");
-      return;
-    }
+    try {
+      console.log("handleCreateSchedule called", newSchedule);
 
-    // Determine paths to use for scheduled backup
-    let pathsToBackup: string[] | undefined;
-
-    if (newSchedule.type === "files" || newSchedule.type === "full") {
-      if (newSchedule.usePresetPaths) {
-        // Get preset paths
-        const presetPaths = PRESET_PATH_OPTIONS.find((opt) => opt.value === newSchedule.presetPathType)?.paths || [];
-        pathsToBackup = presetPaths;
-      }
-    }
-
-    const success = await scheduleBackup({
-      name: newSchedule.name,
-      type: newSchedule.type,
-      description: `Backup agendado ${getFrequencyLabel(newSchedule.frequency).toLowerCase()} às ${newSchedule.time}`,
-      priority: newSchedule.priority,
-      compressionLevel: newSchedule.compressionLevel,
-      encrypted: newSchedule.encrypted,
-      enabled: newSchedule.enabled,
-      cron: generateCronExpression(newSchedule.frequency, newSchedule.time),
-      paths: pathsToBackup,
-    });
-
-    if (success) {
-      setScheduleDialogOpen(false);
-      setNewSchedule({
-        name: "",
-        type: "database",
-        frequency: "daily",
-        time: "23:00",
-        enabled: true,
-        priority: "medium",
-        compressionLevel: 6,
-        encrypted: false,
-        usePresetPaths: true,
-        presetPathType: "high",
-      });
-    }
-  }, [newSchedule, scheduleBackup, getFrequencyLabel, generateCronExpression]);
-
-  const handleDeleteSchedule = useCallback(
-    async (schedule: ScheduledBackupJob) => {
-      const confirmed = window.confirm(`Tem certeza que deseja deletar o agendamento "${schedule.name}"?`);
-
-      if (!confirmed) return;
-
-      // Use the most reliable identifier: key > id > jobName
-      const identifier = schedule.key || schedule.id || schedule.jobName;
-
-      if (!identifier) {
-        toast.error("Não foi possível identificar o agendamento para exclusão");
+      if (!newSchedule.name.trim()) {
+        toast.error("Nome do agendamento é obrigatório");
         return;
       }
 
-      const success = await removeScheduledBackup(identifier);
-      if (success) {
-        // Refresh scheduled backups list is handled by the hook
+      // Determine paths to use for scheduled backup
+      let pathsToBackup: string[] | undefined;
+
+      if (newSchedule.type === "files") {
+        // Files backup - WebDAV folders
+        if (newSchedule.webdavFolders.length > 0) {
+          pathsToBackup = newSchedule.webdavFolders;
+        }
+      } else if (newSchedule.type === "system") {
+        // System backup - System configuration paths
+        if (newSchedule.usePresetPaths) {
+          const presetPaths = PRESET_PATH_OPTIONS.find((opt) => opt.value === newSchedule.presetPathType)?.paths || [];
+          pathsToBackup = presetPaths;
+        }
       }
+
+      const cronExpression = generateCronExpression(newSchedule.frequency, newSchedule.time);
+      console.log("Generated cron:", cronExpression);
+
+      // Format time for display (handle Date object from DateTimeInput)
+      let timeDisplay: string;
+      if (newSchedule.time instanceof Date) {
+        const hours = newSchedule.time.getHours().toString().padStart(2, '0');
+        const minutes = newSchedule.time.getMinutes().toString().padStart(2, '0');
+        timeDisplay = `${hours}:${minutes}`;
+      } else {
+        timeDisplay = String(newSchedule.time);
+      }
+
+      const scheduleData = {
+        name: newSchedule.name,
+        type: newSchedule.type,
+        description: `Backup agendado ${getFrequencyLabel(newSchedule.frequency).toLowerCase()} às ${timeDisplay}`,
+        priority: newSchedule.priority,
+        raidAware: true, // Enable RAID-aware backups for scheduled jobs
+        compressionLevel: newSchedule.compressionLevel,
+        encrypted: newSchedule.encrypted,
+        enabled: newSchedule.enabled,
+        cron: cronExpression,
+        paths: pathsToBackup,
+      };
+
+      console.log("Scheduling backup with data:", scheduleData);
+
+      const success = await scheduleBackup(scheduleData);
+
+      console.log("Schedule backup result:", success);
+
+      if (success) {
+        setScheduleDialogOpen(false);
+        setNewSchedule({
+          name: "",
+          type: "database",
+          frequency: "daily",
+          time: "23:00",
+          enabled: true,
+          priority: "medium",
+          compressionLevel: 6,
+          encrypted: false,
+          usePresetPaths: true,
+          presetPathType: "high",
+          webdavFolders: [],
+        });
+      }
+    } catch (error) {
+      console.error("Error in handleCreateSchedule:", error);
+      toast.error(`Erro ao criar agendamento: ${error.message || "Erro desconhecido"}`);
+    }
+  }, [newSchedule, scheduleBackup, getFrequencyLabel, generateCronExpression]);
+
+  const handleDeleteSchedule = useCallback((schedule: ScheduledBackupJob) => {
+    setScheduleToDelete(schedule);
+    setDeleteScheduleDialogOpen(true);
+  }, []);
+
+  const confirmDeleteSchedule = useCallback(async () => {
+    if (!scheduleToDelete) return;
+
+    // Use the most reliable identifier: key > id > jobName
+    const identifier = scheduleToDelete.key || scheduleToDelete.id || scheduleToDelete.jobName;
+
+    if (!identifier) {
+      toast.error("Não foi possível identificar o agendamento para exclusão");
+      return;
+    }
+
+    const success = await removeScheduledBackup(identifier);
+    if (success) {
+      setDeleteScheduleDialogOpen(false);
+      setScheduleToDelete(null);
+    }
+  }, [scheduleToDelete, removeScheduledBackup]);
+
+  // Context menu handlers for scheduled backups
+  const handleScheduleContextMenu = useCallback(
+    (event: React.MouseEvent, schedule: ScheduledBackupJob) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      setScheduleContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        schedule: schedule,
+      });
     },
-    [removeScheduledBackup],
+    [],
   );
+
+  const handleScheduleContextMenuDelete = useCallback(() => {
+    if (scheduleContextMenu) {
+      handleDeleteSchedule(scheduleContextMenu.schedule);
+      setScheduleContextMenu(null);
+    }
+  }, [scheduleContextMenu, handleDeleteSchedule]);
+
+  // Close context menus when clicking outside
+  useEffect(() => {
+    const handleClick = () => {
+      setScheduleContextMenu(null);
+      setBackupContextMenu(null);
+    };
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
 
   const handleVerifyBackup = useCallback(
     async (backup: BackupMetadata) => {
@@ -433,15 +756,122 @@ const BackupManagementPage = () => {
     [verifyBackup],
   );
 
+  // Context menu handlers for existing backups
+  const handleBackupContextMenu = useCallback(
+    (event: React.MouseEvent, backup: BackupMetadata) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const isBackupSelected = isSelected(backup.id);
+      const hasSelection = selectionCount > 0;
+
+      if (hasSelection && isBackupSelected) {
+        // Show bulk actions for all selected backups
+        const selectedBackupsList = backups.filter((b) => isSelected(b.id));
+        setBackupContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          backups: selectedBackupsList,
+          isBulk: true,
+        });
+      } else {
+        // Show actions for just the clicked backup
+        setBackupContextMenu({
+          x: event.clientX,
+          y: event.clientY,
+          backups: [backup],
+          isBulk: false,
+        });
+      }
+    },
+    [backups, isSelected, selectionCount],
+  );
+
+  const handleBackupContextMenuVerify = useCallback(() => {
+    if (backupContextMenu && !backupContextMenu.isBulk) {
+      handleVerifyBackup(backupContextMenu.backups[0]);
+      setBackupContextMenu(null);
+    }
+  }, [backupContextMenu, handleVerifyBackup]);
+
+  const handleBackupContextMenuRestore = useCallback(() => {
+    if (backupContextMenu && !backupContextMenu.isBulk) {
+      setSelectedBackup(backupContextMenu.backups[0]);
+      setRestoreDialogOpen(true);
+      setBackupContextMenu(null);
+    }
+  }, [backupContextMenu]);
+
+  const handleBackupContextMenuDelete = useCallback(() => {
+    if (backupContextMenu) {
+      setBackupToDelete(backupContextMenu.backups);
+      setDeleteDialogOpen(true);
+      setBackupContextMenu(null);
+    }
+  }, [backupContextMenu]);
+
   // BackupTableRow component to use the progress hook
   const BackupTableRow = ({ backup }: { backup: BackupMetadata }) => {
     const simulatedProgress = useSimulatedProgress(backup.id, backup.status === "in_progress");
     const actualProgress = backup.progress || simulatedProgress;
+    const isBackupSelected = isSelected(backup.id);
 
     const TypeIcon = getBackupTypeIcon(backup.type) === "IconDatabase" ? IconDatabase : getBackupTypeIcon(backup.type) === "IconFolder" ? IconFolder : IconServer;
 
+    // Format folder/file display
+    const formatPathsDisplay = () => {
+      if (!backup.paths || backup.paths.length === 0) {
+        // No paths specified = full backup
+        return <span className="text-sm text-muted-foreground">todas</span>;
+      }
+
+      if (backup.paths.length === 1) {
+        // Show single folder name
+        return (
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <IconFolder className="h-3 w-3" />
+            <span>{backup.paths[0]}</span>
+          </div>
+        );
+      }
+
+      if (backup.paths.length === 2) {
+        // Show both folder names
+        return (
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <IconFolder className="h-3 w-3" />
+            <span>{backup.paths.join(", ")}</span>
+          </div>
+        );
+      }
+
+      // 3+ folders: show count
+      return (
+        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          <IconFolder className="h-3 w-3" />
+          <span>{backup.paths.length} pastas</span>
+        </div>
+      );
+    };
+
     return (
-      <TableRow key={backup.id}>
+      <TableRow
+        key={backup.id}
+        className={cn(
+          "cursor-pointer hover:bg-muted/20",
+          isBackupSelected && "bg-muted/30 hover:bg-muted/40"
+        )}
+        onContextMenu={(e) => handleBackupContextMenu(e, backup)}
+      >
+        <TableCell className="w-[50px]">
+          <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <Checkbox
+              checked={isBackupSelected}
+              onCheckedChange={() => toggleSelection(backup.id)}
+              aria-label={`Selecionar backup ${backup.name}`}
+            />
+          </div>
+        </TableCell>
         <TableCell>
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -452,20 +882,6 @@ const BackupManagementPage = () => {
                   Criptografado
                 </Badge>
               )}
-              {backup.priority && (
-                <Badge variant={getPriorityBadgeVariant(backup.priority)} className="text-xs">
-                  {getPriorityLabel(backup.priority)}
-                </Badge>
-              )}
-            </div>
-            <div className="text-sm text-muted-foreground space-y-1">
-              {backup.description && <div>{backup.description}</div>}
-              {backup.paths && backup.paths.length > 0 && (
-                <div className="flex items-center gap-1">
-                  <IconFolder className="h-3 w-3" />
-                  <span>{backup.paths.length === 1 ? backup.paths[0] : `${backup.paths.length} pastas incluídas`}</span>
-                </div>
-              )}
             </div>
           </div>
         </TableCell>
@@ -475,45 +891,30 @@ const BackupManagementPage = () => {
             {getBackupTypeLabel(backup.type)}
           </div>
         </TableCell>
+        <TableCell>
+          {backup.priority ? (
+            <Badge variant={getPriorityBadgeVariant(backup.priority)} className="text-xs">
+              {getPriorityLabel(backup.priority)}
+            </Badge>
+          ) : (
+            <span className="text-sm text-muted-foreground">-</span>
+          )}
+        </TableCell>
+        <TableCell>
+          {formatPathsDisplay()}
+        </TableCell>
         <TableCell>{formatBytes(backup.size)}</TableCell>
         <TableCell>{formatDate(backup.createdAt)}</TableCell>
         <TableCell>
           <div className="space-y-2">
-            <Badge variant={getStatusBadgeVariant(backup.status)}>{getStatusLabel(backup.status)}</Badge>
-            {backup.status === "in_progress" && (
+            {backup.status === "in_progress" ? (
               <div className="space-y-1">
                 <Progress value={actualProgress} className="h-2" />
-                <div className="text-xs text-muted-foreground">{backup.progress ? `${Math.round(backup.progress)}% concluído` : `${actualProgress}% concluído (simulado)`}</div>
+                <div className="text-xs text-muted-foreground">{Math.round(actualProgress)}% concluído</div>
               </div>
+            ) : (
+              <Badge variant={getStatusBadgeVariant(backup.status)}>{getStatusLabel(backup.status)}</Badge>
             )}
-          </div>
-        </TableCell>
-        <TableCell className="text-right">
-          <div className="flex justify-end gap-2">
-            {backup.status === "completed" && (
-              <>
-                <Button size="sm" variant="outline" onClick={() => handleVerifyBackup(backup)} disabled={isVerifying}>
-                  <IconEye className="h-4 w-4" />
-                  Verificar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedBackup(backup);
-                    setRestoreDialogOpen(true);
-                  }}
-                  disabled={isRestoring}
-                >
-                  <IconDownload className="h-4 w-4" />
-                  Restaurar
-                </Button>
-              </>
-            )}
-            <Button size="sm" variant="destructive" onClick={() => handleDeleteBackup(backup)} disabled={backup.status === "in_progress" || isDeleting}>
-              <IconTrash className="h-4 w-4" />
-              Deletar
-            </Button>
           </div>
         </TableCell>
       </TableRow>
@@ -535,13 +936,6 @@ const BackupManagementPage = () => {
       icon: IconClock,
       onClick: () => setScheduleDialogOpen(true),
       variant: "outline" as const,
-    },
-    {
-      key: "refresh",
-      label: "Atualizar",
-      icon: IconRefresh,
-      onClick: refreshAll,
-      variant: "ghost" as const,
     },
   ];
 
@@ -567,7 +961,7 @@ const BackupManagementPage = () => {
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
                     <IconDatabase className="h-4 w-4 text-blue-500" />
-                    <div className="text-2xl font-bold">{systemHealth.totalBackups}</div>
+                    <div className="text-2xl font-bold">{systemHealth.backupStats.total}</div>
                   </div>
                   <p className="text-xs text-muted-foreground">Total de Backups</p>
                 </CardContent>
@@ -576,7 +970,7 @@ const BackupManagementPage = () => {
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
                     <IconCheck className="h-4 w-4 text-green-500" />
-                    <div className="text-2xl font-bold">{systemHealth.completedBackups}</div>
+                    <div className="text-2xl font-bold">{systemHealth.backupStats.completed}</div>
                   </div>
                   <p className="text-xs text-muted-foreground">Concluídos</p>
                 </CardContent>
@@ -594,7 +988,7 @@ const BackupManagementPage = () => {
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
                     <IconServer className="h-4 w-4 text-purple-500" />
-                    <div className="text-2xl font-bold">{systemHealth.totalSize}</div>
+                    <div className="text-2xl font-bold">{formatBytes(systemHealth.backupStats.totalSize)}</div>
                   </div>
                   <p className="text-xs text-muted-foreground">Tamanho Total</p>
                 </CardContent>
@@ -615,18 +1009,30 @@ const BackupManagementPage = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[50px]">
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            checked={isAllSelected(backups.map(b => b.id))}
+                            indeterminate={isPartiallySelected(backups.map(b => b.id))}
+                            onCheckedChange={() => toggleSelectAll(backups.map(b => b.id))}
+                            aria-label="Selecionar todos"
+                            disabled={isLoading || backups.length === 0}
+                          />
+                        </div>
+                      </TableHead>
                       <TableHead>Nome</TableHead>
                       <TableHead>Tipo</TableHead>
+                      <TableHead>Prioridade</TableHead>
+                      <TableHead>Pastas/Arquivos</TableHead>
                       <TableHead>Tamanho</TableHead>
                       <TableHead>Data de Criação</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {backups.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           Nenhum backup encontrado
                         </TableCell>
                       </TableRow>
@@ -654,45 +1060,64 @@ const BackupManagementPage = () => {
                     <TableRow>
                       <TableHead>Nome</TableHead>
                       <TableHead>Tipo</TableHead>
-                      <TableHead>Frequência</TableHead>
-                      <TableHead>Horário</TableHead>
+                      <TableHead>Prioridade</TableHead>
+                      <TableHead>Agendamento</TableHead>
                       <TableHead>Próxima Execução</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {scheduledBackups.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                           Nenhum backup agendado
                         </TableCell>
                       </TableRow>
                     ) : (
                       scheduledBackups.map((schedule) => {
-                        const TypeIcon = IconDatabase; // Simplified for now
+                        const TypeIcon =
+                          schedule.type === "database" ? IconDatabase :
+                          schedule.type === "files" ? IconFolder :
+                          schedule.type === "full" ? IconServer :
+                          IconDatabase;
+
                         return (
-                          <TableRow key={schedule.id}>
+                          <TableRow
+                            key={schedule.id}
+                            className="cursor-pointer hover:bg-muted/20"
+                            onContextMenu={(e) => handleScheduleContextMenu(e, schedule)}
+                          >
                             <TableCell className="font-medium">{schedule.name}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <TypeIcon className="h-4 w-4 text-muted-foreground" />
-                                Database
+                                {getBackupTypeLabel(schedule.type || "database")}
                               </div>
                             </TableCell>
-                            <TableCell>{parseCronToHuman(schedule.cron)}</TableCell>
-                            <TableCell>{schedule.cron}</TableCell>
+                            <TableCell>
+                              {schedule.priority ? (
+                                <Badge variant={getPriorityBadgeVariant(schedule.priority)} className="text-xs">
+                                  {getPriorityLabel(schedule.priority)}
+                                </Badge>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1">
+                                {schedule.description && (
+                                  <div className="text-sm text-muted-foreground">
+                                    {schedule.description}
+                                  </div>
+                                )}
+                                <div className="text-sm font-medium">
+                                  {parseCronToHuman(schedule.cron)}
+                                </div>
+                              </div>
+                            </TableCell>
                             <TableCell>{formatNextExecution(schedule.next)}</TableCell>
                             <TableCell>
                               <Badge variant="success">Ativo</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button size="sm" variant="destructive" onClick={() => handleDeleteSchedule(schedule)}>
-                                  <IconTrash className="h-4 w-4" />
-                                  Deletar
-                                </Button>
-                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -715,7 +1140,7 @@ const BackupManagementPage = () => {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="backup-name">Nome do Backup</Label>
-                <Input id="backup-name" value={newBackup.name} onChange={(value) => setNewBackup({ ...newBackup, name: value as string })} placeholder="Ex: backup_sistema_2024-09-12" />
+                <Input transparent id="backup-name" value={newBackup.name} onChange={(value) => setNewBackup({ ...newBackup, name: value as string })} placeholder="Ex: backup_sistema_2024-09-12" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="backup-type">Tipo de Backup</Label>
@@ -725,6 +1150,7 @@ const BackupManagementPage = () => {
                   options={[
                     { label: "Banco de Dados", value: "database" },
                     { label: "Arquivos", value: "files" },
+                    { label: "Sistema", value: "system" },
                     { label: "Backup Completo", value: "full" },
                   ]}
                   searchable={false}
@@ -734,6 +1160,7 @@ const BackupManagementPage = () => {
               <div className="space-y-2">
                 <Label htmlFor="backup-description">Descrição (Opcional)</Label>
                 <Input
+                  transparent
                   id="backup-description"
                   value={newBackup.description}
                   onChange={(value) => setNewBackup({ ...newBackup, description: value as string })}
@@ -767,13 +1194,41 @@ const BackupManagementPage = () => {
                   />
                 </div>
               </div>
-              {/* Folder Selection Section */}
-              {(newBackup.type === "files" || newBackup.type === "full") && (
+              {/* Folder Selection Section for Files */}
+              {newBackup.type === "files" && (
+                <div className="space-y-4 border-t pt-4">
+                  <Label>Pastas para Backup</Label>
+                  <p className="text-sm text-muted-foreground">Selecione as pastas ou deixe vazio para backup completo</p>
+                  <Combobox
+                    value={newBackup.webdavFolders}
+                    onValueChange={(value) => {
+                      if (Array.isArray(value)) {
+                        setNewBackup({ ...newBackup, webdavFolders: value as string[] });
+                      }
+                    }}
+                    options={webdavFolders}
+                    placeholder={loadingFolders ? "Carregando pastas..." : "Selecione as pastas"}
+                    emptyText="Nenhuma pasta disponível"
+                    searchable={true}
+                    clearable={true}
+                    mode="multiple"
+                    disabled={loadingFolders}
+                  />
+                  {newBackup.webdavFolders.length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      <strong>{newBackup.webdavFolders.length} {newBackup.webdavFolders.length === 1 ? "pasta selecionada" : "pastas selecionadas"}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Folder Selection Section for System */}
+              {newBackup.type === "system" && (
                 <div className="space-y-4 border-t pt-4">
                   <div className="flex items-center space-x-2">
                     <Checkbox id="use-preset-paths" checked={newBackup.usePresetPaths} onCheckedChange={(checked) => setNewBackup({ ...newBackup, usePresetPaths: !!checked })} />
                     <Label htmlFor="use-preset-paths" className="text-sm font-normal">
-                      Usar pastas predefinidas por prioridade
+                      Usar pastas de sistema predefinidas
                     </Label>
                   </div>
 
@@ -811,7 +1266,7 @@ const BackupManagementPage = () => {
                     <div className="space-y-3">
                       <Label>Pastas Personalizadas</Label>
                       <div className="flex gap-2">
-                        <Input value={customPathInput} onChange={(value) => setCustomPathInput(value as string)} placeholder="/caminho/para/pasta" />
+                        <Input transparent value={customPathInput} onChange={(value) => setCustomPathInput(value as string)} placeholder="/caminho/para/pasta" />
                         <Button
                           type="button"
                           variant="outline"
@@ -942,6 +1397,7 @@ const BackupManagementPage = () => {
               <div className="space-y-2">
                 <Label htmlFor="schedule-name">Nome do Agendamento</Label>
                 <Input
+                  transparent
                   id="schedule-name"
                   value={newSchedule.name}
                   onChange={(value) => setNewSchedule({ ...newSchedule, name: value as string })}
@@ -957,6 +1413,7 @@ const BackupManagementPage = () => {
                     options={[
                       { label: "Banco de Dados", value: "database" },
                       { label: "Arquivos", value: "files" },
+                      { label: "Sistema", value: "system" },
                       { label: "Backup Completo", value: "full" },
                     ]}
                     searchable={false}
@@ -1074,16 +1531,91 @@ const BackupManagementPage = () => {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-              <AlertDialogDescription>Tem certeza que deseja deletar o backup "{backupToDelete?.name}"? Esta ação não pode ser desfeita.</AlertDialogDescription>
+              <AlertDialogDescription>
+                {backupToDelete && backupToDelete.length > 1
+                  ? `Tem certeza que deseja excluir ${backupToDelete.length} backups? Esta ação não pode ser desfeita.`
+                  : `Tem certeza que deseja deletar o backup "${backupToDelete?.[0]?.name}"? Esta ação não pode ser desfeita.`}
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction onClick={confirmDeleteBackup} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Deletar
+                Excluir
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Delete Schedule Confirmation Dialog */}
+        <AlertDialog open={deleteScheduleDialogOpen} onOpenChange={setDeleteScheduleDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Exclusão de Agendamento</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja deletar o agendamento "{scheduleToDelete?.name}"? Esta ação não pode ser desfeita e o backup agendado não será mais executado automaticamente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeleteSchedule} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Deletar Agendamento
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Context Menu for Scheduled Backups */}
+        <DropdownMenu open={!!scheduleContextMenu} onOpenChange={(open) => !open && setScheduleContextMenu(null)}>
+          <PositionedDropdownMenuContent
+            position={scheduleContextMenu}
+            isOpen={!!scheduleContextMenu}
+            className="w-56 ![position:fixed]"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
+            <DropdownMenuItem onClick={handleScheduleContextMenuDelete} className="text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              Excluir
+            </DropdownMenuItem>
+          </PositionedDropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Context Menu for Existing Backups */}
+        <DropdownMenu open={!!backupContextMenu} onOpenChange={(open) => !open && setBackupContextMenu(null)}>
+          <PositionedDropdownMenuContent
+            position={backupContextMenu}
+            isOpen={!!backupContextMenu}
+            className="w-56 ![position:fixed]"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
+            {backupContextMenu?.isBulk && (
+              <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                {backupContextMenu.backups.length} backups selecionados
+              </div>
+            )}
+
+            {!backupContextMenu?.isBulk && backupContextMenu?.backups[0]?.status === "completed" && (
+              <>
+                <DropdownMenuItem onClick={handleBackupContextMenuVerify} disabled={isVerifying}>
+                  <IconEye className="mr-2 h-4 w-4" />
+                  Verificar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleBackupContextMenuRestore} disabled={isRestoring}>
+                  <IconDownload className="mr-2 h-4 w-4" />
+                  Restaurar
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <DropdownMenuItem
+              onClick={handleBackupContextMenuDelete}
+              disabled={backupContextMenu?.backups.some(b => b.status === "in_progress") || isDeleting}
+              className="text-destructive"
+            >
+              <IconTrash className="mr-2 h-4 w-4" />
+              {backupContextMenu?.isBulk && backupContextMenu.backups.length > 1 ? "Excluir selecionados" : "Deletar"}
+            </DropdownMenuItem>
+          </PositionedDropdownMenuContent>
+        </DropdownMenu>
       </div>
     </PrivilegeRoute>
   );

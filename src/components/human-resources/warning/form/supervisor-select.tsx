@@ -30,7 +30,7 @@ export function SupervisorSelect({ control, disabled, required, initialSuperviso
       page,
       take: 50,
       where: {
-        status: { not: USER_STATUS.DISMISSED },
+        isActive: true,
         sector: {
           privileges: {
             in: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES],

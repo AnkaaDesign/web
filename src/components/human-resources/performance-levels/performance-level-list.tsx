@@ -107,7 +107,7 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
       where: {
-        status: { not: USER_STATUS.DISMISSED },  // By default, only show non-dismissed users
+        isActive: true,  // By default, only show active users
       }
     },
     searchDebounceMs: 500, // Increased debounce for better performance
@@ -136,14 +136,26 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
   }, [sortConfigs]);
 
   // Memoize query params to prevent unnecessary refetches
-  const userQueryParams = useMemo(() => ({
-    ...queryFilters,
-    include: {
-      position: true,
-      sector: true,
-    },
-    orderBy,
-  }), [queryFilters, orderBy]);
+  const userQueryParams = useMemo(() => {
+    // Use default sectors if no sectors are explicitly filtered
+    const currentSectorFilter = queryFilters.where?.sectorId;
+    const sectorsToFilter = currentSectorFilter?.in || defaultSectorIds;
+
+    return {
+      ...queryFilters,
+      where: {
+        ...queryFilters.where,
+        ...(sectorsToFilter.length > 0 && {
+          sectorId: { in: sectorsToFilter }
+        })
+      },
+      include: {
+        position: true,
+        sector: true,
+      },
+      orderBy,
+    };
+  }, [queryFilters, orderBy, defaultSectorIds]);
 
   const { data: response, isLoading, error, refetch } = useUsers(userQueryParams);
 

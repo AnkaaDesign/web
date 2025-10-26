@@ -44,7 +44,7 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
       currentStatus: user.status, // Required for validation in update mode
       verified: user.verified,
       birth: toDate(user.birth),
-      dismissal: toDate(user.dismissal),
+      dismissedAt: toDate(user.dismissal),
       positionId: user.positionId,
       performanceLevel: user.performanceLevel,
       sectorId: user.sectorId,
@@ -116,7 +116,7 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
       // Special handling for dates
       else if (
         typedKey === "birth" ||
-        typedKey === "dismissal" ||
+        typedKey === "dismissedAt" ||
         typedKey === "exp1StartAt" ||
         typedKey === "exp1EndAt" ||
         typedKey === "exp2StartAt" ||

@@ -24,10 +24,9 @@ export function PaintCardGridVirtualized({ paints, isLoading, onFilterChange, cu
 
             {/* Card content skeleton */}
             <div className="p-4 space-y-3 flex-1 flex flex-col">
-              {/* Name and type */}
+              {/* Name */}
               <div className="flex-1">
                 <Skeleton className="h-5 w-3/4 mb-2" />
-                <Skeleton className="h-4 w-1/2" />
               </div>
 
               {/* Badges */}
@@ -44,6 +43,9 @@ export function PaintCardGridVirtualized({ paints, isLoading, onFilterChange, cu
               </div>
 
               {/* Formula count */}
+              <Skeleton className="h-4 w-24" />
+
+              {/* Task count */}
               <Skeleton className="h-4 w-24" />
             </div>
           </Card>

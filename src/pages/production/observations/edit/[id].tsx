@@ -23,7 +23,11 @@ export const ObservationEdit = () => {
     include: {
       task: {
         include: {
-          customer: true,
+          customer: {
+            include: {
+              logo: true,
+            },
+          },
           sector: true,
         },
       },

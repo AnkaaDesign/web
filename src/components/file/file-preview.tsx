@@ -6,7 +6,7 @@ import { VisuallyHidden } from "@/components/ui/visually-hidden";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../types";
-import { isImageFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension, getApiBaseUrl } from "../../utils/file";
+import { isImageFile, getFileUrl, getFileDownloadUrl, getFileThumbnailUrl, formatFileSize, getFileExtension, getApiBaseUrl } from "../../utils/file";
 import { isPDFFile } from "../../utils/pdf-thumbnail";
 // No PDF.js imports needed - using native browser PDF viewer
 
@@ -225,8 +225,8 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
   const handleDownload = () => {
     if (!currentFile) return;
 
-    const apiUrl = baseUrl || getApiBaseUrl();
-    const downloadUrl = `${apiUrl}/files/${currentFile.id}/download`;
+    // Use the utility function which handles both WebDAV and database files
+    const downloadUrl = getFileDownloadUrl(currentFile, baseUrl);
     window.open(downloadUrl, "_blank");
   };
 
@@ -388,11 +388,11 @@ export function FilePreview({ files, initialFileIndex = 0, open, onOpenChange, b
                   <img
                     ref={imageRef}
                     src={
-                      // For EPS with thumbnailUrl, use it
+                      // For EPS with thumbnailUrl, use high-res xlarge (1200x1200 @ 600 DPI)
                       isCurrentFileEps && currentFile.thumbnailUrl
                         ? currentFile.thumbnailUrl.startsWith("http")
                           ? currentFile.thumbnailUrl
-                          : `${baseUrl || getApiBaseUrl()}/files/thumbnail/${currentFile.id}?size=large`
+                          : `${baseUrl || getApiBaseUrl()}/files/thumbnail/${currentFile.id}?size=xlarge`
                         // For images, use full resolution
                         : getFileUrl(currentFile, baseUrl)
                     }

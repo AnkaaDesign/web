@@ -14,6 +14,7 @@ import {
   IconSelector,
   IconSpray,
   IconEye,
+  IconCheck,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -38,6 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
+import { SetStatusModal } from "./set-status-modal";
 
 interface AirbrushingTableProps {
   visibleColumns: Set<string>;
@@ -48,7 +50,7 @@ interface AirbrushingTableProps {
 
 export function AirbrushingTable({ visibleColumns, className, filters = {}, onDataChange }: AirbrushingTableProps) {
   const navigate = useNavigate();
-  const { delete: deleteAirbrushing } = useAirbrushingMutations();
+  const { delete: deleteAirbrushing, update: updateAirbrushing } = useAirbrushingMutations();
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -161,6 +163,11 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
     isBulk: boolean;
   } | null>(null);
 
+  // Status change modal state
+  const [statusModal, setStatusModal] = useState<{
+    items: Airbrushing[];
+  } | null>(null);
+
   // Use viewport boundary checking hook
   
   // Define all available columns
@@ -253,6 +260,15 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
     }
   };
 
+  const handleSetStatus = () => {
+    if (contextMenu) {
+      setStatusModal({
+        items: contextMenu.items,
+      });
+      setContextMenu(null);
+    }
+  };
+
   // Confirm delete
   const confirmDelete = async () => {
     if (deleteDialog) {
@@ -265,6 +281,22 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
         // Error handled by API client
       } finally {
         setDeleteDialog(null);
+      }
+    }
+  };
+
+  // Confirm status change
+  const confirmStatusChange = async (status: string) => {
+    if (statusModal) {
+      try {
+        for (const item of statusModal.items) {
+          await updateAirbrushing({ id: item.id, data: { status } });
+        }
+        removeFromSelection(statusModal.items.map(i => i.id));
+      } catch (error) {
+        // Error handled by API client
+      } finally {
+        setStatusModal(null);
       }
     }
   };
@@ -472,6 +504,13 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
 
             {!contextMenu?.isBulk && <DropdownMenuSeparator />}
 
+            <DropdownMenuItem onClick={handleSetStatus}>
+              <IconCheck className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Alterar status" : "Alterar status"}
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
             <DropdownMenuItem onClick={handleDelete} className="text-destructive">
               <IconTrash className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Deletar selecionados" : "Deletar"}
@@ -499,6 +538,16 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Status Change Modal */}
+      {statusModal && (
+        <SetStatusModal
+          open={!!statusModal}
+          onOpenChange={(open) => !open && setStatusModal(null)}
+          airbrushings={statusModal.items}
+          onConfirm={confirmStatusChange}
+        />
+      )}
     </>
   );
 }

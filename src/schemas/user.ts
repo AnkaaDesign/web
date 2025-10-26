@@ -2,8 +2,8 @@
 
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, orderByWithNullsSchema, normalizeOrderBy, emailSchema, phoneSchema, cpfSchema, pisSchema, createNameSchema, nullableDate } from "./common";
-import type { User } from "../types";
-import { USER_STATUS, VERIFICATION_TYPE } from "../constants";
+import type { User } from '@types';
+import { USER_STATUS, VERIFICATION_TYPE } from '@constants';
 
 // =====================
 // Include Schema Based on Prisma Schema (Second Level Only)
@@ -192,6 +192,7 @@ export const userOrderBySchema = z.union([
       id: orderByDirectionSchema.optional(),
       email: orderByDirectionSchema.optional(),
       name: orderByDirectionSchema.optional(),
+      avatarId: orderByDirectionSchema.optional(),
       status: orderByDirectionSchema.optional(),
       statusOrder: orderByDirectionSchema.optional(),
       phone: orderByDirectionSchema.optional(),
@@ -201,20 +202,17 @@ export const userOrderBySchema = z.union([
       verified: orderByDirectionSchema.optional(),
       payrollNumber: orderByDirectionSchema.optional(),
       birth: orderByDirectionSchema.optional(),
-      dismissal: orderByDirectionSchema.optional(),
-      performanceLevel: orderByDirectionSchema.optional(),
-      sectorId: orderByDirectionSchema.optional(),
-      managedSectorId: orderByDirectionSchema.optional(),
-      createdAt: orderByDirectionSchema.optional(),
-      updatedAt: orderByDirectionSchema.optional(),
-
-      // Status timestamps
       contractedAt: orderByDirectionSchema.optional(),
       exp1StartAt: orderByDirectionSchema.optional(),
       exp1EndAt: orderByDirectionSchema.optional(),
       exp2StartAt: orderByDirectionSchema.optional(),
       exp2EndAt: orderByDirectionSchema.optional(),
       dismissedAt: orderByDirectionSchema.optional(),
+      performanceLevel: orderByDirectionSchema.optional(),
+      sectorId: orderByDirectionSchema.optional(),
+      managedSectorId: orderByDirectionSchema.optional(),
+      createdAt: orderByDirectionSchema.optional(),
+      updatedAt: orderByDirectionSchema.optional(),
 
       // Nested relation ordering
       position: z
@@ -254,6 +252,7 @@ export const userOrderBySchema = z.union([
         id: orderByDirectionSchema.optional(),
         email: orderByDirectionSchema.optional(),
         name: orderByDirectionSchema.optional(),
+        avatarId: orderByDirectionSchema.optional(),
         status: orderByDirectionSchema.optional(),
         statusOrder: orderByDirectionSchema.optional(),
         phone: orderByDirectionSchema.optional(),
@@ -263,20 +262,17 @@ export const userOrderBySchema = z.union([
         verified: orderByDirectionSchema.optional(),
         payrollNumber: orderByDirectionSchema.optional(),
         birth: orderByDirectionSchema.optional(),
-        dismissal: orderByDirectionSchema.optional(),
-        performanceLevel: orderByDirectionSchema.optional(),
-        sectorId: orderByDirectionSchema.optional(),
-        managedSectorId: orderByDirectionSchema.optional(),
-        createdAt: orderByDirectionSchema.optional(),
-        updatedAt: orderByDirectionSchema.optional(),
-
-        // Status timestamps
         contractedAt: orderByDirectionSchema.optional(),
         exp1StartAt: orderByDirectionSchema.optional(),
         exp1EndAt: orderByDirectionSchema.optional(),
         exp2StartAt: orderByDirectionSchema.optional(),
         exp2EndAt: orderByDirectionSchema.optional(),
         dismissedAt: orderByDirectionSchema.optional(),
+        performanceLevel: orderByDirectionSchema.optional(),
+        sectorId: orderByDirectionSchema.optional(),
+        managedSectorId: orderByDirectionSchema.optional(),
+        createdAt: orderByDirectionSchema.optional(),
+        updatedAt: orderByDirectionSchema.optional(),
 
         // Nested relation ordering
         position: z
@@ -361,6 +357,19 @@ export const userWhereSchema: z.ZodSchema = z.lazy(() =>
             startsWith: z.string().optional(),
             endsWith: z.string().optional(),
             mode: z.enum(["default", "insensitive"]).optional(),
+          }),
+        ])
+        .optional(),
+
+      avatarId: z
+        .union([
+          z.string(),
+          z.null(),
+          z.object({
+            equals: z.union([z.string(), z.null()]).optional(),
+            not: z.union([z.string(), z.null()]).optional(),
+            in: z.array(z.string()).optional(),
+            notIn: z.array(z.string()).optional(),
           }),
         ])
         .optional(),
@@ -472,7 +481,82 @@ export const userWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      dismissal: z
+      contractedAt: z
+        .union([
+          z.date(),
+          z.null(),
+          z.object({
+            equals: z.union([z.date(), z.null()]).optional(),
+            not: z.union([z.date(), z.null()]).optional(),
+            gte: z.coerce.date().optional(),
+            gt: z.coerce.date().optional(),
+            lte: z.coerce.date().optional(),
+            lt: z.coerce.date().optional(),
+          }),
+        ])
+        .optional(),
+
+      exp1StartAt: z
+        .union([
+          z.date(),
+          z.null(),
+          z.object({
+            equals: z.union([z.date(), z.null()]).optional(),
+            not: z.union([z.date(), z.null()]).optional(),
+            gte: z.coerce.date().optional(),
+            gt: z.coerce.date().optional(),
+            lte: z.coerce.date().optional(),
+            lt: z.coerce.date().optional(),
+          }),
+        ])
+        .optional(),
+
+      exp1EndAt: z
+        .union([
+          z.date(),
+          z.null(),
+          z.object({
+            equals: z.union([z.date(), z.null()]).optional(),
+            not: z.union([z.date(), z.null()]).optional(),
+            gte: z.coerce.date().optional(),
+            gt: z.coerce.date().optional(),
+            lte: z.coerce.date().optional(),
+            lt: z.coerce.date().optional(),
+          }),
+        ])
+        .optional(),
+
+      exp2StartAt: z
+        .union([
+          z.date(),
+          z.null(),
+          z.object({
+            equals: z.union([z.date(), z.null()]).optional(),
+            not: z.union([z.date(), z.null()]).optional(),
+            gte: z.coerce.date().optional(),
+            gt: z.coerce.date().optional(),
+            lte: z.coerce.date().optional(),
+            lt: z.coerce.date().optional(),
+          }),
+        ])
+        .optional(),
+
+      exp2EndAt: z
+        .union([
+          z.date(),
+          z.null(),
+          z.object({
+            equals: z.union([z.date(), z.null()]).optional(),
+            not: z.union([z.date(), z.null()]).optional(),
+            gte: z.coerce.date().optional(),
+            gt: z.coerce.date().optional(),
+            lte: z.coerce.date().optional(),
+            lt: z.coerce.date().optional(),
+          }),
+        ])
+        .optional(),
+
+      dismissedAt: z
         .union([
           z.date(),
           z.null(),
@@ -675,15 +759,33 @@ const userTransform = (data: any) => {
 
   // Handle searchingFor
   if (data.searchingFor && typeof data.searchingFor === "string" && data.searchingFor.trim()) {
-    andConditions.push({
-      OR: [
-        { name: { contains: data.searchingFor.trim(), mode: "insensitive" } },
-        { email: { contains: data.searchingFor.trim(), mode: "insensitive" } },
-        { phone: { contains: data.searchingFor.trim() } },
-        { cpf: { contains: data.searchingFor.trim() } },
-        { pis: { contains: data.searchingFor.trim() } },
-      ],
-    });
+    const searchTerm = data.searchingFor.trim();
+    const searchNumber = parseInt(searchTerm, 10);
+    console.log("[UserTransform] Processing searchingFor:", searchTerm);
+    console.log("[UserTransform] Parsed number:", searchNumber, "isNaN:", isNaN(searchNumber), "toString match:", searchNumber.toString() === searchTerm);
+
+    // If the search term is purely numeric, search ONLY in payrollNumber for exact match
+    if (!isNaN(searchNumber) && searchNumber.toString() === searchTerm) {
+      console.log("[UserTransform] Searching ONLY by payrollNumber:", searchNumber);
+      andConditions.push({ payrollNumber: searchNumber });
+    } else {
+      console.log("[UserTransform] Searching text fields");
+
+      // Otherwise, search across text fields
+      const orConditions: any[] = [
+        { name: { contains: searchTerm, mode: "insensitive" } },
+        { email: { contains: searchTerm, mode: "insensitive" } },
+        { phone: { contains: searchTerm } },
+        { cpf: { contains: searchTerm } },
+        { pis: { contains: searchTerm } },
+        { position: { is: { name: { contains: searchTerm, mode: "insensitive" } } } },
+        { sector: { is: { name: { contains: searchTerm, mode: "insensitive" } } } },
+        { managedSector: { is: { name: { contains: searchTerm, mode: "insensitive" } } } },
+      ];
+
+      andConditions.push({ OR: orConditions });
+    }
+
     delete data.searchingFor;
   }
 
@@ -821,6 +923,8 @@ const userTransform = (data: any) => {
   }
 
   // Merge with existing where conditions
+  console.log("[UserTransform] andConditions count:", andConditions.length);
+  console.log("[UserTransform] Existing data.where:", JSON.stringify(data.where || {}).substring(0, 200));
   if (andConditions.length > 0) {
     if (data.where) {
       if (data.where.AND && Array.isArray(data.where.AND)) {
@@ -833,6 +937,7 @@ const userTransform = (data: any) => {
     }
   }
 
+  console.log("[UserTransform] Final data.where:", JSON.stringify(data.where || {}).substring(0, 300));
   return data;
 };
 
@@ -920,14 +1025,18 @@ export const userCreateSchema = z
     password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres").nullable().optional(),
 
     // Address fields
-    address: z.string().min(1, "Endereço é obrigatório").nullable().optional(),
-    addressNumber: z.string().min(1, "Número é obrigatório").nullable().optional(),
+    address: z.string().nullable().optional(),
+    addressNumber: z.string().nullable().optional(),
     addressComplement: z.string().nullable().optional(),
-    neighborhood: z.string().min(1, "Bairro é obrigatório").nullable().optional(),
-    city: z.string().min(1, "Cidade é obrigatória").nullable().optional(),
-    state: z.string().length(2, "Estado deve ter 2 caracteres").nullable().optional(),
+    neighborhood: z.string().nullable().optional(),
+    city: z.string().nullable().optional(),
+    state: z.string().nullable().optional().refine((val) => !val || val.length === 2, {
+      message: "Estado deve ter 2 caracteres"
+    }),
     zipCode: z.string().nullable().optional(),
-    site: z.string().url("URL inválida").nullable().optional(),
+    site: z.string().nullable().optional().refine((val) => !val || z.string().url().safeParse(val).success, {
+      message: "URL inválida"
+    }),
 
     // Additional dates - birth is required
     birth: z.coerce
@@ -940,18 +1049,17 @@ export const userCreateSchema = z
         },
         { message: "O colaborador deve ter pelo menos 18 anos" }
       ),
-    dismissal: nullableDate.optional(),
 
-    // Payroll info
-    payrollNumber: z.number().int().positive("Número da folha deve ser positivo").nullable().optional(),
-
-    // Status timestamps (auto-managed by backend)
+    // Status timestamp tracking
     contractedAt: nullableDate.optional(),
     exp1StartAt: nullableDate.optional(),
     exp1EndAt: nullableDate.optional(),
     exp2StartAt: nullableDate.optional(),
     exp2EndAt: nullableDate.optional(),
     dismissedAt: nullableDate.optional(),
+
+    // Payroll info
+    payrollNumber: z.number().int().positive("Número da folha deve ser positivo").nullable().optional(),
 
     // Nested PPE size creation for new users
     ppeSize: ppeSizeCreateNestedSchema.optional(),
@@ -991,9 +1099,13 @@ export const userUpdateSchema = z
     addressComplement: z.string().nullable().optional(),
     neighborhood: z.string().nullable().optional(),
     city: z.string().nullable().optional(),
-    state: z.string().length(2, "Estado deve ter 2 caracteres").nullable().optional(),
+    state: z.string().nullable().optional().refine((val) => !val || val.length === 2, {
+      message: "Estado deve ter 2 caracteres"
+    }),
     zipCode: z.string().nullable().optional(),
-    site: z.string().url("URL inválida").nullable().optional(),
+    site: z.string().nullable().optional().refine((val) => !val || z.string().url().safeParse(val).success, {
+      message: "URL inválida"
+    }),
 
     // Additional dates
     birth: z.coerce
@@ -1007,13 +1119,8 @@ export const userUpdateSchema = z
         { message: "O colaborador deve ter pelo menos 18 anos" }
       )
       .optional(),
-    dismissal: nullableDate.optional(),
 
-    // Payroll info
-    payrollNumber: z.number().int().positive("Número da folha deve ser positivo").nullable().optional(),
-    secullumId: z.string().nullable().optional(),
-
-    // Status timestamps (auto-managed by backend)
+    // Status timestamp tracking
     contractedAt: nullableDate.optional(),
     exp1StartAt: nullableDate.optional(),
     exp1EndAt: nullableDate.optional(),
@@ -1021,8 +1128,9 @@ export const userUpdateSchema = z
     exp2EndAt: nullableDate.optional(),
     dismissedAt: nullableDate.optional(),
 
-    // PPE size for update
-    ppeSize: ppeSizeCreateNestedSchema.optional(),
+    // Payroll info
+    payrollNumber: z.number().int().positive("Número da folha deve ser positivo").nullable().optional(),
+    secullumId: z.string().nullable().optional(),
 
     verificationCode: z.string().nullable().optional(),
     verificationExpiresAt: z.date().nullable().optional(),
@@ -1037,13 +1145,15 @@ export const userUpdateSchema = z
     // Required for changelog tracking
     userId: z.string().optional(),
     preferences: z.record(z.any()).optional(),
+    // PPE Size update
+    ppeSize: ppeSizeCreateNestedSchema.optional(),
     // Store current status for validation (used by backend)
     currentStatus: z.nativeEnum(USER_STATUS).optional(),
   })
   .refine(
     (data) => {
-      // If dismissal date is provided, status must be DISMISSED
-      if (data.dismissal && data.status && data.status !== USER_STATUS.DISMISSED) {
+      // If dismissedAt date is provided, status must be DISMISSED
+      if (data.dismissedAt && data.status && data.status !== USER_STATUS.DISMISSED) {
         return false;
       }
       return true;
@@ -1055,15 +1165,15 @@ export const userUpdateSchema = z
   )
   .refine(
     (data) => {
-      // If status is DISMISSED, dismissal date is required
-      if (data.status === USER_STATUS.DISMISSED && !data.dismissal) {
+      // If status is DISMISSED, dismissedAt date is required
+      if (data.status === USER_STATUS.DISMISSED && !data.dismissedAt) {
         return false;
       }
       return true;
     },
     {
       message: "Data de demissão é obrigatória quando o status é DISMISSED",
-      path: ["dismissal"],
+      path: ["dismissedAt"],
     }
   )
   .refine(
@@ -1133,6 +1243,15 @@ export const userBatchDeleteSchema = z.object({
   userIds: z.array(z.string().uuid("Usuário inválido")).min(1, "Pelo menos um ID deve ser fornecido"),
 });
 
+export const userMergeSchema = z.object({
+  targetUserId: z.string().uuid({ message: "ID do usuário principal inválido" }),
+  sourceUserIds: z
+    .array(z.string().uuid({ message: "ID de usuário inválido" }))
+    .min(1, { message: "É necessário selecionar pelo menos 1 usuário para mesclar" })
+    .max(10, { message: "Máximo de 10 usuários podem ser mesclados por vez" }),
+  conflictResolutions: z.record(z.any()).optional(),
+});
+
 // Query schema for include parameter
 export const userQuerySchema = z.object({
   include: userIncludeSchema.optional(),
@@ -1160,6 +1279,7 @@ export type UserUpdateFormData = z.infer<typeof userUpdateSchema>;
 export type UserBatchCreateFormData = z.infer<typeof userBatchCreateSchema>;
 export type UserBatchUpdateFormData = z.infer<typeof userBatchUpdateSchema>;
 export type UserBatchDeleteFormData = z.infer<typeof userBatchDeleteSchema>;
+export type UserMergeFormData = z.infer<typeof userMergeSchema>;
 
 export type UserInclude = z.infer<typeof userIncludeSchema>;
 export type UserOrderBy = z.infer<typeof userOrderBySchema>;
@@ -1230,6 +1350,7 @@ export function getStatusTransitionError(currentStatus: USER_STATUS | string, ne
 export const mapUserToFormData = createMapToFormDataHelper<User, UserUpdateFormData>((user) => ({
   email: user.email || undefined,
   name: user.name,
+  avatarId: user.avatarId || undefined,
   status: user.status as USER_STATUS,
   phone: user.phone || undefined,
   positionId: user.positionId || undefined,
@@ -1251,9 +1372,9 @@ export const mapUserToFormData = createMapToFormDataHelper<User, UserUpdateFormD
   zipCode: user.zipCode || undefined,
   // site: user.site || undefined,
 
-  // Additional dates - use birth and dismissal
+  // Additional dates - use birth and dismissedAt
   birth: user.birth,
-  dismissal: user.dismissal || undefined,
+  dismissedAt: user.dismissedAt || undefined,
 
   // Payroll info
   payrollNumber: user.payrollNumber || undefined,

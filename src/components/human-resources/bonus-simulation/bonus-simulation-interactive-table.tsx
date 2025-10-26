@@ -317,9 +317,11 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
     let filtered = simulatedUsers;
 
     // Apply sector filter
-    if (selectedSectorIds.length > 0) {
+    // If sectors are loaded and user hasn't selected any, use default sectors
+    const sectorsToFilter = selectedSectorIds.length > 0 ? selectedSectorIds : defaultSectorIds;
+    if (sectorsToFilter.length > 0) {
       filtered = filtered.filter(user =>
-        user.sectorId && selectedSectorIds.includes(user.sectorId)
+        user.sectorId && sectorsToFilter.includes(user.sectorId)
       );
     }
 
@@ -331,7 +333,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
     }
 
     return filtered;
-  }, [simulatedUsers, selectedSectorIds, excludedUserIds]);
+  }, [simulatedUsers, selectedSectorIds, excludedUserIds, defaultSectorIds]);
 
   // Calculate metrics
   // For simulation: ALL filtered users are considered "eligible"
@@ -895,6 +897,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
               placeholder="Todos os setores"
               emptyText="Nenhum setor encontrado"
               className="w-full h-10"
+              hideDefaultBadges={true}
             />
           </div>
 
@@ -914,6 +917,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
               placeholder="Nenhuma exclusão"
               emptyText="Nenhum usuário encontrado"
               className="w-full h-10"
+              hideDefaultBadges={true}
             />
           </div>
 

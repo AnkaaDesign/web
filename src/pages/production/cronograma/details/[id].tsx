@@ -69,6 +69,7 @@ import {
   IconSparkles,
   IconBrush,
   IconTruckLoading,
+  IconDroplet,
   IconCut,
   IconSpray,
   IconDownload,
@@ -420,7 +421,7 @@ export const TaskDetailsPage = () => {
           files: true,
         },
       },
-      airbrushing: {
+      airbrushings: {
         include: {
           receipts: true,
           invoices: true,
@@ -440,7 +441,12 @@ export const TaskDetailsPage = () => {
           },
         },
       },
-      logoPaints: true,
+      logoPaints: {
+        include: {
+          paintType: true,
+          paintBrand: true,
+        },
+      },
       truck: true,
     },
   });
@@ -468,7 +474,7 @@ export const TaskDetailsPage = () => {
   const cuts = cutsResponse?.data || [];
 
   // Get airbrushings directly from task (they're included in the task query)
-  const airbrushings = task?.airbrushing || [];
+  const airbrushings = task?.airbrushings || [];
 
   // Fetch layouts for truck dimensions
   const { data: layouts } = useLayoutsByTruck(task?.truck?.id || '', {
@@ -1362,16 +1368,19 @@ export const TaskDetailsPage = () => {
 
                               {/* Paint information */}
                               <div className="flex-1 space-y-3">
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <h3 className="font-semibold text-base">{task.generalPainting?.name}</h3>
-                                    <span className="text-xs font-mono text-muted-foreground">{task.generalPainting?.hex}</span>
-                                  </div>
-                                  {task.generalPainting?.paintType && <p className="text-sm text-muted-foreground">{task.generalPainting?.paintType.name}</p>}
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold text-base">{task.generalPainting?.name}</h3>
+                                  <span className="text-xs font-mono text-muted-foreground">{task.generalPainting?.hex}</span>
                                 </div>
 
                                 {/* Badges */}
                                 <div className="flex flex-wrap gap-1">
+                                  {task.generalPainting?.paintType?.name && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      <IconDroplet className="h-3 w-3 mr-1" />
+                                      {task.generalPainting?.paintType.name}
+                                    </Badge>
+                                  )}
                                   {task.generalPainting?.finish && (
                                     <Badge variant="secondary" className="text-xs">
                                       <IconSparkles className="h-3 w-3 mr-1" />
@@ -1441,16 +1450,19 @@ export const TaskDetailsPage = () => {
 
                                   {/* Paint information */}
                                   <div className="flex-1 space-y-3">
-                                    <div>
-                                      <div className="flex items-center gap-2">
-                                        <h3 className="font-semibold text-base">{paint.name}</h3>
-                                        <span className="text-xs font-mono text-muted-foreground">{paint.hex}</span>
-                                      </div>
-                                      {paint.paintType && <p className="text-sm text-muted-foreground">{paint.paintType.name}</p>}
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="font-semibold text-base">{paint.name}</h3>
+                                      <span className="text-xs font-mono text-muted-foreground">{paint.hex}</span>
                                     </div>
 
                                     {/* Badges */}
                                     <div className="flex flex-wrap gap-1">
+                                      {paint.paintType?.name && (
+                                        <Badge variant="secondary" className="text-xs">
+                                          <IconDroplet className="h-3 w-3 mr-1" />
+                                          {paint.paintType.name}
+                                        </Badge>
+                                      )}
                                       {paint.finish && (
                                         <Badge variant="secondary" className="text-xs">
                                           <IconSparkles className="h-3 w-3 mr-1" />
@@ -1566,13 +1578,13 @@ export const TaskDetailsPage = () => {
                               {airbrushing.startDate && (
                                 <div className="flex items-center gap-1">
                                   <IconClock className="h-3 w-3" />
-                                  <span>Iniciado: {formatDate(airbrushing.startDate)}</span>
+                                  <span>Data de início: {formatDate(airbrushing.startDate)}</span>
                                 </div>
                               )}
                               {airbrushing.finishDate && (
                                 <div className="flex items-center gap-1">
                                   <IconCheck className="h-3 w-3 text-green-600" />
-                                  <span>Finalizado: {formatDate(airbrushing.finishDate)}</span>
+                                  <span>Data de finalização: {formatDate(airbrushing.finishDate)}</span>
                                 </div>
                               )}
                               {!airbrushing.startDate && !airbrushing.finishDate && airbrushing.createdAt && (

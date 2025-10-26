@@ -11,6 +11,7 @@ import type {
   UserBatchUpdateFormData,
   UserBatchDeleteFormData,
   UserQueryFormData,
+  UserMergeFormData,
 } from "../schemas";
 import type {
   // Interface types (for responses)
@@ -23,6 +24,7 @@ import type {
   UserBatchCreateResponse,
   UserBatchUpdateResponse,
   UserBatchDeleteResponse,
+  UserMergeResponse,
 } from "../types";
 
 // =====================
@@ -98,6 +100,17 @@ export class UserService {
     });
     return response.data;
   }
+
+  // =====================
+  // Merge Operations
+  // =====================
+
+  async mergeUsers(data: UserMergeFormData, query?: UserQueryFormData): Promise<UserMergeResponse> {
+    const response = await apiClient.post<UserMergeResponse>(`${this.basePath}/merge`, data, {
+      params: query,
+    });
+    return response.data;
+  }
 }
 
 // =====================
@@ -123,3 +136,6 @@ export const deleteUser = (id: string) => userService.deleteUser(id);
 export const batchCreateUsers = (data: UserBatchCreateFormData, query?: UserQueryFormData) => userService.batchCreateUsers(data, query);
 export const batchUpdateUsers = (data: UserBatchUpdateFormData, query?: UserQueryFormData) => userService.batchUpdateUsers(data, query);
 export const batchDeleteUsers = (data: UserBatchDeleteFormData, query?: UserQueryFormData) => userService.batchDeleteUsers(data, query);
+
+// Merge Operations
+export const mergeUsers = (data: UserMergeFormData, query?: UserQueryFormData) => userService.mergeUsers(data, query);

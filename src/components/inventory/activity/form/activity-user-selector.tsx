@@ -50,12 +50,15 @@ export const ActivityUserSelector = ({
     const response = await getUsers({
       take: pageSize,
       skip: (page - 1) * pageSize,
-      where: searchTerm ? {
-        OR: [
-          { name: { contains: searchTerm, mode: "insensitive" } },
-          { email: { contains: searchTerm, mode: "insensitive" } },
-        ],
-      } : {},
+      where: {
+        isActive: true,
+        ...(searchTerm ? {
+          OR: [
+            { name: { contains: searchTerm, mode: "insensitive" } },
+            { email: { contains: searchTerm, mode: "insensitive" } },
+          ],
+        } : {}),
+      },
       orderBy: [
         { status: "asc" }, // Active users first
         { name: "asc" },

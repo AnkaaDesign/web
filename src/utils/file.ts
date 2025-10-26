@@ -218,17 +218,36 @@ export const normalizeThumbnailUrl = (thumbnailUrl: string | undefined | null): 
 };
 
 export const getFileUrl = (file: File, baseUrl?: string): string => {
+  // Check if this is a WebDAV file (path starts with http)
+  if (file.path && file.path.startsWith("http")) {
+    return file.path; // Use direct WebDAV URL
+  }
+
+  // Database file - use API endpoint
   const apiUrl = baseUrl || getApiBaseUrl();
   return `${apiUrl}/files/serve/${file.id}`;
 };
 
 export const getFileDownloadUrl = (file: File, baseUrl?: string): string => {
+  // Check if this is a WebDAV file (path starts with http)
+  if (file.path && file.path.startsWith("http")) {
+    return file.path; // Use direct WebDAV URL
+  }
+
+  // Database file - use API endpoint
   const apiUrl = baseUrl || getApiBaseUrl();
   return `${apiUrl}/files/${file.id}/download`;
 };
 
 export const getFileThumbnailUrl = (file: File, size: "small" | "medium" | "large" = "medium", baseUrl?: string): string => {
   if (!isImageFile(file)) return "";
+
+  // Check if this is a WebDAV file with thumbnailUrl (images only)
+  if (file.thumbnailUrl && file.thumbnailUrl.startsWith("http")) {
+    return file.thumbnailUrl; // Use direct WebDAV URL as thumbnail
+  }
+
+  // Database file - use API endpoint
   const apiUrl = baseUrl || getApiBaseUrl();
   return `${apiUrl}/files/thumbnail/${file.id}?size=${size}`;
 };

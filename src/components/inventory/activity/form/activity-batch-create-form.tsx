@@ -61,7 +61,7 @@ export const ActivityBatchCreateForm = () => {
   // Mutations and data
   const { batchCreateAsync, isLoading: isSubmitting } = useActivityBatchMutations();
   const { data: usersResponse } = useUsers({
-    where: { status: { not: USER_STATUS.DISMISSED } },
+    where: { isActive: true },
     orderBy: { name: "asc" },
     take: 100,
     include: { sector: true },

@@ -3,7 +3,7 @@ import { apiClient } from "./axiosClient";
 interface BackupMetadata {
   id: string;
   name: string;
-  type: "database" | "files" | "full";
+  type: "database" | "files" | "system" | "full";
   size: number;
   createdAt: string;
   status: "pending" | "in_progress" | "completed" | "failed";
@@ -19,7 +19,7 @@ interface BackupMetadata {
 
 interface CreateBackupRequest {
   name: string;
-  type: "database" | "files" | "full";
+  type: "database" | "files" | "system" | "full";
   description?: string;
   paths?: string[];
   priority?: "low" | "medium" | "high" | "critical";
@@ -66,14 +66,17 @@ interface BackupVerification {
 interface ScheduledBackupJob {
   id: string;
   name: string;
+  type?: "database" | "files" | "system" | "full";
   cron: string;
   next: number;
+  priority?: "low" | "medium" | "high" | "critical";
+  description?: string;
   jobName?: string; // Full job name for internal use
   key?: string; // Job key for deletion
 }
 
 interface BackupQueryParams {
-  type?: "database" | "files" | "full";
+  type?: "database" | "files" | "system" | "full";
   status?: "pending" | "in_progress" | "completed" | "failed";
   limit?: number;
 }
@@ -197,8 +200,34 @@ class BackupApiClient {
   }
 
   // Generate cron expression helpers
-  generateCronExpression(frequency: "daily" | "weekly" | "monthly", time: string): string {
-    const [hours, minutes] = time.split(":").map(Number);
+  generateCronExpression(frequency: "daily" | "weekly" | "monthly", time: string | number | null | Date): string {
+    let hours: number;
+    let minutes: number;
+
+    // Handle Date object (from DateTimeInput component)
+    if (time instanceof Date) {
+      hours = time.getHours();
+      minutes = time.getMinutes();
+    } else {
+      // Ensure time is a valid string
+      const timeString = time ? String(time) : "23:00";
+
+      // Validate time format
+      if (!timeString.includes(":")) {
+        console.error("Invalid time format:", time);
+        return "0 23 * * *"; // Default to 23:00 daily
+      }
+
+      const parts = timeString.split(":").map(Number);
+      hours = parts[0];
+      minutes = parts[1];
+    }
+
+    // Validate hours and minutes
+    if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      console.error("Invalid time values:", { hours, minutes });
+      return "0 23 * * *"; // Default to 23:00 daily
+    }
 
     switch (frequency) {
       case "daily":
@@ -215,25 +244,31 @@ class BackupApiClient {
   // Parse cron expression to human readable
   parseCronToHuman(cron: string): string {
     const parts = cron.split(" ");
-    if (parts.length < 5) return "Invalid cron expression";
+    if (parts.length < 5) return "Expressão cron inválida";
 
     const [minutes, hours, dayOfMonth, month, dayOfWeek] = parts;
 
     if (dayOfMonth === "*" && month === "*" && dayOfWeek === "*") {
-      return `Daily at ${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}`;
+      return `Diariamente às ${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}`;
     }
 
     if (dayOfMonth === "*" && month === "*" && dayOfWeek !== "*") {
-      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const dayName = days[parseInt(dayOfWeek)] || `Day ${dayOfWeek}`;
-      return `Weekly on ${dayName} at ${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}`;
+      const days = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+      const dayName = days[parseInt(dayOfWeek)] || `Dia ${dayOfWeek}`;
+      return `Semanalmente às ${dayName} às ${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}`;
     }
 
     if (dayOfMonth !== "*" && month === "*") {
-      return `Monthly on day ${dayOfMonth} at ${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}`;
+      return `Mensalmente no dia ${dayOfMonth} às ${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}`;
     }
 
-    return `At ${hours.padStart(2, "0")}:${minutes.padStart(2, "0")} (${cron})`;
+    return `Às ${hours.padStart(2, "0")}:${minutes.padStart(2, "0")} (${cron})`;
+  }
+
+  // Get list of WebDAV folders available for backup
+  async getWebDAVFolders(): Promise<string[]> {
+    const response = await this.api.get<{ success: boolean; data: string[]; message: string }>("/backups/webdav-folders");
+    return response.data.data || [];
   }
 }
 

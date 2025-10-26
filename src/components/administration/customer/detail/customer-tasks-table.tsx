@@ -30,7 +30,7 @@ export function CustomerTasksTable({
   className,
   filters = {},
   onDataChange,
-  navigationRoute = 'schedule',
+  navigationRoute = 'history',
 }: CustomerTasksTableProps) {
   const navigate = useNavigate();
 

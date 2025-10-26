@@ -201,44 +201,39 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
                   singleMode={false}
                   clearable={true}
                   initialOptions={initialOptions}
+                  hideDefaultBadges={true}
                 />
 
                 {/* Selected paints display with improved design */}
                 {selectedPaints.size > 0 && (
-                  <div className="rounded-lg border bg-muted/30 p-3">
-                    <div className="flex flex-wrap gap-2">
-                      {Array.from(selectedPaints.values()).map((paint) => {
-                        const color = paint.hex || paletteColors[paint.palette || ""] || "#888888";
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {Array.from(selectedPaints.values()).map((paint) => {
+                      const color = paint.hex || paletteColors[paint.palette || ""] || "#888888";
 
-                        return (
-                          <Badge key={paint.id} variant="secondary" className="pl-2.5 pr-1 py-1.5 flex items-center gap-2 border">
-                            {paint.finish ? (
-                              <div className="w-4 h-4 rounded border border-border shadow-sm overflow-hidden">
-                                <CanvasNormalMapRenderer baseColor={color} finish={paint.finish as PAINT_FINISH} width={16} height={16} quality="low" className="w-full h-full" />
-                              </div>
-                            ) : (
-                              <div className="w-4 h-4 rounded border border-border shadow-sm" style={{ backgroundColor: color }} />
-                            )}
-                            <span className="text-xs font-medium">{paint.name}</span>
-                            {paint.paintType?.name && <span className="text-xs text-muted-foreground">({paint.paintType.name})</span>}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-4 w-4 p-0 ml-1 hover:bg-transparent"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                const currentValue = field.value || [];
-                                field.onChange(currentValue.filter((id: string) => id !== paint.id));
-                              }}
-                              disabled={disabled}
-                            >
-                              <IconX className="h-3 w-3" />
-                            </Button>
-                          </Badge>
-                        );
-                      })}
-                    </div>
+                      return (
+                        <Badge
+                          key={paint.id}
+                          variant="secondary"
+                          className="pl-2.5 pr-2.5 py-1.5 flex items-center gap-2 border cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            const currentValue = field.value || [];
+                            field.onChange(currentValue.filter((id: string) => id !== paint.id));
+                          }}
+                        >
+                          {paint.finish ? (
+                            <div className="w-4 h-4 rounded border border-border shadow-sm overflow-hidden">
+                              <CanvasNormalMapRenderer baseColor={color} finish={paint.finish as PAINT_FINISH} width={16} height={16} quality="low" className="w-full h-full" />
+                            </div>
+                          ) : (
+                            <div className="w-4 h-4 rounded border border-border shadow-sm" style={{ backgroundColor: color }} />
+                          )}
+                          <span className="text-xs font-medium">{paint.name}</span>
+                          {paint.paintType?.name && <span className="text-xs opacity-70">({paint.paintType.name})</span>}
+                          <IconX className="h-3 w-3 ml-1" />
+                        </Badge>
+                      );
+                    })}
                   </div>
                 )}
               </div>

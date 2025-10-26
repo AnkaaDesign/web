@@ -10,7 +10,6 @@ import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorit
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { cn } from "@/lib/utils";
 import { useSystemUsers, useCreateSystemUser, useDeleteSystemUser, useSetSystemUserPassword } from "../../hooks";
-import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -31,7 +30,6 @@ import { createUserSchema, setUserPasswordSchema } from "../../schemas";
 import type { CreateUserFormData, SetUserPasswordFormData } from "../../schemas";
 
 export function ServerUsersPage() {
-  const { success, error } = useToast();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
@@ -70,16 +68,10 @@ export function ServerUsersPage() {
     createUser(data, {
       onSuccess: (response) => {
         if (response.success) {
-          success("Usuário criado com sucesso");
           setIsCreateDialogOpen(false);
           createForm.reset();
           refetch();
-        } else {
-          error("Erro ao criar usuário", response.message);
         }
-      },
-      onError: (error: any) => {
-        error("Erro ao criar usuário", error.message);
       },
     });
   };
@@ -88,14 +80,8 @@ export function ServerUsersPage() {
     deleteUser(username, {
       onSuccess: (response) => {
         if (response.success) {
-          success("Usuário removido com sucesso");
           refetch();
-        } else {
-          error("Erro ao remover usuário", response.message);
         }
-      },
-      onError: (error: any) => {
-        error("Erro ao remover usuário", error.message);
       },
     });
   };
@@ -108,16 +94,10 @@ export function ServerUsersPage() {
       {
         onSuccess: (response) => {
           if (response.success) {
-            success("Senha alterada com sucesso");
             setIsPasswordDialogOpen(false);
             setSelectedUser(null);
             passwordForm.reset();
-          } else {
-            error("Erro ao alterar senha", response.message);
           }
-        },
-        onError: (error: any) => {
-          error("Erro ao alterar senha", error.message);
         },
       },
     );
@@ -185,7 +165,6 @@ export function ServerUsersPage() {
                 icon: IconRefresh,
                 onClick: () => {
                   refetch();
-                  success("Lista de usuários atualizada");
                 },
                 variant: "outline" as const,
                 disabled: isLoading,

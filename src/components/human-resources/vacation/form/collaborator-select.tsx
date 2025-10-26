@@ -28,7 +28,7 @@ export function CollaboratorSelect({ control, disabled, required, initialCollabo
     const queryParams: any = {
       page,
       take: 50,
-      where: { status: { not: USER_STATUS.DISMISSED } },
+      where: { isActive: true },
       include: { position: true },
     };
 

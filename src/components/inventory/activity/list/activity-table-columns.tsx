@@ -48,7 +48,7 @@ export function getActivityColumns(): ActivityColumn[] {
         if (!activity.item) {
           return <span className="text-sm text-muted-foreground">-</span>;
         }
-        return <div className="text-sm">{activity.item.uniCode || "-"}</div>;
+        return <div className="text-sm truncate max-w-full">{activity.item.uniCode || "-"}</div>;
       },
       sortable: true,
       className: "w-28",
@@ -71,12 +71,12 @@ export function getActivityColumns(): ActivityColumn[] {
       accessor: (activity) => (
         <Badge
           className={cn(
-            "text-xs font-medium border text-white",
+            "text-xs font-medium border text-white whitespace-nowrap inline-flex items-center gap-1 max-w-full",
             activity.operation === ACTIVITY_OPERATION.INBOUND ? "bg-green-700 hover:bg-green-800 border-green-700" : "bg-red-700 hover:bg-red-800 border-red-700",
           )}
         >
-          <span className="font-enhanced-unicode sort-arrow">{activity.operation === ACTIVITY_OPERATION.INBOUND ? "↑" : "↓"}</span>{" "}
-          {activity.operation ? ACTIVITY_OPERATION_LABELS[activity.operation] : "-"}
+          <span className="font-enhanced-unicode sort-arrow shrink-0">{activity.operation === ACTIVITY_OPERATION.INBOUND ? "↑" : "↓"}</span>
+          <span className="truncate">{activity.operation ? ACTIVITY_OPERATION_LABELS[activity.operation] : "-"}</span>
         </Badge>
       ),
       sortable: true,

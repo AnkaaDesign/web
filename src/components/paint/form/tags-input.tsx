@@ -87,19 +87,11 @@ export function TagsInput({ control, disabled, required }: TagsInputProps) {
                       <Badge
                         key={`tag-${index}`}
                         variant="secondary"
-                        className="flex items-center gap-1 text-xs pr-1"
+                        className="flex items-center gap-1.5 text-sm pr-1.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => !disabled && removeTag(tag)}
                       >
                         <span>{tag}</span>
-                        <Button
-                          type="button"
-                          onClick={() => removeTag(tag)}
-                          disabled={disabled}
-                          variant="ghost"
-                          size="sm"
-                          className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground ml-1"
-                        >
-                          <IconX className="h-3 w-3" />
-                        </Button>
+                        <IconX className="h-3.5 w-3.5" />
                       </Badge>
                     ))}
                   </div>

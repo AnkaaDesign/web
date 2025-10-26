@@ -85,7 +85,6 @@ export function UserForm(props: UserFormProps) {
 
     // Additional dates
     birth: null,
-    dismissal: null,
 
     // Status tracking dates
     exp1StartAt: null,
@@ -140,7 +139,6 @@ export function UserForm(props: UserFormProps) {
       zipCode: null,
       site: null,
       birth: null,
-      dismissal: null,
       exp1StartAt: null,
       exp1EndAt: null,
       exp2StartAt: null,
@@ -190,11 +188,11 @@ export function UserForm(props: UserFormProps) {
     if (mode === "update") {
       const subscription = form.watch((value, { name }) => {
         // If dismissal date is set and status is not DISMISSED, auto-set status to DISMISSED
-        if (name === "dismissal" && value.dismissal && value.status !== USER_STATUS.DISMISSED) {
+        if (name === "dismissedAt" && value.dismissedAt && value.status !== USER_STATUS.DISMISSED) {
           form.setValue("status", USER_STATUS.DISMISSED, { shouldDirty: true, shouldValidate: true });
         }
         // If dismissal date is cleared and status is DISMISSED, clear status
-        if (name === "dismissal" && !value.dismissal && value.status === USER_STATUS.DISMISSED) {
+        if (name === "dismissedAt" && !value.dismissedAt && value.status === USER_STATUS.DISMISSED) {
           // Revert to currentStatus
           const currentStatus = form.getValues("currentStatus");
           if (currentStatus && currentStatus !== USER_STATUS.DISMISSED) {
@@ -297,7 +295,7 @@ export function UserForm(props: UserFormProps) {
                     disabled={isSubmitting}
                     required={false}
                   />
-                  <BirthDateInput disabled={isSubmitting} />
+                  <BirthDateInput disabled={isSubmitting} required={mode === "create"} />
                   <PayrollNumberInput disabled={isSubmitting} />
                 </div>
               </CardContent>

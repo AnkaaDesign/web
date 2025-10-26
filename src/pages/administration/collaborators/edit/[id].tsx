@@ -113,7 +113,7 @@ const EditCollaboratorPage = () => {
 
       // Parse all dates to local timezone to avoid timezone shift bugs
       birth: parseLocalDate(user.birth),
-      dismissal: parseLocalDate(user.dismissal),
+      dismissal: parseLocalDate(user.dismissedAt),
 
       // Status tracking dates (CRITICAL - these were missing before!)
       contractedAt: parseLocalDate(user.contractedAt),

@@ -49,6 +49,17 @@ export interface Paint extends BaseEntity {
   relatedTo?: Paint[];
   paintGrounds?: PaintGround[];
   groundPaintFor?: PaintGround[];
+
+  // Count fields (optional, populated when using _count in include)
+  _count?: {
+    formulas?: number;
+    generalPaintings?: number;
+    logoTasks?: number;
+    relatedPaints?: number;
+    relatedTo?: number;
+    paintGrounds?: number;
+    groundPaintFor?: number;
+  };
 }
 
 export interface PaintGround extends BaseEntity {
@@ -177,6 +188,11 @@ export interface PaintFormulaIncludes {
     | boolean
     | {
         include?: PaintIncludes;
+      };
+  paintProduction?:
+    | boolean
+    | {
+        include?: PaintProductionIncludes;
       };
 }
 

@@ -1,4 +1,4 @@
-import { CHANGE_LOG_ENTITY_TYPE, MEASURE_UNIT_LABELS, CHANGE_LOG_ACTION, CHANGE_TRIGGERED_BY } from "../constants";
+import { CHANGE_LOG_ENTITY_TYPE, MEASURE_UNIT_LABELS, CHANGE_LOG_ACTION, CHANGE_TRIGGERED_BY } from '@constants';
 import { formatDateTime } from "./date";
 import { formatCurrency } from "./number";
 import { formatBrazilianPhone, formatCPF, formatCNPJ } from "./formatters";
@@ -35,6 +35,8 @@ const commonFields: Record<string, string> = {
 // Entity-specific field mappings
 const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string, string>>> = {
   [CHANGE_LOG_ENTITY_TYPE.ITEM]: {
+    // Basic fields
+    name: "Nome",
     quantity: "Quantidade",
     price: "Preço",
     maxQuantity: "Quantidade Máxima",
@@ -45,40 +47,69 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     barcodes: "Códigos de Barras",
     unicode: "Código Único",
     uniCode: "Código Único",
+
+    // PPE fields
     CA: "CA (Certificado de Aprovação)",
-    leadTime: "Tempo de Entrega",
-    estimatedLeadTime: "Tempo de Entrega Estimado",
-    tax: "Imposto (%)",
-    totalPrice: "Preço Total",
-    monthlyConsumption: "Consumo Mensal",
-    monthlyConsumptionTrendPercent: "Tendência de Consumo (%)",
+    ppeCA: "CA (Certificado de Aprovação)",
+    ppeType: "Tipo de EPI",
+    ppeSize: "Tamanho do EPI",
+    ppeDeliveryMode: "Modo de Entrega de EPI",
+    ppeStandardQuantity: "Quantidade Padrão de EPI",
+    ppeAutoOrderMonths: "Meses para Pedido Automático de EPI",
     shouldAssignToUser: "Deve ser Atribuído a Usuário",
     isForEpi: "É EPI",
+
+    // Stock management
+    leadTime: "Tempo de Entrega",
+    estimatedLeadTime: "Tempo de Entrega Estimado",
     boxQuantity: "Quantidade por Caixa",
     reorderPoint: "Ponto de Reposição",
     reorderQuantity: "Quantidade de Reposição",
     location: "Localização",
-    weight: "Peso",
-    dimensions: "Dimensões",
-    abcCategory: "Categoria ABC",
-    xyzCategory: "Categoria XYZ",
-    serialNumber: "Número de Série",
-    manufacturerCode: "Código do Fabricante",
-    supplierCode: "Código do Fornecedor",
-    sku: "SKU",
-    ean: "EAN",
-    ncm: "NCM",
-    warranty: "Garantia",
-    warrantyPeriod: "Período de Garantia",
-    expirationDate: "Data de Validade",
-    manufacturingDate: "Data de Fabricação",
-    lastPurchaseDate: "Data da Última Compra",
+
+    // Financial fields
+    tax: "Imposto (%)",
+    taxrate: "Taxa de Imposto (%)",
+    totalPrice: "Preço Total",
     lastPurchasePrice: "Preço da Última Compra",
     averageCost: "Custo Médio",
     unitCost: "Custo Unitário",
     margin: "Margem",
     minimumMargin: "Margem Mínima",
     suggestedPrice: "Preço Sugerido",
+
+    // Analysis fields
+    monthlyConsumption: "Consumo Mensal",
+    monthlyConsumptionTrendPercent: "Tendência de Consumo (%)",
+    abcCategory: "Categoria ABC",
+    abcCategoryOrder: "Ordem da Categoria ABC",
+    xyzCategory: "Categoria XYZ",
+    xyzCategoryOrder: "Ordem da Categoria XYZ",
+
+    // Physical attributes
+    weight: "Peso",
+    dimensions: "Dimensões",
+
+    // Codes and identifiers
+    serialNumber: "Número de Série",
+    manufacturerCode: "Código do Fabricante",
+    supplierCode: "Código do Fornecedor",
+    sku: "SKU",
+    ean: "EAN",
+    ncm: "NCM",
+
+    // Dates and warranty
+    warranty: "Garantia",
+    warrantyPeriod: "Período de Garantia",
+    expirationDate: "Data de Validade",
+    manufacturingDate: "Data de Fabricação",
+    lastPurchaseDate: "Data da Última Compra",
+
+    // Status and relationships
+    isActive: "Ativo",
+    relatedItems: "Itens Relacionados",
+    relatedItemIds: "Itens Relacionados",
+    relatedTo: "Relacionado a",
   },
   [CHANGE_LOG_ENTITY_TYPE.ITEM_CATEGORY]: {
     isPpe: "É EPI",
@@ -134,31 +165,16 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     totalPrice: "Valor Total",
   },
   [CHANGE_LOG_ENTITY_TYPE.USER]: {
+    // Basic information
     name: "Nome",
     email: "E-mail",
+    phone: "Telefone",
     cpf: "CPF",
     pis: "PIS",
     payrollNumber: "Número da Folha",
-    phone: "Telefone",
-    position: "Cargo",
-    positionId: "Cargo",
-    performanceLevel: "Nível de Desempenho",
-    sector: "Setor",
-    sectorId: "Setor",
-    managedSectorId: "Setor Gerenciado",
-    status: "Status",
-    statusOrder: "Ordem do Status",
-    verified: "Verificado",
-    requirePasswordChange: "Requer Mudança de Senha",
     birth: "Data de Nascimento",
-    dismissal: "Data de Demissão",
-    verificationCode: "Código de Verificação",
-    verificationExpiresAt: "Expiração da Verificação",
-    verificationType: "Tipo de Verificação",
-    sessionToken: "Token de Sessão",
-    lastLoginAt: "Último Login",
-    isExternal: "É Externo",
-    password: "Senha",
+
+    // Address fields
     address: "Endereço",
     addressNumber: "Número",
     addressComplement: "Complemento",
@@ -167,32 +183,66 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     state: "Estado",
     zipCode: "CEP",
     site: "Site",
+
+    // Organizational fields
+    position: "Cargo",
+    positionId: "Cargo",
+    sector: "Setor",
+    sectorId: "Setor",
+    managedSectorId: "Setor Gerenciado",
+    performanceLevel: "Nível de Desempenho",
+
+    // Status and employment
+    status: "Status",
+    statusOrder: "Ordem do Status",
+    isActive: "Ativo",
+    admissional: "Data de Admissão",
+    contractedAt: "Data de Contratação",
+    exp1StartAt: "Início da Experiência 1",
+    exp1EndAt: "Fim da Experiência 1",
+    exp2StartAt: "Início da Experiência 2",
+    exp2EndAt: "Fim da Experiência 2",
+    dismissedAt: "Data de Demissão",
+
+    // Security and verification
+    verified: "Verificado",
+    requirePasswordChange: "Requer Mudança de Senha",
+    password: "Senha",
+    verificationCode: "Código de Verificação",
+    verificationExpiresAt: "Expiração da Verificação",
+    verificationType: "Tipo de Verificação",
+    sessionToken: "Token de Sessão",
+    lastLoginAt: "Último Login",
+
+    // External integrations
     secullumId: "ID Secullum",
+    preferenceId: "ID de Preferências",
+    avatarId: "Avatar",
+
+    // Legacy/computed fields
+    isExternal: "É Externo",
   },
   [CHANGE_LOG_ENTITY_TYPE.TASK]: {
     name: "Nome",
-    title: "Título",
-    priority: "Prioridade",
-    dueDate: "Data de Vencimento",
-    startedAt: "Iniciado em",
-    completedAt: "Concluído em",
-    finishedAt: "Finalizado em",
-    estimatedHours: "Horas Estimadas",
-    actualHours: "Horas Reais",
+    status: "Status",
+    statusOrder: "Ordem do Status",
     serialNumber: "Número de Série",
+    chassisNumber: "Número do Chassi",
     plate: "Placa",
     details: "Detalhes",
     entryDate: "Data de Entrada",
     term: "Prazo",
+    startedAt: "Iniciado em",
+    finishedAt: "Finalizado em",
+    paintId: "Tinta",
     commission: "Comissão",
-    statusOrder: "Ordem do Status",
+    bonusDiscountId: "Desconto Bônus",
     customerId: "Cliente",
     sectorId: "Setor",
     createdById: "Criado por",
     budgetId: "Orçamento",
     nfeId: "Nota Fiscal",
     receiptId: "Recibo",
-    paintId: "Tinta",
     generalPainting: "Pintura Geral",
     observationId: "Observação",
     truckId: "Caminhão",
@@ -207,8 +257,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     truck: "Caminhão",
     createdBy: "Criado por",
     artworks: "Artes",
-    logoPaints: "Tintas do Logo",
-    paints: "Tintas do Logo",
+    logoPaints: "Tintas da logomarca",
+    paints: "Tintas da logomarca",
     commissions: "Comissões",
     services: "Serviços",
     airbrushings: "Aerografias",
@@ -234,6 +284,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "truck.manufacturer": "Fabricante do Caminhão",
   },
   [CHANGE_LOG_ENTITY_TYPE.SUPPLIER]: {
+    // Basic information
     corporateName: "Razão Social",
     fantasyName: "Nome Fantasia",
     cnpj: "CNPJ",
@@ -241,19 +292,29 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     phone: "Telefone",
     phones: "Telefones",
     site: "Site",
-    representativeName: "Nome do Representante",
+
+    // Address fields
+    logradouro: "Logradouro",
     address: "Endereço",
+    addressNumber: "Número",
+    addressComplement: "Complemento",
     number: "Número",
     complement: "Complemento",
     neighborhood: "Bairro",
     city: "Cidade",
     state: "Estado",
     zipCode: "CEP",
+
+    // Additional fields
+    tags: "Tags",
+    logoId: "Logo",
+    logo: "Logo",
+
+    // Legacy fields (may exist in old data)
+    representativeName: "Nome do Representante",
     country: "País",
     observations: "Observações",
     statusOrder: "Ordem do Status",
-    logoId: "Logo",
-    logo: "Logo",
   },
   [CHANGE_LOG_ENTITY_TYPE.PPE_DELIVERY]: {
     ppeConfigId: "ID da Configuração de EPI",
@@ -426,6 +487,14 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     garageId: "Garagem",
     "garage.name": "Nome da Garagem",
   },
+  [CHANGE_LOG_ENTITY_TYPE.PARKING_SPOT]: {
+    name: "Número",
+    length: "Comprimento",
+    garageLaneId: "Faixa da Garagem",
+    "garageLane.id": "ID da Faixa",
+    "garageLane.xPosition": "Posição X da Faixa",
+    "garageLane.yPosition": "Posição Y da Faixa",
+  },
   [CHANGE_LOG_ENTITY_TYPE.MAINTENANCE]: {
     type: "Tipo",
     truckId: "Caminhão",
@@ -516,6 +585,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "user.name": "Nome do Usuário",
   },
   [CHANGE_LOG_ENTITY_TYPE.CUSTOMER]: {
+    // Basic information
     fantasyName: "Nome Fantasia",
     corporateName: "Razão Social",
     cnpj: "CNPJ",
@@ -523,6 +593,11 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     email: "E-mail",
     phone: "Telefone",
     phones: "Telefones",
+    site: "Site",
+    tags: "Tags",
+
+    // Address fields
+    logradouro: "Logradouro",
     address: "Endereço",
     addressNumber: "Número",
     addressComplement: "Complemento",
@@ -530,12 +605,16 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     city: "Cidade",
     state: "Estado",
     zipCode: "CEP",
-    site: "Site",
-    tags: "Tags",
+
+    // Additional fields
     logoId: "Logo",
+    economicActivityId: "Atividade Econômica",
+    situacaoCadastral: "Situação Cadastral",
+
     // Nested relationship fields
     "logo.filename": "Nome do Logo",
     "tasks.length": "Quantidade de Tarefas",
+    "economicActivity.description": "Descrição da Atividade Econômica",
   },
   [CHANGE_LOG_ENTITY_TYPE.PAINT]: {
     name: "Nome",
@@ -762,7 +841,7 @@ interface FieldMetadata {
  * @returns The formatted value as a string
  */
 export function formatFieldValue(value: ComplexFieldValue, field?: string | null, entityType?: CHANGE_LOG_ENTITY_TYPE, metadata?: FieldMetadata): string {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return "Nenhum";
 
   // Special handling for item returned quantity from metadata
   if (metadata?.fieldType === "item_returned_quantity" && typeof value === "number") {
@@ -817,136 +896,33 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       return formattedMeasures.join(", ");
     }
 
-    // Task-specific array handling with detailed formatting
+    // Task-specific array handling
     if (entityType === CHANGE_LOG_ENTITY_TYPE.TASK) {
-      if (field === "cuts" || field === "cutRequest" || field === "cutPlan") {
-        // Format cuts with details: type, quantity, and file
-        const cutTypeLabels: Record<string, string> = {
-          VINYL: "Adesivo",
-          STENCIL: "Espovo",
-        };
-
-        const formattedCuts = value.map((cut: any) => {
-          const parts: string[] = [];
-
-          if (cut.type) {
-            parts.push(`Tipo: ${cutTypeLabels[cut.type] || cut.type}`);
-          }
-          if (cut.quantity) {
-            parts.push(`Quantidade: ${cut.quantity}`);
-          }
-          if (cut.fileId || cut.file?.filename || cut.file?.name) {
-            const filename = cut.file?.filename || cut.file?.name || cut.fileId;
-            parts.push(`Arquivo: ${filename}`);
-          }
-
-          return parts.join(", ");
-        });
-
-        return formattedCuts.join(" | ");
-      }
-
-      if (field === "services") {
-        // Format services with description and status
-        const formattedServices = value.map((service: any) => {
-          const parts: string[] = [];
-
-          if (service.description) {
-            parts.push(`Descrição: ${service.description}`);
-          }
-          if (service.status) {
-            const statusLabels: Record<string, string> = {
-              PENDING: "Pendente",
-              IN_PROGRESS: "Em Progresso",
-              COMPLETED: "Concluído",
-              CANCELLED: "Cancelado",
-            };
-            parts.push(`Status: ${statusLabels[service.status] || service.status}`);
-          }
-
-          return parts.join(", ");
-        });
-
-        return formattedServices.join(" | ");
-      }
-
-      if (field === "airbrushings") {
-        // Format airbrushings with description and status
-        const formattedAirbrushings = value.map((airbrushing: any) => {
-          const parts: string[] = [];
-
-          if (airbrushing.description) {
-            parts.push(`Descrição: ${airbrushing.description}`);
-          }
-          if (airbrushing.status) {
-            const statusLabels: Record<string, string> = {
-              PENDING: "Pendente",
-              IN_PRODUCTION: "Em Produção",
-              COMPLETED: "Concluído",
-              CANCELLED: "Cancelado",
-            };
-            parts.push(`Status: ${statusLabels[airbrushing.status] || airbrushing.status}`);
-          }
-
-          return parts.join(", ");
-        });
-
-        return formattedAirbrushings.join(" | ");
-      }
-
       if (field === "artworks") {
-        // Format artworks with file information
-        const formattedArtworks = value.map((artwork: any) => {
-          if (artwork.filename || artwork.name) {
-            return `Arquivo: ${artwork.filename || artwork.name}`;
-          }
-          if (artwork.id) {
-            return `Arquivo ID: ${artwork.id}`;
-          }
-          return "Arquivo";
-        });
-
-        return formattedArtworks.join(" | ");
+        return `${value.length} ${value.length === 1 ? "arte" : "artes"}`;
       }
-
+      // Don't format logoPaints/paints as strings - they will be rendered as special cards in the UI
       if (field === "logoPaints" || field === "paints") {
-        // Format logo paints with paint information
-        const formattedPaints = value.map((paint: any) => {
-          const parts: string[] = [];
-
-          if (paint.name) {
-            parts.push(`Tinta: ${paint.name}`);
-          }
-          if (paint.hex) {
-            parts.push(`Cor: ${paint.hex}`);
-          }
-          if (paint.id && !paint.name) {
-            parts.push(`ID: ${paint.id}`);
-          }
-
-          return parts.join(", ");
-        });
-
-        return formattedPaints.join(" | ");
+        // Return the array as-is to be handled by the UI component
+        return value;
       }
-
+      if (field === "services") {
+        return `${value.length} ${value.length === 1 ? "serviço" : "serviços"}`;
+      }
       if (field === "commissions") {
         return `${value.length} ${value.length === 1 ? "comissão" : "comissões"}`;
       }
-
+      if (field === "airbrushings") {
+        return `${value.length} ${value.length === 1 ? "aerografia" : "aerografias"}`;
+      }
+      if (field === "cutRequest") {
+        return `${value.length} ${value.length === 1 ? "solicitação de corte" : "solicitações de corte"}`;
+      }
+      if (field === "cutPlan") {
+        return `${value.length} ${value.length === 1 ? "plano de corte" : "planos de corte"}`;
+      }
       if (field === "relatedTasks" || field === "relatedTo") {
-        // Format related tasks with task names
-        const formattedTasks = value.map((task: any) => {
-          if (task.name) {
-            return `Tarefa: ${task.name}`;
-          }
-          if (task.id) {
-            return `Tarefa ID: ${task.id}`;
-          }
-          return "Tarefa";
-        });
-
-        return formattedTasks.join(" | ");
+        return `${value.length} ${value.length === 1 ? "tarefa relacionada" : "tarefas relacionadas"}`;
       }
     }
 
@@ -1172,6 +1148,45 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return xyzLabels[value] || value;
   }
 
+  // Handle logradouro type (street type) for Supplier and Customer
+  if (field === "logradouro" && typeof value === "string") {
+    const logradouroLabels: Record<string, string> = {
+      RUA: "Rua",
+      AVENIDA: "Avenida",
+      ALAMEDA: "Alameda",
+      TRAVESSA: "Travessa",
+      PRACA: "Praça",
+      RODOVIA: "Rodovia",
+      ESTRADA: "Estrada",
+      VIA: "Via",
+      LARGO: "Largo",
+      VIELA: "Viela",
+      BECO: "Beco",
+      RUELA: "Ruela",
+      CAMINHO: "Caminho",
+      PASSAGEM: "Passagem",
+      JARDIM: "Jardim",
+      QUADRA: "Quadra",
+      LOTE: "Lote",
+      SITIO: "Sítio",
+      PARQUE: "Parque",
+      FAZENDA: "Fazenda",
+    };
+    return logradouroLabels[value] || value;
+  }
+
+  // Handle registration status (situação cadastral) for Customer
+  if (field === "situacaoCadastral" && typeof value === "string") {
+    const registrationStatusLabels: Record<string, string> = {
+      ATIVA: "Ativa",
+      SUSPENSA: "Suspensa",
+      INAPTA: "Inapta",
+      ATIVA_NAO_REGULAR: "Ativa Não Regular",
+      BAIXADA: "Baixada",
+    };
+    return registrationStatusLabels[value] || value;
+  }
+
   // Handle sector privileges
   if (field === "privileges" && (entityType === CHANGE_LOG_ENTITY_TYPE.SECTOR || entityType === CHANGE_LOG_ENTITY_TYPE.POSITION) && typeof value === "string") {
     const privilegeLabels: Record<string, string> = {
@@ -1284,6 +1299,17 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       FACE_SHIELD: "Protetor Facial",
     };
     return ppeTypeLabels[value] || value;
+  }
+
+  // Handle PPE delivery mode
+  if (field === "ppeDeliveryMode" && typeof value === "string") {
+    const ppeDeliveryModeLabels: Record<string, string> = {
+      INDIVIDUAL: "Individual",
+      CATEGORY: "Por Categoria",
+      SCHEDULED: "Agendado",
+      ON_DEMAND: "Sob Demanda",
+    };
+    return ppeDeliveryModeLabels[value] || value;
   }
 
   // Handle PPE sizes
@@ -1634,19 +1660,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return value.toLocaleString("pt-BR");
   }
 
-  // Handle date formatting - first check for ISO date strings generically
-  if (typeof value === "string") {
-    // Match ISO 8601 date format (e.g., "2025-10-20T03:00:00.000Z")
-    const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
-    if (isoDateRegex.test(value)) {
-      const date = new Date(value);
-      if (!isNaN(date.getTime())) {
-        return formatDateTime(date);
-      }
-    }
-  }
-
-  // Handle date formatting for known date fields
+  // Handle date formatting
   if (
     field === "createdAt" ||
     field === "updatedAt" ||
@@ -1680,7 +1694,14 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     field === "productionDate" ||
     field === "sentAt" ||
     field === "scheduledAt" ||
-    field === "seenAt"
+    field === "seenAt" ||
+    field === "admissional" ||
+    field === "contractedAt" ||
+    field === "exp1StartAt" ||
+    field === "exp1EndAt" ||
+    field === "exp2StartAt" ||
+    field === "exp2EndAt" ||
+    field === "dismissedAt"
   ) {
     const date = new Date(value as any);
     if (!isNaN(date.getTime())) {
@@ -1688,9 +1709,9 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     }
   }
 
-  // Handle empty strings - show same as null/undefined
+  // Handle empty strings
   if (value === "") {
-    return "—";
+    return "Nenhum";
   }
 
   // Handle objects

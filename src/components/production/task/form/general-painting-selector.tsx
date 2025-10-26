@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
 import { getPaints } from "../../../../api-client";
 import type { Paint } from "../../../../types";
@@ -194,33 +194,33 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
 
                 {/* Selected paint display with improved design */}
                 {selectedPaint && (
-                  <div className="rounded-lg border bg-muted/30 p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {selectedPaint.finish ? (
-                          <div className="w-5 h-5 rounded border border-border shadow-sm overflow-hidden">
-                            <CanvasNormalMapRenderer
-                              baseColor={selectedPaint.hex || paletteColors[selectedPaint.palette || ""] || "#888888"}
-                              finish={selectedPaint.finish as PAINT_FINISH}
-                              width={20}
-                              height={20}
-                              quality="low"
-                              className="w-full h-full"
-                            />
-                          </div>
-                        ) : (
-                          <div
-                            className="w-5 h-5 rounded border border-border shadow-sm"
-                            style={{ backgroundColor: selectedPaint.hex || paletteColors[selectedPaint.palette || ""] || "#888888" }}
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <Badge
+                      variant="secondary"
+                      className="pl-2.5 pr-2.5 py-1.5 flex items-center gap-2 border cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                      onClick={() => field.onChange(null)}
+                    >
+                      {selectedPaint.finish ? (
+                        <div className="w-4 h-4 rounded border border-border shadow-sm overflow-hidden">
+                          <CanvasNormalMapRenderer
+                            baseColor={selectedPaint.hex || paletteColors[selectedPaint.palette || ""] || "#888888"}
+                            finish={selectedPaint.finish as PAINT_FINISH}
+                            width={16}
+                            height={16}
+                            quality="low"
+                            className="w-full h-full"
                           />
-                        )}
-                        <span className="text-sm font-medium">{selectedPaint.name}</span>
-                        {selectedPaint.paintType?.name && <span className="text-xs text-muted-foreground">({selectedPaint.paintType.name})</span>}
-                      </div>
-                      <Button type="button" variant="ghost" size="icon" className="h-5 w-5" onClick={() => field.onChange(null)} disabled={disabled}>
-                        <IconX className="h-3 w-3" />
-                      </Button>
-                    </div>
+                        </div>
+                      ) : (
+                        <div
+                          className="w-4 h-4 rounded border border-border shadow-sm"
+                          style={{ backgroundColor: selectedPaint.hex || paletteColors[selectedPaint.palette || ""] || "#888888" }}
+                        />
+                      )}
+                      <span className="text-xs font-medium">{selectedPaint.name}</span>
+                      {selectedPaint.paintType?.name && <span className="text-xs opacity-70">({selectedPaint.paintType.name})</span>}
+                      <IconX className="h-3 w-3 ml-1" />
+                    </Badge>
                   </div>
                 )}
               </div>

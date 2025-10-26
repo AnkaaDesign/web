@@ -28,23 +28,17 @@ export function TagsCell<TFieldValues extends FieldValues = FieldValues>({ contr
                   {field.value.map((tag: string, tagIndex: number) => (
                     <Badge
                       key={tagIndex}
-                      className="inline-flex items-center gap-2 px-2.5 py-1 text-xs font-medium transition-colors bg-neutral-400/20 text-neutral-600 border-neutral-300 hover:bg-red-700 hover:text-white hover:border-red-700 dark:bg-neutral-600 dark:text-neutral-300 dark:border-neutral-600 dark:hover:bg-red-700 dark:hover:text-white dark:hover:border-red-700"
-                    >
-                      {tag}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-3 w-3 p-0 hover:bg-transparent"
-                        onClick={() => {
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition-colors bg-neutral-400/20 text-neutral-600 border-neutral-300 hover:bg-red-700 hover:text-white hover:border-red-700 dark:bg-neutral-600 dark:text-neutral-300 dark:border-neutral-600 dark:hover:bg-red-700 dark:hover:text-white dark:hover:border-red-700 rounded-full cursor-pointer"
+                      onClick={() => {
+                        if (!disabled) {
                           const newTags = [...field.value];
                           newTags.splice(tagIndex, 1);
                           field.onChange(newTags);
-                        }}
-                        disabled={disabled}
-                      >
-                        <IconX className="h-3 w-3" />
-                      </Button>
+                        }
+                      }}
+                    >
+                      {tag}
+                      <IconX className="h-3 w-3" />
                     </Badge>
                   ))}
                 </div>

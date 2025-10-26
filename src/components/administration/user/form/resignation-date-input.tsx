@@ -16,7 +16,7 @@ export function ResignationDateInput({ disabled }: ResignationDateInputProps) {
   return (
     <FormField
       control={form.control}
-      name="dismissal"
+      name="dismissedAt"
       render={({ field }) => (
         <DateTimeInput
           field={field}

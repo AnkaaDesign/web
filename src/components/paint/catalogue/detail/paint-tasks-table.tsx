@@ -87,7 +87,7 @@ export function PaintTasksTable({ paint }: PaintTasksTableProps) {
   };
 
   return (
-    <Card className="flex flex-col overflow-hidden min-h-[400px] max-h-[600px]">
+    <Card className="flex flex-col overflow-hidden min-h-[400px]">
       <CardHeader className="flex-shrink-0">
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -99,7 +99,7 @@ export function PaintTasksTable({ paint }: PaintTasksTableProps) {
           </Button>
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col space-y-4 overflow-hidden p-6">
+      <CardContent className="flex-1 flex flex-col space-y-4 p-6">
         {/* Search and column visibility controls */}
         <div className="flex flex-col gap-3 sm:flex-row flex-shrink-0">
           <TableSearchInput
@@ -118,7 +118,7 @@ export function PaintTasksTable({ paint }: PaintTasksTableProps) {
         </div>
 
         {/* Table - Full width with min/max height */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0">
           <CustomerTasksTable
             visibleColumns={visibleColumns}
             filters={filters}

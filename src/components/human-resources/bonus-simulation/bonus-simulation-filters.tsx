@@ -51,11 +51,11 @@ export function BonusSimulationFilters({
 }: BonusSimulationFiltersProps) {
   const [localFilters, setLocalFilters] = useState(filters);
 
-  // Get all users for exclude filter
+  // Get all active users for exclude filter
   const { data: allUsersData } = useUsers({
     include: { position: true, sector: true },
     where: {
-      status: { not: USER_STATUS.DISMISSED },
+      isActive: true,
       performanceLevel: { gt: 0 },
       position: { is: { bonifiable: true } }
     },

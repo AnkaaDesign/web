@@ -341,6 +341,12 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
         paintType: true,
         paintBrand: true,
         formulas: true,
+        _count: {
+          select: {
+            logoTasks: true,
+            generalPaintings: true,
+          },
+        },
       },
     };
 

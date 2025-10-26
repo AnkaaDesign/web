@@ -20,13 +20,7 @@ export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione
         page: page,
         take: 50,
         where: {
-          status: {
-            in: [
-              USER_STATUS.EXPERIENCE_PERIOD_1,
-              USER_STATUS.EXPERIENCE_PERIOD_2,
-              USER_STATUS.CONTRACTED
-            ]
-          }
+          isActive: true
         },
         include: {
           position: true,

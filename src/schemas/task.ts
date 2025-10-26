@@ -191,8 +191,12 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
             include: z
               .object({
                 task: z.boolean().optional(),
-                receipts: z.boolean().optional(),
+                artworks: z.boolean().optional(),
+                budgets: z.boolean().optional(),
                 invoices: z.boolean().optional(),
+                invoiceReimbursements: z.boolean().optional(),
+                receipts: z.boolean().optional(),
+                reimbursements: z.boolean().optional(),
               })
               .optional(),
             orderBy: z

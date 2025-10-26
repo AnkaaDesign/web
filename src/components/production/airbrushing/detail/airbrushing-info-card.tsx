@@ -21,17 +21,28 @@ import { type Airbrushing } from "../../../../types";
 import { formatDate, formatDateTime } from "../../../../utils";
 import { TASK_STATUS_LABELS, AIRBRUSHING_STATUS_LABELS, ENTITY_BADGE_CONFIG } from "../../../../constants";
 import { cn } from "@/lib/utils";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 
 interface AirbrushingInfoCardProps {
   airbrushing: Airbrushing & {
     task?: {
       id: string;
       name: string;
+      serialNumber?: string;
       status: string;
       statusOrder: number;
       customer?: {
         id: string;
         fantasyName: string;
+        logo?: {
+          id: string;
+          filename: string;
+          originalName: string;
+          fileUrl: string;
+          thumbnailUrl?: string;
+          size: number;
+          mimetype: string;
+        };
       };
       sector?: {
         id: string;
@@ -118,9 +129,9 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <IconClock className="h-4 w-4" />
-                    <span>Data de Início</span>
+                    <span>Data de início</span>
                   </div>
-                  <p className="font-semibold">{formatDateTime(airbrushing.startDate)}</p>
+                  <p className="font-semibold">{formatDate(airbrushing.startDate)}</p>
                 </div>
               )}
 
@@ -129,31 +140,9 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <IconCalendar className="h-4 w-4" />
-                    <span>Data de Término</span>
+                    <span>Data de finalização</span>
                   </div>
-                  <p className="font-semibold">{formatDateTime(airbrushing.finishDate)}</p>
-                </div>
-              )}
-
-              <Separator />
-
-              {/* Created At */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <IconCalendar className="h-4 w-4" />
-                  <span>Criada em</span>
-                </div>
-                <p className="font-semibold">{formatDateTime(airbrushing.createdAt)}</p>
-              </div>
-
-              {/* Updated At */}
-              {airbrushing.updatedAt !== airbrushing.createdAt && (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <IconCalendar className="h-4 w-4" />
-                    <span>Atualizada em</span>
-                  </div>
-                  <p className="font-semibold">{formatDateTime(airbrushing.updatedAt)}</p>
+                  <p className="font-semibold">{formatDate(airbrushing.finishDate)}</p>
                 </div>
               )}
             </div>
@@ -183,20 +172,10 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
                     <p className="font-semibold text-lg">{airbrushing.task.name}</p>
                   </div>
 
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Status da Tarefa</p>
-                    <Badge variant="secondary">
-                      {TASK_STATUS_LABELS[airbrushing.task.status] || airbrushing.task.status}
-                    </Badge>
-                  </div>
-
-                  {airbrushing.task.customer && (
+                  {airbrushing.task.serialNumber && (
                     <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <IconUser className="h-3 w-3" />
-                        Cliente
-                      </p>
-                      <p className="font-semibold">{airbrushing.task.customer.fantasyName}</p>
+                      <p className="text-sm text-muted-foreground">Número de Série</p>
+                      <p className="font-semibold">{airbrushing.task.serialNumber}</p>
                     </div>
                   )}
 
@@ -207,6 +186,24 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
                         Setor
                       </p>
                       <p className="font-semibold">{airbrushing.task.sector.name}</p>
+                    </div>
+                  )}
+
+                  {airbrushing.task.customer && (
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
+                        <IconUser className="h-3 w-3" />
+                        Cliente
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <CustomerLogoDisplay
+                          logo={airbrushing.task.customer.logo}
+                          customerName={airbrushing.task.customer.fantasyName}
+                          size="sm"
+                          shape="rounded"
+                        />
+                        <p className="font-semibold">{airbrushing.task.customer.fantasyName}</p>
+                      </div>
                     </div>
                   )}
                 </div>

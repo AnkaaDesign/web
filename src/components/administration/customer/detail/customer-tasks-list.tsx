@@ -29,7 +29,7 @@ export function CustomerTasksList({
   className,
   customerId,
   customerName,
-  navigationRoute = 'schedule',
+  navigationRoute = 'history',
 }: CustomerTasksListProps) {
   const navigate = useNavigate();
   // Get table state for selected tasks functionality

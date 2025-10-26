@@ -215,10 +215,10 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
         }) || [];
 
       setReceiptFiles(receipts);
-      setNfeFiles(nfes);
+      setNfeFiles(invoices);
       setArtworkFiles(artworks);
       setReceiptFileIds(receipts.map((f) => f.id));
-      setNfeFileIds(nfes.map((f) => f.id));
+      setNfeFileIds(invoices.map((f) => f.id));
       setArtworkFileIds(artworks.map((f) => f.id));
     }
   }, [mode, airbrushing, form]);

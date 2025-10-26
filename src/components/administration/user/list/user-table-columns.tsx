@@ -147,9 +147,9 @@ export const createUserColumns = (): UserColumn[] => [
 
   // Data de Demissão (Dismissal Date)
   {
-    key: "dismissal",
+    key: "dismissedAt",
     header: "DATA DE DEMISSÃO",
-    accessor: (user: User) => <div className="text-sm truncate">{user.dismissal ? formatDate(new Date(user.dismissal)) : <span className="text-muted-foreground">-</span>}</div>,
+    accessor: (user: User) => <div className="text-sm truncate">{user.dismissedAt ? formatDate(new Date(user.dismissedAt)) : <span className="text-muted-foreground">-</span>}</div>,
     sortable: true,
     className: "min-w-[150px]",
     align: "left",

@@ -198,16 +198,16 @@ export const BADGE_COLORS: Record<
     hover: "hover:bg-gray-600",
   },
 
-  // Financial variants (Purple/Indigo tones - financial states)
+  // Financial variants - financial states
   invoiced: {
-    bg: "bg-purple-700",
+    bg: "bg-cyan-600",
     text: "text-white",
-    hover: "hover:bg-purple-800",
+    hover: "hover:bg-cyan-700",
   },
   settled: {
-    bg: "bg-indigo-700",
+    bg: "bg-emerald-600",
     text: "text-white",
-    hover: "hover:bg-indigo-800",
+    hover: "hover:bg-emerald-700",
   },
 
   // Additional color variants for unique sector privileges

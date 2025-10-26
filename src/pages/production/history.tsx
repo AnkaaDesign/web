@@ -27,7 +27,7 @@ export const TaskHistoryPage = () => {
             ]}
           />
         </div>
-        <TaskHistoryList className="flex-1 min-h-0" />
+        <TaskHistoryList className="flex-1 min-h-0" navigationRoute="history" />
       </div>
     </PrivilegeRoute>
   );

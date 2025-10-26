@@ -45,6 +45,7 @@ export default function PaintDetailsPage() {
             },
           },
           paintProduction: true,
+          paint: true,
         },
       },
       relatedPaints: true,
@@ -190,8 +191,13 @@ export default function PaintDetailsPage() {
             <PaintTasksTable paint={paint} />
           </div>
 
-          {/* Row 3: Changelog - Full Width */}
+          {/* Row 3: Production History - Full Width */}
           <div className="animate-in fade-in-50 duration-900 transition-all">
+            <PaintProductionHistoryCard paint={paint} className="h-auto lg:h-[550px]" />
+          </div>
+
+          {/* Row 4: Changelog - Full Width */}
+          <div className="animate-in fade-in-50 duration-1000 transition-all">
             <ChangelogHistory
               entityType={CHANGE_LOG_ENTITY_TYPE.PAINT}
               entityId={paint.id}
@@ -201,17 +207,12 @@ export default function PaintDetailsPage() {
             />
           </div>
 
-          {/* Row 4: Related Paints Section */}
+          {/* Row 5: Related Paints Section */}
           {((paint.relatedPaints && paint.relatedPaints.length > 0) || (paint.relatedTo && paint.relatedTo.length > 0)) && (
-            <div className="animate-in fade-in-50 duration-1000 transition-all">
+            <div className="animate-in fade-in-50 duration-1100 transition-all">
               <RelatedPaintsCard paint={paint} />
             </div>
           )}
-
-          {/* Row 5: Production History - Full Width (Last Section) */}
-          <div className="animate-in fade-in-50 duration-1100 transition-all">
-            <PaintProductionHistoryCard paint={paint} className="h-auto lg:h-[550px]" />
-          </div>
         </div>
       </div>
 

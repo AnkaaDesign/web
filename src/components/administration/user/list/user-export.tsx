@@ -28,7 +28,7 @@ const EXPORT_COLUMNS: ExportColumn<User>[] = [
   { id: "tasksCount", label: "Tarefas", getValue: (user: User) => user._count?.createdTasks?.toString() || "0" },
   { id: "vacationsCount", label: "Férias", getValue: (user: User) => user._count?.vacations?.toString() || "0" },
   { id: "birth", label: "Data de Nascimento", getValue: (user: User) => (user.birth ? formatDate(new Date(user.birth)) : "") },
-  { id: "dismissal", label: "Data de Demissão", getValue: (user: User) => (user.dismissal ? formatDate(new Date(user.dismissal)) : "") },
+  { id: "dismissedAt", label: "Data de Demissão", getValue: (user: User) => (user.dismissedAt ? formatDate(new Date(user.dismissedAt)) : "") },
   { id: "status", label: "Status", getValue: (user: User) => getUserStatusBadgeText(user) },
   { id: "performanceLevel", label: "Nível de Performance", getValue: (user: User) => user.performanceLevel?.toString() || "0" },
   { id: "verified", label: "Verificado", getValue: (user: User) => (user.verified ? "Sim" : "Não") },
@@ -332,7 +332,7 @@ export function UserExport({ className, filters, currentUsers = [], totalRecords
                   width = "70px";
                   break;
                 case "birth":
-                case "dismissal":
+                case "dismissedAt":
                   width = "100px";
                   break;
                 case "status":

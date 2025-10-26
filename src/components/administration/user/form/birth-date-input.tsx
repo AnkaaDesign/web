@@ -6,9 +6,10 @@ import type { UserCreateFormData, UserUpdateFormData } from "../../../../schemas
 
 interface BirthDateInputProps {
   disabled?: boolean;
+  required?: boolean;
 }
 
-export function BirthDateInput({ disabled }: BirthDateInputProps) {
+export function BirthDateInput({ disabled, required = false }: BirthDateInputProps) {
   const form = useFormContext<UserCreateFormData | UserUpdateFormData>();
 
   return (
@@ -22,13 +23,13 @@ export function BirthDateInput({ disabled }: BirthDateInputProps) {
             <span className="flex items-center gap-1.5">
               <IconCake className="h-4 w-4" />
               Data de Nascimento
-              <span className="text-destructive ml-0.5">*</span>
+              {required && <span className="text-destructive ml-0.5">*</span>}
             </span>
           }
           context="birth"
           disabled={disabled}
           mode="date"
-          required
+          required={required}
         />
       )}
     />

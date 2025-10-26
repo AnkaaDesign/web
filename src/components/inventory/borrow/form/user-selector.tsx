@@ -32,13 +32,7 @@ export function BorrowUserSelector({ control, disabled, selectedUserId, initialU
       take: pageSize,
       skip: (page - 1) * pageSize,
       where: {
-        status: {
-          in: [
-            USER_STATUS.EXPERIENCE_PERIOD_1,
-            USER_STATUS.EXPERIENCE_PERIOD_2,
-            USER_STATUS.CONTRACTED,
-          ],
-        },
+        isActive: true,
         ...(searchTerm ? {
           OR: [
             { name: { contains: searchTerm, mode: "insensitive" } },

@@ -428,13 +428,14 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       const requestId = generateRequestId();
       const startTime = Date.now();
 
-      // Add request metadata
+      // Merge with existing metadata (preserve custom flags like suppressToast)
       const metadata: RequestMetadata = {
+        ...config.metadata, // Preserve any existing metadata
         startTime,
         requestId,
         method: config.method?.toUpperCase() || "UNKNOWN",
         url: config.url || "",
-        retryCount: 0,
+        retryCount: config.metadata?.retryCount || 0,
       };
 
       config.metadata = metadata;
@@ -708,8 +709,10 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       if (finalConfig.enableNotifications && isWriteMethod(config.method)) {
         // Skip notifications for batch operations - they'll be handled by the dialog
         const isBatchOperation = config.url?.includes("/batch");
+        // Only show success if the response indicates success
+        const isSuccess = response.data?.success !== false; // Show success unless explicitly false
 
-        if (!isBatchOperation) {
+        if (!isBatchOperation && isSuccess) {
           const message = response.data?.message || getSuccessMessage(config.method);
           notify.success("Sucesso", message);
         }
@@ -845,13 +848,11 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         const isBatchOperation = config?.url?.includes("/batch");
         // Skip notifications for file uploads - they should be handled by upload components
         const isFileUpload = config?.url?.includes("/files/upload");
-        // Skip notifications if explicitly suppressed
-        const suppressToast = metadata.suppressToast;
 
         // Check if we should show this toast (deduplication check)
         const shouldShow = retryTracker.shouldShowToast(metadata.url, metadata.method, errorInfo.message);
 
-        if (!isBatchOperation && !isFileUpload && !suppressToast && shouldShow) {
+        if (!isBatchOperation && !isFileUpload && shouldShow) {
           // For rate limit errors, show specialized message
           if (errorInfo.category === ErrorCategory.RATE_LIMIT) {
             notify.error("Limite de Requisições", errorInfo.message, {

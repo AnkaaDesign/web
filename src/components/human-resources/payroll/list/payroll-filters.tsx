@@ -33,7 +33,7 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
   const { data: usersData } = useUsers({
     orderBy: { name: "asc" },
     include: { position: true, sector: true },
-    where: { status: { not: USER_STATUS.DISMISSED } }, // Only non-dismissed users for payroll
+    where: { isActive: true }, // Only active users for payroll
     limit: 100, // Max 100 due to API limit
   });
 
@@ -331,6 +331,7 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 disabled={localFilters.excludeUserIds && localFilters.excludeUserIds.length > 0}
                 searchable={true}
                 clearable={true}
+                hideDefaultBadges={true}
               />
               {localFilters.userIds && localFilters.userIds.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-1">
@@ -366,6 +367,7 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 disabled={localFilters.userIds && localFilters.userIds.length > 0}
                 searchable={true}
                 clearable={true}
+                hideDefaultBadges={true}
               />
               {localFilters.excludeUserIds && localFilters.excludeUserIds.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-1">
@@ -400,6 +402,7 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 emptyText="Nenhum setor encontrado"
                 searchable={true}
                 clearable={true}
+                hideDefaultBadges={true}
               />
               {localFilters.sectorIds && localFilters.sectorIds.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-1">
@@ -429,6 +432,7 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 emptyText="Nenhum cargo encontrado"
                 searchable={true}
                 clearable={true}
+                hideDefaultBadges={true}
               />
               {localFilters.positionIds && localFilters.positionIds.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-1">
@@ -462,6 +466,7 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
                 emptyText="Nenhum nível encontrado"
                 searchable={true}
                 clearable={true}
+                hideDefaultBadges={true}
               />
               {localFilters.performanceLevels && localFilters.performanceLevels.length > 0 && (
                 <div className="text-xs text-muted-foreground mt-1">

@@ -126,7 +126,6 @@ export const AirbrushingEdit = () => {
             <PageHeader
               variant="form"
               title="Editar Aerografia"
-              subtitle={airbrushing.task ? `Tarefa: ${airbrushing.task.name}` : `ID: ${airbrushing.id.slice(-8)}`}
               icon={IconBrush}
               breadcrumbs={[
                 { label: "Início", href: routes.home },

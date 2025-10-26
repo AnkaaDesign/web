@@ -40,7 +40,7 @@ export function WitnessMultiSelect({ control, disabled, excludeIds = [], initial
   // Memoize queryFn
   const queryFn = useCallback(async (search: string, page: number = 1) => {
     const validExcludeIds = excludeIds.filter((id) => id && id.trim() !== "");
-    const whereClause: any = { status: { not: USER_STATUS.DISMISSED } };
+    const whereClause: any = { isActive: true };
 
     if (validExcludeIds.length > 0) {
       whereClause.id = { notIn: validExcludeIds };

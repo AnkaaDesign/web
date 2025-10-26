@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PageHeader } from "@/components/ui/page-header";
 import { routes } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
+import { useCepLookup } from "@/hooks/use-cep-lookup";
 
 export function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -39,6 +40,30 @@ export function ProfilePage() {
       zipCode: "",
     },
   });
+
+  // Setup CEP lookup
+  const { lookupCep, isLoading: isLoadingCep } = useCepLookup({
+    onSuccess: (data) => {
+      form.setValue("address", data.logradouro || "", { shouldDirty: true });
+      form.setValue("neighborhood", data.bairro || "", { shouldDirty: true });
+      form.setValue("city", data.localidade || "", { shouldDirty: true });
+      form.setValue("state", data.uf || "", { shouldDirty: true });
+      toast.success("Endereço encontrado!");
+    },
+    onError: () => {
+      toast.error("CEP não encontrado");
+    },
+  });
+
+  // Watch zipCode field for changes
+  const zipCode = form.watch("zipCode");
+
+  // Auto-lookup CEP when it's complete
+  useEffect(() => {
+    if (zipCode && zipCode.replace(/\D/g, "").length === 8) {
+      lookupCep(zipCode);
+    }
+  }, [zipCode, lookupCep]);
 
   const handleSave = () => {
     form.handleSubmit(onSubmit)();
@@ -386,7 +411,7 @@ export function ProfilePage() {
                         name="address"
                         label="Endereço"
                         placeholder="Rua, avenida..."
-                        disabled={isSaving}
+                        disabled={isSaving || isLoadingCep}
                       />
                     </div>
                     <FormInput
@@ -407,28 +432,35 @@ export function ProfilePage() {
                       name="neighborhood"
                       label="Bairro"
                       placeholder="Digite o bairro"
-                      disabled={isSaving}
+                      disabled={isSaving || isLoadingCep}
                     />
-                    <FormInput
-                      name="zipCode"
-                      type="cep"
-                      label="CEP"
-                      placeholder="00000-000"
-                      disabled={isSaving}
-                    />
+                    <div className="relative">
+                      <FormInput
+                        name="zipCode"
+                        type="cep"
+                        label="CEP"
+                        placeholder="00000-000"
+                        disabled={isSaving}
+                      />
+                      {isLoadingCep && (
+                        <div className="absolute right-3 top-9">
+                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <FormInput
                       name="city"
                       label="Cidade"
                       placeholder="Digite a cidade"
-                      disabled={isSaving}
+                      disabled={isSaving || isLoadingCep}
                     />
                     <FormInput
                       name="state"
                       label="Estado"
                       placeholder="UF"
-                      disabled={isSaving}
+                      disabled={isSaving || isLoadingCep}
                       maxLength={2}
                     />
                   </div>

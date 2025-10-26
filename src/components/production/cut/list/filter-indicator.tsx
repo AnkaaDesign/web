@@ -1,44 +1,106 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { IconX } from "@tabler/icons-react";
-import { CUT_STATUS_LABELS, CUT_STATUS } from "../../../../constants";
+import {
+  FilterIndicators as StandardFilterIndicators,
+  FilterIndicator as StandardFilterIndicator,
+} from "@/components/ui/filter-indicator";
+import {
+  IconSearch,
+  IconScissors,
+  IconChartBar,
+  IconTarget,
+  IconCalendar,
+} from "@tabler/icons-react";
+import type { FilterTag } from "./filter-utils";
 
-interface FilterIndicatorProps {
-  hasFilters: boolean;
-  onClear: () => void;
-  searchingFor?: string;
-  status?: CUT_STATUS;
-  onRemoveFilter: (key: string) => void;
+function renderFilterIcon(iconType?: string) {
+  if (!iconType) return null;
+
+  const iconProps = { className: "h-3 w-3" };
+
+  switch (iconType) {
+    case "search":
+      return <IconSearch {...iconProps} />;
+    case "chart-bar":
+      return <IconChartBar {...iconProps} />;
+    case "scissors":
+      return <IconScissors {...iconProps} />;
+    case "calendar":
+      return <IconCalendar {...iconProps} />;
+    case "target":
+      return <IconTarget {...iconProps} />;
+    default:
+      return null;
+  }
 }
 
-export function FilterIndicator({ hasFilters, onClear, searchingFor, status, onRemoveFilter }: FilterIndicatorProps) {
-  if (!hasFilters) return null;
+interface FilterIndicatorProps {
+  label: string;
+  value: string;
+  onRemove: () => void;
+  className?: string;
+  iconType?: string;
+}
+
+export function FilterIndicator({
+  label,
+  value,
+  onRemove,
+  className,
+  iconType,
+}: FilterIndicatorProps) {
+  return (
+    <StandardFilterIndicator
+      label={label}
+      value={value}
+      onRemove={onRemove}
+      icon={iconType ? renderFilterIcon(iconType) : undefined}
+      className={className}
+    />
+  );
+}
+
+interface FilterIndicatorsProps {
+  filters: FilterTag[];
+  onClearAll: () => void;
+  className?: string;
+}
+
+export function FilterIndicators({ filters, onClearAll, className }: FilterIndicatorsProps) {
+  if (filters.length === 0) {
+    return null;
+  }
+
+  // Transform filters to match standardized component interface
+  const transformedFilters = filters.map((filter, index) => ({
+    key: `${filter.key}-${filter.value}-${index}`,
+    label: filter.label,
+    value: filter.displayValue,
+    onRemove: filter.onRemove,
+    icon: getIconForFilter(filter.key, filter.value),
+  }));
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-sm text-muted-foreground">Filtros ativos:</span>
-
-      {searchingFor && (
-        <Badge variant="secondary" className="gap-1">
-          Busca: {searchingFor}
-          <button onClick={() => onRemoveFilter("searchingFor")} className="ml-1 hover:text-destructive">
-            <IconX className="h-3 w-3" />
-          </button>
-        </Badge>
-      )}
-
-      {status && (
-        <Badge variant="secondary" className="gap-1">
-          Status: {CUT_STATUS_LABELS[status]}
-          <button onClick={() => onRemoveFilter("status")} className="ml-1 hover:text-destructive">
-            <IconX className="h-3 w-3" />
-          </button>
-        </Badge>
-      )}
-
-      <Button variant="ghost" size="sm" onClick={onClear} className="h-6 px-2">
-        Limpar todos
-      </Button>
-    </div>
+    <StandardFilterIndicators
+      filters={transformedFilters}
+      onClearAll={onClearAll}
+      className={className}
+    />
   );
+}
+
+// Helper function to determine icon based on filter type
+function getIconForFilter(key: string, value: any): React.ReactNode | undefined {
+  switch (key) {
+    case "searchingFor":
+      return renderFilterIcon("search");
+    case "status":
+      return renderFilterIcon("chart-bar");
+    case "type":
+      return renderFilterIcon("scissors");
+    case "origin":
+      return renderFilterIcon("target");
+    case "createdAt":
+      return renderFilterIcon("calendar");
+    default:
+      return renderFilterIcon("target");
+  }
 }
