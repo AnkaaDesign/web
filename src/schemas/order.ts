@@ -1305,7 +1305,8 @@ export const orderCreateSchema = z
     items: z
       .array(
         z.object({
-          itemId: z.string().uuid({ message: "Item inválido" }),
+          itemId: z.string().uuid({ message: "Item inválido" }).optional(),
+          temporaryItemDescription: z.string().min(1, "Descrição do item temporário é obrigatória").max(500, "Descrição muito longa").optional(),
           orderedQuantity: z.number().positive("Quantidade deve ser positiva"),
           price: moneySchema,
           tax: z
@@ -1314,16 +1315,33 @@ export const orderCreateSchema = z
             .max(100, "Taxa deve ser menor ou igual a 100")
             .multipleOf(0.01, "Taxa deve ter no máximo 2 casas decimais")
             .default(0),
+        })
+        .superRefine((data, ctx) => {
+          // Either itemId or temporaryItemDescription must be provided, but not both
+          if (!data.itemId && !data.temporaryItemDescription) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Item de estoque ou descrição de item temporário deve ser fornecido",
+              path: ['itemId'],
+            });
+          }
+          if (data.itemId && data.temporaryItemDescription) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: "Não é possível fornecer item de estoque e descrição de item temporário ao mesmo tempo",
+              path: ['itemId'],
+            });
+          }
         }),
       )
       .refine(
         (items) => {
-          // Check for duplicate items
-          const itemIds = items.map((item) => item.itemId);
+          // Check for duplicate inventory items (ignore temporary items)
+          const itemIds = items.filter(item => item.itemId).map((item) => item.itemId);
           return new Set(itemIds).size === itemIds.length;
         },
         {
-          message: "Lista não pode conter itens duplicados",
+          message: "Lista não pode conter itens de estoque duplicados",
         },
       )
       .optional(),

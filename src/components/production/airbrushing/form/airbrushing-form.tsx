@@ -15,7 +15,9 @@ import { Separator } from "@/components/ui/separator";
 import { FormSteps, type FormStep } from "@/components/ui/form-steps";
 import { AirbrushingFormFields } from "./airbrushing-form-fields";
 import { TaskSelector } from "./task-selector";
-import { IconSpray, IconCheck, IconFileInvoice, IconClipboardList, IconPhoto } from "@tabler/icons-react";
+import { IconSpray, IconCheck, IconFileInvoice, IconClipboardList, IconPhoto, IconUser, IconBuildingFactory, IconHash } from "@tabler/icons-react";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "../../../../utils";
@@ -40,6 +42,7 @@ interface AirbrushingFormProps {
   onCancel?: () => void;
   className?: string;
   onStepChange?: (step: number) => void;
+  onFormStateChange?: () => void; // Callback to notify parent of form state changes
 }
 
 // Define steps for the form
@@ -73,7 +76,7 @@ const setStepInUrl = (searchParams: URLSearchParams, step: number): URLSearchPar
   return params;
 };
 
-export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingFormProps>(({ airbrushingId, mode, initialTaskId, onSuccess, className, onStepChange }, ref) => {
+export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingFormProps>(({ airbrushingId, mode, initialTaskId, onSuccess, className, onStepChange, onFormStateChange }, ref) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -99,7 +102,11 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
     include: {
       task: {
         include: {
-          customer: true,
+          customer: {
+            include: {
+              logo: true,
+            },
+          },
           sector: true,
         },
       },
@@ -379,18 +386,28 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
       const data = form.getValues();
 
-      // Check if there are new files to upload
-      const newReceiptFiles = receiptFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
-      const newNfeFiles = nfeFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
-      const newArtworkFiles = artworkFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
+      // Separate existing files from new files using the 'uploaded' flag
+      // Existing files have uploaded=true, new files have uploaded=false
+      const newReceiptFiles = receiptFiles.filter(f => !f.uploaded);
+      const newNfeFiles = nfeFiles.filter(f => !f.uploaded);
+      const newArtworkFiles = artworkFiles.filter(f => !f.uploaded);
+
+      // Get IDs of existing files to keep
+      const existingReceiptIds = receiptFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+      const existingNfeIds = nfeFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+      const existingArtworkIds = artworkFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+
       const hasNewFiles = newReceiptFiles.length > 0 || newNfeFiles.length > 0 || newArtworkFiles.length > 0;
 
       console.log('[AIRBRUSHING FORM] Submission data:', {
         mode,
         hasNewFiles,
-        receiptFilesCount: newReceiptFiles.length,
-        nfeFilesCount: newNfeFiles.length,
-        artworkFilesCount: newArtworkFiles.length,
+        newReceiptFilesCount: newReceiptFiles.length,
+        newNfeFilesCount: newNfeFiles.length,
+        newArtworkFilesCount: newArtworkFiles.length,
+        existingReceiptIdsCount: existingReceiptIds.length,
+        existingNfeIdsCount: existingNfeIds.length,
+        existingArtworkIdsCount: existingArtworkIds.length,
       });
 
       let result;
@@ -402,8 +419,16 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
           name: selectedTask.data.customer.fantasyName || selectedTask.data.customer.name,
         } : undefined;
 
+        // Prepare data with existing file IDs
+        const submitData = {
+          ...data,
+          receiptIds: existingReceiptIds,
+          invoiceIds: existingNfeIds,
+          artworkIds: existingArtworkIds,
+        };
+
         const formData = createAirbrushingFormData(
-          data,
+          submitData,
           {
             receipts: newReceiptFiles.length > 0 ? newReceiptFiles as File[] : undefined,
             invoices: newNfeFiles.length > 0 ? newNfeFiles as File[] : undefined,
@@ -421,23 +446,31 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
           });
         }
       } else {
-        console.log('[AIRBRUSHING FORM] Submitting without files');
+        console.log('[AIRBRUSHING FORM] Submitting without new files');
+        // Even without new files, we need to send the IDs of existing files to keep
+        const submitData = {
+          ...data,
+          receiptIds: existingReceiptIds,
+          invoiceIds: existingNfeIds,
+          artworkIds: existingArtworkIds,
+        };
+
         if (mode === "create") {
-          result = await create(data as AirbrushingCreateFormData);
+          result = await create(submitData as AirbrushingCreateFormData);
         } else {
           result = await update({
             id: airbrushingId!,
-            data: data as AirbrushingUpdateFormData,
+            data: submitData as AirbrushingUpdateFormData,
           });
         }
       }
 
       // Success toast is handled automatically by API client
 
-      if (onSuccess && result) {
-        onSuccess(result);
-      } else if (result) {
-        navigate(routes.production.airbrushings.details(result.data?.id || ""));
+      if (onSuccess && result?.data) {
+        onSuccess(result.data);
+      } else if (result?.data?.id) {
+        navigate(routes.production.airbrushings.details(result.data.id));
       }
     } catch (error) {
       toast.error(`Erro ao ${mode === "create" ? "criar" : "atualizar"} aerografia`);
@@ -457,9 +490,17 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       getCurrentStep: () => currentStep,
       isLastStep: () => isLastStep,
       isFirstStep: () => isFirstStep,
-      canSubmit: () => selectedTasks.size > 0 && form.formState.isValid,
+      canSubmit: () => {
+        // For edit mode, allow submit if form is valid (even without dirty state)
+        // Files changes don't mark form as dirty but should enable submit
+        if (mode === "edit") {
+          return selectedTasks.size > 0 && form.formState.isValid;
+        }
+        // For create mode, require valid form
+        return selectedTasks.size > 0 && form.formState.isValid;
+      },
     }),
-    [handleNext, prevStep, handleSubmit, currentStep, isLastStep, isFirstStep, selectedTasks, form.formState.isValid],
+    [handleNext, prevStep, handleSubmit, currentStep, isLastStep, isFirstStep, selectedTasks, form.formState.isValid, receiptFiles, nfeFiles, artworkFiles, mode],
   );
 
   // Notify parent about step changes
@@ -468,6 +509,14 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       onStepChange(currentStep);
     }
   }, [currentStep, onStepChange]);
+
+  // Notify parent about form state changes (file changes, validity changes)
+  // This allows the parent to update the button state
+  useEffect(() => {
+    if (onFormStateChange) {
+      onFormStateChange();
+    }
+  }, [receiptFiles, nfeFiles, artworkFiles, form.formState.isValid, onFormStateChange]);
 
   // Loading state
   if (mode === "edit" && isLoadingAirbrushing) {
@@ -495,6 +544,63 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
               {/* Step 1: Basic Information */}
               {(mode === "edit" || currentStep === 1) && (
                 <div className="space-y-6">
+                  {/* Task Display for Edit Mode */}
+                  {mode === "edit" && airbrushing?.task && (
+                    <div className="border rounded-lg p-4 bg-muted/30">
+                      <Label className="text-sm font-medium text-muted-foreground mb-3 block">Tarefa Relacionada</Label>
+                      <div className="space-y-3">
+                        {/* Task Name */}
+                        <div>
+                          <div className="font-semibold text-base">{airbrushing.task.name}</div>
+                        </div>
+
+                        {/* Task Details Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {/* Customer with Logo */}
+                          {airbrushing.task.customer && (
+                            <div>
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                                <IconUser className="h-3.5 w-3.5" />
+                                <span>Cliente</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <CustomerLogoDisplay
+                                  logo={airbrushing.task.customer.logo}
+                                  customerName={airbrushing.task.customer.fantasyName || airbrushing.task.customer.name || "Cliente"}
+                                  size="sm"
+                                  shape="rounded"
+                                />
+                                <span className="font-medium text-sm">{airbrushing.task.customer.fantasyName || airbrushing.task.customer.name}</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Sector */}
+                          {airbrushing.task.sector && (
+                            <div>
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                                <IconBuildingFactory className="h-3.5 w-3.5" />
+                                <span>Setor</span>
+                              </div>
+                              <div className="font-medium text-sm">{airbrushing.task.sector.name}</div>
+                            </div>
+                          )}
+
+                          {/* Serial Number */}
+                          {airbrushing.task.serialNumber && (
+                            <div>
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
+                                <IconHash className="h-3.5 w-3.5" />
+                                <span>Número de Série</span>
+                              </div>
+                              <div className="font-medium text-sm">{airbrushing.task.serialNumber}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -661,16 +767,6 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
                 </div>
               )}
             </div>
-
-            {/* Form Actions - Only show for edit mode (create mode has actions in page header) */}
-            {mode === "edit" && (
-              <div className="flex justify-end gap-2 pt-4 mt-4 border-t">
-                <Button type="button" onClick={handleSubmit} disabled={isUpdating || !form.formState.isValid}>
-                  {isUpdating ? <LoadingSpinner className="h-4 w-4 mr-2" /> : <IconCheck className="h-4 w-4 mr-2" />}
-                  Salvar Alterações
-                </Button>
-              </div>
-            )}
           </form>
         </Form>
       </CardContent>

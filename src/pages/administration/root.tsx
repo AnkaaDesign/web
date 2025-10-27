@@ -305,13 +305,6 @@ export const AdministrationRootPage = () => {
                   count={data?.notificationMetrics?.totalNotifications?.value ?? 0}
                   color="red"
                 />
-                <QuickAccessCard
-                  title="Arquivos"
-                  icon={IconFolder}
-                  onClick={() => navigate(routes.administration.files.root)}
-                  count={data?.fileMetrics?.totalFiles?.value ?? 0}
-                  color="teal"
-                />
               </div>
             </div>
 

@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Separator } from "@/components/ui/separator";
 import { IconRuler, IconScale, IconBox, IconRuler2, IconChevronDown, IconChevronUp, IconCircle, IconBolt, IconHash, IconDimensions } from "@tabler/icons-react";
 import type { Item, Measure } from "../../../../types";
-import { MEASURE_UNIT_LABELS, MEASURE_TYPE_LABELS, MEASURE_UNIT, MEASURE_TYPE } from "../../../../constants";
+import { MEASURE_UNIT_LABELS, MEASURE_TYPE_LABELS, MEASURE_UNIT, MEASURE_TYPE, MEASURE_TYPE_ORDER } from "../../../../constants";
 import { measureUtils } from "../../../../utils";
 import { cn } from "@/lib/utils";
 
@@ -37,12 +37,23 @@ const MEASURE_TYPE_ICONS = {
   [MEASURE_TYPE.SIZE]: IconDimensions,
 } as const;
 
+/**
+ * Sort measures by their type order (WEIGHT → VOLUME → LENGTH → AREA → COUNT → DIAMETER → THREAD → ELECTRICAL → SIZE)
+ */
+const sortMeasuresByType = (measures: Measure[]): Measure[] => {
+  return [...measures].sort((a, b) => {
+    const orderA = MEASURE_TYPE_ORDER[a.measureType] ?? 999;
+    const orderB = MEASURE_TYPE_ORDER[b.measureType] ?? 999;
+    return orderA - orderB;
+  });
+};
+
 export function MeasureDisplay({ item, showConversions = false, compact = false, showGrouped = true, className }: MeasureDisplayProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<MEASURE_TYPE>>(new Set());
   const [conversionPopoverOpen, setConversionPopoverOpen] = useState<string | null>(null);
 
-  // Get all measures from relations
-  const allMeasures = item.measures || [];
+  // Get all measures from relations and sort by type order
+  const allMeasures = sortMeasuresByType(item.measures || []);
 
   // Check if we have any measure data
   const hasAnyMeasures = allMeasures.length > 0;
@@ -51,7 +62,7 @@ export function MeasureDisplay({ item, showConversions = false, compact = false,
     return <div className={cn("text-muted-foreground text-sm", className)}>Nenhuma medida definida</div>;
   }
 
-  // Group measures by type
+  // Group measures by type (already sorted)
   const measureGroups: MeasureGroup[] = Object.values(MEASURE_TYPE)
     .map((type) => {
       const typeMeasures = allMeasures.filter((m) => m.measureType === type);
@@ -142,7 +153,7 @@ export function MeasureDisplay({ item, showConversions = false, compact = false,
   };
 
   if (compact) {
-    // Compact display shows first measure and count of additional measures
+    // Compact display shows first measure (already sorted by type) and count of additional measures
     const firstMeasure = allMeasures[0];
     const additionalCount = allMeasures.length - 1;
 
@@ -164,7 +175,7 @@ export function MeasureDisplay({ item, showConversions = false, compact = false,
   }
 
   if (!showGrouped) {
-    // Simple list display
+    // Simple list display (measures already sorted by type)
     return (
       <div className={cn("space-y-2", className)}>
         {allMeasures.map((measure) => (
@@ -240,11 +251,14 @@ export function MeasureDisplayCompact({ item, className }: { item: Item; classNa
     return <div className="text-muted-foreground text-sm">-</div>;
   }
 
+  // Sort measures by type order before displaying
+  const sortedMeasures = sortMeasuresByType(allMeasures);
+
   // Format all measures into a compact string
   const measureStrings: string[] = [];
 
-  // Add all measures
-  allMeasures.forEach((measure) => {
+  // Add all measures (now sorted)
+  sortedMeasures.forEach((measure) => {
     // Only format if both value and unit are present
     if (measure.value !== null && measure.unit !== null) {
       measureStrings.push(

@@ -7,6 +7,7 @@ interface FormMoneyInputProps {
   disabled?: boolean;
   required?: boolean;
   className?: string;
+  align?: "left" | "right";
 }
 
 export function FormMoneyInput({
@@ -16,6 +17,7 @@ export function FormMoneyInput({
   disabled = false,
   required = false,
   className,
+  align = "right",
 }: FormMoneyInputProps) {
   return (
     <FormInput
@@ -25,7 +27,7 @@ export function FormMoneyInput({
       placeholder={placeholder}
       disabled={disabled}
       required={required}
-      className={className}
+      className={`${className} ${align === "left" ? "text-left" : ""}`}
     />
   );
 }

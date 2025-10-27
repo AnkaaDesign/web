@@ -138,6 +138,7 @@ export const OrderCreateForm = () => {
       forecast: forecast || undefined,
       notes: notes || "",
       items: [],
+      temporaryItems: [],
     },
     mode: "onTouched", // Only validate after user touches a field
     reValidateMode: "onChange", // Re-validate on change after initial validation
@@ -562,23 +563,67 @@ export const OrderCreateForm = () => {
     }
   }, [validateCurrentStep, nextStep]);
 
-  const isLastStep = currentStep === steps.length;
+  // Check if we're on the last step (review step is always step 3)
+  const isLastStep = currentStep === 3 || (currentStep === steps[steps.length - 1]?.id);
   const isFirstStep = currentStep === 1;
 
-  // Watch form description for submit button state
+  // Watch form state to trigger validation when it changes
   const watchedDescription = form.watch("description");
+  const watchedTemporaryItems = form.watch("temporaryItems");
 
-  // Compute if form is ready to submit
-  const isFormReadyToSubmit = useMemo(() => {
-    // Check if we have a description
+  // Compute if form is ready to submit (no useMemo - compute on every render)
+  const computeFormReadiness = () => {
+    // Use watched values (they're live and trigger re-renders)
+    const tempItems = watchedTemporaryItems || [];
     const hasDescription = watchedDescription?.trim().length > 0;
 
-    // Check if we have selected items with prices
-    const hasSelectedItems = selectedItems.size > 0;
-    const allItemsHavePrices = Array.from(selectedItems).every((itemId) => prices[itemId] !== undefined && Number(prices[itemId]) >= 0);
+    console.log('[VALIDATION] Mode:', orderItemMode);
+    console.log('[VALIDATION] Description:', watchedDescription, 'Valid:', hasDescription);
+    console.log('[VALIDATION] Form Temporary Items:', JSON.stringify(tempItems, null, 2));
 
-    return hasDescription && hasSelectedItems && allItemsHavePrices;
-  }, [watchedDescription, selectedItems, prices]);
+    // Check based on order mode
+    if (orderItemMode === "temporary") {
+      // Temporary mode: check for valid temporary items
+      const hasTemporaryItems = tempItems.length > 0;
+
+      console.log('[VALIDATION] Temp Items Count:', tempItems.length);
+      console.log('[VALIDATION] Has Temporary Items:', hasTemporaryItems);
+
+      const allTemporaryItemsValid = tempItems.every((item: any, index: number) => {
+        const hasDescription = item.temporaryItemDescription && item.temporaryItemDescription.trim() !== "";
+        const hasValidQuantity = item.orderedQuantity && item.orderedQuantity > 0;
+        const hasValidPrice = item.price !== undefined && item.price !== null && Number(item.price) > 0;
+
+        console.log(`[VALIDATION] Item ${index}:`, {
+          description: item.temporaryItemDescription,
+          hasDescription,
+          quantity: item.orderedQuantity,
+          hasValidQuantity,
+          price: item.price,
+          priceType: typeof item.price,
+          priceAsNumber: Number(item.price),
+          hasValidPrice,
+          isValid: hasDescription && hasValidQuantity && hasValidPrice
+        });
+
+        return hasDescription && hasValidQuantity && hasValidPrice;
+      });
+
+      console.log('[VALIDATION] All Items Valid:', allTemporaryItemsValid);
+      const finalResult = hasDescription && hasTemporaryItems && allTemporaryItemsValid;
+      console.log('[VALIDATION] Final Result:', finalResult);
+
+      return finalResult;
+    } else {
+      // Inventory mode: check for selected items with prices
+      const hasSelectedItems = selectedItems.size > 0;
+      const allItemsHavePrices = Array.from(selectedItems).every((itemId) => prices[itemId] !== undefined && Number(prices[itemId]) >= 0);
+
+      return hasDescription && hasSelectedItems && allItemsHavePrices;
+    }
+  };
+
+  const isFormReadyToSubmit = computeFormReadiness();
 
   // PDF Export function
   const exportToPDF = useCallback(
@@ -1169,50 +1214,6 @@ export const OrderCreateForm = () => {
                             <FormMessage className="text-sm text-red-500">{form.formState.errors.description?.message}</FormMessage>
                           </div>
 
-                          {/* Mode Switch */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium flex items-center gap-2">
-                              <IconClipboardList className="h-4 w-4" />
-                              Tipo de Itens
-                            </Label>
-                            <RadioGroup
-                              value={orderItemMode}
-                              onValueChange={(value) => setOrderItemMode(value as "inventory" | "temporary")}
-                              className="grid grid-cols-1 md:grid-cols-2 gap-3"
-                            >
-                              <div
-                                className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
-                                onClick={() => setOrderItemMode("inventory")}
-                              >
-                                <RadioGroupItem value="inventory" id="mode-inventory" className="mt-0.5" />
-                                <div className="flex-1 space-y-1">
-                                  <Label htmlFor="mode-inventory" className="flex items-center gap-2 font-medium cursor-pointer group-hover:text-white">
-                                    <IconShoppingCart className="h-4 w-4" />
-                                    Itens do Estoque
-                                  </Label>
-                                  <p className="text-sm text-muted-foreground group-hover:text-white/90">
-                                    Selecione itens do inventário
-                                  </p>
-                                </div>
-                              </div>
-                              <div
-                                className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
-                                onClick={() => setOrderItemMode("temporary")}
-                              >
-                                <RadioGroupItem value="temporary" id="mode-temporary" className="mt-0.5" />
-                                <div className="flex-1 space-y-1">
-                                  <Label htmlFor="mode-temporary" className="flex items-center gap-2 font-medium cursor-pointer group-hover:text-white">
-                                    <IconFileInvoice className="h-4 w-4" />
-                                    Itens Temporários
-                                  </Label>
-                                  <p className="text-sm text-muted-foreground group-hover:text-white/90">
-                                    Compras únicas sem inventário
-                                  </p>
-                                </div>
-                              </div>
-                            </RadioGroup>
-                          </div>
-
                           {/* Supplier, Date and Observations in the same row */}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Left Column: Supplier and Date */}
@@ -1314,6 +1315,50 @@ export const OrderCreateForm = () => {
                             </div>
                           </div>
 
+                          {/* Mode Switch */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <IconClipboardList className="h-4 w-4" />
+                              Tipo de Itens
+                            </Label>
+                            <RadioGroup
+                              value={orderItemMode}
+                              onValueChange={(value) => setOrderItemMode(value as "inventory" | "temporary")}
+                              className="grid grid-cols-1 md:grid-cols-2 gap-3"
+                            >
+                              <div
+                                className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
+                                onClick={() => setOrderItemMode("inventory")}
+                              >
+                                <RadioGroupItem value="inventory" id="mode-inventory" className="mt-0.5" />
+                                <div className="flex-1 space-y-1">
+                                  <Label htmlFor="mode-inventory" className="flex items-center gap-2 font-medium cursor-pointer group-hover:text-white">
+                                    <IconShoppingCart className="h-4 w-4" />
+                                    Itens do Estoque
+                                  </Label>
+                                  <p className="text-sm text-muted-foreground group-hover:text-white/90">
+                                    Selecione itens do inventário
+                                  </p>
+                                </div>
+                              </div>
+                              <div
+                                className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
+                                onClick={() => setOrderItemMode("temporary")}
+                              >
+                                <RadioGroupItem value="temporary" id="mode-temporary" className="mt-0.5" />
+                                <div className="flex-1 space-y-1">
+                                  <Label htmlFor="mode-temporary" className="flex items-center gap-2 font-medium cursor-pointer group-hover:text-white">
+                                    <IconFileInvoice className="h-4 w-4" />
+                                    Itens Temporários
+                                  </Label>
+                                  <p className="text-sm text-muted-foreground group-hover:text-white/90">
+                                    Compras únicas sem inventário
+                                  </p>
+                                </div>
+                              </div>
+                            </RadioGroup>
+                          </div>
+
                           {/* Temporary Items Input (shown only in temporary mode) */}
                           {orderItemMode === "temporary" && (
                             <div className="space-y-4">
@@ -1346,7 +1391,7 @@ export const OrderCreateForm = () => {
                                 <FileUploadField
                                   onFilesChange={handleBudgetFilesChange}
                                   existingFiles={budgetFiles}
-                                  maxFiles={1}
+                                  maxFiles={10}
                                   maxSize={10 * 1024 * 1024} // 10MB
                                   acceptedFileTypes={{
                                     "application/pdf": [".pdf"],
@@ -1369,7 +1414,7 @@ export const OrderCreateForm = () => {
                                 <FileUploadField
                                   onFilesChange={handleReceiptFilesChange}
                                   existingFiles={receiptFiles}
-                                  maxFiles={1}
+                                  maxFiles={10}
                                   maxSize={10 * 1024 * 1024} // 10MB
                                   acceptedFileTypes={{
                                     "application/pdf": [".pdf"],
@@ -1390,7 +1435,7 @@ export const OrderCreateForm = () => {
                                 <FileUploadField
                                   onFilesChange={handleNfeFilesChange}
                                   existingFiles={nfeFiles}
-                                  maxFiles={1}
+                                  maxFiles={10}
                                   maxSize={10 * 1024 * 1024} // 10MB
                                   acceptedFileTypes={{
                                     "application/pdf": [".pdf"],

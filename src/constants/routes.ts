@@ -17,12 +17,6 @@ export const routes = {
       edit: (id: string) => `/administracao/colaboradores/editar/${id}`,
       root: "/administracao/colaboradores",
     },
-    files: {
-      details: (id: string) => `/administracao/arquivos/detalhes/${id}`,
-      orphans: "/administracao/arquivos/orfaos",
-      root: "/administracao/arquivos",
-      upload: "/administracao/arquivos/upload",
-    },
     notifications: {
       create: "/administracao/notificacoes/cadastrar/enviar",
       details: (id: string) => `/administracao/notificacoes/detalhes/${id}`,
@@ -182,18 +176,7 @@ export const routes = {
       edit: (payrollId: string) => `/recursos-humanos/folha-de-pagamento/editar/${payrollId}`,
     },
     bonus: {
-      root: "/recursos-humanos/bonificacoes",
-      list: "/recursos-humanos/bonificacoes",
-      create: "/recursos-humanos/bonificacoes/cadastrar",
-      details: (id: string) => `/recursos-humanos/bonificacoes/detalhes/${id}`,
-      edit: (id: string) => `/recursos-humanos/bonificacoes/editar/${id}`,
       simulation: "/recursos-humanos/simulacao-bonus",
-      discounts: {
-        root: "/recursos-humanos/bonificacoes-desconto",
-        create: "/recursos-humanos/bonificacoes-desconto/cadastrar",
-        details: (id: string) => `/recursos-humanos/bonificacoes-desconto/detalhes/${id}`,
-        edit: (id: string) => `/recursos-humanos/bonificacoes-desconto/editar/${id}`,
-      },
     },
   },
 
@@ -352,26 +335,12 @@ export const routes = {
       formulas: (paintId: string) => `/pintura/catalogo/detalhes/${paintId}/formulas`,
       root: "/pintura/catalogo",
     },
-    components: {
-      create: "/pintura/componentes/cadastrar",
-      details: (id: string) => `/pintura/componentes/detalhes/${id}`,
-      edit: (id: string) => `/pintura/componentes/editar/${id}`,
-      list: "/pintura/componentes/listar",
-      root: "/pintura/componentes",
-    },
     formulas: {
       create: "/pintura/formulas/cadastrar",
       details: (id: string) => `/pintura/formulas/detalhes/${id}`,
       edit: (id: string) => `/pintura/formulas/editar/${id}`,
       list: "/pintura/formulas/listar",
       root: "/pintura/formulas",
-    },
-    formulations: {
-      create: "/pintura/formulacoes/cadastrar",
-      details: (id: string) => `/pintura/formulacoes/detalhes/${id}`,
-      edit: (id: string) => `/pintura/formulacoes/editar/${id}`,
-      list: "/pintura/formulacoes/listar",
-      root: "/pintura/formulacoes",
     },
     paintTypes: {
       create: "/pintura/tipos-de-tinta/cadastrar",
@@ -484,26 +453,6 @@ export const routes = {
     scheduleOnHold: {
       root: "/producao/em-espera",
       details: (id: string) => `/producao/em-espera/detalhes/${id}`,
-    },
-    serviceOrders: {
-      create: "/producao/ordens-de-servico/cadastrar",
-      details: (id: string) => `/producao/ordens-de-servico/detalhes/${id}`,
-      edit: (id: string) => `/producao/ordens-de-servico/editar/${id}`,
-      root: "/producao/ordens-de-servico",
-    },
-    services: {
-      create: "/producao/servicos/cadastrar",
-      details: (id: string) => `/producao/servicos/detalhes/${id}`,
-      edit: (id: string) => `/producao/servicos/editar/${id}`,
-      list: "/producao/servicos",
-      root: "/producao/servicos",
-    },
-    trucks: {
-      create: "/producao/caminhoes/cadastrar",
-      details: (id: string) => `/producao/caminhoes/detalhes/${id}`,
-      edit: (id: string) => `/producao/caminhoes/editar/${id}`,
-      list: "/producao/caminhoes",
-      root: "/producao/caminhoes",
     },
   },
 

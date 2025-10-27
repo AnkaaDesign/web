@@ -49,10 +49,6 @@ const VALID_ROUTES = [
   routes.production.garages.create,
   routes.production.garages.edit(":id"),
   routes.production.garages.details(":id"),
-  routes.production.serviceOrders.root,
-  routes.production.serviceOrders.create,
-  routes.production.serviceOrders.edit(":id"),
-  routes.production.serviceOrders.details(":id"),
   routes.production.observations.root,
   routes.production.observations.create,
   routes.production.observations.edit(":id"),
@@ -60,10 +56,6 @@ const VALID_ROUTES = [
 
   // Administration routes
   routes.administration.root,
-  routes.administration.files.root,
-  routes.administration.files.upload,
-  routes.administration.files.details(":id"),
-  routes.administration.files.orphans,
   routes.administration.customers.root,
   routes.administration.customers.create,
   routes.administration.customers.edit(":id"),

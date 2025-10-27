@@ -1348,7 +1348,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               <FileUploadField
                                 onFilesChange={handleBudgetFilesChange}
                                 existingFiles={budgetFiles}
-                                maxFiles={1}
+                                maxFiles={10}
                                 maxSize={10 * 1024 * 1024}
                                 acceptedFileTypes={{
                                   "application/pdf": [".pdf"],
@@ -1371,7 +1371,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               <FileUploadField
                                 onFilesChange={handleReceiptFilesChange}
                                 existingFiles={receiptFiles}
-                                maxFiles={1}
+                                maxFiles={10}
                                 maxSize={10 * 1024 * 1024}
                                 acceptedFileTypes={{
                                   "application/pdf": [".pdf"],
@@ -1392,7 +1392,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               <FileUploadField
                                 onFilesChange={handleNfeFilesChange}
                                 existingFiles={nfeFiles}
-                                maxFiles={1}
+                                maxFiles={10}
                                 maxSize={10 * 1024 * 1024}
                                 acceptedFileTypes={{
                                   "application/pdf": [".pdf"],

@@ -234,8 +234,8 @@ export function FileList({ className }: FileListProps) {
   // Context menu handlers
   const handleBulkEdit = (files: File[]) => {
     if (files.length === 1) {
-      // Single file - navigate to details page
-      navigate(routes.administration.files.details(files[0].id));
+      // Single file - show alert (files route not yet implemented)
+      alert("Visualização de arquivo em desenvolvimento");
     } else {
       // Multiple files - show info (no batch edit available for files)
       alert(`${files.length} arquivos selecionados`);
@@ -277,7 +277,7 @@ export function FileList({ className }: FileListProps) {
               <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
               <span className="text-foreground">Filtros</span>
             </Button>
-            <Button variant="default" size="default" onClick={() => navigate(routes.administration.files.upload)} className="group">
+            <Button variant="default" size="default" onClick={() => alert("Upload de arquivo em desenvolvimento")} className="group">
               <IconUpload className="h-4 w-4 mr-2" />
               <span>Upload</span>
             </Button>
@@ -304,7 +304,7 @@ export function FileList({ className }: FileListProps) {
                 <div
                   key={file.id}
                   className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => navigate(routes.administration.files.details(file.id))}
+                  onClick={() => alert("Visualização de arquivo em desenvolvimento")}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <FileTypeIcon filename={file.filename} mimeType={file.mimetype} size="sm" />

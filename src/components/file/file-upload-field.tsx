@@ -149,6 +149,7 @@ export function FileUploadField({
         const fileWithId: FileWithPreview = Object.assign(file, {
           id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           uploadProgress: 0,
+          uploaded: false, // Mark as not uploaded yet (new file)
         });
 
         // Create preview for images
@@ -184,6 +185,7 @@ export function FileUploadField({
         const fileWithId: FileWithPreview = Object.assign(file, {
           id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           error: translatedErrors.join(", "),
+          uploaded: false, // Mark as not uploaded yet (new file)
         });
         return fileWithId;
       });

@@ -133,16 +133,6 @@ export const ProductionRootPage = () => {
       });
     }
 
-    // Add service orders activity
-    if (data.serviceOrders?.completedServiceOrders?.value) {
-      activities.push({
-        item: "Ordens de Serviço",
-        info: `${data.serviceOrders.completedServiceOrders.value} finalizadas`,
-        quantity: "Hoje",
-        time: new Date(Date.now() - 45 * 60 * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-      });
-    }
-
     return activities.slice(0, 5); // Limit to 5 most recent
   };
 
@@ -584,7 +574,6 @@ export const ProductionRootPage = () => {
                   type="SERVICE"
                   data={getProductionAnalysis()}
                   icon={IconChartPie}
-                  onDetailsClick={() => navigate(routes.production.serviceOrders.root)}
                 />
                 <AnalysisCard
                   title="Receita por Setor"

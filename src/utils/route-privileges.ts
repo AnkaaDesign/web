@@ -92,9 +92,6 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   [routes.production.garages.root]: ["PRODUCTION", "LOGISTIC", "LEADER", "ADMIN"], // LOGISTIC has read access, Warehouse excluded
   [routes.production.garages.create]: ["PRODUCTION", "LEADER", "ADMIN"], // LOGISTIC excluded (read-only), Warehouse excluded
   "/producao/garagens/editar": ["PRODUCTION", "LEADER", "ADMIN"], // LOGISTIC excluded (read-only), Warehouse excluded (dynamic route)
-  [routes.production.serviceOrders.root]: ["PRODUCTION", "WAREHOUSE"], // WAREHOUSE has full access
-  [routes.production.serviceOrders.create]: ["PRODUCTION", "WAREHOUSE"], // WAREHOUSE can create
-  "/producao/ordens-de-servico/editar": ["PRODUCTION", "WAREHOUSE"], // WAREHOUSE can edit (dynamic route)
   [routes.production.observations.root]: ["PRODUCTION", "WAREHOUSE"], // WAREHOUSE has full access
   [routes.production.observations.create]: ["PRODUCTION", "WAREHOUSE"], // WAREHOUSE can create
   "/producao/observacoes/editar": ["PRODUCTION", "WAREHOUSE"], // WAREHOUSE can edit (dynamic route)

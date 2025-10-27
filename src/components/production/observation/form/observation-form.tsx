@@ -276,6 +276,14 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
   // Handle file changes
   const handleFilesChange = (files: FileWithPreview[]) => {
+    console.log('[ObservationForm] handleFilesChange called with', files.length, 'files');
+    console.log('[ObservationForm] Files details:', files.map(f => ({
+      name: f.name,
+      id: f.id,
+      uploaded: f.uploaded,
+      uploadedFileId: f.uploadedFileId
+    })));
+
     setUploadedFiles(files);
 
     // Filter out files without IDs (newly uploaded files might not have IDs yet)
@@ -283,6 +291,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       .map((f) => f.uploadedFileId || f.id)
       .filter((id): id is string => Boolean(id));
 
+    console.log('[ObservationForm] Setting fileIds:', fileIds);
     setUploadedFileIds(fileIds);
 
     // Update form with file IDs and trigger validation
@@ -299,20 +308,26 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
         return;
       }
 
-      // Separate existing files from new files
-      const existingFileIds: string[] = [];
-      const newFiles: File[] = [];
+      // Separate existing files from new files using the 'uploaded' flag
+      // Existing files have uploaded=true, new files have uploaded=false
+      console.log('[ObservationForm] SUBMIT - uploadedFiles:', uploadedFiles.map(f => ({
+        name: f.name,
+        uploaded: f.uploaded,
+        uploadedFileId: f.uploadedFileId,
+        id: f.id
+      })));
 
-      uploadedFiles.forEach((file) => {
-        // Check if this is an existing file (has a UUID id) or a new file (File object)
-        if (file.id && file.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-          // This is an existing file with UUID
-          existingFileIds.push(file.id);
-        } else if (file instanceof File) {
-          // This is a new file to upload
-          newFiles.push(file);
-        }
-      });
+      const existingFileIds = uploadedFiles
+        .filter(f => f.uploaded)
+        .map(f => f.uploadedFileId || f.id)
+        .filter((id): id is string => Boolean(id));
+
+      const newFiles = uploadedFiles
+        .filter(f => !f.uploaded && f instanceof File)
+        .filter((f): f is File => f instanceof File);
+
+      console.log('[ObservationForm] SUBMIT - existingFileIds:', existingFileIds);
+      console.log('[ObservationForm] SUBMIT - newFiles:', newFiles.map(f => f.name));
 
       // Prepare submission data
       const submitData = {

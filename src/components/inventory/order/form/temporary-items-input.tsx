@@ -104,45 +104,55 @@ export const TemporaryItemsInput = forwardRef<
 
   return (
     <div className="space-y-4">
+      {/* Header Row */}
       {fields.length > 0 && (
-        <div className="space-y-3">
+        <div className="flex gap-3 items-center text-xs font-medium text-muted-foreground px-1">
+          <div className="flex-1">Descrição do Item</div>
+          <div className="w-32">Quantidade</div>
+          <div className="w-36">Preço Unitário</div>
+          <div className="w-28">Imposto (%)</div>
+          <div className="w-10"></div>
+        </div>
+      )}
+
+      {fields.length > 0 && (
+        <div className="space-y-2">
           {fields.map((field, index) => (
             <div
               key={field.id}
               ref={index === fields.length - 1 ? lastRowRef : null}
-              className="border rounded-lg p-4 space-y-4"
+              className="flex gap-3 items-start"
             >
-              {/* Description Field - Full Width */}
-              <FormField
-                control={control}
-                name={`temporaryItems.${index}.temporaryItemDescription`}
-                render={({ field }) => (
-                  <FormItem>
-                    {index === 0 && <FormLabel>Descrição do Item</FormLabel>}
-                    <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value || ""}
-                        placeholder="Ex: Parafuso 5mm, Material de consumo"
-                        disabled={disabled}
-                        className="bg-transparent"
-                        maxLength={500}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Description Field - Takes all available space */}
+              <div className="flex-1">
+                <FormField
+                  control={control}
+                  name={`temporaryItems.${index}.temporaryItemDescription`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value || ""}
+                          placeholder="Ex: Parafuso 5mm, Material de consumo"
+                          disabled={disabled}
+                          className="bg-transparent h-10"
+                          maxLength={500}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-              {/* Quantity, Price, and Tax in Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Quantity Field */}
+              {/* Quantity Field - Fixed width */}
+              <div className="w-32">
                 <FormField
                   control={control}
                   name={`temporaryItems.${index}.orderedQuantity`}
                   render={({ field }) => (
                     <FormItem>
-                      {index === 0 && <FormLabel>Quantidade</FormLabel>}
                       <FormControl>
                         <NaturalFloatInput
                           {...field}
@@ -153,29 +163,33 @@ export const TemporaryItemsInput = forwardRef<
                           step={0.01}
                           placeholder="1"
                           disabled={disabled}
-                          className="bg-transparent"
+                          className="bg-transparent h-10"
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+              </div>
 
-                {/* Price Field */}
+              {/* Price Field - Fixed width */}
+              <div className="w-36">
                 <FormMoneyInput
                   name={`temporaryItems.${index}.price`}
-                  {...(index === 0 ? { label: "Preço Unitário" } : { label: "" })}
+                  label=""
                   placeholder="R$ 0,00"
                   disabled={disabled}
+                  align="left"
                 />
+              </div>
 
-                {/* Tax Field */}
+              {/* Tax Field - Fixed width */}
+              <div className="w-28">
                 <FormField
                   control={control}
                   name={`temporaryItems.${index}.tax`}
                   render={({ field }) => (
                     <FormItem>
-                      {index === 0 && <FormLabel>Imposto (%)</FormLabel>}
                       <FormControl>
                         <Input
                           {...field}
@@ -187,7 +201,7 @@ export const TemporaryItemsInput = forwardRef<
                           step={0.01}
                           placeholder="0"
                           disabled={disabled}
-                          className="bg-transparent"
+                          className="bg-transparent h-10"
                         />
                       </FormControl>
                       <FormMessage />
@@ -196,18 +210,18 @@ export const TemporaryItemsInput = forwardRef<
                 />
               </div>
 
-              {/* Remove Button */}
-              <div className="flex justify-end">
+              {/* Trash Button - Fixed width */}
+              <div className="w-10 flex items-center justify-center">
                 <Button
                   type="button"
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => remove(index)}
                   disabled={disabled || !canRemove}
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  className="h-10 w-10 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  title="Remover item"
                 >
-                  <IconTrash className="h-4 w-4 mr-2" />
-                  Remover Item
+                  <IconTrash className="h-4 w-4" />
                 </Button>
               </div>
             </div>

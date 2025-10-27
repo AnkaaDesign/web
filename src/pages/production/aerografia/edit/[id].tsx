@@ -1,9 +1,11 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useRef, useState, useEffect } from "react";
 import { useAirbrushing } from "../../../../hooks";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { AirbrushingForm } from "@/components/production/airbrushing/form/airbrushing-form";
-import { IconBrush } from "@tabler/icons-react";
+import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { AirbrushingForm, type AirbrushingFormHandle } from "@/components/production/airbrushing/form/airbrushing-form";
+import { IconBrush, IconCheck, IconArrowLeft } from "@tabler/icons-react";
 import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import type { Airbrushing } from "../../../../types";
@@ -13,6 +15,16 @@ import { Card, CardContent } from "@/components/ui/card";
 export const AirbrushingEdit = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const formRef = useRef<AirbrushingFormHandle>(null);
+  const [, forceUpdate] = useState({});
+
+  // Redirect if no ID is provided
+  useEffect(() => {
+    if (!id) {
+      console.error('[AirbrushingEdit] No ID provided, redirecting to list');
+      navigate(routes.production.airbrushings.root);
+    }
+  }, [id, navigate]);
 
   // Track page for analytics
   usePageTracker({ title: "Aerografia - Editar" });
@@ -23,11 +35,17 @@ export const AirbrushingEdit = () => {
     include: {
       task: {
         include: {
-          customer: true,
+          customer: {
+            include: {
+              logo: true,
+            },
+          },
           sector: true,
         },
       },
-      files: true,
+      receipts: true,
+      invoices: true,
+      artworks: true,
     },
   });
 
@@ -43,6 +61,11 @@ export const AirbrushingEdit = () => {
     } else {
       navigate(routes.production.airbrushings.root);
     }
+  };
+
+  // Handle form state changes to re-render button state
+  const handleFormStateChange = () => {
+    forceUpdate({});
   };
 
   // Loading state
@@ -120,25 +143,46 @@ export const AirbrushingEdit = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="h-full">
-        <div className="flex flex-col h-full space-y-4">
-          <div className="flex-shrink-0">
-            <PageHeader
-              variant="form"
-              title="Editar Aerografia"
-              icon={IconBrush}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Produção", href: routes.production.root },
-                { label: "Aerografia", href: routes.production.airbrushings.root },
-                { label: `Aerografia #${airbrushing.id.slice(-8)}`, href: routes.production.airbrushings.details(airbrushing.id) },
-                { label: "Editar" },
-              ]}
-            />
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <AirbrushingForm mode="edit" airbrushingId={id!} onSuccess={handleSuccess} onCancel={handleCancel} className="h-full" />
-          </div>
+      <div className="h-full flex flex-col space-y-4">
+        <div className="flex-shrink-0">
+          <PageHeaderWithFavorite
+            title="Editar Aerografia"
+            icon={IconBrush}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Produção", href: routes.production.root },
+              { label: "Aerografia", href: routes.production.airbrushings.root },
+              { label: `Aerografia #${airbrushing.id.slice(-8)}`, href: routes.production.airbrushings.details(airbrushing.id) },
+              { label: "Editar" },
+            ]}
+            actions={[
+              {
+                key: "cancel",
+                label: "Cancelar",
+                icon: IconArrowLeft,
+                onClick: handleCancel,
+                variant: "outline",
+              },
+              {
+                key: "submit",
+                label: "Salvar",
+                icon: IconCheck,
+                onClick: () => formRef.current?.handleSubmit(),
+                variant: "default",
+                disabled: !formRef.current?.canSubmit(),
+              },
+            ]}
+          />
+        </div>
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <AirbrushingForm
+            ref={formRef}
+            mode="edit"
+            airbrushingId={id!}
+            onSuccess={handleSuccess}
+            onCancel={handleCancel}
+            onFormStateChange={handleFormStateChange}
+          />
         </div>
       </div>
     </PrivilegeRoute>

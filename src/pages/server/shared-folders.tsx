@@ -308,8 +308,12 @@ export function ServerSharedFoldersPage() {
   const location = useLocation();
   const { success } = useToast();
 
-  // Parse the current path from URL
-  const pathSegments = location.pathname.replace("/servidor/pastas-compartilhadas", "").split("/").filter(Boolean);
+  // Parse the current path from URL and decode it to handle spaces and special characters
+  const pathSegments = location.pathname
+    .replace("/servidor/pastas-compartilhadas", "")
+    .split("/")
+    .filter(Boolean)
+    .map(segment => decodeURIComponent(segment));
   const selectedFolder = pathSegments[0] || null;
   const currentSubPath = pathSegments.slice(1).join("/") || undefined;
   const viewMode = selectedFolder ? "browse" : "folders";
@@ -344,20 +348,26 @@ export function ServerSharedFoldersPage() {
 
   // Navigation handlers using actual routes
   const handleBrowseFolder = (folderName: string) => {
-    navigate(`/servidor/pastas-compartilhadas/${folderName}`);
+    navigate(`/servidor/pastas-compartilhadas/${encodeURIComponent(folderName)}`);
   };
 
   const handleNavigateToSubfolder = (subPath: string) => {
     // subPath already contains the full path from the root of the selected folder
     const fullPath = `${selectedFolder}/${subPath}`;
-    navigate(`/servidor/pastas-compartilhadas/${fullPath}`);
+    // Encode each segment separately to preserve the path structure
+    const encodedPath = fullPath.split("/").map(seg => encodeURIComponent(seg)).join("/");
+    navigate(`/servidor/pastas-compartilhadas/${encodedPath}`);
   };
 
   const handleNavigateUp = () => {
     if (currentSubPath) {
       const parentPath = currentSubPath.split("/").slice(0, -1).join("/");
-      const newPath = parentPath ? `/servidor/pastas-compartilhadas/${selectedFolder}/${parentPath}` : `/servidor/pastas-compartilhadas/${selectedFolder}`;
-      navigate(newPath);
+      if (parentPath) {
+        const encodedPath = `${encodeURIComponent(selectedFolder!)}/${parentPath.split("/").map(seg => encodeURIComponent(seg)).join("/")}`;
+        navigate(`/servidor/pastas-compartilhadas/${encodedPath}`);
+      } else {
+        navigate(`/servidor/pastas-compartilhadas/${encodeURIComponent(selectedFolder!)}`);
+      }
     } else if (selectedFolder) {
       navigate("/servidor/pastas-compartilhadas");
     }
@@ -473,10 +483,10 @@ export function ServerSharedFoldersPage() {
         },
         {
           label: selectedFolder,
-          href: `/servidor/pastas-compartilhadas/${selectedFolder}`,
+          href: `/servidor/pastas-compartilhadas/${encodeURIComponent(selectedFolder)}`,
           onClick: (e: React.MouseEvent) => {
             e.preventDefault();
-            navigate(`/servidor/pastas-compartilhadas/${selectedFolder}`);
+            navigate(`/servidor/pastas-compartilhadas/${encodeURIComponent(selectedFolder)}`);
           },
         },
       );
@@ -487,10 +497,12 @@ export function ServerSharedFoldersPage() {
 
         pathParts.forEach((part, index) => {
           accumulatedPath += `/${part}`;
-          const routePath = `/servidor/pastas-compartilhadas/${accumulatedPath}`;
+          // Encode each segment of the accumulated path for URLs
+          const encodedPath = accumulatedPath.split("/").map(seg => encodeURIComponent(seg)).join("/");
+          const routePath = `/servidor/pastas-compartilhadas/${encodedPath}`;
 
           breadcrumbs.push({
-            label: decodeURIComponent(part),
+            label: part, // Already decoded from pathSegments
             href: routePath,
             onClick: (e: React.MouseEvent) => {
               e.preventDefault();
