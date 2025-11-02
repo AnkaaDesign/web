@@ -214,21 +214,19 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
           />
 
           {/* Value */}
-          <input
-            type="number"
-            min={0}
-            step="any"
-            placeholder="0"
-            value={newMeasure.value || ""}
-            onChange={(e) => {
-              const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+          <Input
+            type="decimal"
+            value={newMeasure.value || null}
+            onChange={(value) => {
               setNewMeasure((prev: any) => ({
                 ...prev,
-                value: isNaN(value) ? 0 : value,
+                value: typeof value === "number" ? value : 0,
               }));
             }}
+            placeholder="0"
             disabled={disabled}
-            className="flex h-10 w-full md:w-32 rounded-md border border-border bg-transparent px-2 py-2 text-sm placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200"
+            className="w-full md:w-32"
+            transparent
           />
 
           {/* Unit */}

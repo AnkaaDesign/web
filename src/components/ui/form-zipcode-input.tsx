@@ -40,11 +40,25 @@ export function ZipCodeInput({
         if (response.ok) {
           const data = await response.json();
           if (!data.erro) {
-            // Auto-fill address fields
-            if (data.logradouro) form.setValue(addressFieldName, data.logradouro, { shouldDirty: true });
-            if (data.bairro) form.setValue(neighborhoodFieldName, data.bairro, { shouldDirty: true });
-            if (data.localidade) form.setValue(cityFieldName, data.localidade, { shouldDirty: true });
-            if (data.uf) form.setValue(stateFieldName, data.uf, { shouldDirty: true });
+            // Get current form values to check if fields are already filled
+            const currentValues = form.getValues();
+
+            // Helper to check if a field should be filled (only fill if empty)
+            const shouldFillField = (fieldValue: any) => fieldValue === null || fieldValue === undefined || fieldValue === "";
+
+            // Auto-fill address fields only if they're empty
+            if (data.logradouro && shouldFillField(currentValues[addressFieldName])) {
+              form.setValue(addressFieldName, data.logradouro, { shouldDirty: true });
+            }
+            if (data.bairro && shouldFillField(currentValues[neighborhoodFieldName])) {
+              form.setValue(neighborhoodFieldName, data.bairro, { shouldDirty: true });
+            }
+            if (data.localidade && shouldFillField(currentValues[cityFieldName])) {
+              form.setValue(cityFieldName, data.localidade, { shouldDirty: true });
+            }
+            if (data.uf && shouldFillField(currentValues[stateFieldName])) {
+              form.setValue(stateFieldName, data.uf, { shouldDirty: true });
+            }
 
             // If Google Places is available, try to get more complete address
             if (import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {

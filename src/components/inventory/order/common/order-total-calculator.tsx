@@ -20,8 +20,11 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
       const quantity = orderItem.orderedQuantity;
       const unitPrice = orderItem.price;
       const subtotal = quantity * unitPrice;
-      const taxRate = orderItem.tax;
-      const taxAmount = subtotal * (taxRate / 100);
+      const icms = orderItem.icms;
+      const ipi = orderItem.ipi;
+      const icmsAmount = subtotal * (icms / 100);
+      const ipiAmount = subtotal * (ipi / 100);
+      const taxAmount = icmsAmount + ipiAmount;
       const total = subtotal + taxAmount;
 
       return {
@@ -29,7 +32,10 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
         quantity,
         unitPrice,
         subtotal,
-        taxRate,
+        icms,
+        ipi,
+        icmsAmount,
+        ipiAmount,
         taxAmount,
         total,
       };
@@ -86,13 +92,13 @@ const OrderTotalCalculatorComponent: React.FC<OrderTotalCalculatorProps> = ({ or
             <div className="space-y-2">
               <div className="text-sm font-medium text-muted-foreground">Detalhamento por Item</div>
               <div className="max-h-32 overflow-y-auto space-y-1">
-                {itemCalculations.map(({ orderItem, quantity, unitPrice, taxRate, total }) => (
+                {itemCalculations.map(({ orderItem, quantity, unitPrice, icms, ipi, total }) => (
                   <div key={orderItem.id} className="flex items-center justify-between text-sm">
                     <div className="flex-1 min-w-0">
                       <div className="truncate font-medium">{orderItem.item?.name || `Item ${orderItem.itemId.slice(0, 8)}...`}</div>
                       <div className="text-xs text-muted-foreground">
                         {quantity} × {formatCurrency(unitPrice)}
-                        {taxRate > 0 && ` + ${taxRate}% imposto`}
+                        {(icms > 0 || ipi > 0) && ` + ${icms}% ICMS + ${ipi}% IPI`}
                       </div>
                     </div>
                     <div className="flex-shrink-0 font-medium">{formatCurrency(total)}</div>
@@ -156,8 +162,9 @@ const OrderTotalBadgeComponent: React.FC<{
       const quantity = orderItem.orderedQuantity;
       const unitPrice = orderItem.price;
       const subtotal = quantity * unitPrice;
-      const taxRate = orderItem.tax;
-      const taxAmount = subtotal * (taxRate / 100);
+      const icmsAmount = subtotal * (orderItem.icms / 100);
+      const ipiAmount = subtotal * (orderItem.ipi / 100);
+      const taxAmount = icmsAmount + ipiAmount;
       return total + subtotal + taxAmount;
     }, 0);
   }, [orderItems]);
@@ -189,7 +196,8 @@ interface OrderFormTotalCalculatorProps {
   selectedItems: string[] | Set<string>;
   quantities: Record<string, number>;
   prices: Record<string, number>;
-  taxes?: Record<string, number>;
+  icmses?: Record<string, number>;
+  ipis?: Record<string, number>;
   items?: OrderFormItem[];
   className?: string;
   showItemBreakdown?: boolean;
@@ -200,7 +208,8 @@ const OrderFormTotalCalculatorComponent: React.FC<OrderFormTotalCalculatorProps>
   selectedItems,
   quantities,
   prices,
-  taxes = {},
+  icmses = {},
+  ipis = {},
   items = [],
   className,
   showItemBreakdown = false,
@@ -214,8 +223,11 @@ const OrderFormTotalCalculatorComponent: React.FC<OrderFormTotalCalculatorProps>
       const quantity = quantities[itemId] || 1;
       const unitPrice = prices[itemId] || item?.prices?.[0]?.value || 0;
       const subtotal = quantity * unitPrice;
-      const taxRate = taxes[itemId] || 0;
-      const taxAmount = subtotal * (taxRate / 100);
+      const icms = icmses[itemId] || 0;
+      const ipi = ipis[itemId] || 0;
+      const icmsAmount = subtotal * (icms / 100);
+      const ipiAmount = subtotal * (ipi / 100);
+      const taxAmount = icmsAmount + ipiAmount;
       const total = subtotal + taxAmount;
 
       return {
@@ -224,12 +236,15 @@ const OrderFormTotalCalculatorComponent: React.FC<OrderFormTotalCalculatorProps>
         quantity,
         unitPrice,
         subtotal,
-        taxRate,
+        icms,
+        ipi,
+        icmsAmount,
+        ipiAmount,
         taxAmount,
         total,
       };
     });
-  }, [selectedItems, quantities, prices, taxes, items]);
+  }, [selectedItems, quantities, prices, icmses, ipis, items]);
 
   const totals = React.useMemo(() => {
     return itemCalculations.reduce(
@@ -283,13 +298,13 @@ const OrderFormTotalCalculatorComponent: React.FC<OrderFormTotalCalculatorProps>
             <div className="space-y-2">
               <div className="text-sm font-medium text-muted-foreground">Detalhamento por Item</div>
               <div className="max-h-32 overflow-y-auto space-y-1">
-                {itemCalculations.map(({ itemId, item, quantity, unitPrice, taxRate, total }) => (
+                {itemCalculations.map(({ itemId, item, quantity, unitPrice, icms, ipi, total }) => (
                   <div key={itemId} className="flex items-center justify-between text-sm">
                     <div className="flex-1 min-w-0">
                       <div className="truncate font-medium">{item?.name || `Item ${itemId.slice(0, 8)}...`}</div>
                       <div className="text-xs text-muted-foreground">
                         {quantity} × {formatCurrency(unitPrice)}
-                        {taxRate > 0 && ` + ${taxRate}% imposto`}
+                        {(icms > 0 || ipi > 0) && ` + ${icms}% ICMS + ${ipi}% IPI`}
                       </div>
                     </div>
                     <div className="flex-shrink-0 font-medium">{formatCurrency(total)}</div>
@@ -349,9 +364,10 @@ const OrderFormTotalBadgeComponent: React.FC<{
   selectedItems: string[] | Set<string>;
   quantities: Record<string, number>;
   prices: Record<string, number>;
-  taxes?: Record<string, number>;
+  icmses?: Record<string, number>;
+  ipis?: Record<string, number>;
   items?: OrderFormItem[];
-}> = ({ selectedItems, quantities, prices, taxes = {}, items = [] }) => {
+}> = ({ selectedItems, quantities, prices, icmses = {}, ipis = {}, items = [] }) => {
   const grandTotal = React.useMemo(() => {
     const itemsArray = Array.isArray(selectedItems) ? selectedItems : Array.from(selectedItems);
     return itemsArray.reduce((total, itemId) => {
@@ -359,11 +375,12 @@ const OrderFormTotalBadgeComponent: React.FC<{
       const quantity = quantities[itemId] || 1;
       const unitPrice = prices[itemId] || item?.prices?.[0]?.value || 0;
       const subtotal = quantity * unitPrice;
-      const taxRate = taxes[itemId] || 0;
-      const taxAmount = subtotal * (taxRate / 100);
+      const icmsAmount = subtotal * ((icmses[itemId] || 0) / 100);
+      const ipiAmount = subtotal * ((ipis[itemId] || 0) / 100);
+      const taxAmount = icmsAmount + ipiAmount;
       return total + subtotal + taxAmount;
     }, 0);
-  }, [selectedItems, quantities, prices, taxes, items]);
+  }, [selectedItems, quantities, prices, icmses, ipis, items]);
 
   return (
     <Badge variant={grandTotal > 0 ? "default" : "outline"} className="text-sm">

@@ -6,7 +6,7 @@ import { usePageTracker } from "@/hooks/use-page-tracker";
 import { IconUsers, IconPlus } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
-export const FinanceiroClientesListPage = () => {
+export const FinancialCustomersListPage = () => {
   const navigate = useNavigate();
 
   // Track page access
@@ -45,4 +45,4 @@ export const FinanceiroClientesListPage = () => {
   );
 };
 
-export default FinanceiroClientesListPage;
+export default FinancialCustomersListPage;

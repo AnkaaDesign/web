@@ -42,8 +42,10 @@ const Administration = lazy(() => import("@/pages/administration/root").then((mo
 
 const AdministrationCustomers = lazy(() => import("@/pages/administration/customers/list").then((module) => ({ default: module.CustomerListPage })));
 
-// Financeiro
-const FinanceiroClientesList = lazy(() => import("@/pages/financeiro/clientes/list").then((module) => ({ default: module.FinanceiroClientesListPage })));
+// Financial
+const FinancialCustomersList = lazy(() => import("@/pages/financial/customers/list").then((module) => ({ default: module.FinancialCustomersListPage })));
+const FinancialCustomersDetails = lazy(() => import("@/pages/financial/customers/details/[id]").then((module) => ({ default: module.FinancialCustomersDetailsPage })));
+const FinancialCustomersEdit = lazy(() => import("@/pages/financial/customers/edit/[id]").then((module) => ({ default: module.FinancialCustomersEditPage })));
 const AdministrationCustomersCreate = lazy(() => import("@/pages/administration/customers/create").then((module) => ({ default: module.CreateCustomerPage })));
 const AdministrationCustomersEdit = lazy(() => import("@/pages/administration/customers/edit/[id]").then((module) => ({ default: module.EditCustomerPage })));
 const AdministrationCustomersDetails = lazy(() => import("@/pages/administration/customers/details/[id]").then((module) => ({ default: module.CustomerDetailsPage })));
@@ -56,8 +58,8 @@ const AdministrationCollaboratorsDetails = lazy(() => import("@/pages/administra
 const AdministrationCollaboratorsBatchEdit = lazy(() => import("@/pages/administration/collaborators/batch-edit").then((module) => ({ default: module.default })));
 
 
-const HumanResourcesPayrollList = lazy(() => import("@/pages/human-resources/folha-de-pagamento/list").then((module) => ({ default: module.default })));
-const HumanResourcesPayrollDetail = lazy(() => import("@/pages/human-resources/folha-de-pagamento/detail").then((module) => ({ default: module.default })));
+const HumanResourcesPayrollList = lazy(() => import("@/pages/human-resources/payroll/list").then((module) => ({ default: module.default })));
+const HumanResourcesPayrollDetail = lazy(() => import("@/pages/human-resources/payroll/detail").then((module) => ({ default: module.default })));
 const HumanResourcesBonusSimulation = lazy(() => import("@/pages/human-resources/simulacao-bonus").then((module) => ({ default: module.default })));
 
 const AdministrationSectorsList = lazy(() => import("@/pages/administration/sectors/list").then((module) => ({ default: module.SectorListPage })));
@@ -199,21 +201,21 @@ const ProductionObservationsEdit = lazy(() => import("@/pages/production/observa
 const ProductionObservationsDetails = lazy(() => import("@/pages/production/observations/details/[id]").then((module) => ({ default: module.ObservationDetailsPage })));
 
 // Airbrushing routes
-const ProductionAirbrushing = lazy(() => import("@/pages/production/aerografia/list").then((module) => ({ default: module.AirbrushingListPage })));
-const ProductionAirbrushingCreate = lazy(() => import("@/pages/production/aerografia/cadastrar").then((module) => ({ default: module.AirbrushingCreate })));
-const ProductionAirbrushingEdit = lazy(() => import("@/pages/production/aerografia/edit/[id]").then((module) => ({ default: module.AirbrushingEdit })));
-const ProductionAirbrushingDetails = lazy(() => import("@/pages/production/aerografia/details/[id]").then((module) => ({ default: module.AirbrushingDetails })));
+const ProductionAirbrushing = lazy(() => import("@/pages/production/airbrushing/list").then((module) => ({ default: module.AirbrushingListPage })));
+const ProductionAirbrushingCreate = lazy(() => import("@/pages/production/airbrushing/create").then((module) => ({ default: module.AirbrushingCreate })));
+const ProductionAirbrushingEdit = lazy(() => import("@/pages/production/airbrushing/edit/[id]").then((module) => ({ default: module.AirbrushingEdit })));
+const ProductionAirbrushingDetails = lazy(() => import("@/pages/production/airbrushing/details/[id]").then((module) => ({ default: module.AirbrushingDetails })));
 const ProductionGarages = lazy(() => import("@/pages/production/garages"));
 const ProductionCutting = lazy(() => import("@/pages/production/cutting/list").then((module) => ({ default: module.default })));
 const ProductionCuttingDetails = lazy(() => import("@/pages/production/cutting/details/[id]").then((module) => ({ default: module.CuttingDetailsPage })));
 
 // Production Tasks
-const ProductionTasksList = lazy(() => import("@/pages/production/cronograma/list").then((module) => ({ default: module.TaskListPage })));
+const ProductionTasksList = lazy(() => import("@/pages/production/schedule/list").then((module) => ({ default: module.TaskListPage })));
 const ProductionTasksHistory = lazy(() => import("@/pages/production/history").then((module) => ({ default: module.TaskHistoryPage })));
-const ProductionTasksBatchEdit = lazy(() => import("@/pages/production/cronograma/batch-edit"));
-const ProductionTasksCreate = lazy(() => import("@/pages/production/cronograma/create"));
-const ProductionTasksEdit = lazy(() => import("@/pages/production/cronograma/edit/[id]").then((module) => ({ default: module.TaskEditPage })));
-const ProductionTasksDetails = lazy(() => import("@/pages/production/cronograma/details/[id]").then((module) => ({ default: module.TaskDetailsPage })));
+const ProductionTasksBatchEdit = lazy(() => import("@/pages/production/schedule/batch-edit"));
+const ProductionTasksCreate = lazy(() => import("@/pages/production/schedule/create"));
+const ProductionTasksEdit = lazy(() => import("@/pages/production/schedule/edit/[id]").then((module) => ({ default: module.TaskEditPage })));
+const ProductionTasksDetails = lazy(() => import("@/pages/production/schedule/details/[id]").then((module) => ({ default: module.TaskDetailsPage })));
 const ProductionScheduleOnHold = lazy(() => import("@/pages/production/schedule-on-hold").then((module) => ({ default: module.ScheduleOnHoldPage })));
 
 // Human Resources
@@ -245,7 +247,7 @@ const HumanResourcesPpeSchedulesCreate = lazy(() => import("@/pages/human-resour
 const HumanResourcesPpeSchedulesEdit = lazy(() => import("@/pages/human-resources/ppe/schedules/edit/[id]").then((module) => ({ default: module.PPEScheduleEditPage })));
 const HumanResourcesPpeSchedulesDetails = lazy(() => import("@/pages/human-resources/ppe/schedules/details/[id]").then((module) => ({ default: module.PPEScheduleDetailsPage })));
 const HumanResourcesCalculations = lazy(() => import("@/pages/human-resources/calculations/list").then((module) => ({ default: module.default })));
-const HumanResourcesRequisicoes = lazy(() => import("@/pages/human-resources/requisicoes/list").then((module) => ({ default: module.default })));
+const HumanResourcesRequisitions = lazy(() => import("@/pages/human-resources/requisitions/list").then((module) => ({ default: module.default })));
 const HumanResourcesHolidays = lazy(() => import("@/pages/human-resources/holidays/list").then((module) => ({ default: module.HolidayListPage })));
 const HumanResourcesHolidaysCalendar = lazy(() => import("@/pages/human-resources/holidays/calendar").then((module) => ({ default: module.HolidayCalendarPage })));
 const HumanResourcesHolidaysCreate = lazy(() => import("@/pages/human-resources/holidays/cadastrar").then((module) => ({ default: module.HolidayCreatePage })));
@@ -735,12 +737,28 @@ function App() {
                   }
                 />
 
-                {/* Financeiro routes */}
+                {/* Financial routes (URL in Portuguese: /financeiro) */}
                 <Route
                   path="/financeiro/clientes"
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <FinanceiroClientesList />
+                      <FinancialCustomersList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.customers.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialCustomersDetails />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.financial.customers.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <FinancialCustomersEdit />
                     </Suspense>
                   }
                 />
@@ -1782,7 +1800,7 @@ function App() {
                   path={routes.humanResources.requisicoes.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesRequisicoes />
+                      <HumanResourcesRequisitions />
                     </Suspense>
                   }
                 />

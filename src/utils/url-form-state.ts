@@ -194,7 +194,8 @@ export function serializeItemFormToUrlParams(formData: Partial<ItemCreateFormDat
   if (formData.reorderPoint !== undefined && formData.reorderPoint !== null) params.set("reorderPoint", formData.reorderPoint.toString());
   if (formData.reorderQuantity !== undefined && formData.reorderQuantity !== null) params.set("reorderQuantity", formData.reorderQuantity.toString());
   if (formData.boxQuantity !== undefined && formData.boxQuantity !== null) params.set("boxQuantity", formData.boxQuantity.toString());
-  if (formData.tax !== undefined && formData.tax !== null && formData.tax !== 0) params.set("tax", formData.tax.toString());
+  if (formData.icms !== undefined && formData.icms !== null && formData.icms !== 0) params.set("icms", formData.icms.toString());
+  if (formData.ipi !== undefined && formData.ipi !== null && formData.ipi !== 0) params.set("ipi", formData.ipi.toString());
   if (formData.monthlyConsumption !== undefined && formData.monthlyConsumption !== null && formData.monthlyConsumption !== 0) params.set("monthlyConsumption", formData.monthlyConsumption.toString());
   if (formData.estimatedLeadTime !== undefined && formData.estimatedLeadTime !== null && formData.estimatedLeadTime !== 30)
     params.set("estimatedLeadTime", formData.estimatedLeadTime.toString());
@@ -219,7 +220,6 @@ export function serializeItemFormToUrlParams(formData: Partial<ItemCreateFormDat
 
   // Numeric PPE fields
   if (formData.ppeStandardQuantity !== undefined && formData.ppeStandardQuantity !== null) params.set("ppeStandardQuantity", formData.ppeStandardQuantity.toString());
-  if (formData.ppeAutoOrderMonths !== undefined && formData.ppeAutoOrderMonths !== null) params.set("ppeAutoOrderMonths", formData.ppeAutoOrderMonths.toString());
 
   // Serialize arrays
   if (formData.barcodes && formData.barcodes.length > 0) {
@@ -275,10 +275,16 @@ export function deserializeUrlParamsToItemForm(searchParams: URLSearchParams): P
     if (!isNaN(parsed)) formData.boxQuantity = parsed;
   }
 
-  const tax = searchParams.get("tax");
-  if (tax) {
-    const parsed = parseFloat(tax);
-    if (!isNaN(parsed)) formData.tax = parsed;
+  const icms = searchParams.get("icms");
+  if (icms) {
+    const parsed = parseFloat(icms);
+    if (!isNaN(parsed)) formData.icms = parsed;
+  }
+
+  const ipi = searchParams.get("ipi");
+  if (ipi) {
+    const parsed = parseFloat(ipi);
+    if (!isNaN(parsed)) formData.ipi = parsed;
   }
 
   const monthlyConsumption = searchParams.get("monthlyConsumption");
@@ -342,12 +348,6 @@ export function deserializeUrlParamsToItemForm(searchParams: URLSearchParams): P
     if (!isNaN(parsed)) formData.ppeStandardQuantity = parsed;
   }
 
-  const ppeAutoOrderMonths = searchParams.get("ppeAutoOrderMonths");
-  if (ppeAutoOrderMonths) {
-    const parsed = parseInt(ppeAutoOrderMonths, 10);
-    if (!isNaN(parsed)) formData.ppeAutoOrderMonths = parsed;
-  }
-
   // Parse arrays
   try {
     const barcodesParam = searchParams.get("barcodes");
@@ -386,7 +386,8 @@ export function getDefaultItemFormValues(searchParams: URLSearchParams, baseDefa
     reorderQuantity: null,
     maxQuantity: null,
     boxQuantity: null,
-    tax: undefined,
+    icms: undefined,
+    ipi: undefined,
     measures: [],
     barcodes: [],
     shouldAssignToUser: true,
@@ -405,7 +406,6 @@ export function getDefaultItemFormValues(searchParams: URLSearchParams, baseDefa
     ppeCA: null,
     ppeDeliveryMode: null,
     ppeStandardQuantity: null,
-    ppeAutoOrderMonths: null,
     ...baseDefaults,
     ...urlFormData,
   };

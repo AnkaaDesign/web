@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { usePaintProductions, usePaintTypes } from "../../../../hooks";
+import { usePaintProductions, usePaintTypes, usePaintProductionMutations, usePaintProductionBatchMutations } from "../../../../hooks";
 import type { PaintProduction } from "../../../../types";
 import type { PaintProductionGetManyFormData } from "../../../../schemas";
 import { routes } from "../../../../constants";
@@ -19,7 +19,6 @@ import { cn } from "@/lib/utils";
 import { PaintProductionFilters } from "@/components/paint/production/filters/paint-production-filters";
 import { FilterIndicators } from "@/components/paint/production/filters/filter-indicator";
 import { extractActiveFilters, createFilterRemover } from "@/components/paint/production/filters/filter-utils";
-import { toast } from "sonner";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { PaintProductionSkeleton } from "./paint-production-skeleton";
 import { createPaintProductionColumns, getDefaultVisibleColumns } from "./paint-production-table-columns";
@@ -84,15 +83,19 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
   } | null>(null);
 
   // Use viewport boundary checking hook
-  
-  // Delete confirmation dialog state
-  const [deleteDialog, setDeleteDialog] = useState<{ production: PaintProduction } | null>(null);
+
+  // Delete confirmation dialog state - supports single or batch delete
+  const [deleteDialog, setDeleteDialog] = useState<{ production: PaintProduction } | { productions: PaintProduction[] } | null>(null);
 
   // Column visibility state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility("paint-production-list-visible-columns", getDefaultVisibleColumns());
 
   // Load paint types for filter labels
   const { data: paintTypesData } = usePaintTypes({ orderBy: { name: "asc" } });
+
+  // Get mutation functions
+  const { deleteAsync: deletePaintProduction, isDeleting } = usePaintProductionMutations();
+  const { batchDeleteAsync: batchDeletePaintProductions, isBatchDeleting } = usePaintProductionBatchMutations();
 
   // Custom deserializer for paint production filters
   const deserializePaintProductionFilters = useCallback((params: URLSearchParams): Partial<PaintProductionGetManyFormData> => {
@@ -270,10 +273,39 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
     }
   };
 
-  const confirmDelete = () => {
-    if (deleteDialog) {
-      toast.info("Exclusão de produção ainda não implementada");
+  const confirmDelete = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent dialog from auto-closing
+
+    if (!deleteDialog) {
+      console.error("No deleteDialog found");
+      return;
+    }
+
+    if (isDeleting || isBatchDeleting) {
+      console.log("Already deleting, skipping...");
+      return;
+    }
+
+    try {
+      // Check if it's a batch delete or single delete
+      if ("productions" in deleteDialog) {
+        // Batch delete
+        const productionIds = deleteDialog.productions.map((p) => p.id);
+        console.log("Calling batchDeletePaintProductions with IDs:", productionIds);
+        const result = await batchDeletePaintProductions({ ids: productionIds });
+        console.log("Productions deleted successfully, result:", result);
+        // Clear selection after successful batch delete
+        selectedIds.forEach((id) => toggleSelection(id));
+      } else {
+        // Single delete
+        console.log("Calling deletePaintProduction with ID:", deleteDialog.production.id);
+        const result = await deletePaintProduction(deleteDialog.production.id);
+        console.log("Production deleted successfully, result:", result);
+      }
       setDeleteDialog(null);
+    } catch (error: any) {
+      console.error("Error deleting production:", error);
+      // Error toast is already handled by the API client
     }
   };
 
@@ -385,6 +417,29 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
 
           {/* Show Selected Toggle */}
           {selectionCount > 0 && <ShowSelectedToggle selectionCount={selectionCount} showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} />}
+
+          {/* Delete Selected Button */}
+          {selectionCount > 0 && (
+            <Button
+              variant="destructive"
+              size="default"
+              onClick={() => {
+                // For batch delete, we'll just pass the IDs since we may not have all production objects loaded
+                // Create a minimal array with just the IDs - the dialog will show count instead of details
+                setDeleteDialog({
+                  productions: selectedIds.map((id) => {
+                    // Try to find the production in current page, otherwise create a minimal object
+                    const production = productions.find((p) => p.id === id);
+                    return production || { id, volumeLiters: 0 } as PaintProduction;
+                  })
+                });
+              }}
+              disabled={isDeleting || isBatchDeleting}
+            >
+              <IconTrash className="h-4 w-4 mr-2" />
+              Deletar Selecionados ({selectionCount})
+            </Button>
+          )}
 
           {/* Filter Button */}
           <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)}>
@@ -585,19 +640,59 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
       </DropdownMenu>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+      <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && !isDeleting && !isBatchDeleting && setDeleteDialog(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <IconAlertTriangle className="h-5 w-5 text-destructive" />
+              {deleteDialog && "productions" in deleteDialog
+                ? `Confirmar exclusão de ${deleteDialog.productions.length} produções`
+                : "Confirmar exclusão de produção"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja deletar a produção "{deleteDialog?.production?.id}"? Esta ação não pode ser desfeita.
+              {deleteDialog && "productions" in deleteDialog ? (
+                <>
+                  Tem certeza que deseja deletar <strong>{deleteDialog.productions.length} produções</strong>?
+                  <br />
+                  <br />
+                  Volume total:{" "}
+                  <strong>
+                    {deleteDialog.productions.reduce((sum, p) => sum + (p.volumeLiters || 0), 0).toFixed(2)}L
+                  </strong>
+                  <br />
+                  <br />
+                  Esta ação irá:
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Restaurar o estoque de todos os componentes utilizados</li>
+                    <li>Remover as atividades de saída criadas</li>
+                    <li>Deletar permanentemente os registros das produções</li>
+                  </ul>
+                  <br />
+                  <strong>Esta ação não pode ser desfeita.</strong>
+                </>
+              ) : (
+                <>
+                  Tem certeza que deseja deletar a produção de{" "}
+                  <strong>{deleteDialog && "production" in deleteDialog ? deleteDialog.production?.volumeLiters?.toFixed(2) : 0}L</strong>?
+                  <br />
+                  <br />
+                  Esta ação irá:
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Restaurar o estoque de todos os componentes utilizados</li>
+                    <li>Remover as atividades de saída criadas</li>
+                    <li>Deletar permanentemente o registro da produção</li>
+                  </ul>
+                  <br />
+                  <strong>Esta ação não pode ser desfeita.</strong>
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Deletar
-            </AlertDialogAction>
+            <AlertDialogCancel disabled={isDeleting || isBatchDeleting}>Cancelar</AlertDialogCancel>
+            <Button onClick={confirmDelete} disabled={isDeleting || isBatchDeleting} variant="destructive">
+              {isDeleting || isBatchDeleting ? "Deletando..." : "Deletar"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

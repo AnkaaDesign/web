@@ -15,11 +15,12 @@ import {
   IconAlertCircle,
   IconShoppingCart,
   IconTruck,
+  IconDownload,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "../../../../utils";
+import { formatCurrency, formatDate, measureUtils } from "../../../../utils";
 import type { Order, OrderItem } from "../../../../types";
-import { ORDER_STATUS } from "../../../../constants";
+import { ORDER_STATUS, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER } from "../../../../constants";
 import { useOrderItemBatchMutations, useOrderItemSpecializedBatchMutations } from "../../../../hooks";
 import { toast } from "sonner";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
@@ -51,7 +52,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
   });
   const { markFulfilled, markReceived } = useOrderItemSpecializedBatchMutations({
     onMarkFulfilledSuccess: () => {
-      toast.success("Itens marcados como pedido com sucesso");
+      toast.success("Itens marcados como feito com sucesso");
       onOrderUpdate?.();
       setSelectedItems({});
     },
@@ -218,8 +219,15 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
 
     items.forEach((item) => {
       const currentValues = getItemValue(item);
-      const itemTotal = item.orderedQuantity * item.price * (1 + item.tax / 100);
-      const itemReceivedTotal = currentValues.receivedQuantity * item.price * (1 + item.tax / 100);
+      const subtotal = item.orderedQuantity * item.price;
+      const icmsAmount = subtotal * (item.icms / 100);
+      const ipiAmount = subtotal * (item.ipi / 100);
+      const itemTotal = subtotal + icmsAmount + ipiAmount;
+
+      const receivedSubtotal = currentValues.receivedQuantity * item.price;
+      const receivedIcmsAmount = receivedSubtotal * (item.icms / 100);
+      const receivedIpiAmount = receivedSubtotal * (item.ipi / 100);
+      const itemReceivedTotal = receivedSubtotal + receivedIcmsAmount + receivedIpiAmount;
 
       totalOrdered += item.orderedQuantity;
       totalReceived += currentValues.receivedQuantity;
@@ -258,6 +266,284 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
     },
     [itemChanges, getItemValue],
   );
+
+  // PDF Export function
+  const exportToPDF = useCallback(() => {
+    const orderDescription = order.description || "Pedido de Compra";
+
+    // Helper function to format measures like MeasureDisplayCompact
+    const formatMeasuresCompact = (measures: any[]) => {
+      if (!measures || measures.length === 0) return "-";
+
+      // Sort measures by type order
+      const sortedMeasures = [...measures].sort((a, b) => {
+        const orderA = MEASURE_TYPE_ORDER[a.measureType] ?? 999;
+        const orderB = MEASURE_TYPE_ORDER[b.measureType] ?? 999;
+        return orderA - orderB;
+      });
+
+      // Format all measures
+      const measureStrings: string[] = [];
+      sortedMeasures.forEach((measure) => {
+        if (measure.value !== null && measure.unit !== null) {
+          measureStrings.push(measureUtils.formatMeasure({ value: measure.value, unit: measure.unit }));
+        } else if (measure.unit !== null) {
+          measureStrings.push(MEASURE_UNIT_LABELS[measure.unit] || measure.unit);
+        } else if (measure.value !== null) {
+          measureStrings.push(measure.value.toString());
+        }
+      });
+
+      // Show first 2 measures, then "+N" for additional
+      if (measureStrings.length > 2) {
+        return measureStrings.slice(0, 2).join(" - ") + " +" + (measureStrings.length - 2);
+      }
+      return measureStrings.join(" - ");
+    };
+
+    const pdfContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>${orderDescription} - ${formatDate(new Date())}</title>
+        <style>
+          @page {
+            size: A4;
+            margin: 12mm;
+          }
+
+          * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+          }
+
+          html, body {
+            height: 100vh;
+            width: 100vw;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: white;
+            font-size: 12px;
+            line-height: 1.3;
+          }
+
+          body {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            min-height: 100vh;
+            padding: 0;
+          }
+
+          .header {
+            display: flex;
+            align-items: center;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e5e7eb;
+          }
+
+          .logo {
+            width: 100px;
+            height: auto;
+            margin-right: 15px;
+          }
+
+          .header-info {
+            flex: 1;
+          }
+
+          .title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #1f2937;
+          }
+
+          .info {
+            color: #6b7280;
+            font-size: 12px;
+          }
+
+          .info p {
+            margin: 2px 0;
+          }
+
+          .content-wrapper {
+            flex: 1;
+            overflow: auto;
+            min-height: 0;
+            padding-bottom: 40px;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #e5e7eb;
+            font-size: 12px;
+          }
+
+          th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+            padding: 10px 6px;
+            border-bottom: 2px solid #e5e7eb;
+            border-right: 1px solid #e5e7eb;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            text-align: left;
+          }
+
+          td {
+            padding: 8px 6px;
+            border-bottom: 1px solid #f3f4f6;
+            border-right: 1px solid #f3f4f6;
+            vertical-align: top;
+          }
+
+          tbody tr:nth-child(even) {
+            background-color: #fafafa;
+          }
+
+          .text-left { text-align: left; }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+
+          .font-mono {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 11px;
+          }
+
+          .font-medium {
+            font-weight: 500;
+          }
+
+          .font-semibold {
+            font-weight: 600;
+          }
+
+          .notes-section {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+          }
+
+          .notes-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #374151;
+          }
+
+          .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 10px;
+            background: white;
+          }
+
+          /* Print optimizations */
+          @media print {
+            .footer {
+              position: fixed;
+              bottom: 15px;
+              left: 12mm;
+              right: 12mm;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <img src="/logo.png" alt="Logo" class="logo" />
+          <div class="header-info">
+            <h1 class="title">${orderDescription}</h1>
+            <div class="info">
+              <p><strong>Data do Pedido:</strong> ${order.createdAt ? formatDate(new Date(order.createdAt)) : formatDate(new Date())}${order.forecast ? ` | <strong>Data de Entrega:</strong> ${formatDate(new Date(order.forecast))}` : ""} | <strong>Fornecedor:</strong> ${order.supplier ? (order.supplier.fantasyName || order.supplier.name) : "-"} | <strong>Total de itens:</strong> ${order.items?.length || 0}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="content-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th class="text-left">Código</th>
+                <th class="text-left">Nome</th>
+                <th class="text-left">Marca</th>
+                <th class="text-left">Medidas</th>
+                <th class="text-center">Quantidade</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${(order.items || [])
+                .map((item) => {
+                  const itemCode = item.item?.uniCode || "-";
+                  const itemName = item.temporaryItemDescription || item.item?.name || "-";
+                  const brandName = item.item?.brand?.name || "-";
+                  const measuresDisplay = item.item ? formatMeasuresCompact(item.item.measures || []) : "-";
+                  const orderedQuantity = item.orderedQuantity || 0;
+
+                  return `
+                    <tr>
+                      <td class="font-mono text-left">${itemCode}</td>
+                      <td class="font-medium text-left">${itemName}</td>
+                      <td class="text-left">${brandName}</td>
+                      <td class="text-left">${measuresDisplay}</td>
+                      <td class="text-center font-medium">${orderedQuantity.toLocaleString("pt-BR")}</td>
+                    </tr>
+                  `;
+                })
+                .join("")}
+            </tbody>
+          </table>
+
+          ${
+            order.notes
+              ? `
+          <div class="notes-section">
+            <div class="notes-title">Observações:</div>
+            <div>${order.notes}</div>
+          </div>
+          `
+              : ""
+          }
+        </div>
+
+        <div class="footer">
+          <div>
+            <p>Relatório gerado pelo sistema Ankaa</p>
+          </div>
+          <div>
+            <p><strong>Gerado em:</strong> ${formatDate(new Date())} ${new Date().toLocaleTimeString("pt-BR")}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(pdfContent);
+      printWindow.document.close();
+      printWindow.focus();
+
+      printWindow.onload = () => {
+        printWindow.print();
+        printWindow.onafterprint = () => {
+          printWindow.close();
+        };
+      };
+    }
+  }, [order]);
 
   if (!order.items || order.items.length === 0) {
     return (
@@ -328,34 +614,43 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
         </div>
 
         {/* Action Buttons */}
-        {canEditItems && (
-          <div className="flex flex-wrap gap-2">
-            {selectedCount > 0 && (
-              <>
-                <Button variant="outline" size="sm" onClick={handleBatchMarkFulfilled} disabled={isSaving}>
-                  <IconShoppingCart className="mr-2 h-4 w-4" />
-                  Marcar como Pedido ({selectedCount})
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleBatchMarkReceived} disabled={isSaving}>
-                  <IconTruck className="mr-2 h-4 w-4" />
-                  Marcar como Recebido ({selectedCount})
-                </Button>
-              </>
-            )}
-            {hasChanges && (
-              <>
-                <Button variant="default" size="sm" onClick={handleSave} disabled={isSaving}>
-                  <IconDeviceFloppy className="mr-2 h-4 w-4" />
-                  Salvar Alterações ({Object.keys(itemChanges).length})
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleReset} disabled={isSaving}>
-                  <IconReload className="mr-2 h-4 w-4" />
-                  Desfazer
-                </Button>
-              </>
-            )}
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {/* PDF Export button - always visible */}
+          <Button variant="outline" size="sm" onClick={exportToPDF}>
+            <IconDownload className="mr-2 h-4 w-4" />
+            Exportar PDF
+          </Button>
+
+          {/* Edit action buttons - only visible when can edit */}
+          {canEditItems && (
+            <>
+              {selectedCount > 0 && (
+                <>
+                  <Button variant="outline" size="sm" onClick={handleBatchMarkFulfilled} disabled={isSaving}>
+                    <IconShoppingCart className="mr-2 h-4 w-4" />
+                    Marcar como Feito ({selectedCount})
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleBatchMarkReceived} disabled={isSaving}>
+                    <IconTruck className="mr-2 h-4 w-4" />
+                    Marcar como Recebido ({selectedCount})
+                  </Button>
+                </>
+              )}
+              {hasChanges && (
+                <>
+                  <Button variant="default" size="sm" onClick={handleSave} disabled={isSaving}>
+                    <IconDeviceFloppy className="mr-2 h-4 w-4" />
+                    Salvar Alterações ({Object.keys(itemChanges).length})
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleReset} disabled={isSaving}>
+                    <IconReload className="mr-2 h-4 w-4" />
+                    Desfazer
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+        </div>
 
         {/* Items Table */}
         <div className="border rounded-lg overflow-hidden">
@@ -373,12 +668,13 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                     />
                   </div>
                 </TableHead>
-                <TableHead>Item</TableHead>
+                <TableHead className="max-w-[250px]">Item</TableHead>
                 <TableHead className="text-center">Estoque</TableHead>
                 <TableHead className="text-center">Qtd. Pedida</TableHead>
                 <TableHead className="text-center">Qtd. Recebida</TableHead>
                 <TableHead className="text-right">Preço Unit.</TableHead>
-                <TableHead className="text-right">Taxa</TableHead>
+                <TableHead className="text-right">ICMS</TableHead>
+                <TableHead className="text-right">IPI</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-center">Status</TableHead>
               </TableRow>
@@ -387,7 +683,10 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
               {order.items.map((item) => {
                 const currentValues = getItemValue(item);
                 const rowStatus = getRowStatus(item);
-                const itemTotal = item.orderedQuantity * item.price * (1 + item.tax / 100);
+                const subtotal = item.orderedQuantity * item.price;
+                const icmsAmount = subtotal * (item.icms / 100);
+                const ipiAmount = subtotal * (item.ipi / 100);
+                const itemTotal = subtotal + icmsAmount + ipiAmount;
                 const isSelected = selectedItems[item.id] || false;
 
                 return (
@@ -412,22 +711,12 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                         />
                       </div>
                     </TableCell>
-                    <TableCell className="py-2">
+                    <TableCell className="py-2 max-w-[250px]">
                       <div className="flex items-center gap-2">
-                        {item.temporaryItemDescription ? (
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs">Temporário</Badge>
-                            <TruncatedTextWithTooltip
-                              text={item.temporaryItemDescription}
-                              className="font-medium text-sm"
-                            />
-                          </div>
-                        ) : (
-                          <TruncatedTextWithTooltip
-                            text={item.item ? (item.item.uniCode ? `${item.item.uniCode} - ${item.item.name}` : item.item.name) : "-"}
-                            className="font-medium text-sm"
-                          />
-                        )}
+                        <TruncatedTextWithTooltip
+                          text={item.temporaryItemDescription || (item.item ? (item.item.uniCode ? `${item.item.uniCode} - ${item.item.name}` : item.item.name) : "-")}
+                          className="font-medium text-sm"
+                        />
                       </div>
                     </TableCell>
                     <TableCell className="text-center py-2">
@@ -476,42 +765,47 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                       <span className="text-sm">{formatCurrency(item.price)}</span>
                     </TableCell>
                     <TableCell className="text-right py-2">
-                      <span className="text-sm">{item.tax}%</span>
+                      <span className="text-sm">{item.icms}%</span>
+                    </TableCell>
+                    <TableCell className="text-right py-2">
+                      <span className="text-sm">{item.ipi}%</span>
                     </TableCell>
                     <TableCell className="text-right py-2">
                       <span className="text-sm font-medium">{formatCurrency(itemTotal)}</span>
                     </TableCell>
                     <TableCell className="text-center py-2">
-                      {rowStatus === "pending" && (
-                        <Badge variant="outline" className="text-xs">
-                          Pendente
-                        </Badge>
-                      )}
-                      {rowStatus === "fulfilled" && (
-                        <Badge variant="secondary" className="text-xs text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
-                          Pedido
-                        </Badge>
-                      )}
-                      {rowStatus === "partial" && (
-                        <Badge variant="secondary" className="text-xs">
-                          Parcial
-                        </Badge>
-                      )}
-                      {rowStatus === "complete" && (
-                        <Badge variant="success" className="text-xs">
-                          Recebido
-                        </Badge>
-                      )}
-                      {rowStatus === "excess" && (
-                        <Badge variant="default" className="text-xs">
-                          Excesso
-                        </Badge>
-                      )}
-                      {rowStatus === "changed" && (
-                        <Badge variant="warning" className="text-xs">
-                          Alterado
-                        </Badge>
-                      )}
+                      <div className="flex flex-wrap items-center justify-center gap-1">
+                        {rowStatus === "pending" && (
+                          <Badge variant="outline" className="text-xs">
+                            Pendente
+                          </Badge>
+                        )}
+                        {rowStatus === "fulfilled" && (
+                          <Badge variant="pending" className="text-xs">
+                            Feito
+                          </Badge>
+                        )}
+                        {rowStatus === "partial" && (
+                          <Badge variant="secondary" className="text-xs">
+                            Parcial
+                          </Badge>
+                        )}
+                        {rowStatus === "complete" && (
+                          <Badge variant="success" className="text-xs">
+                            Recebido
+                          </Badge>
+                        )}
+                        {rowStatus === "excess" && (
+                          <Badge variant="default" className="text-xs">
+                            Excesso
+                          </Badge>
+                        )}
+                        {rowStatus === "changed" && (
+                          <Badge variant="warning" className="text-xs">
+                            Alterado
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

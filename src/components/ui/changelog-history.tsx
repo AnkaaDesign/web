@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { FilePreviewCard } from "@/components/file";
 import { CUT_TYPE_LABELS, CUT_STATUS_LABELS, CUT_ORIGIN_LABELS, AIRBRUSHING_STATUS_LABELS, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS } from "@/constants/enum-labels";
-import { ENTITY_BADGE_CONFIG, PAINT_FINISH } from "@/constants";
+import { ENTITY_BADGE_CONFIG, PAINT_FINISH, SECTOR_PRIVILEGES } from "@/constants";
 import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-normal-map-renderer";
+import { useAuth } from "@/contexts/auth-context";
+import { hasAnyPrivilege } from "@/utils";
 import {
   IconHistory,
   IconEdit,
@@ -749,8 +751,8 @@ const ChangelogTimelineItem = ({
                               </>
                             );
                           })()
-                        ) : changelog.field === "logoPaints" || changelog.field === "paints" ? (
-                          // Special handling for paints - render as cards (handles all cases: add, remove, update)
+                        ) : changelog.field === "logoPaints" || changelog.field === "paints" || changelog.field === "paintGrounds" || changelog.field === "groundPaints" ? (
+                          // Special handling for paints, paintGrounds, and groundPaints - render as cards (handles all cases: add, remove, update)
                           (() => {
                             const parseValue = (val: any) => {
                               if (!val) return val;
@@ -916,9 +918,12 @@ const ChangelogTimelineItem = ({
   );
 };
 
-export function ChangelogHistory({ entityType, entityId, entityName, entityCreatedAt, className, maxHeight = "500px", limit = 50 }: ChangelogHistoryProps) {
+export function ChangelogHistory({ entityType, entityId, entityName, entityCreatedAt, className, maxHeight, limit = 50 }: ChangelogHistoryProps) {
   // Rollback loading state
   const [rollbackLoading, setRollbackLoading] = useState<string | null>(null);
+
+  // Get current user for privilege checking
+  const { user } = useAuth();
 
   // Fetch changelogs for this specific entity
   const {
@@ -969,15 +974,36 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
   const changelogs = useMemo(() => {
     const logs = changelogsResponse?.data || [];
 
+    // Check if user can view financial fields
+    const canViewFinancialFields = user && hasAnyPrivilege(user, [
+      SECTOR_PRIVILEGES.FINANCIAL,
+      SECTOR_PRIVILEGES.ADMIN,
+    ]);
+
     // Define sensitive fields that should not be displayed
     const sensitiveFields = ["sessionToken", "verificationCode", "verificationExpiresAt", "verificationType", "password", "token", "apiKey", "secret"];
 
-    // Filter out sensitive field changes
+    // Define financial/document fields that should only be visible to FINANCIAL and ADMIN
+    const financialFields = ["budgetId", "nfeId", "receiptId", "price", "cost", "value", "totalPrice", "totalCost", "discount", "profit", "commission"];
+
+    // Filter out sensitive field changes and financial fields for non-privileged users
     const filteredLogs = logs.filter((log) => {
       if (!log.field) return true;
+
       // Check if the field is sensitive (case-insensitive)
       const fieldLower = log.field.toLowerCase();
-      return !sensitiveFields.some((sensitive) => fieldLower.includes(sensitive.toLowerCase()));
+
+      // Always filter out sensitive fields
+      if (sensitiveFields.some((sensitive) => fieldLower.includes(sensitive.toLowerCase()))) {
+        return false;
+      }
+
+      // Filter out financial fields for non-FINANCIAL/ADMIN users
+      if (!canViewFinancialFields && financialFields.some((financial) => fieldLower.includes(financial.toLowerCase()))) {
+        return false;
+      }
+
+      return true;
     });
 
     // Only add creation entry if entityCreatedAt is provided AND there's no existing CREATE action
@@ -1010,7 +1036,7 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
     }
 
     return filteredLogs;
-  }, [changelogsResponse?.data, entityCreatedAt, entityId, entityType, isLoading]);
+  }, [changelogsResponse?.data, entityCreatedAt, entityId, entityType, isLoading, user]);
 
   // Extract all entity IDs that need to be fetched
   const entityIds = useMemo(() => {
@@ -1050,7 +1076,7 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
       } else if (changelog.field === "paintId") {
         if (changelog.oldValue && typeof changelog.oldValue === "string") paintIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string") paintIds.add(changelog.newValue);
-      } else if (changelog.field === "logoPaints" || changelog.field === "paints") {
+      } else if (changelog.field === "logoPaints" || changelog.field === "paints" || changelog.field === "groundPaints" || changelog.field === "paintGrounds") {
         // Extract paint IDs from arrays
         const extractPaintIds = (val: any) => {
           if (!val) return;
@@ -1190,7 +1216,7 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1} style={{ maxHeight }}>
       <CardHeader className="pb-4 flex-shrink-0">
         <CardTitle className="flex items-center gap-3 text-xl">
           <div className="p-2 rounded-lg bg-primary/10">
@@ -1242,13 +1268,13 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
         )}
       </CardHeader>
 
-      <CardContent className="pt-0 flex-grow flex flex-col min-h-0">
+      <CardContent className="pt-0 flex-grow flex flex-col min-h-0 overflow-hidden">
         {isLoading ? (
           <ChangelogSkeleton />
         ) : changelogs.length === 0 ? (
           <EmptyState entityType={entityType} />
         ) : (
-          <ScrollArea className="pr-4 flex-grow" style={{ maxHeight }}>
+          <ScrollArea className="pr-4 flex-1">
             <div className="space-y-6">
               {groupedChangelogs.map(([date, dayChangelogGroups], groupIndex) => {
                 const isLastGroup = groupIndex === groupedChangelogs.length - 1;

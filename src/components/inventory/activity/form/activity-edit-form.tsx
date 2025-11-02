@@ -13,7 +13,6 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 import { ActivityUserSelector } from "./activity-user-selector";
-import { NaturalFloatInput } from "@/components/ui/natural-float-input";
 
 interface ActivityEditFormProps {
   activity: Activity;
@@ -194,14 +193,12 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
                           Quantidade <span className="text-destructive">*</span>
                         </FormLabel>
                         <FormControl>
-                          <NaturalFloatInput
+                          <Input
+                            type="decimal"
                             value={field.value || 0.01}
                             onChange={field.onChange}
-                            min={0.01}
-                            max={999999}
-                            step={0.01}
                             placeholder="0,01"
-                            className="bg-transparent"
+                            transparent
                           />
                         </FormControl>
                         <FormMessage />

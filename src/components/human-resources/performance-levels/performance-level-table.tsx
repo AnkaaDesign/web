@@ -18,9 +18,10 @@ import { AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { IconSelector, IconChevronUp, IconChevronDown } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useUserMutations } from "../../../hooks/useUser";
-import { useBonusSimulation } from "../../../hooks/payroll";
-import { bonusKeys } from "../../../hooks/queryKeys";
-import { formatCurrency, getCurrentPayrollPeriod } from "../../../utils";
+import { useTasks } from "../../../hooks";
+import { formatCurrency, getCurrentPayrollPeriod, getBonusPeriod } from "../../../utils";
+import { calculateBonusForPosition } from "../../../utils/bonus";
+import { TASK_STATUS, COMMISSION_STATUS } from "../../../constants";
 import type { User } from "../../../types";
 
 interface PerformanceLevelTableProps {
@@ -141,12 +142,25 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
   // If today is Sept 26th or later, this returns October
   const { year: currentYear, month: currentMonth } = getCurrentPayrollPeriod();
 
-  // Use bonus simulation to get live bonus calculations
-  // This uses the same endpoint as the bonus simulation page and the payroll detail page
-  const { data: simulationData, isLoading: isLoadingBonuses, error: bonusError, refetch: refetchBonuses } = useBonusSimulation({
-    year: currentYear,
-    month: currentMonth,
-  });
+  // Get current bonus period for task counting
+  const currentPeriod = getBonusPeriod(currentYear, currentMonth);
+
+  // Fetch tasks for the current period to calculate bonuses
+  const taskQuery = useMemo(() => ({
+    limit: 1000,
+    where: {
+      status: TASK_STATUS.COMPLETED,
+      commission: {
+        in: [COMMISSION_STATUS.FULL_COMMISSION, COMMISSION_STATUS.PARTIAL_COMMISSION]
+      },
+      finishedAt: {
+        gte: currentPeriod.startDate,
+        lte: currentPeriod.endDate
+      }
+    }
+  }), [currentPeriod.startDate, currentPeriod.endDate]);
+
+  const { data: currentPeriodTasks, isLoading: isLoadingTasks } = useTasks(taskQuery);
 
   // Initialize user performance levels from props
   useEffect(() => {
@@ -157,69 +171,81 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
     setUserPerformanceLevels(levels);
   }, [users]);
 
-  // Map bonus data by user ID from simulation data
-  // When user changes performance level, we need to recalculate the bonus
-  // The bonus is calculated using a matrix (position level × performance level)
-  // We approximate the recalculation by scaling proportionally based on performance level change
+  // Calculate task quantity for bonus calculation
+  const taskQuantity = useMemo(() => {
+    if (!currentPeriodTasks?.data) return 0;
+
+    const tasks = currentPeriodTasks.data;
+    const fullCommissionCount = tasks.filter((t: any) =>
+      t.commission === COMMISSION_STATUS.FULL_COMMISSION
+    ).length;
+    const partialCommissionCount = tasks.filter((t: any) =>
+      t.commission === COMMISSION_STATUS.PARTIAL_COMMISSION
+    ).length;
+
+    // Weighted task count: full commission = 1.0, partial commission = 0.5
+    return fullCommissionCount + (partialCommissionCount * 0.5);
+  }, [currentPeriodTasks]);
+
+  // Calculate average tasks per user
+  const averageTasksPerUser = useMemo(() => {
+    // Count eligible users (bonifiable positions with performance level > 0)
+    const eligibleUsers = users.filter(user =>
+      user.position?.bonifiable === true &&
+      (userPerformanceLevels.get(user.id) || user.performanceLevel || 0) > 0
+    );
+
+    const eligibleCount = eligibleUsers.length;
+    if (eligibleCount === 0) return 0;
+
+    return taskQuantity / eligibleCount;
+  }, [users, taskQuantity, userPerformanceLevels]);
+
+  // Calculate bonuses for all users on the frontend
   const bonusByUserId = useMemo(() => {
     const map = new Map<string, number>();
 
-    if (simulationData?.data?.users && Array.isArray(simulationData.data.users)) {
-      simulationData.data.users.forEach((simulationUser: any) => {
-        if (!simulationUser.userId || simulationUser.bonusAmount == null) return;
+    users.forEach(user => {
+      // Skip if position is not bonifiable
+      if (user.position?.bonifiable !== true) {
+        map.set(user.id, 0);
+        return;
+      }
 
-        // Check if this user has a pending performance level change
-        const currentPerformanceLevel = pendingChanges.get(simulationUser.userId);
-        const originalPerformanceLevel = simulationUser.performanceLevel;
+      const positionName = user.position?.name || "Pleno I";
 
-        if (currentPerformanceLevel != null && currentPerformanceLevel !== originalPerformanceLevel) {
-          // User has a pending change - we need to estimate the new bonus
-          // The bonus calculation uses a matrix where different performance levels have different multipliers
-          // This is an approximation - the real calculation happens on the backend after saving
+      // Use pending performance level if exists, otherwise use current level
+      const performanceLevel = pendingChanges.get(user.id) ??
+                               userPerformanceLevels.get(user.id) ??
+                               user.performanceLevel ??
+                               0;
 
-          // Performance level multipliers (approximate from the matrix)
-          // Level 1 = 1x base, Level 2 = 2x base, Level 3 = 3x base, Level 4 = 3.5x base, Level 5 = 4x base
-          const multipliers: Record<number, number> = {
-            0: 0,
-            1: 1.0,
-            2: 2.0,
-            3: 3.0,
-            4: 3.5,
-            5: 4.0,
-          };
+      if (performanceLevel === 0) {
+        map.set(user.id, 0);
+        return;
+      }
 
-          const originalMultiplier = multipliers[originalPerformanceLevel] || 1.0;
-          const newMultiplier = multipliers[currentPerformanceLevel] || 1.0;
+      // Calculate bonus using the same function as bonus simulation
+      const bonus = calculateBonusForPosition(
+        positionName,
+        performanceLevel,
+        averageTasksPerUser
+      );
 
-          if (originalMultiplier > 0) {
-            // Calculate the base bonus (without performance multiplier)
-            const baseBonus = simulationUser.bonusAmount / originalMultiplier;
-            // Apply the new performance multiplier
-            const recalculatedBonus = baseBonus * newMultiplier;
-            map.set(simulationUser.userId, Math.round(recalculatedBonus * 100) / 100);
-          } else {
-            map.set(simulationUser.userId, simulationUser.bonusAmount);
-          }
-        } else {
-          // No pending change - use the original bonus from simulation
-          map.set(simulationUser.userId, simulationUser.bonusAmount);
-        }
-      });
-    }
+      map.set(user.id, bonus);
+    });
 
     return map;
-  }, [simulationData, pendingChanges]);
+  }, [users, taskQuantity, pendingChanges, userPerformanceLevels]);
 
-  // Use GLOBAL totals from simulation (all eligible users, not just visible ones)
-  // This matches the payroll page which shows all users
+  // Calculate total bonus sum from all visible users
   const totalBonusSum = useMemo(() => {
-    return simulationData?.data?.summary?.totalBonusAmount || 0;
-  }, [simulationData]);
-
-  // Get average tasks per user from simulation summary (sector-wide average)
-  const averageTasksPerUser = useMemo(() => {
-    return simulationData?.data?.summary?.averageTasksPerUser || 0;
-  }, [simulationData]);
+    let sum = 0;
+    bonusByUserId.forEach(bonus => {
+      sum += bonus;
+    });
+    return sum;
+  }, [bonusByUserId]);
 
   // Check if there are any modified users
   const hasModifiedUsers = modifiedUsers.size > 0;
@@ -306,9 +332,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
       setModifiedUsers(new Set());
       setPendingChanges(new Map());
 
-      // Invalidate bonus queries to refetch with new performance levels
-      queryClient.invalidateQueries({ queryKey: bonusKeys.all });
-      refetchBonuses();
+      // Bonuses are calculated on the frontend automatically when performance levels change
 
       // Manually refresh the list after successful update
       if (onRefresh) {
@@ -318,7 +342,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
       // API client already shows error toasts, but we can add context if needed
       console.error("Failed to update performance levels:", error);
     }
-  }, [pendingChanges, batchUpdate, updateAsync, queryClient, refetchBonuses, onRefresh]);
+  }, [pendingChanges, batchUpdate, updateAsync, queryClient, onRefresh]);
 
   // Revert all pending changes
   const revertAllChanges = useCallback(() => {
@@ -408,7 +432,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
               {visibleColumns.has("payrollNumber") && (
-                <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted w-32 p-0 !border-r-0">
+                <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted w-28 p-0 !border-r-0">
                   {onSort ? (
                     <button
                       onClick={() => onSort("payrollNumber")}
@@ -539,7 +563,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
       </div>
 
       {/* Scrollable Body Table */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden border-l border-r border-b border-border rounded-b-lg">
+      <div className="flex-1 min-h-0 overflow-y-auto border-l border-r border-b border-border rounded-b-lg">
         <Table className="w-full table-fixed">
           <TableBody>
           {users.map((user, index) => {
@@ -617,10 +641,10 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
                 {visibleColumns.has("bonus") && (
                   <TableCell className="w-32 p-0">
                     <div className="px-3 py-1.5 text-sm">
-                      {isLoadingBonuses ? (
+                      {isLoadingTasks ? (
                         <Skeleton className="h-4 w-20" />
-                      ) : bonusError ? (
-                        <span className="text-red-500 text-xs" title={String(bonusError)}>Erro</span>
+                      ) : taskQuantity === 0 ? (
+                        <span className="text-muted-foreground text-xs" title="Nenhuma tarefa no período">R$ 0,00</span>
                       ) : (
                         <>
                           {bonusByUserId.has(user.id) && bonusByUserId.get(user.id)! > 0 ? (

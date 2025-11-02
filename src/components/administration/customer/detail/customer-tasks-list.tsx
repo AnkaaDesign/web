@@ -46,7 +46,7 @@ export function CustomerTasksList({
     queryFilters: baseQueryFilters,
   } = useTableFilters<TaskGetManyFormData>({
     defaultFilters: {
-      status: [TASK_STATUS.COMPLETED],
+      // Show all tasks, not just completed ones
     },
     searchDebounceMs: 300,
     searchParamName: "customerTaskSearch",
@@ -91,7 +91,7 @@ export function CustomerTasksList({
         ...baseQueryFilters.where,  // Preserve any existing where conditions
         customerId: customerId,
       },
-      status: [TASK_STATUS.COMPLETED],
+      // Show all tasks, not filtered by status
       searchingFor: baseQueryFilters.searchingFor,  // Explicitly preserve searchingFor
     };
   }, [baseQueryFilters, customerId]);

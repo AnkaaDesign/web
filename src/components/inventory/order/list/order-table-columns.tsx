@@ -65,8 +65,12 @@ export const createOrderColumns = (): OrderColumn[] => [
         const total = order.items.reduce((sum, item) => {
           const quantity = item.orderedQuantity || 0;
           const price = item.price || 0;
-          const tax = item.tax || 0;
-          const itemTotal = quantity * price * (1 + tax / 100);
+          const icms = item.icms || 0;
+          const ipi = item.ipi || 0;
+          const subtotal = quantity * price;
+          const icmsAmount = subtotal * (icms / 100);
+          const ipiAmount = subtotal * (ipi / 100);
+          const itemTotal = subtotal + icmsAmount + ipiAmount;
           return sum + itemTotal;
         }, 0);
         return <span className="text-sm font-medium tabular-nums">{formatCurrency(total)}</span>;

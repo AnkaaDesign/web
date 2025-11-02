@@ -8,10 +8,14 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { SpecificationsCard } from "@/components/inventory/item/brand/detail/specifications-card";
 import { RelatedItemsCard } from "@/components/inventory/item/brand/detail/related-items-card";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditItems } from "@/utils/permissions/entity-permissions";
 
 const BrandDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditItems(user);
 
   const {
     data: response,
@@ -152,12 +156,12 @@ const BrandDetailsPage = () => {
               icon: IconRefresh,
               onClick: handleRefresh,
             },
-            {
+            ...(canEdit ? [{
               key: "edit",
               label: "Editar",
               icon: IconEdit,
               onClick: handleEdit,
-            },
+            }] : []),
           ]}
         />
       </div>

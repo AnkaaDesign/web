@@ -6,7 +6,6 @@ import { useCustomerBatchMutations } from "../../../../hooks";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import { IconEdit, IconTrash, IconX, IconLoader2, IconUsers, IconCheck } from "@tabler/icons-react";
 import {
   AlertDialog,
@@ -55,7 +54,7 @@ export function CustomerBatchActionsBar({ selectedCustomers, onSelectionClear, o
       const ids = selectedCustomers.map((customer) => customer.id);
       await batchDeleteAsync({ customerIds: ids });
 
-      toast.success(`${selectedCount} ${selectedCount === 1 ? "cliente excluído" : "clientes excluídos"} com sucesso`);
+      // Success toast is handled by the API client
       onSelectionClear();
       onSuccess?.();
     } catch (error) {

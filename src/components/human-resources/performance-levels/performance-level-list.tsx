@@ -62,26 +62,12 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const tableRef = useRef<PerformanceLevelTableRef>(null);
-  const hasInitializedSectorsRef = useRef(false);
 
-  // Load sectors to get default sector IDs
+  // Load sectors for filter modal
   const { data: sectorsData } = useSectors({
     orderBy: { name: "asc" },
     limit: 100,
   });
-
-  // Get default sector IDs (production, warehouse, leader privileges)
-  const defaultSectorIds = useMemo(() => {
-    if (!sectorsData?.data) return [];
-
-    return sectorsData.data
-      .filter(sector =>
-        sector.privilege === 'PRODUCTION' ||
-        sector.privilege === 'WAREHOUSE' ||
-        sector.privilege === 'LEADER'
-      )
-      .map(sector => sector.id);
-  }, [sectorsData?.data]);
 
   // Use table state hook for sorting
   const {
@@ -107,26 +93,17 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
       where: {
-        isActive: true,  // By default, only show active users
+        status: USER_STATUS.CONTRACTED,  // Only CONTRACTED users (not dismissed, not inactive)
+        position: {
+          is: {
+            bonifiable: true  // Only users with bonifiable positions
+          }
+        }
       }
     },
     searchDebounceMs: 500, // Increased debounce for better performance
     searchParamName: "search",
   });
-
-  // Set default sector filters when they become available
-  useEffect(() => {
-    if (!hasInitializedSectorsRef.current && defaultSectorIds.length > 0) {
-      setFilters(prev => ({
-        ...prev,
-        where: {
-          ...prev.where,
-          sectorId: { in: defaultSectorIds }
-        }
-      }));
-      hasInitializedSectorsRef.current = true;
-    }
-  }, [defaultSectorIds, setFilters]);
 
   // Convert sort configs to orderBy format
   const orderBy = useMemo(() => {
@@ -137,25 +114,15 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
 
   // Memoize query params to prevent unnecessary refetches
   const userQueryParams = useMemo(() => {
-    // Use default sectors if no sectors are explicitly filtered
-    const currentSectorFilter = queryFilters.where?.sectorId;
-    const sectorsToFilter = currentSectorFilter?.in || defaultSectorIds;
-
     return {
       ...queryFilters,
-      where: {
-        ...queryFilters.where,
-        ...(sectorsToFilter.length > 0 && {
-          sectorId: { in: sectorsToFilter }
-        })
-      },
       include: {
         position: true,
         sector: true,
       },
       orderBy,
     };
-  }, [queryFilters, orderBy, defaultSectorIds]);
+  }, [queryFilters, orderBy]);
 
   const { data: response, isLoading, error, refetch } = useUsers(userQueryParams);
 

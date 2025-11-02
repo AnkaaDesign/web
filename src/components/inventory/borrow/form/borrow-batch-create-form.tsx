@@ -47,6 +47,12 @@ export const BorrowBatchCreateForm = () => {
   console.log("=== BorrowBatchCreateForm rendered ===");
 
   // URL state management
+  const urlState = useBorrowFormUrlState({
+    defaultQuantity: 1,
+    preserveQuantitiesOnDeselect: false,
+    defaultPageSize: 40,
+  });
+
   const {
     selectedItems,
     quantities,
@@ -74,11 +80,7 @@ export const BorrowBatchCreateForm = () => {
     updateGlobalUserId,
     selectionCount,
     clearAllSelections,
-  } = useBorrowFormUrlState({
-    defaultQuantity: 1,
-    preserveQuantitiesOnDeselect: false,
-    defaultPageSize: 40,
-  });
+  } = urlState;
 
   // Form setup with validation
   const form = useForm<BorrowBatchFormData>({
@@ -358,6 +360,8 @@ export const BorrowBatchCreateForm = () => {
                     onPageChange={setPage}
                     onPageSizeChange={setPageSize}
                     onTotalRecordsChange={setTotalRecords}
+                    // Batch selection function for atomic updates
+                    updateSelectedItems={urlState.batchUpdateSelection}
                     className="h-full"
                   />
                 </div>

@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import type { Task } from "../../../../types";
 import { routes, TASK_STATUS } from "../../../../constants";
 import { formatDate, getHoursBetween, isDateInPast, calculateTaskMeasures, formatTaskMeasures } from "../../../../utils";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { DeadlineCountdown } from "./deadline-countdown";
@@ -35,6 +37,8 @@ interface TaskRow extends Task {
 
 export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTableProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditTasks(user);
   const [sortConfigs, setSortConfigs] = useState<SortConfig[]>([]);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
@@ -171,15 +175,16 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
   );
 
   // All columns are visible by default
+  // Only show select column for users who can edit tasks
   const columns = useMemo(() => {
-    const baseColumns = allColumns.filter((col) => col.id === "select");
+    const baseColumns = canEdit ? allColumns.filter((col) => col.id === "select") : [];
     const visibleDataColumns = allColumns.filter((col) => {
       if (col.id === "select") return false;
       if (!visibleColumns || visibleColumns.size === 0) return true;
       return visibleColumns.has(col.id);
     });
     return [...baseColumns, ...visibleDataColumns];
-  }, [allColumns, visibleColumns]);
+  }, [allColumns, visibleColumns, canEdit]);
 
   // Prepare tasks with deadline info and apply cumulative sorting
   const preparedTasks = useMemo<TaskRow[]>(() => {
@@ -575,7 +580,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
                 key={task.id}
                 className={cn("cursor-pointer transition-colors", index < preparedTasks.length - 1 && "border-b border-neutral-400 dark:border-neutral-600", getRowClassName(task))}
                 onClick={(e) => handleRowClick(e, task.id)}
-                onContextMenu={(e) => handleContextMenu(e, task)}
+                onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
               >
                 {columns.map((column) => (
                   <TableCell key={column.id} className="py-2 truncate max-w-0 whitespace-nowrap">

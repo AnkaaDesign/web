@@ -54,7 +54,7 @@ const taskBatchEditSchema = z.object({
           finishedAt: nullableDate.optional(),
           customerId: z.string().uuid().nullable().optional(),
           sectorId: z.string().uuid().nullable().optional(),
-          generalPaintingId: z.string().uuid().nullable().optional(),
+          paintId: z.string().uuid().nullable().optional(),
           priority: z
             .enum(Object.values(PRIORITY_TYPE) as [string, ...string[]])
             .nullable()
@@ -114,7 +114,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                 finishedAt: task.finishedAt ? new Date(task.finishedAt) : null,
                 customerId: task.customerId || null,
                 sectorId: task.sectorId || null,
-                generalPaintingId: task.generalPainting?.id || null,
+                paintId: task.generalPainting?.id || null,
                 priority: task.priority || null,
                 truckHeight: task.truck?.height || null,
                 truckLength: task.truck?.length || null,
@@ -148,7 +148,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
           finishedAt: task.finishedAt ? new Date(task.finishedAt) : null,
           customerId: task.customerId || null,
           sectorId: task.sectorId || null,
-          generalPaintingId: task.generalPainting?.id || null,
+          paintId: task.generalPainting?.id || null,
           priority: task.priority || null,
           truckHeight: task.truck?.height || null,
           truckLength: task.truck?.length || null,
@@ -173,7 +173,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
           task.data.plate !== originalTask.plate ||
           task.data.customerId !== originalTask.customerId ||
           task.data.sectorId !== originalTask.sectorId ||
-          task.data.generalPaintingId !== originalTask.generalPainting?.id ||
+          task.data.paintId !== originalTask.generalPainting?.id ||
           task.data.priority !== originalTask.priority ||
           task.data.entryDate?.toISOString() !== originalTask.entryDate ||
           task.data.term?.toISOString() !== originalTask.term ||

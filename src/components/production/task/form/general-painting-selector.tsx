@@ -150,7 +150,7 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
   return (
     <FormField
       control={control}
-      name="generalPaintingId"
+      name="paintId"
       render={({ field }) => {
         // Update selected paint when field value changes
         useEffect(() => {

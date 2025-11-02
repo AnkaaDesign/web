@@ -46,9 +46,10 @@ export function ColumnVisibilityManager({ visibleColumns, onVisibilityChange }: 
     return columns.filter((col) => col.header.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [columns, searchQuery]);
 
-  const handleToggle = (columnKey: string, checked: boolean) => {
+  const handleToggle = (columnKey: string, checked: boolean | undefined) => {
     const newVisible = new Set(localVisible);
-    if (checked) {
+    const isChecked = checked === true;
+    if (isChecked) {
       newVisible.add(columnKey);
     } else {
       newVisible.delete(columnKey);
@@ -105,8 +106,8 @@ export function ColumnVisibilityManager({ visibleColumns, onVisibilityChange }: 
               type="text"
               placeholder="Buscar coluna..."
               value={searchQuery}
-              onChange={(value) => setSearchQuery(value as string)}
-              className="pl-9 h-9"
+              onChange={(value) => setSearchQuery(String(value || ""))}
+              className="pl-9 h-9 bg-transparent"
             />
           </div>
 
@@ -129,7 +130,7 @@ export function ColumnVisibilityManager({ visibleColumns, onVisibilityChange }: 
                 htmlFor={`column-${column.key}`}
               >
                 <span className="text-sm">{column.header}</span>
-                <Switch id={`column-${column.key}`} checked={localVisible.has(column.key)} onCheckedChange={(checked) => handleToggle(column.key, !!checked)} />
+                <Switch id={`column-${column.key}`} checked={localVisible.has(column.key)} onCheckedChange={(checked) => handleToggle(column.key, checked)} />
               </Label>
             ))}
           </div>

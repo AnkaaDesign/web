@@ -155,6 +155,12 @@ export function PaintSpecificationsCard({ paint, className }: PaintSpecification
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-muted-foreground">Informações Básicas</h3>
           <div className="space-y-2">
+            {paint.code && (
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground">Código</span>
+                <span className="text-sm font-medium">{paint.code}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
               <span className="text-sm font-medium text-muted-foreground">Marca</span>
               <span className="text-sm font-medium">{paint.paintBrand?.name || "N/A"}</span>
@@ -178,14 +184,7 @@ export function PaintSpecificationsCard({ paint, className }: PaintSpecification
             {paint.paintType && (
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground">Tipo de Tinta</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{paint.paintType.name}</span>
-                  {paint.paintType.needGround && (
-                    <Badge variant="outline" className="text-xs">
-                      Requer Primer
-                    </Badge>
-                  )}
-                </div>
+                <span className="text-sm font-medium">{paint.paintType.name}</span>
               </div>
             )}
             {paint.tags && paint.tags.length > 0 && (

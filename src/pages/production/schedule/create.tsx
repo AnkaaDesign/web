@@ -1,15 +1,22 @@
-import { UnderConstruction } from "@/components/navigation/under-construction";
+import { PrivilegeRoute } from "@/components/navigation/privilege-route";
+import { SECTOR_PRIVILEGES } from "../../../constants";
+import { usePageTracker } from "@/hooks/use-page-tracker";
+import { TaskCreateForm } from "@/components/production/task/form/task-create-form";
 
-export const ScheduleCreate = () => {
+export const TaskCreatePage = () => {
+  // Track page access
+  usePageTracker({
+    title: "Criar Tarefa",
+    icon: "clipboard-list",
+  });
+
   return (
-    <div className="h-full">
-      <div className="flex flex-col h-full">
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-3xl mx-auto space-y-4 pb-6">
-            <UnderConstruction title="Criar Cronograma" />
-          </div>
-        </div>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+      <div className="h-full">
+        <TaskCreateForm />
       </div>
-    </div>
+    </PrivilegeRoute>
   );
 };
+
+export default TaskCreatePage;

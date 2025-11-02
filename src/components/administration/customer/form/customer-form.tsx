@@ -105,36 +105,46 @@ export function CustomerForm(props: CustomerFormProps) {
   // CNPJ lookup hook
   const { lookupCnpj } = useCnpjLookup({
     onSuccess: async (data) => {
+      // In edit mode, only autofill empty fields to avoid overwriting existing data
+      // In create mode, autofill all fields
+      const currentValues = form.getValues();
+      const isEditMode = mode === "update";
+
+      // Helper to check if a field should be filled
+      const shouldFillField = (fieldValue: any) => !isEditMode || fieldValue === null || fieldValue === undefined || fieldValue === "";
+
       // Autofill fields with data from Brasil API
-      form.setValue("fantasyName", data.fantasyName, { shouldDirty: true, shouldValidate: true });
-      if (data.corporateName) {
+      if (shouldFillField(currentValues.fantasyName)) {
+        form.setValue("fantasyName", data.fantasyName, { shouldDirty: true, shouldValidate: true });
+      }
+      if (data.corporateName && shouldFillField(currentValues.corporateName)) {
         form.setValue("corporateName", data.corporateName, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.email) {
+      if (data.email && shouldFillField(currentValues.email)) {
         form.setValue("email", data.email, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.zipCode) {
+      if (data.zipCode && shouldFillField(currentValues.zipCode)) {
         form.setValue("zipCode", data.zipCode, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.logradouroType) {
+      if (data.logradouroType && shouldFillField(currentValues.logradouro)) {
         form.setValue("logradouro", data.logradouroType, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.address) {
+      if (data.address && shouldFillField(currentValues.address)) {
         form.setValue("address", data.address, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.addressNumber) {
+      if (data.addressNumber && shouldFillField(currentValues.addressNumber)) {
         form.setValue("addressNumber", data.addressNumber, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.addressComplement) {
+      if (data.addressComplement && shouldFillField(currentValues.addressComplement)) {
         form.setValue("addressComplement", data.addressComplement, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.neighborhood) {
+      if (data.neighborhood && shouldFillField(currentValues.neighborhood)) {
         form.setValue("neighborhood", data.neighborhood, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.city) {
+      if (data.city && shouldFillField(currentValues.city)) {
         form.setValue("city", data.city, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.state) {
+      if (data.state && shouldFillField(currentValues.state)) {
         form.setValue("state", data.state, { shouldDirty: true, shouldValidate: true });
       }
       if (data.phones && data.phones.length > 0) {
@@ -145,12 +155,12 @@ export function CustomerForm(props: CustomerFormProps) {
           form.setValue("phones", [...currentPhones, ...newPhones], { shouldDirty: true, shouldValidate: true });
         }
       }
-      if (data.situacaoCadastral) {
+      if (data.situacaoCadastral && shouldFillField(currentValues.situacaoCadastral)) {
         form.setValue("situacaoCadastral", data.situacaoCadastral, { shouldDirty: true, shouldValidate: true });
       }
 
-      // Handle economic activity (CNAE)
-      if (data.economicActivityCode && data.economicActivityDescription) {
+      // Handle economic activity (CNAE) - only if field is empty
+      if (data.economicActivityCode && data.economicActivityDescription && shouldFillField(currentValues.economicActivityId)) {
         try {
           // Create or get existing activity (API is idempotent)
           const response = await createEconomicActivity({

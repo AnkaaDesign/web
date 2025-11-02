@@ -25,6 +25,10 @@ export default function SupplierCreate() {
     }
   };
 
+  const handleFormStateChange = (formState: { isValid: boolean; isDirty: boolean }) => {
+    setIsFormValid(formState.isValid);
+  };
+
   const handleCancel = () => {
     navigate(routes.inventory.suppliers.root);
   };
@@ -71,7 +75,7 @@ export default function SupplierCreate() {
       {/* Main Content Card - Dashboard style scrolling */}
       <div className="flex-1 overflow-hidden max-w-4xl mx-auto w-full">
         <div className="h-full bg-white rounded-lg shadow-sm border overflow-hidden">
-          <SupplierForm mode="create" onSubmit={handleSubmit} isSubmitting={createSupplier.isPending} onValidityChange={setIsFormValid} />
+          <SupplierForm mode="create" onSubmit={handleSubmit} isSubmitting={createSupplier.isPending} onFormStateChange={handleFormStateChange} />
         </div>
       </div>
     </div>

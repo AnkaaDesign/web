@@ -115,14 +115,6 @@ export function PaintProductionHistoryCard({ paint, className }: PaintProduction
     });
   }, [filteredItems, sortConfigs]);
 
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const total = productionItems.length;
-    const totalVolume = productionItems.reduce((sum, item) => sum + item.volumeLiters, 0);
-    const lastProduction = productionItems.length > 0 ? productionItems.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0].createdAt : null;
-    return { total, totalVolume, lastProduction };
-  }, [productionItems]);
-
   // Paginate items
   const paginatedItems = useMemo(() => {
     // Ensure currentPage is at least 1 to prevent negative indexes
@@ -198,30 +190,12 @@ export function PaintProductionHistoryCard({ paint, className }: PaintProduction
             <IconPaint className="h-5 w-5" />
             Histórico de Produção
           </div>
-          {stats.total > 0 && (
+          {productionItems.length > 0 && (
             <Button variant="outline" size="sm" onClick={() => navigate(routes.painting.productions.root)}>
               Ver todas as produções
             </Button>
           )}
         </CardTitle>
-
-        {/* Statistics */}
-        {stats.total > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-            <div className="bg-card-nested rounded-lg p-3 border border-border">
-              <p className="text-xs text-muted-foreground mb-1">Total de Produções</p>
-              <p className="text-lg font-semibold text-purple-600 dark:text-purple-400">{stats.total}</p>
-            </div>
-            <div className="bg-card-nested rounded-lg p-3 border border-border">
-              <p className="text-xs text-muted-foreground mb-1">Volume Total</p>
-              <p className="text-lg font-semibold text-blue-600 dark:text-blue-400">{stats.totalVolume.toFixed(2)}L</p>
-            </div>
-            <div className="bg-card-nested rounded-lg p-3 border border-border">
-              <p className="text-xs text-muted-foreground mb-1">Última Produção</p>
-              <p className="text-lg font-semibold text-green-600 dark:text-green-400">{stats.lastProduction ? formatDate(stats.lastProduction) : "N/A"}</p>
-            </div>
-          </div>
-        )}
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col space-y-4 p-6">

@@ -24,7 +24,8 @@ export function EpiEditForm({ item, onSubmit, isSubmitting }: EpiEditFormProps) 
       reorderQuantity: item.reorderQuantity,
       maxQuantity: item.maxQuantity,
       boxQuantity: item.boxQuantity,
-      tax: item.tax,
+      icms: item.icms,
+      ipi: item.ipi,
       measures: item.measures || [], // Include measures array
       barcodes: item.barcodes || [],
       shouldAssignToUser: item.shouldAssignToUser,
@@ -42,7 +43,6 @@ export function EpiEditForm({ item, onSubmit, isSubmitting }: EpiEditFormProps) 
       ppeCA: item.ppeCA,
       ppeDeliveryMode: item.ppeDeliveryMode,
       ppeStandardQuantity: item.ppeStandardQuantity,
-      ppeAutoOrderMonths: item.ppeAutoOrderMonths,
     };
   }, [item]);
 

@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { useTasks } from "../../../../hooks";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
@@ -33,6 +35,8 @@ export function TaskHistoryTable({
   navigationRoute = 'history',
 }: TaskHistoryTableProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditTasks(user);
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -329,18 +333,20 @@ export function TaskHistoryTable({
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-              {/* Selection column */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={partiallySelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all tasks"
-                    disabled={isLoading || tasks.length === 0}
-                  />
-                </div>
-              </TableHead>
+              {/* Selection column - only show for users who can edit */}
+              {canEdit && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={partiallySelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all tasks"
+                      disabled={isLoading || tasks.length === 0}
+                    />
+                  </div>
+                </TableHead>
+              )}
 
               {/* Data columns */}
               {columns.map((column) => (
@@ -432,14 +438,16 @@ export function TaskHistoryTable({
                       console.log('Task history row clicked, navigating to:', detailRoute);
                       navigate(detailRoute);
                     }}
-                    onContextMenu={(e) => handleContextMenu(e, task)}
+                    onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
                   >
-                    {/* Selection checkbox */}
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={taskIsSelected} onCheckedChange={() => handleSelectItem(task.id)} aria-label={`Select ${task.name}`} data-checkbox />
-                      </div>
-                    </TableCell>
+                    {/* Selection checkbox - only show for users who can edit */}
+                    {canEdit && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={taskIsSelected} onCheckedChange={() => handleSelectItem(task.id)} aria-label={`Select ${task.name}`} data-checkbox />
+                        </div>
+                      </TableCell>
+                    )}
 
                     {/* Data columns */}
                     {columns.map((column) => (

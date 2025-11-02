@@ -14,11 +14,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { FileViewerProvider } from "@/components/file";
 import { toast } from "sonner";
 import { usePageTracker } from "@/hooks/use-page-tracker";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditSuppliers } from "@/utils/permissions/entity-permissions";
 
 const SupplierDetailsPage = () => {
   usePageTracker({ title: "supplier-detail" });
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditSuppliers(user);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const {
@@ -102,18 +106,18 @@ const SupplierDetailsPage = () => {
                 onClick: () => refetch(),
                 loading: isRefetching,
               },
-              {
+              ...(canEdit ? [{
                 key: "edit",
                 label: "Editar",
                 icon: IconEdit,
                 onClick: () => navigate(routes.inventory.suppliers.edit(id)),
-              },
-              {
+              }] : []),
+              ...(canEdit ? [{
                 key: "delete",
                 label: "Excluir",
                 icon: IconTrash,
                 onClick: () => setIsDeleteDialogOpen(true),
-              },
+              }] : []),
             ]}
           />
 

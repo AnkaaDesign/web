@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useItemCategories } from "../../../../hooks";
+import { useItemCategories, useItemMutations, useItemBatchMutations } from "../../../../hooks";
 import type { Item } from "../../../../types";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { routes, ITEM_CATEGORY_TYPE, PPE_TYPE } from "../../../../constants";
@@ -164,6 +164,12 @@ export function PpeList({ className }: PpeListProps) {
       filters.outOfStock = true;
     }
 
+    // Parse show inactive filter
+    const showInactive = searchParams.get("showInactive");
+    if (showInactive === "true") {
+      filters.showInactive = true;
+    }
+
     return filters;
   }, [searchParams]);
 
@@ -192,6 +198,7 @@ export function PpeList({ className }: PpeListProps) {
     newParams.delete("ppeType");
     newParams.delete("lowStock");
     newParams.delete("outOfStock");
+    newParams.delete("showInactive");
 
     // Add search parameter
     if (searchingFor) {
@@ -215,6 +222,10 @@ export function PpeList({ className }: PpeListProps) {
 
     if (filters.outOfStock) {
       newParams.set("outOfStock", "true");
+    }
+
+    if (filters.showInactive) {
+      newParams.set("showInactive", "true");
     }
 
     setSearchParams(newParams, { replace: true });
@@ -284,6 +295,10 @@ export function PpeList({ className }: PpeListProps) {
     [debouncedSearch],
   );
 
+  // Get mutation hooks
+  const { update } = useItemMutations();
+  const { batchUpdate } = useItemBatchMutations();
+
   // Context menu handlers
   const handleBulkEdit = (items: Item[]) => {
     if (items.length === 1) {
@@ -293,6 +308,52 @@ export function PpeList({ className }: PpeListProps) {
       // Multiple items - navigate to batch edit page (note: batch edit route may need to be added to ppe routes)
       const ids = items.map((item) => item.id).join(",");
       navigate(`${routes.inventory.products.batchEdit}?ids=${ids}&category=epi`);
+    }
+  };
+
+  const handleActivate = async (items: Item[]) => {
+    try {
+      if (items.length === 1) {
+        // Single item update
+        const updateData = { id: items[0].id, data: { isActive: true } };
+
+        await update(updateData);
+      } else {
+        // Batch update
+        const updateItems = items.map((item) => ({
+          id: item.id,
+          data: { isActive: true },
+        }));
+        const batchData = { items: updateItems };
+
+        await batchUpdate(batchData);
+      }
+    } catch (error: any) {
+      // Error is handled by the API client with detailed message
+      console.error("Error activating PPE item(s):", error);
+    }
+  };
+
+  const handleDeactivate = async (items: Item[]) => {
+    try {
+      if (items.length === 1) {
+        // Single item update
+        const updateData = { id: items[0].id, data: { isActive: false } };
+
+        await update(updateData);
+      } else {
+        // Batch update
+        const updateItems = items.map((item) => ({
+          id: item.id,
+          data: { isActive: false },
+        }));
+        const batchData = { items: updateItems };
+
+        await batchUpdate(batchData);
+      }
+    } catch (error: any) {
+      // Error is handled by the API client with detailed message
+      console.error("Error deactivating PPE item(s):", error);
     }
   };
 
@@ -329,7 +390,15 @@ export function PpeList({ className }: PpeListProps) {
 
         {/* Paginated table */}
         <div className="flex-1 min-h-0">
-          <PpeTable visibleColumns={visibleColumns} onEdit={handleBulkEdit} filters={queryFilters} className="h-full" onDataChange={handleTableDataChange} />
+          <PpeTable
+            visibleColumns={visibleColumns}
+            onEdit={handleBulkEdit}
+            onActivate={handleActivate}
+            onDeactivate={handleDeactivate}
+            filters={queryFilters}
+            className="h-full"
+            onDataChange={handleTableDataChange}
+          />
         </div>
       </CardContent>
 

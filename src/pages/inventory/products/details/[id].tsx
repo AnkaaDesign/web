@@ -11,10 +11,14 @@ import { MetricsCard } from "@/components/inventory/item/detail/metrics-card";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { PageHeader } from "@/components/ui/page-header";
 import { PpeInfoCard } from "@/components/inventory/item/detail/ppe-info-card";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditItems } from "@/utils/permissions/entity-permissions";
 
 const ProductDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditItems(user);
 
   const {
     data: response,
@@ -186,12 +190,12 @@ const ProductDetailsPage = () => {
               icon: IconRefresh,
               onClick: handleRefresh,
             },
-            {
+            ...(canEdit ? [{
               key: "edit",
               label: "Editar",
               icon: IconEdit,
               onClick: handleEdit,
-            },
+            }] : []),
           ]}
           breadcrumbs={[
             { label: "Início", href: routes.home },

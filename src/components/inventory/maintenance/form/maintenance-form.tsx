@@ -83,7 +83,8 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
 
   const form = useForm<FormData>({
     resolver: mode === "create" ? zodResolver(maintenanceCreateSchema) : zodResolver(maintenanceUpdateSchema),
-    mode: "onChange",
+    mode: "onBlur", // Validate on blur for better UX
+    reValidateMode: "onChange", // Re-validate on change after first validation
     defaultValues: mode === "create" ? createDefaults : (processedDefaultValues as FormData),
   });
 
@@ -172,7 +173,7 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
                         <FormItem>
                           <FormLabel className={isRequired ? "after:content-['*'] after:ml-0.5 after:text-destructive" : ""}>Nome da Manutenção</FormLabel>
                           <FormControl>
-                            <Input placeholder="Ex: Troca de óleo" disabled={isSubmitting} {...field} />
+                            <Input placeholder="Ex: Troca de óleo" disabled={isSubmitting} className="bg-transparent" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -260,6 +261,7 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
                               min={1}
                               placeholder="Quantidade"
                               disabled={isSubmitting}
+                              className="bg-transparent"
                               {...field}
                               value={field.value || 1}
                               onChange={(e) => {

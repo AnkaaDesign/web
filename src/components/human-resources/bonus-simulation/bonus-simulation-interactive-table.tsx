@@ -25,7 +25,12 @@ import {
   IconX,
   IconBuilding,
   IconDownload,
-  IconUserMinus
+  IconUserMinus,
+  IconBriefcase,
+  IconUserCheck,
+  IconArrowUp,
+  IconArrowDown,
+  IconSelector
 } from "@tabler/icons-react";
 import { formatCurrency, getBonusPeriod, getCurrentPayrollPeriod, formatDate } from "../../../utils";
 import { useUsers, useSectors, useTasks } from "../../../hooks";
@@ -35,6 +40,7 @@ import { TASK_STATUS, COMMISSION_STATUS, USER_STATUS } from "../../../constants"
 import { FilterIndicators, FilterIndicator } from "@/components/ui/filter-indicator";
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
 import { toast } from "sonner";
+import { BonusSimulationFilters } from "./bonus-simulation-filters";
 
 // Position levels mapping
 const POSITIONS = [
@@ -45,15 +51,16 @@ const POSITIONS = [
 
 // Export columns configuration
 const EXPORT_COLUMNS: ExportColumn<SimulatedUser>[] = [
+  { id: "payrollNumber", label: "Nº Folha", getValue: (user: SimulatedUser) => user.payrollNumber?.toString() || "-" },
   { id: "name", label: "Nome", getValue: (user: SimulatedUser) => user.name },
   { id: "sectorName", label: "Setor", getValue: (user: SimulatedUser) => user.sectorName || "-" },
   { id: "position", label: "Cargo", getValue: (user: SimulatedUser) => user.position },
-  { id: "performanceLevel", label: "Nível de Performance", getValue: (user: SimulatedUser) => user.performanceLevel.toString() },
+  { id: "performanceLevel", label: "Performance", getValue: (user: SimulatedUser) => user.performanceLevel.toString() },
   { id: "bonusAmount", label: "Bônus", getValue: (user: SimulatedUser) => formatCurrency(user.bonusAmount) },
 ];
 
 // Default visible columns (all columns)
-const DEFAULT_VISIBLE_COLUMNS = new Set(["name", "sectorName", "position", "performanceLevel", "bonusAmount"]);
+const DEFAULT_VISIBLE_COLUMNS = new Set(["payrollNumber", "name", "sectorName", "position", "performanceLevel", "bonusAmount"]);
 
 // Performance level selector with chevron buttons
 interface PerformanceLevelSelectorProps {
@@ -129,6 +136,7 @@ interface SimulatedUser {
   id: string;
   name: string;
   email: string;
+  payrollNumber: number | null;
   originalPosition: string;
   originalPerformanceLevel: number;
   sectorId: string | null;
@@ -147,14 +155,24 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
   // State
   const [taskQuantity, setTaskQuantity] = useState<number>(0); // Will be set from current period
   const [originalTaskQuantity, setOriginalTaskQuantity] = useState<number>(0); // Store original for restore
-  const [taskInput, setTaskInput] = useState<string>('0.0'); // String value for controlled input
-  const [averageInput, setAverageInput] = useState<string>('0.0'); // String value for controlled input
+  const [taskInput, setTaskInput] = useState<string>('0,0'); // String value for controlled input (Brazilian format)
+  const [averageInput, setAverageInput] = useState<string>('0,0'); // String value for controlled input (Brazilian format)
   const [simulatedUsers, setSimulatedUsers] = useState<SimulatedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Filter state - initialize with default sectors
-  const [selectedSectorIds, setSelectedSectorIds] = useState<string[]>([]);
-  const [excludedUserIds, setExcludedUserIds] = useState<string[]>([]);
+  // Filter state - no default filters, show all eligible users
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [filters, setFilters] = useState({
+    sectorIds: [] as string[],
+    positionIds: [] as string[],
+    includeUserIds: [] as string[],
+    excludeUserIds: [] as string[],
+    showOnlyEligible: true // Default to showing only eligible users
+  });
+
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<'payrollNumber' | 'name' | 'sectorName' | 'position' | 'performanceLevel' | 'bonusAmount' | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Get current bonus period for task counting
   // Get current payroll period (26th-25th cycle) - centralized utility
@@ -174,30 +192,6 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
     orderBy: { name: "asc" },
     limit: 100
   });
-
-  // Get default sector IDs (production, warehouse, leader privileges)
-  const defaultSectorIds = useMemo(() => {
-    if (!sectorsData?.data) return [];
-
-    return sectorsData.data
-      .filter(sector =>
-        sector.privilege === 'PRODUCTION' ||
-        sector.privilege === 'WAREHOUSE' ||
-        sector.privilege === 'LEADER'
-      )
-      .map(sector => sector.id);
-  }, [sectorsData?.data]);
-
-  // Set default sectors when they become available
-  // Use a ref to track if we've initialized to avoid dependency issues
-  const hasInitializedSectorsRef = React.useRef(false);
-
-  useEffect(() => {
-    if (!hasInitializedSectorsRef.current && defaultSectorIds.length > 0) {
-      setSelectedSectorIds(defaultSectorIds);
-      hasInitializedSectorsRef.current = true;
-    }
-  }, [defaultSectorIds]);
 
   // Fetch tasks for current period to get actual count
   // Ensure dates are set to exact times: 26th at 00:00:00.000 and 25th at 23:59:59.999
@@ -226,11 +220,11 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
 
   const { data: currentPeriodTasks } = useTasks(taskQuery);
 
-  // Fetch ALL CONTRACTED users for simulation
-  // In simulation mode, user can include/exclude anyone, not just "eligible" users
+  // Fetch all contracted users for bonus simulation
+  // Client-side filters will handle eligibility, sectors, positions, etc.
   const { data: usersData } = useUsers({
     where: {
-      status: USER_STATUS.CONTRACTED // Only CONTRACTED users (not experience periods)
+      status: USER_STATUS.CONTRACTED, // Only CONTRACTED users (not dismissed, not inactive)
     },
     include: {
       position: true,
@@ -280,7 +274,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
         console.log('Setting initial weighted task quantity to:', weightedTaskCount);
         setTaskQuantity(weightedTaskCount);
         setOriginalTaskQuantity(weightedTaskCount);
-        setTaskInput(weightedTaskCount.toFixed(1));
+        setTaskInput(weightedTaskCount.toFixed(1).replace('.', ','));
       }
     } else {
       console.log('No tasks data or failed request:', currentPeriodTasks);
@@ -290,50 +284,137 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
   // Initialize simulated users from fetched data
   useEffect(() => {
     if (usersData?.data && usersData.data.length > 0) {
+      // Calculate initial average for bonus calculation
+      const eligibleCount = usersData.data.length;
+      const initialAverage = eligibleCount > 0 ? taskQuantity / eligibleCount : 0;
+
       const users = usersData.data.map(user => {
         const initialPosition = user.position?.name || "Pleno I";
         const initialPerformanceLevel = user.performanceLevel || 3;
+
+        // Calculate initial bonus immediately
+        const initialBonus = calculateBonusForPosition(
+          initialPosition,
+          initialPerformanceLevel,
+          initialAverage
+        );
 
         return {
           id: user.id,
           name: user.name,
           email: user.email,
+          payrollNumber: user.payrollNumber || null,
           originalPosition: initialPosition,
           originalPerformanceLevel: initialPerformanceLevel,
           sectorId: user.sector?.id || null,
           sectorName: user.sector?.name || null,
           position: initialPosition,
           performanceLevel: initialPerformanceLevel,
-          bonusAmount: 0 // Will be calculated by effect
+          bonusAmount: initialBonus
         };
       });
       setSimulatedUsers(users);
       setIsLoading(false);
     }
-  }, [usersData]); // Removed taskQuantity dependency to prevent re-initialization
+  }, [usersData, taskQuantity]); // Added taskQuantity back to recalculate on task changes
 
   // Apply filters to get visible users
   const filteredUsers = useMemo(() => {
     let filtered = simulatedUsers;
 
-    // Apply sector filter
-    // If sectors are loaded and user hasn't selected any, use default sectors
-    const sectorsToFilter = selectedSectorIds.length > 0 ? selectedSectorIds : defaultSectorIds;
-    if (sectorsToFilter.length > 0) {
+    // Apply eligibility filter
+    // A user is eligible if:
+    // 1. They have a bonifiable position
+    // 2. They are CONTRACTED status (already filtered in the query)
+    // 3. They have a performance level > 0
+    if (filters.showOnlyEligible) {
+      filtered = filtered.filter(user => {
+        // Find the original user data to check position bonifiable flag
+        const originalUser = usersData?.data?.find(u => u.id === user.id);
+        const isBonifiable = originalUser?.position?.bonifiable === true;
+        const hasPerformanceLevel = user.performanceLevel > 0;
+
+        return isBonifiable && hasPerformanceLevel;
+      });
+    }
+
+    // Apply sector filter (only if sectors are explicitly selected)
+    if (filters.sectorIds.length > 0) {
       filtered = filtered.filter(user =>
-        user.sectorId && sectorsToFilter.includes(user.sectorId)
+        user.sectorId && filters.sectorIds.includes(user.sectorId)
+      );
+    }
+
+    // Apply position filter (only if positions are explicitly selected)
+    if (filters.positionIds.length > 0) {
+      filtered = filtered.filter(user => {
+        // Find the user's position ID from the original data
+        const originalUser = usersData?.data?.find(u => u.id === user.id);
+        return originalUser?.positionId && filters.positionIds.includes(originalUser.positionId);
+      });
+    }
+
+    // Apply include users filter (if specified, only show these users)
+    if (filters.includeUserIds.length > 0) {
+      filtered = filtered.filter(user =>
+        filters.includeUserIds.includes(user.id)
       );
     }
 
     // Apply exclusion filter
-    if (excludedUserIds.length > 0) {
+    if (filters.excludeUserIds.length > 0) {
       filtered = filtered.filter(user =>
-        !excludedUserIds.includes(user.id)
+        !filters.excludeUserIds.includes(user.id)
       );
     }
 
     return filtered;
-  }, [simulatedUsers, selectedSectorIds, excludedUserIds, defaultSectorIds]);
+  }, [simulatedUsers, filters, usersData]);
+
+  // Apply sorting to filtered users
+  const sortedUsers = useMemo(() => {
+    if (!sortColumn) return filteredUsers;
+
+    const sorted = [...filteredUsers].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortColumn) {
+        case 'payrollNumber':
+          aValue = a.payrollNumber ?? -1;
+          bValue = b.payrollNumber ?? -1;
+          break;
+        case 'name':
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case 'sectorName':
+          aValue = (a.sectorName || '').toLowerCase();
+          bValue = (b.sectorName || '').toLowerCase();
+          break;
+        case 'position':
+          aValue = a.position.toLowerCase();
+          bValue = b.position.toLowerCase();
+          break;
+        case 'performanceLevel':
+          aValue = a.performanceLevel;
+          bValue = b.performanceLevel;
+          break;
+        case 'bonusAmount':
+          aValue = a.bonusAmount;
+          bValue = b.bonusAmount;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }, [filteredUsers, sortColumn, sortDirection]);
 
   // Calculate metrics
   // For simulation: ALL filtered users are considered "eligible"
@@ -352,8 +433,8 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
   }, [taskQuantity]);
 
   const totalBonusAmount = useMemo(() =>
-    filteredUsers.reduce((sum, user) => sum + user.bonusAmount, 0),
-    [filteredUsers]
+    sortedUsers.reduce((sum, user) => sum + user.bonusAmount, 0),
+    [sortedUsers]
   );
 
   // Effect 1: Update average input when task quantity or eligible count changes
@@ -363,8 +444,8 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
 
     if (eligibleUserCount === 0) {
       console.log('[Effect 1] No eligible users, setting average to 0');
-      if (averageInput !== '0.0') {
-        setAverageInput('0.0');
+      if (averageInput !== '0,0') {
+        setAverageInput('0,0');
       }
       return;
     }
@@ -373,13 +454,13 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
     console.log('[Effect 1] Calculated average:', newAverage);
 
     // Only update if the current input value doesn't match (to avoid overwriting while typing)
-    const currentParsed = parseFloat(averageInput);
+    const currentParsed = parseFloat(averageInput.replace(',', '.'));
     const difference = Math.abs(currentParsed - newAverage);
 
     // If difference is significant (more than 0.01), update the display
     if (isNaN(currentParsed) || difference > 0.01) {
       console.log('[Effect 1] Updating averageInput to:', newAverage.toFixed(1), 'difference:', difference);
-      setAverageInput(newAverage.toFixed(1));
+      setAverageInput(newAverage.toFixed(1).replace('.', ','));
     } else {
       console.log('[Effect 1] Skipping update - current value matches (difference:', difference, ')');
     }
@@ -426,7 +507,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
   // Handlers
   const handleTaskQuantityChange = (e: React.ChangeEvent<HTMLInputElement> | string) => {
     // Handle both event object and direct value
-    const value = typeof e === 'string' ? e : e?.target?.value;
+    let value = typeof e === 'string' ? e : e?.target?.value;
 
     if (value === undefined) {
       console.error('[Handler] No value received:', e);
@@ -435,14 +516,17 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
 
     console.log('[Handler] Task input changed to:', value);
 
-    // Allow empty string, numbers, and decimal points while typing
-    if (value === '' || value === '.' || /^\d*\.?\d*$/.test(value)) {
+    // Replace period with comma for Brazilian format
+    value = value.replace('.', ',');
+
+    // Allow empty string, numbers, and decimal commas while typing
+    if (value === '' || value === ',' || /^\d*,?\d*$/.test(value)) {
       console.log('[Handler] Value passed regex validation');
       setTaskInput(value); // Update input string immediately for smooth typing
 
-      // Only update taskQuantity if it's a valid number (not just a dot or empty)
-      if (value !== '' && value !== '.') {
-        const num = parseFloat(value);
+      // Only update taskQuantity if it's a valid number (not just a comma or empty)
+      if (value !== '' && value !== ',') {
+        const num = parseFloat(value.replace(',', '.'));
         console.log('[Handler] Parsed number:', num);
         if (!isNaN(num) && num >= 0) {
           console.log('[Handler] Setting taskQuantity to:', num);
@@ -459,7 +543,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
 
   const handleAveragePerUserChange = (e: React.ChangeEvent<HTMLInputElement> | string) => {
     // Handle both event object and direct value
-    const value = typeof e === 'string' ? e : e?.target?.value;
+    let value = typeof e === 'string' ? e : e?.target?.value;
 
     if (value === undefined) {
       console.error('[Handler] No value received:', e);
@@ -468,14 +552,17 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
 
     console.log('[Handler] Average input changed to:', value);
 
-    // Allow empty string, numbers, and decimal points while typing
-    if (value === '' || value === '.' || /^\d*\.?\d*$/.test(value)) {
+    // Replace period with comma for Brazilian format
+    value = value.replace('.', ',');
+
+    // Allow empty string, numbers, and decimal commas while typing
+    if (value === '' || value === ',' || /^\d*,?\d*$/.test(value)) {
       console.log('[Handler] Average value passed regex validation');
       setAverageInput(value); // Update input string immediately for smooth typing
 
       // Only update taskQuantity if it's a valid number and we have eligible users
-      if (value !== '' && value !== '.' && eligibleUserCount > 0) {
-        const num = parseFloat(value);
+      if (value !== '' && value !== ',' && eligibleUserCount > 0) {
+        const num = parseFloat(value.replace(',', '.'));
         console.log('[Handler] Parsed average:', num, 'eligibleUserCount:', eligibleUserCount);
         if (!isNaN(num) && num >= 0) {
           // Update task quantity based on average (reverse calculation)
@@ -483,7 +570,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
           const newTaskQuantity = num * eligibleUserCount;
           console.log('[Handler] Calculated newTaskQuantity:', newTaskQuantity);
           setTaskQuantity(newTaskQuantity);
-          setTaskInput(newTaskQuantity.toFixed(1)); // Format with 1 decimal
+          setTaskInput(newTaskQuantity.toFixed(1).replace('.', ',')); // Format with 1 decimal, Brazilian format
         }
       } else if (value === '') {
         console.log('[Handler] Empty average, setting taskQuantity to 0');
@@ -495,12 +582,38 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
     }
   };
 
-  const handleSectorFilterChange = (sectorIds: string[]) => {
-    setSelectedSectorIds(sectorIds);
+  const handleFiltersApply = (newFilters: typeof filters) => {
+    setFilters(newFilters);
   };
 
-  const handleUserExclusionChange = (userIds: string[]) => {
-    setExcludedUserIds(userIds);
+  const handleFiltersReset = () => {
+    setFilters({
+      sectorIds: [],
+      positionIds: [],
+      includeUserIds: [],
+      excludeUserIds: [],
+      showOnlyEligible: true
+    });
+  };
+
+  const handleSort = (column: typeof sortColumn) => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking same column
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Set new column and default to ascending
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (column: typeof sortColumn) => {
+    if (sortColumn !== column) {
+      return <IconSelector className="h-4 w-4 opacity-50" />;
+    }
+    return sortDirection === 'asc'
+      ? <IconArrowUp className="h-4 w-4" />
+      : <IconArrowDown className="h-4 w-4" />;
   };
 
   const handlePositionChange = (userId: string, newPosition: string) => {
@@ -523,17 +636,30 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
     }));
   };
 
-  const hasActiveFilters = selectedSectorIds.length > 0 || excludedUserIds.length > 0;
+  const hasManualFilters =
+    filters.sectorIds.length > 0 ||
+    filters.positionIds.length > 0 ||
+    filters.includeUserIds.length > 0 ||
+    filters.excludeUserIds.length > 0;
+
+  const hasActiveFilters =
+    hasManualFilters ||
+    (!filters.showOnlyEligible && !hasManualFilters); // Only count eligibility as active if explicitly disabled
 
   const clearAllFilters = () => {
-    setSelectedSectorIds([]);
-    setExcludedUserIds([]);
+    setFilters({
+      sectorIds: [],
+      positionIds: [],
+      includeUserIds: [],
+      excludeUserIds: [],
+      showOnlyEligible: true
+    });
   };
 
   // Create filter badges for display (like items table)
-  // Each sector and user gets its own individual badge
+  // Each sector, position, and user gets its own individual badge
   const activeFilters = useMemo(() => {
-    const filters: Array<{
+    const filterBadges: Array<{
       key: string;
       label: string;
       value: string;
@@ -542,40 +668,92 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
     }> = [];
 
     // Add individual sector filter badges
-    selectedSectorIds.forEach(sectorId => {
+    filters.sectorIds.forEach(sectorId => {
       const sector = sectorsData?.data?.find(s => s.id === sectorId);
       if (sector) {
-        filters.push({
+        filterBadges.push({
           key: `sector-${sectorId}`,
           label: "Setor",
           value: sector.name,
-          onRemove: () => setSelectedSectorIds(prev => prev.filter(id => id !== sectorId)),
+          onRemove: () => setFilters(prev => ({
+            ...prev,
+            sectorIds: prev.sectorIds.filter(id => id !== sectorId)
+          })),
           icon: <IconBuilding className="h-3 w-3" />
         });
       }
     });
 
-    // Add individual excluded user filter badges
-    excludedUserIds.forEach(userId => {
+    // Add individual position filter badges
+    filters.positionIds.forEach(positionId => {
+      const position = usersData?.data?.find(u => u.positionId === positionId)?.position;
+      if (position) {
+        filterBadges.push({
+          key: `position-${positionId}`,
+          label: "Cargo",
+          value: position.name,
+          onRemove: () => setFilters(prev => ({
+            ...prev,
+            positionIds: prev.positionIds.filter(id => id !== positionId)
+          })),
+          icon: <IconBriefcase className="h-3 w-3" />
+        });
+      }
+    });
+
+    // Add individual included user filter badges
+    filters.includeUserIds.forEach(userId => {
       const user = simulatedUsers.find(u => u.id === userId);
       if (user) {
-        filters.push({
-          key: `user-${userId}`,
-          label: "Usuário Excluído",
+        filterBadges.push({
+          key: `include-${userId}`,
+          label: "Incluir Usuário",
           value: user.name,
-          onRemove: () => setExcludedUserIds(prev => prev.filter(id => id !== userId)),
+          onRemove: () => setFilters(prev => ({
+            ...prev,
+            includeUserIds: prev.includeUserIds.filter(id => id !== userId)
+          })),
+          icon: <IconUserCheck className="h-3 w-3" />
+        });
+      }
+    });
+
+    // Add individual excluded user filter badges
+    filters.excludeUserIds.forEach(userId => {
+      const user = simulatedUsers.find(u => u.id === userId);
+      if (user) {
+        filterBadges.push({
+          key: `exclude-${userId}`,
+          label: "Excluir Usuário",
+          value: user.name,
+          onRemove: () => setFilters(prev => ({
+            ...prev,
+            excludeUserIds: prev.excludeUserIds.filter(id => id !== userId)
+          })),
           icon: <IconUserMinus className="h-3 w-3" />
         });
       }
     });
 
-    return filters;
-  }, [selectedSectorIds, excludedUserIds, sectorsData?.data, simulatedUsers]);
+    // Add "Mostrar todos" badge if showOnlyEligible is false AND no manual filters are applied
+    // Don't show this badge if eligibility was automatically disabled by applying other filters
+    if (!filters.showOnlyEligible && !hasManualFilters) {
+      filterBadges.push({
+        key: 'show-all',
+        label: "Exibir",
+        value: "Todos os usuários",
+        onRemove: () => setFilters(prev => ({ ...prev, showOnlyEligible: true })),
+        icon: <IconUsers className="h-3 w-3" />
+      });
+    }
+
+    return filterBadges;
+  }, [filters, sectorsData?.data, simulatedUsers, usersData]);
 
   const restoreCurrentPeriodTasks = () => {
     setTaskQuantity(originalTaskQuantity);
-    setTaskInput(originalTaskQuantity.toFixed(1));
-    setAverageInput((originalTaskQuantity / eligibleUserCount).toFixed(1));
+    setTaskInput(originalTaskQuantity.toFixed(1).replace('.', ','));
+    setAverageInput((originalTaskQuantity / eligibleUserCount).toFixed(1).replace('.', ','));
   };
 
   // Export handlers
@@ -871,118 +1049,83 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
     taskInput,
     averageInput,
     eligibleUserCount,
-    filteredUsersLength: filteredUsers.length,
+    sortedUsersLength: sortedUsers.length,
     isTaskQuantityModified,
-    originalTaskQuantity
+    originalTaskQuantity,
+    sortColumn,
+    sortDirection
   });
 
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
       {/* Header with Task Input and Summary */}
-      <div className="p-4 border-b space-y-3">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Sector Filter */}
-          <div className="flex flex-col flex-[2]">
-            <Label className="text-sm font-medium mb-1.5">
-              Filtrar Setores
-            </Label>
-            <Combobox
-              mode="multiple"
-              value={selectedSectorIds}
-              onValueChange={handleSectorFilterChange}
-              options={sectorsData?.data?.map(sector => ({
-                value: sector.id,
-                label: sector.name
-              })) || []}
-              placeholder="Todos os setores"
-              emptyText="Nenhum setor encontrado"
-              className="w-full h-10"
-              hideDefaultBadges={true}
-            />
+      <div className="p-4 space-y-3">
+        <div className="flex flex-col md:flex-row gap-4 justify-between">
+          {/* Left side - Inputs */}
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Task Quantity Input */}
+            <div className="flex flex-col" style={{ width: '120px' }}>
+              <Label htmlFor="taskQuantity" className="text-sm font-medium mb-1.5">
+                Tarefas
+              </Label>
+              <Input
+                id="taskQuantity"
+                type="text"
+                inputMode="decimal"
+                value={taskInput}
+                onChange={handleTaskQuantityChange}
+                className="h-10 text-center font-semibold bg-transparent"
+                placeholder="0,0"
+              />
+            </div>
+
+            {/* Eligible Users Count - All filtered/selected users */}
+            <div className="flex flex-col" style={{ width: '120px' }}>
+              <Label className="text-sm font-medium mb-1.5">
+                Colaboradores
+              </Label>
+              <Input
+                type="text"
+                value={eligibleUserCount}
+                readOnly
+                className="h-10 text-center font-semibold bg-transparent cursor-default"
+                title={`${eligibleUserCount} usuários elegíveis para cálculo (todos os filtrados/selecionados)`}
+              />
+            </div>
+
+            {/* Average Tasks per User - Editable for Reverse Calculation */}
+            <div className="flex flex-col" style={{ width: '120px' }}>
+              <Label htmlFor="averagePerUser" className="text-sm font-medium mb-1.5">
+                Média
+              </Label>
+              <Input
+                id="averagePerUser"
+                type="text"
+                inputMode="decimal"
+                value={averageInput}
+                onChange={handleAveragePerUserChange}
+                className="h-10 text-center font-semibold bg-transparent"
+                placeholder="0,0"
+                title="Digite a média desejada por usuário para calcular tarefas totais"
+              />
+            </div>
+
+            {/* Total Bonus */}
+            <div className="flex flex-col" style={{ width: '160px' }}>
+              <Label className="text-sm font-medium mb-1.5">
+                Total
+              </Label>
+              <Input
+                type="text"
+                value={formatCurrency(totalBonusAmount)}
+                readOnly
+                className="h-10 text-center font-semibold bg-transparent cursor-default text-green-600"
+              />
+            </div>
           </div>
 
-          {/* User Exclusion Filter */}
-          <div className="flex flex-col flex-[2]">
-            <Label className="text-sm font-medium mb-1.5">
-              Excluir Usuários
-            </Label>
-            <Combobox
-              mode="multiple"
-              value={excludedUserIds}
-              onValueChange={handleUserExclusionChange}
-              options={simulatedUsers.map(user => ({
-                value: user.id,
-                label: user.name
-              }))}
-              placeholder="Nenhuma exclusão"
-              emptyText="Nenhum usuário encontrado"
-              className="w-full h-10"
-              hideDefaultBadges={true}
-            />
-          </div>
-
-          {/* Task Quantity Input */}
-          <div className="flex flex-col" style={{ width: '120px' }}>
-            <Label htmlFor="taskQuantity" className="text-sm font-medium mb-1.5">
-              Tarefas
-            </Label>
-            <Input
-              id="taskQuantity"
-              type="text"
-              inputMode="decimal"
-              value={taskInput}
-              onChange={handleTaskQuantityChange}
-              className="h-10 text-center font-semibold bg-transparent"
-              placeholder="0.0"
-            />
-          </div>
-
-          {/* Eligible Users Count - All filtered/selected users */}
-          <div className="flex flex-col" style={{ width: '120px' }}>
-            <Label className="text-sm font-medium mb-1.5">
-              Colaboradores
-            </Label>
-            <Input
-              type="text"
-              value={eligibleUserCount}
-              readOnly
-              className="h-10 text-center font-semibold bg-transparent cursor-default"
-              title={`${eligibleUserCount} usuários elegíveis para cálculo (todos os filtrados/selecionados)`}
-            />
-          </div>
-
-          {/* Average Tasks per User - Editable for Reverse Calculation */}
-          <div className="flex flex-col" style={{ width: '120px' }}>
-            <Label htmlFor="averagePerUser" className="text-sm font-medium mb-1.5">
-              Média
-            </Label>
-            <Input
-              id="averagePerUser"
-              type="text"
-              inputMode="decimal"
-              value={averageInput}
-              onChange={handleAveragePerUserChange}
-              className="h-10 text-center font-semibold bg-transparent"
-              placeholder="0.0"
-              title="Digite a média desejada por usuário para calcular tarefas totais"
-            />
-          </div>
-
-          {/* Total Bonus */}
-          <div className="flex flex-col" style={{ width: '160px' }}>
-            <Label className="text-sm font-medium mb-1.5">
-              Total
-            </Label>
-            <Input
-              type="text"
-              value={formatCurrency(totalBonusAmount)}
-              readOnly
-              className="h-10 text-center font-semibold bg-transparent cursor-default text-green-600"
-            />
-          </div>
-
-          {/* Action Buttons - Aligned with inputs */}
-          <div className="flex flex-col flex-1">
+          {/* Right side - Action Buttons */}
+          <div className="flex flex-col">
             <Label className="text-sm font-medium mb-1.5 opacity-0">
               Ações
             </Label>
@@ -1000,10 +1143,23 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
                   Restaurar
                 </Button>
               )}
+              <Button
+                variant={hasActiveFilters ? "default" : "outline"}
+                onClick={() => setShowFiltersModal(true)}
+                className="h-10 gap-2"
+              >
+                <IconFilter className="h-4 w-4" />
+                Filtrar
+                {hasActiveFilters && (
+                  <Badge variant="secondary" className="ml-1 bg-background/20 text-white">
+                    {activeFilters.length}
+                  </Badge>
+                )}
+              </Button>
               <BaseExportPopover<SimulatedUser>
                 className="h-10"
-                currentItems={filteredUsers}
-                totalRecords={filteredUsers.length}
+                currentItems={sortedUsers}
+                totalRecords={sortedUsers.length}
                 visibleColumns={DEFAULT_VISIBLE_COLUMNS}
                 exportColumns={EXPORT_COLUMNS}
                 defaultVisibleColumns={DEFAULT_VISIBLE_COLUMNS}
@@ -1069,7 +1225,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
             <div className="p-8 text-center text-muted-foreground">
               Nenhum usuário elegível encontrado
             </div>
-          ) : filteredUsers.length === 0 ? (
+          ) : sortedUsers.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground">
               <IconFilter className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
               <p className="text-lg font-medium mb-2">Nenhum usuário encontrado</p>
@@ -1085,13 +1241,62 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
               {/* Fixed Header Table */}
               <div className="border-b border-border overflow-hidden">
                 <Table className="w-full table-fixed">
-                  <TableHeader className="[&_tr]:border-b-0">
-                    <TableRow className="bg-muted hover:bg-muted">
-                      <TableHead className="font-bold uppercase text-xs">Nome</TableHead>
-                      <TableHead className="w-48 font-bold uppercase text-xs">Setor</TableHead>
-                      <TableHead className="w-48 font-bold uppercase text-xs">Cargo</TableHead>
-                      <TableHead className="w-44 text-center font-bold uppercase text-xs">Nível Performance</TableHead>
-                      <TableHead className="w-36 text-right font-bold uppercase text-xs">Bônus</TableHead>
+                  <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
+                    <TableRow className="bg-muted hover:bg-muted even:bg-muted">
+                      <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted w-32 p-0 !border-r-0">
+                        <button
+                          onClick={() => handleSort('payrollNumber')}
+                          className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
+                        >
+                          <span className="truncate">Nº FOLHA</span>
+                          {getSortIcon('payrollNumber')}
+                        </button>
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted p-0 !border-r-0">
+                        <button
+                          onClick={() => handleSort('name')}
+                          className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
+                        >
+                          <span className="truncate">NOME</span>
+                          {getSortIcon('name')}
+                        </button>
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted w-48 p-0 !border-r-0">
+                        <button
+                          onClick={() => handleSort('sectorName')}
+                          className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
+                        >
+                          <span className="truncate">SETOR</span>
+                          {getSortIcon('sectorName')}
+                        </button>
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted w-48 p-0 !border-r-0">
+                        <button
+                          onClick={() => handleSort('position')}
+                          className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
+                        >
+                          <span className="truncate">CARGO</span>
+                          {getSortIcon('position')}
+                        </button>
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted w-44 p-0 !border-r-0">
+                        <button
+                          onClick={() => handleSort('performanceLevel')}
+                          className="flex items-center justify-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer border-0 bg-transparent"
+                        >
+                          <span className="truncate">PERFORMANCE</span>
+                          {getSortIcon('performanceLevel')}
+                        </button>
+                      </TableHead>
+                      <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted w-36 p-0 !border-r-0">
+                        <button
+                          onClick={() => handleSort('bonusAmount')}
+                          className="flex items-center justify-end gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer border-0 bg-transparent"
+                        >
+                          <span className="truncate">BÔNUS</span>
+                          {getSortIcon('bonusAmount')}
+                        </button>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                 </Table>
@@ -1101,7 +1306,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
             <div className="flex-1 min-h-0 overflow-y-auto">
               <Table className="w-full table-fixed">
                 <TableBody>
-                  {filteredUsers.map((user, index) => (
+                  {sortedUsers.map((user, index) => (
                     <TableRow
                       key={user.id}
                       className={cn(
@@ -1110,33 +1315,44 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
                         "hover:bg-muted/20"
                       )}
                     >
-                      <TableCell className="font-medium py-2">
-                        {user.name}
+                      <TableCell className="w-32 p-0">
+                        <div className="px-4 py-2 text-sm text-muted-foreground font-medium truncate">
+                          {user.payrollNumber || '-'}
+                        </div>
                       </TableCell>
-                      <TableCell className="w-48 py-2">
-                        {user.sectorName || '-'}
+                      <TableCell className="p-0">
+                        <div className="px-4 py-2 font-medium truncate">
+                          {user.name}
+                        </div>
                       </TableCell>
-                      <TableCell className="w-48 py-2">
-                        <Combobox
-                          mode="single"
-                          value={user.position}
-                          onValueChange={(value) => {
-                            if (value && typeof value === 'string') {
-                              handlePositionChange(user.id, value);
-                            }
-                          }}
-                          options={POSITIONS.map(pos => ({
-                            value: pos,
-                            label: pos
-                          }))}
-                          placeholder={user.position || "Selecione o cargo"}
-                          emptyText="Nenhum cargo encontrado"
-                          className="w-full"
-                          renderValue={() => user.position || "Selecione o cargo"}
-                        />
+                      <TableCell className="w-48 p-0">
+                        <div className="px-4 py-2 text-sm text-gray-600 truncate">
+                          {user.sectorName || '-'}
+                        </div>
                       </TableCell>
-                      <TableCell className="w-44 py-2">
-                        <div className="flex items-center justify-center">
+                      <TableCell className="w-48 p-0">
+                        <div className="px-3 py-1">
+                          <Combobox
+                            mode="single"
+                            value={user.position}
+                            onValueChange={(value) => {
+                              if (value && typeof value === 'string') {
+                                handlePositionChange(user.id, value);
+                              }
+                            }}
+                            options={POSITIONS.map(pos => ({
+                              value: pos,
+                              label: pos
+                            }))}
+                            placeholder={user.position || "Selecione o cargo"}
+                            emptyText="Nenhum cargo encontrado"
+                            className="w-full"
+                            renderValue={() => user.position || "Selecione o cargo"}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="w-44 p-0">
+                        <div className="px-3 py-1 flex items-center justify-center">
                           <PerformanceLevelSelector
                             value={user.performanceLevel}
                             onChange={(newLevel) => handlePerformanceLevelChange(user.id, newLevel)}
@@ -1145,13 +1361,15 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
                           />
                         </div>
                       </TableCell>
-                      <TableCell className="w-36 text-right py-2">
-                        <span className={cn(
-                          "font-bold",
-                          user.bonusAmount > 0 ? 'text-green-600' : 'text-muted-foreground'
-                        )}>
-                          {formatCurrency(user.bonusAmount)}
-                        </span>
+                      <TableCell className="w-36 p-0">
+                        <div className="px-4 py-2 text-right">
+                          <span className={cn(
+                            "font-bold",
+                            user.bonusAmount > 0 ? 'text-green-600' : 'text-muted-foreground'
+                          )}>
+                            {formatCurrency(user.bonusAmount)}
+                          </span>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1162,6 +1380,16 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
           )}
         </div>
       </div>
+
+      {/* Filters Modal */}
+      <BonusSimulationFilters
+        open={showFiltersModal}
+        onOpenChange={setShowFiltersModal}
+        filters={filters}
+        onApply={handleFiltersApply}
+        onReset={handleFiltersReset}
+        sectors={sectorsData?.data || []}
+      />
     </Card>
   );
 }

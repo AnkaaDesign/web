@@ -563,7 +563,7 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
               {contextMenu?.orders[0] && contextMenu.orders[0].status === ORDER_STATUS.CREATED && (
                 <DropdownMenuItem onClick={handleMarkAsFulfilledFromMenu} className="text-amber-600 dark:text-amber-400">
                   <IconCheck className="mr-2 h-4 w-4" />
-                  Marcar como pedido
+                  Marcar como feito
                 </DropdownMenuItem>
               )}
 

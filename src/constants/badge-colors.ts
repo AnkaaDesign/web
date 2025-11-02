@@ -739,10 +739,6 @@ export const BOOLEAN_BADGE_CONFIG = {
     true: "destructive" as BadgeVariant,
     false: "default" as BadgeVariant,
   },
-  isCritical: {
-    true: "destructive" as BadgeVariant,
-    false: "default" as BadgeVariant,
-  },
   isCompleted: {
     true: "completed" as BadgeVariant,
     false: "pending" as BadgeVariant,

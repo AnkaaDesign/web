@@ -74,7 +74,8 @@ export const ITEM_FIELD_ICONS: Record<string, string> = {
   boxQuantity: "IconBox",
 
   // Financial
-  tax: "IconReceipt",
+  icms: "IconReceipt",
+  ipi: "IconReceipt",
   totalPrice: "IconCurrencyDollar",
   monthlyConsumption: "IconTrendingDown",
   prices: "IconCurrencyDollar",

@@ -4,6 +4,8 @@ import { IconPaint, IconTrash, IconRefresh, IconEdit } from "@tabler/icons-react
 
 import { usePaint, usePaintMutations } from "../../../../hooks";
 import { routes } from "../../../../constants";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditPaints } from "@/utils/permissions/entity-permissions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +19,7 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { LoadingPage } from "@/components/navigation/loading-page";
 import { ErrorCard } from "@/components/ui/error-card";
-import { PaintSpecificationsCard, PaintFormulasCard, PaintProductionHistoryCard, RelatedPaintsCard } from "@/components/paint/catalogue/detail";
+import { PaintSpecificationsCard, PaintFormulasCard, PaintProductionHistoryCard, RelatedPaintsCard, GroundPaintsCard } from "@/components/paint/catalogue/detail";
 import { PaintTasksTable } from "@/components/paint/catalogue/detail/paint-tasks-table";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
@@ -25,6 +27,8 @@ import { CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 export default function PaintDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditPaints(user);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const {
@@ -50,6 +54,16 @@ export default function PaintDetailsPage() {
       },
       relatedPaints: true,
       relatedTo: true,
+      paintGrounds: {
+        include: {
+          groundPaint: {
+            include: {
+              paintType: true,
+              paintBrand: true,
+            },
+          },
+        },
+      },
       generalPaintings: {
         include: {
           customer: true,
@@ -145,18 +159,18 @@ export default function PaintDetailsPage() {
               onClick: handleRefresh,
               loading: isRefetching,
             },
-            {
+            ...(canEdit ? [{
               key: "edit",
               label: "Editar",
               icon: IconEdit,
               onClick: handleEdit,
-            },
-            {
+            }] : []),
+            ...(canEdit ? [{
               key: "delete",
               label: "Excluir",
               icon: IconTrash,
               onClick: () => setShowDeleteDialog(true),
-            },
+            }] : []),
           ]}
           breadcrumbs={[
             { label: "Início", href: routes.home },
@@ -169,34 +183,52 @@ export default function PaintDetailsPage() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-6">
-          {/* Row 1: Specifications and Formulas - Same Height */}
+          {/* Row 1: Specifications + (Formulas + Fundos Recomendados) */}
           <div className="animate-in fade-in-50 duration-500 transition-all">
             {/* Mobile: Single column */}
             <div className="block lg:hidden space-y-4">
               <PaintSpecificationsCard paint={paint} className="h-auto" />
               <PaintFormulasCard paint={paint} className="h-auto" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
+              {paint.paintGrounds && paint.paintGrounds.length > 0 && (
+                <GroundPaintsCard paint={paint} className="h-auto" />
+              )}
             </div>
 
-            {/* Desktop: 2 columns - Same height */}
+            {/* Desktop: 2 columns - Specifications + (Formulas + Fundos) */}
             <div className="hidden lg:block">
               <div className="grid grid-cols-2 gap-6 items-start">
-                <PaintSpecificationsCard paint={paint} className="h-auto" />
-                <PaintFormulasCard paint={paint} className="h-full" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
+                {/* Column 1: Specifications */}
+                <PaintSpecificationsCard paint={paint} className="h-full" />
+
+                {/* Column 2: Formulas + Fundos Recomendados */}
+                <div className="flex flex-col gap-4 h-full">
+                  <PaintFormulasCard paint={paint} className="flex-1 min-h-0" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
+                  {paint.paintGrounds && paint.paintGrounds.length > 0 && (
+                    <GroundPaintsCard paint={paint} className="h-[200px] flex-shrink-0" />
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Row 2: Task History - Full Width */}
+          {/* Row 3: Related Paints Section */}
+          {((paint.relatedPaints && paint.relatedPaints.length > 0) || (paint.relatedTo && paint.relatedTo.length > 0)) && (
+            <div className="animate-in fade-in-50 duration-700 transition-all">
+              <RelatedPaintsCard paint={paint} />
+            </div>
+          )}
+
+          {/* Row 3: Task History - Full Width */}
           <div className="animate-in fade-in-50 duration-700 transition-all">
             <PaintTasksTable paint={paint} />
           </div>
 
-          {/* Row 3: Production History - Full Width */}
+          {/* Row 4: Production History - Full Width */}
           <div className="animate-in fade-in-50 duration-900 transition-all">
             <PaintProductionHistoryCard paint={paint} className="h-auto lg:h-[550px]" />
           </div>
 
-          {/* Row 4: Changelog - Full Width */}
+          {/* Row 5: Changelog - Full Width */}
           <div className="animate-in fade-in-50 duration-1000 transition-all">
             <ChangelogHistory
               entityType={CHANGE_LOG_ENTITY_TYPE.PAINT}
@@ -206,13 +238,6 @@ export default function PaintDetailsPage() {
               className="h-auto lg:h-[500px]"
             />
           </div>
-
-          {/* Row 5: Related Paints Section */}
-          {((paint.relatedPaints && paint.relatedPaints.length > 0) || (paint.relatedTo && paint.relatedTo.length > 0)) && (
-            <div className="animate-in fade-in-50 duration-1100 transition-all">
-              <RelatedPaintsCard paint={paint} />
-            </div>
-          )}
         </div>
       </div>
 

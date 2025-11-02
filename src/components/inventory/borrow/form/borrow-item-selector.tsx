@@ -58,6 +58,8 @@ interface BorrowItemSelectorProps {
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
   onTotalRecordsChange?: (total: number) => void;
+  // Batch selection function - combines both selected items and quantities in one atomic update
+  updateSelectedItems?: (items: Set<string>, quantities: Record<string, number>) => void;
 }
 
 export const BorrowItemSelector = ({
@@ -93,6 +95,8 @@ export const BorrowItemSelector = ({
   toggleSort: toggleSortProp,
   getSortDirection: getSortDirectionProp,
   getSortOrder: getSortOrderProp,
+  // Batch selection function
+  updateSelectedItems,
 }: BorrowItemSelectorProps) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -318,20 +322,60 @@ export const BorrowItemSelector = ({
 
   // Handle select all on current page
   const handleSelectAllPage = () => {
-    if (allPageItemsSelected) {
-      // Deselect all on current page
-      items.forEach((item) => {
-        if (isSelected(item.id)) {
-          onSelectItem(item.id);
-        }
-      });
+    // Calculate available stock for filtering
+    const itemsWithStock = items.map((item) => {
+      const activeBorrowsQuantity =
+        item.borrows?.reduce((total, borrow) => {
+          return borrow.status === "ACTIVE" ? total + borrow.quantity : total;
+        }, 0) || 0;
+      return {
+        id: item.id,
+        availableStock: item.quantity - activeBorrowsQuantity,
+      };
+    });
+
+    // Use batch update function if available for atomic state update
+    if (updateSelectedItems) {
+      const newSelected = new Set(selectedItems);
+      const newQuantities = { ...quantities };
+
+      if (allPageItemsSelected) {
+        // Deselect all on current page
+        items.forEach((item) => {
+          if (newSelected.has(item.id)) {
+            newSelected.delete(item.id);
+            delete newQuantities[item.id];
+          }
+        });
+      } else {
+        // Select all on current page - only items with available stock
+        itemsWithStock.forEach(({ id, availableStock }) => {
+          if (!newSelected.has(id) && availableStock > 0) {
+            newSelected.add(id);
+            newQuantities[id] = quantities[id] || 1;
+          }
+        });
+      }
+
+      // Single atomic update - pass both selected items and quantities
+      updateSelectedItems(newSelected, newQuantities);
     } else {
-      // Select all on current page
-      items.forEach((item) => {
-        if (!isSelected(item.id)) {
-          onSelectItem(item.id);
-        }
-      });
+      // Fallback to old behavior if batch function not provided
+      if (allPageItemsSelected) {
+        // Deselect all on current page
+        items.forEach((item) => {
+          if (isSelected(item.id)) {
+            onSelectItem(item.id);
+          }
+        });
+      } else {
+        // Select all on current page - only items with available stock
+        itemsWithStock.forEach(({ id, availableStock }) => {
+          if (!isSelected(id) && availableStock > 0) {
+            onSelectItem(id);
+          }
+        });
+      }
     }
   };
 

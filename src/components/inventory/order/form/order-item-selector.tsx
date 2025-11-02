@@ -22,24 +22,26 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { extractActiveFilters } from "./filter-utils";
 import { FilterIndicators } from "./filter-indicator";
 import { useDirectFilterUpdate } from "./use-direct-filter-update";
-import { NaturalFloatInput } from "@/components/ui/natural-float-input";
 import { StockStatusIndicator } from "../../item/list/stock-status-indicator";
 
 interface OrderItemSelectorProps {
   selectedItems: Set<string>;
-  onSelectItem: (itemId: string, quantity?: number, price?: number, tax?: number) => void;
+  onSelectItem: (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => void;
   onSelectAll: () => void;
   className?: string;
   onQuantityChange?: (itemId: string, quantity: number) => void;
   onPriceChange?: (itemId: string, price: number) => void;
-  onTaxChange?: (itemId: string, tax: number) => void;
+  onIcmsChange?: (itemId: string, icms: number) => void;
+  onIpiChange?: (itemId: string, ipi: number) => void;
   quantities?: Record<string, number>;
   prices?: Record<string, number>;
-  taxes?: Record<string, number>;
+  icmses?: Record<string, number>;
+  ipis?: Record<string, number>;
   isSelected?: (itemId: string) => boolean;
   showQuantityInput?: boolean;
   showPriceInput?: boolean;
-  showTaxInput?: boolean;
+  showIcmsInput?: boolean;
+  showIpiInput?: boolean;
   // URL state props
   showSelectedOnly?: boolean;
   searchTerm?: string;
@@ -66,6 +68,8 @@ interface OrderItemSelectorProps {
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
   onTotalRecordsChange?: (total: number) => void;
+  // Batch selection function - combines selected items, quantities, prices, icmses and ipis in one atomic update
+  updateSelection?: (items: Set<string>, quantities: Record<string, number>, prices: Record<string, number>, icmses?: Record<string, number>, ipis?: Record<string, number>) => void;
 }
 
 export const OrderItemSelector = ({
@@ -75,14 +79,17 @@ export const OrderItemSelector = ({
   className,
   onQuantityChange,
   onPriceChange,
-  onTaxChange,
+  onIcmsChange,
+  onIpiChange,
   quantities = {},
   prices = {},
-  taxes = {},
+  icmses = {},
+  ipis = {},
   isSelected = (itemId: string) => selectedItems.has(itemId),
   showQuantityInput = true,
   showPriceInput = true,
-  showTaxInput = true,
+  showIcmsInput = false,
+  showIpiInput = false,
   // URL state props with defaults
   showSelectedOnly: showSelectedOnlyProp = false,
   searchTerm: searchTermProp = "",
@@ -110,6 +117,8 @@ export const OrderItemSelector = ({
   onPageChange,
   onPageSizeChange,
   onTotalRecordsChange,
+  // Batch selection function
+  updateSelection,
 }: OrderItemSelectorProps) => {
   // Use direct filter update for immediate, atomic URL updates
   const { updateFilters: directUpdateFilters } = useDirectFilterUpdate();
@@ -322,23 +331,60 @@ export const OrderItemSelector = ({
     const currentFiltered = items;
     const filteredIds = currentFiltered.map((item) => item.id);
 
-    if (filteredIds.every((id) => selectedItems.has(id))) {
-      // Deselect all current page items
-      filteredIds.forEach((id) => onSelectItem(id));
-    } else {
-      // Select all current page items that aren't already selected
-      filteredIds.forEach((id) => {
-        if (!selectedItems.has(id)) {
-          onSelectItem(id);
-          // Initialize price with item's default price if available
-          const item = items.find((i) => i.id === id);
-          if (item?.prices?.[0]?.value && onPriceChange && !prices[id]) {
-            onPriceChange(id, item.prices[0].value);
+    // Use batch update function if available for atomic state update
+    if (updateSelection) {
+      const newSelected = new Set(selectedItems);
+      const newQuantities = { ...quantities };
+      const newPrices = { ...prices };
+      const newIcmses = { ...icmses };
+      const newIpis = { ...ipis };
+
+      if (filteredIds.every((id) => selectedItems.has(id))) {
+        // Deselect all current page items
+        filteredIds.forEach((id) => {
+          newSelected.delete(id);
+          delete newQuantities[id];
+          delete newPrices[id];
+          delete newIcmses[id];
+          delete newIpis[id];
+        });
+      } else {
+        // Select all current page items that aren't already selected
+        filteredIds.forEach((id) => {
+          if (!newSelected.has(id)) {
+            newSelected.add(id);
+            newQuantities[id] = quantities[id] || 1;
+            // Initialize price with item's default price if available
+            const item = items.find((i) => i.id === id);
+            newPrices[id] = prices[id] || item?.prices?.[0]?.value || 0;
+            newIcmses[id] = icmses[id] || item?.icms || 0;
+            newIpis[id] = ipis[id] || item?.ipi || 0;
           }
-        }
-      });
+        });
+      }
+
+      // Single atomic update - pass all state together
+      updateSelection(newSelected, newQuantities, newPrices, newIcmses, newIpis);
+    } else {
+      // Fallback to old behavior if batch function not provided
+      if (filteredIds.every((id) => selectedItems.has(id))) {
+        // Deselect all current page items
+        filteredIds.forEach((id) => onSelectItem(id));
+      } else {
+        // Select all current page items that aren't already selected
+        filteredIds.forEach((id) => {
+          if (!selectedItems.has(id)) {
+            onSelectItem(id);
+            // Initialize price with item's default price if available
+            const item = items.find((i) => i.id === id);
+            if (item?.prices?.[0]?.value && onPriceChange && !prices[id]) {
+              onPriceChange(id, item.prices[0].value);
+            }
+          }
+        });
+      }
     }
-  }, [items, selectedItems, onSelectItem, onPriceChange, prices]);
+  }, [items, selectedItems, quantities, prices, icmses, ipis, onSelectItem, onPriceChange, updateSelection]);
 
   // Clear all filters - preserves sort order like item list
   const handleClearAllFilters = useCallback(() => {
@@ -680,10 +726,17 @@ export const OrderItemSelector = ({
                     </div>
                   </TableHead>
                 )}
-                {showTaxInput && (
+                {showIcmsInput && (
                   <TableHead className="w-24 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
                     <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                      <TruncatedTextWithTooltip text="IMPOSTO" />
+                      <TruncatedTextWithTooltip text="ICMS %" />
+                    </div>
+                  </TableHead>
+                )}
+                {showIpiInput && (
+                  <TableHead className="w-24 whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0">
+                    <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
+                      <TruncatedTextWithTooltip text="IPI %" />
                     </div>
                   </TableHead>
                 )}
@@ -723,7 +776,6 @@ export const OrderItemSelector = ({
                     : (typeof itemDefaultPrice === 'number' && !isNaN(itemDefaultPrice))
                       ? itemDefaultPrice
                       : 0;
-                  // const tax = taxes[item.id] || 0; // Currently unused
 
                   return (
                     <TableRow
@@ -752,8 +804,9 @@ export const OrderItemSelector = ({
                         } else {
                           // Select - call with default values
                           const defaultPrice = item.prices?.[0]?.value || 0;
-                          const defaultTax = item.tax || 0;
-                          onSelectItem(item.id, 1, defaultPrice, defaultTax);
+                          const defaultIcms = item.icms || 0;
+                          const defaultIpi = item.ipi || 0;
+                          onSelectItem(item.id, 1, defaultPrice, defaultIcms, defaultIpi);
                         }
                       }}
                     >
@@ -769,8 +822,9 @@ export const OrderItemSelector = ({
                               } else {
                                 // Select - call with default values
                                 const defaultPrice = item.prices?.[0]?.value || 0;
-                                const defaultTax = item.tax || 0;
-                                onSelectItem(item.id, 1, defaultPrice, defaultTax);
+                                const defaultIcms = item.icms || 0;
+                                const defaultIpi = item.ipi || 0;
+                                onSelectItem(item.id, 1, defaultPrice, defaultIcms, defaultIpi);
                               }
                             }}
                             className="h-4 w-4"
@@ -810,12 +864,10 @@ export const OrderItemSelector = ({
                         <TableCell className="w-28 p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
                           <div className="px-4 py-1">
                             {itemIsSelected ? (
-                              <NaturalFloatInput
+                              <Input
+                                type="decimal"
                                 value={quantity}
-                                onChange={(value) => onQuantityChange?.(item.id, value)}
-                                min={0.01}
-                                max={999999}
-                                step={0.01}
+                                onChange={(value) => onQuantityChange?.(item.id, typeof value === "number" ? value : 0)}
                                 className="w-full h-8 text-sm"
                               />
                             ) : (
@@ -849,18 +901,37 @@ export const OrderItemSelector = ({
                           </div>
                         </TableCell>
                       )}
-                      {showTaxInput && (
+                      {showIcmsInput && (
                         <TableCell className="w-24 p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
                           <div className="px-4 py-1">
                             {itemIsSelected ? (
                               <Input
-                                type="percentage"
+                                type="decimal"
                                 min={0}
                                 max={100}
-                                value={taxes[item.id] || 0}
-                                onChange={(value) => onTaxChange?.(item.id, Number(value) || 0)}
+                                value={icmses[item.id] || 0}
+                                onChange={(value) => onIcmsChange?.(item.id, typeof value === "number" ? value : 0)}
                                 className="w-20 h-8 text-sm"
-                                decimals={2}
+                              />
+                            ) : (
+                              <div className="h-8 flex items-center">
+                                <span className="text-muted-foreground">-</span>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
+                      {showIpiInput && (
+                        <TableCell className="w-24 p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
+                          <div className="px-4 py-1">
+                            {itemIsSelected ? (
+                              <Input
+                                type="decimal"
+                                min={0}
+                                max={100}
+                                value={ipis[item.id] || 0}
+                                onChange={(value) => onIpiChange?.(item.id, typeof value === "number" ? value : 0)}
+                                className="w-20 h-8 text-sm"
                               />
                             ) : (
                               <div className="h-8 flex items-center">

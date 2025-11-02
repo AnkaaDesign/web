@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
-import { useItems, useUsers } from "../../../../hooks";
-import { Combobox } from "@/components/ui/combobox";
+import { useState, useEffect, useCallback } from "react";
+import { useUsers } from "../../../../hooks";
+import { getItems } from "../../../../api-client";
+import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Item } from "../../../../types";
-import { ITEM_CATEGORY_TYPE, PPE_TYPE, PPE_TYPE_ORDER, PPE_TYPE_LABELS, BOOT_SIZE_ORDER, PANTS_SIZE_ORDER, SHIRT_SIZE_ORDER, MASK_SIZE_ORDER } from "../../../../constants";
+import { ITEM_CATEGORY_TYPE, PPE_TYPE, PPE_TYPE_ORDER, PPE_TYPE_LABELS, PPE_SIZE_LABELS, BOOT_SIZE_ORDER, PANTS_SIZE_ORDER, SHIRT_SIZE_ORDER, MASK_SIZE_ORDER } from "../../../../constants";
 import { getPpeSizeFromMeasures } from "@/utils/ppe-size-helpers";
 
 interface ItemSelectorDropdownProps {
@@ -55,6 +56,7 @@ const getSizeOrder = (ppeType: string | null, size: string | null): number => {
 export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione um EPI", userId, disabled = false }: ItemSelectorDropdownProps) {
   const [showAllSizes, setShowAllSizes] = useState(false);
   const [userSizes, setUserSizes] = useState<UserPpeSizes>({});
+  const [queryKey, setQueryKey] = useState(0);
 
   // Fetch user with PPE sizes if userId is provided
   const { data: userResponse } = useUsers({
@@ -87,137 +89,196 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
   // Check if user has any sizes configured
   const hasSizesConfigured = Object.keys(userSizes).length > 0 && Object.values(userSizes).some((size) => size);
 
-  // Build filters for PPE items - use simple query to avoid Zod validation issues
-  // We'll filter for PPE and stock on client side
-  const baseFilters = {
-    take: 100, // Maximum allowed by API
-    include: {
-      category: true,
-      measures: true,
+  // Trigger refresh when showAllSizes changes
+  useEffect(() => {
+    setQueryKey((prev) => prev + 1);
+  }, [showAllSizes]);
+
+  // Async query function for the combobox
+  const queryItems = useCallback(
+    async (searchTerm: string, page = 1) => {
+      if (!userId) {
+        return {
+          data: [],
+          hasMore: false,
+        };
+      }
+
+      try {
+        const queryParams: any = {
+          orderBy: { name: "asc" },
+          page: page,
+          take: 50,
+          where: {
+            category: {
+              type: ITEM_CATEGORY_TYPE.PPE,
+            },
+            quantity: {
+              gt: 0,
+            },
+          },
+          include: {
+            category: true,
+            measures: true,
+            brand: true,
+          },
+        };
+
+        // Only add searchingFor if there's a search term
+        if (searchTerm && searchTerm.trim()) {
+          queryParams.searchingFor = searchTerm.trim();
+        }
+
+        const response = await getItems(queryParams);
+        const items = response.data || [];
+        const hasMore = response.meta?.hasNextPage || false;
+
+        // Filter items based on user sizes if not showing all
+        let filteredItems = items;
+
+        if (!showAllSizes && hasSizesConfigured) {
+          filteredItems = items.filter((item: Item) => {
+            // If item doesn't have a ppeType, include it
+            if (!item.ppeType) return true;
+
+            // For OUTROS type, sizes are optional - always include these items
+            if (item.ppeType === PPE_TYPE.OUTROS) return true;
+
+            // Get the size field mapping for this PPE type
+            const sizeField = PPE_TYPE_TO_USER_SIZE_FIELD[item.ppeType];
+
+            // If no size field mapping exists for this type, include the item
+            if (!sizeField) return true;
+
+            // Check if the item's size matches the user's size
+            const userSize = userSizes[sizeField];
+            // Filter measures to only SIZE type
+            const sizeMeasures = (item.measures || []).filter((m: any) => m.measureType === "SIZE");
+            const itemSize = getPpeSizeFromMeasures(sizeMeasures);
+
+            // Include items without size measures (size is optional)
+            if (!itemSize) return true;
+
+            // Match user's size with item's size
+            return userSize && itemSize === userSize;
+          });
+        }
+
+        // Convert items to options format
+        const options: ComboboxOption[] = filteredItems.map((item: Item) => {
+          // Check if this item matches user's size for its type
+          // Filter measures to only SIZE type
+          const sizeMeasures = (item.measures || []).filter((m: any) => m.measureType === "SIZE");
+          const itemSize = getPpeSizeFromMeasures(sizeMeasures);
+          const isMatchingSize = item.ppeType && userSizes[PPE_TYPE_TO_USER_SIZE_FIELD[item.ppeType]] === itemSize;
+
+          // Format label
+          const label = item.uniCode ? `${item.uniCode} - ${item.name}` : item.name;
+
+          const typeOrder = item.ppeType ? PPE_TYPE_ORDER[item.ppeType as keyof typeof PPE_TYPE_ORDER] || 999 : 999;
+          const sizeOrder = getSizeOrder(item.ppeType, itemSize);
+
+          return {
+            value: item.id,
+            label: label,
+            metadata: {
+              displayName: item.name,
+              uniCode: item.uniCode || "",
+              quantity: item.quantity,
+              size: itemSize,
+              ppeType: item.ppeType || null,
+              categoryName: item.category?.name || null,
+              brandName: item.brand?.name || null,
+              isMatchingSize,
+              typeOrder,
+              sizeOrder,
+            },
+          };
+        });
+
+        // Sort by name first, then by size order
+        options.sort((a, b) => {
+          // Compare names first (case-insensitive)
+          const nameComparison = a.metadata.displayName.localeCompare(b.metadata.displayName, undefined, { sensitivity: 'base' });
+          if (nameComparison !== 0) return nameComparison;
+
+          // If names are the same, sort by size order
+          return a.metadata.sizeOrder - b.metadata.sizeOrder;
+        });
+
+        return {
+          data: options,
+          hasMore: hasMore,
+        };
+      } catch (error) {
+        console.error("Error fetching items:", error);
+        return {
+          data: [],
+          hasMore: false,
+        };
+      }
     },
-  };
-
-  // If not showing all and user has sizes configured, filter by matching PPE type and size
-  if (!showAllSizes && hasSizesConfigured) {
-    // For now, we'll fetch all PPE items and filter on the client side
-    // This is a workaround for the complex query serialization issue
-    // TODO: Fix backend query parsing for complex nested OR conditions
-    // Note: We're still fetching all items but will filter them in the sortedOptions
-    // This ensures the user sees only their configured sizes unless they check "show all"
-  }
-
-  const itemFilters = baseFilters;
-
-  // Fetch items with filters
-  const { data: itemsResponse, isLoading } = useItems(itemFilters);
-
-  const items = itemsResponse?.data || [];
-
-  // Process and sort items
-  const sortedOptions = useMemo(() => {
-    // First, filter for PPE items only and items with stock
-    const ppeItems = items.filter((item: Item) => {
-      // Check if item is PPE type and has stock
-      return item.category?.type === ITEM_CATEGORY_TYPE.PPE && item.quantity > 0;
-    });
-
-    // Filter items based on user sizes if not showing all
-    let filteredItems = ppeItems;
-
-    if (!showAllSizes && hasSizesConfigured) {
-      filteredItems = ppeItems.filter((item: Item) => {
-        if (!item.ppeType) return false;
-        const sizeField = PPE_TYPE_TO_USER_SIZE_FIELD[item.ppeType];
-        if (!sizeField) return false;
-        const userSize = userSizes[sizeField];
-        // Filter measures to only SIZE type on client side
-        const sizeMeasures = (item.measures || []).filter((m: any) => m.measureType === "SIZE");
-        const itemSize = getPpeSizeFromMeasures(sizeMeasures);
-        return userSize && itemSize === userSize;
-      });
-    }
-
-    const options = filteredItems.map((item: Item) => {
-      // Check if this item matches user's size for its type
-      // Filter measures to only SIZE type on client side
-      const sizeMeasures = (item.measures || []).filter((m: any) => m.measureType === "SIZE");
-      const itemSize = getPpeSizeFromMeasures(sizeMeasures);
-      const isMatchingSize = item.ppeType && userSizes[PPE_TYPE_TO_USER_SIZE_FIELD[item.ppeType]] === itemSize;
-
-      // Format label - we'll handle the display in renderOption
-      const label = item.uniCode ? `${item.uniCode} - ${item.name}` : item.name;
-
-      return {
-        value: item.id,
-        label: label,
-        displayName: item.name,
-        uniCode: item.uniCode || "",
-        quantity: item.quantity,
-        size: itemSize,
-        ppeType: item.ppeType || null,
-        categoryName: item.category?.name || null,
-        isMatchingSize,
-        typeOrder: item.ppeType ? PPE_TYPE_ORDER[item.ppeType as keyof typeof PPE_TYPE_ORDER] || 999 : 999,
-        sizeOrder: getSizeOrder(item.ppeType, itemSize),
-      };
-    });
-
-    // Sort by type order, then size order, then name
-    return options.sort((a, b) => {
-      if (a.typeOrder !== b.typeOrder) return a.typeOrder - b.typeOrder;
-      if (a.sizeOrder !== b.sizeOrder) return a.sizeOrder - b.sizeOrder;
-      return a.label.localeCompare(b.label);
-    });
-  }, [items, userSizes, showAllSizes, hasSizesConfigured]);
+    [userId, userSizes, showAllSizes, hasSizesConfigured]
+  );
 
   return (
     <div className="space-y-1.5">
       <Combobox
-        options={sortedOptions}
+        async={true}
+        queryKey={["item-selector", userId, queryKey]}
+        queryFn={queryItems}
         value={value}
         onValueChange={onChange}
         placeholder={userId ? placeholder : "Selecione um funcionário primeiro"}
         searchPlaceholder="Buscar EPI..."
-        emptyText={
-          userId
-            ? items.length === 0
-              ? !showAllSizes && hasSizesConfigured
-                ? "Nenhum EPI disponível no tamanho do funcionário"
-                : "Nenhum EPI disponível"
-              : "Nenhum EPI encontrado"
-            : "Selecione um funcionário primeiro"
-        }
-        disabled={disabled || isLoading || !userId}
+        emptyText={userId ? "Nenhum EPI encontrado" : "Selecione um funcionário primeiro"}
+        disabled={disabled || !userId}
         searchable={true}
         clearable={true}
-        renderOption={(option: any) => {
-          const hasTypeOrSize = option.ppeType || option.size;
+        minSearchLength={0}
+        pageSize={50}
+        debounceMs={300}
+        renderOption={(option: ComboboxOption) => {
+          const meta = option.metadata as any;
+
+          // Build the label: unicode - name - type • size
+          let label = '';
+
+          // Add unicode if available
+          if (meta.uniCode) {
+            label += meta.uniCode;
+          }
+
+          // Add name
+          if (meta.displayName) {
+            label += (label ? ' - ' : '') + meta.displayName;
+          }
+
+          // Add type
+          if (meta.ppeType) {
+            const typeLabel = PPE_TYPE_LABELS[meta.ppeType as keyof typeof PPE_TYPE_LABELS] || meta.ppeType;
+            label += (label ? ' - ' : '') + typeLabel;
+          }
+
+          // Add size (or brand for OUTROS type) with bullet separator
+          if (meta.ppeType === PPE_TYPE.OUTROS) {
+            if (meta.brandName) {
+              label += (label ? ' • ' : '') + meta.brandName;
+            }
+          } else if (meta.size) {
+            const sizeLabel = PPE_SIZE_LABELS[meta.size as keyof typeof PPE_SIZE_LABELS] || meta.size;
+            label += (label ? ' • ' : '') + sizeLabel;
+          }
 
           return (
-            <div className={`flex items-center justify-between w-full gap-2 min-h-[48px] ${!hasTypeOrSize ? "items-center" : ""}`}>
-              {/* Left side with item info */}
-              <div className={`flex flex-col flex-1 min-w-0 py-1 ${!hasTypeOrSize ? "justify-center" : ""}`}>
-                {/* Main row with unicode (if available) and name */}
-                <div className="flex items-center gap-2">
-                  {option.uniCode && <span className="font-mono text-xs text-muted-foreground group-hover:text-white">{option.uniCode}</span>}
-                  <span className="font-medium truncate">{option.displayName}</span>
-                </div>
-                {/* Secondary row with PPE type and size - only render if has type or size */}
-                {hasTypeOrSize && (
-                  <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 group-hover:text-white mt-0.5 h-4">
-                    {option.ppeType && <span className="font-medium">{PPE_TYPE_LABELS[option.ppeType as keyof typeof PPE_TYPE_LABELS] || option.ppeType}</span>}
-                    {option.size && (
-                      <>
-                        {option.ppeType && <span>•</span>}
-                        <span>Tamanho: {option.size}</span>
-                      </>
-                    )}
-                  </div>
-                )}
+            <div className="flex items-center justify-between w-full gap-2">
+              {/* Left side with item info in single row */}
+              <div className="flex items-center gap-1 flex-1 min-w-0">
+                <span className="font-medium truncate">{label}</span>
               </div>
-              {/* Right side with stock quantity - fixed width with left alignment for "Estoque" */}
+              {/* Right side with stock quantity */}
               <div className="flex items-center min-w-[110px]">
-                <span className="text-sm font-semibold text-gray-900 dark:text-gray-300 group-hover:text-white whitespace-nowrap">Estoque: {option.quantity}</span>
+                <span className="text-sm font-semibold whitespace-nowrap">Estoque: {meta.quantity}</span>
               </div>
             </div>
           );

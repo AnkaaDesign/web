@@ -36,7 +36,7 @@ export default function FormulaDetailsPage() {
   // Paint production mutations
   const { create: createProduction } = usePaintProductionMutations({
     onCreateSuccess: () => {
-      navigate(routes.painting.productions.root);
+      navigate(routes.painting.catalog.root);
     },
   });
 

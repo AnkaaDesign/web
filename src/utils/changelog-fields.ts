@@ -1,4 +1,16 @@
-import { CHANGE_LOG_ENTITY_TYPE, MEASURE_UNIT_LABELS, CHANGE_LOG_ACTION, CHANGE_TRIGGERED_BY } from '@constants';
+import {
+  CHANGE_LOG_ENTITY_TYPE,
+  MEASURE_UNIT_LABELS,
+  CHANGE_LOG_ACTION,
+  CHANGE_TRIGGERED_BY,
+  SHIRT_SIZE_LABELS,
+  BOOT_SIZE_LABELS,
+  PANTS_SIZE_LABELS,
+  SLEEVES_SIZE_LABELS,
+  MASK_SIZE_LABELS,
+  GLOVES_SIZE_LABELS,
+  RAIN_BOOTS_SIZE_LABELS,
+} from '@constants';
 import { formatDateTime } from "./date";
 import { formatCurrency } from "./number";
 import { formatBrazilianPhone, formatCPF, formatCNPJ } from "./formatters";
@@ -55,7 +67,6 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     ppeSize: "Tamanho do EPI",
     ppeDeliveryMode: "Modo de Entrega de EPI",
     ppeStandardQuantity: "Quantidade Padrão de EPI",
-    ppeAutoOrderMonths: "Meses para Pedido Automático de EPI",
     shouldAssignToUser: "Deve ser Atribuído a Usuário",
     isForEpi: "É EPI",
 
@@ -68,7 +79,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     location: "Localização",
 
     // Financial fields
-    tax: "Imposto (%)",
+    icms: "ICMS (%)",
+    ipi: "IPI (%)",
     taxrate: "Taxa de Imposto (%)",
     totalPrice: "Preço Total",
     lastPurchasePrice: "Preço da Última Compra",
@@ -150,8 +162,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     orderedQuantity: "Quantidade Pedida",
     receivedQuantity: "Quantidade Recebida",
     price: "Preço Unitário",
-    tax: "Imposto (%)",
-    isCritical: "Item Crítico",
+    icms: "ICMS (%)",
+    ipi: "IPI (%)",
     receivedAt: "Recebido em",
     fulfilledAt: "Cumprido em",
     notes: "Observações do Item",
@@ -219,6 +231,15 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     preferenceId: "ID de Preferências",
     avatarId: "Avatar",
 
+    // PPE size fields
+    "ppeSize.shirts": "Tamanho de Camiseta",
+    "ppeSize.boots": "Tamanho de Botas",
+    "ppeSize.pants": "Tamanho de Calças",
+    "ppeSize.sleeves": "Tamanho de Mangas",
+    "ppeSize.mask": "Tamanho de Máscara",
+    "ppeSize.gloves": "Tamanho de Luvas",
+    "ppeSize.rainBoots": "Tamanho de Galochas",
+
     // Legacy/computed fields
     isExternal: "É Externo",
   },
@@ -259,6 +280,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     artworks: "Artes",
     logoPaints: "Tintas da logomarca",
     paints: "Tintas da logomarca",
+    groundPaints: "Fundos da Tinta",
     commissions: "Comissões",
     services: "Serviços",
     airbrushings: "Aerografias",
@@ -444,7 +466,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     price: "Preço Unitário",
     unitPrice: "Preço Unitário",
     totalPrice: "Preço Total",
-    tax: "Imposto",
+    icms: "ICMS (%)",
+    ipi: "IPI (%)",
     discount: "Desconto",
     notes: "Observações",
     condition: "Condição",
@@ -565,7 +588,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
   [CHANGE_LOG_ENTITY_TYPE.PRICE]: {
     itemId: "Item",
     value: "Valor",
-    tax: "Imposto (%)",
+    icms: "ICMS (%)",
+    ipi: "IPI (%)",
     // Nested relationship fields
     "item.name": "Nome do Item",
     "item.sku": "SKU do Item",
@@ -629,6 +653,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     isActive: "Ativo",
     notes: "Observações",
     formulas: "Fórmulas",
+    paintGrounds: "Fundos da Tinta",
+    groundPaints: "Fundos da Tinta",
     // Nested relationship fields
     "formulas.length": "Quantidade de Fórmulas",
   },
@@ -901,8 +927,8 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       if (field === "artworks") {
         return `${value.length} ${value.length === 1 ? "arte" : "artes"}`;
       }
-      // Don't format logoPaints/paints as strings - they will be rendered as special cards in the UI
-      if (field === "logoPaints" || field === "paints") {
+      // Don't format logoPaints/paints/groundPaints as strings - they will be rendered as special cards in the UI
+      if (field === "logoPaints" || field === "paints" || field === "groundPaints") {
         // Return the array as-is to be handled by the UI component
         return value;
       }
@@ -923,6 +949,18 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       }
       if (field === "relatedTasks" || field === "relatedTo") {
         return `${value.length} ${value.length === 1 ? "tarefa relacionada" : "tarefas relacionadas"}`;
+      }
+    }
+
+    // Paint-specific array handling
+    if (entityType === CHANGE_LOG_ENTITY_TYPE.PAINT) {
+      // Don't format paintGrounds as strings - they will be rendered as special cards in the UI
+      if (field === "paintGrounds" || field === "groundPaints") {
+        // Return the array as-is to be handled by the UI component
+        return value;
+      }
+      if (field === "formulas") {
+        return `${value.length} ${value.length === 1 ? "fórmula" : "fórmulas"}`;
       }
     }
 
@@ -993,6 +1031,31 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       DISMISSED: "Demitido",
     };
     return userStatusLabels[value] || value;
+  }
+
+  // Handle PPE size fields for User entity
+  if (entityType === CHANGE_LOG_ENTITY_TYPE.USER && typeof value === "string") {
+    if (field === "ppeSize.shirts") {
+      return SHIRT_SIZE_LABELS[value as keyof typeof SHIRT_SIZE_LABELS] || value;
+    }
+    if (field === "ppeSize.boots") {
+      return BOOT_SIZE_LABELS[value as keyof typeof BOOT_SIZE_LABELS] || value;
+    }
+    if (field === "ppeSize.pants") {
+      return PANTS_SIZE_LABELS[value as keyof typeof PANTS_SIZE_LABELS] || value;
+    }
+    if (field === "ppeSize.sleeves") {
+      return SLEEVES_SIZE_LABELS[value as keyof typeof SLEEVES_SIZE_LABELS] || value;
+    }
+    if (field === "ppeSize.mask") {
+      return MASK_SIZE_LABELS[value as keyof typeof MASK_SIZE_LABELS] || value;
+    }
+    if (field === "ppeSize.gloves") {
+      return GLOVES_SIZE_LABELS[value as keyof typeof GLOVES_SIZE_LABELS] || value;
+    }
+    if (field === "ppeSize.rainBoots") {
+      return RAIN_BOOTS_SIZE_LABELS[value as keyof typeof RAIN_BOOTS_SIZE_LABELS] || value;
+    }
   }
 
   // Handle PPE delivery status
@@ -1598,7 +1661,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     }
 
     // Percentage fields
-    if (field === "tax" || field === "margin" || field === "minimumMargin" || field === "monthlyConsumptionTrendPercent" || field === "ratio") {
+    if (field === "icms" || field === "ipi" || field === "margin" || field === "minimumMargin" || field === "monthlyConsumptionTrendPercent" || field === "ratio") {
       return `${value.toLocaleString("pt-BR")}%`;
     }
 
@@ -1660,7 +1723,19 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return value.toLocaleString("pt-BR");
   }
 
-  // Handle date formatting
+  // Generic ISO date string detection - catches any value that looks like an ISO date
+  if (typeof value === "string") {
+    // Check if the string matches ISO 8601 format (e.g., "2025-10-30T14:35:59.569Z")
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
+    if (isoDateRegex.test(value)) {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        return formatDateTime(date);
+      }
+    }
+  }
+
+  // Handle date formatting for known date fields
   if (
     field === "createdAt" ||
     field === "updatedAt" ||

@@ -99,7 +99,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       temporaryItemDescription: item.temporaryItemDescription!,
       orderedQuantity: item.orderedQuantity,
       price: item.price,
-      tax: item.tax,
+      icms: item.icms,
+      ipi: item.ipi,
     })),
     [order.items]
   );
@@ -132,11 +133,23 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     [inventoryItems],
   );
 
-  const initialTaxes = useMemo(
+  const initialIcmses = useMemo(
     () =>
       inventoryItems.reduce(
         (acc, item) => {
-          acc[item.itemId!] = item.tax;
+          acc[item.itemId!] = item.icms;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+    [inventoryItems],
+  );
+
+  const initialIpis = useMemo(
+    () =>
+      inventoryItems.reduce(
+        (acc, item) => {
+          acc[item.itemId!] = item.ipi;
           return acc;
         },
         {} as Record<string, number>,
@@ -211,7 +224,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     selectedItems,
     quantities,
     prices,
-    taxes,
+    icmses,
+    ipis,
     description,
     supplierId,
     forecast,
@@ -245,12 +259,14 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     toggleItemSelection,
     setItemQuantity,
     setItemPrice,
-    setItemTax,
+    setItemIcms,
+    setItemIpi,
     selectionCount,
   } = useOrderFormUrlState({
     defaultQuantity: 1,
     defaultPrice: 0,
-    defaultTax: 0,
+    defaultIcms: 0,
+    defaultIpi: 0,
     preserveQuantitiesOnDeselect: false,
     defaultPageSize: 40,
     // Always provide initial data - URL params will override if present
@@ -264,7 +280,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       selectedItems: initialSelectedItems,
       quantities: initialQuantities,
       prices: initialPrices,
-      taxes: initialTaxes,
+      icmses: initialIcmses,
+      ipis: initialIpis,
       temporaryItems: temporaryItems,
     },
   });
@@ -288,40 +305,63 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   // Note: form is intentionally excluded from dependencies to prevent cascading re-syncs
   // that could cause race conditions and clear field values when other fields are updated
   useEffect(() => {
-    console.log('[useEffect DESCRIPTION SYNC] URL state changed to:', description);
-    console.log('[useEffect DESCRIPTION SYNC] Setting form value to:', description || "");
-    form.setValue("description", description || "", {
-      shouldValidate: true,
-      shouldDirty: true,
-      shouldTouch: true
-    });
+    const currentValue = form.getValues("description");
+    const newValue = description || "";
+    // Only update if value has actually changed to prevent infinite loops
+    if (currentValue !== newValue) {
+      console.log('[useEffect DESCRIPTION SYNC] URL state changed to:', description);
+      console.log('[useEffect DESCRIPTION SYNC] Setting form value to:', newValue);
+      form.setValue("description", newValue, {
+        shouldValidate: false, // Don't validate on sync to prevent loops
+        shouldDirty: false,    // Don't mark as dirty on sync
+        shouldTouch: false     // Don't mark as touched on sync
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [description]);
 
   useEffect(() => {
-    form.setValue("supplierId", supplierId || undefined, {
-      shouldValidate: true,
-      shouldDirty: true,
-      shouldTouch: true
-    });
+    const currentValue = form.getValues("supplierId");
+    const newValue = supplierId || undefined;
+    // Only update if value has actually changed
+    if (currentValue !== newValue) {
+      form.setValue("supplierId", newValue, {
+        shouldValidate: false,
+        shouldDirty: false,
+        shouldTouch: false
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierId]);
 
   useEffect(() => {
-    form.setValue("forecast", forecast || undefined, {
-      shouldValidate: true,
-      shouldDirty: true,
-      shouldTouch: true
-    });
+    const currentValue = form.getValues("forecast");
+    const newValue = forecast || undefined;
+    // Only update if value has actually changed
+    // Compare timestamps for Date objects
+    const currentTime = currentValue instanceof Date ? currentValue.getTime() : null;
+    const newTime = newValue instanceof Date ? newValue.getTime() : null;
+    if (currentTime !== newTime) {
+      form.setValue("forecast", newValue, {
+        shouldValidate: false,
+        shouldDirty: false,
+        shouldTouch: false
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forecast]);
 
   useEffect(() => {
-    form.setValue("notes", notes || "", {
-      shouldValidate: true,
-      shouldDirty: true,
-      shouldTouch: true
-    });
+    const currentValue = form.getValues("notes");
+    const newValue = notes || "";
+    // Only update if value has actually changed
+    if (currentValue !== newValue) {
+      form.setValue("notes", newValue, {
+        shouldValidate: false,
+        shouldDirty: false,
+        shouldTouch: false
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes]);
 
@@ -371,10 +411,13 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       return Array.from(selectedItems).reduce((total, itemId) => {
         const quantity = quantities[itemId] || 1;
         const price = prices[itemId] || 0;
-        const tax = taxes[itemId] || 0;
-        const itemTotal = quantity * price;
-        const taxAmount = itemTotal * (tax / 100);
-        return total + itemTotal + taxAmount;
+        const icms = icmses[itemId] || 0;
+        const ipi = ipis[itemId] || 0;
+        const subtotal = quantity * price;
+        const icmsAmount = subtotal * (icms / 100);
+        const ipiAmount = subtotal * (ipi / 100);
+        const taxAmount = icmsAmount + ipiAmount;
+        return total + subtotal + taxAmount;
       }, 0);
     } else {
       // Temporary mode
@@ -382,13 +425,16 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       return tempItems.reduce((total: number, item: any) => {
         const quantity = Number(item.orderedQuantity) || 1;
         const price = Number(item.price) || 0;
-        const tax = Number(item.tax) || 0;
-        const itemTotal = quantity * price;
-        const taxAmount = itemTotal * (tax / 100);
-        return total + itemTotal + taxAmount;
+        const icms = Number(item.icms) || 0;
+        const ipi = Number(item.ipi) || 0;
+        const subtotal = quantity * price;
+        const icmsAmount = subtotal * (icms / 100);
+        const ipiAmount = subtotal * (ipi / 100);
+        const taxAmount = icmsAmount + ipiAmount;
+        return total + subtotal + taxAmount;
       }, 0);
     }
-  }, [orderItemMode, selectedItems, quantities, prices, taxes, form, temporaryItemsState]);
+  }, [orderItemMode, selectedItems, quantities, prices, icmses, ipis, form, temporaryItemsState]);
 
   // Calculate item count based on mode
   const itemCount = useMemo(() => {
@@ -572,7 +618,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
           itemId,
           orderedQuantity: quantities[itemId] || 0,
           price: prices[itemId] || 0,
-          tax: taxes[itemId] || 0,
+          icms: icmses[itemId] || 0,
+          ipi: ipis[itemId] || 0,
         }));
       } else {
         // Temporary mode - get items from form state
@@ -581,7 +628,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
           temporaryItemDescription: item.temporaryItemDescription,
           orderedQuantity: Number(item.orderedQuantity) || 1,
           price: Number(item.price) || 0,
-          tax: Number(item.tax) || 0,
+          icms: Number(item.icms) || 0,
+          ipi: Number(item.ipi) || 0,
         }));
       }
 
@@ -697,7 +745,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       });
       // Error is handled by the mutation hook
     }
-  }, [validateCurrentStep, orderItemMode, selectedItems, quantities, prices, taxes, description, supplierId, forecast, notes, budgetFiles, receiptFiles, nfeFiles, updateAsync, order, navigate, form, temporaryItemsState]);
+  }, [validateCurrentStep, orderItemMode, selectedItems, quantities, prices, icmses, ipis, description, supplierId, forecast, notes, budgetFiles, receiptFiles, nfeFiles, updateAsync, order, navigate, form, temporaryItemsState]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === steps.length;
@@ -986,9 +1034,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                 <th>Marca</th>
                 <th class="text-right">Quantidade</th>
                 <th class="text-right">Preço Unit.</th>
-                <th class="text-right">Taxa %</th>
+                <th class="text-right">ICMS %</th>
+                <th class="text-right">IPI %</th>
                 <th class="text-right">Subtotal</th>
-                <th class="text-right">Taxa</th>
+                <th class="text-right">Impostos</th>
                 <th class="text-right">Total</th>
               </tr>
             </thead>
@@ -997,9 +1046,12 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                 .map((item) => {
                   const quantity = quantities[item.id] || 1;
                   const price = prices[item.id] || 0;
-                  const tax = taxes[item.id] || 0;
+                  const icms = icmses[item.id] || 0;
+                  const ipi = ipis[item.id] || 0;
                   const subtotal = quantity * price;
-                  const taxAmount = subtotal * (tax / 100);
+                  const icmsAmount = subtotal * (icms / 100);
+                  const ipiAmount = subtotal * (ipi / 100);
+                  const taxAmount = icmsAmount + ipiAmount;
                   const itemTotal = subtotal + taxAmount;
                   const measureUnit = getMeasureUnitDisplay(item.measures);
                   return `
@@ -1010,7 +1062,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                     <td>${item.brand?.name || "-"}</td>
                     <td class="text-right">${quantity} ${measureUnit}</td>
                     <td class="text-right">${formatCurrency(price)}</td>
-                    <td class="text-right">${tax}%</td>
+                    <td class="text-right">${icms}%</td>
+                    <td class="text-right">${ipi}%</td>
                     <td class="text-right">${formatCurrency(subtotal)}</td>
                     <td class="text-right">${formatCurrency(taxAmount)}</td>
                     <td class="text-right font-medium">${formatCurrency(itemTotal)}</td>
@@ -1021,7 +1074,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
             </tbody>
             <tfoot>
               <tr class="total-row">
-                <td colspan="9" class="text-right">Total Geral</td>
+                <td colspan="10" class="text-right">Total Geral</td>
                 <td class="text-right">${formatCurrency(totalPrice)}</td>
               </tr>
             </tfoot>
@@ -1049,7 +1102,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         };
       }
     },
-    [description, supplierId, forecast, notes, selectionCount, selectedItemsData, quantities, prices, taxes, totalPrice, order.id, suppliers],
+    [description, supplierId, forecast, notes, selectionCount, selectedItemsData, quantities, prices, icmses, ipis, totalPrice, order.id, suppliers],
   );
 
   // Generate navigation actions based on current step
@@ -1087,13 +1140,20 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       disabled: isSubmitting,
     });
   } else {
-    const submitDisabled = isSubmitting || !hasFormChanges || !form.formState.isValid || !description?.trim();
+    // For updates, we only need to check if there are changes and if required fields are valid
+    // We don't check form.formState.isValid because quantities/prices/items are managed in URL state,
+    // not form state, so the form might never be touched/validated
+    const hasRequiredFields = !!description?.trim();
+    const submitDisabled = isSubmitting || !hasFormChanges || !hasRequiredFields;
     console.log('[Submit Button State]', {
       isSubmitting,
       hasFormChanges,
       isValid: form.formState.isValid,
       hasDescription: !!description?.trim(),
+      hasRequiredFields,
       submitDisabled,
+      formErrors: form.formState.errors,
+      formValues: form.getValues(),
     });
     navigationActions.push({
       key: "submit",
@@ -1157,14 +1217,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               // Custom Input component passes value directly, not event object
                               const newValue = value?.toString() || "";
                               console.log('[DESCRIPTION CHANGE] User typed:', newValue);
-                              console.log('[DESCRIPTION CHANGE] Current URL description:', description);
                               updateDescription(newValue);
-                              form.setValue("description", newValue, {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                                shouldTouch: true
-                              });
-                              console.log('[DESCRIPTION CHANGE] After update, form value:', form.getValues('description'));
+                              // Form will be synced by useEffect, no need to set it here
+                              // Trigger validation after state update
+                              setTimeout(() => form.trigger(), 0);
                             }}
                             className={`h-10 w-full ${form.formState.errors.description ? "border-red-500" : ""}`}
                           />
@@ -1233,11 +1289,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 onValueChange={(value) => {
                                   const newValue = typeof value === "string" ? value : undefined;
                                   updateSupplierId(newValue);
-                                  form.setValue("supplierId", newValue, {
-                                    shouldValidate: true,
-                                    shouldDirty: true,
-                                    shouldTouch: true
-                                  });
+                                  // Form will be synced by useEffect
+                                  // Trigger validation after state update
+                                  setTimeout(() => form.trigger(), 0);
                                 }}
                                 className="h-10 w-full"
                                 mode="single"
@@ -1274,18 +1328,14 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                     const newDate = new Date(date);
                                     newDate.setHours(13, 0, 0, 0);
                                     updateForecast(newDate);
-                                    form.setValue("forecast", newDate, {
-                                      shouldValidate: true,
-                                      shouldDirty: true,
-                                      shouldTouch: true
-                                    });
+                                    // Form will be synced by useEffect
+                                    // Trigger validation after state update
+                                    setTimeout(() => form.trigger(), 0);
                                   } else {
                                     updateForecast(null);
-                                    form.setValue("forecast", undefined, {
-                                      shouldValidate: true,
-                                      shouldDirty: true,
-                                      shouldTouch: true
-                                    });
+                                    // Form will be synced by useEffect
+                                    // Trigger validation after state update
+                                    setTimeout(() => form.trigger(), 0);
                                   }
                                 }}
                                 context="delivery"
@@ -1307,11 +1357,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               value={notes}
                               onChange={(e) => {
                                 updateNotes(e.target.value);
-                                form.setValue("notes", e.target.value, {
-                                  shouldValidate: true,
-                                  shouldDirty: true,
-                                  shouldTouch: true
-                                });
+                                // Form will be synced by useEffect
+                                // Trigger validation after state update
+                                setTimeout(() => form.trigger(), 0);
                               }}
                               className="resize-none w-full flex-1"
                               rows={3}
@@ -1417,10 +1465,12 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                     onSelectAll={() => {}}
                     onQuantityChange={setItemQuantity}
                     onPriceChange={setItemPrice}
-                    onTaxChange={setItemTax}
+                    onIcmsChange={setItemIcms}
+                    onIpiChange={setItemIpi}
                     quantities={quantities}
                     prices={prices}
-                    taxes={taxes}
+                    icmses={icmses}
+                    ipis={ipis}
                     isSelected={(itemId) => selectedItems.has(itemId)}
                     showSelectedOnly={showSelectedOnly}
                     searchTerm={searchTerm}
@@ -1521,9 +1571,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   <TableHead>Marca</TableHead>
                                   <TableHead className="text-right">Quantidade</TableHead>
                                   <TableHead className="text-right">Preço Unit.</TableHead>
-                                  <TableHead className="text-right">Taxa %</TableHead>
+                                  <TableHead className="text-right">ICMS %</TableHead>
+                                  <TableHead className="text-right">IPI %</TableHead>
                                   <TableHead className="text-right">Subtotal</TableHead>
-                                  <TableHead className="text-right">Taxa</TableHead>
+                                  <TableHead className="text-right">Impostos</TableHead>
                                   <TableHead className="text-right">Total</TableHead>
                                 </TableRow>
                               </TableHeader>
@@ -1531,9 +1582,12 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 {selectedItemsData.map((item) => {
                                   const quantity = quantities[item.id] || 1;
                                   const price = prices[item.id] || 0;
-                                  const tax = taxes[item.id] || 0;
+                                  const icms = icmses[item.id] || 0;
+                                  const ipi = ipis[item.id] || 0;
                                   const subtotal = quantity * price;
-                                  const taxAmount = subtotal * (tax / 100);
+                                  const icmsAmount = subtotal * (icms / 100);
+                                  const ipiAmount = subtotal * (ipi / 100);
+                                  const taxAmount = icmsAmount + ipiAmount;
                                   const itemTotal = subtotal + taxAmount;
 
                                   return (
@@ -1546,7 +1600,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                         {quantity} {getMeasureUnitDisplay(item.measures)}
                                       </TableCell>
                                       <TableCell className="text-right">{formatCurrency(price)}</TableCell>
-                                      <TableCell className="text-right">{tax}%</TableCell>
+                                      <TableCell className="text-right">{icms}%</TableCell>
+                                      <TableCell className="text-right">{ipi}%</TableCell>
                                       <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
                                       <TableCell className="text-right">{formatCurrency(taxAmount)}</TableCell>
                                       <TableCell className="text-right font-medium">{formatCurrency(itemTotal)}</TableCell>
@@ -1556,7 +1611,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               </TableBody>
                               <TableFooter>
                                 <TableRow>
-                                  <TableCell colSpan={9} className="text-right font-medium">
+                                  <TableCell colSpan={10} className="text-right font-medium">
                                     Total Geral
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-base">{formatCurrency(totalPrice)}</TableCell>
@@ -1570,9 +1625,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   <TableHead>Descrição do Item</TableHead>
                                   <TableHead className="text-right">Quantidade</TableHead>
                                   <TableHead className="text-right">Preço Unit.</TableHead>
-                                  <TableHead className="text-right">Taxa %</TableHead>
+                                  <TableHead className="text-right">ICMS %</TableHead>
+                                  <TableHead className="text-right">IPI %</TableHead>
                                   <TableHead className="text-right">Subtotal</TableHead>
-                                  <TableHead className="text-right">Taxa</TableHead>
+                                  <TableHead className="text-right">Impostos</TableHead>
                                   <TableHead className="text-right">Total</TableHead>
                                 </TableRow>
                               </TableHeader>
@@ -1580,9 +1636,12 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 {(form.getValues("temporaryItems") || temporaryItemsState || []).map((item: any, index: number) => {
                                   const quantity = Number(item.orderedQuantity) || 1;
                                   const price = Number(item.price) || 0;
-                                  const tax = Number(item.tax) || 0;
+                                  const icms = Number(item.icms) || 0;
+                                  const ipi = Number(item.ipi) || 0;
                                   const subtotal = quantity * price;
-                                  const taxAmount = subtotal * (tax / 100);
+                                  const icmsAmount = subtotal * (icms / 100);
+                                  const ipiAmount = subtotal * (ipi / 100);
+                                  const taxAmount = icmsAmount + ipiAmount;
                                   const itemTotal = subtotal + taxAmount;
 
                                   return (
@@ -1590,7 +1649,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                       <TableCell>{item.temporaryItemDescription}</TableCell>
                                       <TableCell className="text-right">{quantity}</TableCell>
                                       <TableCell className="text-right">{formatCurrency(price)}</TableCell>
-                                      <TableCell className="text-right">{tax}%</TableCell>
+                                      <TableCell className="text-right">{icms}%</TableCell>
+                                      <TableCell className="text-right">{ipi}%</TableCell>
                                       <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
                                       <TableCell className="text-right">{formatCurrency(taxAmount)}</TableCell>
                                       <TableCell className="text-right font-medium">{formatCurrency(itemTotal)}</TableCell>
@@ -1600,7 +1660,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               </TableBody>
                               <TableFooter>
                                 <TableRow>
-                                  <TableCell colSpan={6} className="text-right font-medium">
+                                  <TableCell colSpan={7} className="text-right font-medium">
                                     Total Geral
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-base">{formatCurrency(totalPrice)}</TableCell>

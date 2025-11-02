@@ -71,7 +71,7 @@ export const AirbrushingDetails = () => {
   // Loading state
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.PRODUCTION}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="flex flex-col h-full space-y-6">
           <PageHeader
             variant="detail"
@@ -106,7 +106,7 @@ export const AirbrushingDetails = () => {
   // Error or not found state
   if (isError || !airbrushing) {
     return (
-      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.PRODUCTION}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="flex flex-col h-full space-y-6">
           <PageHeader
             variant="detail"
@@ -139,7 +139,7 @@ export const AirbrushingDetails = () => {
   }
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.PRODUCTION}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="flex flex-col h-full space-y-6">
         <PageHeader
           variant="detail"

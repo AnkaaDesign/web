@@ -578,10 +578,13 @@ export function getPpeStandardQuantity(item: Item): number {
 }
 
 /**
- * Get PPE auto order months from item
+ * Calculate PPE auto order lead time in days based on item's estimated lead time
+ * Default to 180 days (6 months) if no lead time is specified
  */
-export function getPpeAutoOrderMonths(item: Item): number {
-  return item.ppeAutoOrderMonths || 6;
+export function getPpeAutoOrderLeadTime(item: Item): number {
+  // Use estimatedLeadTime if available, otherwise default to 180 days (6 months)
+  const leadTimeDays = item.estimatedLeadTime || 180;
+  return leadTimeDays;
 }
 
 /**

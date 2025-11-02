@@ -61,8 +61,10 @@ export function TagsInput<TFieldValues extends FieldValues = FieldValues>({ cont
                     // Handle both event and direct value from custom Input component
                     if (typeof value === "string") {
                       setNewTag(value);
-                    } else if (value && typeof value === "object" && "target" in value) {
+                    } else if (value && typeof value === "object" && "target" in value && value.target) {
                       setNewTag((value as any).target.value);
+                    } else if (value === null || value === undefined) {
+                      setNewTag("");
                     }
                   }}
                   onKeyDown={(e: React.KeyboardEvent) => {

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useCustomerBatchMutations } from "../../../../hooks";
 import type { Customer } from "../../../../types";
 import type { CustomerGetManyFormData } from "../../../../schemas";
@@ -42,9 +42,13 @@ const DEFAULT_PAGE_SIZE = 40;
 
 export function CustomerList({ className }: CustomerListProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { batchDeleteAsync: batchDeleteMutation } = useCustomerBatchMutations();
   const queryClient = useQueryClient();
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Determine if we're in the financial section based on current path
+  const isFinancialSection = location.pathname.startsWith("/financeiro");
 
   // State to hold current page customers and total count from the table
   const [tableData, setTableData] = useState<{ customers: Customer[]; totalRecords: number }>({ customers: [], totalRecords: 0 });
@@ -273,10 +277,14 @@ export function CustomerList({ className }: CustomerListProps) {
   // Context menu handlers
   const handleBulkEdit = (customers: Customer[]) => {
     if (customers.length === 1) {
-      // Single customer - navigate to edit page
-      navigate(routes.administration.customers.edit(customers[0].id));
+      // Single customer - navigate to edit page (context-aware)
+      const editRoute = isFinancialSection
+        ? routes.financial.customers.edit(customers[0].id)
+        : routes.administration.customers.edit(customers[0].id);
+      navigate(editRoute);
     } else {
       // Multiple customers - navigate to batch edit page
+      // Note: batch edit is only available in administration section
       const ids = customers.map((customer) => customer.id).join(",");
       navigate(`${routes.administration.customers.batchEdit}?ids=${ids}`);
     }

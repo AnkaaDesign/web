@@ -54,7 +54,8 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
   // Create form with appropriate schema
   const form = useForm<MaintenanceScheduleCreateFormData | MaintenanceScheduleUpdateFormData>({
     resolver: zodResolver(mode === "create" ? maintenanceScheduleCreateSchema : maintenanceScheduleUpdateSchema),
-    mode: "onChange",
+    mode: "onBlur", // Validate on blur for better UX
+    reValidateMode: "onChange", // Re-validate on change after first validation
     defaultValues: mode === "create" ? createDefaults : (((defaultValues as Partial<MaintenanceScheduleUpdateFormData>) || {}) as any),
   });
 
@@ -237,13 +238,14 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                             ref={field.ref}
                             placeholder="Ex: Manutenção Preventiva Mensal"
                             disabled={isSubmitting}
+                            className="bg-transparent"
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <MaintenanceItemSelector control={form.control} disabled={isSubmitting} fieldName="itemId" label="Item para Manutenção" />
+                  <MaintenanceItemSelector control={form.control} disabled={isSubmitting} fieldName="itemId" required={isRequired} label="Item para Manutenção" />
                 </div>
 
                 <FormField
@@ -329,6 +331,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                                 min={1}
                                 placeholder="1"
                                 disabled={isSubmitting}
+                                className="bg-transparent"
                                 {...field}
                                 onChange={(value) => field.onChange(typeof value === "number" ? value : parseInt(String(value)) || 1)}
                               />
@@ -433,6 +436,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                               max={31}
                               placeholder="1-31"
                               disabled={isSubmitting}
+                              className="bg-transparent"
                               {...field}
                               value={field.value ?? ""}
                               onChange={(value) => field.onChange(typeof value === "number" ? value : parseInt(String(value)) || undefined)}
@@ -492,6 +496,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                         control={form.control}
                         fieldName={`maintenanceItemsConfig.${index}.itemId`}
                         disabled={isSubmitting}
+                        required={false}
                         label={index === 0 ? "Item" : undefined}
                       />
                     </div>
@@ -507,6 +512,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                               min={1}
                               placeholder="Quantidade"
                               disabled={isSubmitting}
+                              className="bg-transparent"
                               {...field}
                               value={field.value || 1}
                               onChange={(e) => {

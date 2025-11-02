@@ -43,9 +43,10 @@ export const ColumnVisibilityManager = React.memo(function ColumnVisibilityManag
     });
   }, [columns, searchQuery]);
 
-  const handleToggle = (columnKey: string, checked: boolean) => {
+  const handleToggle = (columnKey: string, checked: boolean | undefined) => {
     const newVisible = new Set(localVisible);
-    if (checked) {
+    const isChecked = checked === true;
+    if (isChecked) {
       newVisible.add(columnKey);
     } else {
       newVisible.delete(columnKey);
@@ -98,7 +99,7 @@ export const ColumnVisibilityManager = React.memo(function ColumnVisibilityManag
 
           <div className="relative">
             <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input type="text" placeholder="Buscar coluna..." value={searchQuery} onChange={(value) => setSearchQuery(value as string)} className="pl-9 h-9" />
+            <Input type="text" placeholder="Buscar coluna..." value={searchQuery} onChange={(value) => setSearchQuery(String(value || ""))} className="pl-9 h-9 bg-transparent" />
           </div>
 
           <div className="flex gap-2 mt-2">
@@ -120,7 +121,7 @@ export const ColumnVisibilityManager = React.memo(function ColumnVisibilityManag
                 htmlFor={`column-${column.key}`}
               >
                 <span className="text-sm">{typeof column.header === "string" ? column.header : column.key}</span>
-                <Switch id={`column-${column.key}`} checked={localVisible.has(column.key)} onCheckedChange={(checked) => handleToggle(column.key, !!checked)} />
+                <Switch id={`column-${column.key}`} checked={localVisible.has(column.key)} onCheckedChange={(checked) => handleToggle(column.key, checked)} />
               </Label>
             ))}
           </div>

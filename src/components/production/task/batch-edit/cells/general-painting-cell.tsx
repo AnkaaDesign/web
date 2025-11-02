@@ -26,7 +26,7 @@ export function GeneralPaintingCell({ control, index }: GeneralPaintingCellProps
   return (
     <FormField
       control={control}
-      name={`tasks.${index}.data.generalPaintingId`}
+      name={`tasks.${index}.data.paintId`}
       render={({ field }) => (
         <FormItem>
           <FormControl>

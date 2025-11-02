@@ -559,7 +559,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                         {component.hasError ? (
                           // Show actual amount entered for error component
                           <span className="text-red-600 font-medium">
-                            {parseFloat(actualAmount) > 20 ? Math.round(parseFloat(actualAmount)) : formatNumberWithDecimals(parseFloat(actualAmount) || 0, 1)}
+                            {parseFloat(actualAmount.replace(",", ".")) > 20 ? Math.round(parseFloat(actualAmount.replace(",", "."))) : formatNumberWithDecimals(parseFloat(actualAmount.replace(",", ".")) || 0, 1)}
                           </span>
                         ) : component.correctedWeightInGrams ? (
                           component.wasAlreadyAdded && component.additionalWeightNeeded !== undefined ? (
@@ -723,13 +723,14 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
               <Label htmlFor="actual-amount">Quantidade Real (g)</Label>
               <Input
                 id="actual-amount"
-                type="text"
-                value={actualAmount}
+                type="decimal"
+                value={actualAmount ? parseFloat(actualAmount.replace(",", ".")) : null}
                 onChange={(value) => {
-                  const strValue = typeof value === "string" ? value : String(value || "");
-                  // Allow digits, comma, and period
-                  const cleaned = strValue.replace(/[^\d.,]/g, "");
-                  setActualAmount(cleaned);
+                  if (value === null) {
+                    setActualAmount("");
+                  } else {
+                    setActualAmount(String(value).replace(".", ","));
+                  }
                 }}
                 placeholder="Digite a quantidade real em gramas"
                 autoFocus

@@ -404,6 +404,20 @@ export function useActivityFormUrlState(options: UseActivityFormUrlStateOptions 
     }));
   }, [selectedItems, quantities, operations, userIds, defaultQuantity, defaultOperation, globalOperation, globalUserId, useGlobalOperation, useGlobalUser]);
 
+  // Batch update selected items and quantities atomically
+  const batchUpdateSelection = useCallback(
+    (newSelected: Set<string>, newQuantities: Record<string, number>) => {
+      const selectedArray = Array.from(newSelected);
+      const filteredQuantities = Object.fromEntries(Object.entries(newQuantities).filter(([_, v]) => v >= 0.01));
+
+      setFilters({
+        selectedItems: selectedArray.length > 0 ? selectedArray : undefined,
+        quantities: Object.keys(filteredQuantities).length > 0 ? filteredQuantities : undefined,
+      });
+    },
+    [setFilters],
+  );
+
   return {
     // State
     selectedItems,
@@ -450,6 +464,7 @@ export function useActivityFormUrlState(options: UseActivityFormUrlStateOptions 
     setItemOperation,
     setItemUser,
     getSelectedItemsWithData,
+    batchUpdateSelection,
 
     // Computed values
     selectionCount: selectedItems.size,

@@ -37,7 +37,8 @@ const EXPORT_COLUMNS: ExportColumn<Item>[] = [
   { id: "reorderPoint", label: "Ponto de Reposição", getValue: (item: Item) => item.reorderPoint?.toString() || "" },
   { id: "reorderQuantity", label: "Qtd. de Reposição", getValue: (item: Item) => item.reorderQuantity?.toString() || "" },
   { id: "boxQuantity", label: "Qtd. por Caixa", getValue: (item: Item) => item.boxQuantity?.toString() || "" },
-  { id: "tax", label: "Taxa", getValue: (item: Item) => (item.tax ? `${item.tax}%` : "") },
+  { id: "icms", label: "ICMS", getValue: (item: Item) => (item.icms ? `${item.icms}%` : "") },
+  { id: "ipi", label: "IPI", getValue: (item: Item) => (item.ipi ? `${item.ipi}%` : "") },
   {
     id: "measures",
     label: "Medidas",
@@ -458,7 +459,7 @@ export function ItemExport({ className, filters = {}, currentItems = [], totalRe
                   .map((col) => {
                     // Get column alignment matching the table component
                     let alignment = "text-left";
-                    if (["monthlyConsumption", "maxQuantity", "reorderPoint", "reorderQuantity", "boxQuantity", "tax", "measureValue"].includes(col.id)) {
+                    if (["monthlyConsumption", "maxQuantity", "reorderPoint", "reorderQuantity", "boxQuantity", "icms", "ipi", "measureValue"].includes(col.id)) {
                       alignment = "text-right";
                     } else if (["measureUnit"].includes(col.id)) {
                       alignment = "text-center";
@@ -531,7 +532,8 @@ export function ItemExport({ className, filters = {}, currentItems = [], totalRe
                             className = "text-right text-muted";
                             break;
 
-                          case "tax":
+                          case "icms":
+                          case "ipi":
                             className = "text-right text-muted";
                             break;
 

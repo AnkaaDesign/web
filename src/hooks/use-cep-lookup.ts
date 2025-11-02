@@ -50,7 +50,12 @@ const LOGRADOURO_TYPES = [
   "RESIDENCIAL",
 ];
 
-function extractLogradouroType(street: string): { type: string | null; address: string } {
+function extractLogradouroType(street: string | null | undefined): { type: string | null; address: string } {
+  // Handle null or undefined street
+  if (!street) {
+    return { type: null, address: "" };
+  }
+
   const normalized = street.toUpperCase().trim();
 
   for (const type of LOGRADOURO_TYPES) {

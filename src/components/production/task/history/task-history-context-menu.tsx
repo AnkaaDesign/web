@@ -245,11 +245,20 @@ export function TaskHistoryContextMenu({
             {isBulk ? "Editar selecionadas" : "Editar"}
           </DropdownMenuItem>
 
+          <DropdownMenuSeparator />
+
+          {/* Set Status action - Available for all users including FINANCIAL */}
+          <DropdownMenuItem
+            onClick={handleSetStatus}
+            onSelect={(e) => e.preventDefault()}
+          >
+            <IconFileInvoice className="mr-2 h-4 w-4" />
+            Definir Status
+          </DropdownMenuItem>
+
           {/* Additional actions - not available for FINANCIAL users */}
           {!isFinancialUser && (
             <>
-              <DropdownMenuSeparator />
-
               {/* Set Sector action */}
               <DropdownMenuItem
                 onClick={handleSetSector}
@@ -257,15 +266,6 @@ export function TaskHistoryContextMenu({
               >
                 <IconBuildingFactory2 className="mr-2 h-4 w-4" />
                 {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}
-              </DropdownMenuItem>
-
-              {/* Set Status action - includes option to put back in production */}
-              <DropdownMenuItem
-                onClick={handleSetStatus}
-                onSelect={(e) => e.preventDefault()}
-              >
-                <IconFileInvoice className="mr-2 h-4 w-4" />
-                Definir Status
               </DropdownMenuItem>
 
               <DropdownMenuSeparator />

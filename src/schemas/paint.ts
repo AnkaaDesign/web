@@ -2433,6 +2433,7 @@ export type PaintBrandWhere = z.infer<typeof paintBrandWhereSchema>;
 
 export const mapPaintToFormData = createMapToFormDataHelper<Paint, PaintUpdateFormData>((paint) => ({
   name: paint.name,
+  code: paint.code,
   hex: paint.hex,
   finish: paint.finish,
   paintBrandId: paint.paintBrandId,

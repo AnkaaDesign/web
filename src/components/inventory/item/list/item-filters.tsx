@@ -49,7 +49,8 @@ interface FilterState {
   // Range filters
   quantityRange?: { min?: number; max?: number };
   totalPriceRange?: { min?: number; max?: number };
-  taxRange?: { min?: number; max?: number };
+  icmsRange?: { min?: number; max?: number };
+  ipiRange?: { min?: number; max?: number };
   monthlyConsumptionRange?: { min?: number; max?: number };
   measureValueRange?: { min?: number; max?: number };
 
@@ -81,7 +82,8 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
       hasMultipleMeasures: filters.hasMultipleMeasures,
       quantityRange: filters.quantityRange,
       totalPriceRange: filters.totalPriceRange,
-      taxRange: filters.taxRange,
+      icmsRange: filters.icmsRange,
+      ipiRange: filters.ipiRange,
       monthlyConsumptionRange: filters.monthlyConsumptionRange,
       measureValueRange: filters.measureValueRange,
       createdAtRange: filters.createdAt,
@@ -102,7 +104,8 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
       ...(localState.noReorderPoint && { noReorderPoint: true }),
       quantityRange: localState.quantityRange,
       totalPriceRange: localState.totalPriceRange,
-      taxRange: localState.taxRange,
+      icmsRange: localState.icmsRange,
+      ipiRange: localState.ipiRange,
       monthlyConsumptionRange: localState.monthlyConsumptionRange,
       measureValueRange: localState.measureValueRange,
       createdAt: localState.createdAtRange,
@@ -182,7 +185,8 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
     if (localState.hasMultipleMeasures) count++;
     if (localState.quantityRange?.min || localState.quantityRange?.max) count++;
     if (localState.totalPriceRange?.min || localState.totalPriceRange?.max) count++;
-    if (localState.taxRange?.min || localState.taxRange?.max) count++;
+    if (localState.icmsRange?.min || localState.icmsRange?.max) count++;
+    if (localState.ipiRange?.min || localState.ipiRange?.max) count++;
     if (localState.monthlyConsumptionRange?.min || localState.monthlyConsumptionRange?.max) count++;
     if (localState.measureValueRange?.min || localState.measureValueRange?.max) count++;
     if (localState.createdAtRange?.gte || localState.createdAtRange?.lte) count++;
@@ -284,8 +288,10 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
                   onQuantityRangeChange={(range: any) => setLocalState((prev: any) => ({ ...prev, quantityRange: range }))}
                   totalPriceRange={localState.totalPriceRange}
                   onTotalPriceRangeChange={(range: any) => setLocalState((prev: any) => ({ ...prev, totalPriceRange: range }))}
-                  taxRange={localState.taxRange}
-                  onTaxRangeChange={(range: any) => setLocalState((prev: any) => ({ ...prev, taxRange: range }))}
+                  icmsRange={localState.icmsRange}
+                  onIcmsRangeChange={(range: any) => setLocalState((prev: any) => ({ ...prev, icmsRange: range }))}
+                  ipiRange={localState.ipiRange}
+                  onIpiRangeChange={(range: any) => setLocalState((prev: any) => ({ ...prev, ipiRange: range }))}
                   monthlyConsumptionRange={localState.monthlyConsumptionRange}
                   onMonthlyConsumptionRangeChange={(range: any) => setLocalState((prev: any) => ({ ...prev, monthlyConsumptionRange: range }))}
                   measureValueRange={localState.measureValueRange}

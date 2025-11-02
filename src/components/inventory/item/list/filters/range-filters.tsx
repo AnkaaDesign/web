@@ -8,8 +8,10 @@ interface RangeFiltersProps {
   onQuantityRangeChange: (range?: { min?: number; max?: number }) => void;
   totalPriceRange?: { min?: number; max?: number };
   onTotalPriceRangeChange: (range?: { min?: number; max?: number }) => void;
-  taxRange?: { min?: number; max?: number };
-  onTaxRangeChange: (range?: { min?: number; max?: number }) => void;
+  icmsRange?: { min?: number; max?: number };
+  onIcmsRangeChange: (range?: { min?: number; max?: number }) => void;
+  ipiRange?: { min?: number; max?: number };
+  onIpiRangeChange: (range?: { min?: number; max?: number }) => void;
   monthlyConsumptionRange?: { min?: number; max?: number };
   onMonthlyConsumptionRangeChange: (range?: { min?: number; max?: number }) => void;
 }
@@ -19,8 +21,10 @@ export function RangeFilters({
   onQuantityRangeChange,
   totalPriceRange,
   onTotalPriceRangeChange,
-  taxRange,
-  onTaxRangeChange,
+  icmsRange,
+  onIcmsRangeChange,
+  ipiRange,
+  onIpiRangeChange,
   monthlyConsumptionRange,
   onMonthlyConsumptionRangeChange,
 }: RangeFiltersProps) {
@@ -34,14 +38,24 @@ export function RangeFilters({
     onQuantityRangeChange({ ...quantityRange, max });
   };
 
-  const handleTaxMinChange = (value: string | number | null) => {
+  const handleIcmsMinChange = (value: string | number | null) => {
     const min = typeof value === "number" ? value : undefined;
-    onTaxRangeChange({ ...taxRange, min });
+    onIcmsRangeChange({ ...icmsRange, min });
   };
 
-  const handleTaxMaxChange = (value: string | number | null) => {
+  const handleIcmsMaxChange = (value: string | number | null) => {
     const max = typeof value === "number" ? value : undefined;
-    onTaxRangeChange({ ...taxRange, max });
+    onIcmsRangeChange({ ...icmsRange, max });
+  };
+
+  const handleIpiMinChange = (value: string | number | null) => {
+    const min = typeof value === "number" ? value : undefined;
+    onIpiRangeChange({ ...ipiRange, min });
+  };
+
+  const handleIpiMaxChange = (value: string | number | null) => {
+    const max = typeof value === "number" ? value : undefined;
+    onIpiRangeChange({ ...ipiRange, max });
   };
 
   const handleMonthlyConsumptionMinChange = (value: string) => {
@@ -90,24 +104,48 @@ export function RangeFilters({
 
       <Separator />
 
-      {/* Tax Range */}
+      {/* ICMS Range */}
       <div className="space-y-2">
         <Label className="text-sm font-medium flex items-center gap-2">
           <IconPercentage className="h-4 w-4" />
-          Faixa de Taxa (%)
+          Faixa de ICMS (%)
         </Label>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <Label htmlFor="taxMin" className="text-xs text-muted-foreground">
+            <Label htmlFor="icmsMin" className="text-xs text-muted-foreground">
               Mínimo
             </Label>
-            <Input id="taxMin" type="percentage" min={0} max={100} placeholder="0" value={taxRange?.min ?? undefined} onChange={handleTaxMinChange} decimals={2} />
+            <Input id="icmsMin" type="percentage" min={0} max={100} placeholder="0" value={icmsRange?.min ?? undefined} onChange={handleIcmsMinChange} decimals={2} />
           </div>
           <div>
-            <Label htmlFor="taxMax" className="text-xs text-muted-foreground">
+            <Label htmlFor="icmsMax" className="text-xs text-muted-foreground">
               Máximo
             </Label>
-            <Input id="taxMax" type="percentage" min={0} max={100} placeholder="100" value={taxRange?.max ?? undefined} onChange={handleTaxMaxChange} decimals={2} />
+            <Input id="icmsMax" type="percentage" min={0} max={100} placeholder="100" value={icmsRange?.max ?? undefined} onChange={handleIcmsMaxChange} decimals={2} />
+          </div>
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* IPI Range */}
+      <div className="space-y-2">
+        <Label className="text-sm font-medium flex items-center gap-2">
+          <IconPercentage className="h-4 w-4" />
+          Faixa de IPI (%)
+        </Label>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label htmlFor="ipiMin" className="text-xs text-muted-foreground">
+              Mínimo
+            </Label>
+            <Input id="ipiMin" type="percentage" min={0} max={100} placeholder="0" value={ipiRange?.min ?? undefined} onChange={handleIpiMinChange} decimals={2} />
+          </div>
+          <div>
+            <Label htmlFor="ipiMax" className="text-xs text-muted-foreground">
+              Máximo
+            </Label>
+            <Input id="ipiMax" type="percentage" min={0} max={100} placeholder="100" value={ipiRange?.max ?? undefined} onChange={handleIpiMaxChange} decimals={2} />
           </div>
         </div>
       </div>

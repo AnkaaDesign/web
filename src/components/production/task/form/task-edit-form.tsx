@@ -105,6 +105,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   const isWarehouseUser = user?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
   const isDesignerUser = user?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
   const isLogisticUser = user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC;
+  const isAdminUser = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+
+  // Financial sections should only be visible to ADMIN and FINANCIAL users
+  const canViewFinancialSections = isAdminUser || isFinancialUser;
 
   // Fetch cuts separately using useCutsByTask hook (same approach as detail page)
   const { data: cutsData } = useCutsByTask({
@@ -271,7 +275,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       finishedAt: taskData.finishedAt ? new Date(taskData.finishedAt) : null,
       customerId: taskData.customerId || null,
       sectorId: taskData.sectorId || null,
-      generalPaintingId: taskData.paintId || null,
+      paintId: taskData.paintId || null,
       budgetId: taskData.budgetId || null,
       budget: taskData.budget?.map((b) => ({
         referencia: b.referencia || "",
@@ -1141,7 +1145,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                             <Combobox
                               value={field.value || COMMISSION_STATUS.FULL_COMMISSION}
                               onValueChange={field.onChange}
-                              disabled={isSubmitting}
+                              disabled={isSubmitting || isFinancialUser}
                               options={Object.values(COMMISSION_STATUS).map((status) => ({
                                 value: status,
                                 label: COMMISSION_STATUS_LABELS[status],
@@ -1300,8 +1304,8 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                 </Card>
                 )}
 
-                {/* Layout Section - Hidden for Warehouse users, Read-only for Financial and Designer users, EDITABLE for Logistic users */}
-                {!isWarehouseUser && (
+                {/* Layout Section - Hidden for Warehouse and Financial users, Read-only for Designer users, EDITABLE for Logistic users */}
+                {!isWarehouseUser && !isFinancialUser && (
                 <Card className="bg-transparent">
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -1412,8 +1416,8 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                 </Card>
                 )}
 
-                {/* Financial Information Card - Hidden for Warehouse, Designer, and Logistic users */}
-                {!isWarehouseUser && !isDesignerUser && !isLogisticUser && (
+                {/* Financial Information Card - Only visible to ADMIN and FINANCIAL users */}
+                {canViewFinancialSections && (
                 <Card className="bg-transparent">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -1481,8 +1485,8 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                 </Card>
                 )}
 
-                {/* Budget Card - Hidden for Warehouse, Designer, and Logistic users */}
-                {!isWarehouseUser && !isDesignerUser && !isLogisticUser && (
+                {/* Budget Card - Only visible to ADMIN and FINANCIAL users */}
+                {canViewFinancialSections && (
                 <Card className="bg-transparent">
                   <CardHeader>
                     <div className="flex items-center justify-between">

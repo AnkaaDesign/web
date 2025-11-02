@@ -8,10 +8,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconAlertCircle, IconEdit, IconTag } from "@tabler/icons-react";
 import { PaintBrandSpecificationsCard, PaintBrandComponentsCard, PaintBrandRelatedPaintsCard } from "@/components/paint/paint-brand/detail";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditPaintBrands } from "@/utils/permissions/entity-permissions";
 
 export function PaintBrandDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditPaintBrands(user);
 
   // Fetch paint brand with all related data
   const {
@@ -142,14 +146,16 @@ export function PaintBrandDetailsPage() {
           { label: "Marcas de Tinta", href: routes.painting.paintBrands.root },
           { label: paintBrand.name },
         ]}
-        actions={[
-          {
-            key: "edit",
-            label: "Editar",
-            icon: IconEdit,
-            onClick: () => navigate(routes.painting.paintBrands.edit(id!)),
-          },
-        ]}
+        actions={
+          canEdit ? [
+            {
+              key: "edit",
+              label: "Editar",
+              icon: IconEdit,
+              onClick: () => navigate(routes.painting.paintBrands.edit(id!)),
+            },
+          ] : []
+        }
       />
 
       {/* Content wrapper with proper height management */}

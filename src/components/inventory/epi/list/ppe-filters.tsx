@@ -5,8 +5,9 @@ import { Label } from "@/components/ui/label";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { IconFilter, IconX, IconShield, IconBrandApple, IconCalendarPlus } from "@tabler/icons-react";
+import { IconFilter, IconX, IconShield, IconBrandApple, IconCalendarPlus, IconXboxX } from "@tabler/icons-react";
 import { getItemBrands } from "../../../../api-client";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { PPE_TYPE, PPE_TYPE_LABELS, ITEM_CATEGORY_TYPE } from "../../../../constants";
@@ -27,6 +28,9 @@ interface FilterState {
 
   // Date range filters
   createdAtRange?: { gte?: Date; lte?: Date };
+
+  // Show inactive items
+  showInactive?: boolean;
 }
 
 export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeFiltersProps) {
@@ -43,6 +47,7 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
       brandIds: filters.brandIds || [],
       ppeType: filters.ppeType || [],
       createdAtRange: filters.createdAt,
+      showInactive: filters.showInactive,
     });
   }, [open]);
 
@@ -123,6 +128,11 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
       newFilters.createdAt = localState.createdAtRange;
     }
 
+    // Show inactive filter
+    if (localState.showInactive) {
+      newFilters.showInactive = true;
+    }
+
     onFilterChange(newFilters);
     onOpenChange(false);
   };
@@ -150,6 +160,7 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
     if (localState.brandIds?.length) count++;
     if (localState.ppeType?.length) count++;
     if (localState.createdAtRange?.gte || localState.createdAtRange?.lte) count++;
+    if (localState.showInactive) count++;
     return count;
   };
 
@@ -235,6 +246,19 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
                 {localState.ppeType.length} tipo{localState.ppeType.length !== 1 ? "s" : ""} selecionado{localState.ppeType.length !== 1 ? "s" : ""}
               </div>
             )}
+          </div>
+
+          {/* Show Inactive Toggle */}
+          <div className="flex items-center justify-between">
+            <Label htmlFor="showInactive" className="text-sm font-normal flex items-center gap-2">
+              <IconXboxX className="h-4 w-4 text-muted-foreground" />
+              Mostrar também desativados
+            </Label>
+            <Switch
+              id="showInactive"
+              checked={localState.showInactive ?? false}
+              onCheckedChange={(checked) => setLocalState((prev) => ({ ...prev, showInactive: checked }))}
+            />
           </div>
 
           {/* Created At Date Range */}

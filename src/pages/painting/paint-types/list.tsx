@@ -34,7 +34,7 @@ export function PaintTypesListPage() {
   const breadcrumbs = useMemo(() => [{ label: "Início", href: routes.home }, { label: "Pintura", href: routes.painting.root }, { label: "Tipos de Tinta" }], []);
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.BASIC}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="flex flex-col h-full space-y-4">
         <div className="flex-shrink-0">
           <PageHeader

@@ -23,13 +23,11 @@ const batchEditSchema = z.object({
   sectorId: z.string().uuid().optional().nullable(),
   paintId: z.string().uuid().optional().nullable(),
   term: z.date().optional().nullable(),
-  price: z.number().optional().nullable(),
   // Flags for which fields to update
   updateStatus: z.boolean().default(false),
   updateSector: z.boolean().default(false),
   updatePaint: z.boolean().default(false),
   updateTerm: z.boolean().default(false),
-  updatePrice: z.boolean().default(false),
 });
 
 type BatchEditFormData = z.infer<typeof batchEditSchema>;
@@ -60,7 +58,6 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
       updateSector: false,
       updatePaint: false,
       updateTerm: false,
-      updatePrice: false,
       updateCommission: false,
     },
   });
@@ -83,9 +80,6 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
       }
       if (data.updateTerm) {
         updateData.term = data.term;
-      }
-      if (data.updatePrice) {
-        updateData.price = data.price;
       }
 
       // Prepare batch update
@@ -114,7 +108,6 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
   const watchUpdateSector = form.watch("updateSector");
   const watchUpdatePaint = form.watch("updatePaint");
   const watchUpdateTerm = form.watch("updateTerm");
-  const watchUpdatePrice = form.watch("updatePrice");
   const watchUpdateCommission = form.watch("updateCommission");
 
   // Check if tasks can be batch edited based on their status
@@ -320,52 +313,6 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
                 )}
               </div>
 
-              {/* Price */}
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <FormField
-                    control={form.control}
-                    name="updatePrice"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-2">
-                        <FormControl>
-                          <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={!canEdit || isSubmitting} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormLabel className="font-medium">Valor</FormLabel>
-                </div>
-
-                {watchUpdatePrice && (
-                  <FormField
-                    control={form.control}
-                    name="price"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
-                            <Input
-                              {...field}
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={field.value || ""}
-                              onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
-                              className="pl-10"
-                              placeholder="0,00"
-                              disabled={isSubmitting}
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-              </div>
-
             </div>
 
             <DialogFooter className="flex-shrink-0 px-6 py-4 border-t">
@@ -375,7 +322,7 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
               <Button
                 type="submit"
                 disabled={
-                  !canEdit || isSubmitting || (!watchUpdateStatus && !watchUpdateSector && !watchUpdatePaint && !watchUpdateTerm && !watchUpdatePrice && !watchUpdateCommission)
+                  !canEdit || isSubmitting || (!watchUpdateStatus && !watchUpdateSector && !watchUpdatePaint && !watchUpdateTerm && !watchUpdateCommission)
                 }
               >
                 {isSubmitting && <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />}

@@ -10,6 +10,8 @@ import { BorrowItemCard } from "@/components/inventory/borrow/detail/borrow-item
 import { BorrowHistoryCard } from "@/components/inventory/borrow/detail/borrow-history-card";
 import { usePrivileges } from "../../../../hooks";
 import { useState } from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditBorrows } from "@/utils/permissions/entity-permissions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +29,8 @@ export const LoanDetailsPage = () => {
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showMarkLostDialog, setShowMarkLostDialog] = useState(false);
-  const { canManageWarehouse } = usePrivileges();
+  const { user } = useAuth();
+  const canManageWarehouse = canEditBorrows(user);
   const { deleteMutation, markAsLostMutation } = useBorrowMutations();
 
   const {

@@ -37,7 +37,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
 import { ObservationTableSkeleton } from "./observation-table-skeleton";
 
 interface ObservationTableProps {
@@ -276,14 +275,14 @@ export function ObservationTable({ visibleColumns, className, filters = {}, onDa
         }
         // Remove deleted IDs from selection
         removeFromSelection(deleteDialog.items.map((item) => item.id));
-        toast.success(`${deleteDialog.items.length} observações excluídas com sucesso`);
+        // Success toast is handled by the API client
       } else {
         // Single delete
         const deletedId = deleteDialog.items[0].id;
         await deleteObservation(deletedId);
         // Remove deleted ID from selection
         removeFromSelection([deletedId]);
-        toast.success("Observação excluída com sucesso");
+        // Success toast is handled by the API client
       }
     } catch (error) {
       // Error is handled by the API client with detailed message

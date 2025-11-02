@@ -11,6 +11,8 @@ import { OrderDetailSkeleton } from "@/components/inventory/order/detail/order-d
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { usePrivileges } from "../../../../hooks";
 import { useState } from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditOrders } from "@/utils/permissions/entity-permissions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,7 +33,8 @@ const OrderDetailsPage = () => {
   const navigate = useNavigate();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
-  const { canManageWarehouse } = usePrivileges();
+  const { user } = useAuth();
+  const canManageWarehouse = canEditOrders(user);
   const { deleteMutation, updateAsync } = useOrderMutations();
 
   // Track page access
@@ -49,10 +52,19 @@ const OrderDetailsPage = () => {
     include: {
       items: {
         include: {
-          item: true,
+          item: {
+            include: {
+              brand: true,
+              measures: true,
+            },
+          },
         },
       },
-      supplier: true,
+      supplier: {
+        include: {
+          logo: true,
+        },
+      },
       budgets: true,
       invoices: true,
       receipts: true,
@@ -113,10 +125,9 @@ const OrderDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await deleteMutation.mutateAsync(order.id);
-      toast.success("Pedido excluído com sucesso");
       navigate(routes.inventory.orders.list);
     } catch (error) {
-      toast.error("Erro ao excluir pedido");
+      // Error toast is handled by API client
     }
   };
 
@@ -132,11 +143,10 @@ const OrderDetailsPage = () => {
           status: ORDER_STATUS.RECEIVED,
         },
       });
-      toast.success("Pedido marcado como recebido");
       setShowCompleteDialog(false);
       refetch();
     } catch (error) {
-      toast.error("Erro ao marcar pedido como recebido");
+      // Error toast is handled by API client
     }
   };
 
@@ -167,7 +177,7 @@ const OrderDetailsPage = () => {
   if (canManageWarehouse && !allItemsFulfilled && ![ORDER_STATUS.RECEIVED, ORDER_STATUS.CANCELLED].includes(order.status)) {
     orderActions.push({
       key: "fulfill",
-      label: "Marcar como Pedido",
+      label: "Marcar como Feito",
       icon: IconShoppingCart,
       onClick: async () => {
         try {
@@ -183,10 +193,9 @@ const OrderDetailsPage = () => {
             const { batchMarkOrderItemsFulfilled } = await import("../../../../api-client");
             await batchMarkOrderItemsFulfilled(itemIds);
           }
-          toast.success("Pedido marcado como pedido");
           refetch();
         } catch (error) {
-          toast.error("Erro ao marcar pedido como pedido");
+          // Error toast is handled by API client
         }
       },
     });
@@ -206,40 +215,38 @@ const OrderDetailsPage = () => {
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
       <div className="flex flex-col h-full space-y-6">
         {/* Hero Section - Enhanced Header with Actions */}
-        <div className="animate-in fade-in-50 duration-500">
-          <PageHeader
-            variant="detail"
-            title={order.description}
-            icon={IconShoppingCart}
-            className="shadow-lg"
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Estoque", href: routes.inventory.root },
-              { label: "Pedidos", href: routes.inventory.orders.list },
-              { label: order.description },
-            ]}
-            actions={[
-              {
-                key: "refresh",
-                label: "Atualizar",
-                icon: IconRefresh,
-                onClick: handleRefresh,
-              },
-              ...(orderActions as PageAction[]),
-              ...(canEdit
-                ? [
-                    {
-                      key: "edit",
-                      label: "Editar",
-                      icon: IconEdit,
-                      onClick: handleEdit,
-                    } as PageAction,
-                  ]
-                : []),
-              ...(customActions.map((action) => ({ key: "delete", ...action })) as PageAction[]),
-            ]}
-          />
-        </div>
+        <PageHeader
+          variant="detail"
+          title={order.description}
+          icon={IconShoppingCart}
+          className="shadow-lg"
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Estoque", href: routes.inventory.root },
+            { label: "Pedidos", href: routes.inventory.orders.list },
+            { label: order.description },
+          ]}
+          actions={[
+            {
+              key: "refresh",
+              label: "Atualizar",
+              icon: IconRefresh,
+              onClick: handleRefresh,
+            },
+            ...(orderActions as PageAction[]),
+            ...(canEdit
+              ? [
+                  {
+                    key: "edit",
+                    label: "Editar",
+                    icon: IconEdit,
+                    onClick: handleEdit,
+                  } as PageAction,
+                ]
+              : []),
+            ...(customActions.map((action) => ({ key: "delete", ...action })) as PageAction[]),
+          ]}
+        />
 
         <div className="flex-1 overflow-y-auto">
           <div className="space-y-6">

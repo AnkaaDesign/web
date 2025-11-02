@@ -4,7 +4,7 @@ import type { Item } from "../../../../types";
 import { routes } from "../../../../constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { IconChevronUp, IconChevronDown, IconRefresh, IconEdit, IconTrash, IconSelector, IconAlertTriangle, IconShield, IconEye } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconRefresh, IconEdit, IconTrash, IconSelector, IconAlertTriangle, IconShield, IconEye, IconCheck, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import {
@@ -31,11 +31,13 @@ interface PpeTableProps {
   visibleColumns: Set<string>;
   className?: string;
   onEdit?: (items: Item[]) => void;
+  onActivate?: (items: Item[]) => void;
+  onDeactivate?: (items: Item[]) => void;
   filters?: Partial<ItemGetManyFormData>;
   onDataChange?: (data: { items: Item[]; totalRecords: number }) => void;
 }
 
-export function PpeTable({ visibleColumns, className, onEdit, filters = {}, onDataChange }: PpeTableProps) {
+export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeactivate, filters = {}, onDataChange }: PpeTableProps) {
   const navigate = useNavigate();
 
   // Get scrollbar width info
@@ -92,6 +94,14 @@ export function PpeTable({ visibleColumns, className, onEdit, filters = {}, onDa
       },
     },
   };
+
+  // Hide inactive items by default unless showInactive is true
+  if (!cleanFilters.showInactive && !showSelectedOnly) {
+    queryFilters.where = {
+      ...queryFilters.where,
+      isActive: true,
+    };
+  }
 
   // Filter to show only selected items if enabled
   if (showSelectedOnly && selectedIds.length > 0) {
@@ -188,6 +198,20 @@ export function PpeTable({ visibleColumns, className, onEdit, filters = {}, onDa
   const handleEdit = () => {
     if (contextMenu && onEdit) {
       onEdit(contextMenu.items);
+      setContextMenu(null);
+    }
+  };
+
+  const handleActivate = () => {
+    if (contextMenu && onActivate) {
+      onActivate(contextMenu.items);
+      setContextMenu(null);
+    }
+  };
+
+  const handleDeactivate = () => {
+    if (contextMenu && onDeactivate) {
+      onDeactivate(contextMenu.items);
       setContextMenu(null);
     }
   };
@@ -393,6 +417,20 @@ export function PpeTable({ visibleColumns, className, onEdit, filters = {}, onDa
             <IconEdit className="mr-2 h-4 w-4" />
             {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Editar em lote" : "Editar"}
           </DropdownMenuItem>
+
+          {contextMenu?.items.some((item) => !item.isActive) && (
+            <DropdownMenuItem onClick={handleActivate} className="text-green-700">
+              <IconCheck className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Ativar selecionados" : "Ativar"}
+            </DropdownMenuItem>
+          )}
+
+          {contextMenu?.items.some((item) => item.isActive) && (
+            <DropdownMenuItem onClick={handleDeactivate} className="text-destructive">
+              <IconX className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Desativar selecionados" : "Desativar"}
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuSeparator />
 

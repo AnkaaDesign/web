@@ -12,10 +12,14 @@ import { LastRunCard } from "@/components/inventory/maintenance/detail/last-run-
 import { MaintenanceMetricsCard } from "@/components/inventory/maintenance/detail/maintenance-metrics-card";
 import { MaintenanceDetailSkeleton } from "@/components/inventory/maintenance/detail/maintenance-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditMaintenance } from "@/utils/permissions/entity-permissions";
 
 const MaintenanceDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditMaintenance(user);
   const { updateAsync, deleteAsync } = useMaintenanceMutations();
   const finishMutation = useFinishMaintenance();
 
@@ -171,8 +175,8 @@ const MaintenanceDetailsPage = () => {
     },
   ];
 
-  // Add status-specific actions
-  if (canStart) {
+  // Add status-specific actions only if user can edit
+  if (canEdit && canStart) {
     actions.push({
       key: "start",
       label: "Iniciar",
@@ -181,7 +185,7 @@ const MaintenanceDetailsPage = () => {
     });
   }
 
-  if (canFinish) {
+  if (canEdit && canFinish) {
     actions.push({
       key: "finish",
       label: "Concluir",
@@ -190,8 +194,18 @@ const MaintenanceDetailsPage = () => {
     });
   }
 
-  // Delete action
-  if (canDelete) {
+  // Edit action only if user can edit
+  if (canEdit) {
+    actions.push({
+      key: "edit",
+      label: "Editar",
+      icon: IconEdit,
+      onClick: handleEdit,
+    });
+  }
+
+  // Delete action only if user can edit
+  if (canEdit && canDelete) {
     actions.push({
       key: "delete",
       label: "Excluir",
@@ -199,14 +213,6 @@ const MaintenanceDetailsPage = () => {
       onClick: handleDelete,
     });
   }
-
-  // Edit action always at the end
-  actions.push({
-    key: "edit",
-    label: "Editar",
-    icon: IconEdit,
-    onClick: handleEdit,
-  });
 
   return (
     <div className="flex flex-col h-full space-y-6">

@@ -19,6 +19,13 @@ export const ActivityBatchCreateForm = () => {
   const navigate = useNavigate();
 
   // URL state management
+  const urlState = useActivityFormUrlState({
+    defaultQuantity: 1,
+    defaultOperation: ACTIVITY_OPERATION.OUTBOUND,
+    preserveQuantitiesOnDeselect: false,
+    defaultPageSize: 40,
+  });
+
   const {
     selectedItems,
     quantities,
@@ -48,12 +55,7 @@ export const ActivityBatchCreateForm = () => {
     updateGlobalOperation,
     selectionCount,
     clearAllSelections,
-  } = useActivityFormUrlState({
-    defaultQuantity: 1,
-    defaultOperation: ACTIVITY_OPERATION.OUTBOUND,
-    preserveQuantitiesOnDeselect: false,
-    defaultPageSize: 40,
-  });
+  } = urlState;
 
   // Local state for global reason (optional field)
   const [globalReason, setGlobalReason] = useState<ACTIVITY_REASON | undefined>(undefined);
@@ -283,6 +285,8 @@ export const ActivityBatchCreateForm = () => {
                 onPageChange={setPage}
                 onPageSizeChange={setPageSize}
                 onTotalRecordsChange={setTotalRecords}
+                // Batch selection function for atomic updates
+                updateSelectedItems={urlState.batchUpdateSelection}
                 className="h-full"
               />
             </div>

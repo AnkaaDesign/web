@@ -366,7 +366,7 @@ const BackupManagementPage = () => {
     compressionLevel: 6,
     encrypted: false,
     customPaths: [],
-    usePresetPaths: true,
+    usePresetPaths: false,
     presetPathType: "high",
     webdavFolders: [],
   });
@@ -383,13 +383,31 @@ const BackupManagementPage = () => {
     priority: "medium",
     compressionLevel: 6,
     encrypted: false,
-    usePresetPaths: true,
+    usePresetPaths: false,
     presetPathType: "high",
     webdavFolders: [],
   });
 
+  // Reset usePresetPaths when schedule type changes to files/full
+  useEffect(() => {
+    if (newSchedule.type === "files" || newSchedule.type === "full") {
+      setNewSchedule((prev) => ({ ...prev, usePresetPaths: false }));
+    } else if (newSchedule.type === "system") {
+      setNewSchedule((prev) => ({ ...prev, usePresetPaths: true }));
+    }
+  }, [newSchedule.type]);
+
+  // Reset usePresetPaths when backup type changes to files/full
+  useEffect(() => {
+    if (newBackup.type === "files" || newBackup.type === "full") {
+      setNewBackup((prev) => ({ ...prev, usePresetPaths: false }));
+    } else if (newBackup.type === "system") {
+      setNewBackup((prev) => ({ ...prev, usePresetPaths: true }));
+    }
+  }, [newBackup.type]);
+
   // Utility functions
-  const formatDate = (dateString: string) => {
+  const formatBackupDateTime = (dateString: string) => {
     if (!dateString || dateString === "Invalid Date" || dateString === "") {
       return "Data inválida";
     }
@@ -904,7 +922,7 @@ const BackupManagementPage = () => {
           {formatPathsDisplay()}
         </TableCell>
         <TableCell>{formatBytes(backup.size)}</TableCell>
-        <TableCell>{formatDate(backup.createdAt)}</TableCell>
+        <TableCell>{formatBackupDateTime(backup.createdAt)}</TableCell>
         <TableCell>
           <div className="space-y-2">
             {backup.status === "in_progress" ? (
@@ -1194,8 +1212,8 @@ const BackupManagementPage = () => {
                   />
                 </div>
               </div>
-              {/* Folder Selection Section for Files */}
-              {newBackup.type === "files" && (
+              {/* Folder Selection Section for Files/Full */}
+              {(newBackup.type === "files" || newBackup.type === "full") && (
                 <div className="space-y-4 border-t pt-4">
                   <Label>Pastas para Backup</Label>
                   <p className="text-sm text-muted-foreground">Selecione as pastas ou deixe vazio para backup completo</p>
@@ -1361,7 +1379,7 @@ const BackupManagementPage = () => {
                       <span className="font-medium">Tamanho:</span> {selectedBackup.size}
                     </div>
                     <div>
-                      <span className="font-medium">Criado em:</span> {formatDate(selectedBackup.createdAt)}
+                      <span className="font-medium">Criado em:</span> {formatBackupDateTime(selectedBackup.createdAt)}
                     </div>
                   </div>
                 </div>
@@ -1435,8 +1453,36 @@ const BackupManagementPage = () => {
                   />
                 </div>
               </div>
-              {/* Folder Selection Section for Scheduled Backups */}
+              {/* Folder Selection Section for Files/Full Backups */}
               {(newSchedule.type === "files" || newSchedule.type === "full") && (
+                <div className="space-y-4 border-t pt-4">
+                  <Label>Pastas para Backup</Label>
+                  <p className="text-sm text-muted-foreground">Selecione as pastas do WebDAV ou deixe vazio para backup completo</p>
+                  <Combobox
+                    value={newSchedule.webdavFolders}
+                    onValueChange={(value) => {
+                      if (Array.isArray(value)) {
+                        setNewSchedule({ ...newSchedule, webdavFolders: value as string[] });
+                      }
+                    }}
+                    options={webdavFolders}
+                    placeholder={loadingFolders ? "Carregando pastas..." : "Selecione as pastas"}
+                    emptyText="Nenhuma pasta disponível"
+                    searchable={true}
+                    clearable={true}
+                    mode="multiple"
+                    disabled={loadingFolders}
+                  />
+                  {newSchedule.webdavFolders.length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      <strong>{newSchedule.webdavFolders.length} {newSchedule.webdavFolders.length === 1 ? "pasta selecionada" : "pastas selecionadas"}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Folder Selection Section for System Backups */}
+              {newSchedule.type === "system" && (
                 <div className="space-y-4 border-t pt-4">
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -1445,11 +1491,11 @@ const BackupManagementPage = () => {
                       onCheckedChange={(checked) => setNewSchedule({ ...newSchedule, usePresetPaths: !!checked })}
                     />
                     <Label htmlFor="schedule-use-preset-paths" className="text-sm font-normal">
-                      Usar pastas predefinidas por prioridade
+                      Usar pastas de sistema predefinidas
                     </Label>
                   </div>
 
-                  {newSchedule.usePresetPaths && (
+                  {newSchedule.usePresetPaths ? (
                     <div className="space-y-2">
                       <Label htmlFor="schedule-preset-path-type">Prioridade das Pastas</Label>
                       <Combobox
@@ -1472,6 +1518,31 @@ const BackupManagementPage = () => {
                           )}
                         </ul>
                       </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Pastas WebDAV para Backup</Label>
+                      <p className="text-sm text-muted-foreground">Selecione as pastas do WebDAV para backup</p>
+                      <Combobox
+                        value={newSchedule.webdavFolders}
+                        onValueChange={(value) => {
+                          if (Array.isArray(value)) {
+                            setNewSchedule({ ...newSchedule, webdavFolders: value as string[] });
+                          }
+                        }}
+                        options={webdavFolders}
+                        placeholder={loadingFolders ? "Carregando pastas..." : "Selecione as pastas"}
+                        emptyText="Nenhuma pasta disponível"
+                        searchable={true}
+                        clearable={true}
+                        mode="multiple"
+                        disabled={loadingFolders}
+                      />
+                      {newSchedule.webdavFolders.length > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          <strong>{newSchedule.webdavFolders.length} {newSchedule.webdavFolders.length === 1 ? "pasta selecionada" : "pastas selecionadas"}</strong>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

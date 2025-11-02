@@ -20,6 +20,8 @@ import { createCustomerColumns } from "./customer-table-columns";
 import type { CustomerColumn } from "./customer-table-columns";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { CustomerListSkeleton } from "./customer-list-skeleton";
+import { useAuth } from "@/contexts/auth-context";
+import { getCustomerDetailRoute, getCustomerEditRoute } from "@/utils/sector-routes";
 
 interface CustomerTableProps {
   visibleColumns: Set<string>;
@@ -33,6 +35,7 @@ interface CustomerTableProps {
 
 export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onMerge, filters = {}, onDataChange }: CustomerTableProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { delete: deleteCustomer } = useCustomerMutations();
   const { batchDelete } = useCustomerBatchMutations();
 
@@ -208,7 +211,7 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
 
   const handleViewDetails = () => {
     if (contextMenu && !contextMenu.isBulk) {
-      navigate(routes.administration.customers.details(contextMenu.customers[0].id));
+      navigate(getCustomerDetailRoute(contextMenu.customers[0].id, user));
       setContextMenu(null);
     }
   };
@@ -224,7 +227,7 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
         }
       } else {
         // Single edit
-        navigate(routes.administration.customers.edit(contextMenu.customers[0].id));
+        navigate(getCustomerEditRoute(contextMenu.customers[0].id, user));
       }
       setContextMenu(null);
     }
@@ -388,7 +391,7 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
                       // Selected state overrides alternating colors
                       customerIsSelected && "bg-muted/30 hover:bg-muted/40",
                     )}
-                    onClick={() => navigate(routes.administration.customers.details(customer.id))}
+                    onClick={() => navigate(getCustomerDetailRoute(customer.id, user))}
                     onContextMenu={(e) => handleContextMenu(e, customer)}
                   >
                     {/* Selection checkbox */}

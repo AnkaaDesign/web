@@ -102,6 +102,12 @@ export function ActivityList({ className }: ActivityListProps) {
       };
     }
 
+    // Parse showPaintProduction filter
+    const showPaintProduction = params.get("showPaintProduction");
+    if (showPaintProduction === "true") {
+      filters.showPaintProduction = true;
+    }
+
     return filters;
   }, []);
 
@@ -129,6 +135,9 @@ export function ActivityList({ className }: ActivityListProps) {
     // Date filters
     if (filters.createdAt?.gte) params.createdAfter = filters.createdAt.gte.toISOString();
     if (filters.createdAt?.lte) params.createdBefore = filters.createdAt.lte.toISOString();
+
+    // Paint production filter
+    if (filters.showPaintProduction) params.showPaintProduction = "true";
 
     return params;
   }, []);

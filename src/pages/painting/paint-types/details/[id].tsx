@@ -8,10 +8,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconAlertCircle, IconEdit, IconPaint } from "@tabler/icons-react";
 import { PaintTypeSpecificationsCard, PaintTypeComponentsCard, PaintTypeRelatedPaintsCard } from "@/components/paint/paint-type/detail";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditPaintTypes } from "@/utils/permissions/entity-permissions";
 
 export function PaintTypeDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditPaintTypes(user);
 
   // Fetch paint type with all related data
   const {
@@ -141,14 +145,16 @@ export function PaintTypeDetailsPage() {
           { label: "Tipos de Tinta", href: routes.painting.paintTypes.root },
           { label: paintType.name },
         ]}
-        actions={[
-          {
-            key: "edit",
-            label: "Editar",
-            icon: IconEdit,
-            onClick: () => navigate(routes.painting.paintTypes.edit(id!)),
-          },
-        ]}
+        actions={
+          canEdit ? [
+            {
+              key: "edit",
+              label: "Editar",
+              icon: IconEdit,
+              onClick: () => navigate(routes.painting.paintTypes.edit(id!)),
+            },
+          ] : []
+        }
       />
 
       {/* Content wrapper with proper height management */}

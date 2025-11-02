@@ -80,7 +80,7 @@ export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione
         <div className="flex items-center justify-between w-full">
           <div className="flex flex-col">
             <span className="font-medium">{option.label}</span>
-            {option.metadata?.department && <span className="text-xs text-muted-foreground group-hover:text-white">{option.metadata.department}</span>}
+            {option.metadata?.department && <span className="text-xs text-muted-foreground group-hover:text-white group-data-[state=checked]:text-white">{option.metadata.department}</span>}
           </div>
         </div>
       )}

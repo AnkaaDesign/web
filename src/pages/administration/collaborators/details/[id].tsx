@@ -133,8 +133,8 @@ const CollaboratorDetailsPage = () => {
 
             {/* PPE Sizes and Changelog History - Side by Side */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <PpeSizesCard user={user} />
-              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.USER} entityId={id} maxHeight="400px" className="h-[500px]" />
+              <PpeSizesCard user={user} className="h-[700px]" />
+              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.USER} entityId={id} maxHeight="700px" className="h-[700px]" />
             </div>
 
             {/* Related Activities */}

@@ -23,7 +23,6 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { extractActiveFilters } from "./filter-utils";
 import { FilterIndicators } from "./filter-indicator";
 import { useDirectFilterUpdate } from "./use-direct-filter-update";
-import { NaturalFloatInput } from "@/components/ui/natural-float-input";
 
 interface ExternalWithdrawalItemSelectorProps {
   selectedItems: Set<string>;
@@ -766,12 +765,10 @@ export const ExternalWithdrawalItemSelector = ({
                         <TableCell className="w-32 p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
                           <div className="px-4 py-1">
                             {itemIsSelected ? (
-                              <NaturalFloatInput
+                              <Input
+                                type="decimal"
                                 value={quantity}
-                                onChange={(value) => onQuantityChange?.(item.id, value)}
-                                min={0.01}
-                                max={999999}
-                                step={0.01}
+                                onChange={(value) => onQuantityChange?.(item.id, typeof value === "number" ? value : 0)}
                                 className="w-full h-8 text-sm"
                               />
                             ) : (

@@ -35,7 +35,11 @@ export interface ItemFilters {
     min?: number;
     max?: number;
   };
-  taxRange?: {
+  icmsRange?: {
+    min?: number;
+    max?: number;
+  };
+  ipiRange?: {
     min?: number;
     max?: number;
   };
@@ -146,7 +150,13 @@ const filterSchemas = {
       max: z.coerce.number().optional(),
     }),
   },
-  taxRange: {
+  icmsRange: {
+    schema: z.object({
+      min: z.coerce.number().optional(),
+      max: z.coerce.number().optional(),
+    }),
+  },
+  ipiRange: {
     schema: z.object({
       min: z.coerce.number().optional(),
       max: z.coerce.number().optional(),
@@ -195,7 +205,8 @@ const filterSchemas = {
         id: z.enum(["asc", "desc"]).optional(),
         name: z.enum(["asc", "desc"]).optional(),
         quantity: z.enum(["asc", "desc"]).optional(),
-        tax: z.enum(["asc", "desc"]).optional(),
+        icms: z.enum(["asc", "desc"]).optional(),
+        ipi: z.enum(["asc", "desc"]).optional(),
         monthlyConsumption: z.enum(["asc", "desc"]).optional(),
         createdAt: z.enum(["asc", "desc"]).optional(),
         updatedAt: z.enum(["asc", "desc"]).optional(),
@@ -205,7 +216,8 @@ const filterSchemas = {
           id: z.enum(["asc", "desc"]).optional(),
           name: z.enum(["asc", "desc"]).optional(),
           quantity: z.enum(["asc", "desc"]).optional(),
-          tax: z.enum(["asc", "desc"]).optional(),
+          icms: z.enum(["asc", "desc"]).optional(),
+          ipi: z.enum(["asc", "desc"]).optional(),
           monthlyConsumption: z.enum(["asc", "desc"]).optional(),
           createdAt: z.enum(["asc", "desc"]).optional(),
           updatedAt: z.enum(["asc", "desc"]).optional(),
@@ -279,7 +291,7 @@ export interface UseItemFiltersReturn {
   ) => void;
   addToArrayFilter: (key: keyof Pick<ItemFilters, "itemIds" | "brandIds" | "categoryIds" | "supplierIds" | "barcodes" | "names" | "stockLevels">, value: string) => void;
   removeFromArrayFilter: (key: keyof Pick<ItemFilters, "itemIds" | "brandIds" | "categoryIds" | "supplierIds" | "barcodes" | "names" | "stockLevels">, value: string) => void;
-  setRangeFilter: (key: keyof Pick<ItemFilters, "quantityRange" | "taxRange" | "monthlyConsumptionRange">, min?: number, max?: number) => void;
+  setRangeFilter: (key: keyof Pick<ItemFilters, "quantityRange" | "icmsRange" | "ipiRange" | "monthlyConsumptionRange">, min?: number, max?: number) => void;
   setDateRange: (key: keyof Pick<ItemFilters, "createdAt" | "updatedAt">, start?: Date, end?: Date) => void;
 
   // Transform to API format
@@ -387,7 +399,7 @@ export function useItemFilters(options: UseItemFiltersOptions = {}): UseItemFilt
   );
 
   const setRangeFilter = useCallback(
-    (key: keyof Pick<ItemFilters, "quantityRange" | "taxRange" | "monthlyConsumptionRange">, min?: number, max?: number) => {
+    (key: keyof Pick<ItemFilters, "quantityRange" | "icmsRange" | "ipiRange" | "monthlyConsumptionRange">, min?: number, max?: number) => {
       if (min === undefined && max === undefined) {
         setFilter(key, undefined);
       } else {

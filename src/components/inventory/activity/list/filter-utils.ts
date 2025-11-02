@@ -31,6 +31,17 @@ export function extractActiveFilters(
     });
   }
 
+  // Paint production filter
+  if (filters.showPaintProduction) {
+    activeFilters.push({
+      key: "showPaintProduction",
+      label: "Produção de tinta",
+      value: "Exibindo",
+      iconType: "file-text",
+      onRemove: () => onRemoveFilter("showPaintProduction"),
+    });
+  }
+
   // Operation types filter
   if (filters.operations && filters.operations.length > 0) {
     const labels = filters.operations.map((op: string) => ACTIVITY_OPERATION_LABELS[op as keyof typeof ACTIVITY_OPERATION_LABELS] || op);
@@ -174,6 +185,10 @@ export function createFilterRemover(currentFilters: Partial<ActivityGetManyFormD
     switch (key) {
       case "searchingFor":
         delete newFilters.searchingFor;
+        break;
+
+      case "showPaintProduction":
+        delete newFilters.showPaintProduction;
         break;
 
       case "operations":

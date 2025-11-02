@@ -9,14 +9,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,12 +23,9 @@ import { StandardizedTable, type StandardizedColumn } from "@/components/ui/stan
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import {
   IconUsers,
-  IconCalendar,
   IconCurrencyReal,
   IconFilter,
-  IconX,
   IconPlus,
-  IconDownload,
   IconRefresh,
   IconCalculator,
 } from "@tabler/icons-react";
@@ -50,19 +39,19 @@ import { formatCurrency } from "../../../utils";
 import { routes } from "../../../constants";
 import type { Payroll } from "../../../types";
 import type { PayrollGetManyParams } from "../../../types";
-import { Combobox } from "@/components/ui/combobox";
-import { Label } from "@/components/ui/label";
+import { PayrollFilters } from "./list/payroll-filters";
 
 interface PayrollListProps {
   className?: string;
 }
 
-interface PayrollFilters {
+interface PayrollFiltersState {
   year: number;
-  month: number;
-  searchTerm: string;
-  userId?: string;
-  sectorIds?: string[];
+  months: string[];
+  sectorIds: string[];
+  positionIds: string[];
+  userIds: string[];
+  excludeUserIds: string[];
 }
 
 // Calculate net salary for a payroll entry
@@ -109,17 +98,29 @@ const getTotalDiscounts = (payroll: Payroll): number => {
 export function PayrollList({ className }: PayrollListProps) {
   const navigate = useNavigate();
   const currentDate = new Date();
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth() + 1;
-  const hasInitializedSectorsRef = useRef(false);
+  const currentDay = currentDate.getDate();
+  let currentYear = currentDate.getFullYear();
+  let currentMonth = currentDate.getMonth() + 1;
 
-  const [filters, setFilters] = useState<PayrollFilters>({
+  // Adjust for payroll period (26th cutoff)
+  if (currentDay > 26) {
+    currentMonth += 1;
+    if (currentMonth > 12) {
+      currentMonth = 1;
+      currentYear += 1;
+    }
+  }
+
+  const [filters, setFilters] = useState<PayrollFiltersState>({
     year: currentYear,
-    month: currentMonth,
-    searchTerm: "",
+    months: [String(currentMonth).padStart(2, '0')],
+    sectorIds: [],
+    positionIds: [],
+    userIds: [],
+    excludeUserIds: [],
   });
 
-  const [showFilters, setShowFilters] = useState(true);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [finalizeDialog, setFinalizeDialog] = useState<{ year: number; month: number } | null>(null);
 
   // Batch operations mutations
@@ -131,30 +132,6 @@ export function PayrollList({ className }: PayrollListProps) {
     orderBy: { name: "asc" },
     limit: 100
   });
-
-  // Get default sector IDs (production, warehouse, leader privileges)
-  const defaultSectorIds = useMemo(() => {
-    if (!sectorsData?.data) return [];
-
-    return sectorsData.data
-      .filter(sector =>
-        sector.privilege === 'PRODUCTION' ||
-        sector.privilege === 'WAREHOUSE' ||
-        sector.privilege === 'LEADER'
-      )
-      .map(sector => sector.id);
-  }, [sectorsData?.data]);
-
-  // Set default sectors when they become available
-  useEffect(() => {
-    if (!hasInitializedSectorsRef.current && defaultSectorIds.length > 0) {
-      setFilters(prev => ({
-        ...prev,
-        sectorIds: defaultSectorIds
-      }));
-      hasInitializedSectorsRef.current = true;
-    }
-  }, [defaultSectorIds]);
 
   // Table state management
   const {
@@ -180,40 +157,52 @@ export function PayrollList({ className }: PayrollListProps) {
   const queryParams = useMemo((): PayrollGetManyParams => {
     const orderBy = convertSortConfigsToOrderBy(sortConfigs) || { createdAt: "desc" };
 
-    // Use default sectors if user hasn't selected any
-    const sectorsToFilter = filters.sectorIds && filters.sectorIds.length > 0 ? filters.sectorIds : defaultSectorIds;
+    // Build user filter conditions
+    // Default filters: only active users with payroll numbers
+    const userConditions: any = {
+      isActive: true, // Only active users
+      payrollNumber: { not: null } // Only users with payroll numbers
+    };
+
+    // Add sector filter
+    if (filters.sectorIds.length > 0) {
+      userConditions.sectorId = { in: filters.sectorIds };
+    }
+
+    // Add position filter
+    if (filters.positionIds.length > 0) {
+      userConditions.positionId = { in: filters.positionIds };
+    }
+
+    // Handle include/exclude users
+    if (filters.userIds.length > 0) {
+      userConditions.id = { in: filters.userIds };
+    } else if (filters.excludeUserIds.length > 0) {
+      userConditions.id = { notIn: filters.excludeUserIds };
+    }
+
+    // Build where clause for payroll
+    const whereClause: any = {
+      year: filters.year,
+      user: userConditions // Always include user conditions
+    };
+
+    // Handle multiple months
+    if (filters.months.length > 0) {
+      const monthNumbers = filters.months.map(m => parseInt(m));
+      whereClause.month = monthNumbers.length === 1 ? monthNumbers[0] : { in: monthNumbers };
+    }
+
+    // Add selected IDs filter
+    if (showSelectedOnly && selectedIds.length > 0) {
+      whereClause.id = { in: selectedIds };
+    }
 
     return {
       page: page + 1, // Convert 0-based to 1-based
       limit: pageSize,
       orderBy,
-      where: {
-        year: filters.year,
-        month: filters.month,
-        ...(filters.userId && { userId: filters.userId }),
-        ...(sectorsToFilter.length > 0 && {
-          user: {
-            sectorId: { in: sectorsToFilter }
-          }
-        }),
-        ...(filters.searchTerm && {
-          OR: [
-            {
-              user: {
-                name: { contains: filters.searchTerm, mode: "insensitive" }
-              }
-            },
-            {
-              user: {
-                email: { contains: filters.searchTerm, mode: "insensitive" }
-              }
-            }
-          ]
-        }),
-        ...(showSelectedOnly && selectedIds.length > 0 && {
-          id: { in: selectedIds }
-        }),
-      },
+      where: whereClause,
       include: {
         user: {
           include: {
@@ -227,7 +216,7 @@ export function PayrollList({ className }: PayrollListProps) {
         },
       },
     };
-  }, [filters, page, pageSize, sortConfigs, showSelectedOnly, selectedIds, defaultSectorIds]);
+  }, [filters, page, pageSize, sortConfigs, showSelectedOnly, selectedIds]);
 
   // Fetch payrolls data
   const {
@@ -335,17 +324,27 @@ export function PayrollList({ className }: PayrollListProps) {
 
   // Handle batch operations
   const handleBatchCreatePayroll = () => {
+    // Use the first month if multiple are selected
+    const month = filters.months.length > 0 ? parseInt(filters.months[0]) : currentMonth;
     batchCreatePayroll({
       year: filters.year,
-      month: filters.month
+      month: month
     });
   };
 
   const handleFinalizeMonth = () => {
+    // Use the first month if multiple are selected
+    const month = filters.months.length > 0 ? parseInt(filters.months[0]) : currentMonth;
     setFinalizeDialog({
       year: filters.year,
-      month: filters.month
+      month: month
     });
+  };
+
+  // Handle filter changes
+  const handleFiltersApply = (newFilters: any) => {
+    setFilters(newFilters);
+    setShowFiltersModal(false);
   };
 
   const confirmFinalizeMonth = () => {
@@ -390,7 +389,7 @@ export function PayrollList({ className }: PayrollListProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setShowFilters(!showFilters)}
+            onClick={() => setShowFiltersModal(true)}
           >
             <IconFilter className="h-4 w-4" />
             Filtros
@@ -438,7 +437,10 @@ export function PayrollList({ className }: PayrollListProps) {
           <CardContent>
             <div className="text-2xl font-bold">{summaryStats.totalEmployees}</div>
             <p className="text-xs text-muted-foreground">
-              {filters.month}/{filters.year}
+              {filters.months.length > 0
+                ? `${filters.months.join(', ')}/${filters.year}`
+                : `${filters.year}`
+              }
             </p>
           </CardContent>
         </Card>
@@ -480,112 +482,6 @@ export function PayrollList({ className }: PayrollListProps) {
         </Card>
       </div>
 
-      {/* Filters */}
-      {showFilters && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Filtros</CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowFilters(false)}
-              >
-                <IconX className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Ano</label>
-                <Select
-                  value={String(filters.year)}
-                  onValueChange={(value) =>
-                    setFilters({ ...filters, year: parseInt(value) })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 5 }, (_, i) => currentYear - 2 + i).map((year) => (
-                      <SelectItem key={year} value={String(year)}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Mês</label>
-                <Select
-                  value={String(filters.month)}
-                  onValueChange={(value) =>
-                    setFilters({ ...filters, month: parseInt(value) })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                      <SelectItem key={month} value={String(month)}>
-                        {new Date(2024, month - 1).toLocaleDateString("pt-BR", { month: "long" })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Setores</Label>
-                <Combobox
-                  mode="multiple"
-                  value={filters.sectorIds || []}
-                  onValueChange={(value) =>
-                    setFilters({ ...filters, sectorIds: value as string[] })
-                  }
-                  options={sectorsData?.data?.map(sector => ({
-                    value: sector.id,
-                    label: sector.name
-                  })) || []}
-                  placeholder="Todos os setores"
-                  emptyText="Nenhum setor encontrado"
-                  className="w-full"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Buscar funcionário</label>
-                <Input
-                  placeholder="Nome ou email..."
-                  value={filters.searchTerm}
-                  onChange={(e) =>
-                    setFilters({ ...filters, searchTerm: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="flex items-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setFilters({
-                    year: currentYear,
-                    month: currentMonth,
-                    searchTerm: "",
-                    sectorIds: defaultSectorIds,
-                  })}
-                  className="w-full"
-                >
-                  Limpar Filtros
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Payroll Table */}
       <Card>
@@ -639,6 +535,14 @@ export function PayrollList({ className }: PayrollListProps) {
           />
         </CardContent>
       </Card>
+
+      {/* Filters Modal */}
+      <PayrollFilters
+        open={showFiltersModal}
+        onOpenChange={setShowFiltersModal}
+        filters={filters}
+        onApplyFilters={handleFiltersApply}
+      />
 
       {/* Finalize Month Confirmation Dialog */}
       <AlertDialog open={!!finalizeDialog} onOpenChange={(open) => !open && setFinalizeDialog(null)}>

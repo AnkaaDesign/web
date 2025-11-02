@@ -53,7 +53,8 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
       { field: "reorderPoint", label: "Ponto de Reposição", type: "number" as const },
       { field: "reorderQuantity", label: "Quantidade de Reposição", type: "number" as const },
       { field: "boxQuantity", label: "Quantidade por Caixa", type: "number" as const },
-      { field: "tax", label: "Imposto", type: "number" as const },
+      { field: "icms", label: "ICMS (%)", type: "number" as const },
+      { field: "ipi", label: "IPI (%)", type: "number" as const },
       { field: "totalPrice", label: "Preço Total", type: "number" as const },
       { field: "monthlyConsumption", label: "Consumo Mensal", type: "number" as const },
       { field: "estimatedLeadTime", label: "Lead Time Estimado", type: "number" as const },
@@ -75,8 +76,10 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
 
           // Format value for display
           if (type === "number" && typeof value === "number") {
-            if (field === "totalPrice" || field === "tax") {
+            if (field === "totalPrice") {
               formatted = formatCurrency(value);
+            } else if (field === "icms" || field === "ipi") {
+              formatted = `${value}%`;
             } else {
               formatted = value.toString();
             }

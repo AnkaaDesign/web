@@ -4,10 +4,12 @@ import { IconUsers, IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTria
 
 import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { useCustomer, useCustomerMutations } from "../../../../hooks";
+import { useAuth } from "@/contexts/auth-context";
+import { hasAnyPrivilege } from "@/utils";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { BasicInfoCard, ContactDetailsCard, AddressInfoCard, RelatedInvoicesCard, CustomerTasksList, DocumentsCard } from "@/components/administration/customer/detail";
+import { BasicInfoCard, ContactDetailsCard, AddressInfoCard, CustomerTasksList, DocumentsCard } from "@/components/administration/customer/detail";
 import { CustomerDetailSkeleton } from "@/components/administration/customer/detail/customer-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,13 @@ export const CustomerDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const { user } = useAuth();
+
+  // Check if user can view sensitive documents (CNPJ/CPF, invoices)
+  const canViewDocuments = user && hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.FINANCIAL
+  ]);
 
   const {
     data: response,
@@ -133,18 +142,13 @@ export const CustomerDetailsPage = () => {
             </div>
 
             {/* Address and Changelog Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
               <AddressInfoCard customer={customer} />
-              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.CUSTOMER} entityId={id} maxHeight="400px" />
+              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.CUSTOMER} entityId={id} maxHeight="650px" />
             </div>
 
-            {/* Documents and Empty Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <DocumentsCard customer={customer} />
-            </div>
-
-            {/* Related Invoices */}
-            <RelatedInvoicesCard customer={customer} />
+            {/* Documents (ADMIN and FINANCIAL only) */}
+            {canViewDocuments && <DocumentsCard customer={customer} />}
 
             {/* Customer Tasks - Full Width at Bottom */}
             <CustomerTasksList

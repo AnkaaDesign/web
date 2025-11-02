@@ -23,7 +23,6 @@ import { extractActiveFilters } from "./filter-utils";
 import { FilterIndicators } from "./filter-indicator";
 import { useDirectFilterUpdate } from "./use-direct-filter-update";
 import { StockStatusIndicator } from "@/components/inventory/item/list/stock-status-indicator";
-import { NaturalFloatInput } from "@/components/ui/natural-float-input";
 
 interface ActivityItemSelectorProps {
   selectedItems: Set<string>;
@@ -59,6 +58,8 @@ interface ActivityItemSelectorProps {
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
   onTotalRecordsChange?: (total: number) => void;
+  // Batch selection function - combines both selected items and quantities in one atomic update
+  updateSelectedItems?: (items: Set<string>, quantities: Record<string, number>) => void;
 }
 
 export const ActivityItemSelector = ({
@@ -95,6 +96,8 @@ export const ActivityItemSelector = ({
   onPageChange,
   onPageSizeChange,
   onTotalRecordsChange,
+  // Batch selection function
+  updateSelectedItems,
 }: ActivityItemSelectorProps) => {
   // Use direct filter update for immediate, atomic URL updates
   const { updateFilters: directUpdateFilters } = useDirectFilterUpdate();
@@ -307,18 +310,44 @@ export const ActivityItemSelector = ({
     const currentFiltered = items;
     const filteredIds = currentFiltered.map((item) => item.id);
 
-    if (filteredIds.every((id) => selectedItems.has(id))) {
-      // Deselect all current page items
-      filteredIds.forEach((id) => onSelectItem(id));
+    // Use batch update function if available for atomic state update
+    if (updateSelectedItems) {
+      const newSelected = new Set(selectedItems);
+      const newQuantities = { ...quantities };
+
+      if (filteredIds.every((id) => selectedItems.has(id))) {
+        // Deselect all current page items
+        filteredIds.forEach((id) => {
+          newSelected.delete(id);
+          delete newQuantities[id];
+        });
+      } else {
+        // Select all current page items that aren't already selected
+        filteredIds.forEach((id) => {
+          if (!newSelected.has(id)) {
+            newSelected.add(id);
+            newQuantities[id] = quantities[id] || 1;
+          }
+        });
+      }
+
+      // Single atomic update - pass both selected items and quantities
+      updateSelectedItems(newSelected, newQuantities);
     } else {
-      // Select all current page items that aren't already selected
-      filteredIds.forEach((id) => {
-        if (!selectedItems.has(id)) {
-          onSelectItem(id);
-        }
-      });
+      // Fallback to old behavior if batch functions not provided
+      if (filteredIds.every((id) => selectedItems.has(id))) {
+        // Deselect all current page items
+        filteredIds.forEach((id) => onSelectItem(id));
+      } else {
+        // Select all current page items that aren't already selected
+        filteredIds.forEach((id) => {
+          if (!selectedItems.has(id)) {
+            onSelectItem(id);
+          }
+        });
+      }
     }
-  }, [items, selectedItems, onSelectItem]);
+  }, [items, selectedItems, quantities, onSelectItem, updateSelectedItems]);
 
   // Clear all filters - preserves sort order like item list
   const handleClearAllFilters = useCallback(() => {
@@ -725,9 +754,10 @@ export const ActivityItemSelector = ({
                         <TableCell className="w-32 p-0 !border-r-0" onClick={(e) => e.stopPropagation()}>
                           <div className="px-4 py-1">
                             {itemIsSelected ? (
-                              <NaturalFloatInput
+                              <Input
+                                type="decimal"
                                 value={quantity}
-                                onChange={(value) => onQuantityChange?.(item.id, value)}
+                                onChange={(value) => onQuantityChange?.(item.id, typeof value === "number" ? value : 0)}
                                 min={0.01}
                                 max={999999}
                                 step={0.01}

@@ -49,7 +49,8 @@ export interface OrderFormData {
   selectedItems: Map<string, OrderFormItem>;
   quantities: Record<string, number>;
   prices: Record<string, number>;
-  taxes: Record<string, number>;
+  icmses: Record<string, number>;
+  ipis: Record<string, number>;
   budgetId?: string | null;
   nfeId?: string | null;
   receiptId?: string | null;
@@ -72,8 +73,11 @@ export interface ItemCalculation {
   item: OrderFormItem;
   quantity: number;
   price: number;
-  tax: number;
+  icms: number;
+  ipi: number;
   subtotal: number;
+  icmsAmount: number;
+  ipiAmount: number;
   taxAmount: number;
   total: number;
   hasValidPrice: boolean;
@@ -83,10 +87,14 @@ export interface OrderTotals {
   totalItems: number;
   totalQuantity: number;
   subtotal: number;
+  totalIcms: number;
+  totalIpi: number;
   totalTax: number;
   grandTotal: number;
   itemCalculations: ItemCalculation[];
   hasItemsWithoutPrice: boolean;
+  averageIcmsRate: number;
+  averageIpiRate: number;
   averageTaxRate: number;
 }
 
@@ -119,12 +127,14 @@ export function getBestItemPrice(item: OrderFormItem, manualPrice?: number | nul
 }
 
 /**
- * Calculate individual item total with tax
+ * Calculate individual item total with ICMS and IPI
  */
-export function calculateItemTotal(item: OrderFormItem, quantity: number, manualPrice?: number | null, taxRate: number = 0): ItemCalculation {
+export function calculateItemTotal(item: OrderFormItem, quantity: number, manualPrice?: number | null, icmsRate: number = 0, ipiRate: number = 0): ItemCalculation {
   const price = getBestItemPrice(item, manualPrice);
   const subtotal = roundToDecimals(quantity * price, 2);
-  const taxAmount = roundToDecimals(subtotal * (taxRate / 100), 2);
+  const icmsAmount = roundToDecimals(subtotal * (icmsRate / 100), 2);
+  const ipiAmount = roundToDecimals(subtotal * (ipiRate / 100), 2);
+  const taxAmount = roundToDecimals(icmsAmount + ipiAmount, 2);
   const total = roundToDecimals(subtotal + taxAmount, 2);
   const hasValidPrice = price > 0;
 
@@ -133,8 +143,11 @@ export function calculateItemTotal(item: OrderFormItem, quantity: number, manual
     item,
     quantity,
     price,
-    tax: taxRate,
+    icms: icmsRate,
+    ipi: ipiRate,
     subtotal,
+    icmsAmount,
+    ipiAmount,
     taxAmount,
     total,
     hasValidPrice,
@@ -148,7 +161,8 @@ export function calculateOrderTotals(
   selectedItems: Map<string, OrderFormItem>,
   quantities: Record<string, number>,
   prices: Record<string, number>,
-  taxes: Record<string, number>,
+  icmses: Record<string, number>,
+  ipis: Record<string, number>,
 ): OrderTotals {
   const itemCalculations: ItemCalculation[] = [];
 
@@ -156,30 +170,39 @@ export function calculateOrderTotals(
   selectedItems.forEach((item: OrderFormItem, itemId: string) => {
     const quantity = quantities[itemId] || 1;
     const manualPrice = prices[itemId];
-    const taxRate = taxes[itemId] || 0;
+    const icmsRate = icmses[itemId] || 0;
+    const ipiRate = ipis[itemId] || 0;
 
-    const calculation = calculateItemTotal(item, quantity, manualPrice, taxRate);
+    const calculation = calculateItemTotal(item, quantity, manualPrice, icmsRate, ipiRate);
     itemCalculations.push(calculation);
   });
 
   const totalItems = selectedItems.size;
   const totalQuantity = calculateSum(itemCalculations.map((calc: ItemCalculation) => calc.quantity));
   const subtotal = roundToDecimals(calculateSum(itemCalculations.map((calc: ItemCalculation) => calc.subtotal)), 2);
-  const totalTax = roundToDecimals(calculateSum(itemCalculations.map((calc: ItemCalculation) => calc.taxAmount)), 2);
+  const totalIcms = roundToDecimals(calculateSum(itemCalculations.map((calc: ItemCalculation) => calc.icmsAmount)), 2);
+  const totalIpi = roundToDecimals(calculateSum(itemCalculations.map((calc: ItemCalculation) => calc.ipiAmount)), 2);
+  const totalTax = roundToDecimals(totalIcms + totalIpi, 2);
   const grandTotal = roundToDecimals(subtotal + totalTax, 2);
   const hasItemsWithoutPrice = itemCalculations.some((calc: ItemCalculation) => !calc.hasValidPrice);
 
-  // Calculate average tax rate
+  // Calculate average ICMS and IPI rates
+  const averageIcmsRate = subtotal > 0 ? roundToDecimals((totalIcms / subtotal) * 100, 2) : 0;
+  const averageIpiRate = subtotal > 0 ? roundToDecimals((totalIpi / subtotal) * 100, 2) : 0;
   const averageTaxRate = subtotal > 0 ? roundToDecimals((totalTax / subtotal) * 100, 2) : 0;
 
   return {
     totalItems,
     totalQuantity,
     subtotal,
+    totalIcms,
+    totalIpi,
     totalTax,
     grandTotal,
     itemCalculations,
     hasItemsWithoutPrice,
+    averageIcmsRate,
+    averageIpiRate,
     averageTaxRate,
   };
 }
@@ -192,7 +215,8 @@ export function calculatePartialTotal(
   selectedItems: Map<string, OrderFormItem>,
   quantities: Record<string, number>,
   prices: Record<string, number>,
-  taxes: Record<string, number>,
+  icmses: Record<string, number>,
+  ipis: Record<string, number>,
 ): number {
   return roundToDecimals(
     itemIds.reduce((total: number, itemId: string) => {
@@ -201,11 +225,13 @@ export function calculatePartialTotal(
 
       const quantity = quantities[itemId] || 1;
       const price = getBestItemPrice(item, prices[itemId]);
-      const taxRate = taxes[itemId] || 0;
+      const icmsRate = icmses[itemId] || 0;
+      const ipiRate = ipis[itemId] || 0;
       const subtotal = quantity * price;
-      const taxAmount = subtotal * (taxRate / 100);
+      const icmsAmount = subtotal * (icmsRate / 100);
+      const ipiAmount = subtotal * (ipiRate / 100);
 
-      return total + subtotal + taxAmount;
+      return total + subtotal + icmsAmount + ipiAmount;
     }, 0),
     2,
   );
@@ -273,7 +299,7 @@ export function validatePriceInput(value: string, fieldName: string = "Preço", 
 }
 
 /**
- * Validate tax input
+ * Validate ICMS/IPI input
  */
 export function validateTaxInput(value: string): string | null {
   if (!value || value.trim() === "") {
@@ -311,13 +337,15 @@ export function transformFormDataForAPI(formData: OrderFormData): OrderCreateFor
   formData.selectedItems.forEach((item: OrderFormItem, itemId: string) => {
     const quantity = formData.quantities[itemId] || 1;
     const price = formData.prices[itemId] || getBestItemPrice(item);
-    const tax = formData.taxes[itemId] || 0;
+    const icms = formData.icmses[itemId] || 0;
+    const ipi = formData.ipis[itemId] || 0;
 
     items.push({
       itemId,
       orderedQuantity: quantity,
       price,
-      tax,
+      icms,
+      ipi,
     } as OrderItemCreateFormData);
   });
 
@@ -341,7 +369,8 @@ export function transformAPIDataToFormData(order: Order, items: Item[]): Partial
   const selectedItems = new Map<string, OrderFormItem>();
   const quantities: Record<string, number> = {};
   const prices: Record<string, number> = {};
-  const taxes: Record<string, number> = {};
+  const icmses: Record<string, number> = {};
+  const ipis: Record<string, number> = {};
 
   // Transform items if they exist
   if (order.items) {
@@ -371,7 +400,8 @@ export function transformAPIDataToFormData(order: Order, items: Item[]): Partial
 
         quantities[item.id] = orderItem.orderedQuantity;
         prices[item.id] = orderItem.price;
-        taxes[item.id] = orderItem.tax;
+        icmses[item.id] = orderItem.icms;
+        ipis[item.id] = orderItem.ipi;
       }
     });
   }
@@ -387,7 +417,8 @@ export function transformAPIDataToFormData(order: Order, items: Item[]): Partial
     selectedItems,
     quantities,
     prices,
-    taxes,
+    icmses,
+    ipis,
   };
 }
 
@@ -406,7 +437,8 @@ export function cloneFormData(formData: OrderFormData): OrderFormData {
     selectedItems: new Map(formData.selectedItems),
     quantities: { ...formData.quantities },
     prices: { ...formData.prices },
-    taxes: { ...formData.taxes },
+    icmses: { ...formData.icmses },
+    ipis: { ...formData.ipis },
   };
 }
 
@@ -593,31 +625,31 @@ export function validateItemPrices(selectedItems: Map<string, OrderFormItem>, pr
 }
 
 /**
- * Validate item taxes
+ * Validate item ICMS
  */
-export function validateItemTaxes(selectedItems: Map<string, OrderFormItem>, taxes: Record<string, number>): ValidationError[] {
+export function validateItemIcms(selectedItems: Map<string, OrderFormItem>, icmses: Record<string, number>): ValidationError[] {
   const errors: ValidationError[] = [];
 
   selectedItems.forEach((item: OrderFormItem, itemId: string) => {
-    const tax = taxes[itemId];
+    const icms = icmses[itemId];
 
-    if (tax !== undefined && tax !== null) {
-      if (!isValidNumber(tax)) {
+    if (icms !== undefined && icms !== null) {
+      if (!isValidNumber(icms)) {
         errors.push({
-          field: `tax-${itemId}`,
-          message: `Taxa do item "${item.name}" deve ser um número válido`,
+          field: `icms-${itemId}`,
+          message: `ICMS do item "${item.name}" deve ser um número válido`,
           type: "data",
         });
-      } else if (tax < 0) {
+      } else if (icms < 0) {
         errors.push({
-          field: `tax-${itemId}`,
-          message: `Taxa do item "${item.name}" não pode ser negativa`,
+          field: `icms-${itemId}`,
+          message: `ICMS do item "${item.name}" não pode ser negativo`,
           type: "data",
         });
-      } else if (tax > 100) {
+      } else if (icms > 100) {
         errors.push({
-          field: `tax-${itemId}`,
-          message: `Taxa do item "${item.name}" não pode exceder 100%`,
+          field: `icms-${itemId}`,
+          message: `ICMS do item "${item.name}" não pode exceder 100%`,
           type: "business",
         });
       }
@@ -625,6 +657,50 @@ export function validateItemTaxes(selectedItems: Map<string, OrderFormItem>, tax
   });
 
   return errors;
+}
+
+/**
+ * Validate item IPI
+ */
+export function validateItemIpi(selectedItems: Map<string, OrderFormItem>, ipis: Record<string, number>): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  selectedItems.forEach((item: OrderFormItem, itemId: string) => {
+    const ipi = ipis[itemId];
+
+    if (ipi !== undefined && ipi !== null) {
+      if (!isValidNumber(ipi)) {
+        errors.push({
+          field: `ipi-${itemId}`,
+          message: `IPI do item "${item.name}" deve ser um número válido`,
+          type: "data",
+        });
+      } else if (ipi < 0) {
+        errors.push({
+          field: `ipi-${itemId}`,
+          message: `IPI do item "${item.name}" não pode ser negativo`,
+          type: "data",
+        });
+      } else if (ipi > 100) {
+        errors.push({
+          field: `ipi-${itemId}`,
+          message: `IPI do item "${item.name}" não pode exceder 100%`,
+          type: "business",
+        });
+      }
+    }
+  });
+
+  return errors;
+}
+
+/**
+ * Validate item taxes (deprecated - use validateItemIcms and validateItemIpi)
+ * @deprecated Use validateItemIcms and validateItemIpi instead
+ */
+export function validateItemTaxes(selectedItems: Map<string, OrderFormItem>, taxes: Record<string, number>): ValidationError[] {
+  // For backwards compatibility, validate as ICMS
+  return validateItemIcms(selectedItems, taxes);
 }
 
 /**
@@ -697,11 +773,14 @@ export function validateOrderForm(
   errors.push(...priceErrors);
 
   // Validate taxes
-  const taxErrors = validateItemTaxes(formData.selectedItems, formData.taxes);
-  errors.push(...taxErrors);
+  const icmsErrors = validateItemIcms(formData.selectedItems, formData.icmses);
+  errors.push(...icmsErrors);
+
+  const ipiErrors = validateItemIpi(formData.selectedItems, formData.ipis);
+  errors.push(...ipiErrors);
 
   // Calculate totals for additional validations
-  const totals = calculateOrderTotals(formData.selectedItems, formData.quantities, formData.prices, formData.taxes);
+  const totals = calculateOrderTotals(formData.selectedItems, formData.quantities, formData.prices, formData.icmses, formData.ipis);
 
   // Validate total value if needed
   if (options.maxTotal && totals.grandTotal > options.maxTotal) {
@@ -960,7 +1039,9 @@ export function debugFormData(formData: OrderFormData, label?: string): void {
     return;
   }
 
-  console.group(`🔍 Order Form Data${label ? ` - ${label}` : ""}`););const totals = calculateOrderTotals(formData.selectedItems, formData.quantities, formData.prices, formData.taxes);console.groupEnd();
+  console.group(`🔍 Order Form Data${label ? ` - ${label}` : ""}`);
+  const totals = calculateOrderTotals(formData.selectedItems, formData.quantities, formData.prices, formData.icmses, formData.ipis);
+  console.groupEnd();
 }
 
 /**
@@ -1013,7 +1094,9 @@ export const orderFormUtils = {
   validateForecast,
   validateItemSelection,
   validateItemPrices,
-  validateItemTaxes,
+  validateItemIcms,
+  validateItemIpi,
+  validateItemTaxes, // deprecated
   validateNotes,
 
   // Item processing

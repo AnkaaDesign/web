@@ -989,7 +989,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Em Espera",
         icon: "pause",
         path: "/producao/em-espera",
-        // No requiredPrivilege - inherits from parent (Production menu)
+        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC], // WAREHOUSE excluded
       },
 
       {
@@ -1081,13 +1081,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     requiredPrivilege: [SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC],
   },
 
-  // Em Espera - Direct access for DESIGNER, FINANCIAL, LOGISTIC
+  // Em Espera - Direct access for PRODUCTION, DESIGNER, FINANCIAL, LOGISTIC (WAREHOUSE excluded)
   {
     id: "em-espera-direct",
     title: "Em Espera",
     icon: "pause",
     path: "/producao/em-espera",
-    requiredPrivilege: [SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC],
+    requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC],
   },
 
   // Histórico - Direct access for DESIGNER, FINANCIAL, LOGISTIC

@@ -39,41 +39,47 @@ export function MaintenanceItemSelector<TFieldValues extends FieldValues = Field
 
   // Async query function for Combobox with pagination
   const queryFn = useCallback(async (searchTerm: string, page: number = 1) => {
-    const pageSize = 20;
-    const response = await getItems({
-      take: pageSize,
-      skip: (page - 1) * pageSize,
-      where: {
+    try {
+      // Build query parameters - same structure as paint type selector
+      const queryParams: any = {
+        orderBy: { name: "asc" },
+        page: page,
+        take: 50,
+        include: {
+          brand: true,
+          category: true,
+        },
+      };
+
+      // Add search filter if provided
+      if (searchTerm && searchTerm.trim()) {
+        queryParams.searchingFor = searchTerm.trim();
+      }
+
+      // Add isActive filter
+      queryParams.where = {
         isActive: true,
-        ...(searchTerm ? {
-          OR: [
-            { name: { contains: searchTerm, mode: "insensitive" } },
-            { uniCode: { contains: searchTerm, mode: "insensitive" } },
-          ],
-        } : {}),
-      },
-      orderBy: {
-        name: "asc",
-      },
-      include: {
-        brand: true,
-        category: true,
-      },
-    });
+      };
 
-    const items = response.data || [];
-    const total = response.total || 0;
-    const hasMore = (page * pageSize) < total;
+      const response = await getItems(queryParams);
+      const items = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
 
-    return {
-      data: items.map((item) => ({
-        value: item.id,
-        label: item.name,
-        description: item.uniCode ? `Código: ${item.uniCode} • Estoque: ${item.quantity || 0}` : `Estoque: ${item.quantity || 0}`,
-      })),
-      hasMore,
-      total,
-    };
+      return {
+        data: items.map((item) => ({
+          value: item.id,
+          label: item.name,
+          description: item.uniCode ? `Código: ${item.uniCode} • Estoque: ${item.quantity || 0}` : `Estoque: ${item.quantity || 0}`,
+        })),
+        hasMore,
+      };
+    } catch (error) {
+      console.error("Error fetching items:", error);
+      return {
+        data: [],
+        hasMore: false,
+      };
+    }
   }, []);
 
   return (
@@ -90,7 +96,7 @@ export function MaintenanceItemSelector<TFieldValues extends FieldValues = Field
               queryFn={queryFn}
               initialOptions={initialOptions}
               minSearchLength={0}
-              pageSize={20}
+              pageSize={50}
               value={field.value || ""}
               onValueChange={(value) => {
                 field.onChange(value);
@@ -103,6 +109,7 @@ export function MaintenanceItemSelector<TFieldValues extends FieldValues = Field
               searchable
               disabled={disabled}
               emptyText="Nenhum item encontrado"
+              searchPlaceholder="Pesquisar itens..."
               className="w-full"
             />
           </FormControl>

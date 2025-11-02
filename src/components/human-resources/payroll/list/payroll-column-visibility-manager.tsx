@@ -46,9 +46,10 @@ export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityCha
     return PAYROLL_COLUMNS.filter((col) => col.header.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [searchQuery]);
 
-  const handleToggle = (columnKey: string, checked: boolean) => {
+  const handleToggle = (columnKey: string, checked: boolean | undefined) => {
     const newVisible = new Set(localVisible);
-    if (checked) {
+    const isChecked = checked === true;
+    if (isChecked) {
       newVisible.add(columnKey);
     } else {
       newVisible.delete(columnKey);
@@ -107,7 +108,7 @@ export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityCha
               type="text"
               placeholder="Buscar coluna..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => setSearchQuery(e?.target?.value || "")}
               className="pl-9 h-9"
             />
           </div>
@@ -134,7 +135,7 @@ export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityCha
                 <Switch
                   id={`column-${column.key}`}
                   checked={localVisible.has(column.key)}
-                  onCheckedChange={(checked) => handleToggle(column.key, !!checked)}
+                  onCheckedChange={(checked) => handleToggle(column.key, checked)}
                 />
               </Label>
             ))}

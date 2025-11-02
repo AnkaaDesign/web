@@ -90,7 +90,7 @@ export function BrandColumnVisibilityManager({ columns, visibleColumns, onVisibi
 
           <div className="relative">
             <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input type="text" placeholder="Buscar coluna..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9" />
+            <Input type="text" placeholder="Buscar coluna..." value={searchQuery} onChange={(value) => setSearchQuery(String(value || ""))} className="pl-9 h-9" />
           </div>
 
           <div className="flex gap-2 mt-2">

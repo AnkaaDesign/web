@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, Camera, Trash2, User as UserIcon, Mail, Phone, MapPin, Briefcase, Save, RefreshCw } from "lucide-react";
+import { Loader2, Camera, Trash2, User as UserIcon, Mail, Phone, MapPin, Briefcase, Save, RefreshCw, Ruler } from "lucide-react";
 import { getProfile, updateProfile, uploadPhoto, deletePhoto } from "@/api-client";
 import type { User } from "@/types";
 import type { UserUpdateFormData } from "@/schemas";
@@ -271,114 +271,93 @@ export function ProfilePage() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto">
-        <div className="max-w-5xl mx-auto px-4 w-full">
-          <div className="grid gap-6 md:grid-cols-[300px,1fr]">
-        {/* Profile Photo Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Foto de Perfil</CardTitle>
-            <CardDescription>Atualize sua foto de perfil</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center space-y-4">
-            <div className="relative">
-              <Avatar className="w-32 h-32">
-                <AvatarImage src={photoPreview || undefined} alt={user.name} />
-                <AvatarFallback className="text-2xl">
-                  {getInitials(user.name)}
-                </AvatarFallback>
-              </Avatar>
+        <div className="px-4 sm:px-6 h-full">
+          <div className="grid gap-6 md:grid-cols-[300px,1fr] h-full md:items-start">
+            {/* First Column: Profile Photo (Full Height) */}
+            <Card className="md:h-full">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Camera className="w-5 h-5" />
+                Foto de Perfil
+              </CardTitle>
+              <CardDescription>Atualize sua foto de perfil</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center space-y-4">
+              <div className="relative">
+                <Avatar className="w-32 h-32">
+                  <AvatarImage src={photoPreview || undefined} alt={user.name} />
+                  <AvatarFallback className="text-2xl">
+                    {getInitials(user.name)}
+                  </AvatarFallback>
+                </Avatar>
 
-              {isUploadingPhoto && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
-                  <Loader2 className="w-8 h-8 animate-spin text-white" />
-                </div>
-              )}
-            </div>
+                {isUploadingPhoto && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
+                    <Loader2 className="w-8 h-8 animate-spin text-white" />
+                  </div>
+                )}
+              </div>
 
-            <div className="flex flex-col gap-2 w-full">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                disabled={isUploadingPhoto}
-                onClick={() => document.getElementById("photo-upload")?.click()}
-              >
-                <Camera className="w-4 h-4 mr-2" />
-                {user.avatarId ? "Alterar Foto" : "Adicionar Foto"}
-              </Button>
-
-              <input
-                id="photo-upload"
-                type="file"
-                accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                className="hidden"
-                onChange={handlePhotoUpload}
-                disabled={isUploadingPhoto}
-              />
-
-              {user.avatarId && (
+              <div className="flex flex-col gap-2 w-full">
                 <Button
-                  variant="destructive"
+                  variant="outline"
                   size="sm"
                   className="w-full"
                   disabled={isUploadingPhoto}
-                  onClick={handleDeletePhoto}
+                  onClick={() => document.getElementById("photo-upload")?.click()}
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Remover Foto
+                  <Camera className="w-4 h-4 mr-2" />
+                  {user.avatarId ? "Alterar Foto" : "Adicionar Foto"}
                 </Button>
-              )}
-            </div>
 
-            <p className="text-xs text-muted-foreground text-center">
-              Formatos aceitos: JPG, PNG, GIF, WEBP
-              <br />
-              Tamanho máximo: 5MB
-            </p>
-          </CardContent>
-        </Card>
+                <input
+                  id="photo-upload"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={handlePhotoUpload}
+                  disabled={isUploadingPhoto}
+                />
 
-        {/* Profile Information Form */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UserIcon className="w-5 h-5" />
-                Informações Básicas
-              </CardTitle>
-              <CardDescription>Seus dados básicos (somente leitura)</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              <div>
-                <label className="text-sm font-medium">Nome</label>
-                <p className="text-sm text-muted-foreground mt-1">{user.name}</p>
+                {user.avatarId && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="w-full"
+                    disabled={isUploadingPhoto}
+                    onClick={handleDeletePhoto}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Remover Foto
+                  </Button>
+                )}
               </div>
-              <div>
-                <label className="text-sm font-medium">Cargo</label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {user.position?.name || "Não definido"}
-                </p>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Setor</label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {user.sector?.name || "Não definido"}
-                </p>
-              </div>
+
+              <p className="text-xs text-muted-foreground text-center">
+                Formatos aceitos: JPG, PNG, GIF, WEBP
+                <br />
+                Tamanho máximo: 5MB
+              </p>
             </CardContent>
           </Card>
 
-          <Form {...form}>
-            <form className="space-y-6">
+          {/* Second Column: Basic Info, Measures, and Address */}
+          <div className="space-y-6">
+            {/* Basic Information Card with Email and Phone */}
+            <Form {...form}>
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Mail className="w-5 h-5" />
-                    Informações de Contato
+                    <UserIcon className="w-5 h-5" />
+                    Informações Básicas
                   </CardTitle>
-                  <CardDescription>Atualize seus dados de contato</CardDescription>
+                  <CardDescription>Seus dados básicos e de contato</CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-4">
+                <CardContent className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="text-sm font-medium">Nome</label>
+                    <p className="text-sm text-muted-foreground mt-1">{user.name}</p>
+                  </div>
                   <FormInput
                     name="email"
                     type="email"
@@ -386,6 +365,12 @@ export function ProfilePage() {
                     placeholder="Digite seu e-mail"
                     disabled={isSaving}
                   />
+                  <div>
+                    <label className="text-sm font-medium">Cargo</label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {user.position?.name || "Não definido"}
+                    </p>
+                  </div>
                   <FormInput
                     name="phone"
                     type="phone"
@@ -393,85 +378,152 @@ export function ProfilePage() {
                     placeholder="Digite seu telefone"
                     disabled={isSaving}
                   />
+                  <div>
+                    <label className="text-sm font-medium">Setor</label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {user.sector?.name || "Não definido"}
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
+            </Form>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5" />
-                    Endereço
-                  </CardTitle>
-                  <CardDescription>Atualize seu endereço</CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="col-span-2">
+            {/* Bottom Row: Measures and Address */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Measures Card */}
+              {user.ppeSize && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Ruler className="w-5 h-5" />
+                      Medidas
+                    </CardTitle>
+                    <CardDescription>Suas medidas para EPIs (somente leitura)</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-3">
+                    {user.ppeSize.shirts && (
+                      <div>
+                        <label className="text-sm font-medium">Camisa</label>
+                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.shirts}</p>
+                      </div>
+                    )}
+                    {user.ppeSize.pants && (
+                      <div>
+                        <label className="text-sm font-medium">Calça</label>
+                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.pants}</p>
+                      </div>
+                    )}
+                    {user.ppeSize.boots && (
+                      <div>
+                        <label className="text-sm font-medium">Bota</label>
+                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.boots}</p>
+                      </div>
+                    )}
+                    {user.ppeSize.gloves && (
+                      <div>
+                        <label className="text-sm font-medium">Luvas</label>
+                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.gloves}</p>
+                      </div>
+                    )}
+                    {user.ppeSize.mask && (
+                      <div>
+                        <label className="text-sm font-medium">Máscara</label>
+                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.mask}</p>
+                      </div>
+                    )}
+                    {user.ppeSize.sleeves && (
+                      <div>
+                        <label className="text-sm font-medium">Mangas</label>
+                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.sleeves}</p>
+                      </div>
+                    )}
+                    {user.ppeSize.rainBoots && (
+                      <div>
+                        <label className="text-sm font-medium">Galocha</label>
+                        <p className="text-sm text-muted-foreground mt-1">{user.ppeSize.rainBoots}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Address Card (Editable Form) */}
+              <Form {...form}>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <MapPin className="w-5 h-5" />
+                      Endereço
+                    </CardTitle>
+                    <CardDescription>Atualize seu endereço</CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-4">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="col-span-2">
+                        <FormInput
+                          name="address"
+                          label="Endereço"
+                          placeholder="Rua, avenida..."
+                          disabled={isSaving || isLoadingCep}
+                        />
+                      </div>
                       <FormInput
-                        name="address"
-                        label="Endereço"
-                        placeholder="Rua, avenida..."
-                        disabled={isSaving || isLoadingCep}
-                      />
-                    </div>
-                    <FormInput
-                      name="addressNumber"
-                      label="Número"
-                      placeholder="Nº"
-                      disabled={isSaving}
-                    />
-                  </div>
-                  <FormInput
-                    name="addressComplement"
-                    label="Complemento"
-                    placeholder="Apto, bloco..."
-                    disabled={isSaving}
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormInput
-                      name="neighborhood"
-                      label="Bairro"
-                      placeholder="Digite o bairro"
-                      disabled={isSaving || isLoadingCep}
-                    />
-                    <div className="relative">
-                      <FormInput
-                        name="zipCode"
-                        type="cep"
-                        label="CEP"
-                        placeholder="00000-000"
+                        name="addressNumber"
+                        label="Número"
+                        placeholder="Nº"
                         disabled={isSaving}
                       />
-                      {isLoadingCep && (
-                        <div className="absolute right-3 top-9">
-                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                        </div>
-                      )}
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
                     <FormInput
-                      name="city"
-                      label="Cidade"
-                      placeholder="Digite a cidade"
-                      disabled={isSaving || isLoadingCep}
+                      name="addressComplement"
+                      label="Complemento"
+                      placeholder="Apto, bloco..."
+                      disabled={isSaving}
                     />
-                    <FormInput
-                      name="state"
-                      label="Estado"
-                      placeholder="UF"
-                      disabled={isSaving || isLoadingCep}
-                      maxLength={2}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-            </form>
-          </Form>
-        </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormInput
+                        name="neighborhood"
+                        label="Bairro"
+                        placeholder="Digite o bairro"
+                        disabled={isSaving || isLoadingCep}
+                      />
+                      <div className="relative">
+                        <FormInput
+                          name="zipCode"
+                          type="cep"
+                          label="CEP"
+                          placeholder="00000-000"
+                          disabled={isSaving}
+                        />
+                        {isLoadingCep && (
+                          <div className="absolute right-3 top-9">
+                            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormInput
+                        name="city"
+                        label="Cidade"
+                        placeholder="Digite a cidade"
+                        disabled={isSaving || isLoadingCep}
+                      />
+                      <FormInput
+                        name="state"
+                        label="Estado"
+                        placeholder="UF"
+                        disabled={isSaving || isLoadingCep}
+                        maxLength={2}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Form>
+            </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

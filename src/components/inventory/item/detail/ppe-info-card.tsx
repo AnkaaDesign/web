@@ -105,13 +105,6 @@ export function PpeInfoCard({ item, className }: PpeInfoCardProps) {
                 <p className="text-base font-semibold text-foreground">{item.ppeStandardQuantity}</p>
               </div>
 
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                  <IconCalendar className="h-4 w-4" />
-                  Antecedência de Pedido
-                </p>
-                <p className="text-base font-semibold text-foreground">{item.ppeAutoOrderMonths} meses</p>
-              </div>
             </div>
           </div>
         </div>

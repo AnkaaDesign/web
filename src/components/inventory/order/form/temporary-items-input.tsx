@@ -20,7 +20,6 @@ import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { FormMoneyInput } from "@/components/ui/form-money-input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { NaturalFloatInput } from "@/components/ui/natural-float-input";
 
 interface TemporaryItemsInputProps {
   control: any;
@@ -79,7 +78,8 @@ export const TemporaryItemsInput = forwardRef<
       temporaryItemDescription: "",
       orderedQuantity: 1,
       price: null,
-      tax: 0,
+      icms: 0,
+      ipi: 0,
     });
 
     // Focus on the new input after adding
@@ -110,7 +110,8 @@ export const TemporaryItemsInput = forwardRef<
           <div className="flex-1">Descrição do Item</div>
           <div className="w-32">Quantidade</div>
           <div className="w-36">Preço Unitário</div>
-          <div className="w-28">Imposto (%)</div>
+          <div className="w-28">ICMS (%)</div>
+          <div className="w-28">IPI (%)</div>
           <div className="w-10"></div>
         </div>
       )}
@@ -154,16 +155,16 @@ export const TemporaryItemsInput = forwardRef<
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <NaturalFloatInput
-                          {...field}
+                        <Input
+                          type="decimal"
                           value={field.value || 1}
                           onChange={(value) => field.onChange(value)}
                           min={0.01}
                           max={999999}
-                          step={0.01}
                           placeholder="1"
                           disabled={disabled}
-                          className="bg-transparent h-10"
+                          transparent
+                          className="h-10"
                         />
                       </FormControl>
                       <FormMessage />
@@ -183,11 +184,38 @@ export const TemporaryItemsInput = forwardRef<
                 />
               </div>
 
-              {/* Tax Field - Fixed width */}
+              {/* ICMS Field - Fixed width */}
               <div className="w-28">
                 <FormField
                   control={control}
-                  name={`temporaryItems.${index}.tax`}
+                  name={`temporaryItems.${index}.icms`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="number"
+                          value={field.value ?? 0}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          min={0}
+                          max={100}
+                          step={0.01}
+                          placeholder="0"
+                          disabled={disabled}
+                          className="bg-transparent h-10"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* IPI Field - Fixed width */}
+              <div className="w-28">
+                <FormField
+                  control={control}
+                  name={`temporaryItems.${index}.ipi`}
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>

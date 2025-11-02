@@ -9,10 +9,14 @@ import { IconFlask, IconRefresh, IconEdit } from "@tabler/icons-react";
 import { routes, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { formatCurrency } from "../../../../utils";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditPaints } from "@/utils/permissions/entity-permissions";
 
 export default function FormulaDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditPaints(user);
   const { create: createProduction } = usePaintProductionMutations();
 
   const {
@@ -98,12 +102,12 @@ export default function FormulaDetails() {
               icon: IconRefresh,
               onClick: handleRefresh,
             },
-            {
+            ...(canEdit ? [{
               key: "edit",
               label: "Editar",
               icon: IconEdit,
               onClick: handleEdit,
-            },
+            }] : []),
           ]}
           breadcrumbs={[
             { label: "Início", href: routes.home },

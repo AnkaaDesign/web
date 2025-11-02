@@ -38,6 +38,7 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
     if (localFilters.itemIds?.length) count++;
     if (localFilters.quantityRange?.min || localFilters.quantityRange?.max) count++;
     if (localFilters.createdAt?.gte || localFilters.createdAt?.lte) count++;
+    if (localFilters.showPaintProduction) count++;
     return count;
   }, [localFilters]);
 
@@ -259,6 +260,25 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
                   </Label>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Paint Production Filter */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="showPaintProduction"
+                checked={localFilters.showPaintProduction ?? false}
+                onCheckedChange={(checked) =>
+                  setLocalFilters({
+                    ...localFilters,
+                    showPaintProduction: checked ? true : undefined,
+                  })
+                }
+              />
+              <Label htmlFor="showPaintProduction" className="text-sm font-normal cursor-pointer">
+                Exibir atividades de produção de tinta
+              </Label>
             </div>
           </div>
 

@@ -263,9 +263,9 @@ export function extractActiveFilters(
     });
   }
 
-  if (filters.taxRange?.min !== undefined || filters.taxRange?.max !== undefined) {
-    const min = filters.taxRange.min;
-    const max = filters.taxRange.max;
+  if (filters.icmsRange?.min !== undefined || filters.icmsRange?.max !== undefined) {
+    const min = filters.icmsRange.min;
+    const max = filters.icmsRange.max;
     let value = "";
 
     if (min !== undefined && max !== undefined) {
@@ -277,11 +277,33 @@ export function extractActiveFilters(
     }
 
     activeFilters.push({
-      key: "taxRange",
-      label: "Taxa",
+      key: "icmsRange",
+      label: "ICMS",
       value,
       iconType: "calculator",
-      onRemove: () => onRemoveFilter("taxRange"),
+      onRemove: () => onRemoveFilter("icmsRange"),
+    });
+  }
+
+  if (filters.ipiRange?.min !== undefined || filters.ipiRange?.max !== undefined) {
+    const min = filters.ipiRange.min;
+    const max = filters.ipiRange.max;
+    let value = "";
+
+    if (min !== undefined && max !== undefined) {
+      value = `${min}% - ${max}%`;
+    } else if (min !== undefined) {
+      value = `≥ ${min}%`;
+    } else if (max !== undefined) {
+      value = `≤ ${max}%`;
+    }
+
+    activeFilters.push({
+      key: "ipiRange",
+      label: "IPI",
+      value,
+      iconType: "calculator",
+      onRemove: () => onRemoveFilter("ipiRange"),
     });
   }
 
@@ -466,8 +488,11 @@ export function createFilterRemover(currentFilters: Partial<ItemGetManyFormData>
       case "quantityRange":
         delete newFilters.quantityRange;
         break;
-      case "taxRange":
-        delete newFilters.taxRange;
+      case "icmsRange":
+        delete newFilters.icmsRange;
+        break;
+      case "ipiRange":
+        delete newFilters.ipiRange;
         break;
       case "monthlyConsumptionRange":
         delete newFilters.monthlyConsumptionRange;

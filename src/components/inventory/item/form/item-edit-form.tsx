@@ -27,7 +27,8 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
       reorderQuantity: item.reorderQuantity,
       maxQuantity: item.maxQuantity,
       boxQuantity: item.boxQuantity,
-      tax: item.tax,
+      icms: item.icms,
+      ipi: item.ipi,
       measures: item.measures || [], // Include measures array
       barcodes: item.barcodes || [],
       shouldAssignToUser: item.shouldAssignToUser,
@@ -45,7 +46,6 @@ export function ItemEditForm({ item, onSubmit, isSubmitting, onDirtyChange, onFo
       ppeCA: item.ppeCA,
       ppeDeliveryMode: item.ppeDeliveryMode,
       ppeStandardQuantity: item.ppeStandardQuantity,
-      ppeAutoOrderMonths: item.ppeAutoOrderMonths,
     };
   }, [item]);
 

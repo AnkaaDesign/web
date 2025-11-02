@@ -16,8 +16,7 @@ const renderMonthlyConsumptionWithTrend = (item: Item) => {
 
   if (!consumption) return <div className="truncate">-</div>;
 
-  const formattedConsumption =
-    consumption % 1 === 0 ? consumption.toLocaleString("pt-BR") : consumption.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formattedConsumption = Math.round(consumption).toLocaleString("pt-BR");
 
   const getTrendIcon = (trendValue: number | null) => {
     if (trendValue === null || trendValue === 0) {
@@ -219,12 +218,26 @@ export const createItemColumns = (): ItemColumn[] => [
     align: "left",
   },
   {
-    key: "tax",
-    header: "TAXA",
+    key: "icms",
+    header: "ICMS",
     accessor: (item: Item) => (
       <div className="text-muted-foreground truncate">
-        {item.tax !== null && item.tax !== undefined
-          ? `${item.tax % 1 === 0 ? item.tax.toLocaleString("pt-BR") : item.tax.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+        {item.icms !== null && item.icms !== undefined
+          ? `${item.icms % 1 === 0 ? item.icms.toLocaleString("pt-BR") : item.icms.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+          : "-"}
+      </div>
+    ),
+    sortable: true,
+    className: "w-20",
+    align: "left",
+  },
+  {
+    key: "ipi",
+    header: "IPI",
+    accessor: (item: Item) => (
+      <div className="text-muted-foreground truncate">
+        {item.ipi !== null && item.ipi !== undefined
+          ? `${item.ipi % 1 === 0 ? item.ipi.toLocaleString("pt-BR") : item.ipi.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
           : "-"}
       </div>
     ),

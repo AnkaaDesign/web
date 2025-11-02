@@ -8,10 +8,14 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { RelatedItemsCard } from "@/components/inventory/item/category/detail/related-items-card";
 import { SpecificationsCard } from "@/components/inventory/item/category/detail/specifications-card";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditItems } from "@/utils/permissions/entity-permissions";
 
 const CategoryDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditItems(user);
 
   const {
     data: response,
@@ -150,12 +154,12 @@ const CategoryDetailsPage = () => {
               icon: IconRefresh,
               onClick: handleRefresh,
             },
-            {
+            ...(canEdit ? [{
               key: "edit",
               label: "Editar",
               icon: IconEdit,
               onClick: handleEdit,
-            },
+            }] : []),
           ]}
         />
       </div>

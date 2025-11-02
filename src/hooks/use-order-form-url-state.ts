@@ -6,7 +6,7 @@ import { useUrlFilters } from "./use-url-filters";
  * Order Form URL State Hook
  *
  * Important behaviors:
- * - Manages selected items, their quantities, prices, and tax in URL state
+ * - Manages selected items, their quantities, prices, ICMS, and IPI in URL state
  * - Manages form data (description, supplierId, forecast, notes) in URL state
  * - Handles form validation state
  * - Persists all state in URL for page refresh recovery
@@ -27,7 +27,8 @@ export interface OrderFormValidationState {
 interface UseOrderFormUrlStateOptions {
   defaultQuantity?: number;
   defaultPrice?: number;
-  defaultTax?: number;
+  defaultIcms?: number;
+  defaultIpi?: number;
   preserveQuantitiesOnDeselect?: boolean;
   defaultPageSize?: number;
   initialData?: {
@@ -39,13 +40,14 @@ interface UseOrderFormUrlStateOptions {
     selectedItems?: Set<string>;
     quantities?: Record<string, number>;
     prices?: Record<string, number>;
-    taxes?: Record<string, number>;
-    criticalItems?: Set<string>;
+    icmses?: Record<string, number>;
+    ipis?: Record<string, number>;
     temporaryItems?: Array<{
       temporaryItemDescription: string;
       orderedQuantity: number;
       price: number;
-      tax: number;
+      icms: number;
+      ipi: number;
     }>;
   };
 }
@@ -75,15 +77,15 @@ const orderFormFilterConfig = {
     defaultValue: {} as Record<string, number>,
     debounceMs: 0, // Immediate update for prices
   },
-  taxes: {
+  icmses: {
     schema: z.record(z.string(), z.number().min(0).max(100)).default({}),
     defaultValue: {} as Record<string, number>,
-    debounceMs: 0, // Immediate update for taxes
+    debounceMs: 0, // Immediate update for ICMS
   },
-  criticalItems: {
-    schema: z.array(z.string()).default([]),
-    defaultValue: [] as string[],
-    debounceMs: 0, // Immediate update for critical items
+  ipis: {
+    schema: z.record(z.string(), z.number().min(0).max(100)).default({}),
+    defaultValue: {} as Record<string, number>,
+    debounceMs: 0, // Immediate update for IPI
   },
 
   // Order item mode (inventory vs temporary items)
@@ -100,14 +102,16 @@ const orderFormFilterConfig = {
         temporaryItemDescription: z.string(),
         orderedQuantity: z.number().positive(),
         price: z.number().min(0),
-        tax: z.number().min(0).max(100).default(0),
+        icms: z.number().min(0).max(100).default(0),
+        ipi: z.number().min(0).max(100).default(0),
       })
     ).default([]),
     defaultValue: [] as Array<{
       temporaryItemDescription: string;
       orderedQuantity: number;
       price: number;
-      tax: number;
+      icms: number;
+      ipi: number;
     }>,
     debounceMs: 0, // Immediate update
   },
@@ -198,7 +202,7 @@ const orderFormFilterConfig = {
 } as const;
 
 export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) {
-  const { defaultQuantity = 1, defaultPrice = 0, defaultTax = 0, preserveQuantitiesOnDeselect = false, defaultPageSize = 40, initialData } = options;
+  const { defaultQuantity = 1, defaultPrice = 0, defaultIcms = 0, defaultIpi = 0, preserveQuantitiesOnDeselect = false, defaultPageSize = 40, initialData } = options;
 
   // Update orderFormFilterConfig with custom defaults and initial data
   const configWithDefaults = useMemo(() => {
@@ -257,16 +261,16 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
           defaultValue: initialData.prices,
         };
       }
-      if (initialData.taxes) {
-        config.taxes = {
-          ...config.taxes,
-          defaultValue: initialData.taxes,
+      if (initialData.icmses) {
+        config.icmses = {
+          ...config.icmses,
+          defaultValue: initialData.icmses,
         };
       }
-      if (initialData.criticalItems) {
-        config.criticalItems = {
-          ...config.criticalItems,
-          defaultValue: Array.from(initialData.criticalItems),
+      if (initialData.ipis) {
+        config.ipis = {
+          ...config.ipis,
+          defaultValue: initialData.ipis,
         };
       }
       if (initialData.orderItemMode !== undefined) {
@@ -293,15 +297,11 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     return new Set<string>(filters.selectedItems || []);
   }, [filters.selectedItems]);
 
-  // Convert criticalItems array to Set
-  const criticalItems = useMemo(() => {
-    return new Set<string>(filters.criticalItems || []);
-  }, [filters.criticalItems]);
-
   // Memoized state values
   const quantities = filters.quantities || {};
   const prices = filters.prices || {};
-  const taxes = filters.taxes || {};
+  const icmses = filters.icmses || {};
+  const ipis = filters.ipis || {};
   const description = filters.description || "";
   const supplierId = filters.supplierId;
   const forecast = filters.forecast;
@@ -563,22 +563,24 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
 
   // Helper to toggle item selection
   const toggleItemSelection = useCallback(
-    (itemId: string, quantity?: number, price?: number, tax?: number) => {
+    (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => {
       const newSelected = new Set(selectedItems);
       const newQuantities = { ...quantities };
       const newPrices = { ...prices };
-      const newTaxes = { ...taxes };
+      const newIcmses = { ...icmses };
+      const newIpis = { ...ipis };
 
       if (newSelected.has(itemId)) {
         // Item is already selected - check if we should deselect or just update values
         // If no explicit values are provided, this is a toggle to deselect
-        if (quantity === undefined && price === undefined && tax === undefined) {
+        if (quantity === undefined && price === undefined && icms === undefined && ipi === undefined) {
           // Deselect
           newSelected.delete(itemId);
           if (!preserveQuantitiesOnDeselect) {
             delete newQuantities[itemId];
             delete newPrices[itemId];
-            delete newTaxes[itemId];
+            delete newIcmses[itemId];
+            delete newIpis[itemId];
           }
         } else {
           // Update existing item values without deselecting
@@ -589,8 +591,11 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
           if (price !== undefined) {
             newPrices[itemId] = price;
           }
-          if (tax !== undefined) {
-            newTaxes[itemId] = tax;
+          if (icms !== undefined) {
+            newIcmses[itemId] = icms;
+          }
+          if (ipi !== undefined) {
+            newIpis[itemId] = ipi;
           }
         }
       } else {
@@ -598,7 +603,8 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
         newSelected.add(itemId);
         newQuantities[itemId] = quantity || quantities[itemId] || defaultQuantity;
         newPrices[itemId] = price !== undefined ? price : prices[itemId] !== undefined ? prices[itemId] : defaultPrice;
-        newTaxes[itemId] = tax !== undefined ? tax : taxes[itemId] !== undefined ? taxes[itemId] : defaultTax;
+        newIcmses[itemId] = icms !== undefined ? icms : icmses[itemId] !== undefined ? icmses[itemId] : defaultIcms;
+        newIpis[itemId] = ipi !== undefined ? ipi : ipis[itemId] !== undefined ? ipis[itemId] : defaultIpi;
       }
 
       // Batch update all related state
@@ -606,58 +612,51 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
         newSelected.size !== selectedItems.size ||
         JSON.stringify(newQuantities) !== JSON.stringify(quantities) ||
         JSON.stringify(newPrices) !== JSON.stringify(prices) ||
-        JSON.stringify(newTaxes) !== JSON.stringify(taxes);
+        JSON.stringify(newIcmses) !== JSON.stringify(icmses) ||
+        JSON.stringify(newIpis) !== JSON.stringify(ipis);
 
       if (hasChanges) {
         setFilters({
           selectedItems: newSelected.size > 0 ? Array.from(newSelected) : undefined,
           quantities: Object.keys(newQuantities).length > 0 ? newQuantities : undefined,
           prices: Object.keys(newPrices).length > 0 ? newPrices : undefined,
-          taxes: Object.keys(newTaxes).length > 0 ? newTaxes : undefined,
+          icmses: Object.keys(newIcmses).length > 0 ? newIcmses : undefined,
+          ipis: Object.keys(newIpis).length > 0 ? newIpis : undefined,
         });
       }
     },
-    [selectedItems, quantities, prices, taxes, defaultQuantity, defaultPrice, defaultTax, preserveQuantitiesOnDeselect, setFilters],
-  );
-
-  // Helper to toggle critical status
-  const toggleCriticalItem = useCallback(
-    (itemId: string) => {
-      // Ensure the item is selected when toggling critical status
-      const newSelected = new Set(selectedItems);
-      newSelected.add(itemId); // Ensure item is selected
-
-      const newCritical = new Set(criticalItems);
-      if (newCritical.has(itemId)) {
-        newCritical.delete(itemId);
-      } else {
-        newCritical.add(itemId);
-      }
-
-      // Batch update to avoid race conditions
-      setFilters({
-        selectedItems: Array.from(newSelected),
-        criticalItems: newCritical.size > 0 ? Array.from(newCritical) : undefined,
-      });
-    },
-    [criticalItems, selectedItems, setFilters],
+    [selectedItems, quantities, prices, icmses, ipis, defaultQuantity, defaultPrice, defaultIcms, defaultIpi, preserveQuantitiesOnDeselect, setFilters],
   );
 
   // Helper to clear all selections
   const clearAllSelections = useCallback(() => {
     const resetData: any = {
       selectedItems: undefined,
-      criticalItems: undefined,
     };
 
     if (!preserveQuantitiesOnDeselect) {
       resetData.quantities = undefined;
       resetData.prices = undefined;
-      resetData.taxes = undefined;
+      resetData.icmses = undefined;
+      resetData.ipis = undefined;
     }
 
     setFilters(resetData);
   }, [preserveQuantitiesOnDeselect, setFilters]);
+
+  // Helper to batch update selection (for select all / deselect all)
+  const batchUpdateSelection = useCallback(
+    (newSelected: Set<string>, newQuantities: Record<string, number>, newPrices: Record<string, number>, newIcmses: Record<string, number>, newIpis: Record<string, number>) => {
+      setFilters({
+        selectedItems: newSelected.size > 0 ? Array.from(newSelected) : undefined,
+        quantities: Object.keys(newQuantities).length > 0 ? newQuantities : undefined,
+        prices: Object.keys(newPrices).length > 0 ? newPrices : undefined,
+        icmses: Object.keys(newIcmses).length > 0 ? newIcmses : undefined,
+        ipis: Object.keys(newIpis).length > 0 ? newIpis : undefined,
+      });
+    },
+    [setFilters]
+  );
 
   // Helper to set quantity for an item
   const setItemQuantity = useCallback(
@@ -674,17 +673,19 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
 
       // Include current prices and taxes to avoid losing them in race conditions
       const currentPrices = { ...prices };
-      const currentTaxes = { ...taxes };
+      const currentIcmses = { ...icmses };
+      const currentIpis = { ...ipis };
 
       // Batch update to avoid race conditions - include all related state
       setFilters({
         selectedItems: Array.from(newSelected),
         quantities: Object.keys(newQuantities).length > 0 ? newQuantities : undefined,
         prices: Object.keys(currentPrices).length > 0 ? currentPrices : undefined,
-        taxes: Object.keys(currentTaxes).length > 0 ? currentTaxes : undefined,
+        icmses: Object.keys(currentIcmses).length > 0 ? currentIcmses : undefined,
+        ipis: Object.keys(currentIpis).length > 0 ? currentIpis : undefined,
       });
     },
-    [quantities, selectedItems, prices, taxes, setFilters],
+    [quantities, selectedItems, prices, icmses, ipis, setFilters],
   );
 
   // Helper to set price for an item
@@ -702,45 +703,79 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
 
       // Include current quantities and taxes to avoid losing them in race conditions
       const currentQuantities = { ...quantities };
-      const currentTaxes = { ...taxes };
+      const currentIcmses = { ...icmses };
+      const currentIpis = { ...ipis };
 
       // Batch update to avoid race conditions - include all related state
       setFilters({
         selectedItems: Array.from(newSelected),
         quantities: Object.keys(currentQuantities).length > 0 ? currentQuantities : undefined,
         prices: Object.keys(newPrices).length > 0 ? newPrices : undefined,
-        taxes: Object.keys(currentTaxes).length > 0 ? currentTaxes : undefined,
+        icmses: Object.keys(currentIcmses).length > 0 ? currentIcmses : undefined,
+        ipis: Object.keys(currentIpis).length > 0 ? currentIpis : undefined,
       });
     },
-    [prices, selectedItems, quantities, taxes, setFilters],
+    [prices, selectedItems, quantities, icmses, ipis, setFilters],
   );
 
-  // Helper to set tax for an item
-  const setItemTax = useCallback(
-    (itemId: string, tax: number) => {
-      if (tax < 0 || tax > 100) {
+  // Helper to set ICMS for an item
+  const setItemIcms = useCallback(
+    (itemId: string, icms: number) => {
+      if (icms < 0 || icms > 100) {
         return;
       }
 
-      // Ensure the item is selected and update tax atomically
+      // Ensure the item is selected and update ICMS atomically
       const newSelected = new Set(selectedItems);
       newSelected.add(itemId); // Ensure item is selected
 
-      const newTaxes = { ...taxes, [itemId]: tax };
+      const newIcmses = { ...icmses, [itemId]: icms };
 
-      // Include current quantities and prices to avoid losing them in race conditions
+      // Include current quantities, prices, and IPI to avoid losing them in race conditions
       const currentQuantities = { ...quantities };
       const currentPrices = { ...prices };
+      const currentIpis = { ...ipis };
 
       // Batch update to avoid race conditions - include all related state
       setFilters({
         selectedItems: Array.from(newSelected),
         quantities: Object.keys(currentQuantities).length > 0 ? currentQuantities : undefined,
         prices: Object.keys(currentPrices).length > 0 ? currentPrices : undefined,
-        taxes: Object.keys(newTaxes).length > 0 ? newTaxes : undefined,
+        icmses: Object.keys(newIcmses).length > 0 ? newIcmses : undefined,
+        ipis: Object.keys(currentIpis).length > 0 ? currentIpis : undefined,
       });
     },
-    [taxes, selectedItems, quantities, prices, setFilters],
+    [icmses, selectedItems, quantities, prices, ipis, setFilters],
+  );
+
+  // Helper to set IPI for an item
+  const setItemIpi = useCallback(
+    (itemId: string, ipi: number) => {
+      if (ipi < 0 || ipi > 100) {
+        return;
+      }
+
+      // Ensure the item is selected and update IPI atomically
+      const newSelected = new Set(selectedItems);
+      newSelected.add(itemId); // Ensure item is selected
+
+      const newIpis = { ...ipis, [itemId]: ipi };
+
+      // Include current quantities, prices, and ICMS to avoid losing them in race conditions
+      const currentQuantities = { ...quantities };
+      const currentPrices = { ...prices };
+      const currentIcmses = { ...icmses };
+
+      // Batch update to avoid race conditions - include all related state
+      setFilters({
+        selectedItems: Array.from(newSelected),
+        quantities: Object.keys(currentQuantities).length > 0 ? currentQuantities : undefined,
+        prices: Object.keys(currentPrices).length > 0 ? currentPrices : undefined,
+        icmses: Object.keys(currentIcmses).length > 0 ? currentIcmses : undefined,
+        ipis: Object.keys(newIpis).length > 0 ? newIpis : undefined,
+      });
+    },
+    [ipis, selectedItems, quantities, prices, icmses, setFilters],
   );
 
   // Get selected items with data
@@ -749,10 +784,10 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
       id,
       quantity: quantities[id] || defaultQuantity,
       price: prices[id] || defaultPrice,
-      tax: taxes[id] || defaultTax,
-      isCritical: criticalItems.has(id),
+      icms: icmses[id] || defaultIcms,
+      ipi: ipis[id] || defaultIpi,
     }));
-  }, [selectedItems, quantities, prices, taxes, criticalItems, defaultQuantity, defaultPrice, defaultTax]);
+  }, [selectedItems, quantities, prices, icmses, ipis, defaultQuantity, defaultPrice, defaultIcms, defaultIpi]);
 
   // Form data helpers
   const getFormData = useCallback(() => {
@@ -765,8 +800,8 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
         itemId: item.id,
         orderedQuantity: item.quantity,
         price: item.price,
-        tax: item.tax,
-        isCritical: item.isCritical,
+        icms: item.icms,
+        ipi: item.ipi,
       })),
     };
   }, [description, supplierId, forecast, notes, getSelectedItemsWithData]);
@@ -776,8 +811,8 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
       selectedItems: undefined,
       quantities: undefined,
       prices: undefined,
-      taxes: undefined,
-      criticalItems: undefined,
+      icmses: undefined,
+      ipis: undefined,
       description: undefined,
       supplierId: undefined,
       forecast: undefined,
@@ -813,7 +848,8 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
       temporaryItemDescription: string;
       orderedQuantity: number;
       price: number;
-      tax?: number;
+      icms?: number;
+      ipi?: number;
     }) => {
       const newTemporaryItems = [
         ...temporaryItems,
@@ -821,7 +857,8 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
           temporaryItemDescription: item.temporaryItemDescription,
           orderedQuantity: item.orderedQuantity,
           price: item.price,
-          tax: item.tax ?? 0,
+          icms: item.icms ?? 0,
+          ipi: item.ipi ?? 0,
         },
       ];
       setFilters({ temporaryItems: newTemporaryItems });
@@ -837,7 +874,8 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
         temporaryItemDescription: string;
         orderedQuantity: number;
         price: number;
-        tax: number;
+        icms: number;
+        ipi: number;
       }>
     ) => {
       const newTemporaryItems = [...temporaryItems];
@@ -872,7 +910,8 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
       temporaryItemDescription: string;
       orderedQuantity: number;
       price: number;
-      tax: number;
+      icms: number;
+      ipi: number;
     }>) => {
       setFilters({ temporaryItems: items });
     },
@@ -884,8 +923,8 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     selectedItems,
     quantities,
     prices,
-    taxes,
-    criticalItems,
+    icmses,
+    ipis,
     orderItemMode,
     temporaryItems,
     description,
@@ -935,11 +974,12 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
 
     // Item Management Helper Functions
     toggleItemSelection,
-    toggleCriticalItem,
     clearAllSelections,
+    batchUpdateSelection,
     setItemQuantity,
     setItemPrice,
-    setItemTax,
+    setItemIcms,
+    setItemIpi,
     getSelectedItemsWithData,
 
     // Order Item Mode Management

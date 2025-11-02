@@ -104,7 +104,7 @@ export const AirbrushingCreate = () => {
   }
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}>
       <div className="h-full flex flex-col">
         <div className="flex-shrink-0">
           <PageHeaderWithFavorite

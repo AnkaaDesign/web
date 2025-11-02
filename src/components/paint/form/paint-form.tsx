@@ -6,7 +6,7 @@ import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormSteps, type FormStep } from "@/components/ui/form-steps";
 import { paintCreateSchema, paintUpdateSchema, type PaintCreateFormData, type PaintUpdateFormData } from "../../../schemas";
-import type { PaintFormula } from "../../../types";
+import type { PaintFormula, Paint } from "../../../types";
 import { useAvailableComponents, usePaintType } from "../../../hooks";
 import { serializeFormToUrlParams, deserializeUrlParamsToForm, debounce } from "@/utils/url-form-state";
 
@@ -45,6 +45,7 @@ interface UpdateFormProps extends BaseFormProps {
   defaultValues?: Partial<PaintUpdateFormData>;
   existingFormulas?: PaintFormula[];
   paintId: string;
+  initialGrounds?: Paint[];
 }
 
 type PaintFormProps = CreateFormProps | UpdateFormProps;
@@ -433,7 +434,11 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
                   <CardDescription>Selecione os fundos necessários para esta tinta</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <GroundSelector control={form.control} required />
+                  <GroundSelector
+                    control={form.control}
+                    required
+                    initialPaints={props.mode === "update" ? props.initialGrounds : undefined}
+                  />
                 </CardContent>
               </Card>
             </div>

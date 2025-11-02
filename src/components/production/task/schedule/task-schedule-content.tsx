@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useSectors, useTasks } from "../../../../hooks";
+import { useSectors, useTasks, useCurrentUser } from "../../../../hooks";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
@@ -14,12 +14,19 @@ import { IconSearch, IconFilter } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { hasPrivilege } from "@/utils";
 
 interface TaskScheduleContentProps {
   className?: string;
 }
 
 export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
+  // Get current user to check permissions
+  const { data: currentUser } = useCurrentUser();
+
+  // Check if user can export (Admin or Financial only)
+  const canExport = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL));
+
   // Default visible columns
   const defaultVisibleColumns = useMemo(
     () => new Set(["name", "customer.fantasyName", "generalPainting", "serialNumberOrPlate", "entryDate", "term", "remainingTime"]),
@@ -182,7 +189,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
               Filtros{hasActiveFilters ? ` (${activeFiltersCount})` : ""}
             </Button>
             <ColumnVisibilityManager visibleColumns={visibleColumns} onColumnVisibilityChange={setVisibleColumns} />
-            <TaskScheduleExport tasks={filteredTasks} visibleColumns={visibleColumns} />
+            {canExport && <TaskScheduleExport tasks={filteredTasks} visibleColumns={visibleColumns} />}
           </div>
         </div>
 

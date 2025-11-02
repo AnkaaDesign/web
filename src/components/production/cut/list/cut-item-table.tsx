@@ -5,6 +5,8 @@ import { IconFileOff } from "@tabler/icons-react";
 import type { Cut } from "../../../../types";
 import type { CutGetManyFormData } from "../../../../schemas";
 import { useCuts, useCutMutations } from "../../../../hooks";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditCuts } from "@/utils/permissions/entity-permissions";
 import { CUT_STATUS_LABELS, CUT_REQUEST_REASON_LABELS, CUT_ORIGIN_LABELS, CUT_TYPE_LABELS } from "../../../../constants";
 import { CUT_STATUS, CUT_REQUEST_REASON, CUT_ORIGIN, routes } from "../../../../constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -41,6 +43,8 @@ interface CutItemTableProps {
 
 export function CutItemTable({ filters = {}, className, onDataChange }: CutItemTableProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const canEdit = canEditCuts(user); // WAREHOUSE, DESIGNER, ADMIN can edit cuts
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [selectedCutItem, setSelectedCutItem] = useState<Cut | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; items: Cut[] }>({
@@ -99,6 +103,10 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
+    defaultSort: [
+      { column: "status", direction: "asc" },
+      { column: "createdAt", direction: "desc" },
+    ],
   });
 
   // Include configuration for API calls
@@ -386,18 +394,20 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-              {/* Selection column */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={partiallySelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all items"
-                    disabled={isLoading || items.length === 0}
-                  />
-                </div>
-              </TableHead>
+              {/* Selection column - only show for users who can edit cuts (WAREHOUSE, DESIGNER, ADMIN) */}
+              {canEdit && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={partiallySelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all items"
+                      disabled={isLoading || items.length === 0}
+                    />
+                  </div>
+                </TableHead>
+              )}
 
               {/* File preview column */}
               <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-20">
@@ -516,7 +526,7 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
                   <TableRow
                     key={item.id}
                     data-state={itemIsSelected ? "selected" : undefined}
-                    onContextMenu={(e) => handleContextMenu(e, item)}
+                    onContextMenu={canEdit ? (e) => handleContextMenu(e, item) : undefined}
                     onClick={() => navigate(routes.production.cutting.details(item.id))}
                     className={cn(
                       "cursor-pointer transition-colors border-b border-border",
@@ -528,12 +538,14 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
                       itemIsSelected && "bg-muted/30 hover:bg-muted/40",
                     )}
                   >
-                    {/* Selection checkbox */}
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select ${item.id}`} data-checkbox />
-                      </div>
-                    </TableCell>
+                    {/* Selection checkbox - only show for users who can edit cuts */}
+                    {canEdit && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select ${item.id}`} data-checkbox />
+                        </div>
+                      </TableCell>
+                    )}
 
                     {/* File preview column */}
                     <TableCell className="w-20 p-0 !border-r-0">

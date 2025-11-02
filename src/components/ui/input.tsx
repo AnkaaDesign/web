@@ -73,6 +73,10 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   withIcon?: boolean;
   transparent?: boolean;
   maxLength?: number; // Handle maxLength in JavaScript to avoid Unicode issues
+  // Min/Max for number/decimal/natural/integer types
+  min?: number;
+  max?: number;
+  step?: number;
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
@@ -95,6 +99,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       transparent = false,
       disabled,
       placeholder,
+      min,
+      max,
+      step,
       ...props
     },
     ref,
@@ -169,7 +176,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           case "number": {
             const decVal = typeof val === "number" ? val : parseFloat(strValue.replace(/[^\d,.-]/g, "").replace(",", "."));
             if (isNaN(decVal)) return "";
-            return formatNumberWithDecimals(decVal, inputType === "decimal" ? decimals : 0);
+            // For decimal type, keep natural format - don't force decimal places
+            // This allows "1" to stay as "1" instead of "1,00"
+            if (inputType === "decimal") {
+              return decVal.toString().replace(".", ",");
+            }
+            return formatNumberWithDecimals(decVal, 0);
           }
           case "integer":
           case "natural": {
@@ -645,6 +657,95 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           e.preventDefault();
         }
       }
+
+      // Special handling for decimal and number inputs
+      if (type === "decimal" || type === "number") {
+        // Allow control keys
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+        // Allow navigation and selection keys
+        const allowedKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "Tab", "Enter", "Escape", "Backspace", "Delete"];
+        if (allowedKeys.includes(e.key)) return;
+
+        // Allow minus for negative numbers (only at the start)
+        if (e.key === "-") {
+          const input = e.currentTarget;
+          const selectionStart = input.selectionStart || 0;
+          // Only allow minus at the beginning
+          if (selectionStart !== 0 || input.value.includes("-")) {
+            e.preventDefault();
+          }
+          return;
+        }
+
+        // Allow decimal separator (comma or period)
+        if (e.key === "," || e.key === ".") {
+          const input = e.currentTarget;
+          // Only allow one decimal separator
+          if (input.value.includes(",") || input.value.includes(".")) {
+            e.preventDefault();
+          }
+          return;
+        }
+
+        // Only allow numbers
+        if (!/^\d$/.test(e.key)) {
+          e.preventDefault();
+        }
+      }
+
+      // Special handling for natural numbers (no negative, no decimal)
+      if (type === "natural") {
+        // Allow control keys
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+        // Allow navigation and selection keys
+        const allowedKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "Tab", "Enter", "Escape", "Backspace", "Delete"];
+        if (allowedKeys.includes(e.key)) return;
+
+        // Block decimal separators and minus
+        if (e.key === "," || e.key === "." || e.key === "-") {
+          e.preventDefault();
+          return;
+        }
+
+        // Only allow numbers
+        if (!/^\d$/.test(e.key)) {
+          e.preventDefault();
+        }
+      }
+
+      // Special handling for integer (allow negative but no decimal)
+      if (type === "integer") {
+        // Allow control keys
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+        // Allow navigation and selection keys
+        const allowedKeys = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "Tab", "Enter", "Escape", "Backspace", "Delete"];
+        if (allowedKeys.includes(e.key)) return;
+
+        // Allow minus for negative numbers (only at the start)
+        if (e.key === "-") {
+          const input = e.currentTarget;
+          const selectionStart = input.selectionStart || 0;
+          // Only allow minus at the beginning
+          if (selectionStart !== 0 || input.value.includes("-")) {
+            e.preventDefault();
+          }
+          return;
+        }
+
+        // Block decimal separators
+        if (e.key === "," || e.key === ".") {
+          e.preventDefault();
+          return;
+        }
+
+        // Only allow numbers
+        if (!/^\d$/.test(e.key)) {
+          e.preventDefault();
+        }
+      }
     };
 
     const handleCompositionStart = () => {
@@ -899,7 +1000,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       if (type === "decimal" || type === "number") {
         const cleanedForNumber = rawValue.replace(/[^\d.,-]/g, "");
 
-        if (!cleanedForNumber) {
+        if (!cleanedForNumber || cleanedForNumber === "," || cleanedForNumber === ".") {
           setInternalValue("");
           setDisplayValue("");
           setCursorPosition(0);
@@ -907,36 +1008,53 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           return;
         }
 
-        // Replace comma with dot for parsing
-        const normalized = cleanedForNumber.replace(",", ".");
+        // Convert . to , for Brazilian format display
+        let displayValue = cleanedForNumber.replace(/\./g, ",");
 
-        // Ensure only one decimal point
-        const parts = normalized.split(".");
-        const validNumber = parts.length > 2 ? parts[0] + "." + parts.slice(1).join("") : normalized;
+        // Only allow one decimal separator
+        const commaCount = (displayValue.match(/,/g) || []).length;
+        if (commaCount > 1) {
+          // Keep only the first comma
+          const firstCommaIndex = displayValue.indexOf(",");
+          displayValue = displayValue.slice(0, firstCommaIndex + 1) + displayValue.slice(firstCommaIndex + 1).replace(/,/g, "");
+        }
 
-        const numValue = parseFloat(validNumber);
+        // For parsing, convert comma to dot
+        const normalized = displayValue.replace(",", ".");
+
+        const numValue = parseFloat(normalized);
 
         if (isNaN(numValue)) {
-          setInternalValue("");
-          setDisplayValue("");
-          setCursorPosition(0);
-          onChange?.(null);
+          // Allow partial input like "15," or "15-"
+          setInternalValue(displayValue);
+          if (!naturalTyping) {
+            setDisplayValue(displayValue);
+          }
+          setCursorPosition(isTypingAtEnd ? displayValue.length : calculateSimpleCursorPosition(rawValue, displayValue, oldCursorPos));
           return;
         }
 
-        const formattedValue = type === "decimal"
-          ? formatNumberWithDecimals(numValue, decimals)
-          : String(Math.round(numValue));
-
-        setInternalValue(formattedValue);
-        if (!naturalTyping) {
-          setDisplayValue(formattedValue);
+        // Apply min/max constraints if provided
+        // Note: We constrain the value passed to onChange, but keep the displayValue as typed by the user
+        // The displayValue will be corrected on blur to match NaturalFloatInput behavior
+        let constrainedValue = numValue;
+        if (min !== undefined && constrainedValue < min) {
+          constrainedValue = min;
+        }
+        if (max !== undefined && constrainedValue > max) {
+          constrainedValue = max;
         }
 
-        const newPos = calculateSimpleCursorPosition(rawValue, formattedValue, oldCursorPos);
+        // Keep user's input format - don't force decimal places on integers
+        setInternalValue(displayValue);
+        if (!naturalTyping) {
+          setDisplayValue(displayValue);
+        }
+
+        const newPos = isTypingAtEnd ? displayValue.length : calculateSimpleCursorPosition(rawValue, displayValue, oldCursorPos);
         setCursorPosition(newPos);
 
-        onChange?.(numValue);
+        onChange?.(constrainedValue);
         return;
       }
 
@@ -1163,6 +1281,87 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         }
       }
 
+      // Enforce min value on blur for decimal/number inputs
+      if ((type === "decimal" || type === "number") && min !== undefined) {
+        const normalized = internalValue.replace(",", ".");
+        const numValue = parseFloat(normalized);
+
+        if (isNaN(numValue) || internalValue === "" || internalValue === ",") {
+          // Reset to minimum value if invalid - keep natural format
+          const minDisplay = min.toString().replace(".", ",");
+          setInternalValue(minDisplay);
+          setDisplayValue(minDisplay);
+          onChange?.(min);
+        } else if (numValue < min) {
+          // Enforce minimum - keep natural format
+          const minDisplay = min.toString().replace(".", ",");
+          setInternalValue(minDisplay);
+          setDisplayValue(minDisplay);
+          onChange?.(min);
+        } else if (max !== undefined && numValue > max) {
+          // Enforce maximum - keep natural format
+          const maxDisplay = max.toString().replace(".", ",");
+          setInternalValue(maxDisplay);
+          setDisplayValue(maxDisplay);
+          onChange?.(max);
+        } else {
+          // Value is valid - keep it as typed by user (natural format)
+          // Don't force decimal places
+          setInternalValue(internalValue);
+          setDisplayValue(internalValue);
+        }
+      }
+
+      // Enforce min value on blur for natural numbers
+      if (type === "natural" && min !== undefined) {
+        const numValue = parseInt(internalValue.replace(/\D/g, ""), 10);
+
+        if (isNaN(numValue) || internalValue === "") {
+          // Reset to minimum value if invalid
+          const minDisplay = min.toString();
+          setInternalValue(minDisplay);
+          setDisplayValue(minDisplay);
+          onChange?.(min);
+        } else if (numValue < min) {
+          // Enforce minimum
+          const minDisplay = min.toString();
+          setInternalValue(minDisplay);
+          setDisplayValue(minDisplay);
+          onChange?.(min);
+        } else if (max !== undefined && numValue > max) {
+          // Enforce maximum
+          const maxDisplay = max.toString();
+          setInternalValue(maxDisplay);
+          setDisplayValue(maxDisplay);
+          onChange?.(max);
+        }
+      }
+
+      // Enforce min value on blur for integers
+      if (type === "integer" && min !== undefined) {
+        const numValue = parseInt(internalValue.replace(/[^\d-]/g, ""), 10);
+
+        if (isNaN(numValue) || internalValue === "") {
+          // Reset to minimum value if invalid
+          const minDisplay = min.toString();
+          setInternalValue(minDisplay);
+          setDisplayValue(minDisplay);
+          onChange?.(min);
+        } else if (numValue < min) {
+          // Enforce minimum
+          const minDisplay = min.toString();
+          setInternalValue(minDisplay);
+          setDisplayValue(minDisplay);
+          onChange?.(min);
+        } else if (max !== undefined && numValue > max) {
+          // Enforce maximum
+          const maxDisplay = max.toString();
+          setInternalValue(maxDisplay);
+          setDisplayValue(maxDisplay);
+          onChange?.(max);
+        }
+      }
+
       // Enforce maxLength on blur for text inputs
       if ((type === "text" || type === "email" || type === "password") && props.maxLength) {
         const input = e.target;
@@ -1318,7 +1517,6 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             "flex h-10 w-full rounded-md border border-border px-2 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 ease-in-out",
             transparent ? "bg-transparent" : "bg-input",
             withIcon && "pr-10",
-            type === "currency" && "text-right",
             className,
           )}
           value={currentDisplayValue}

@@ -121,7 +121,7 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
             <button type="submit" id="ppe-delivery-form-submit" className="hidden" aria-hidden="true" />
               {/* User, Item and Quantity Selection (only for create mode) */}
               {canEditItemAndUser && (
-                <div className="grid grid-cols-1 md:grid-cols-[2fr,2fr,150px] gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-[1.5fr,2.5fr,150px] gap-4">
                   <FormField
                     control={form.control}
                     name="userId"
@@ -129,7 +129,7 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
                       <FormItem>
                         <FormLabel className="flex items-center gap-2">
                           <IconUser className="h-4 w-4" />
-                          Funcionário *
+                          Funcionário <span className="text-destructive">*</span>
                         </FormLabel>
                         <FormControl>
                           <UserSelectorDropdown
@@ -155,7 +155,7 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
                       <FormItem>
                         <FormLabel className="flex items-center gap-2">
                           <IconPackage className="h-4 w-4" />
-                          EPI *
+                          EPI <span className="text-destructive">*</span>
                         </FormLabel>
                         <FormControl>
                           <ItemSelectorDropdown value={field.value} onChange={field.onChange} placeholder="Selecione o EPI" userId={selectedUserId} />

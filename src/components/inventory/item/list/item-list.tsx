@@ -137,12 +137,21 @@ export function ItemList({ className }: ItemListProps) {
       };
     }
 
-    const taxMin = params.get("taxMin");
-    const taxMax = params.get("taxMax");
-    if (taxMin || taxMax) {
-      filters.taxRange = {
-        ...(taxMin && { min: Number(taxMin) }),
-        ...(taxMax && { max: Number(taxMax) }),
+    const icmsMin = params.get("icmsMin");
+    const icmsMax = params.get("icmsMax");
+    if (icmsMin || icmsMax) {
+      filters.icmsRange = {
+        ...(icmsMin && { min: Number(icmsMin) }),
+        ...(icmsMax && { max: Number(icmsMax) }),
+      };
+    }
+
+    const ipiMin = params.get("ipiMin");
+    const ipiMax = params.get("ipiMax");
+    if (ipiMin || ipiMax) {
+      filters.ipiRange = {
+        ...(ipiMin && { min: Number(ipiMin) }),
+        ...(ipiMax && { max: Number(ipiMax) }),
       };
     }
 
@@ -205,8 +214,10 @@ export function ItemList({ className }: ItemListProps) {
     // Range filters
     if (filters.quantityRange?.min !== undefined) params.quantityMin = String(filters.quantityRange.min);
     if (filters.quantityRange?.max !== undefined) params.quantityMax = String(filters.quantityRange.max);
-    if (filters.taxRange?.min !== undefined) params.taxMin = String(filters.taxRange.min);
-    if (filters.taxRange?.max !== undefined) params.taxMax = String(filters.taxRange.max);
+    if (filters.icmsRange?.min !== undefined) params.icmsMin = String(filters.icmsRange.min);
+    if (filters.icmsRange?.max !== undefined) params.icmsMax = String(filters.icmsRange.max);
+    if (filters.ipiRange?.min !== undefined) params.ipiMin = String(filters.ipiRange.min);
+    if (filters.ipiRange?.max !== undefined) params.ipiMax = String(filters.ipiRange.max);
     if (filters.monthlyConsumptionRange?.min !== undefined) params.monthlyConsumptionMin = String(filters.monthlyConsumptionRange.min);
     if (filters.monthlyConsumptionRange?.max !== undefined) params.monthlyConsumptionMax = String(filters.monthlyConsumptionRange.max);
 

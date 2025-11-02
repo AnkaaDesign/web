@@ -3,11 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { OrderStatusBadge } from "../common/order-status-badge";
 import { OrderTotalBadge } from "../common/order-total-calculator";
-import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFile, IconFileInvoice, IconReceipt } from "@tabler/icons-react";
+import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFile, IconFileInvoice, IconReceipt, IconFileText, IconId } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { formatDate, formatDateTime } from "../../../../utils";
+import { formatDate, formatDateTime, formatCNPJ } from "../../../../utils";
 import type { Order } from "../../../../types";
 import { FilePreviewCard } from "@/components/file";
+import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 interface OrderInfoCardProps {
   order: Order;
@@ -15,6 +16,9 @@ interface OrderInfoCardProps {
 }
 
 export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
+  // Check if order has temporary items
+  const hasTemporaryItems = order.items?.some((item) => item.temporaryItemDescription);
+
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6">
@@ -25,7 +29,14 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
             </div>
             Informações do Pedido
           </CardTitle>
-          <OrderStatusBadge status={order.status} />
+          <div className="flex items-center gap-2">
+            <OrderStatusBadge status={order.status} />
+            {hasTemporaryItems && (
+              <Badge variant="outline" className="text-xs">
+                Temporário
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
 
@@ -36,17 +47,30 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
           <div className="space-y-4">
             {order.supplier ? (
               <>
+                {/* Logo and Fantasy Name Section */}
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconTruck className="h-4 w-4" />
                     Nome Fantasia
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{order.supplier.fantasyName}</span>
+                  <div className="flex items-center gap-3">
+                    <SupplierLogoDisplay
+                      logo={order.supplier.logo}
+                      supplierName={order.supplier.fantasyName}
+                      size="md"
+                      shape="rounded"
+                    />
+                    <span className="text-sm font-semibold text-foreground">{order.supplier.fantasyName}</span>
+                  </div>
                 </div>
+
                 {order.supplier.cnpj && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                    <span className="text-sm font-medium text-muted-foreground">CNPJ</span>
-                    <span className="text-sm text-foreground">{order.supplier.cnpj}</span>
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconId className="h-4 w-4" />
+                      CNPJ
+                    </span>
+                    <span className="text-sm text-foreground">{formatCNPJ(order.supplier.cnpj)}</span>
                   </div>
                 )}
               </>
@@ -64,7 +88,10 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
 
           <div className="space-y-4">
             <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-              <span className="text-sm font-medium text-muted-foreground">Descrição</span>
+              <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <IconFileText className="h-4 w-4" />
+                Descrição
+              </span>
               <span className="text-sm font-semibold text-foreground">{order.description || "-"}</span>
             </div>
 
@@ -104,7 +131,7 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
 
             <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
               <span className="text-sm font-medium text-muted-foreground">Total de Itens</span>
-              <Badge variant="secondary">{order.items?.length || 0} itens</Badge>
+              <Badge variant="secondary" className="text-sm">{order.items?.length || 0} itens</Badge>
             </div>
 
             {order.orderSchedule && (

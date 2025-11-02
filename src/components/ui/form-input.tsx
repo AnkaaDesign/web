@@ -78,20 +78,26 @@ export function FormInput<T extends Record<string, any>>({
   const handleCepLookup = React.useCallback(
     (data: any) => {
       if (type === "cep" && data && !data.erro) {
-        // Auto-fill address fields
-        if (data.logradouro && addressFieldName) {
+        // Get current form values
+        const currentValues = form.getValues();
+
+        // Helper to check if a field should be filled (only fill if empty)
+        const shouldFillField = (fieldValue: any) => fieldValue === null || fieldValue === undefined || fieldValue === "";
+
+        // Auto-fill address fields only if they're empty
+        if (data.logradouro && addressFieldName && shouldFillField(currentValues[addressFieldName])) {
           form.setValue(addressFieldName, data.logradouro as any, { shouldDirty: true });
         }
-        if (data.logradouroType && logradouroFieldName) {
+        if (data.logradouroType && logradouroFieldName && shouldFillField(currentValues[logradouroFieldName])) {
           form.setValue(logradouroFieldName, data.logradouroType as any, { shouldDirty: true });
         }
-        if (data.bairro && neighborhoodFieldName) {
+        if (data.bairro && neighborhoodFieldName && shouldFillField(currentValues[neighborhoodFieldName])) {
           form.setValue(neighborhoodFieldName, data.bairro as any, { shouldDirty: true });
         }
-        if (data.localidade && cityFieldName) {
+        if (data.localidade && cityFieldName && shouldFillField(currentValues[cityFieldName])) {
           form.setValue(cityFieldName, data.localidade as any, { shouldDirty: true });
         }
-        if (data.uf && stateFieldName) {
+        if (data.uf && stateFieldName && shouldFillField(currentValues[stateFieldName])) {
           form.setValue(stateFieldName, data.uf as any, { shouldDirty: true });
         }
       }

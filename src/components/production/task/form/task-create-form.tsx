@@ -25,8 +25,8 @@ import {
 } from "@tabler/icons-react";
 import type { TaskCreateFormData } from "../../../../schemas";
 import { taskCreateSchema } from "../../../../schemas";
-import { useTaskMutations, useTaskFormUrlState, useLayoutMutations } from "../../../../hooks";
-import { TASK_STATUS, CUT_TYPE, COMMISSION_STATUS, COMMISSION_STATUS_LABELS } from "../../../../constants";
+import { useTaskMutations, useTaskFormUrlState, useLayoutMutations, useCurrentUser } from "../../../../hooks";
+import { TASK_STATUS, CUT_TYPE, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { getCustomerById } from "../../../../api-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +53,10 @@ import { LayoutForm } from "@/components/production/layout/layout-form";
 import { FormMoneyInput } from "@/components/ui/form-money-input";
 
 export const TaskCreateForm = () => {
+  // Get current user to check if they're from financial sector
+  const { data: currentUser } = useCurrentUser();
+  const isFinancialSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>([]);
   const [observationFiles, setObservationFiles] = useState<FileWithPreview[]>([]);
@@ -132,7 +136,7 @@ export const TaskCreateForm = () => {
       services: urlState.services || [],
       cuts: urlState.cuts,
       airbrushings: urlState.airbrushings || [],
-      generalPaintingId: urlState.generalPaintingId,
+      paintId: urlState.generalPaintingId,
       paintIds: urlState.logoPaintIds,
       truck: urlState.truck,
       artworkIds: urlState.artworkIds,
@@ -711,7 +715,7 @@ export const TaskCreateForm = () => {
                                 field.onChange(value);
                                 urlState.updateCommission(value || null);
                               }}
-                              disabled={isSubmitting}
+                              disabled={isSubmitting || isFinancialSector}
                               options={Object.values(COMMISSION_STATUS).map((status) => ({
                                 value: status,
                                 label: COMMISSION_STATUS_LABELS[status],
@@ -827,7 +831,8 @@ export const TaskCreateForm = () => {
                   </CardContent>
                 </Card>
 
-                {/* Layout Section */}
+                {/* Layout Section - Hidden for Financial sector */}
+                {!isFinancialSector && (
                 <Card className="bg-transparent">
                   <CardHeader>
                     <div className="flex items-center justify-between">
@@ -917,6 +922,7 @@ export const TaskCreateForm = () => {
                     ) : null}
                   </CardContent>
                 </Card>
+                )}
 
                 {/* Financial Information Card */}
                 <Card className="bg-transparent">

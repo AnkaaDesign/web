@@ -133,19 +133,16 @@ export function ComponentForm({
     }
   };
 
-  const handleRatioChange = (value: string) => {
-    if (value === "") {
+  const handleRatioChange = (value: number) => {
+    if (!value || value === 0) {
       form.setValue("ratio", 0);
       form.setValue("weightInGrams", 0);
       return;
     }
-    const numValue = Number(value);
-    if (!isNaN(numValue)) {
-      form.setValue("ratio", numValue);
-      // Update estimated weight based on ratio
-      const estimatedWeight = (1000 * totalFormulaDensity * numValue) / 100;
-      form.setValue("weightInGrams", estimatedWeight);
-    }
+    form.setValue("ratio", value);
+    // Update estimated weight based on ratio
+    const estimatedWeight = (1000 * totalFormulaDensity * value) / 100;
+    form.setValue("weightInGrams", estimatedWeight);
   };
 
   const handleSubmit = (data: ComponentFormData) => {
@@ -269,24 +266,20 @@ export function ComponentForm({
                   <FormControl>
                     <div className="flex gap-2">
                       <Input
-                        type="number"
-                        step="0.1"
-                        min="0.1"
-                        max={remainingRatio}
-                        {...field}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          const value = e.target.value;
-                          field.onChange(value === "" ? 0 : Number(value));
+                        type="decimal"
+                        value={field.value}
+                        onChange={(value) => {
+                          field.onChange(value);
                           handleRatioChange(value);
                         }}
-                        placeholder="Ex: 15.5"
+                        placeholder="Ex: 15,5"
                         className="flex-1"
                       />
                       <div className="px-3 py-2 bg-muted rounded-md text-sm">%</div>
                     </div>
                   </FormControl>
                   <FormMessage />
-                  <p className="text-xs text-muted-foreground mt-1">Disponível: {remainingRatio.toFixed(1)}% | A proporção representa o percentual em peso na fórmula final</p>
+                  <p className="text-xs text-muted-foreground mt-1">Disponível: {remainingRatio.toFixed(1).replace(".", ",")}% | A proporção representa o percentual em peso na fórmula final</p>
                 </FormItem>
               )}
             />

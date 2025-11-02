@@ -253,6 +253,9 @@ export default function CatalogEditPage() {
   const paint = response.data;
   const defaultValues = mapPaintToFormData(paint);
 
+  // Extract ground paints for the GroundSelector's initialPaints
+  const initialGrounds = paint.paintGrounds?.map((pg) => pg.groundPaint).filter(Boolean) || [];
+
   return (
     <div className="h-full flex flex-col space-y-4">
       {/* Fixed Header */}
@@ -290,6 +293,7 @@ export default function CatalogEditPage() {
             currentStep={currentStep}
             onStepChange={setCurrentStep}
             onPaintTypeChange={setCurrentPaintTypeId}
+            initialGrounds={initialGrounds}
           />
         </div>
       </div>

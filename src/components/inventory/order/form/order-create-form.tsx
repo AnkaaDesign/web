@@ -6,7 +6,7 @@ import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconBuilding, Ic
 import type { OrderCreateFormData } from "../../../../schemas";
 import { orderCreateSchema } from "../../../../schemas";
 import { useOrderMutations, useItems, useSuppliers } from "../../../../hooks";
-import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
+import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER } from "../../../../constants";
 import { toast } from "sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
 import { FileUploadField, type FileWithPreview } from "@/components/file";
@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { OrderItemSelector } from "./order-item-selector";
 import { TemporaryItemsInput } from "./temporary-items-input";
 import { useOrderFormUrlState } from "@/hooks/use-order-form-url-state";
-import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
+import { formatCurrency, formatDate, formatDateTime, measureUtils } from "../../../../utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
@@ -45,7 +45,8 @@ export const OrderCreateForm = () => {
     selectedItems,
     quantities,
     prices,
-    taxes,
+    icmses,
+    ipis,
     orderItemMode,
     temporaryItems,
     description,
@@ -82,14 +83,18 @@ export const OrderCreateForm = () => {
     setSupplierIds,
     setBatchFilters,
     toggleItemSelection,
+    batchUpdateSelection,
     setItemQuantity,
     setItemPrice,
-    setItemTax,
+    setItemIcms,
+    setItemIpi,
     selectionCount,
     clearAllSelections,
   } = useOrderFormUrlState({
     defaultQuantity: 1,
     defaultPrice: 0,
+    defaultIcms: 0,
+    defaultIpi: 0,
     preserveQuantitiesOnDeselect: false,
     defaultPageSize: 40,
   });
@@ -186,14 +191,15 @@ export const OrderCreateForm = () => {
       itemId,
       orderedQuantity: quantities[itemId] || 1,
       price: prices[itemId] || 0,
-      tax: taxes[itemId] || 0,
+      icms: icmses[itemId] || 0,
+      ipi: ipis[itemId] || 0,
     }));
     const isTouched = form.formState.touchedFields.items;
     form.setValue("items", items, {
       shouldValidate: isTouched,
       shouldDirty: true
     });
-  }, [selectedItems, quantities, prices, taxes, form]);
+  }, [selectedItems, quantities, prices, icmses, ipis, form]);
 
   // Mutations
   const { createAsync, isLoading: isSubmitting } = useOrderMutations();
@@ -226,9 +232,12 @@ export const OrderCreateForm = () => {
   const totalPrice = Array.from(selectedItems).reduce((total: number, itemId: string) => {
     const quantity = Number(quantities[itemId]) || 1;
     const price = Number(prices[itemId]) || 0;
-    const tax = Number(taxes[itemId]) || 0;
+    const icms = Number(icmses[itemId]) || 0;
+    const ipi = Number(ipis[itemId]) || 0;
     const subtotal = quantity * price;
-    const taxAmount = subtotal * (tax / 100);
+    const icmsAmount = subtotal * (icms / 100);
+    const ipiAmount = subtotal * (ipi / 100);
+    const taxAmount = icmsAmount + ipiAmount;
     return total + subtotal + taxAmount;
   }, 0);
 
@@ -396,8 +405,8 @@ export const OrderCreateForm = () => {
 
   // Handle item selection
   const handleSelectItem = useCallback(
-    (itemId: string, quantity?: number, price?: number, tax?: number) => {
-      toggleItemSelection(itemId, quantity, price, tax);
+    (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => {
+      toggleItemSelection(itemId, quantity, price, icms, ipi);
     },
     [toggleItemSelection],
   );
@@ -418,12 +427,20 @@ export const OrderCreateForm = () => {
     [setItemPrice],
   );
 
-  const handleTaxChange = useCallback(
-    (itemId: string, tax: number) => {
-      const validTax = Math.max(0, Math.min(100, tax));
-      setItemTax(itemId, validTax);
+  const handleIcmsChange = useCallback(
+    (itemId: string, icms: number) => {
+      const validIcms = Math.max(0, Math.min(100, icms));
+      setItemIcms(itemId, validIcms);
     },
-    [setItemTax],
+    [setItemIcms],
+  );
+
+  const handleIpiChange = useCallback(
+    (itemId: string, ipi: number) => {
+      const validIpi = Math.max(0, Math.min(100, ipi));
+      setItemIpi(itemId, validIpi);
+    },
+    [setItemIpi],
   );
 
   // Handle form submission
@@ -438,7 +455,8 @@ export const OrderCreateForm = () => {
           itemId: String(itemId),
           orderedQuantity: Number(quantities[itemId]) || 1,
           price: Number(prices[itemId]) || 0,
-          tax: Number(taxes[itemId]) || 0,
+          icms: Number(icmses[itemId]) || 0,
+          ipi: Number(ipis[itemId]) || 0,
         }));
       } else {
         // Temporary items
@@ -447,7 +465,8 @@ export const OrderCreateForm = () => {
           temporaryItemDescription: item.temporaryItemDescription,
           orderedQuantity: Number(item.orderedQuantity) || 1,
           price: Number(item.price) || 0,
-          tax: Number(item.tax) || 0,
+          icms: Number(item.icms) || 0,
+          ipi: Number(item.ipi) || 0,
         }));
       }
 
@@ -550,7 +569,7 @@ export const OrderCreateForm = () => {
       console.error("Submission error:", error);
       // Error is handled by the mutation hook, but let's log it
     }
-  }, [validateCurrentStep, description, supplierId, forecast, notes, selectedItems, quantities, prices, taxes, orderItemMode, budgetFiles, receiptFiles, nfeFiles, suppliers, createAsync, form, clearAllSelections, navigate]);
+  }, [validateCurrentStep, description, supplierId, forecast, notes, selectedItems, quantities, prices, icmses, ipis, orderItemMode, budgetFiles, receiptFiles, nfeFiles, suppliers, createAsync, form, clearAllSelections, navigate]);
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.orders.root);
@@ -634,26 +653,57 @@ export const OrderCreateForm = () => {
       }
 
       const selectedSupplier = suppliers.find((s) => s.id === form.watch("supplierId"));
+      const orderDescription = form.watch("description") || "Pedido de Compra";
+
+      // Helper function to format measures like MeasureDisplayCompact
+      const formatMeasuresCompact = (measures: any[]) => {
+        if (!measures || measures.length === 0) return "-";
+
+        // Sort measures by type order
+        const sortedMeasures = [...measures].sort((a, b) => {
+          const orderA = MEASURE_TYPE_ORDER[a.measureType] ?? 999;
+          const orderB = MEASURE_TYPE_ORDER[b.measureType] ?? 999;
+          return orderA - orderB;
+        });
+
+        // Format all measures
+        const measureStrings: string[] = [];
+        sortedMeasures.forEach((measure) => {
+          if (measure.value !== null && measure.unit !== null) {
+            measureStrings.push(measureUtils.formatMeasure({ value: measure.value, unit: measure.unit }));
+          } else if (measure.unit !== null) {
+            measureStrings.push(MEASURE_UNIT_LABELS[measure.unit] || measure.unit);
+          } else if (measure.value !== null) {
+            measureStrings.push(measure.value.toString());
+          }
+        });
+
+        // Show first 2 measures, then "+N" for additional
+        if (measureStrings.length > 2) {
+          return measureStrings.slice(0, 2).join(" - ") + " +" + (measureStrings.length - 2);
+        }
+        return measureStrings.join(" - ");
+      };
 
       const pdfContent = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Pedido de Compra - ${formatDate(new Date())}</title>
+        <title>${orderDescription} - ${formatDate(new Date())}</title>
         <style>
           @page {
             size: A4;
             margin: 12mm;
           }
-          
-          * { 
-            box-sizing: border-box; 
+
+          * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
           }
-          
-          html, body { 
+
+          html, body {
             height: 100vh;
             width: 100vw;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -661,173 +711,104 @@ export const OrderCreateForm = () => {
             font-size: 12px;
             line-height: 1.3;
           }
-          
+
           body {
             display: grid;
             grid-template-rows: auto 1fr auto;
             min-height: 100vh;
             padding: 0;
           }
-          
+
           .header {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
+            margin-top: 20px;
             margin-bottom: 20px;
             padding-bottom: 15px;
             border-bottom: 2px solid #e5e7eb;
-            flex-shrink: 0;
           }
-          
+
           .logo {
             width: 100px;
             height: auto;
-            margin-right: 20px;
+            margin-right: 15px;
           }
-          
+
           .header-info {
             flex: 1;
           }
-          
+
           .title {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 700;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             color: #1f2937;
           }
-          
-          .subtitle {
-            font-size: 14px;
+
+          .info {
             color: #6b7280;
-            margin-bottom: 5px;
+            font-size: 12px;
           }
-          
-          .info-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-            padding: 15px;
-            background: #f9fafb;
-            border-radius: 8px;
+
+          .info p {
+            margin: 2px 0;
           }
-          
-          .info-item {
-            display: flex;
-            flex-direction: column;
-          }
-          
-          .info-label {
-            font-size: 11px;
-            font-weight: 600;
-            color: #6b7280;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 2px;
-          }
-          
-          .info-value {
-            font-size: 14px;
-            color: #1f2937;
-          }
-          
+
           .content-wrapper {
             flex: 1;
             overflow: auto;
             min-height: 0;
             padding-bottom: 40px;
           }
-          
+
           table {
             width: 100%;
             border-collapse: collapse;
             border: 1px solid #e5e7eb;
             font-size: 12px;
-            table-layout: fixed;
-            word-wrap: break-word;
           }
-          
+
           th {
             background-color: #f9fafb;
             font-weight: 600;
             color: #374151;
-            padding: 10px 12px;
+            padding: 10px 6px;
             border-bottom: 2px solid #e5e7eb;
             border-right: 1px solid #e5e7eb;
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.03em;
             text-align: left;
           }
-          
-          th:last-child {
-            border-right: none;
-          }
-          
+
           td {
-            padding: 8px 12px;
+            padding: 8px 6px;
             border-bottom: 1px solid #f3f4f6;
             border-right: 1px solid #f3f4f6;
             vertical-align: top;
           }
-          
-          td:last-child {
-            border-right: none;
-          }
-          
+
           tbody tr:nth-child(even) {
             background-color: #fafafa;
           }
-          
-          tbody tr:hover {
-            background-color: #f3f4f6;
-          }
-          
-          .text-right {
-            text-align: right;
-          }
-          
-          .text-center {
-            text-align: center;
-          }
-          
+
+          .text-left { text-align: left; }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+
           .font-mono {
             font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
             font-size: 11px;
           }
-          
+
           .font-medium {
             font-weight: 500;
           }
-          
+
           .font-semibold {
             font-weight: 600;
           }
-          
-          .text-muted {
-            color: #6b7280;
-          }
-          
-          .total-row {
-            font-weight: 600;
-            background-color: #f3f4f6 !important;
-            border-top: 2px solid #e5e7eb;
-          }
-          
-          .footer {
-            display: flex;
-            justify-content: flex-end;
-            align-items: center;
-            padding-top: 15px;
-            border-top: 1px solid #e5e7eb;
-            color: #6b7280;
-            font-size: 10px;
-            flex-shrink: 0;
-            background: white;
-          }
-          
-          .footer-right {
-            text-align: right;
-          }
-          
+
           .notes-section {
             margin-top: 20px;
             padding: 15px;
@@ -835,232 +816,94 @@ export const OrderCreateForm = () => {
             border-radius: 8px;
             border: 1px solid #e5e7eb;
           }
-          
+
           .notes-title {
             font-weight: 600;
             margin-bottom: 5px;
             color: #374151;
           }
-          
-          /* Column widths */
-          th:nth-child(1), td:nth-child(1) { width: 90px; } /* UniCode */
-          th:nth-child(2), td:nth-child(2) { width: 180px; } /* Nome */
-          th:nth-child(3), td:nth-child(3) { width: 100px; } /* Marca */
-          th:nth-child(4), td:nth-child(4) { width: 80px; } /* Medida */
-          th:nth-child(5), td:nth-child(5) { width: 90px; text-align: right; } /* Quantidade */
-          th:nth-child(6), td:nth-child(6) { width: 90px; text-align: right; } /* Preço Unit. */
-          th:nth-child(7), td:nth-child(7) { width: 90px; text-align: right; } /* Total */
-          
+
+          .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 10px;
+            background: white;
+          }
+
           /* Print optimizations */
           @media print {
-            html, body {
-              width: 100%;
-              height: 100%;
-              overflow: visible;
-            }
-            
-            body {
-              display: block;
-              min-height: 100vh;
-              position: relative;
-              padding-bottom: 50px;
-            }
-            
-            .header { 
-              margin-bottom: 15px; 
-              padding-bottom: 10px;
-            }
-            
-            .logo { 
-              width: 80px; 
-            }
-            
-            table { 
-              font-size: 10px;
-              page-break-inside: auto;
-            }
-            
-            th { 
-              padding: 6px 8px;
-              font-size: 10px;
-            }
-            
-            td { 
-              padding: 5px 8px;
-            }
-            
-            tr {
-              page-break-inside: avoid;
-              page-break-after: auto;
-            }
-            
-            thead {
-              display: table-header-group;
-            }
-            
             .footer {
               position: fixed;
               bottom: 15px;
               left: 12mm;
               right: 12mm;
-              background: white;
-              font-size: 8px;
-            }
-            
-            .content-wrapper {
-              padding-bottom: 60px;
             }
           }
         </style>
       </head>
       <body>
         <div class="header">
-          <img src="/logo.png" alt="Ankaa Logo" class="logo" />
+          <img src="/logo.png" alt="Logo" class="logo" />
           <div class="header-info">
-            <h1 class="title">Pedido de Compra</h1>
-            <p class="subtitle">Documento de controle de pedido de materiais</p>
+            <h1 class="title">${orderDescription}</h1>
+            <div class="info">
+              <p><strong>Data do Pedido:</strong> ${formatDate(new Date())}${form.watch("forecast") ? ` | <strong>Data de Entrega:</strong> ${formatDate(new Date(form.watch("forecast")))}` : ""} | <strong>Fornecedor:</strong> ${selectedSupplier ? (selectedSupplier.fantasyName || selectedSupplier.name) : "-"} | <strong>Total de itens:</strong> ${orderItemMode === "inventory" ? selectedItemsData.length : (form.watch("temporaryItems") || []).length}</p>
+            </div>
           </div>
         </div>
-        
-        <div class="info-grid">
-          <div class="info-item full-width">
-            <span class="info-label">Descrição</span>
-            <span class="info-value">${form.watch("description") || "-"}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Fornecedor</span>
-            <span class="info-value">${selectedSupplier?.name || "-"}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Data de Entrega</span>
-            <span class="info-value">${form.watch("forecast") ? formatDate(new Date(form.watch("forecast"))) : "-"}</span>
-          </div>
-        </div>
-        
+
         <div class="content-wrapper">
           <table>
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Nome do Item</th>
-                <th>Marca</th>
-                <th>Medida</th>
-                <th class="text-right">Quantidade</th>
-                <th class="text-right">Preço Unit.</th>
-                <th class="text-right">Total</th>
+                <th class="text-left">Código</th>
+                <th class="text-left">Nome</th>
+                <th class="text-left">Marca</th>
+                <th class="text-left">Medidas</th>
+                <th class="text-center">Quantidade</th>
               </tr>
             </thead>
             <tbody>
-              ${selectedItemsData
-                .map((item) => {
-                  const quantity = Number(quantities[item.id]) || 1;
-                  const price = Number(prices[item.id]) || 0;
-                  const total = quantity * price;
+              ${
+                orderItemMode === "inventory"
+                  ? selectedItemsData
+                      .map((item) => {
+                        const quantity = Number(quantities[item.id]) || 1;
+                        const measuresDisplay = formatMeasuresCompact(item.measures || []);
 
-                  // Get measure display - prioritize volume if both weight and volume exist
-                  const getMeasureDisplay = () => {
-                    if (!item.measures || item.measures.length === 0) return "-";
-
-                    const volumeUnits = ["MILLILITER", "LITER", "CUBIC_METER", "CUBIC_CENTIMETER"];
-                    const weightUnits = ["KILOGRAM", "GRAM"];
-
-                    const hasVolume = item.measures.some((m) => m.unit !== null && volumeUnits.includes(m.unit as string));
-                    const hasWeight = item.measures.some((m) => m.unit !== null && weightUnits.includes(m.unit as string));
-
-                    if (hasVolume && hasWeight) {
-                      // If both exist, show only volume
-                      const volumeMeasure = item.measures.find((m) => m.unit !== null && volumeUnits.includes(m.unit as string));
-                      if (volumeMeasure) {
-                        const unitLabels = {
-                          MILLILITER: "ml",
-                          LITER: "l",
-                          CUBIC_METER: "m³",
-                          CUBIC_CENTIMETER: "cm³",
-                        };
-                        const unitLabel = unitLabels[volumeMeasure.unit as keyof typeof unitLabels] || volumeMeasure.unit;
-                        return volumeMeasure.value + " " + unitLabel;
-                      }
-                      return "-";
-                    }
-
-                    // Otherwise show the first measure
-                    const firstMeasure = item.measures[0];
-                    if (!firstMeasure) return "-";
-
-                    const unitLabels = {
-                      // Weight units
-                      KILOGRAM: "kg",
-                      GRAM: "g",
-                      // Volume units
-                      MILLILITER: "ml",
-                      LITER: "l",
-                      CUBIC_METER: "m³",
-                      CUBIC_CENTIMETER: "cm³",
-                      // Length units
-                      MILLIMETER: "mm",
-                      CENTIMETER: "cm",
-                      METER: "m",
-                      INCHES: "pol",
-                      // Diameter units (fractional inches)
-                      INCH_1_8: '1/8"',
-                      INCH_1_4: '1/4"',
-                      INCH_3_8: '3/8"',
-                      INCH_1_2: '1/2"',
-                      INCH_5_8: '5/8"',
-                      INCH_3_4: '3/4"',
-                      INCH_7_8: '7/8"',
-                      INCH_1: '1"',
-                      INCH_1_1_4: '1.1/4"',
-                      INCH_1_1_2: '1.1/2"',
-                      INCH_2: '2"',
-                      // Thread pitch units
-                      THREAD_MM: "mm (passo)",
-                      THREAD_TPI: "TPI",
-                      // Electrical units
-                      WATT: "W",
-                      VOLT: "V",
-                      AMPERE: "A",
-                      // Area units
-                      SQUARE_CENTIMETER: "cm²",
-                      SQUARE_METER: "m²",
-                      // Count and packaging units
-                      UNIT: "un",
-                      PAIR: "par",
-                      DOZEN: "dz",
-                      HUNDRED: "ct",
-                      THOUSAND: "mil",
-                      // Container and packaging units
-                      PACKAGE: "pct",
-                      BOX: "cx",
-                      ROLL: "rl",
-                      SHEET: "fl",
-                      SET: "cj",
-                      SACK: "sc",
-                    };
-                    const unitLabel = unitLabels[firstMeasure.unit as keyof typeof unitLabels] || firstMeasure.unit;
-                    return firstMeasure.value + " " + unitLabel;
-                  };
-
-                  return `
-                  <tr>
-                    <td class="font-mono">${item.uniCode || "-"}</td>
-                    <td class="font-medium">${item.name}</td>
-                    <td>${item.brand?.name || "-"}</td>
-                    <td>${getMeasureDisplay()}</td>
-                    <td class="text-right font-medium">${quantity.toLocaleString("pt-BR")}</td>
-                    <td class="text-right">${formatCurrency(Number(price))}</td>
-                    <td class="text-right font-semibold">${formatCurrency(Number(total))}</td>
-                  </tr>
-                `;
-                })
-                .join("")}
-              <tr class="total-row">
-                <td colspan="6" class="text-right">Total Geral:</td>
-                <td class="text-right font-semibold">${formatCurrency(Number(totalPrice))}</td>
-              </tr>
+                        return `
+                        <tr>
+                          <td class="font-mono text-left">${item.uniCode || "-"}</td>
+                          <td class="font-medium text-left">${item.name}</td>
+                          <td class="text-left">${item.brand?.name || "-"}</td>
+                          <td class="text-left">${measuresDisplay}</td>
+                          <td class="text-center font-medium">${quantity.toLocaleString("pt-BR")}</td>
+                        </tr>
+                      `;
+                      })
+                      .join("")
+                  : (form.watch("temporaryItems") || [])
+                      .map((item: any) => {
+                        const quantity = Number(item.orderedQuantity) || 0;
+                        return `
+                        <tr>
+                          <td class="font-mono text-left">-</td>
+                          <td class="font-medium text-left">${item.temporaryItemDescription || "-"}</td>
+                          <td class="text-left">-</td>
+                          <td class="text-left">-</td>
+                          <td class="text-center font-medium">${quantity.toLocaleString("pt-BR")}</td>
+                        </tr>
+                      `;
+                      })
+                      .join("")
+              }
             </tbody>
           </table>
-          
+
           ${
             form.watch("notes")
               ? `
@@ -1072,10 +915,13 @@ export const OrderCreateForm = () => {
               : ""
           }
         </div>
-        
+
         <div class="footer">
-          <div class="footer-right">
-            <p><strong>Gerado em:</strong> ${formatDateTime(new Date())}</p>
+          <div>
+            <p>Relatório gerado pelo sistema Ankaa</p>
+          </div>
+          <div>
+            <p><strong>Gerado em:</strong> ${formatDate(new Date())} ${new Date().toLocaleTimeString("pt-BR")}</p>
           </div>
         </div>
       </body>
@@ -1096,7 +942,7 @@ export const OrderCreateForm = () => {
         };
       }
     },
-    [form, suppliers, selectionCount, selectedItemsData, quantities, prices, totalPrice],
+    [form, suppliers, selectionCount, selectedItemsData, quantities, prices, orderItemMode],
   );
 
   // Generate navigation actions based on current step
@@ -1462,14 +1308,17 @@ export const OrderCreateForm = () => {
                     onSelectAll={() => {}}
                     onQuantityChange={handleQuantityChange}
                     onPriceChange={handlePriceChange}
-                    onTaxChange={handleTaxChange}
+                    onIcmsChange={handleIcmsChange}
+                    onIpiChange={handleIpiChange}
                     quantities={quantities}
                     prices={prices}
-                    taxes={taxes}
+                    icmses={icmses}
+                    ipis={ipis}
                     isSelected={(itemId) => selectedItems.has(itemId)}
                     showQuantityInput={true}
                     showPriceInput={true}
-                    showTaxInput={true}
+                    showIcmsInput={true}
+                    showIpiInput={true}
                     showSelectedOnly={showSelectedOnly}
                     searchTerm={searchTerm}
                     showInactive={showInactive}
@@ -1489,6 +1338,7 @@ export const OrderCreateForm = () => {
                     onBrandIdsChange={setBrandIds}
                     onSupplierIdsChange={setSupplierIds}
                     onBatchFiltersChange={setBatchFilters}
+                    updateSelection={batchUpdateSelection}
                     className="flex-1 min-h-0"
                   />
                 )}
@@ -1571,9 +1421,12 @@ export const OrderCreateForm = () => {
                                   : (form.watch("temporaryItems") || []).reduce((total: number, item: any) => {
                                       const quantity = Number(item.orderedQuantity) || 0;
                                       const price = Number(item.price) || 0;
-                                      const tax = Number(item.tax) || 0;
+                                      const icms = Number(item.icms) || 0;
+                                      const ipi = Number(item.ipi) || 0;
                                       const subtotal = quantity * price;
-                                      const taxAmount = subtotal * (tax / 100);
+                                      const icmsAmount = subtotal * (icms / 100);
+                                      const ipiAmount = subtotal * (ipi / 100);
+                                      const taxAmount = icmsAmount + ipiAmount;
                                       return total + subtotal + taxAmount;
                                     }, 0)
                               )}
@@ -1674,8 +1527,10 @@ export const OrderCreateForm = () => {
                                   <TableHead className="font-semibold">Descrição</TableHead>
                                   <TableHead className="text-right font-semibold">Quantidade</TableHead>
                                   <TableHead className="text-right font-semibold">Preço Unit.</TableHead>
-                                  <TableHead className="text-right font-semibold">Taxa (%)</TableHead>
+                                  <TableHead className="text-right font-semibold">ICMS (%)</TableHead>
+                                  <TableHead className="text-right font-semibold">IPI (%)</TableHead>
                                   <TableHead className="text-right font-semibold">Subtotal</TableHead>
+                                  <TableHead className="text-right font-semibold">Impostos</TableHead>
                                   <TableHead className="text-right font-semibold">Total</TableHead>
                                 </TableRow>
                               </TableHeader>
@@ -1683,9 +1538,12 @@ export const OrderCreateForm = () => {
                                 {(form.watch("temporaryItems") || []).map((item: any, index: number) => {
                                   const quantity = Number(item.orderedQuantity) || 0;
                                   const price = Number(item.price) || 0;
-                                  const tax = Number(item.tax) || 0;
+                                  const icms = Number(item.icms) || 0;
+                                  const ipi = Number(item.ipi) || 0;
                                   const subtotal = quantity * price;
-                                  const taxAmount = subtotal * (tax / 100);
+                                  const icmsAmount = subtotal * (icms / 100);
+                                  const ipiAmount = subtotal * (ipi / 100);
+                                  const taxAmount = icmsAmount + ipiAmount;
                                   const total = subtotal + taxAmount;
 
                                   return (
@@ -1693,14 +1551,16 @@ export const OrderCreateForm = () => {
                                       <TableCell className="font-medium">{item.temporaryItemDescription || "-"}</TableCell>
                                       <TableCell className="text-right font-medium">{quantity.toLocaleString("pt-BR")}</TableCell>
                                       <TableCell className="text-right">{formatCurrency(price)}</TableCell>
-                                      <TableCell className="text-right">{tax.toFixed(2)}%</TableCell>
+                                      <TableCell className="text-right">{icms.toFixed(2)}%</TableCell>
+                                      <TableCell className="text-right">{ipi.toFixed(2)}%</TableCell>
                                       <TableCell className="text-right">{formatCurrency(subtotal)}</TableCell>
+                                      <TableCell className="text-right">{formatCurrency(taxAmount)}</TableCell>
                                       <TableCell className="text-right font-semibold">{formatCurrency(total)}</TableCell>
                                     </TableRow>
                                   );
                                 })}
                                 <TableRow className="bg-muted/30 font-semibold">
-                                  <TableCell colSpan={5} className="text-right">
+                                  <TableCell colSpan={7} className="text-right">
                                     Total Geral:
                                   </TableCell>
                                   <TableCell className="text-right">
@@ -1708,9 +1568,12 @@ export const OrderCreateForm = () => {
                                       (form.watch("temporaryItems") || []).reduce((total: number, item: any) => {
                                         const quantity = Number(item.orderedQuantity) || 0;
                                         const price = Number(item.price) || 0;
-                                        const tax = Number(item.tax) || 0;
+                                        const icms = Number(item.icms) || 0;
+                                        const ipi = Number(item.ipi) || 0;
                                         const subtotal = quantity * price;
-                                        const taxAmount = subtotal * (tax / 100);
+                                        const icmsAmount = subtotal * (icms / 100);
+                                        const ipiAmount = subtotal * (ipi / 100);
+                                        const taxAmount = icmsAmount + ipiAmount;
                                         return total + subtotal + taxAmount;
                                       }, 0)
                                     )}

@@ -37,11 +37,22 @@ export const OrderBatchCreateForm = () => {
     reValidateMode: "onChange",
   });
 
-  // State for batch operations
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [prices, setPrices] = useState<Record<string, number>>({});
-  const [taxes, setTaxes] = useState<Record<string, number>>({});
+  // State for batch operations - using single state object for atomic updates
+  const [selectionState, setSelectionState] = useState<{
+    selectedItems: Set<string>;
+    quantities: Record<string, number>;
+    prices: Record<string, number>;
+    icmses: Record<string, number>;
+    ipis: Record<string, number>;
+  }>({
+    selectedItems: new Set(),
+    quantities: {},
+    prices: {},
+    icmses: {},
+    ipis: {},
+  });
+
+  const { selectedItems, quantities, prices, icmses, ipis } = selectionState;
   const [showSelectedOnly, setShowSelectedOnly] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [showInactive, setShowInactive] = useState(false);
@@ -84,59 +95,112 @@ export const OrderBatchCreateForm = () => {
   const totalPrice = Array.from(selectedItems).reduce((total, itemId) => {
     const quantity = quantities[itemId] || 1;
     const price = prices[itemId] || 0;
-    return total + quantity * price;
+    const icms = icmses[itemId] || 0;
+    const ipi = ipis[itemId] || 0;
+    const subtotal = quantity * price;
+    const icmsAmount = subtotal * (icms / 100);
+    const ipiAmount = subtotal * (ipi / 100);
+    const taxAmount = icmsAmount + ipiAmount;
+    return total + subtotal + taxAmount;
   }, 0);
 
   // Handle item selection
   const handleSelectItem = useCallback(
-    (itemId: string, quantity?: number, price?: number, tax?: number) => {
-      setSelectedItems((prev) => {
-        const newSelection = new Set(prev);
+    (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => {
+      setSelectionState((prev) => {
+        const newSelection = new Set(prev.selectedItems);
+        const newQuantities = { ...prev.quantities };
+        const newPrices = { ...prev.prices };
+        const newIcmses = { ...prev.icmses };
+        const newIpis = { ...prev.ipis };
+
         if (newSelection.has(itemId)) {
           newSelection.delete(itemId);
-          // Clean up quantities, prices and taxes when deselecting
-          const newQuantities = { ...quantities };
-          const newPrices = { ...prices };
-          const newTaxes = { ...taxes };
           delete newQuantities[itemId];
           delete newPrices[itemId];
-          delete newTaxes[itemId];
-          setQuantities(newQuantities);
-          setPrices(newPrices);
-          setTaxes(newTaxes);
+          delete newIcmses[itemId];
+          delete newIpis[itemId];
         } else {
           newSelection.add(itemId);
-          // Set quantity, price and tax
-          setQuantities((prev) => ({ ...prev, [itemId]: quantity || 1 }));
+          newQuantities[itemId] = quantity || 1;
           if (price !== undefined) {
-            setPrices((prev) => ({ ...prev, [itemId]: price }));
+            newPrices[itemId] = price;
           }
-          if (tax !== undefined) {
-            setTaxes((prev) => ({ ...prev, [itemId]: tax }));
+          if (icms !== undefined) {
+            newIcmses[itemId] = icms;
+          }
+          if (ipi !== undefined) {
+            newIpis[itemId] = ipi;
           }
         }
-        return newSelection;
+
+        return {
+          selectedItems: newSelection,
+          quantities: newQuantities,
+          prices: newPrices,
+          icmses: newIcmses,
+          ipis: newIpis,
+        };
       });
     },
-    [quantities, prices, taxes],
+    [],
   );
 
   const handleQuantityChange = useCallback((itemId: string, quantity: number) => {
     const validQuantity = Math.max(0.01, quantity);
-    setQuantities((prev) => ({ ...prev, [itemId]: validQuantity }));
+    setSelectionState((prev) => ({
+      ...prev,
+      quantities: { ...prev.quantities, [itemId]: validQuantity },
+    }));
   }, []);
 
   const handlePriceChange = useCallback((itemId: string, price: number) => {
     const validPrice = Math.max(0, price);
-    setPrices((prev) => ({ ...prev, [itemId]: validPrice }));
+    setSelectionState((prev) => ({
+      ...prev,
+      prices: { ...prev.prices, [itemId]: validPrice },
+    }));
   }, []);
+
+  const handleIcmsChange = useCallback((itemId: string, icms: number) => {
+    const validIcms = Math.max(0, Math.min(100, icms));
+    setSelectionState((prev) => ({
+      ...prev,
+      icmses: { ...prev.icmses, [itemId]: validIcms },
+    }));
+  }, []);
+
+  const handleIpiChange = useCallback((itemId: string, ipi: number) => {
+    const validIpi = Math.max(0, Math.min(100, ipi));
+    setSelectionState((prev) => ({
+      ...prev,
+      ipis: { ...prev.ipis, [itemId]: validIpi },
+    }));
+  }, []);
+
+  // Batch update selection for atomic state updates
+  const handleBatchUpdateSelection = useCallback(
+    (items: Set<string>, newQuantities: Record<string, number>, newPrices: Record<string, number>, newIcmses?: Record<string, number>, newIpis?: Record<string, number>) => {
+      setSelectionState({
+        selectedItems: items,
+        quantities: newQuantities,
+        prices: newPrices,
+        icmses: newIcmses || {},
+        ipis: newIpis || {},
+      });
+    },
+    [],
+  );
 
   // Clear all selections
   const clearAllSelections = useCallback(() => {
-    setSelectedItems(new Set());
-    setQuantities({});
-    setPrices({});
-    setTaxes({});
+    setSelectionState({
+      selectedItems: new Set(),
+      quantities: {},
+      prices: {},
+      icmses: {},
+      ipis: {},
+    });
   }, []);
 
   // Validate form
@@ -189,7 +253,8 @@ export const OrderBatchCreateForm = () => {
               itemId,
               orderedQuantity: quantities[itemId] || 1,
               price: prices[itemId] || 0,
-              tax: taxes[itemId] || 0,
+              icms: icmses[itemId] || 0,
+              ipi: ipis[itemId] || 0,
             },
           ],
         }));
@@ -218,7 +283,7 @@ export const OrderBatchCreateForm = () => {
         // Error is handled by the mutation hook, but let's log it
       }
     },
-    [validateForm, selectedItems, quantities, prices, taxes, selectedItemsData, batchCreateAsync, form, clearAllSelections, navigate],
+    [validateForm, selectedItems, quantities, prices, icmses, ipis, selectedItemsData, batchCreateAsync, form, clearAllSelections, navigate],
   );
 
   const handleCancel = useCallback(() => {
@@ -659,7 +724,7 @@ export const OrderBatchCreateForm = () => {
         };
       }
     },
-    [form, suppliers, selectedItems, selectedItemsData, quantities, prices, totalPrice],
+    [form, suppliers, selectedItems, selectedItemsData, quantities, prices, icmses, ipis, totalPrice],
   );
 
   // Navigation actions
@@ -835,11 +900,17 @@ export const OrderBatchCreateForm = () => {
                   onSelectAll={() => {}}
                   onQuantityChange={handleQuantityChange}
                   onPriceChange={handlePriceChange}
+                  onIcmsChange={handleIcmsChange}
+                  onIpiChange={handleIpiChange}
                   quantities={quantities}
                   prices={prices}
+                  icmses={icmses}
+                  ipis={ipis}
                   isSelected={(itemId) => selectedItems.has(itemId)}
                   showQuantityInput={true}
                   showPriceInput={true}
+                  showIcmsInput={true}
+                  showIpiInput={true}
                   showSelectedOnly={showSelectedOnly}
                   searchTerm={searchTerm}
                   showInactive={showInactive}
@@ -858,6 +929,8 @@ export const OrderBatchCreateForm = () => {
                   onCategoryIdsChange={setCategoryIds}
                   onBrandIdsChange={setBrandIds}
                   onSupplierIdsChange={setSupplierIds}
+                  // Batch selection function for atomic updates
+                  updateSelection={handleBatchUpdateSelection}
                   className="flex-1"
                 />
               </div>

@@ -84,6 +84,18 @@ export const routes = {
   // Favorites - Favoritos - User Favorites
   favorites: "/favoritos",
 
+  // Financial - Financeiro - Financial Management
+  financial: {
+    customers: {
+      batchEdit: "/financeiro/clientes/editar-em-lote",
+      create: "/financeiro/clientes/cadastrar",
+      details: (id: string) => `/financeiro/clientes/detalhes/${id}`,
+      edit: (id: string) => `/financeiro/clientes/editar/${id}`,
+      root: "/financeiro/clientes",
+    },
+    root: "/financeiro",
+  },
+
   // Home - Página inicial
   home: "/",
 
@@ -355,6 +367,13 @@ export const routes = {
       edit: (id: string) => `/pintura/marcas-de-tinta/editar/${id}`,
       list: "/pintura/marcas-de-tinta/listar",
       root: "/pintura/marcas-de-tinta",
+    },
+    paintGrounds: {
+      create: "/pintura/bases-de-tinta/cadastrar",
+      details: (id: string) => `/pintura/bases-de-tinta/detalhes/${id}`,
+      edit: (id: string) => `/pintura/bases-de-tinta/editar/${id}`,
+      list: "/pintura/bases-de-tinta/listar",
+      root: "/pintura/bases-de-tinta",
     },
     productions: {
       create: "/pintura/producoes/cadastrar",

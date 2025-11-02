@@ -46,27 +46,14 @@ export function SupplierBatchOperationsToolbar({ selectedSuppliers, onClearSelec
     setIsDeleting(true);
     try {
       const supplierIds = selectedSuppliers.map((supplier) => supplier.id);
-      const result = await batchDeleteAsync({ supplierIds });
+      await batchDeleteAsync({ supplierIds });
 
-      if (result?.data) {
-        const { totalSuccess, totalFailed } = result.data;
-
-        if (totalSuccess > 0) {
-          toast.success(`${totalSuccess} ${totalSuccess === 1 ? "fornecedor excluído" : "fornecedores excluídos"} com sucesso`);
-        }
-
-        if (totalFailed > 0) {
-          toast.error(`${totalFailed} ${totalFailed === 1 ? "fornecedor falhou" : "fornecedores falharam"} ao excluir`);
-        }
-      } else {
-        toast.success("Fornecedores excluídos com sucesso");
-      }
-
+      // Success/error toasts are handled by the API client
       onClearSelection();
       onRefresh?.();
     } catch (error) {
+      // Error is handled by the API client
       console.error("Error during batch delete:", error);
-      toast.error("Erro ao excluir fornecedores em lote");
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);

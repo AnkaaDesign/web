@@ -85,6 +85,12 @@ export function CustomerTasksTable({
       },
       createdBy: true,
       updatedBy: true,
+      // Include task documents for proper display
+      invoices: true,
+      receipts: true,
+      budgets: true,
+      reimbursements: true,
+      invoiceReimbursements: true,
       // Note: commission is a direct field on Task, not a relation, so it's always included
     }),
     [],
@@ -92,14 +98,14 @@ export function CustomerTasksTable({
 
   // Build query parameters
   const queryParams = React.useMemo(() => {
-    // Determine status to use
-    const statusToUse = (!filters.status || (Array.isArray(filters.status) && filters.status.length === 0))
-      ? [TASK_STATUS.COMPLETED]
-      : filters.status;
+    // Use status from filters if provided, otherwise show all tasks
+    const statusToUse = (filters.status && Array.isArray(filters.status) && filters.status.length > 0)
+      ? filters.status
+      : undefined; // Show all tasks when no status filter is provided
 
     const params = {
       // When showSelectedOnly is true, don't apply filters (except searchingFor which should always apply)
-      ...(showSelectedOnly ? { searchingFor: filters.searchingFor } : { ...filters, status: statusToUse }),
+      ...(showSelectedOnly ? { searchingFor: filters.searchingFor } : { ...filters, ...(statusToUse && { status: statusToUse }) }),
       page: page + 1, // Convert 0-based to 1-based for API
       limit: pageSize,
       include: includeConfig,

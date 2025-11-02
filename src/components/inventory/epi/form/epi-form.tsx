@@ -5,7 +5,6 @@ import { useSearchParams } from "react-router-dom";
 import { Form } from "@/components/ui/form";
 import { FormInput } from "@/components/ui/form-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { itemCreateSchema, itemUpdateSchema, type ItemCreateFormData, type ItemUpdateFormData } from "../../../../schemas";
 import { useItemCategories } from "../../../../hooks";
 import { ITEM_CATEGORY_TYPE } from "../../../../constants";
@@ -22,6 +21,8 @@ import { MaxQuantityInput } from "@/components/inventory/item/form/max-quantity-
 import { BoxQuantityInput } from "@/components/inventory/item/form/box-quantity-input";
 import { LeadTimeInput } from "@/components/inventory/item/form/lead-time-input";
 import { PriceInput } from "@/components/inventory/item/form/price-input";
+import { IcmsInput } from "@/components/inventory/item/form/icms-input";
+import { IpiInput } from "@/components/inventory/item/form/ipi-input";
 import { MeasureInput } from "@/components/inventory/item/form/measure-input";
 import { BarcodeManager } from "@/components/inventory/item/form/barcode-manager";
 import { AssignToUserToggle } from "@/components/inventory/item/form/assign-to-user-toggle";
@@ -76,7 +77,8 @@ export function EpiForm(props: EpiFormProps) {
     reorderQuantity: null,
     maxQuantity: null,
     boxQuantity: null,
-    tax: 0,
+    icms: 0,
+    ipi: 0,
     measureValue: null,
     measureUnit: null,
     measures: [], // Initialize with empty measures array
@@ -95,7 +97,6 @@ export function EpiForm(props: EpiFormProps) {
     ppeCA: null,
     ppeDeliveryMode: null,
     ppeStandardQuantity: null,
-    ppeAutoOrderMonths: null,
     ...defaultValues,
   };
 
@@ -248,7 +249,6 @@ export function EpiForm(props: EpiFormProps) {
                 </div>
                 {/* Display name validation errors */}
                 {form.formState.errors.name && <div className="text-red-500 text-sm mt-1">{form.formState.errors.name.message}</div>}
-                <Separator className="my-4" />
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <ItemBrandSelector control={form.control} disabled={isSubmitting} />
                   <ItemSupplierSelector control={form.control} disabled={isSubmitting} />
@@ -287,11 +287,12 @@ export function EpiForm(props: EpiFormProps) {
               <CardContent>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <PriceInput control={form.control} disabled={isSubmitting} />
-                  <FormInput<ItemCreateFormData> name="tax" label="Taxa" type="percentage" disabled={isSubmitting} decimals={2} />
+                  <IcmsInput control={form.control} disabled={isSubmitting} />
+                  <IpiInput control={form.control} disabled={isSubmitting} />
                 </div>
                 {/* Display price-related validation errors */}
-                {(form.formState.errors.price || form.formState.errors.tax) && (
-                  <div className="text-red-500 text-sm mt-2">{form.formState.errors.price?.message || form.formState.errors.tax?.message}</div>
+                {(form.formState.errors.price || form.formState.errors.icms || form.formState.errors.ipi) && (
+                  <div className="text-red-500 text-sm mt-2">{form.formState.errors.price?.message || form.formState.errors.icms?.message || form.formState.errors.ipi?.message}</div>
                 )}
               </CardContent>
             </Card>

@@ -62,8 +62,8 @@ export function GroundSelector({ control, disabled, required, initialPaints }: G
       }
 
       const response = await getPaints(queryParams);
-      const paints = response.data?.data || [];
-      const hasMore = response.data?.meta?.hasNextPage || false;
+      const paints = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
 
       // Convert paints to options format and add to cache
       const options = paints.map((paint) => {
@@ -126,11 +126,20 @@ export function GroundSelector({ control, disabled, required, initialPaints }: G
               minSearchLength={0}
               debounceMs={300}
               renderOption={(option, isSelected) => (
-                <div className="flex items-center gap-2">
-                  {option.metadata?.hex && <div className="w-4 h-4 rounded border border-border" style={{ backgroundColor: option.metadata.hex }} />}
+                <div className="flex items-center gap-3">
+                  {option.metadata?.hex && (
+                    <div
+                      className="w-8 h-8 rounded border border-border flex-shrink-0"
+                      style={{ backgroundColor: option.metadata.hex }}
+                    />
+                  )}
                   <div className="flex-1">
-                    <div>{option.label}</div>
-                    {option.description && <div className="text-xs text-muted-foreground">{option.description}</div>}
+                    <div className={isSelected ? "text-white" : ""}>{option.label}</div>
+                    {option.description && (
+                      <div className={`text-xs ${isSelected ? "text-white/90" : "text-muted-foreground"}`}>
+                        {option.description}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

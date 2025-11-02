@@ -13,7 +13,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useSecullumDeleteHoliday } from "../../../../../hooks";
-import { toast } from "sonner";
 
 import type { SecullumHolidayData } from "../../../../../schemas";
 
@@ -56,12 +55,13 @@ export function HolidaysContextMenu({ contextMenu, onClose, onEdit }: HolidaysCo
     try {
       deleteHoliday(holidayToDelete.Id, {
         onSuccess: () => {
-          toast.success("Feriado excluído com sucesso");
+          // Success toast is handled by the API client
           setShowDeleteDialog(false);
           setHolidayToDelete(null);
         },
       });
     } catch (error) {
+      // Error is handled by the API client
       console.error("Error deleting holiday:", error);
       setShowDeleteDialog(false);
       setHolidayToDelete(null);

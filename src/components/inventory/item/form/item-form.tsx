@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router-dom";
 import { FormInput } from "@/components/ui/form-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { itemCreateSchema, itemUpdateSchema, type ItemCreateFormData, type ItemUpdateFormData } from "../../../../schemas";
 import { useItemCategories } from "../../../../hooks";
 import { ITEM_CATEGORY_TYPE } from "../../../../constants";
@@ -24,6 +23,8 @@ import { MaxQuantityInput } from "./max-quantity-input";
 import { BoxQuantityInput } from "./box-quantity-input";
 import { LeadTimeInput } from "./lead-time-input";
 import { PriceInput } from "./price-input";
+import { IcmsInput } from "./icms-input";
+import { IpiInput } from "./ipi-input";
 import { MeasureInput } from "./measure-input";
 import { BarcodeManager } from "./barcode-manager";
 import { AssignToUserToggle } from "./assign-to-user-toggle";
@@ -68,7 +69,8 @@ export function ItemForm(props: ItemFormProps) {
     reorderQuantity: null,
     maxQuantity: null,
     boxQuantity: null,
-    tax: undefined,
+    icms: undefined,
+    ipi: undefined,
     measures: [], // Initialize with empty measures array
     barcodes: [],
     shouldAssignToUser: true,
@@ -85,7 +87,6 @@ export function ItemForm(props: ItemFormProps) {
     ppeCA: null,
     ppeDeliveryMode: null,
     ppeStandardQuantity: null,
-    ppeAutoOrderMonths: null,
     ...defaultValues,
   };
 
@@ -291,7 +292,6 @@ export function ItemForm(props: ItemFormProps) {
                 <UnicodeInput disabled={isSubmitting} />
                 <NameInput disabled={isSubmitting} required={isRequired} />
               </div>
-              <Separator />
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <CategorySelector disabled={isSubmitting} onCategoryChange={setSelectedCategoryId} initialCategory={initialCategory} />
@@ -325,9 +325,22 @@ export function ItemForm(props: ItemFormProps) {
               <CardDescription>Informações de preço e impostos</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <PriceInput disabled={isSubmitting} />
-                <FormInput<ItemCreateFormData> name="tax" label="Taxa" type="percentage" disabled={isSubmitting} decimals={2} />
+                <IcmsInput
+                  control={form.control}
+                  disabled={isSubmitting}
+                  priceFieldName="price"
+                  onPriceUpdate={(newPrice) => form.setValue("price", newPrice, { shouldDirty: true, shouldValidate: true })}
+                  watch={form.watch}
+                />
+                <IpiInput
+                  control={form.control}
+                  disabled={isSubmitting}
+                  priceFieldName="price"
+                  onPriceUpdate={(newPrice) => form.setValue("price", newPrice, { shouldDirty: true, shouldValidate: true })}
+                  watch={form.watch}
+                />
               </div>
             </CardContent>
           </Card>

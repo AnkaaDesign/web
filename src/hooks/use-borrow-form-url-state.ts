@@ -296,6 +296,22 @@ export function useBorrowFormUrlState(options: UseBorrowFormUrlStateOptions = {}
     }));
   }, [selectedItems, quantities, defaultQuantity, globalUserId]);
 
+  // Batch update selected items and quantities atomically
+  const batchUpdateSelection = useCallback(
+    (newSelected: Set<string>, newQuantities: Record<string, number>) => {
+      const selectedArray = Array.from(newSelected);
+      const filteredQuantities = Object.fromEntries(
+        Object.entries(newQuantities).filter(([_, v]) => v >= 1 && Number.isInteger(v))
+      );
+
+      setFilters({
+        selectedItems: selectedArray.length > 0 ? selectedArray : undefined,
+        quantities: Object.keys(filteredQuantities).length > 0 ? filteredQuantities : undefined,
+      });
+    },
+    [setFilters],
+  );
+
   return {
     // State
     selectedItems,
@@ -330,6 +346,7 @@ export function useBorrowFormUrlState(options: UseBorrowFormUrlStateOptions = {}
     clearAllSelections,
     setItemQuantity,
     getSelectedItemsWithData,
+    batchUpdateSelection,
 
     // Computed values
     selectionCount: selectedItems.size,

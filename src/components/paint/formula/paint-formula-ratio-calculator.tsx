@@ -187,12 +187,10 @@ export function PaintFormulaRatioCalculator({ formula }: PaintFormulaRatioCalcul
             <Label htmlFor="targetWeight">Peso desejado para produção</Label>
             <div className="flex gap-2">
               <Input
-                id="targetWeight"
-                type="number"
+                type="decimal"
                 value={targetWeight}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTargetWeight(Number(e.target.value))}
-                min="0"
-                step="0.1"
+                onChange={(value) => setTargetWeight(typeof value === "number" ? value : 0)}
+                placeholder="Digite o peso"
                 className="flex-1"
               />
               <select
@@ -207,8 +205,8 @@ export function PaintFormulaRatioCalculator({ formula }: PaintFormulaRatioCalcul
           </div>
           <div className="text-center p-3 bg-muted rounded-lg">
             <div className="text-sm text-muted-foreground">Volume Estimado</div>
-            <div className="text-lg font-bold">{calculatedTotals.calculatedVolumeInLiters.toFixed(2)} L</div>
-            <div className="text-xs text-muted-foreground">Densidade: {calculatedDensity.toFixed(3)} g/ml</div>
+            <div className="text-lg font-bold">{calculatedTotals.calculatedVolumeInLiters.toFixed(2).replace(".", ",")} L</div>
+            <div className="text-xs text-muted-foreground">Densidade: {calculatedDensity.toFixed(3).replace(".", ",")} g/ml</div>
           </div>
         </div>
 
@@ -218,14 +216,11 @@ export function PaintFormulaRatioCalculator({ formula }: PaintFormulaRatioCalcul
             <Label htmlFor="removedAmount">Quantidade retirada para teste</Label>
             <div className="flex gap-2">
               <Input
-                id="removedAmount"
-                type="number"
+                type="decimal"
                 value={removedAmount}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRemovedAmount(Number(e.target.value))}
-                min="0"
-                step="0.1"
-                className="flex-1"
+                onChange={(value) => setRemovedAmount(typeof value === "number" ? value : 0)}
                 placeholder="Quantidade"
+                className="flex-1"
               />
               <select
                 value={removedUnit}

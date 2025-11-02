@@ -11,6 +11,8 @@ import { ExternalWithdrawalDetailSkeleton } from "@/components/inventory/externa
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { usePrivileges } from "../../../../hooks";
 import React, { useState } from "react";
+import { useAuth } from "@/contexts/auth-context";
+import { canEditExternalWithdrawals } from "@/utils/permissions/entity-permissions";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -34,7 +36,8 @@ const ExternalWithdrawalDetailsPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [actionType, setActionType] = useState<"FULL_RETURN" | null>(null);
   const [actionNotes, setActionNotes] = useState("");
-  const { canManageWarehouse } = usePrivileges();
+  const { user } = useAuth();
+  const canManageWarehouse = canEditExternalWithdrawals(user);
   const statusMutations = useExternalWithdrawalStatusMutations();
   const { deleteMutation } = useExternalWithdrawalMutations();
 

@@ -64,7 +64,12 @@ export function MeasureInput({
   ...props
 }: MeasureInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [inputValue, setInputValue] = useState(() => (value !== undefined && value !== null ? formatNumber(value) : ""));
+  // Format initial value: keep integers as-is, format decimals with comma
+  const [inputValue, setInputValue] = useState(() => {
+    if (value === undefined || value === null) return "";
+    const str = String(value);
+    return str.includes(".") ? str.replace(".", ",") : str;
+  });
   const [convertedValue, setConvertedValue] = useState<string>("");
 
   // Get available units based on measure type and filters
@@ -108,7 +113,7 @@ export function MeasureInput({
   // Handle value input change
   const handleValueChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const rawValue = e.target.value;
+      let rawValue = e.target.value;
 
       // Allow empty value
       if (rawValue === "") {
@@ -118,8 +123,15 @@ export function MeasureInput({
         return;
       }
 
-      // Replace comma with dot for decimal separator
-      const normalizedValue = rawValue.replace(",", ".");
+      // Accept both . and , as decimal separator - convert . to , for Brazilian format
+      let displayValue = rawValue.replace(/\./g, ",");
+
+      // Only allow one decimal separator
+      const commaCount = (displayValue.match(/,/g) || []).length;
+      if (commaCount > 1) return;
+
+      // For internal calculation, convert comma to dot
+      const normalizedValue = displayValue.replace(",", ".");
 
       // Validate number format
       if (!/^\d*\.?\d*$/.test(normalizedValue)) {
@@ -128,15 +140,18 @@ export function MeasureInput({
 
       const numericValue = parseFloat(normalizedValue);
 
-      // Check bounds
+      // Check bounds and update
       if (!isNaN(numericValue)) {
         if (min !== undefined && numericValue < min) return;
         if (max !== undefined && numericValue > max) return;
 
         const roundedValue = roundToDecimals(numericValue, decimals);
-        setInputValue(rawValue); // Keep original input for better UX
+        setInputValue(displayValue); // Keep user input with Brazilian format
         onValueChange?.(roundedValue);
         onChange?.({ value: roundedValue, unit: unit ?? null, measureType });
+      } else {
+        // Allow partial input (like "15," while typing "15,5")
+        setInputValue(displayValue);
       }
     },
     [unit, measureType, onChange, onValueChange, min, max, decimals],
@@ -152,7 +167,8 @@ export function MeasureInput({
         const convertedVal = convertValue(value, unit, newUnit);
         if (convertedVal !== null) {
           const roundedValue = roundToDecimals(convertedVal, decimals);
-          setInputValue(formatNumber(roundedValue));
+          const str = String(roundedValue);
+          setInputValue(str.includes(".") ? str.replace(".", ",") : str);
           onValueChange?.(roundedValue);
           onChange?.({ value: roundedValue, unit: newUnit, measureType });
         }
@@ -211,10 +227,15 @@ export function MeasureInput({
     }
   }, [value, unit, convertTo, showConversion, decimals]);
 
-  // Update input value when external value changes
+  // Update input value when external value changes (only when not focused)
   useEffect(() => {
     if (!inputRef.current?.matches(":focus")) {
-      setInputValue(value !== undefined && value !== null ? formatNumber(value) : "");
+      if (value === undefined || value === null) {
+        setInputValue("");
+      } else {
+        const str = String(value);
+        setInputValue(str.includes(".") ? str.replace(".", ",") : str);
+      }
     }
   }, [value]);
 

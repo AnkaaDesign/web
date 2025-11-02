@@ -8,7 +8,6 @@ import { PpeTypeSelector } from "./ppe-type-selector";
 import { PpeSizeSelector } from "./ppe-size-selector";
 import { PpeDeliveryModeSelector } from "./ppe-delivery-mode-selector";
 import { PpeDeliveryQuantityInput } from "./ppe-delivery-quantity-input";
-import { PpeAutoOrderMonthsInput } from "./ppe-auto-order-months-input";
 import { MEASURE_TYPE, MEASURE_UNIT } from "../../../../constants";
 import { ppeSizeToNumeric, numericToPpeSize } from "@/utils/ppe-size-helpers";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
@@ -111,62 +110,64 @@ export function PpeConfigSection({ disabled, required }: PpeConfigSectionProps) 
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {/* CA Input */}
-          <FormField
-            control={form.control}
-            name="ppeCA"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="flex items-center gap-2">
-                  <IconCertificate className="h-4 w-4" />
-                  Certificado de Aprovação (CA)
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    value={field.value || ""}
-                    onChange={(value) => {
-                      field.onChange(value);
-                    }}
-                    name={field.name}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                    placeholder="Digite o número do CA"
-                    disabled={disabled}
-                    transparent={true}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {/* CA, Type and Size - same row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* CA Input */}
+            <FormField
+              control={form.control}
+              name="ppeCA"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <IconCertificate className="h-4 w-4" />
+                    Certificado de Aprovação (CA)
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      value={field.value || ""}
+                      onChange={(value) => {
+                        field.onChange(value);
+                      }}
+                      name={field.name}
+                      onBlur={field.onBlur}
+                      ref={field.ref}
+                      placeholder="Digite o número do CA"
+                      disabled={disabled}
+                      transparent={true}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-          {/* Type and Size */}
-          <div className="grid grid-cols-1 gap-6">
+            {/* Type */}
             <PpeTypeSelector name="ppeType" disabled={disabled} required={required} />
+
+            {/* Size */}
+            <FormItem>
+              <FormLabel className="flex items-center gap-2">
+                <IconRuler className="h-4 w-4" />
+                Tamanho
+                {/* Size is optional for OUTROS type */}
+                {required && ppeType && ppeType !== "OUTROS" && <span className="text-destructive ml-1">*</span>}
+              </FormLabel>
+              <PpeSizeSelector
+                name="__ppeSize" // Virtual field name
+                ppeType={ppeType}
+                disabled={disabled || !ppeType}
+                required={required && ppeType !== "OUTROS"}
+                value={getCurrentPpeSize()}
+                onValueChange={setPpeSize}
+              />
+              <FormMessage />
+            </FormItem>
           </div>
 
-          {/* Size - separate row */}
-          <FormItem>
-            <FormLabel className="flex items-center gap-2">
-              <IconRuler className="h-4 w-4" />
-              Tamanho {required && "*"}
-            </FormLabel>
-            <PpeSizeSelector
-              name="__ppeSize" // Virtual field name
-              ppeType={ppeType}
-              disabled={disabled || !ppeType}
-              required={required}
-              value={getCurrentPpeSize()}
-              onValueChange={setPpeSize}
-            />
-            <FormMessage />
-          </FormItem>
-
           {/* Delivery Configuration */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <PpeDeliveryModeSelector name="ppeDeliveryMode" disabled={disabled} required={required} />
             <PpeDeliveryQuantityInput name="ppeStandardQuantity" disabled={disabled} required={required} />
-            <PpeAutoOrderMonthsInput name="ppeAutoOrderMonths" disabled={disabled} required={required} />
           </div>
         </div>
       </CardContent>
