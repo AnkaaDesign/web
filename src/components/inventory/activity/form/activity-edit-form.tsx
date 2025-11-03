@@ -195,7 +195,7 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
                         <FormControl>
                           <Input
                             type="decimal"
-                            value={field.value || 0.01}
+                            value={field.value ?? ""}
                             onChange={field.onChange}
                             placeholder="0,01"
                             transparent

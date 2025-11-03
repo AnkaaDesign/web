@@ -757,7 +757,7 @@ export const ActivityItemSelector = ({
                               <Input
                                 type="decimal"
                                 value={quantity}
-                                onChange={(value) => onQuantityChange?.(item.id, typeof value === "number" ? value : 0)}
+                                onChange={(value) => onQuantityChange?.(item.id, typeof value === "number" ? value : null)}
                                 min={0.01}
                                 max={999999}
                                 step={0.01}

@@ -881,6 +881,70 @@ const ChangelogTimelineItem = ({
                               )}
                             </div>
                           </>
+                        ) : changelog.field === "artworks" ? (
+                          // Special handling for artworks field - show thumbnail previews
+                          <>
+                            <div className="text-sm">
+                              <span className="text-muted-foreground">Antes: </span>
+                              {(() => {
+                                const parseValue = (val: any) => {
+                                  if (val === null || val === undefined) return null;
+                                  if (Array.isArray(val)) return val;
+                                  if (typeof val === "string") {
+                                    try {
+                                      const parsed = JSON.parse(val);
+                                      return Array.isArray(parsed) ? parsed : null;
+                                    } catch {
+                                      return null;
+                                    }
+                                  }
+                                  return null;
+                                };
+                                const artworks = parseValue(changelog.oldValue);
+                                if (!artworks || artworks.length === 0) {
+                                  return <span className="text-red-600 dark:text-red-400 font-medium">Nenhuma arte</span>;
+                                }
+                                return (
+                                  <div className="flex flex-wrap gap-2 mt-1">
+                                    {artworks.map((artwork: any, idx: number) => (
+                                      <LogoDisplay key={idx} logoId={artwork.id} size="w-12 h-12" />
+                                    ))}
+                                    <span className="text-sm text-muted-foreground self-center">({artworks.length} arte{artworks.length > 1 ? 's' : ''})</span>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                            <div className="text-sm">
+                              <span className="text-muted-foreground">Depois: </span>
+                              {(() => {
+                                const parseValue = (val: any) => {
+                                  if (val === null || val === undefined) return null;
+                                  if (Array.isArray(val)) return val;
+                                  if (typeof val === "string") {
+                                    try {
+                                      const parsed = JSON.parse(val);
+                                      return Array.isArray(parsed) ? parsed : null;
+                                    } catch {
+                                      return null;
+                                    }
+                                  }
+                                  return null;
+                                };
+                                const artworks = parseValue(changelog.newValue);
+                                if (!artworks || artworks.length === 0) {
+                                  return <span className="text-green-600 dark:text-green-400 font-medium">Nenhuma arte</span>;
+                                }
+                                return (
+                                  <div className="flex flex-wrap gap-2 mt-1">
+                                    {artworks.map((artwork: any, idx: number) => (
+                                      <LogoDisplay key={idx} logoId={artwork.id} size="w-12 h-12" />
+                                    ))}
+                                    <span className="text-sm text-muted-foreground self-center">({artworks.length} arte{artworks.length > 1 ? 's' : ''})</span>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </>
                         ) : (
                           // Field updated - always show both "Antes:" and "Depois:" lines
                           <>

@@ -46,7 +46,7 @@ export const useLayoutsByTruck = (truckId: string, enabled = true) => {
         if (!layout?.id) return layout;
         try {
           const detailResponse = await layoutService.getById(layout.id, {
-            include: { layoutSections: true }
+            include: { layoutSections: true, photo: true }
           });
           return detailResponse.data.data;
         } catch (error) {

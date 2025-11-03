@@ -110,9 +110,15 @@ export const ActivityBatchCreateForm = () => {
 
   // Handle quantity change
   const handleQuantityChange = useCallback(
-    (itemId: string, quantity: number) => {
-      const validQuantity = Math.max(0.01, quantity);
-      setItemQuantity(itemId, validQuantity);
+    (itemId: string, quantity: number | null) => {
+      // Only update if we have a valid number
+      // Don't update on null/undefined - let the field stay empty
+      if (quantity !== null && quantity !== undefined && quantity > 0) {
+        const validQuantity = Math.max(0.01, quantity);
+        setItemQuantity(itemId, validQuantity);
+      }
+      // If quantity is null, don't update - keeps the existing value in state
+      // This allows the user to clear and retype without the field auto-filling
     },
     [setItemQuantity],
   );

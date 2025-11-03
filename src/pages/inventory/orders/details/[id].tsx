@@ -173,8 +173,37 @@ const OrderDetailsPage = () => {
   // Build actions based on status
   const orderActions = [];
 
-  // Show mark as fulfilled action if not all items are fulfilled and order is not received/cancelled
-  if (canManageWarehouse && !allItemsFulfilled && ![ORDER_STATUS.RECEIVED, ORDER_STATUS.CANCELLED].includes(order.status)) {
+  // Determine which button to show based on the order lifecycle:
+  // Priority 1: Check explicit status that indicates fulfillment/receiving phase
+  // Priority 2: For OVERDUE status, check if items are fulfilled to determine phase
+  //
+  // Lifecycle flow:
+  // CREATED → PARTIALLY_FULFILLED → FULFILLED → PARTIALLY_RECEIVED → RECEIVED
+  //    ↓             ↓                   ↓              ↓
+  //           [Marcar como Feito]   [Marcar como Recebido]
+  //
+  // Special case: OVERDUE can occur at any stage, so we check item fulfillment
+
+  // Determine if order is in fulfillment or receiving phase
+  let isInFulfillmentPhase = false;
+  let isInReceivingPhase = false;
+
+  if (order.status === ORDER_STATUS.OVERDUE) {
+    // For OVERDUE orders, check item fulfillment to determine phase
+    // If all items are fulfilled, it's ready to be received
+    // If not all fulfilled, it still needs to be marked as done
+    isInReceivingPhase = allItemsFulfilled;
+    isInFulfillmentPhase = !allItemsFulfilled;
+  } else if ([ORDER_STATUS.CREATED, ORDER_STATUS.PARTIALLY_FULFILLED].includes(order.status)) {
+    // Orders in these statuses are in the fulfillment phase
+    isInFulfillmentPhase = true;
+  } else if ([ORDER_STATUS.FULFILLED, ORDER_STATUS.PARTIALLY_RECEIVED].includes(order.status)) {
+    // Orders in these statuses are in the receiving phase
+    isInReceivingPhase = true;
+  }
+
+  // Show "Marcar como Feito" button when order is in fulfillment phase
+  if (canManageWarehouse && isInFulfillmentPhase && order.status !== ORDER_STATUS.CANCELLED) {
     orderActions.push({
       key: "fulfill",
       label: "Marcar como Feito",
@@ -201,8 +230,8 @@ const OrderDetailsPage = () => {
     });
   }
 
-  // Show complete action if all items are received and order is not yet completed
-  if (canManageWarehouse && allItemsReceived && order.status !== ORDER_STATUS.RECEIVED) {
+  // Show "Marcar como Recebido" button when order is in receiving phase
+  if (canManageWarehouse && isInReceivingPhase && order.status !== ORDER_STATUS.RECEIVED && order.status !== ORDER_STATUS.CANCELLED) {
     orderActions.push({
       key: "complete",
       label: "Marcar como Recebido",
@@ -213,13 +242,13 @@ const OrderDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="flex flex-col h-full">
         {/* Hero Section - Enhanced Header with Actions */}
         <PageHeader
           variant="detail"
           title={order.description}
           icon={IconShoppingCart}
-          className="shadow-lg"
+          className="shadow-lg mb-6"
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Estoque", href: routes.inventory.root },

@@ -164,8 +164,45 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     convertToFileWithPreview(task.observation?.files)
   );
 
-  // Get truck ID from task - assuming task has truck relation
+  // Track current layout state during editing (not saved yet)
+  // Initialize with default values to support validation before user edits
+  const [currentLayoutStates, setCurrentLayoutStates] = useState<Record<'left' | 'right' | 'back', any>>(() => {
+    const defaults = {
+      left: {
+        height: 2.4,
+        sections: [{ width: 8.0, isDoor: false, doorOffset: null, position: 0 }],
+        photoId: null,
+      },
+      right: {
+        height: 2.4,
+        sections: [{ width: 8.0, isDoor: false, doorOffset: null, position: 0 }],
+        photoId: null,
+      },
+      back: {
+        height: 2.42,
+        sections: [{ width: 2.42, isDoor: false, doorOffset: null, position: 0 }],
+        photoId: null,
+      },
+    };
+    return defaults;
+  });
+
+  // Track which sides were actually modified by the user
+  const [modifiedLayoutSides, setModifiedLayoutSides] = useState<Set<'left' | 'right' | 'back'>>(new Set());
+
+  // Get truck ID from task - with safety check
   const truckId = task.truck?.id || task.truckId;
+
+  // Safety mechanism: If task doesn't have a truck yet, trigger a refetch
+  // This shouldn't happen because backend auto-creates it, but it's a safety net
+  useEffect(() => {
+    if (!truckId && task.id) {
+      console.warn('[TaskEditForm] Task loaded without truck - backend should have created it. Task ID:', task.id);
+      // The useTaskDetail query will handle refetching automatically
+      // since the backend ensures truck exists in findById
+    }
+  }, [truckId, task.id]);
+
   const { data: layoutsData } = useLayoutsByTruck(truckId || "", !!truckId);
 
   // Debug logging for layouts
@@ -184,31 +221,125 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   // Check if any layout exists and open the section automatically
   useEffect(() => {
     if (layoutsData && (layoutsData.leftSideLayout || layoutsData.rightSideLayout || layoutsData.backSideLayout)) {
+      console.log('[TaskEditForm] Auto-opening layout section because saved layouts exist');
       setIsLayoutOpen(true);
     }
   }, [layoutsData]);
 
+  // CRITICAL FIX: Sync currentLayoutStates with fresh backend data after save
+  // This ensures that after saving, we have the latest data from backend
+  useEffect(() => {
+    // Only sync if we have no pending modifications (modifiedLayoutSides is empty)
+    // AND we don't have pending layout changes flag set
+    // This prevents overwriting user changes that haven't been saved yet
+    if (modifiedLayoutSides.size === 0 && !hasLayoutChanges && layoutsData) {
+      console.log('[TaskEditForm] ========== SYNCING LAYOUT STATES WITH BACKEND ==========');
+
+      const newStates: Record<'left' | 'right' | 'back', any> = {
+        left: currentLayoutStates.left,
+        right: currentLayoutStates.right,
+        back: currentLayoutStates.back,
+      };
+
+      // Sync left side
+      if (layoutsData.leftSideLayout?.layoutSections) {
+        newStates.left = {
+          height: layoutsData.leftSideLayout.height,
+          sections: layoutsData.leftSideLayout.layoutSections.map((s: any) => ({
+            width: s.width,
+            isDoor: s.isDoor,
+            doorOffset: s.doorOffset,
+            position: s.position,
+          })),
+          photoId: layoutsData.leftSideLayout.photoId,
+        };
+        console.log('[TaskEditForm] Synced left side from backend:', {
+          sectionsCount: newStates.left.sections.length,
+          height: newStates.left.height,
+        });
+      }
+
+      // Sync right side
+      if (layoutsData.rightSideLayout?.layoutSections) {
+        newStates.right = {
+          height: layoutsData.rightSideLayout.height,
+          sections: layoutsData.rightSideLayout.layoutSections.map((s: any) => ({
+            width: s.width,
+            isDoor: s.isDoor,
+            doorOffset: s.doorOffset,
+            position: s.position,
+          })),
+          photoId: layoutsData.rightSideLayout.photoId,
+        };
+        console.log('[TaskEditForm] Synced right side from backend:', {
+          sectionsCount: newStates.right.sections.length,
+          height: newStates.right.height,
+        });
+      }
+
+      // Sync back side
+      if (layoutsData.backSideLayout?.layoutSections) {
+        newStates.back = {
+          height: layoutsData.backSideLayout.height,
+          sections: layoutsData.backSideLayout.layoutSections.map((s: any) => ({
+            width: s.width,
+            isDoor: s.isDoor,
+            doorOffset: s.doorOffset,
+            position: s.position,
+          })),
+          photoId: layoutsData.backSideLayout.photoId,
+        };
+        console.log('[TaskEditForm] Synced back side from backend:', {
+          sectionsCount: newStates.back.sections.length,
+          height: newStates.back.height,
+          photoId: newStates.back.photoId,
+        });
+      }
+
+      setCurrentLayoutStates(newStates);
+      console.log('[TaskEditForm] ✅ Layout states synced with backend');
+      console.log('[TaskEditForm] ════════════════════════════════════════════════════════');
+    } else if (modifiedLayoutSides.size > 0) {
+      console.log('[TaskEditForm] Skipping layout sync - user has pending modifications:', Array.from(modifiedLayoutSides));
+    }
+  }, [layoutsData, modifiedLayoutSides.size]);
+
+  // When layout section opens, mark as having changes (because defaults are considered edits)
+  useEffect(() => {
+    if (isLayoutOpen && !hasLayoutChanges) {
+      console.log('');
+      console.log('🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢');
+      console.log('[TaskEditForm] Layout section opened!');
+      console.log('[TaskEditForm] Setting hasLayoutChanges = TRUE');
+      console.log('[TaskEditForm] Reason: Opening layout means user wants to configure it');
+      console.log('🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢');
+      console.log('');
+      setHasLayoutChanges(true);
+    }
+  }, [isLayoutOpen, hasLayoutChanges]);
+
   // Real-time validation of layout width balance
   useEffect(() => {
-    if (!layoutsData || !isLayoutOpen) {
+    if (!isLayoutOpen) {
       setLayoutWidthError(null);
       return;
     }
 
-    const leftLayout = layoutsData.leftSideLayout;
-    const rightLayout = layoutsData.rightSideLayout;
-    const leftSections = leftLayout?.layoutSections;
-    const rightSections = rightLayout?.layoutSections;
+    // Use current editing state if available, otherwise use saved data
+    const leftLayout = currentLayoutStates.left || layoutsData?.leftSideLayout;
+    const rightLayout = currentLayoutStates.right || layoutsData?.rightSideLayout;
+    const leftSections = leftLayout?.sections || leftLayout?.layoutSections;
+    const rightSections = rightLayout?.sections || rightLayout?.layoutSections;
 
     // Only validate if both sides exist and have sections
     if (leftSections && leftSections.length > 0 && rightSections && rightSections.length > 0) {
-      const leftTotalWidth = leftSections.reduce((sum: number, s: any) => sum + s.width, 0);
-      const rightTotalWidth = rightSections.reduce((sum: number, s: any) => sum + s.width, 0);
+      const leftTotalWidth = leftSections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
+      const rightTotalWidth = rightSections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
       const widthDifference = Math.abs(leftTotalWidth - rightTotalWidth);
       const maxAllowedDifference = 0.04; // 4cm in meters
 
       if (widthDifference > maxAllowedDifference) {
-        const errorMessage = `A largura total do lado Motorista (${leftTotalWidth.toFixed(2)}m) difere em mais de 4cm do lado Sapo (${rightTotalWidth.toFixed(2)}m). Diferença: ${(widthDifference * 100).toFixed(1)}cm. Ajuste as medidas para manter o equilíbrio.`;
+        const errorMessage = `O layout possui diferença de largura maior que 4cm entre os lados. Lado Motorista: ${leftTotalWidth.toFixed(2)}m, Lado Sapo: ${rightTotalWidth.toFixed(2)}m (diferença de ${(widthDifference * 100).toFixed(1)}cm). Ajuste as medidas antes de enviar o formulário.`;
         setLayoutWidthError(errorMessage);
       } else {
         setLayoutWidthError(null);
@@ -217,7 +348,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       // Clear error if one side doesn't have sections
       setLayoutWidthError(null);
     }
-  }, [layoutsData, isLayoutOpen]);
+  }, [layoutsData, currentLayoutStates, isLayoutOpen]);
 
 
   // Map task data to form values
@@ -417,12 +548,104 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
         console.log('[Submit] changedData keys:', Object.keys(changedData));
         console.log('[Submit] changedData.observation:', changedData.observation);
 
-        // If only layout changes exist (no form or file changes), just reload the page
-        if (Object.keys(changedData).length === 0 && hasLayoutChanges && !hasFileChanges && !hasCutsToCreate) {
-          console.log('[TaskEditForm] Only layout changes - reloading page');
-          setHasLayoutChanges(false);
-          window.location.href = `/producao/cronograma/detalhes/${task.id}`;
-          return;
+        // Track layout photo files
+        let layoutPhotoFiles: { side: string; file: File }[] = [];
+
+        // If layout changes exist, add layout data to changedData
+        console.log('[TaskEditForm SUBMIT] ========== LAYOUT CHANGES CHECK ==========');
+        console.log('[TaskEditForm SUBMIT] hasLayoutChanges:', hasLayoutChanges);
+        console.log('[TaskEditForm SUBMIT] modifiedLayoutSides (READING FROM STATE):', modifiedLayoutSides);
+        console.log('[TaskEditForm SUBMIT] modifiedLayoutSides type:', modifiedLayoutSides.constructor.name);
+        console.log('[TaskEditForm SUBMIT] modifiedLayoutSides as Array:', Array.from(modifiedLayoutSides));
+        console.log('[TaskEditForm SUBMIT] modifiedLayoutSides.size:', modifiedLayoutSides.size);
+        console.log('[TaskEditForm SUBMIT] Is Set?:', modifiedLayoutSides instanceof Set);
+
+        if (hasLayoutChanges) {
+          console.log('');
+          console.log('═══════════════════════════════════════════════════════════════');
+          console.log('[TaskEditForm SUBMIT] Layout changes detected - building payload');
+          console.log('[TaskEditForm SUBMIT] Modified sides:', Array.from(modifiedLayoutSides));
+          console.log('[TaskEditForm SUBMIT] Current layout states (FULL DETAILS):', {
+            left: currentLayoutStates.left ? {
+              height: currentLayoutStates.left.height,
+              sectionsCount: currentLayoutStates.left.sections?.length,
+              sections: currentLayoutStates.left.sections,
+              photoId: currentLayoutStates.left.photoId,
+              hasPhotoFile: !!currentLayoutStates.left.photoFile,
+              photoFileName: currentLayoutStates.left.photoFile?.name,
+            } : null,
+            right: currentLayoutStates.right ? {
+              height: currentLayoutStates.right.height,
+              sectionsCount: currentLayoutStates.right.sections?.length,
+              sections: currentLayoutStates.right.sections,
+              photoId: currentLayoutStates.right.photoId,
+              hasPhotoFile: !!currentLayoutStates.right.photoFile,
+              photoFileName: currentLayoutStates.right.photoFile?.name,
+            } : null,
+            back: currentLayoutStates.back ? {
+              height: currentLayoutStates.back.height,
+              sectionsCount: currentLayoutStates.back.sections?.length,
+              sections: currentLayoutStates.back.sections,
+              photoId: currentLayoutStates.back.photoId,
+              hasPhotoFile: !!currentLayoutStates.back.photoFile,
+              photoFileName: currentLayoutStates.back.photoFile?.name,
+            } : null,
+          });
+          const truckLayoutData: any = {};
+
+          // Add ONLY the sides that were actually modified by the user
+          for (const side of modifiedLayoutSides) {
+            console.log(`[TaskEditForm SUBMIT] Processing modified side: ${side}`);
+            const sideData = currentLayoutStates[side];
+            console.log(`[TaskEditForm SUBMIT] sideData for ${side}:`, sideData);
+
+            if (sideData && sideData.sections && sideData.sections.length > 0) {
+              const sideName = side === 'left' ? 'leftSide' : side === 'right' ? 'rightSide' : 'backSide';
+
+              // Extract photo file if present
+              if (sideData.photoFile && sideData.photoFile instanceof File) {
+                console.log(`[TaskEditForm SUBMIT] 📷 Found photo file for ${sideName}:`, sideData.photoFile.name);
+                layoutPhotoFiles.push({ side: sideName, file: sideData.photoFile });
+              }
+
+              truckLayoutData[sideName] = {
+                height: sideData.height,
+                sections: sideData.sections,
+                photoId: sideData.photoId || null,
+                // Don't include file in JSON - it will be in FormData
+              };
+              console.log(`[TaskEditForm SUBMIT] ✅ Added modified ${sideName} to payload:`, {
+                height: truckLayoutData[sideName].height,
+                sectionsCount: truckLayoutData[sideName].sections.length,
+                sections: truckLayoutData[sideName].sections,
+                photoId: truckLayoutData[sideName].photoId,
+                hasPhotoFile: !!sideData.photoFile,
+              });
+            } else {
+              console.log(`[TaskEditForm SUBMIT] ⚠️ Side ${side} has no sections or invalid data!`);
+              console.log(`[TaskEditForm SUBMIT] Debug info:`, {
+                hasSideData: !!sideData,
+                hasSections: !!sideData?.sections,
+                sectionsLength: sideData?.sections?.length,
+                sideDataKeys: sideData ? Object.keys(sideData) : [],
+              });
+            }
+          }
+
+          console.log(`[TaskEditForm SUBMIT] 📷 Total photo files to upload:`, layoutPhotoFiles.length);
+
+          if (Object.keys(truckLayoutData).length > 0) {
+            changedData.truckLayoutData = truckLayoutData;
+            console.log('[TaskEditForm SUBMIT] ✅ Final truckLayoutData (only modified sides):', JSON.stringify(truckLayoutData, null, 2));
+          } else {
+            console.log('[TaskEditForm SUBMIT] ❌ No modified sides to send - this is wrong!');
+            console.log('[TaskEditForm SUBMIT] Debugging info:');
+            console.log('  - hasLayoutChanges:', hasLayoutChanges);
+            console.log('  - modifiedLayoutSides size:', modifiedLayoutSides.size);
+            console.log('  - modifiedLayoutSides array:', Array.from(modifiedLayoutSides));
+          }
+          console.log('═══════════════════════════════════════════════════════════════');
+          console.log('');
         }
 
         // If only cuts exist (no other changes), we still need to update the task to trigger cut creation
@@ -454,8 +677,16 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
         const hasNewFiles = newBudgetFiles.length > 0 || newNnvoiceFiles.length > 0 ||
                            newReceiptFiles.length > 0 || newArtworkFiles.length > 0 ||
-                           hasCutFiles || hasAirbrushingFiles || newObservationFiles.length > 0;
-        console.log('[Submit] hasNewFiles:', hasNewFiles, 'newObservationFiles:', newObservationFiles.length);
+                           hasCutFiles || hasAirbrushingFiles || newObservationFiles.length > 0 ||
+                           layoutPhotoFiles.length > 0;
+        console.log('[Submit] hasNewFiles:', hasNewFiles, {
+          budgets: newBudgetFiles.length,
+          invoices: newNnvoiceFiles.length,
+          receipts: newReceiptFiles.length,
+          artworks: newArtworkFiles.length,
+          observations: newObservationFiles.length,
+          layoutPhotos: layoutPhotoFiles.length,
+        });
 
         let result;
 
@@ -482,6 +713,16 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
             console.log('[Submit] Adding observation files to FormData:', newObservationFiles.length);
             files.observationFiles = newObservationFiles.filter(f => f instanceof File) as File[];
             console.log('[Submit] observationFiles files:', files.observationFiles.length);
+          }
+
+          // Add layout photo files if any (sent WITH task update, backend handles them)
+          if (layoutPhotoFiles.length > 0) {
+            console.log('[Submit] Adding layout photo files to FormData:', layoutPhotoFiles.length);
+            layoutPhotoFiles.forEach(({ side, file }) => {
+              // Backend expects: layoutPhotos.leftSide, layoutPhotos.rightSide, layoutPhotos.backSide
+              files[`layoutPhotos.${side}`] = [file];
+              console.log(`[Submit] Added layout photo for ${side}:`, file.name);
+            });
           }
 
           // DON'T send cuts with task update - they'll be created separately
@@ -614,6 +855,20 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
             }
           );
 
+          console.log('[TaskEditForm] ========== FINAL FORMDATA BEFORE NETWORK REQUEST ==========');
+          console.log('[TaskEditForm] dataForFormData keys:', Object.keys(dataForFormData));
+          console.log('[TaskEditForm] dataForFormData.truckLayoutData:', dataForFormData.truckLayoutData ? JSON.stringify(dataForFormData.truckLayoutData, null, 2) : 'MISSING');
+          console.log('[TaskEditForm] files keys:', Object.keys(files));
+          console.log('[TaskEditForm] FormData entries:');
+          for (const [key, value] of (formData as any).entries()) {
+            if (value instanceof File) {
+              console.log(`  ${key}: [File: ${value.name}]`);
+            } else {
+              console.log(`  ${key}:`, value);
+            }
+          }
+          console.log('[TaskEditForm] ═══════════════════════════════════════════════════════════');
+
           result = await updateAsync({
             id: task.id,
             data: formData as any,
@@ -652,9 +907,12 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
             receipts: currentReceiptIds.length,
           });
 
+          console.log('[TaskEditForm] ========== FINAL JSON BEFORE NETWORK REQUEST ==========');
           console.log('[TaskEditForm] Using JSON submission (no files)');
           console.log('[TaskEditForm] submitData keys:', Object.keys(submitData));
-          console.log('[TaskEditForm] submitData:', JSON.stringify(submitData, null, 2).substring(0, 500));
+          console.log('[TaskEditForm] submitData.truckLayoutData:', submitData.truckLayoutData ? JSON.stringify(submitData.truckLayoutData, null, 2) : 'MISSING');
+          console.log('[TaskEditForm] Full submitData:', JSON.stringify(submitData, null, 2));
+          console.log('[TaskEditForm] ═══════════════════════════════════════════════════════════');
 
           result = await updateAsync({
             id: task.id,
@@ -673,9 +931,20 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
         if (result.success) {
           console.log('[TaskEditForm] ========== TASK UPDATE SUCCESSFUL ==========');
           console.log('[TaskEditForm] Task update result:', result);
+          console.log('[TaskEditForm] Layouts were created/updated by backend during task transaction');
 
+          // CRITICAL: Clear flags BEFORE clearing modifiedLayoutSides
+          // This order matters because the sync effect depends on these flags
           setHasLayoutChanges(false);
           setHasFileChanges(false);
+
+          // CRITICAL: Clear modified sides AFTER the state flags
+          // The sync effect at line 229 checks modifiedLayoutSides.size === 0 && !hasLayoutChanges
+          // We need both conditions to be true for the sync to happen
+          setModifiedLayoutSides(new Set());
+
+          console.log('[TaskEditForm] ✅ Cleared layout change flags and modified sides');
+          console.log('[TaskEditForm] Backend data will sync on next render');
 
           // Create cuts separately via POST /cuts with FormData
           console.log('[TaskEditForm] ========== CREATING CUTS SEPARATELY ==========');
@@ -761,6 +1030,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
             console.log(`[TaskEditForm] Cut creation summary: ${totalCreated} created, ${totalFailed} failed`);
           }
 
+          // Layout photos are uploaded WITH the task update (not separately like cuts)
+          // The backend handles them in the transaction at lines 683-728 of task.service.ts
+          console.log('[TaskEditForm] Layout photos were uploaded with task update');
+
           // Navigate to the task detail page
           console.log('[TaskEditForm] ========== NAVIGATING TO TASK DETAILS ==========');
           window.location.href = `/producao/cronograma/detalhes/${task.id}`;
@@ -771,7 +1044,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
         setIsSubmitting(false);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, budgetFile, nfeFile, receiptFile, uploadedFiles, observationFiles, isObservationOpen, layoutWidthError]
+    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, budgetFile, nfeFile, receiptFile, uploadedFiles, observationFiles, isObservationOpen, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
   );
 
   // Use the edit form hook with change detection
@@ -905,7 +1178,25 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
   // Check if there are changes (form fields, layout, or files)
   // This will be recalculated on every form value change thanks to form.watch() above
-  const hasChanges = Object.keys(getChangedFields()).length > 0 || hasLayoutChanges || hasFileChanges;
+  const formFieldChanges = getChangedFields();
+  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges;
+
+  // Log whenever hasChanges evaluation happens
+  useEffect(() => {
+    console.log('');
+    console.log('▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼');
+    console.log('[TaskEditForm SUBMIT BUTTON] Checking if changes exist');
+    console.log('[TaskEditForm SUBMIT BUTTON] Form field changes:', {
+      count: Object.keys(formFieldChanges).length,
+      fields: Object.keys(formFieldChanges),
+    });
+    console.log('[TaskEditForm SUBMIT BUTTON] hasLayoutChanges:', hasLayoutChanges);
+    console.log('[TaskEditForm SUBMIT BUTTON] hasFileChanges:', hasFileChanges);
+    console.log('[TaskEditForm SUBMIT BUTTON] ➡️  hasChanges (FINAL):', hasChanges);
+    console.log('[TaskEditForm SUBMIT BUTTON] Submit button will be:', hasChanges ? '✅ ENABLED' : '❌ DISABLED');
+    console.log('▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲');
+    console.log('');
+  }, [hasChanges, hasLayoutChanges, hasFileChanges, formFieldChanges]);
 
   // Check for validation errors that should prevent submission
   const hasCutsWithoutFiles = useMemo(() => {
@@ -1312,6 +1603,11 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                       <CardTitle className="flex items-center gap-2">
                         <IconRuler className="h-5 w-5" />
                         Layout do Caminhão
+                        {(layoutsData?.leftSideLayout || layoutsData?.rightSideLayout || layoutsData?.backSideLayout) && truckId && (
+                          <span className="text-xs text-muted-foreground font-normal">
+                            (ID: {truckId.slice(0, 8)}...)
+                          </span>
+                        )}
                       </CardTitle>
                       {!isLayoutOpen ? (
                         <Button
@@ -1340,32 +1636,57 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                   <CardContent>
                     {isLayoutOpen ? (
                       <div className="space-y-4">
-                        {/* Layout Side Selector */}
-                        <div className="flex gap-2">
-                          <Button type="button" variant={selectedLayoutSide === "left" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("left")}>
-                            Motorista
-                            {layoutsData?.leftSideLayout && (
-                              <Badge variant="success" className="ml-2">
-                                Configurado
-                              </Badge>
-                            )}
-                          </Button>
-                          <Button type="button" variant={selectedLayoutSide === "right" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("right")}>
-                            Sapo
-                            {layoutsData?.rightSideLayout && (
-                              <Badge variant="success" className="ml-2">
-                                Configurado
-                              </Badge>
-                            )}
-                          </Button>
-                          <Button type="button" variant={selectedLayoutSide === "back" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("back")}>
-                            Traseira
-                            {layoutsData?.backSideLayout && (
-                              <Badge variant="success" className="ml-2">
-                                Configurado
-                              </Badge>
-                            )}
-                          </Button>
+                        {/* Layout Side Selector with Total Length */}
+                        <div className="flex justify-between items-center">
+                          <div className="flex gap-2">
+                            <Button type="button" variant={selectedLayoutSide === "left" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("left")}>
+                              Motorista
+                              {layoutsData?.leftSideLayout && (
+                                <Badge variant="success" className="ml-2">
+                                  Configurado
+                                </Badge>
+                              )}
+                            </Button>
+                            <Button type="button" variant={selectedLayoutSide === "right" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("right")}>
+                              Sapo
+                              {layoutsData?.rightSideLayout && (
+                                <Badge variant="success" className="ml-2">
+                                  Configurado
+                                </Badge>
+                              )}
+                            </Button>
+                            <Button type="button" variant={selectedLayoutSide === "back" ? "default" : "outline"} size="sm" onClick={() => setSelectedLayoutSide("back")}>
+                              Traseira
+                              {layoutsData?.backSideLayout && (
+                                <Badge variant="success" className="ml-2">
+                                  Configurado
+                                </Badge>
+                              )}
+                            </Button>
+                          </div>
+
+                          {/* Total Length Display */}
+                          <div className="px-3 py-1 bg-primary/10 rounded-md">
+                            <span className="text-sm text-muted-foreground">Comprimento Total: </span>
+                            <span className="text-sm font-semibold text-foreground">
+                              {(() => {
+                                // Use current editing state if available, otherwise use saved data
+                                const currentState = currentLayoutStates[selectedLayoutSide];
+                                const savedLayout = selectedLayoutSide === "left"
+                                  ? layoutsData?.leftSideLayout
+                                  : selectedLayoutSide === "right"
+                                    ? layoutsData?.rightSideLayout
+                                    : layoutsData?.backSideLayout;
+
+                                const currentLayout = currentState || savedLayout;
+                                const sections = currentLayout?.sections || currentLayout?.layoutSections;
+
+                                if (!sections || sections.length === 0) return "0,00m";
+                                const totalWidth = sections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
+                                return totalWidth.toFixed(2).replace(".", ",") + "m";
+                              })()}
+                            </span>
+                          </div>
                         </div>
 
                         {/* Layout Form - Read-only for Financial and Designer users */}
@@ -1379,32 +1700,90 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                                 : layoutsData?.backSideLayout
                           }
                           validationError={layoutWidthError}
+                          onChange={(side, layoutData) => {
+                            console.log('');
+                            console.log('████████████████████████████████████████████████████████████████');
+                            console.log('█ [TaskEditForm] onChange RECEIVED FROM LayoutForm            █');
+                            console.log('████████████████████████████████████████████████████████████████');
+                            console.log('[TaskEditForm] onChange Input:', {
+                              side,
+                              layoutData: {
+                                height: layoutData.height,
+                                sectionsCount: layoutData.sections?.length,
+                                sections: layoutData.sections?.map((s: any) => ({
+                                  width: s.width,
+                                  isDoor: s.isDoor,
+                                  doorOffset: s.doorOffset,
+                                })),
+                                totalWidth: layoutData.sections?.reduce((sum: number, s: any) => sum + s.width, 0),
+                              },
+                            });
+
+                            console.log('[TaskEditForm] Current state BEFORE update:', {
+                              left: currentLayoutStates.left ? {
+                                totalWidth: currentLayoutStates.left.sections?.reduce((sum: number, s: any) => sum + s.width, 0),
+                                sectionsCount: currentLayoutStates.left.sections?.length,
+                              } : 'default/null',
+                              right: currentLayoutStates.right ? {
+                                totalWidth: currentLayoutStates.right.sections?.reduce((sum: number, s: any) => sum + s.width, 0),
+                                sectionsCount: currentLayoutStates.right.sections?.length,
+                              } : 'default/null',
+                              back: currentLayoutStates.back ? {
+                                totalWidth: currentLayoutStates.back.sections?.reduce((sum: number, s: any) => sum + s.width, 0),
+                                sectionsCount: currentLayoutStates.back.sections?.length,
+                              } : 'default/null',
+                            });
+
+                            // Mark this side as modified
+                            setModifiedLayoutSides(prev => {
+                              console.log('[TaskEditForm] setModifiedLayoutSides CALLED');
+                              console.log('[TaskEditForm] Previous modifiedLayoutSides:', Array.from(prev));
+                              const newSet = new Set(prev);
+                              newSet.add(side);
+                              console.log('[TaskEditForm] NEW modifiedLayoutSides (adding ' + side + '):', Array.from(newSet));
+                              console.log('[TaskEditForm] Returning new Set with size:', newSet.size);
+                              return newSet;
+                            });
+
+                            // CRITICAL FIX: Mark as having layout changes to enable submit button
+                            // This was missing - onChange was not setting hasLayoutChanges!
+                            // Without this, door removal and photo uploads don't enable the submit button
+                            console.log('[TaskEditForm] onChange triggered - setting hasLayoutChanges = TRUE');
+                            setHasLayoutChanges(true);
+
+                            // Track current editing state for real-time updates
+                            setCurrentLayoutStates(prev => {
+                              const newState = {
+                                ...prev,
+                                [side]: layoutData,
+                              };
+
+                              console.log('[TaskEditForm] State AFTER update:', {
+                                [side]: {
+                                  totalWidth: layoutData.sections?.reduce((sum: number, s: any) => sum + s.width, 0),
+                                  sectionsCount: layoutData.sections?.length,
+                                  hasPhotoFile: !!layoutData.photoFile,
+                                  photoFileName: layoutData.photoFile?.name,
+                                },
+                              });
+                              console.log('[TaskEditForm] ✅ State updated successfully');
+                              console.log('████████████████████████████████████████████████████████████████');
+                              console.log('');
+
+                              return newState;
+                            });
+                          }}
                           onSave={async (layoutData) => {
                             if (layoutData) {
-                              console.log('[TaskEditForm] LayoutForm onSave called', {
+                              console.log('[TaskEditForm] LayoutForm onSave called - layouts will be saved with task submission', {
                                 side: selectedLayoutSide,
                                 layoutData,
                                 sectionsCount: layoutData.sections?.length,
-                                currentLayoutsData: layoutsData,
                               });
 
-                              // If no truckId exists, the backend will create one
-                              const effectiveTruckId = truckId || task.id; // Use task ID as fallback
-                              console.log('[TaskEditForm] Calling createOrUpdateTruckLayout', {
-                                effectiveTruckId,
-                                side: selectedLayoutSide,
-                              });
-
-                              await createOrUpdateTruckLayout({
-                                truckId: effectiveTruckId,
-                                side: selectedLayoutSide,
-                                data: layoutData,
-                              });
-
-                              console.log('[TaskEditForm] Layout saved successfully');
+                              // Mark layout changes to enable submit button
+                              // Layout will be saved when user submits the task form
                               setHasLayoutChanges(true);
-                              // Layout dimensions are now managed by the Layout system
-                              // Width validation happens in real-time via useEffect
                             }
                           }}
                           showPhoto={selectedLayoutSide === "back"}

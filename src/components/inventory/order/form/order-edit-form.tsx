@@ -292,6 +292,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     supplierId: supplierId || order.supplierId || undefined,
     forecast: forecast || order.forecast || undefined,
     notes: notes || order.notes || "",
+    // Initialize temporary items from URL state or order data
+    temporaryItems: temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems,
   };
 
   const form = useForm<OrderUpdateFormData>({
@@ -364,6 +366,43 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes]);
+
+  useEffect(() => {
+    const currentValue = form.getValues("temporaryItems");
+    const newValue = temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems;
+    // Only update if value has actually changed
+    // Deep comparison for array of objects
+    if (JSON.stringify(currentValue) !== JSON.stringify(newValue)) {
+      console.log('[useEffect TEMPORARY ITEMS SYNC] URL state changed to:', newValue);
+      console.log('[useEffect TEMPORARY ITEMS SYNC] Setting form value to:', newValue);
+      form.setValue("temporaryItems", newValue, {
+        shouldValidate: false,
+        shouldDirty: false,
+        shouldTouch: false
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [temporaryItemsState, temporaryItems]);
+
+  // Sync form temporaryItems back to URL state when they change
+  // This ensures that temporary items are preserved when navigating between steps
+  useEffect(() => {
+    if (orderItemMode === "temporary") {
+      const subscription = form.watch((value, { name }) => {
+        if (name?.startsWith('temporaryItems')) {
+          const currentTemporaryItems = value.temporaryItems || [];
+          const urlTemporaryItems = temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems;
+
+          // Only update URL state if form state has actually changed
+          if (JSON.stringify(currentTemporaryItems) !== JSON.stringify(urlTemporaryItems)) {
+            console.log('[FORM WATCH] Temporary items changed in form, syncing to URL state:', currentTemporaryItems);
+            setTemporaryItems(currentTemporaryItems as any);
+          }
+        }
+      });
+      return () => subscription.unsubscribe();
+    }
+  }, [form, orderItemMode, temporaryItemsState, temporaryItems, setTemporaryItems]);
 
   // Mutations - use update instead of create
   const { updateAsync, isLoading: isSubmitting } = useOrderMutations();
@@ -1222,6 +1261,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               // Trigger validation after state update
                               setTimeout(() => form.trigger(), 0);
                             }}
+                            transparent
                             className={`h-10 w-full ${form.formState.errors.description ? "border-red-500" : ""}`}
                           />
                           <FormMessage className="text-sm text-red-500">{form.formState.errors.description?.message}</FormMessage>
@@ -1321,7 +1361,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 Previsão de Entrega
                               </Label>
                               <DateTimeInput
-                                value={forecast instanceof Date ? forecast : undefined}
+                                value={forecast ? (forecast instanceof Date ? forecast : new Date(forecast)) : undefined}
                                 onChange={(date) => {
                                   if (date) {
                                     // Set to 13:00 São Paulo time

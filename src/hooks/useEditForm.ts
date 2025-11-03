@@ -224,16 +224,23 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
 
   // Handle form submission
   const handleSubmitChanges = (onValid?: (data: Partial<TFieldValues>) => unknown, onInvalid?: (errors: any) => unknown) => {
+    console.log('[useEditForm] handleSubmitChanges CALLED - returning handleSubmit wrapper');
     return form.handleSubmit(() => {
+      console.log('[useEditForm] ========== FORM VALIDATION PASSED - EXECUTING SUBMIT ==========');
       const changedFields = getChangedFields();
 
-      console.log("Changed fields:", changedFields);
+      console.log("[useEditForm] Changed fields:", changedFields);
 
       // Call onSubmit with changed fields
+      console.log('[useEditForm] Calling onSubmit with changedFields...');
       const result = onSubmit(changedFields);
       if (onValid) onValid(changedFields);
       return result;
-    }, onInvalid);
+    }, (errors) => {
+      console.error('[useEditForm] ========== FORM VALIDATION FAILED ==========');
+      console.error('[useEditForm] Validation errors:', errors);
+      if (onInvalid) onInvalid(errors);
+    });
   };
 
   return {

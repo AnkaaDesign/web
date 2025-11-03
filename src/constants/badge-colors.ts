@@ -85,7 +85,9 @@ type BadgeVariant =
   | "green"
   | "teal"
   | "indigo"
-  | "pink";
+  | "pink"
+  | "yellow"
+  | "amber";
 
 /**
  * Badge Color Definitions
@@ -232,9 +234,9 @@ export const BADGE_COLORS: Record<
     hover: "hover:bg-green-700",
   },
   teal: {
-    bg: "bg-teal-600",
+    bg: "bg-teal-500",
     text: "text-white",
-    hover: "hover:bg-teal-700",
+    hover: "hover:bg-teal-600",
   },
   indigo: {
     bg: "bg-indigo-600",
@@ -246,6 +248,16 @@ export const BADGE_COLORS: Record<
     text: "text-white",
     hover: "hover:bg-pink-700",
   },
+  yellow: {
+    bg: "bg-yellow-500",
+    text: "text-white",
+    hover: "hover:bg-yellow-600",
+  },
+  amber: {
+    bg: "bg-amber-500",
+    text: "text-white",
+    hover: "hover:bg-amber-600",
+  },
 };
 
 /**
@@ -256,10 +268,10 @@ export const ENTITY_BADGE_CONFIG = {
   // Order Status
   ORDER: {
     [ORDER_STATUS.CREATED]: "primary" as BadgeVariant,
-    [ORDER_STATUS.PARTIALLY_FULFILLED]: "warning" as BadgeVariant,
-    [ORDER_STATUS.FULFILLED]: "pending" as BadgeVariant, // Yellow - Feito
-    [ORDER_STATUS.OVERDUE]: "warning" as BadgeVariant, // Changed from error to warning (orange)
-    [ORDER_STATUS.PARTIALLY_RECEIVED]: "warning" as BadgeVariant,
+    [ORDER_STATUS.PARTIALLY_FULFILLED]: "yellow" as BadgeVariant, // Yellow-500 - Parcialmente Feito
+    [ORDER_STATUS.FULFILLED]: "amber" as BadgeVariant, // Amber-500 - Feito
+    [ORDER_STATUS.OVERDUE]: "purple" as BadgeVariant, // Purple-600 - Atrasado
+    [ORDER_STATUS.PARTIALLY_RECEIVED]: "teal" as BadgeVariant, // Teal-500 - Parcialmente Recebido
     [ORDER_STATUS.RECEIVED]: "success" as BadgeVariant,
     [ORDER_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
@@ -589,9 +601,9 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
   VERIFIED: "success",
   RETURNED: "completed",
   LOST: "destructive",
-  OVERDUE: "warning", // Changed from error to warning
+  OVERDUE: "purple", // Purple-600 for overdue
   CREATED: "primary",
-  FULFILLED: "success",
+  FULFILLED: "amber", // Amber-500 for fulfilled orders
   RECEIVED: "success",
   SENT: "info",
   ON_HOLD: "onHold",
@@ -652,8 +664,8 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
   FINAL_WARNING: "destructive",
   PENDING_JUSTIFICATION: "pending",
   JUSTIFICATION_SUBMITTED: "info",
-  PARTIALLY_FULFILLED: "warning",
-  PARTIALLY_RECEIVED: "warning",
+  PARTIALLY_FULFILLED: "yellow", // Yellow-500 for partially fulfilled orders
+  PARTIALLY_RECEIVED: "teal", // Teal-500 for partially received orders
   PARTIALLY_RETURNED: "warning",
   FULLY_RETURNED: "success",
 
@@ -756,7 +768,7 @@ export const BOOLEAN_BADGE_CONFIG = {
     false: "pending" as BadgeVariant,
   },
   isOverdue: {
-    true: "warning" as BadgeVariant, // Changed from error to warning
+    true: "purple" as BadgeVariant, // Purple-600 for overdue
     false: "default" as BadgeVariant,
   },
 };

@@ -308,10 +308,28 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
           </Button>
         </div>
 
-        <Button onClick={downloadSVG} size="sm" variant="default">
-          <IconDownload className="h-4 w-4 mr-1" />
-          Baixar SVG
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={downloadSVG} size="sm" variant="default">
+            <IconDownload className="h-4 w-4 mr-1" />
+            Baixar Layout
+          </Button>
+
+          {/* Layout photo download button */}
+          {currentLayout?.photo && (
+            <Button
+              onClick={() => {
+                const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
+                const photoUrl = `${apiUrl}/files/${currentLayout.photo.id}/download`;
+                window.open(photoUrl, '_blank');
+              }}
+              size="sm"
+              variant="outline"
+            >
+              <IconDownload className="h-4 w-4 mr-1" />
+              Baixar Foto do Layout
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* SVG Preview */}

@@ -1286,12 +1286,16 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         const normalized = internalValue.replace(",", ".");
         const numValue = parseFloat(normalized);
 
-        if (isNaN(numValue) || internalValue === "" || internalValue === ",") {
-          // Reset to minimum value if invalid - keep natural format
-          const minDisplay = min.toString().replace(".", ",");
-          setInternalValue(minDisplay);
-          setDisplayValue(minDisplay);
-          onChange?.(min);
+        // Allow empty values - don't force minimum
+        if (internalValue === "" || internalValue === "," || internalValue === ".") {
+          setInternalValue("");
+          setDisplayValue("");
+          onChange?.(null);
+        } else if (isNaN(numValue)) {
+          // Invalid input - clear the field
+          setInternalValue("");
+          setDisplayValue("");
+          onChange?.(null);
         } else if (numValue < min) {
           // Enforce minimum - keep natural format
           const minDisplay = min.toString().replace(".", ",");

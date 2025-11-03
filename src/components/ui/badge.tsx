@@ -38,11 +38,17 @@ const badgeVariants = cva(
         destructive: "border-transparent bg-red-700 text-white hover:bg-red-800",
         cancelled: "border-transparent bg-red-700 text-white hover:bg-red-800",
 
+        // Financial variants
+        invoiced: "border-transparent bg-cyan-600 text-white hover:bg-cyan-700",
+        settled: "border-transparent bg-emerald-600 text-white hover:bg-emerald-700",
+
         // Additional color variants
         purple: "border-transparent bg-purple-600 text-white hover:bg-purple-700",
-        teal: "border-transparent bg-teal-600 text-white hover:bg-teal-700",
+        teal: "border-transparent bg-teal-500 text-white hover:bg-teal-600",
         indigo: "border-transparent bg-indigo-600 text-white hover:bg-indigo-700",
         pink: "border-transparent bg-pink-600 text-white hover:bg-pink-700",
+        yellow: "border-transparent bg-yellow-500 text-white hover:bg-yellow-600",
+        amber: "border-transparent bg-amber-500 text-white hover:bg-amber-600",
 
         // Inactive variant
         inactive: "border-transparent bg-gray-500 text-white hover:bg-gray-600",

@@ -1736,29 +1736,45 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   }
 
   // Handle date formatting for known date fields
+  // Date-only fields (no time component needed)
   if (
-    field === "createdAt" ||
-    field === "updatedAt" ||
     field === "expirationDate" ||
     field === "manufacturingDate" ||
     field === "lastPurchaseDate" ||
     field === "deliveryDate" ||
     field === "receivedDate" ||
     field === "dueDate" ||
-    field === "startedAt" ||
-    field === "completedAt" ||
-    field === "finishedAt" ||
     field === "entryDate" ||
     field === "term" ||
     field === "scheduledFor" ||
     field === "forecast" ||
-    field === "receivedAt" ||
-    field === "fulfilledAt" ||
     field === "scheduledDate" ||
     field === "actualDeliveryDate" ||
     field === "nextRun" ||
     field === "lastRun" ||
     field === "birth" ||
+    field === "productionDate" ||
+    field === "admissional" ||
+    field === "exp1StartAt" ||
+    field === "exp1EndAt" ||
+    field === "exp2StartAt" ||
+    field === "exp2EndAt"
+  ) {
+    const date = new Date(value as any);
+    if (!isNaN(date.getTime())) {
+      return formatDate(date);
+    }
+  }
+
+  // DateTime fields (include time component)
+  if (
+    field === "createdAt" ||
+    field === "updatedAt" ||
+    field === "startedAt" ||
+    field === "completedAt" ||
+    field === "finishedAt" ||
+    field === "receivedAt" ||
+    field === "fulfilledAt" ||
     field === "verificationExpiresAt" ||
     field === "lastLoginAt" ||
     field === "startAt" ||
@@ -1766,16 +1782,10 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     field === "approvedAt" ||
     field === "rejectedAt" ||
     field === "cancelledAt" ||
-    field === "productionDate" ||
     field === "sentAt" ||
     field === "scheduledAt" ||
     field === "seenAt" ||
-    field === "admissional" ||
     field === "contractedAt" ||
-    field === "exp1StartAt" ||
-    field === "exp1EndAt" ||
-    field === "exp2StartAt" ||
-    field === "exp2EndAt" ||
     field === "dismissedAt"
   ) {
     const date = new Date(value as any);
