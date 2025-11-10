@@ -1,6 +1,6 @@
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { usePaintFormula, usePaintFormulaMutations } from "../../../../hooks";
-import { FormulaManager } from "@/components/paint/formula/formula-manager";
+import { FormulaManager } from "@/components/painting/formula/formula-manager";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

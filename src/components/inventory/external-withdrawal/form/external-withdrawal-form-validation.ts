@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Item, User } from "../../../../types";
+import { EXTERNAL_WITHDRAWAL_TYPE } from "../../../../constants";
 
 // =====================
 // VALIDATION ERROR TYPES
@@ -32,7 +33,7 @@ export interface StageValidationResult {
 export const stage1ValidationSchema = z.object({
   withdrawerId: z.string().min(1, "Usuário retirador deve ser selecionado"),
   withdrawerName: z.string().min(2, "Nome do retirador deve ter pelo menos 2 caracteres"),
-  willReturn: z.boolean(),
+  type: z.nativeEnum(EXTERNAL_WITHDRAWAL_TYPE),
   observations: z.string().max(500, "Observações devem ter no máximo 500 caracteres").optional(),
 });
 
@@ -46,13 +47,13 @@ export const stage2ItemSchema = z.object({
 // Stage 2 validation schema
 export const stage2ValidationSchema = z.object({
   selectedItems: z.array(stage2ItemSchema).min(1, "Pelo menos um item deve ser selecionado"),
-  willReturn: z.boolean(),
+  type: z.nativeEnum(EXTERNAL_WITHDRAWAL_TYPE),
 });
 
 // Complete form validation schema
 export const completeFormValidationSchema = z.object({
   withdrawerName: z.string().min(2, "Nome do retirador deve ter pelo menos 2 caracteres"),
-  willReturn: z.boolean(),
+  type: z.nativeEnum(EXTERNAL_WITHDRAWAL_TYPE),
   notes: z.string().max(500, "Observações devem ter no máximo 500 caracteres").optional(),
   items: z.array(stage2ItemSchema).min(1, "Pelo menos um item deve ser selecionado"),
 });
@@ -78,7 +79,7 @@ export function validateStage1(
   data: {
     withdrawerId?: string;
     withdrawerName?: string;
-    willReturn?: boolean;
+    type?: EXTERNAL_WITHDRAWAL_TYPE;
     observations?: string;
   },
   context: ValidationContext = {},
@@ -151,7 +152,7 @@ export function validateStage2(
       quantity: number;
       unitPrice?: number | null;
     }>;
-    willReturn: boolean;
+    type: EXTERNAL_WITHDRAWAL_TYPE;
   },
   context: ValidationContext = {},
 ): StageValidationResult {
@@ -237,8 +238,8 @@ export function validateStage2(
       }
     }
 
-    // Validate price (only if willReturn is false)
-    if (!data.willReturn) {
+    // Validate price (only if type is CHARGEABLE)
+    if (data.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
       if (item.unitPrice === undefined || item.unitPrice === null || item.unitPrice <= 0) {
         errors.push({
           field: `${fieldPrefix}.unitPrice`,
@@ -303,7 +304,7 @@ export function validateStage2(
 export function validateCompleteForm(
   data: {
     withdrawerName: string;
-    willReturn: boolean;
+    type: EXTERNAL_WITHDRAWAL_TYPE;
     notes?: string;
     items: Array<{
       itemId: string;
@@ -320,7 +321,7 @@ export function validateCompleteForm(
   const stage1Result = validateStage1(
     {
       withdrawerName: data.withdrawerName,
-      willReturn: data.willReturn,
+      type: data.type,
       observations: data.notes,
     },
     context,
@@ -332,7 +333,7 @@ export function validateCompleteForm(
   const stage2Result = validateStage2(
     {
       selectedItems: data.items,
-      willReturn: data.willReturn,
+      type: data.type,
     },
     context,
   );
@@ -343,14 +344,14 @@ export function validateCompleteForm(
   }
 
   // Additional complete form validations
-  const totalValue = !data.willReturn
+  const totalValue = data.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
     ? data.items.reduce((sum, item) => {
         return sum + (item.unitPrice || 0) * item.quantity;
       }, 0)
     : 0;
 
   // Warning for high-value transactions
-  if (!data.willReturn && totalValue > 10000) {
+  if (data.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && totalValue > 10000) {
     warnings.push({
       field: "total",
       message: `Valor total elevado: R$ ${totalValue.toFixed(2)}. Confirme os preços.`,
@@ -390,10 +391,10 @@ export function checkStockAvailability(item: Item, requestedQuantity: number, al
   return null;
 }
 
-export function validateItemPrice(item: Item, price: number | null | undefined, willReturn: boolean): ValidationError[] {
+export function validateItemPrice(item: Item, price: number | null | undefined, type: EXTERNAL_WITHDRAWAL_TYPE): ValidationError[] {
   const errors: ValidationError[] = [];
 
-  if (!willReturn) {
+  if (type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
     if (price === undefined || price === null || price <= 0) {
       errors.push({
         field: "unitPrice",
@@ -413,7 +414,7 @@ export function validateItemPrice(item: Item, price: number | null | undefined, 
 export function validateBusinessRules(
   data: {
     withdrawerName: string;
-    willReturn: boolean;
+    type: EXTERNAL_WITHDRAWAL_TYPE;
     items: Array<{
       itemId: string;
       quantity: number;

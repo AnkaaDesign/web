@@ -1,7 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import type { ExternalWithdrawal } from "../../../../types";
-import { routes, EXTERNAL_WITHDRAWAL_STATUS } from "../../../../constants";
+import { routes, EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-to
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { formatCurrency, formatDate } from "../../../../utils";
 import { ExternalWithdrawalStatusBadge } from "../common/external-withdrawal-status-badge";
-import { WillReturnBadge } from "../common/will-return-badge";
+import { Badge } from "@/components/ui/badge";
 import { ExternalWithdrawalTableSkeleton } from "./external-withdrawal-table-skeleton";
 import { ContextMenuTrigger, type ContextMenuItem } from "@/components/ui/context-menu";
 
@@ -72,9 +72,14 @@ const createExternalWithdrawalColumns = (): ExternalWithdrawalColumn[] => [
     className: "w-40",
   },
   {
-    key: "willReturn",
-    header: "DEVOLUÇÃO",
-    accessor: (withdrawal) => <WillReturnBadge willReturn={withdrawal.willReturn} />,
+    key: "type",
+    header: "TIPO",
+    accessor: (withdrawal) => (
+      <Badge variant={withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE ? "default" :
+                     withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? "destructive" : "secondary"}>
+        {EXTERNAL_WITHDRAWAL_TYPE_LABELS[withdrawal.type]}
+      </Badge>
+    ),
     sortable: true,
     align: "left",
     className: "w-36",
@@ -145,7 +150,7 @@ const createExternalWithdrawalColumns = (): ExternalWithdrawalColumn[] => [
     key: "total",
     header: "VALOR TOTAL",
     accessor: (withdrawal) => {
-      if (!withdrawal.willReturn && withdrawal.items) {
+      if (withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && withdrawal.items) {
         const total = withdrawal.items.reduce((sum, item) => {
           const price = item.price || item.unitPrice || 0;
           return sum + item.withdrawedQuantity * price;
@@ -223,7 +228,7 @@ const createExternalWithdrawalColumns = (): ExternalWithdrawalColumn[] => [
 ];
 
 export function getDefaultVisibleColumns(): Set<string> {
-  return new Set(["withdrawerName", "status", "willReturn", "total", "createdAt"]);
+  return new Set(["withdrawerName", "status", "type", "total", "createdAt"]);
 }
 
 export function getAllColumns(): ExternalWithdrawalColumn[] {
@@ -378,7 +383,7 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
 
   const handleMarkAsReturned = React.useCallback(
     async (withdrawal: ExternalWithdrawal) => {
-      if (!withdrawal.willReturn) return;
+      if (withdrawal.type !== EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE) return;
 
       try {
         await markAsFullyReturned.mutateAsync({ id: withdrawal.id });
@@ -544,8 +549,8 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
                   },
                 ];
 
-                // Add "Marcar como devolvido" if willReturn is true
-                if (withdrawal.willReturn && withdrawal.status !== EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED) {
+                // Add "Marcar como devolvido" if type is RETURNABLE
+                if (withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE && withdrawal.status !== EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED) {
                   contextMenuItems.push({
                     id: "mark-returned",
                     label: "Marcar como devolvido",

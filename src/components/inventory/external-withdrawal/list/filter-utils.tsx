@@ -1,7 +1,7 @@
 import React from "react";
 import type { ExternalWithdrawalGetManyFormData } from "../../../../schemas";
 import { IconSearch, IconCalendar, IconFileText, IconReceipt, IconTags, IconArrowBack } from "@tabler/icons-react";
-import { EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_STATUS_LABELS } from "../../../../constants";
+import { EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_STATUS_LABELS, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 
 export interface FilterIndicator {
   id: string;
@@ -36,14 +36,14 @@ export const extractActiveFilters = (filters: Partial<ExternalWithdrawalGetManyF
     });
   }
 
-  // Will return filter
-  if (typeof filters.willReturn === "boolean") {
+  // Type filter
+  if (filters.types && filters.types.length > 0) {
     activeFilters.push({
-      id: "willReturn",
-      label: "Devolução",
-      value: filters.willReturn ? "Com devolução" : "Sem devolução",
+      id: "types",
+      label: "Tipo",
+      value: filters.types.map((type: EXTERNAL_WITHDRAWAL_TYPE) => EXTERNAL_WITHDRAWAL_TYPE_LABELS[type]).join(", "),
       icon: <IconArrowBack className="h-3 w-3" />,
-      onRemove: () => onRemoveFilter("willReturn"),
+      onRemove: () => onRemoveFilter("types"),
     });
   }
 
@@ -130,8 +130,8 @@ export const createFilterRemover = (filters: Partial<ExternalWithdrawalGetManyFo
       case "statuses":
         delete newFilters.statuses;
         break;
-      case "willReturn":
-        delete newFilters.willReturn;
+      case "types":
+        delete newFilters.types;
         break;
       case "hasNfe":
         delete newFilters.hasNfe;

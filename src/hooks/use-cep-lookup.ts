@@ -10,8 +10,8 @@ interface BrasilApiCepData {
 }
 
 interface CepData {
-  logradouro: string;
-  logradouroType?: string;
+  street: string;
+  streetType?: string;
   bairro: string;
   localidade: string;
   uf: string;
@@ -50,6 +50,37 @@ const LOGRADOURO_TYPES = [
   "RESIDENCIAL",
 ];
 
+function toTitleCase(str: string): string {
+  if (!str) return str;
+
+  // Words that should remain uppercase
+  const uppercaseWords = ['LTDA', 'ME', 'EPP', 'EIRELI', 'SA', 'S/A', 'S.A.', 'CIA', 'E', 'DE', 'DA', 'DO', 'DOS', 'DAS'];
+
+  // Words that should be lowercase (prepositions, articles, conjunctions)
+  const lowercaseWords = ['e', 'de', 'da', 'do', 'dos', 'das', 'para', 'com', 'sem'];
+
+  return str
+    .toLowerCase()
+    .split(' ')
+    .map((word, index) => {
+      const upperWord = word.toUpperCase();
+
+      // Keep specific words in uppercase
+      if (uppercaseWords.includes(upperWord)) {
+        return upperWord;
+      }
+
+      // Keep prepositions/articles lowercase unless it's the first word
+      if (index > 0 && lowercaseWords.includes(word.toLowerCase())) {
+        return word.toLowerCase();
+      }
+
+      // Capitalize first letter of each word
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+}
+
 function extractLogradouroType(street: string | null | undefined): { type: string | null; address: string } {
   // Handle null or undefined street
   if (!street) {
@@ -60,9 +91,16 @@ function extractLogradouroType(street: string | null | undefined): { type: strin
 
   for (const type of LOGRADOURO_TYPES) {
     if (normalized.startsWith(type + " ")) {
+      // Extract the remaining address after the street type
+      const remainingAddress = street.substring(type.length + 1).trim();
+
+      // Check if the address starts with a preposition (do, da, dos, das, de)
+      // If so, keep the full address including the street type
+      const hasPreposition = /^(d[oae]s?)\s/i.test(remainingAddress);
+
       return {
         type: type.replace("Ç", "C").replace("Í", "I").replace("Ã", "A").replace("Ó", "O"),
-        address: street.substring(type.length + 1).trim(),
+        address: hasPreposition ? street : remainingAddress, // Keep full address if has preposition
       };
     }
   }
@@ -95,15 +133,15 @@ export function useCepLookup(options?: UseCepLookupOptions) {
 
         const brasilApiData: BrasilApiCepData = await response.json();
 
-        // Extract logradouro type from street name
+        // Extract street type from street name
         const { type, address } = extractLogradouroType(brasilApiData.street);
 
         // Convert to ViaCEP format for compatibility
         const data: CepData = {
-          logradouro: address || brasilApiData.street,
-          logradouroType: type || undefined,
-          bairro: brasilApiData.neighborhood,
-          localidade: brasilApiData.city,
+          street: address || brasilApiData.street,
+          streetType: type || undefined,
+          bairro: toTitleCase(brasilApiData.neighborhood),
+          localidade: toTitleCase(brasilApiData.city),
           uf: brasilApiData.state,
         };
 

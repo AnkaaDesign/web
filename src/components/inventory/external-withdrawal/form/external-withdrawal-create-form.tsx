@@ -6,9 +6,9 @@ import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconUser, IconAr
 import type { ExternalWithdrawalCreateFormData } from "../../../../schemas";
 import { externalWithdrawalCreateSchema } from "../../../../schemas";
 import { useExternalWithdrawalMutations, useItems } from "../../../../hooks";
-import { routes } from "../../../../constants";
+import { routes, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 import { toast } from "sonner";
-import { FileUploadField, type FileWithPreview } from "@/components/file";
+import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -16,7 +16,7 @@ import { Form } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -74,10 +74,10 @@ export const ExternalWithdrawalCreateForm = () => {
     quantities,
     prices,
     withdrawerName,
-    willReturn,
+    type: withdrawalType,
     notes,
     updateWithdrawerName,
-    updateWillReturn,
+    updateType,
     updateNotes,
     showSelectedOnly,
     searchTerm,
@@ -112,7 +112,7 @@ export const ExternalWithdrawalCreateForm = () => {
   // Form setup with default values from URL state
   const defaultValues: Partial<ExternalWithdrawalCreateFormData> = {
     withdrawerName: withdrawerName || "",
-    willReturn: willReturn,
+    type: withdrawalType,
     notes: notes || "",
     items: [],
   };
@@ -129,8 +129,8 @@ export const ExternalWithdrawalCreateForm = () => {
   }, [withdrawerName, form]);
 
   useEffect(() => {
-    form.setValue("willReturn", willReturn);
-  }, [willReturn, form]);
+    form.setValue("type", withdrawalType);
+  }, [withdrawalType, form]);
 
   useEffect(() => {
     form.setValue("notes", notes || "");
@@ -162,8 +162,8 @@ export const ExternalWithdrawalCreateForm = () => {
     }
   }, [searchParams]); // Removed currentStep to prevent circular dependency
 
-  // Calculate total price (only if willReturn is false)
-  const totalPrice = !willReturn
+  // Calculate total price (only for CHARGEABLE type)
+  const totalPrice = withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
     ? Array.from(selectedItems).reduce((total, itemId) => {
         const quantity = Number(quantities[itemId]) || 1;
         const price = Number(prices[itemId]) || 0;
@@ -228,14 +228,14 @@ export const ExternalWithdrawalCreateForm = () => {
           return false;
         }
 
-        // Validate that all selected items have prices set (only if willReturn is false)
-        if (!willReturn) {
+        // Validate that all selected items have prices set (only for CHARGEABLE type)
+        if (withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
           const itemsWithoutPrice = Array.from(selectedItems).filter((itemId) => {
             const price = prices[itemId];
             return price === null || price === undefined || price < 0;
           });
           if (itemsWithoutPrice.length > 0) {
-            toast.error("Todos os itens selecionados devem ter preço definido quando não serão devolvidos");
+            toast.error("Todos os itens selecionados devem ter preço definido para retiradas cobráveis");
             return false;
           }
         }
@@ -277,14 +277,14 @@ export const ExternalWithdrawalCreateForm = () => {
           return false;
         }
 
-        // Validate prices if not returning
-        if (!willReturn) {
+        // Validate prices if CHARGEABLE
+        if (withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
           const itemsWithoutPrice = Array.from(selectedItems).filter((itemId) => {
             const price = prices[itemId];
             return price === null || price === undefined || price < 0;
           });
           if (itemsWithoutPrice.length > 0) {
-            toast.error("Todos os itens selecionados devem ter preço definido quando não serão devolvidos");
+            toast.error("Todos os itens selecionados devem ter preço definido para retiradas cobráveis");
             return false;
           }
         }
@@ -294,7 +294,7 @@ export const ExternalWithdrawalCreateForm = () => {
       default:
         return true;
     }
-  }, [currentStep, withdrawerName, selectedItems, quantities, prices, willReturn, notes]);
+  }, [currentStep, withdrawerName, selectedItems, quantities, prices, withdrawalType, notes]);
 
   // Handle item selection
   const handleSelectItem = useCallback(
@@ -343,12 +343,12 @@ export const ExternalWithdrawalCreateForm = () => {
       const formValues = form.getValues();
       const withdrawalData: ExternalWithdrawalCreateFormData = {
         withdrawerName: formValues.withdrawerName || withdrawerName?.trim() || "",
-        willReturn: formValues.willReturn !== undefined ? formValues.willReturn : willReturn,
+        type: formValues.type || withdrawalType,
         notes: formValues.notes || notes?.trim() || undefined,
         items: Array.from(selectedItems).map((itemId: string) => ({
           itemId,
           withdrawedQuantity: Number(quantities[itemId]) || 1,
-          price: !willReturn ? Number(prices[itemId]) || 0 : undefined,
+          price: withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? Number(prices[itemId]) || 0 : undefined,
         })),
       }; // Validate with schema before submitting
       const parseResult = externalWithdrawalCreateSchema.safeParse(withdrawalData);
@@ -405,7 +405,7 @@ export const ExternalWithdrawalCreateForm = () => {
       console.error("Submission error:", error);
       // Error is handled by the mutation hook, but let's log it
     }
-  }, [validateCurrentStep, withdrawerName, willReturn, notes, selectedItems, quantities, prices, createAsync, form, clearAllSelections, navigate, receiptFiles, nfeFiles]);
+  }, [validateCurrentStep, withdrawerName, withdrawalType, notes, selectedItems, quantities, prices, createAsync, form, clearAllSelections, navigate, receiptFiles, nfeFiles]);
 
   const handleCancel = useCallback(() => {
     navigate(routes.inventory.externalWithdrawals.root);
@@ -642,7 +642,7 @@ export const ExternalWithdrawalCreateForm = () => {
           th:nth-child(4), td:nth-child(4) { width: 80px; } /* Medida */
           th:nth-child(5), td:nth-child(5) { width: 90px; text-align: right; } /* Quantidade */
           ${
-            !willReturn
+            withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
               ? `
           th:nth-child(6), td:nth-child(6) { width: 90px; text-align: right; } /* Preço Unit. */
           th:nth-child(7), td:nth-child(7) { width: 90px; text-align: right; } /* Total */
@@ -742,7 +742,7 @@ export const ExternalWithdrawalCreateForm = () => {
                 <th>Medida</th>
                 <th class="text-right">Quantidade</th>
                 ${
-                  !willReturn
+                  withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
                     ? `
                 <th class="text-right">Preço Unit.</th>
                 <th class="text-right">Total</th>
@@ -863,7 +863,7 @@ export const ExternalWithdrawalCreateForm = () => {
                     <td>${getMeasureDisplay()}</td>
                     <td class="text-right font-medium">${quantity.toLocaleString("pt-BR")}</td>
                     ${
-                      !willReturn
+                      withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
                         ? `
                     <td class="text-right">${formatCurrency(price)}</td>
                     <td class="text-right font-semibold">${formatCurrency(total)}</td>
@@ -875,7 +875,7 @@ export const ExternalWithdrawalCreateForm = () => {
                 })
                 .join("")}
               ${
-                !willReturn
+                withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
                   ? `
               <tr class="total-row">
                 <td colspan="6" class="text-right">Total Geral:</td>
@@ -922,7 +922,7 @@ export const ExternalWithdrawalCreateForm = () => {
         };
       }
     },
-    [withdrawerName, willReturn, notes, selectionCount, selectedItemsData, quantities, prices, totalPrice],
+    [withdrawerName, withdrawalType, notes, selectionCount, selectedItemsData, quantities, prices, totalPrice],
   );
 
   // Generate navigation actions based on current step
@@ -1010,51 +1010,73 @@ export const ExternalWithdrawalCreateForm = () => {
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-6">
-                        {/* Withdrawer Name */}
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium">
-                            Nome do Retirador <span className="text-destructive">*</span>
-                          </Label>
-                          <Input
-                            placeholder="Digite o nome da pessoa que está retirando"
-                            value={form.watch("withdrawerName") || ""}
-                            onChange={(value) => {
-                              // The custom Input component passes the cleaned value directly
-                              const stringValue = value !== null && value !== undefined ? String(value) : "";
-                              form.setValue("withdrawerName", stringValue, {
-                                shouldValidate: true,
-                                shouldDirty: true,
-                                shouldTouch: true,
-                              });
-                              // Update URL state when form changes
-                              updateWithdrawerName(stringValue);
-                            }}
-                            className="h-10"
-                            maxLength={200}
-                          />
-                          {form.formState.errors.withdrawerName && <p className="text-sm text-destructive">{form.formState.errors.withdrawerName.message}</p>}
-                          {!form.formState.errors.withdrawerName && withdrawerName && withdrawerName.trim().length < 2 && (
-                            <p className="text-sm text-destructive">Nome deve ter pelo menos 2 caracteres</p>
-                          )}
-                        </div>
-
-                        {/* Will Return Toggle */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm font-medium flex items-center gap-2">
-                              <IconArrowBack className="h-4 w-4" />
-                              Itens serão devolvidos?
+                        {/* Withdrawer Name and Type in same row */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Withdrawer Name */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">
+                              Nome do Retirador <span className="text-destructive">*</span>
                             </Label>
-                            <Switch
-                              checked={willReturn}
-                              onCheckedChange={(value) => {
-                                updateWillReturn(value);
+                            <Input
+                              placeholder="Digite o nome da pessoa que está retirando"
+                              value={form.watch("withdrawerName") || ""}
+                              onChange={(value) => {
+                                // The custom Input component passes the cleaned value directly
+                                const stringValue = value !== null && value !== undefined ? String(value) : "";
+                                form.setValue("withdrawerName", stringValue, {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                  shouldTouch: true,
+                                });
+                                // Update URL state when form changes
+                                updateWithdrawerName(stringValue);
                               }}
+                              className="h-10"
+                              maxLength={200}
                             />
+                            {form.formState.errors.withdrawerName && <p className="text-sm text-destructive">{form.formState.errors.withdrawerName.message}</p>}
+                            {!form.formState.errors.withdrawerName && withdrawerName && withdrawerName.trim().length < 2 && (
+                              <p className="text-sm text-destructive">Nome deve ter pelo menos 2 caracteres</p>
+                            )}
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {willReturn ? "Os itens serão devolvidos (sem cobrança)" : "Os itens não serão devolvidos (com cobrança)"}
-                          </p>
+
+                          {/* Withdrawal Type */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">
+                              Tipo de Retirada <span className="text-destructive">*</span>
+                            </Label>
+                            <Select
+                              value={withdrawalType}
+                              onValueChange={(value: EXTERNAL_WITHDRAWAL_TYPE) => {
+                                form.setValue("type", value, {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                  shouldTouch: true,
+                                });
+                                updateType(value);
+                              }}
+                            >
+                              <SelectTrigger className="h-10">
+                                <SelectValue placeholder="Selecione o tipo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE}>
+                                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE]}
+                                </SelectItem>
+                                <SelectItem value={EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE}>
+                                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE]}
+                                </SelectItem>
+                                <SelectItem value={EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY}>
+                                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY]}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE && "Itens serão devolvidos (sem cobrança)"}
+                              {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && "Itens não serão devolvidos (com cobrança)"}
+                              {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY && "Itens cortesia (sem devolução e sem cobrança)"}
+                            </p>
+                          </div>
                         </div>
 
                         {/* Notes */}
@@ -1139,7 +1161,7 @@ export const ExternalWithdrawalCreateForm = () => {
                       prices={prices}
                       isSelected={(itemId) => selectedItems.has(itemId)}
                       showQuantityInput={true}
-                      showPriceInput={!willReturn}
+                      showPriceInput={withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE}
                       showSelectedOnly={showSelectedOnly}
                       searchTerm={searchTerm}
                       showInactive={showInactive}
@@ -1187,7 +1209,7 @@ export const ExternalWithdrawalCreateForm = () => {
                           </div>
                           <div>
                             <span className="text-sm font-medium text-muted-foreground">Tipo de Retirada:</span>
-                            <p className="mt-1 font-medium">{willReturn ? "Com Devolução" : "Sem Devolução"}</p>
+                            <p className="mt-1 font-medium">{EXTERNAL_WITHDRAWAL_TYPE_LABELS[withdrawalType]}</p>
                           </div>
                           <div>
                             <span className="text-sm font-medium text-muted-foreground">Quantidade de Itens:</span>
@@ -1195,7 +1217,7 @@ export const ExternalWithdrawalCreateForm = () => {
                               {selectionCount} {selectionCount === 1 ? "item" : "itens"}
                             </p>
                           </div>
-                          {!willReturn && (
+                          {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                             <div>
                               <span className="text-sm font-medium text-muted-foreground">Valor Total:</span>
                               <p className="mt-1 font-medium">{formatCurrency(totalPrice)}</p>
@@ -1229,7 +1251,7 @@ export const ExternalWithdrawalCreateForm = () => {
                                 <TableHead className="font-semibold">Marca</TableHead>
                                 <TableHead className="font-semibold">Medida</TableHead>
                                 <TableHead className="text-right font-semibold">Quantidade</TableHead>
-                                {!willReturn && (
+                                {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                                   <>
                                     <TableHead className="text-right font-semibold">Preço Unit.</TableHead>
                                     <TableHead className="text-right font-semibold">Total</TableHead>
@@ -1285,7 +1307,7 @@ export const ExternalWithdrawalCreateForm = () => {
                                     <TableCell>{item.brand?.name || "-"}</TableCell>
                                     <TableCell>{getMeasureDisplay()}</TableCell>
                                     <TableCell className="text-right font-medium">{quantity.toLocaleString("pt-BR")}</TableCell>
-                                    {!willReturn && (
+                                    {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                                       <>
                                         <TableCell className="text-right">{formatCurrency(price)}</TableCell>
                                         <TableCell className="text-right font-semibold">{formatCurrency(total)}</TableCell>
@@ -1294,7 +1316,7 @@ export const ExternalWithdrawalCreateForm = () => {
                                   </TableRow>
                                 );
                               })}
-                              {!willReturn && (
+                              {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                                 <TableRow className="bg-muted/30 font-semibold">
                                   <TableCell colSpan={6} className="text-right">
                                     Total Geral:

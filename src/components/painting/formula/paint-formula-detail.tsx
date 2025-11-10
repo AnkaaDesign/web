@@ -8,6 +8,7 @@ import { measureUtils } from "../../../utils";
 import { MEASURE_UNIT } from "../../../constants";
 import { DensityValidator } from "./density-validator";
 import { FormulaComponentsRatioTable } from "./formula-components-ratio-table";
+import { PaintFormulaChangelogHistoryCard } from "./paint-formula-changelog-history-card";
 
 interface PaintFormulaDetailProps {
   formula: PaintFormula;
@@ -152,6 +153,9 @@ export function PaintFormulaDetail({ formula }: PaintFormulaDetailProps) {
 
       {/* Components Ratio Table */}
       <FormulaComponentsRatioTable components={components} />
+
+      {/* Changelog History */}
+      <PaintFormulaChangelogHistoryCard formula={formula} />
     </div>
   );
 }

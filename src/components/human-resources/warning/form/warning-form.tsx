@@ -25,7 +25,7 @@ import { FollowUpDatePicker } from "./follow-up-date-picker";
 import { HrNotesTextarea } from "./hr-notes-textarea";
 import { ActiveSwitch } from "./active-switch";
 import { WitnessMultiSelect } from "./witness-multi-select";
-import { FileUploadField, type FileWithPreview } from "@/components/file";
+import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 
 interface CreateModeProps {
   mode: "create";

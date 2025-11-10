@@ -19,10 +19,9 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { LoadingPage } from "@/components/navigation/loading-page";
 import { ErrorCard } from "@/components/ui/error-card";
-import { PaintSpecificationsCard, PaintFormulasCard, PaintProductionHistoryCard, RelatedPaintsCard, GroundPaintsCard } from "@/components/paint/catalogue/detail";
-import { PaintTasksTable } from "@/components/paint/catalogue/detail/paint-tasks-table";
-import { ChangelogHistory } from "@/components/ui/changelog-history";
-import { CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
+import { PaintSpecificationsCard, PaintFormulasCard, PaintProductionHistoryCard, RelatedPaintsCard, GroundPaintsCard } from "@/components/painting/catalogue/detail";
+import { PaintTasksTable } from "@/components/painting/catalogue/detail/paint-tasks-table";
+import { PaintWithFormulasChangelogHistory } from "@/components/painting/catalogue/detail/paint-with-formulas-changelog-history";
 
 export default function PaintDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -230,13 +229,7 @@ export default function PaintDetailsPage() {
 
           {/* Row 5: Changelog - Full Width */}
           <div className="animate-in fade-in-50 duration-1000 transition-all">
-            <ChangelogHistory
-              entityType={CHANGE_LOG_ENTITY_TYPE.PAINT}
-              entityId={paint.id}
-              entityName={paint.name}
-              entityCreatedAt={paint.createdAt}
-              className="h-auto lg:h-[500px]"
-            />
+            <PaintWithFormulasChangelogHistory paint={paint} className="h-auto lg:h-[600px]" />
           </div>
         </div>
       </div>

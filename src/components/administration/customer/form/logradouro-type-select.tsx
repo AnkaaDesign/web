@@ -41,7 +41,7 @@ export function LogradouroTypeSelect({ disabled }: LogradouroTypeSelectProps) {
   return (
     <FormField
       control={form.control}
-      name="logradouro"
+      name="streetType"
       render={({ field }) => (
         <FormItem>
           <FormLabel>Tipo de Logradouro</FormLabel>

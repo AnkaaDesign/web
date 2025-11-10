@@ -44,7 +44,7 @@ export function ProfilePage() {
   // Setup CEP lookup
   const { lookupCep, isLoading: isLoadingCep } = useCepLookup({
     onSuccess: (data) => {
-      form.setValue("address", data.logradouro || "", { shouldDirty: true });
+      form.setValue("address", data.street || "", { shouldDirty: true });
       form.setValue("neighborhood", data.bairro || "", { shouldDirty: true });
       form.setValue("city", data.localidade || "", { shouldDirty: true });
       form.setValue("state", data.uf || "", { shouldDirty: true });

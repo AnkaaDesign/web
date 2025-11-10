@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { routes, FAVORITE_PAGES } from "../../../../constants";
-import { PaintBrandForm } from "@/components/paint/paint-brand/form";
+import { PaintBrandForm } from "@/components/painting/paint-brand/form";
 import { usePaintBrand, usePaintBrandMutations } from "../../../../hooks";
 import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -5,10 +5,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FilePreviewCard } from "@/components/file";
+import { FilePreviewCard } from "@/components/common/file";
 import { CUT_TYPE_LABELS, CUT_STATUS_LABELS, CUT_ORIGIN_LABELS, AIRBRUSHING_STATUS_LABELS, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS } from "@/constants/enum-labels";
 import { ENTITY_BADGE_CONFIG, PAINT_FINISH, SECTOR_PRIVILEGES } from "@/constants";
-import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-normal-map-renderer";
+import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { useAuth } from "@/contexts/auth-context";
 import { hasAnyPrivilege } from "@/utils";
 import {

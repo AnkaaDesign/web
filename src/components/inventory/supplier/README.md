@@ -50,8 +50,8 @@ import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 **Usage:**
 ```tsx
-import { FileViewerProvider, useFileViewer } from "@/components/file";
-import { FileItem } from "@/components/file";
+import { FileViewerProvider, useFileViewer } from "@/components/common/file";
+import { FileItem } from "@/components/common/file";
 
 // Wrap your component tree with FileViewerProvider
 <FileViewerProvider>

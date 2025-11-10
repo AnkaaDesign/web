@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { formatCurrency, formatDate } from "../../../../utils";
-import type { FileWithPreview } from "@/components/file";
+import type { FileWithPreview } from "@/components/common/file";
 import { createAirbrushingFormData } from "@/utils/form-data-helper";
 
 export interface AirbrushingFormHandle {

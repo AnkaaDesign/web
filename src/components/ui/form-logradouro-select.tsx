@@ -37,7 +37,7 @@ interface LogradouroSelectProps<T extends Record<string, any>> {
 
 export function LogradouroSelect<T extends Record<string, any>>({
   disabled,
-  fieldName = "logradouro" as keyof T,
+  fieldName = "streetType" as keyof T,
 }: LogradouroSelectProps<T>) {
   const form = useFormContext<T>();
 

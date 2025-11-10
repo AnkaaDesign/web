@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useExternalWithdrawalMutations } from "../../../../hooks";
-import { routes } from "../../../../constants";
+import { routes, EXTERNAL_WITHDRAWAL_TYPE } from "../../../../constants";
 import { type ExternalWithdrawalCreateFormData } from "../../../../schemas";
 import { type ExternalWithdrawalCreateResponse } from "../../../../types";
 
@@ -16,7 +16,7 @@ export interface FormItem {
 
 export interface FormData {
   withdrawerName: string;
-  willReturn: boolean;
+  type: EXTERNAL_WITHDRAWAL_TYPE;
   notes?: string;
   items: FormItem[];
 }
@@ -85,12 +85,12 @@ export function useExternalWithdrawalFormIntegration(options: UseExternalWithdra
   const transformFormData = useCallback((data: FormData): ExternalWithdrawalCreateFormData => {
     return {
       withdrawerName: data.withdrawerName.trim(),
-      willReturn: data.willReturn,
+      type: data.type,
       notes: data.notes?.trim() || null,
       items: data.items.map((item) => ({
         itemId: item.itemId,
         withdrawedQuantity: item.quantity,
-        price: data.willReturn ? null : item.price || 0,
+        price: data.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? item.price || 0 : null,
       })),
     };
   }, []);
@@ -124,10 +124,10 @@ export function useExternalWithdrawalFormIntegration(options: UseExternalWithdra
           errors.push(`Item ${index + 1}: Quantidade deve ser maior que zero`);
         }
 
-        // Validate price for non-return items
-        if (!data.willReturn) {
+        // Validate price for chargeable items
+        if (data.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
           if (item.price === null || item.price === undefined || item.price < 0) {
-            errors.push(`Item ${index + 1}: Preço é obrigatório para itens que não serão devolvidos`);
+            errors.push(`Item ${index + 1}: Preço é obrigatório para itens cobráveis`);
           }
         }
       });
@@ -302,8 +302,8 @@ export function withExternalWithdrawalFormIntegration<P extends WithFormIntegrat
 /**
  * Utility function to calculate total price from form items
  */
-export function calculateTotalPrice(items: FormItem[], willReturn: boolean): number {
-  if (willReturn) return 0;
+export function calculateTotalPrice(items: FormItem[], type: EXTERNAL_WITHDRAWAL_TYPE): number {
+  if (type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) return 0;
 
   return items.reduce((total, item) => {
     const price = item.price || 0;
@@ -319,7 +319,7 @@ export function validateItemSelection(
   selectedItems: Set<string>,
   quantities: Record<string, number>,
   prices: Record<string, number>,
-  willReturn: boolean,
+  type: EXTERNAL_WITHDRAWAL_TYPE,
 ): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
 
@@ -336,14 +336,14 @@ export function validateItemSelection(
     errors.push("Todos os itens selecionados devem ter quantidade válida");
   }
 
-  // Check for items without prices (only if not returning)
-  if (!willReturn) {
+  // Check for items without prices (only for chargeable type)
+  if (type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
     const itemsWithoutPrice = Array.from(selectedItems).filter((itemId) => {
       const price = prices[itemId];
       return price === null || price === undefined || price < 0;
     });
     if (itemsWithoutPrice.length > 0) {
-      errors.push("Todos os itens selecionados devem ter preço definido quando não serão devolvidos");
+      errors.push("Todos os itens selecionados devem ter preço definido para itens cobráveis");
     }
   }
 
@@ -358,7 +358,7 @@ export function validateItemSelection(
  */
 export function convertUrlStateToFormData(
   withdrawerName: string,
-  willReturn: boolean,
+  type: EXTERNAL_WITHDRAWAL_TYPE,
   notes: string | null,
   selectedItems: Set<string>,
   quantities: Record<string, number>,
@@ -366,12 +366,12 @@ export function convertUrlStateToFormData(
 ): FormData {
   return {
     withdrawerName: withdrawerName.trim(),
-    willReturn,
+    type,
     notes: notes?.trim() || undefined,
     items: Array.from(selectedItems).map((itemId) => ({
       itemId,
       quantity: quantities[itemId] || 1,
-      price: willReturn ? null : prices[itemId] || 0,
+      price: type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? prices[itemId] || 0 : null,
     })),
   };
 }

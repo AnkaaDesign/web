@@ -1,5 +1,5 @@
-import { GroupByField } from "@/components/grouping/GroupBySelector";
-import { Aggregation } from "@/components/grouping/AggregationSelector";
+import { GroupByField } from "@/components/common/filters/grouping/GroupBySelector";
+import { Aggregation } from "@/components/common/filters/grouping/AggregationSelector";
 
 export interface GroupingPreset {
   id: string;

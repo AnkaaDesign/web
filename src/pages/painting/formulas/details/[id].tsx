@@ -1,6 +1,6 @@
 import { useParams, Navigate, useNavigate } from "react-router-dom";
 import { usePaintFormula, usePaintProductionMutations } from "../../../../hooks";
-import { FormulaCalculator } from "@/components/paint/formula/formula-calculator";
+import { FormulaCalculator } from "@/components/painting/formula/formula-calculator";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { LoadingPage } from "@/components/navigation/loading-page";

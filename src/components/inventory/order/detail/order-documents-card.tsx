@@ -5,7 +5,7 @@ import { IconFileText, IconFileTypePdf, IconReceipt, IconCurrencyReal, IconFileI
 import type { Order } from "../../../../types";
 import type { File as AnkaaFile } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { FileItem, type FileViewMode, useFileViewer } from "@/components/file";
+import { FileItem, type FileViewMode, useFileViewer } from "@/components/common/file";
 
 interface OrderDocumentsCardProps {
   order: Order;

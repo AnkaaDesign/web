@@ -9,7 +9,7 @@ import { useOrderMutations, useItems, useSuppliers } from "../../../../hooks";
 import { routes, FAVORITE_PAGES, ORDER_STATUS, MEASURE_UNIT, MEASURE_UNIT_LABELS, MEASURE_TYPE_ORDER } from "../../../../constants";
 import { toast } from "sonner";
 import { createOrderFormData } from "@/utils/form-data-helper";
-import { FileUploadField, type FileWithPreview } from "@/components/file";
+import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -99,40 +99,24 @@ export const OrderCreateForm = () => {
     defaultPageSize: 40,
   });
 
-  // Dynamic steps based on mode
-  const steps = useMemo(() => {
-    if (orderItemMode === "temporary") {
-      return [
-        {
-          id: 1,
-          name: "Informações Básicas",
-          description: "Fornecedor e detalhes do pedido",
-        },
-        {
-          id: 3,
-          name: "Revisão",
-          description: "Confirme os dados do pedido",
-        },
-      ];
-    }
-    return [
-      {
-        id: 1,
-        name: "Informações Básicas",
-        description: "Fornecedor e detalhes do pedido",
-      },
-      {
-        id: 2,
-        name: "Seleção de Itens",
-        description: "Escolha os itens e quantidades",
-      },
-      {
-        id: 3,
-        name: "Revisão",
-        description: "Confirme os dados do pedido",
-      },
-    ];
-  }, [orderItemMode]);
+  // Steps - always show all 3 steps regardless of mode
+  const steps = [
+    {
+      id: 1,
+      name: "Informações Básicas",
+      description: "Fornecedor e detalhes do pedido",
+    },
+    {
+      id: 2,
+      name: orderItemMode === "temporary" ? "Itens Temporários" : "Seleção de Itens",
+      description: orderItemMode === "temporary" ? "Adicione os itens temporários" : "Escolha os itens e quantidades",
+    },
+    {
+      id: 3,
+      name: "Revisão",
+      description: "Confirme os dados do pedido",
+    },
+  ];
 
   // Form setup with default values from URL state
   const form = useForm<OrderCreateFormData>({
@@ -201,6 +185,26 @@ export const OrderCreateForm = () => {
     });
   }, [selectedItems, quantities, prices, icmses, ipis, form]);
 
+  // Auto-add first temporary item when switching to temporary mode
+  useEffect(() => {
+    if (orderItemMode === "temporary") {
+      const currentTemporaryItems = form.getValues("temporaryItems") || [];
+      // Only add if there are no temporary items yet
+      if (currentTemporaryItems.length === 0) {
+        form.setValue("temporaryItems", [{
+          temporaryItemDescription: "",
+          orderedQuantity: 1,
+          price: null,
+          icms: 0,
+          ipi: 0,
+        }], {
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+    }
+  }, [orderItemMode, form]);
+
   // Mutations
   const { createAsync, isLoading: isSubmitting } = useOrderMutations();
 
@@ -244,25 +248,15 @@ export const OrderCreateForm = () => {
   // Navigation helpers - use the hook's setStep which properly manages URL state
   const nextStep = useCallback(() => {
     if (currentStep < steps.length) {
-      // Skip step 2 (item selection) when in temporary mode
-      if (currentStep === 1 && orderItemMode === "temporary") {
-        setCurrentStep(3); // Jump directly to review
-      } else {
-        setCurrentStep(currentStep + 1);
-      }
+      setCurrentStep(currentStep + 1);
     }
-  }, [currentStep, setCurrentStep, orderItemMode]);
+  }, [currentStep, setCurrentStep, steps.length]);
 
   const prevStep = useCallback(() => {
     if (currentStep > 1) {
-      // Skip step 2 (item selection) when in temporary mode
-      if (currentStep === 3 && orderItemMode === "temporary") {
-        setCurrentStep(1); // Jump back to step 1
-      } else {
-        setCurrentStep(currentStep - 1);
-      }
+      setCurrentStep(currentStep - 1);
     }
-  }, [currentStep, setCurrentStep, orderItemMode]);
+  }, [currentStep, setCurrentStep]);
 
   // Stage validation
   const validateCurrentStep = useCallback(async (): Promise<boolean> => {
@@ -291,8 +285,25 @@ export const OrderCreateForm = () => {
           return false;
         }
 
-        // In temporary mode, validate temporary items
-        if (orderItemMode === "temporary") {
+        return true;
+
+      case 2:
+        // Validate item selection based on mode
+        if (orderItemMode === "inventory") {
+          // Inventory mode - validate selected items
+          if (selectedItems.size === 0) {
+            toast.error("Pelo menos um item deve ser selecionado");
+            return false;
+          }
+
+          // Validate that all selected items have prices set
+          const itemsWithoutPrice = Array.from(selectedItems).filter((itemId) => !prices[itemId] || Number(prices[itemId]) <= 0);
+          if (itemsWithoutPrice.length > 0) {
+            toast.error("Todos os itens selecionados devem ter preço definido");
+            return false;
+          }
+        } else {
+          // Temporary mode - validate temporary items
           const tempItems = form.getValues("temporaryItems") || [];
           if (tempItems.length === 0) {
             toast.error("Pelo menos um item temporário deve ser adicionado");
@@ -310,22 +321,6 @@ export const OrderCreateForm = () => {
             toast.error("Todos os itens temporários devem ter descrição, quantidade e preço");
             return false;
           }
-        }
-
-        return true;
-
-      case 2:
-        // Validate item selection
-        if (selectedItems.size === 0) {
-          toast.error("Pelo menos um item deve ser selecionado");
-          return false;
-        }
-
-        // Validate that all selected items have prices set
-        const itemsWithoutPrice = Array.from(selectedItems).filter((itemId) => !prices[itemId] || Number(prices[itemId]) <= 0);
-        if (itemsWithoutPrice.length > 0) {
-          toast.error("Todos os itens selecionados devem ter preço definido");
-          return false;
         }
         return true;
 
@@ -1205,23 +1200,6 @@ export const OrderCreateForm = () => {
                             </RadioGroup>
                           </div>
 
-                          {/* Temporary Items Input (shown only in temporary mode) */}
-                          {orderItemMode === "temporary" && (
-                            <div className="space-y-4">
-                              <Separator />
-                              <div className="space-y-3">
-                                <Label className="text-sm font-medium flex items-center gap-2">
-                                  <IconFileInvoice className="h-4 w-4" />
-                                  Itens Temporários
-                                </Label>
-                                <TemporaryItemsInput
-                                  control={form.control}
-                                  disabled={isSubmitting}
-                                />
-                              </div>
-                            </div>
-                          )}
-
                           {/* File uploads */}
                           <div className="space-y-4">
                             <Separator />
@@ -1341,6 +1319,25 @@ export const OrderCreateForm = () => {
                     updateSelection={batchUpdateSelection}
                     className="flex-1 min-h-0"
                   />
+                )}
+
+                {currentStep === 2 && orderItemMode === "temporary" && (
+                  <div className="space-y-6">
+                    <Card className="w-full">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <IconFileInvoice className="h-5 w-5" />
+                          Itens Temporários
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <TemporaryItemsInput
+                          control={form.control}
+                          disabled={isSubmitting}
+                        />
+                      </CardContent>
+                    </Card>
+                  </div>
                 )}
 
                 {currentStep === 3 && (

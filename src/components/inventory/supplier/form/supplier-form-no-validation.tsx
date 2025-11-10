@@ -161,7 +161,7 @@ export function SupplierFormNoValidation(props: SupplierFormProps) {
                   cityFieldName="city"
                   stateFieldName="state"
                 />
-                <AddressInput disabled={isSubmitting} useGooglePlaces={!!import.meta.env.VITE_GOOGLE_MAPS_API_KEY} />
+                <AddressInput disabled={isSubmitting} />
                 <AddressNumberInput disabled={isSubmitting} />
               </div>
 

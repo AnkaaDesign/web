@@ -5,3 +5,4 @@ export * from "./related-paints-card";
 export * from "./ground-paints-card";
 export * from "./paint-changelog-history-card";
 export * from "./paint-tasks-table";
+export * from "./paint-with-formulas-changelog-history";

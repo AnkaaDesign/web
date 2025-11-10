@@ -4,7 +4,7 @@ import { formatHexColor } from "./color-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { PAINT_FINISH_LABELS, PAINT_FINISH, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
-import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-normal-map-renderer";
+import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface PaintGridProps {

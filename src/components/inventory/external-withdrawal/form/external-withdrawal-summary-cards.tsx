@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 interface ExternalWithdrawalSummaryCardsProps {
   // Basic info
   withdrawerName: string;
-  willReturn: boolean;
+  type: EXTERNAL_WITHDRAWAL_TYPE;
   notes?: string;
 
   // Selected items with their data
@@ -23,11 +23,11 @@ interface ExternalWithdrawalSummaryCardsProps {
   className?: string;
 }
 
-export const ExternalWithdrawalSummaryCards: React.FC<ExternalWithdrawalSummaryCardsProps> = ({ withdrawerName, willReturn, notes, selectedItems, className }) => {
+export const ExternalWithdrawalSummaryCards: React.FC<ExternalWithdrawalSummaryCardsProps> = ({ withdrawerName, type, notes, selectedItems, className }) => {
   // Calculate totals
   const totalItems = selectedItems.size;
   const totalQuantity = Array.from(selectedItems.values()).reduce((sum, item) => sum + item.quantity, 0);
-  const totalValue = !willReturn ? Array.from(selectedItems.values()).reduce((sum, item) => sum + item.quantity * (item.unitPrice || 0), 0) : 0;
+  const totalValue = type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? Array.from(selectedItems.values()).reduce((sum, item) => sum + item.quantity * (item.unitPrice || 0), 0) : 0;
 
   return (
     <div className={cn("space-y-6", className)}>
@@ -38,7 +38,7 @@ export const ExternalWithdrawalSummaryCards: React.FC<ExternalWithdrawalSummaryC
       <ItemsSummaryCard selectedItems={selectedItems} willReturn={willReturn} totalItems={totalItems} totalQuantity={totalQuantity} />
 
       {/* Total Calculation Card (only for non-returnable items) */}
-      {!willReturn && <TotalCalculationCard selectedItems={selectedItems} totalValue={totalValue} totalItems={totalItems} totalQuantity={totalQuantity} />}
+      {type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && <TotalCalculationCard selectedItems={selectedItems} totalValue={totalValue} totalItems={totalItems} totalQuantity={totalQuantity} />}
     </div>
   );
 };
@@ -46,12 +46,12 @@ export const ExternalWithdrawalSummaryCards: React.FC<ExternalWithdrawalSummaryC
 // Basic Info Summary Card Component
 interface BasicInfoSummaryCardProps {
   withdrawerName: string;
-  willReturn: boolean;
+  type: EXTERNAL_WITHDRAWAL_TYPE;
   notes?: string;
   className?: string;
 }
 
-export const BasicInfoSummaryCard: React.FC<BasicInfoSummaryCardProps> = ({ withdrawerName, willReturn, notes, className }) => {
+export const BasicInfoSummaryCard: React.FC<BasicInfoSummaryCardProps> = ({ withdrawerName, type, notes, className }) => {
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6">
@@ -79,7 +79,9 @@ export const BasicInfoSummaryCard: React.FC<BasicInfoSummaryCardProps> = ({ with
               <IconArrowBack className="h-4 w-4" />
               Tipo de Retirada
             </span>
-            <Badge variant={willReturn ? "success" : "warning"}>{willReturn ? "Com devolução" : "Sem devolução"}</Badge>
+            <Badge variant={type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE ? "success" : type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? "destructive" : "secondary"}>
+              {type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE ? "Devolutivo" : type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? "Cobrável" : "Cortesia"}
+            </Badge>
           </div>
 
           {/* Notes */}
@@ -101,13 +103,13 @@ export const BasicInfoSummaryCard: React.FC<BasicInfoSummaryCardProps> = ({ with
 // Items Summary Card Component
 interface ItemsSummaryCardProps {
   selectedItems: Map<string, Item & { quantity: number; unitPrice?: number }>;
-  willReturn: boolean;
+  type: EXTERNAL_WITHDRAWAL_TYPE;
   totalItems: number;
   totalQuantity: number;
   className?: string;
 }
 
-export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItems, willReturn, totalItems, totalQuantity, className }) => {
+export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItems, type, totalItems, totalQuantity, className }) => {
   const items = Array.from(selectedItems.values());
 
   if (items.length === 0) {
@@ -183,7 +185,7 @@ export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItem
                   <TableRow>
                     <TableHead>Item</TableHead>
                     <TableHead className="w-20">Qtd</TableHead>
-                    {!willReturn && (
+                    {type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                       <>
                         <TableHead className="w-28">Preço Unit.</TableHead>
                         <TableHead className="w-28">Total</TableHead>
@@ -193,7 +195,7 @@ export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItem
                 </TableHeader>
                 <TableBody>
                   {items.map((item) => {
-                    const itemTotal = !willReturn ? item.quantity * (item.unitPrice || 0) : 0;
+                    const itemTotal = type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? item.quantity * (item.unitPrice || 0) : 0;
 
                     return (
                       <TableRow key={item.id} className="hover:bg-muted/50">
@@ -229,7 +231,7 @@ export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItem
                             )}
                           </div>
                         </TableCell>
-                        {!willReturn && (
+                        {type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                           <>
                             <TableCell>
                               <div className="text-sm font-medium">{formatCurrency(item.unitPrice || 0)}</div>

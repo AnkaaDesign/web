@@ -4,7 +4,7 @@ import { usePageTracker } from "@/hooks/use-page-tracker";
 import { SECTOR_PRIVILEGES } from "../../../constants";
 import { IconFlask } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { PaintProductionList } from "@/components/paint/production/list/paint-production-list";
+import { PaintProductionList } from "@/components/painting/production/list/paint-production-list";
 
 export default function ProductionsListPage() {
   // Track page access

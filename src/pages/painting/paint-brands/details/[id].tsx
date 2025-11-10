@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconAlertCircle, IconEdit, IconTag } from "@tabler/icons-react";
-import { PaintBrandSpecificationsCard, PaintBrandComponentsCard, PaintBrandRelatedPaintsCard } from "@/components/paint/paint-brand/detail";
+import { PaintBrandSpecificationsCard, PaintBrandComponentsCard, PaintBrandRelatedPaintsCard } from "@/components/painting/paint-brand/detail";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditPaintBrands } from "@/utils/permissions/entity-permissions";
 

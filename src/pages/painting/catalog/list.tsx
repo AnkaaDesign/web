@@ -1,4 +1,4 @@
-import { PaintCatalogueList } from "@/components/paint/catalogue/list/paint-catalogue-list";
+import { PaintCatalogueList } from "@/components/painting/catalogue/list/paint-catalogue-list";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";

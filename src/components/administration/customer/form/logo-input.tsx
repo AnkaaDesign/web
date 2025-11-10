@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { FileUploadField, type FileWithPreview } from "@/components/file";
+import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { fileService } from "../../../../api-client";
 import type { File as AnkaaFile } from "../../../../types";
 import { backendFileToFileWithPreview } from "@/lib/utils";

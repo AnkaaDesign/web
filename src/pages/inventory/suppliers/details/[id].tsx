@@ -11,7 +11,7 @@ import { BasicInfoCard, ContactDetailsCard, AddressInfoCard, RelatedItemsCard, R
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FileViewerProvider } from "@/components/file";
+import { FileViewerProvider } from "@/components/common/file";
 import { toast } from "sonner";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { useAuth } from "@/contexts/auth-context";

@@ -129,11 +129,6 @@ export enum CUT_REQUEST_REASON {
   WRONG = "WRONG",
 }
 
-export enum GARAGE_STATUS {
-  ACTIVE = "ACTIVE",
-  INACTIVE = "INACTIVE",
-  MAINTENANCE = "MAINTENANCE",
-}
 
 export enum VACATION_STATUS {
   PENDING = "PENDING",
@@ -174,11 +169,17 @@ export enum BORROW_STATUS {
 }
 
 export enum EXTERNAL_WITHDRAWAL_STATUS {
+  // Common statuses
   PENDING = "PENDING",
+  CANCELLED = "CANCELLED",
+  // Returnable specific
   PARTIALLY_RETURNED = "PARTIALLY_RETURNED",
   FULLY_RETURNED = "FULLY_RETURNED",
+  // Chargeable specific
   CHARGED = "CHARGED",
-  CANCELLED = "CANCELLED",
+  LIQUIDATED = "LIQUIDATED",
+  // Complimentary specific
+  DELIVERED = "DELIVERED",
 }
 
 export enum EXTERNAL_WITHDRAWAL_TYPE {
@@ -710,18 +711,25 @@ export enum PAINT_BASE_TYPE {
   MIXING = "MIXING",
 }
 
+
+// =====================
+// Truck & Fleet Enums
+// =====================
+
 export enum TRUCK_MANUFACTURER {
+  VOLKSWAGEN = "VOLKSWAGEN",
+  MERCEDES_BENZ = "MERCEDES_BENZ",
   SCANIA = "SCANIA",
   VOLVO = "VOLVO",
   DAF = "DAF",
-  VOLKSWAGEN = "VOLKSWAGEN",
   IVECO = "IVECO",
-  MERCEDES_BENZ = "MERCEDES_BENZ",
 }
 
-// =====================
-// Fleet & Fuel Management
-// =====================
+export enum GARAGE_STATUS {
+  ACTIVE = "ACTIVE",
+  MAINTENANCE = "MAINTENANCE",
+  INACTIVE = "INACTIVE",
+}
 
 // =====================
 // Operations & Actions
@@ -1022,7 +1030,6 @@ export enum PPE_DELIVERY_MODE {
 }
 
 // =====================
-// Fleet & Fuel Card Types
 // =====================
 
 // =====================

@@ -17,6 +17,7 @@ import { SectorSelector } from "./sector-selector";
 import { SectorLeaderSwitch } from "./sector-leader-switch";
 import { UserStatusSelector } from "./status-selector";
 import { VerifiedSwitch } from "./verified-switch";
+import { ActiveSwitch } from "./active-switch";
 import { StatusDatesSection } from "./status-dates-section";
 import { AddressInput } from "@/components/ui/form-address-input";
 import { AddressNumberInput } from "@/components/ui/form-address-number-input";
@@ -68,6 +69,7 @@ export function UserForm(props: UserFormProps) {
     cpf: null,
     pis: null,
     verified: false,
+    isActive: true,
     positionId: null,
     performanceLevel: 0,
     sectorId: null,
@@ -126,6 +128,7 @@ export function UserForm(props: UserFormProps) {
       cpf: null,
       pis: null,
       verified: false,
+      isActive: true,
       positionId: null,
       performanceLevel: 0,
       sectorId: null,
@@ -333,7 +336,7 @@ export function UserForm(props: UserFormProps) {
                     cityFieldName="city"
                     stateFieldName="state"
                   />
-                  <AddressInput disabled={isSubmitting} useGooglePlaces={!!(import.meta as any).env?.VITE_GOOGLE_MAPS_API_KEY} required={false} />
+                  <AddressInput disabled={isSubmitting} required={false} />
                   <AddressNumberInput disabled={isSubmitting} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -377,13 +380,14 @@ export function UserForm(props: UserFormProps) {
               </CardContent>
             </Card>
 
-          {/* Manual Verification */}
+          {/* Access Control */}
           <Card className="bg-transparent">
               <CardHeader>
-                <CardTitle>Verificação Manual</CardTitle>
-                <CardDescription>Controle de verificação manual do usuário</CardDescription>
+                <CardTitle>Controle de Acesso</CardTitle>
+                <CardDescription>Configurações de acesso e verificação do usuário</CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                <ActiveSwitch disabled={isSubmitting} />
                 <VerifiedSwitch disabled={isSubmitting} />
               </CardContent>
             </Card>

@@ -5,7 +5,7 @@ import { REGISTRATION_STATUS_OPTIONS } from "@/constants/enums";
 export function SituacaoCadastralSelect() {
   return (
     <FormCombobox
-      name="situacaoCadastral"
+      name="registrationStatus"
       label="Situação Cadastral"
       icon={<IconCertificate className="h-4 w-4" />}
       placeholder="Selecione a situação cadastral"

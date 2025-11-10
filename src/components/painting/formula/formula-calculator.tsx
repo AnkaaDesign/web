@@ -402,9 +402,9 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
   return (
     <div className="space-y-6">
       {/* Controls Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-        {/* Volume Input with Quick Buttons */}
-        <div className="space-y-2">
+      <div className="flex items-start gap-6 mb-6">
+        {/* Volume Input with Quick Buttons - Compact width */}
+        <div className="space-y-2 max-w-md">
           <Label htmlFor="desired-volume" className="text-sm font-medium">
             Volume Desejado (ml)
           </Label>
@@ -416,7 +416,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
             }}
             type="natural"
             placeholder="Digite o volume desejado em ml"
-            className="text-base h-10"
+            className="text-base h-10 bg-transparent w-full"
             disabled={correctionMode}
           />
           {/* Quick Amount Buttons */}
@@ -430,6 +430,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                 onClick={() => {
                   setDesiredVolume(amount.toString());
                 }}
+                disabled={correctionMode}
               >
                 {amount >= 1000 ? `${amount / 1000}L` : `${amount}ml`}
               </Button>
@@ -438,7 +439,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
         </div>
 
         {/* Toggles */}
-        <div className="flex items-center justify-end gap-6">
+        <div className="flex items-center justify-end gap-6 flex-1">
           {/* Price Toggle */}
           <div className="flex items-center space-x-3">
             <Label htmlFor="show-prices" className="text-sm font-medium">

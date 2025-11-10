@@ -30,7 +30,7 @@ import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { useSuppliers } from "../../../../hooks";
-import { FileUploadField, type FileWithPreview } from "@/components/file";
+import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Separator } from "@/components/ui/separator";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 

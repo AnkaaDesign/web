@@ -492,18 +492,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
       },
 
       {
-        id: "registros-de-alteracoes",
-        title: "Registros de Alterações",
-        icon: "auditLog",
-        path: "/administracao/registros-de-alteracoes",
-        children: [
-          { id: "registros-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/registros-de-alteracoes/detalhes/:id", isDynamic: true },
-          { id: "registros-entidade", title: "Por Entidade", icon: "entity", path: "/administracao/registros-de-alteracoes/entidade", isDynamic: false },
-        ],
-        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
-      },
-
-      {
         id: "setores",
         title: "Setores",
         icon: "building",
@@ -1403,6 +1391,15 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [
           { id: "servidor-implantacoes-cadastrar", title: "Cadastrar", icon: "plus", path: "/servidor/implantacoes/cadastrar" },
           { id: "servidor-implantacoes-detalhes", title: "Detalhes", icon: "eye", path: "/servidor/implantacoes/detalhes/:id", isDynamic: true },
+        ],
+      },
+      {
+        id: "servidor-registros-de-alteracoes",
+        title: "Registros de Alterações",
+        icon: "auditLog",
+        path: "/servidor/registros-de-alteracoes",
+        children: [
+          { id: "servidor-registros-detalhes", title: "Detalhes", icon: "eye", path: "/servidor/registros-de-alteracoes/detalhes/:id", isDynamic: true },
         ],
       },
       {

@@ -109,7 +109,6 @@ export * from "./useMediaViewer";
 // Other Module Hooks
 // =====================================================
 export * from "./useCustomer";
-export * from "./useTruck";
 export * from "./useLayout";
 export * from "./useLayoutSection";
 

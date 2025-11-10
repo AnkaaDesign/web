@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { FileUploadField, type FileWithPreview } from "@/components/file";
+import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconFileTypePdf, IconCertificate, IconFileText } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";

@@ -36,7 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { FileItem } from "@/components/file";
+import { FileItem } from "@/components/common/file";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import {
   IconCut,

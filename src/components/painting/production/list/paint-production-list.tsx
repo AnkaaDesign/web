@@ -16,9 +16,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { cn } from "@/lib/utils";
-import { PaintProductionFilters } from "@/components/paint/production/filters/paint-production-filters";
-import { FilterIndicators } from "@/components/paint/production/filters/filter-indicator";
-import { extractActiveFilters, createFilterRemover } from "@/components/paint/production/filters/filter-utils";
+import { PaintProductionFilters } from "@/components/painting/production/filters/paint-production-filters";
+import { FilterIndicators } from "@/components/painting/production/filters/filter-indicator";
+import { extractActiveFilters, createFilterRemover } from "@/components/painting/production/filters/filter-utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { PaintProductionSkeleton } from "./paint-production-skeleton";
 import { createPaintProductionColumns, getDefaultVisibleColumns } from "./paint-production-table-columns";

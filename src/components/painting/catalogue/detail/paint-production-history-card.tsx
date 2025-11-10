@@ -15,9 +15,9 @@ import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-to
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { routes } from "../../../../constants";
-import { createPaintProductionColumns, getDefaultVisibleColumns } from "@/components/paint/production/list/paint-production-table-columns";
-import type { PaintProductionColumn } from "@/components/paint/production/list/paint-production-table-columns";
-import { ColumnVisibilityManager } from "@/components/paint/production/list/column-visibility-manager";
+import { createPaintProductionColumns, getDefaultVisibleColumns } from "@/components/painting/production/list/paint-production-table-columns";
+import type { PaintProductionColumn } from "@/components/painting/production/list/paint-production-table-columns";
+import { ColumnVisibilityManager } from "@/components/painting/production/list/column-visibility-manager";
 
 interface PaintProductionHistoryCardProps {
   paint: Paint;

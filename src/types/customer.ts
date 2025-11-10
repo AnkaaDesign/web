@@ -28,7 +28,7 @@ export interface Customer extends BaseEntity {
   tags: string[];
   logoId: string | null;
   economicActivityId: string | null;
-  situacaoCadastral: string | null;
+  registrationStatus: string | null;
 
   // Relations
   logo?: File;

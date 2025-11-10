@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { IconCalculator, IconCurrencyReal } from "@tabler/icons-react";
+import { EXTERNAL_WITHDRAWAL_TYPE } from "../../../../constants";
 
 export interface ExternalWithdrawalItem {
   id: string;
@@ -19,7 +20,7 @@ interface ExternalWithdrawalTotalCalculatorProps {
   quantities: Record<string, number>;
   prices: Record<string, number>;
   items?: ExternalWithdrawalItem[];
-  willReturn: boolean;
+  type: EXTERNAL_WITHDRAWAL_TYPE;
   className?: string;
   showItemBreakdown?: boolean;
 }
@@ -29,13 +30,13 @@ const ExternalWithdrawalTotalCalculatorComponent: React.FC<ExternalWithdrawalTot
   quantities,
   prices,
   items = [],
-  willReturn,
+  type,
   className,
   showItemBreakdown = false,
 }) => {
   // Calculate individual item totals and grand total
   const itemCalculations = React.useMemo(() => {
-    if (willReturn) return [];
+    if (type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) return [];
 
     const itemsArray = Array.isArray(selectedItems) ? selectedItems : Array.from(selectedItems);
     return itemsArray.map((itemId) => {
@@ -52,12 +53,12 @@ const ExternalWithdrawalTotalCalculatorComponent: React.FC<ExternalWithdrawalTot
         subtotal,
       };
     });
-  }, [selectedItems, quantities, prices, items, willReturn]);
+  }, [selectedItems, quantities, prices, items, type]);
 
   const grandTotal = React.useMemo(() => {
-    if (willReturn) return 0;
+    if (type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) return 0;
     return itemCalculations.reduce((total, calc) => total + calc.subtotal, 0);
-  }, [itemCalculations, willReturn]);
+  }, [itemCalculations, type]);
 
   const itemsArray = Array.isArray(selectedItems) ? selectedItems : Array.from(selectedItems);
   const totalItems = itemsArray.length;
@@ -68,14 +69,16 @@ const ExternalWithdrawalTotalCalculatorComponent: React.FC<ExternalWithdrawalTot
     }, 0);
   }, [selectedItems, quantities]);
 
-  // Don't render if items will be returned (no calculation needed)
-  if (willReturn) {
+  // Don't render calculation if not chargeable
+  if (type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
     return (
       <Card className={className}>
         <CardContent className="p-4">
           <div className="flex items-center justify-center text-muted-foreground">
             <IconCalculator className="w-5 h-5 mr-2" />
-            <span className="text-sm">Sem cobrança - Itens serão devolvidos</span>
+            <span className="text-sm">
+              {type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE ? "Sem cobrança - Itens serão devolvidos" : "Sem cobrança - Cortesia"}
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -160,10 +163,10 @@ const ExternalWithdrawalTotalBadgeComponent: React.FC<{
   quantities: Record<string, number>;
   prices: Record<string, number>;
   items?: ExternalWithdrawalItem[];
-  willReturn: boolean;
-}> = ({ selectedItems, quantities, prices, items = [], willReturn }) => {
+  type: EXTERNAL_WITHDRAWAL_TYPE;
+}> = ({ selectedItems, quantities, prices, items = [], type }) => {
   const grandTotal = React.useMemo(() => {
-    if (willReturn) return 0;
+    if (type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) return 0;
 
     const itemsArray = Array.isArray(selectedItems) ? selectedItems : Array.from(selectedItems);
     return itemsArray.reduce((total, itemId) => {
@@ -172,9 +175,9 @@ const ExternalWithdrawalTotalBadgeComponent: React.FC<{
       const unitPrice = prices[itemId] || item?.prices?.[0]?.value || 0;
       return total + quantity * unitPrice;
     }, 0);
-  }, [selectedItems, quantities, prices, items, willReturn]);
+  }, [selectedItems, quantities, prices, items, type]);
 
-  if (willReturn) {
+  if (type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
     return (
       <Badge variant="outline" className="text-sm">
         Sem cobrança

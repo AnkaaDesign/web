@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
-import { IconFilter, IconX, IconBriefcase, IconMapPin, IconCalendarPlus, IconTags } from "@tabler/icons-react";
+import { IconFilter, IconX, IconBriefcase, IconMapPin, IconCalendarPlus } from "@tabler/icons-react";
 import { useCustomerFilters } from "@/hooks/use-customer-filters";
 import { BRAZILIAN_STATES, BRAZILIAN_STATE_NAMES } from "../../../../constants";
 
@@ -19,9 +19,7 @@ interface CustomerFiltersProps {
 
 // Local filter state interface
 interface LocalFilterState {
-  hasTasks?: boolean;
   states?: string[];
-  tags?: string[];
   taskCount?: { min?: number; max?: number };
   createdAt?: { gte?: Date; lte?: Date };
 }
@@ -31,7 +29,6 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
 
   // Local state for filters (UI changes)
   const [localState, setLocalState] = useState<LocalFilterState>({});
-  const [customTags, setCustomTags] = useState<string>("");
 
   // Create state options
   const stateOptions = useMemo(
@@ -47,9 +44,7 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
   useEffect(() => {
     if (open) {
       setLocalState({
-        hasTasks: urlFilters.hasTasks,
         states: urlFilters.states,
-        tags: urlFilters.tags,
         taskCount: urlFilters.taskCount,
         createdAt: urlFilters.createdAt,
       });
@@ -59,34 +54,11 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
   // Count active filters in local state
   const localActiveFilterCount = useMemo(() => {
     let count = 0;
-    if (localState.hasTasks) count++;
     if (localState.states && localState.states.length > 0) count++;
-    if (localState.tags && localState.tags.length > 0) count++;
     if (localState.taskCount?.min || localState.taskCount?.max) count++;
     if (localState.createdAt?.gte || localState.createdAt?.lte) count++;
     return count;
   }, [localState]);
-
-  const handleAddTag = () => {
-    if (customTags.trim()) {
-      const newTags = customTags
-        .split(",")
-        .map((tag) => tag.trim())
-        .filter(Boolean);
-      setLocalState((prev) => ({
-        ...prev,
-        tags: [...(prev.tags || []), ...newTags],
-      }));
-      setCustomTags("");
-    }
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    setLocalState((prev) => ({
-      ...prev,
-      tags: prev.tags?.filter((tag) => tag !== tagToRemove),
-    }));
-  };
 
   const handleApply = () => {
     // Prepare batch filter update - only include non-empty values
@@ -114,7 +86,6 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
   const handleReset = () => {
     // Clear local state
     setLocalState({});
-    setCustomTags("");
     // Clear URL filters
     resetUrlFilters();
     // Close dialog
@@ -145,20 +116,6 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          {/* Has Tasks Filter */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="hasTasks" className="text-sm font-normal flex items-center gap-2">
-                <IconBriefcase className="h-4 w-4 text-muted-foreground" />
-                Possui tarefas
-              </Label>
-              <Switch id="hasTasks" checked={localState.hasTasks ?? false} onCheckedChange={(checked) => setLocalState((prev) => ({ ...prev, hasTasks: checked || undefined }))} />
-            </div>
-            <p className="text-xs text-muted-foreground">Clientes que possuem tarefas associadas</p>
-          </div>
-
-          <Separator />
-
           {/* States Filter */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
@@ -182,44 +139,6 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
               </div>
             )}
           </div>
-
-          <Separator />
-
-          {/* Tags Filter */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <IconTags className="h-4 w-4" />
-              Tags
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Digite tags separadas por vírgula..."
-                value={customTags}
-                onChange={(value) => setCustomTags(value as string)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleAddTag();
-                  }
-                }}
-              />
-              <Button type="button" onClick={handleAddTag} size="sm">
-                Adicionar
-              </Button>
-            </div>
-            {localState.tags && localState.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {localState.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="cursor-pointer" onClick={() => handleRemoveTag(tag)}>
-                    {tag}
-                    <IconX className="h-3 w-3 ml-1" />
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <Separator />
 
           {/* Task Count Range */}
           <div className="space-y-2">
@@ -250,6 +169,7 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
                       },
                     }));
                   }}
+                  className="bg-transparent"
                 />
               </div>
               <div>
@@ -274,6 +194,7 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
                       },
                     }));
                   }}
+                  className="bg-transparent"
                 />
               </div>
             </div>
@@ -287,8 +208,6 @@ export function CustomerFilters({ open, onOpenChange }: CustomerFiltersProps) {
               </div>
             )}
           </div>
-
-          <Separator />
 
           {/* Created At Date Range */}
           <div className="space-y-3">

@@ -1,9 +1,6 @@
 /* Import enhanced scrollbar utilities */
 @import "./styles/scrollbar.css";
 
-/* Import paint finish effects */
-@import "./components/paint/effects/paint-finish-effects.css";
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

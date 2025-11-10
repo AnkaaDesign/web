@@ -96,7 +96,8 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
     if (justPressedSpace) {
       const trimmedValue = value.trim();
       const parts = trimmedValue.split(/\s+/).filter(Boolean);
-      const numbers = parts.map(p => parseFloat(p)).filter(n => !isNaN(n));
+      // Replace commas with dots for proper decimal parsing
+      const numbers = parts.map(p => parseFloat(p.replace(",", "."))).filter(n => !isNaN(n));
 
       if (numbers.length >= 2) {
         // User pressed space after entering multiple numbers - calculate sum
@@ -104,7 +105,7 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
         const rounded = Math.round(sum * 100) / 100; // 2 decimal places
         setValue(`components.${index}.weightInGrams`, rounded);
         // Keep the space in rawInput to allow continuing to type
-        setValue(`components.${index}.rawInput`, rounded.toString() + " ");
+        setValue(`components.${index}.rawInput`, rounded.toString().replace(".", ",") + " ");
 
         // Don't move to next row automatically - let user continue adding
       } else if (numbers.length === 1) {
@@ -182,136 +183,157 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
   };
 
   return (
-    <div className={cn("space-y-2", className)}>
-      <div className="grid grid-cols-[1fr_120px_200px_80px] gap-2 text-sm font-medium text-muted-foreground mb-2">
-        <div>Componente</div>
-        <div>Proporção (%)</div>
-        <div>Quantidade (g)</div>
-        <div></div>
-      </div>
+    <div className={cn("space-y-4", className)}>
+      {/* Header Row */}
+      {fields.length > 0 && (
+        <div className="flex gap-3 items-center text-xs font-medium text-muted-foreground px-1">
+          <div className="flex-1">Componente</div>
+          <div className="w-28">Proporção (%)</div>
+          <div className="w-40">Quantidade (g)</div>
+          <div className="w-10"></div>
+        </div>
+      )}
 
-      {fields.map((field, index) => {
-        const isLastRow = index === fields.length - 1;
+      {fields.length > 0 && (
+        <div className="space-y-2">
+          {fields.map((field, index) => {
+            const isLastRow = index === fields.length - 1;
 
-        return (
-          <div key={field.id} ref={isLastRow ? lastRowRef : null} className="grid grid-cols-[1fr_120px_200px_80px] gap-2 items-center">
-            <Combobox
-              options={getComboboxOptionsForRow(index)}
-              value={watch(`components.${index}.itemId`)}
-              onValueChange={(value) => handleItemSelect(index, value || "")}
-              placeholder="Selecione um componente"
-              emptyText="Nenhum item disponível"
-              searchable={true}
-              className="w-full bg-transparent"
-            />
+            return (
+              <div key={field.id} ref={isLastRow ? lastRowRef : null} className="flex gap-3 items-start">
+                <div className="flex-1">
+                  <Combobox
+                    options={getComboboxOptionsForRow(index)}
+                    value={watch(`components.${index}.itemId`)}
+                    onValueChange={(value) => handleItemSelect(index, value || "")}
+                    placeholder="Selecione um componente"
+                    emptyText="Nenhum item disponível"
+                    searchable={true}
+                    className="w-full bg-transparent"
+                  />
+                </div>
 
-            <Input
-              type="text"
-              value={calculateRatio(index)}
-              readOnly
-              tabIndex={-1}
-              className="text-right bg-transparent pointer-events-none"
-            />
+                <div className="w-28">
+                  <Input
+                    type="text"
+                    value={calculateRatio(index)}
+                    readOnly
+                    tabIndex={-1}
+                    className="text-right bg-transparent pointer-events-none h-10"
+                  />
+                </div>
 
-            <Input
-              ref={(el) => {
-                if (el) inputRefs.current[index] = el;
-              }}
-              type="text"
-              placeholder="0"
-              value={watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`) || ""}
-              onChange={(value) => {
-                // Input component passes value directly, not event object
-                const previousValue = watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`)?.toString() || "";
-                handleAmountChange(index, value, previousValue);
-              }}
-              onKeyDown={(e) => handleKeyDown(e, index, "input")}
-              onBlur={async (e: React.FocusEvent<HTMLInputElement>) => {
-                // Input component passes event object to onBlur (unlike onChange)
-                const trimmedValue = (e.target.value || "").toString().trim();
-                if (trimmedValue) {
-                  const parts = trimmedValue.split(/\s+/).filter(Boolean);
-                  const numbers = parts.map(p => parseFloat(p)).filter(n => !isNaN(n));
+                <div className="w-40">
+                  <Input
+                    ref={(el) => {
+                      if (el) inputRefs.current[index] = el;
+                    }}
+                    type="text"
+                    placeholder="0"
+                    value={watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`) || ""}
+                    onChange={(value) => {
+                      // Input component passes value directly, not event object
+                      const previousValue = watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`)?.toString() || "";
+                      handleAmountChange(index, value, previousValue);
+                    }}
+                    onKeyDown={(e) => handleKeyDown(e, index, "input")}
+                    onBlur={async (e: React.FocusEvent<HTMLInputElement>) => {
+                      // Input component passes event object to onBlur (unlike onChange)
+                      const trimmedValue = (e.target.value || "").toString().trim();
+                      if (trimmedValue) {
+                        const parts = trimmedValue.split(/\s+/).filter(Boolean);
+                        // Replace commas with dots for proper decimal parsing
+                        const numbers = parts.map(p => parseFloat(p.replace(",", "."))).filter(n => !isNaN(n));
 
-                  let finalWeight = 0;
-                  if (numbers.length >= 2) {
-                    // Multiple numbers - calculate sum
-                    const sum = numbers.reduce((acc, num) => acc + num, 0);
-                    finalWeight = Math.round(sum * 100) / 100;
-                    setValue(`components.${index}.weightInGrams`, finalWeight);
-                    setValue(`components.${index}.rawInput`, finalWeight.toString());
-                  } else if (numbers.length === 1) {
-                    // Single number
-                    finalWeight = Math.round(numbers[0] * 100) / 100;
-                    setValue(`components.${index}.weightInGrams`, finalWeight);
-                    setValue(`components.${index}.rawInput`, finalWeight.toString());
-                  }
+                        let finalWeight = 0;
+                        if (numbers.length >= 2) {
+                          // Multiple numbers - calculate sum
+                          const sum = numbers.reduce((acc, num) => acc + num, 0);
+                          finalWeight = Math.round(sum * 100) / 100;
+                          setValue(`components.${index}.weightInGrams`, finalWeight);
+                          // Display with comma as decimal separator
+                          setValue(`components.${index}.rawInput`, finalWeight.toString().replace(".", ","));
+                        } else if (numbers.length === 1) {
+                          // Single number
+                          finalWeight = Math.round(numbers[0] * 100) / 100;
+                          setValue(`components.${index}.weightInGrams`, finalWeight);
+                          // Display with comma as decimal separator
+                          setValue(`components.${index}.rawInput`, finalWeight.toString().replace(".", ","));
+                        }
 
-                  // Call API to deduct inventory if we have a valid weight and item
-                  const itemId = watch(`components.${index}.itemId`);
-                  if (finalWeight > 0 && itemId) {
-                    // Get last deducted weight for this row
-                    const lastDeducted = lastDeductedWeights.current[index] || 0;
+                        // Call API to deduct inventory if we have a valid weight and item
+                        const itemId = watch(`components.${index}.itemId`);
+                        if (finalWeight > 0 && itemId) {
+                          // Get last deducted weight for this row
+                          const lastDeducted = lastDeductedWeights.current[index] || 0;
 
-                    // Calculate weight to deduct
-                    let weightToDeduct = 0;
-                    if (finalWeight < lastDeducted) {
-                      // User cleared and started over - deduct full new amount
-                      weightToDeduct = finalWeight;
-                      lastDeductedWeights.current[index] = 0; // Reset tracking
-                    } else if (finalWeight > lastDeducted) {
-                      // User added more - only deduct the difference
-                      weightToDeduct = finalWeight - lastDeducted;
-                    }
-                    // If finalWeight === lastDeducted, no change, don't deduct
+                          // Calculate weight to deduct
+                          let weightToDeduct = 0;
+                          if (finalWeight < lastDeducted) {
+                            // User cleared and started over - deduct full new amount
+                            weightToDeduct = finalWeight;
+                            lastDeductedWeights.current[index] = 0; // Reset tracking
+                          } else if (finalWeight > lastDeducted) {
+                            // User added more - only deduct the difference
+                            weightToDeduct = finalWeight - lastDeducted;
+                          }
+                          // If finalWeight === lastDeducted, no change, don't deduct
 
-                    if (weightToDeduct > 0) {
-                      // Only pass formulaPaintId if it's a real UUID (not temp ID)
-                      const isRealFormula = formulaPaintId && !formulaPaintId.startsWith('temp-');
+                          if (weightToDeduct > 0) {
+                            // Only pass formulaPaintId if it's a real UUID (not temp ID)
+                            const isRealFormula = formulaPaintId && !formulaPaintId.startsWith('temp-');
 
-                      await paintFormulaComponentService.deductForFormulationTest({
-                        itemId,
-                        weight: weightToDeduct,
-                        ...(isRealFormula && { formulaPaintId }), // Only include if real
-                      });
+                            await paintFormulaComponentService.deductForFormulationTest({
+                              itemId,
+                              weight: weightToDeduct,
+                              ...(isRealFormula && { formulaPaintId }), // Only include if real
+                            });
 
-                      // Update tracking after successful deduction
-                      lastDeductedWeights.current[index] = finalWeight;
-                    }
-                  }
-                }
-              }}
-              className="text-right bg-transparent"
-            />
+                            // Update tracking after successful deduction
+                            lastDeductedWeights.current[index] = finalWeight;
+                          }
+                        }
+                      }
+                    }}
+                    className="text-right bg-transparent h-10"
+                  />
+                </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                if (fields.length > 1) {
-                  remove(index);
-                  // Clean up tracking for this row
-                  delete lastDeductedWeights.current[index];
-                } else {
-                  // Clear the inputs for the only row instead of removing it
-                  setValue(`components.${index}.itemId`, "");
-                  setValue(`components.${index}.weightInGrams`, 0);
-                  setValue(`components.${index}.rawInput`, "");
-                  // Reset tracking for this row
-                  lastDeductedWeights.current[index] = 0;
-                }
-              }}
-              className="text-red-600 hover:text-red-700 h-10 w-10 p-0"
-            >
-              <IconTrash className="h-5 w-5" />
-            </Button>
-          </div>
-        );
-      })}
+                <div className="w-10 flex items-center justify-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      if (fields.length > 1) {
+                        remove(index);
+                        // Clean up tracking for this row
+                        delete lastDeductedWeights.current[index];
+                      } else {
+                        // Clear the inputs for the only row instead of removing it
+                        setValue(`components.${index}.itemId`, "");
+                        setValue(`components.${index}.weightInGrams`, 0);
+                        setValue(`components.${index}.rawInput`, "");
+                        // Reset tracking for this row
+                        lastDeductedWeights.current[index] = 0;
+                      }
+                    }}
+                    className="h-10 w-10 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    title="Remover componente"
+                  >
+                    <IconTrash className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <Button
         type="button"
         variant="outline"
+        size="sm"
         onClick={() => {
           append({ itemId: "", weightInGrams: 0, rawInput: "" });
           setTimeout(() => {
@@ -319,10 +341,10 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
             comboboxButton?.focus();
           }, 100);
         }}
-        className="w-full h-10 flex items-center justify-center gap-2"
+        className="w-full"
       >
-        <IconPlus className="h-5 w-5" />
-        <span>Adicionar Componente</span>
+        <IconPlus className="h-4 w-4 mr-2" />
+        Adicionar Componente
       </Button>
     </div>
   );

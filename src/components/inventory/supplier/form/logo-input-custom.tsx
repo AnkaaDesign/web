@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
-import { FileUploadField, FileItem, FilePreview, type FileWithPreview } from "@/components/file";
+import { FileUploadField, FileItem, FilePreview, type FileWithPreview } from "@/components/common/file";
 import { Card } from "@/components/ui/card";
 import { fileService } from "../../../../api-client";
 import type { File as AnkaaFile } from "../../../../types";

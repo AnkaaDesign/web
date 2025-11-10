@@ -23,7 +23,7 @@ import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { CutItemListSkeleton } from "./cut-item-list-skeleton";
 import { CutTableContextMenu, type CutAction } from "./cut-table-context-menu";
-import { useFileViewer } from "@/components/file";
+import { useFileViewer } from "@/components/common/file";
 import {
   AlertDialog,
   AlertDialogAction,

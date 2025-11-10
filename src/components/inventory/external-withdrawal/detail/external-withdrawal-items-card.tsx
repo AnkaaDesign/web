@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { IconPackage, IconCurrencyReal, IconTag, IconCategory, IconBoxMultiple, IconCheck, IconDeviceFloppy, IconReload, IconAlertCircle } from "@tabler/icons-react";
 import type { ExternalWithdrawal, ExternalWithdrawalItem } from "../../../../types";
-import { EXTERNAL_WITHDRAWAL_STATUS } from "../../../../constants";
+import { EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_TYPE } from "../../../../constants";
 import { formatCurrency } from "../../../../utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +41,7 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
   const [isSaving, setIsSaving] = useState(false);
 
   // Check if withdrawal allows inline editing
-  const canEditItems = withdrawal.willReturn && [EXTERNAL_WITHDRAWAL_STATUS.PENDING, EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED].includes(withdrawal.status);
+  const canEditItems = withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE && [EXTERNAL_WITHDRAWAL_STATUS.PENDING, EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED].includes(withdrawal.status);
 
   // Check if there are unsaved changes
   const hasChanges = useMemo(() => {

@@ -101,6 +101,7 @@ const EditCollaboratorPage = () => {
       status: user.status,
       currentStatus: user.status, // Store current status for validation
       verified: user.verified,
+      isActive: user.isActive,
       address: user.address ?? null,
       addressNumber: user.addressNumber ?? null,
       addressComplement: user.addressComplement ?? null,

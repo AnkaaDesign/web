@@ -49,12 +49,6 @@ export function ZipCodeInput({ disabled, onCepChange }: ZipCodeInputProps) {
             if (data.uf && shouldFillField(currentValues.state)) {
               form.setValue("state", data.uf, { shouldDirty: true });
             }
-
-            // If Google Places is available, try to get more complete address
-            if (import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
-              // Construct full address for Google Places search
-              // The AddressInput component will handle Google Places autocomplete
-            }
           }
         }
 

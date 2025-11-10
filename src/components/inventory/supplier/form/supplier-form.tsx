@@ -69,7 +69,7 @@ export function SupplierForm(props: SupplierFormProps) {
       cnpj: null,
       corporateName: null,
       email: null,
-      logradouro: null,
+      streetType: null,
       address: null,
       addressNumber: null,
       addressComplement: null,
@@ -93,7 +93,7 @@ export function SupplierForm(props: SupplierFormProps) {
       cnpj: null,
       corporateName: null,
       email: null,
-      logradouro: null,
+      streetType: null,
       address: null,
       addressNumber: null,
       addressComplement: null,
@@ -115,46 +115,37 @@ export function SupplierForm(props: SupplierFormProps) {
   // CNPJ lookup hook
   const { lookupCnpj } = useCnpjLookup({
     onSuccess: (data) => {
-      // In edit mode, only autofill empty fields to avoid overwriting existing data
-      // In create mode, autofill all fields
-      const currentValues = form.getValues();
-      const isEditMode = mode === "update";
+      // Autofill all fields with data from Brasil API, allowing updates to existing data
+      form.setValue("fantasyName", data.fantasyName, { shouldDirty: true, shouldValidate: true });
 
-      // Helper to check if a field should be filled
-      const shouldFillField = (fieldValue: any) => !isEditMode || fieldValue === null || fieldValue === undefined || fieldValue === "";
-
-      // Autofill fields with data from Brasil API
-      if (shouldFillField(currentValues.fantasyName)) {
-        form.setValue("fantasyName", data.fantasyName, { shouldDirty: true, shouldValidate: true });
-      }
-      if (data.corporateName && shouldFillField(currentValues.corporateName)) {
+      if (data.corporateName) {
         form.setValue("corporateName", data.corporateName, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.email && shouldFillField(currentValues.email)) {
+      if (data.email) {
         form.setValue("email", data.email, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.zipCode && shouldFillField(currentValues.zipCode)) {
+      if (data.zipCode) {
         form.setValue("zipCode", data.zipCode, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.logradouroType && shouldFillField(currentValues.logradouro)) {
-        form.setValue("logradouro", data.logradouroType, { shouldDirty: true, shouldValidate: true });
+      if (data.streetType) {
+        form.setValue("streetType", data.streetType, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.address && shouldFillField(currentValues.address)) {
+      if (data.address) {
         form.setValue("address", data.address, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.addressNumber && shouldFillField(currentValues.addressNumber)) {
+      if (data.addressNumber) {
         form.setValue("addressNumber", data.addressNumber, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.addressComplement && shouldFillField(currentValues.addressComplement)) {
+      if (data.addressComplement) {
         form.setValue("addressComplement", data.addressComplement, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.neighborhood && shouldFillField(currentValues.neighborhood)) {
+      if (data.neighborhood) {
         form.setValue("neighborhood", data.neighborhood, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.city && shouldFillField(currentValues.city)) {
+      if (data.city) {
         form.setValue("city", data.city, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.state && shouldFillField(currentValues.state)) {
+      if (data.state) {
         form.setValue("state", data.state, { shouldDirty: true, shouldValidate: true });
       }
       if (data.phones && data.phones.length > 0) {
@@ -393,7 +384,7 @@ export function SupplierForm(props: SupplierFormProps) {
                   neighborhoodFieldName="neighborhood"
                   cityFieldName="city"
                   stateFieldName="state"
-                  logradouroFieldName="logradouro"
+                  logradouroFieldName="streetType"
                 />
                 <CityInput disabled={isSubmitting} required={false} />
                 <StateSelector disabled={isSubmitting} />
@@ -404,7 +395,7 @@ export function SupplierForm(props: SupplierFormProps) {
                   <LogradouroSelect<SupplierCreateFormData | SupplierUpdateFormData> disabled={isSubmitting} />
                 </div>
                 <div className="md:col-span-3">
-                  <AddressInput disabled={isSubmitting} useGooglePlaces={!!import.meta.env.VITE_GOOGLE_MAPS_API_KEY} required={false} />
+                  <AddressInput disabled={isSubmitting} required={false} />
                 </div>
                 <div className="md:col-span-1">
                   <AddressNumberInput disabled={isSubmitting} />

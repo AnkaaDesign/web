@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-normal-map-renderer";
+import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { cn } from "@/lib/utils";
 
 interface PaintSpecificationsCardProps {

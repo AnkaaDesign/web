@@ -1,6 +1,6 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { PaintForm } from "@/components/paint/form/paint-form";
-import type { PaintFormRef } from "@/components/paint/form/paint-form";
+import { PaintForm } from "@/components/painting/form/paint-form";
+import type { PaintFormRef } from "@/components/painting/form/paint-form";
 import { usePaintFormulaMutations, usePaintType } from "../../../hooks";
 import { createPaint } from "../../../api-client";
 import { routes, FAVORITE_PAGES } from "../../../constants";

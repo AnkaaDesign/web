@@ -4,7 +4,7 @@ import type { Supplier } from "../../../../types";
 import type { File as AnkaaFile } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { maskCNPJ } from "../../../../utils";
-import { FileItem } from "@/components/file";
+import { FileItem } from "@/components/common/file";
 
 interface DocumentsCardProps {
   supplier: Supplier;

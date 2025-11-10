@@ -12,7 +12,7 @@ import {
   TRUCK_MANUFACTURER_LABELS,
 } from "../../../../constants";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-normal-map-renderer";
+import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { IconClock, IconCalendar, IconCheck, IconX, IconAlertCircle } from "@tabler/icons-react";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 

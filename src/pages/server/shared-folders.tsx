@@ -53,8 +53,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useSharedFolders, useSharedFolderContents } from "../../hooks";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/api-client";
-import { FileViewerProvider, useFileViewer } from "@/components/file/file-viewer";
-import { FileItem, type FileViewMode } from "@/components/file";
+import { FileViewerProvider, useFileViewer } from "@/components/common/file/file-viewer";
+import { FileItem, type FileViewMode } from "@/components/common/file";
 import type { File as AnkaaFile } from "@/types";
 
 // Utility function to parse WebDAV size string to bytes

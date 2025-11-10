@@ -15,7 +15,7 @@ import {
   getBadgeVariant
 } from "../../../../constants";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-normal-map-renderer";
+import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 
 // Helper function to render date without icon
 const renderDate = (date: Date | null) => {

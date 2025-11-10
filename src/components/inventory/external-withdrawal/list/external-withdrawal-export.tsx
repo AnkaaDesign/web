@@ -3,7 +3,7 @@ import type { ExternalWithdrawal } from "../../../../types";
 import type { ExternalWithdrawalGetManyFormData } from "../../../../schemas";
 import { externalWithdrawalService } from "../../../../api-client";
 import { formatCurrency, formatDate } from "../../../../utils";
-import { EXTERNAL_WITHDRAWAL_STATUS_LABELS } from "../../../../constants";
+import { EXTERNAL_WITHDRAWAL_STATUS_LABELS, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 
 interface ExternalWithdrawalExportProps {
   className?: string;
@@ -27,15 +27,15 @@ const EXPORT_COLUMNS: ExportColumn<ExternalWithdrawal>[] = [
     getValue: (withdrawal) => EXTERNAL_WITHDRAWAL_STATUS_LABELS[withdrawal.status] || withdrawal.status,
   },
   {
-    id: "willReturn",
-    label: "DEVOLUÇÃO",
-    getValue: (withdrawal) => (withdrawal.willReturn ? "Com devolução" : "Sem devolução"),
+    id: "type",
+    label: "TIPO",
+    getValue: (withdrawal) => EXTERNAL_WITHDRAWAL_TYPE_LABELS[withdrawal.type] || withdrawal.type,
   },
   {
     id: "total",
     label: "VALOR TOTAL",
     getValue: (withdrawal) => {
-      if (!withdrawal.willReturn && withdrawal.items) {
+      if (withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && withdrawal.items) {
         const total = withdrawal.items.reduce((sum, item) => sum + item.withdrawedQuantity * (item.price || 0), 0);
         return formatCurrency(total);
       }
@@ -60,7 +60,7 @@ const EXPORT_COLUMNS: ExportColumn<ExternalWithdrawal>[] = [
 ];
 
 // Default visible columns
-const DEFAULT_VISIBLE_COLUMNS = new Set(["withdrawerName", "status", "willReturn", "total", "createdAt"]);
+const DEFAULT_VISIBLE_COLUMNS = new Set(["withdrawerName", "status", "type", "total", "createdAt"]);
 
 export function ExternalWithdrawalExport({ className, currentItems, totalRecords, selectedItems, visibleColumns, filters }: ExternalWithdrawalExportProps) {
   // Fetch all data when needed
@@ -166,7 +166,7 @@ export function ExternalWithdrawalExport({ className, currentItems, totalRecords
         // Alignment for specific columns
         if (col.id === "total") {
           cellClass = "text-align: right;";
-        } else if (col.id === "willReturn" || col.id === "itemCount") {
+        } else if (col.id === "type" || col.id === "itemCount") {
           cellClass = "text-align: center;";
         }
 
@@ -205,7 +205,7 @@ export function ExternalWithdrawalExport({ className, currentItems, totalRecords
             <tr>
               ${columns
                 .map((col) => {
-                  const align = col.id === "total" ? "text-align: right;" : col.id === "willReturn" || col.id === "status" || col.id === "itemCount" ? "text-align: center;" : "";
+                  const align = col.id === "total" ? "text-align: right;" : col.id === "type" || col.id === "status" || col.id === "itemCount" ? "text-align: center;" : "";
                   return `<th style="padding: 8px; border: 1px solid #e5e7eb; ${align}">${col.label}</th>`;
                 })
                 .join("")}

@@ -1,4 +1,4 @@
-import { PaintTypeList } from "@/components/paint/paint-type/list/paint-type-list";
+import { PaintTypeList } from "@/components/painting/paint-type/list/paint-type-list";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";

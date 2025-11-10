@@ -8,7 +8,7 @@ import type { PaintProductionCreateFormData } from "../../../../../../../schemas
 import { Card, CardContent } from "@/components/ui/card";
 import { LoadingPage } from "@/components/navigation/loading-page";
 import { ErrorCard } from "@/components/ui/error-card";
-import { FormulaCalculator } from "@/components/paint/formula/formula-calculator";
+import { FormulaCalculator } from "@/components/painting/formula/formula-calculator";
 import { PageHeader } from "@/components/ui/page-header";
 
 export default function FormulaDetailsPage() {

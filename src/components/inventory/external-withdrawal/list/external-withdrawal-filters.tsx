@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { IconFilter, IconX } from "@tabler/icons-react";
-import { EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_STATUS_LABELS } from "../../../../constants";
+import { EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_STATUS_LABELS, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 
@@ -19,7 +19,7 @@ interface ExternalWithdrawalFiltersProps {
 
 interface FilterState {
   statuses?: EXTERNAL_WITHDRAWAL_STATUS[];
-  willReturn?: boolean;
+  types?: EXTERNAL_WITHDRAWAL_TYPE[];
   hasNfe?: boolean;
   hasReceipt?: boolean;
   createdAtRange?: { gte?: Date; lte?: Date };
@@ -34,7 +34,7 @@ export function ExternalWithdrawalFilters({ open, onOpenChange, filters, onFilte
 
     setLocalState({
       statuses: filters.statuses || [],
-      willReturn: filters.willReturn,
+      types: filters.types || [],
       hasNfe: filters.hasNfe,
       hasReceipt: filters.hasReceipt,
       createdAtRange: filters.createdAt,
@@ -53,10 +53,12 @@ export function ExternalWithdrawalFilters({ open, onOpenChange, filters, onFilte
       newFilters.statuses = localState.statuses;
     }
 
-    // Add boolean filters
-    if (typeof localState.willReturn === "boolean") {
-      newFilters.willReturn = localState.willReturn;
+    // Add type filter
+    if (localState.types && localState.types.length > 0) {
+      newFilters.types = localState.types;
     }
+
+    // Add boolean filters
     if (typeof localState.hasNfe === "boolean") {
       newFilters.hasNfe = localState.hasNfe;
     }
@@ -91,7 +93,7 @@ export function ExternalWithdrawalFilters({ open, onOpenChange, filters, onFilte
   const countActiveFilters = () => {
     let count = 0;
     if (localState.statuses && localState.statuses.length > 0) count += localState.statuses.length;
-    if (typeof localState.willReturn === "boolean") count++;
+    if (localState.types && localState.types.length > 0) count += localState.types.length;
     if (typeof localState.hasNfe === "boolean") count++;
     if (typeof localState.hasReceipt === "boolean") count++;
     if (localState.createdAtRange?.gte || localState.createdAtRange?.lte) count++;
@@ -103,6 +105,11 @@ export function ExternalWithdrawalFilters({ open, onOpenChange, filters, onFilte
   const statusOptions = Object.values(EXTERNAL_WITHDRAWAL_STATUS).map((status) => ({
     value: status,
     label: EXTERNAL_WITHDRAWAL_STATUS_LABELS[status],
+  }));
+
+  const typeOptions = Object.values(EXTERNAL_WITHDRAWAL_TYPE).map((type) => ({
+    value: type,
+    label: EXTERNAL_WITHDRAWAL_TYPE_LABELS[type],
   }));
 
   return (
@@ -140,26 +147,21 @@ export function ExternalWithdrawalFilters({ open, onOpenChange, filters, onFilte
             />
           </div>
 
+          {/* Type Filter */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Tipo</Label>
+            <Combobox
+              mode="multiple"
+              options={typeOptions}
+              value={localState.types || []}
+              onValueChange={(values: string[]) => setLocalState((prev) => ({ ...prev, types: values as EXTERNAL_WITHDRAWAL_TYPE[] }))}
+              placeholder="Selecione os tipos"
+              emptyText="Nenhum tipo encontrado"
+            />
+          </div>
+
           {/* Boolean Filters */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="will-return">Com devolução</Label>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="will-return"
-                  checked={localState.willReturn === true}
-                  onCheckedChange={(checked) =>
-                    setLocalState((prev) => ({
-                      ...prev,
-                      willReturn: checked ? true : prev.willReturn === true ? undefined : false,
-                    }))
-                  }
-                />
-                <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => setLocalState((prev) => ({ ...prev, willReturn: undefined }))}>
-                  <IconX className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
 
             <div className="flex items-center justify-between">
               <Label htmlFor="has-nfe">Com NFe</Label>

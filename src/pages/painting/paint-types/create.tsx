@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { routes, FAVORITE_PAGES } from "../../../constants";
-import { PaintTypeForm } from "@/components/paint/paint-type/form";
+import { PaintTypeForm } from "@/components/painting/paint-type/form";
 import { usePaintTypeMutations } from "../../../hooks";
 import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
 import { IconCheck, IconLoader2, IconPaint } from "@tabler/icons-react";

@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
+import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { IconFilter, IconUserCheck, IconArrowsExchange, IconListDetails, IconUser, IconPackage, IconNumbers, IconCalendar, IconX } from "@tabler/icons-react";
 import { getUsers, getItems } from "../../../../api-client";
@@ -165,108 +165,69 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
           {/* Attribution and Operation Filters */}
           <div className="grid grid-cols-2 gap-6">
             {/* Attribution Column */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <IconUserCheck className="h-4 w-4" />
                 Atribuição
               </Label>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="hasUser"
-                    checked={localFilters.hasUser === true}
-                    onCheckedChange={(checked) =>
-                      setLocalFilters({
-                        ...localFilters,
-                        hasUser: checked ? true : undefined,
-                      })
-                    }
-                  />
-                  <Label htmlFor="hasUser" className="text-sm font-normal cursor-pointer">
-                    Com usuário atribuído
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="noUser"
-                    checked={localFilters.hasUser === false}
-                    onCheckedChange={(checked) =>
-                      setLocalFilters({
-                        ...localFilters,
-                        hasUser: checked ? false : undefined,
-                      })
-                    }
-                  />
-                  <Label htmlFor="noUser" className="text-sm font-normal cursor-pointer">
-                    Sem usuário atribuído
-                  </Label>
-                </div>
-              </div>
+              <Combobox
+                mode="single"
+                options={[
+                  { value: "ambos", label: "Ambos" },
+                  { value: "com", label: "Com usuário atribuído" },
+                  { value: "sem", label: "Sem usuário atribuído" },
+                ]}
+                value={localFilters.hasUser === true ? "com" : localFilters.hasUser === false ? "sem" : "ambos"}
+                onValueChange={(value) => {
+                  setLocalFilters({
+                    ...localFilters,
+                    hasUser: value === "com" ? true : value === "sem" ? false : undefined,
+                  });
+                }}
+                placeholder="Selecione..."
+                emptyText="Nenhuma opção encontrada"
+              />
             </div>
 
             {/* Operation Column */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <IconArrowsExchange className="h-4 w-4" />
                 Operação
               </Label>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="inbound"
-                    checked={localFilters.operations?.includes(ACTIVITY_OPERATION.INBOUND) ?? false}
-                    onCheckedChange={(checked) => {
-                      const currentOps = localFilters.operations || [];
-                      if (checked) {
-                        setLocalFilters({
-                          ...localFilters,
-                          operations: [...currentOps, ACTIVITY_OPERATION.INBOUND],
-                        });
-                      } else {
-                        const newOps = currentOps.filter((op: string) => op !== ACTIVITY_OPERATION.INBOUND);
-                        setLocalFilters({
-                          ...localFilters,
-                          operations: newOps.length > 0 ? newOps : undefined,
-                        });
-                      }
-                    }}
-                  />
-                  <Label htmlFor="inbound" className="text-sm font-normal cursor-pointer">
-                    Entrada
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="outbound"
-                    checked={localFilters.operations?.includes(ACTIVITY_OPERATION.OUTBOUND) ?? false}
-                    onCheckedChange={(checked) => {
-                      const currentOps = localFilters.operations || [];
-                      if (checked) {
-                        setLocalFilters({
-                          ...localFilters,
-                          operations: [...currentOps, ACTIVITY_OPERATION.OUTBOUND],
-                        });
-                      } else {
-                        const newOps = currentOps.filter((op: string) => op !== ACTIVITY_OPERATION.OUTBOUND);
-                        setLocalFilters({
-                          ...localFilters,
-                          operations: newOps.length > 0 ? newOps : undefined,
-                        });
-                      }
-                    }}
-                  />
-                  <Label htmlFor="outbound" className="text-sm font-normal cursor-pointer">
-                    Saída
-                  </Label>
-                </div>
-              </div>
+              <Combobox
+                mode="single"
+                options={[
+                  { value: "ambos", label: "Ambos" },
+                  { value: "entrada", label: "Entrada" },
+                  { value: "saida", label: "Saída" },
+                ]}
+                value={
+                  localFilters.operations?.includes(ACTIVITY_OPERATION.INBOUND) && !localFilters.operations?.includes(ACTIVITY_OPERATION.OUTBOUND)
+                    ? "entrada"
+                    : localFilters.operations?.includes(ACTIVITY_OPERATION.OUTBOUND) && !localFilters.operations?.includes(ACTIVITY_OPERATION.INBOUND)
+                      ? "saida"
+                      : "ambos"
+                }
+                onValueChange={(value) => {
+                  setLocalFilters({
+                    ...localFilters,
+                    operations: value === "entrada" ? [ACTIVITY_OPERATION.INBOUND] : value === "saida" ? [ACTIVITY_OPERATION.OUTBOUND] : undefined,
+                  });
+                }}
+                placeholder="Selecione..."
+                emptyText="Nenhuma opção encontrada"
+              />
             </div>
           </div>
 
           {/* Paint Production Filter */}
           <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Checkbox
+            <div className="flex items-center justify-between">
+              <Label htmlFor="showPaintProduction" className="text-sm font-normal">
+                Exibir atividades de produção de tinta
+              </Label>
+              <Switch
                 id="showPaintProduction"
                 checked={localFilters.showPaintProduction ?? false}
                 onCheckedChange={(checked) =>
@@ -276,9 +237,6 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
                   })
                 }
               />
-              <Label htmlFor="showPaintProduction" className="text-sm font-normal cursor-pointer">
-                Exibir atividades de produção de tinta
-              </Label>
             </div>
           </div>
 
@@ -399,6 +357,7 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
                       quantityRange: newRange.min === undefined && newRange.max === undefined ? undefined : newRange,
                     });
                   }}
+                  className="bg-transparent"
                 />
               </div>
               <div className="space-y-1">
@@ -418,6 +377,7 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
                       quantityRange: newRange.min === undefined && newRange.max === undefined ? undefined : newRange,
                     });
                   }}
+                  className="bg-transparent"
                 />
               </div>
             </div>

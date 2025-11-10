@@ -35,13 +35,11 @@ export * from "./form-document-input";
 // export * from "./form-select"; // Removed - replaced by form-combobox
 export * from "./form-combobox";
 export * from "./phone-array-input";
-export * from "./google-places-autocomplete";
 export * from "./hover-card";
 export * from "./input";
 export * from "./input-otp";
 export * from "./label";
 export { LoadingSpinner, LoadingOverlay, LoadingDots, SkeletonText, SkeletonCard, SkeletonAvatar, Progress as LoadingProgress, PulseView } from "./loading";
-export * from "./manual-address-form";
 export * from "./measure-constants";
 export * from "./measure-display";
 export * from "./measure-form";

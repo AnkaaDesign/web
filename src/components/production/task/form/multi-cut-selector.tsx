@@ -9,8 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
 import { CUT_TYPE, CUT_TYPE_LABELS, CUT_ORIGIN } from "../../../../constants";
-import { FileUploadField } from "@/components/file";
-import type { FileWithPreview } from "@/components/file";
+import { FileUploadField } from "@/components/common/file";
+import type { FileWithPreview } from "@/components/common/file";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { getApiBaseUrl } from "@/utils/file";
 

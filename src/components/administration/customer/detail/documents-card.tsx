@@ -4,7 +4,7 @@ import { IconFileText, IconFileInvoice, IconReceipt, IconFileSpreadsheet } from 
 import type { Customer } from "../../../../types";
 import type { File as FileType } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { FilePreviewGrid } from "@/components/file";
+import { FilePreviewGrid } from "@/components/common/file";
 import { useTasks } from "../../../../hooks";
 import { Skeleton } from "@/components/ui/skeleton";
 

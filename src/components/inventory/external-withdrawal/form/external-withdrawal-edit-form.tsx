@@ -7,9 +7,9 @@ import type { ExternalWithdrawalCreateFormData } from "../../../../schemas";
 import type { ExternalWithdrawal, ExternalWithdrawalItem, Item } from "../../../../types";
 import { externalWithdrawalCreateSchema } from "../../../../schemas";
 import { useExternalWithdrawalMutations, useItems } from "../../../../hooks";
-import { routes } from "../../../../constants";
+import { routes, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 import { toast } from "sonner";
-import { FileUploadField, type FileWithPreview } from "@/components/file";
+import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -17,7 +17,7 @@ import { Form } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
@@ -150,10 +150,10 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
     quantities,
     prices,
     withdrawerName,
-    willReturn,
+    type: withdrawalType,
     notes,
     updateWithdrawerName,
-    updateWillReturn,
+    updateType,
     updateNotes,
     showSelectedOnly,
     searchTerm,
@@ -185,7 +185,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
     // Initialize with existing data
     initialData: {
       withdrawerName: withdrawal.withdrawerName,
-      willReturn: withdrawal.willReturn,
+      type: withdrawal.type,
       notes: withdrawal.notes || "",
       selectedItems: initialSelectedItems,
       quantities: initialQuantities,
@@ -196,7 +196,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
   // Form setup with default values from URL state
   const defaultValues: Partial<ExternalWithdrawalCreateFormData> = {
     withdrawerName: withdrawerName || withdrawal.withdrawerName,
-    willReturn: willReturn,
+    type: withdrawalType,
     notes: notes || withdrawal.notes || "",
     items: [],
   };
@@ -234,8 +234,8 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
     }
   }, [searchParams]); // Removed currentStep to prevent circular dependency
 
-  // Calculate total price (only if willReturn is false)
-  const totalPrice = !willReturn
+  // Calculate total price (only for CHARGEABLE type)
+  const totalPrice = withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
     ? Array.from(selectedItems).reduce((total, itemId) => {
         const quantity = Number(quantities[itemId]) || 1;
         const price = Number(prices[itemId]) || 0;
@@ -301,7 +301,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
         }
 
         // Validate prices if not returning
-        if (!willReturn) {
+        if (withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
           const missingPrices = Array.from(selectedItems).filter((itemId) => {
             const price = prices[itemId];
             return price === undefined || price === null || price < 0;
@@ -322,7 +322,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
       default:
         return false;
     }
-  }, [currentStep, withdrawerName, selectionCount, selectedItems, quantities, willReturn, prices, notes]);
+  }, [currentStep, withdrawerName, selectionCount, selectedItems, quantities, withdrawalType, prices, notes]);
 
   // Handle file changes
   const handleReceiptFilesChange = useCallback((files: FileWithPreview[]) => {
@@ -366,7 +366,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
 
       const updateData = {
         withdrawerName: withdrawerName?.trim() || "",
-        willReturn,
+        type: withdrawalType,
         notes: notes?.trim() || null,
       };
 
@@ -399,7 +399,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
       console.error("Error updating external withdrawal:", error);
       // Error is handled by the mutation hook
     }
-  }, [validateCurrentStep, selectedItems, quantities, prices, withdrawerName, willReturn, notes, updateAsync, withdrawal.id, navigate, receiptFiles, nfeFiles]);
+  }, [validateCurrentStep, selectedItems, quantities, prices, withdrawerName, withdrawalType, notes, updateAsync, withdrawal.id, navigate, receiptFiles, nfeFiles]);
 
   const isFirstStep = currentStep === 1;
   const isLastStep = currentStep === steps.length;
@@ -640,14 +640,14 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
             </div>
             <div class="info-item">
               <span class="info-label">Tipo de Retirada</span>
-              <span class="info-value">${willReturn ? "Com Devolução" : "Sem Devolução"}</span>
+              <span class="info-value">${EXTERNAL_WITHDRAWAL_TYPE_LABELS[withdrawalType]}</span>
             </div>
             <div class="info-item">
               <span class="info-label">Quantidade de Itens</span>
               <span class="info-value">${selectionCount} ${selectionCount === 1 ? "item" : "itens"}</span>
             </div>
             ${
-              !willReturn
+              withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
                 ? `
               <div class="info-item">
                 <span class="info-label">Valor Total</span>
@@ -678,7 +678,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                 <th>Categoria</th>
                 <th>Marca</th>
                 <th class="text-right">Quantidade</th>
-                ${!willReturn ? '<th class="text-right">Preço Unit.</th><th class="text-right">Total</th>' : ""}
+                ${withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? '<th class="text-right">Preço Unit.</th><th class="text-right">Total</th>' : ""}
               </tr>
             </thead>
             <tbody>
@@ -694,14 +694,14 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                     <td>${item.category?.name || "-"}</td>
                     <td>${item.brand?.name || "-"}</td>
                     <td class="text-right">${quantity}${item.measureUnit && MEASURE_UNIT_LABELS[item.measureUnit as keyof typeof MEASURE_UNIT_LABELS] ? ` ${MEASURE_UNIT_LABELS[item.measureUnit as keyof typeof MEASURE_UNIT_LABELS]}` : ""}</td>
-                    ${!willReturn ? `<td class="text-right">${formatCurrency(price)}</td><td class="text-right font-medium">${formatCurrency(itemTotal)}</td>` : ""}
+                    ${withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? `<td class="text-right">${formatCurrency(price)}</td><td class="text-right font-medium">${formatCurrency(itemTotal)}</td>` : ""}
                   </tr>
                 `;
                 })
                 .join("")}
             </tbody>
             ${
-              !willReturn
+              withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE
                 ? `
               <tfoot>
                 <tr class="total-row">
@@ -737,13 +737,13 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
         };
       }
     },
-    [withdrawerName, willReturn, notes, selectionCount, selectedItemsData, quantities, prices, totalPrice, withdrawal.id],
+    [withdrawerName, withdrawalType, notes, selectionCount, selectedItemsData, quantities, prices, totalPrice, withdrawal.id],
   );
 
   // Detect if form has actual changes from original withdrawal
   const hasFormChanges = useMemo(() => {
     const withdrawerNameChanged = (withdrawerName?.trim() || "") !== (withdrawal.withdrawerName?.trim() || "");
-    const willReturnChanged = willReturn !== withdrawal.willReturn;
+    const typeChanged = withdrawalType !== withdrawal.type;
     const notesChanged = (notes?.trim() || "") !== (withdrawal.notes?.trim() || "");
 
     // Check if selected items have changed
@@ -763,10 +763,10 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
       return currentPrice !== undefined && currentPrice !== item.price;
     });
 
-    const hasChanges = withdrawerNameChanged || willReturnChanged || notesChanged || itemsChanged || quantitiesChanged || pricesChanged || hasFileChanges;
+    const hasChanges = withdrawerNameChanged || typeChanged || notesChanged || itemsChanged || quantitiesChanged || pricesChanged || hasFileChanges;
     console.log('[ExternalWithdrawalEditForm] hasFormChanges:', {
       withdrawerNameChanged,
-      willReturnChanged,
+      typeChanged,
       notesChanged,
       itemsChanged,
       quantitiesChanged,
@@ -775,7 +775,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
       hasChanges
     });
     return hasChanges;
-  }, [withdrawerName, willReturn, notes, selectedItems, quantities, prices, withdrawal, hasFileChanges]);
+  }, [withdrawerName, withdrawalType, notes, selectedItems, quantities, prices, withdrawal, hasFileChanges]);
 
   // Generate navigation actions based on current step
   const navigationActions = [];
@@ -868,39 +868,56 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-6">
-                        {/* Withdrawer Name */}
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium">
-                            Nome do Retirador <span className="text-destructive">*</span>
-                          </Label>
-                          <Input
-                            placeholder="Digite o nome da pessoa que está retirando"
-                            value={withdrawerName}
-                            onChange={(e) => updateWithdrawerName(e.target.value)}
-                            className="h-10"
-                            maxLength={200}
-                          />
-                          {withdrawerName && (withdrawerName.trim().length || 0) < 2 && <p className="text-sm text-destructive">Nome deve ter pelo menos 2 caracteres</p>}
-                          {withdrawerName && withdrawerName.trim().length > 200 && <p className="text-sm text-destructive">Nome deve ter no máximo 200 caracteres</p>}
-                        </div>
-
-                        {/* Will Return Toggle */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm font-medium flex items-center gap-2">
-                              <IconArrowBack className="h-4 w-4" />
-                              Itens serão devolvidos?
+                        {/* Withdrawer Name and Type in same row */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Withdrawer Name */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">
+                              Nome do Retirador <span className="text-destructive">*</span>
                             </Label>
-                            <Switch
-                              checked={willReturn}
-                              onCheckedChange={(value) => {
-                                updateWillReturn(value);
-                              }}
+                            <Input
+                              placeholder="Digite o nome da pessoa que está retirando"
+                              value={withdrawerName}
+                              onChange={(e) => updateWithdrawerName(e.target.value)}
+                              className="h-10"
+                              maxLength={200}
                             />
+                            {withdrawerName && (withdrawerName.trim().length || 0) < 2 && <p className="text-sm text-destructive">Nome deve ter pelo menos 2 caracteres</p>}
+                            {withdrawerName && withdrawerName.trim().length > 200 && <p className="text-sm text-destructive">Nome deve ter no máximo 200 caracteres</p>}
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {willReturn ? "Os itens serão devolvidos (sem cobrança)" : "Os itens não serão devolvidos (com cobrança)"}
-                          </p>
+
+                          {/* Withdrawal Type */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">
+                              Tipo de Retirada <span className="text-destructive">*</span>
+                            </Label>
+                            <Select
+                              value={withdrawalType}
+                              onValueChange={(value: EXTERNAL_WITHDRAWAL_TYPE) => {
+                                updateType(value);
+                              }}
+                            >
+                              <SelectTrigger className="h-10">
+                                <SelectValue placeholder="Selecione o tipo" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE}>
+                                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE]}
+                                </SelectItem>
+                                <SelectItem value={EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE}>
+                                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE]}
+                                </SelectItem>
+                                <SelectItem value={EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY}>
+                                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY]}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE && "Itens serão devolvidos (sem cobrança)"}
+                              {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && "Itens não serão devolvidos (com cobrança)"}
+                              {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY && "Itens cortesia (sem devolução e sem cobrança)"}
+                            </p>
+                          </div>
                         </div>
 
                         {/* Notes */}
@@ -985,7 +1002,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                       prices={prices}
                       isSelected={(itemId) => selectedItems.has(itemId)}
                       showQuantityInput={true}
-                      showPriceInput={!willReturn}
+                      showPriceInput={withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE}
                       showSelectedOnly={showSelectedOnly}
                       searchTerm={searchTerm}
                       showInactive={showInactive}
@@ -1032,7 +1049,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                           </div>
                           <div>
                             <span className="text-sm font-medium text-muted-foreground">Tipo de Retirada:</span>
-                            <p className="mt-1 font-medium">{willReturn ? "Com Devolução" : "Sem Devolução"}</p>
+                            <p className="mt-1 font-medium">{EXTERNAL_WITHDRAWAL_TYPE_LABELS[withdrawalType]}</p>
                           </div>
                           <div>
                             <span className="text-sm font-medium text-muted-foreground">Quantidade de Itens:</span>
@@ -1040,7 +1057,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                               {selectionCount} {selectionCount === 1 ? "item" : "itens"}
                             </p>
                           </div>
-                          {!willReturn && (
+                          {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                             <div>
                               <span className="text-sm font-medium text-muted-foreground">Valor Total:</span>
                               <p className="mt-1 font-medium">{formatCurrency(totalPrice)}</p>
@@ -1074,7 +1091,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                                 <TableHead>Categoria</TableHead>
                                 <TableHead>Marca</TableHead>
                                 <TableHead className="text-right">Quantidade</TableHead>
-                                {!willReturn && (
+                                {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                                   <>
                                     <TableHead className="text-right">Preço Unit.</TableHead>
                                     <TableHead className="text-right">Total</TableHead>
@@ -1100,7 +1117,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                                         ? ` ${MEASURE_UNIT_LABELS[item.measureUnit as keyof typeof MEASURE_UNIT_LABELS]}`
                                         : ""}
                                     </TableCell>
-                                    {!willReturn && (
+                                    {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                                       <>
                                         <TableCell className="text-right">{formatCurrency(price)}</TableCell>
                                         <TableCell className="text-right font-medium">{formatCurrency(itemTotal)}</TableCell>
@@ -1110,7 +1127,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                                 );
                               })}
                             </TableBody>
-                            {!willReturn && (
+                            {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                               <TableFooter>
                                 <TableRow>
                                   <TableCell colSpan={5} className="text-right font-medium">

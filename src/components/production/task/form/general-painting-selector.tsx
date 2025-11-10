@@ -7,7 +7,7 @@ import type { Paint } from "../../../../types";
 import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH } from "../../../../constants";
 import { IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-normal-map-renderer";
+import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 
 const paletteColors: Record<string, string> = {
   BLACK: "#000000",

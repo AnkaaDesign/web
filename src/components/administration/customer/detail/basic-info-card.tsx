@@ -70,13 +70,13 @@ export function BasicInfoCard({ customer, className }: BasicInfoCardProps) {
                 </div>
               )}
 
-              {customer.situacaoCadastral && (
+              {customer.registrationStatus && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconFileDescription className="h-4 w-4" />
                     Situação Cadastral
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{customer.situacaoCadastral}</span>
+                  <span className="text-sm font-semibold text-foreground">{customer.registrationStatus}</span>
                 </div>
               )}
             </div>

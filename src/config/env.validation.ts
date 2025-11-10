@@ -8,9 +8,6 @@ export const envSchema = z.object({
   // API Configuration
   VITE_API_URL: z.string().url("VITE_API_URL must be a valid URL"),
 
-  // Google Services
-  VITE_GOOGLE_PLACES_API_KEY: z.string().optional(),
-
   // Development Flags
   DISABLE_RATE_LIMITING: z
     .string()
@@ -45,10 +42,6 @@ export function validateEnv(): EnvConfig {
     const result = envSchema.parse(envVars);
 
     // Additional custom validations
-    if (result.PROD && !result.VITE_GOOGLE_PLACES_API_KEY) {
-      console.warn("⚠️  Google Places API key not configured - location features may not work");
-    }
-
     if (result.DEV) {
     }
     return result;

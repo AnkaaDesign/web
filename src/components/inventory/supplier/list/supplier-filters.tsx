@@ -15,7 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
-import { IconFilter, IconX, IconShoppingCart, IconMapPin, IconCalendarPlus, IconPackages } from "@tabler/icons-react";
+import { IconFilter, IconX, IconMapPin, IconCalendarPlus, IconPackages } from "@tabler/icons-react";
 import { BRAZILIAN_STATES, BRAZILIAN_STATE_NAMES } from "../../../../constants";
 
 interface SupplierFiltersProps {
@@ -27,7 +27,6 @@ interface SupplierFiltersProps {
 
 // Local filter state interface
 interface LocalFilterState {
-  hasActiveOrders?: boolean;
   hasLogo?: boolean;
   hasItems?: boolean;
   hasOrders?: boolean;
@@ -62,7 +61,6 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
   useEffect(() => {
     if (open) {
       setLocalState({
-        hasActiveOrders: filters.hasActiveOrders,
         hasLogo: filters.hasLogo,
         hasItems: filters.hasItems,
         hasOrders: filters.hasOrders,
@@ -84,7 +82,6 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
   // Count active filters in local state
   const localActiveFilterCount = useMemo(() => {
     let count = 0;
-    if (localState.hasActiveOrders) count++;
     if (localState.hasLogo !== undefined) count++;
     if (localState.hasItems !== undefined) count++;
     if (localState.hasOrders !== undefined) count++;
@@ -158,24 +155,6 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          {/* Active Orders Filter */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="hasActiveOrders" className="text-sm font-normal flex items-center gap-2">
-                <IconShoppingCart className="h-4 w-4 text-muted-foreground" />
-                Pedidos ativos
-              </Label>
-              <Switch
-                id="hasActiveOrders"
-                checked={localState.hasActiveOrders ?? false}
-                onCheckedChange={(checked) => setLocalState((prev) => ({ ...prev, hasActiveOrders: checked || undefined }))}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground">Fornecedores com pedidos em andamento (exceto cancelados ou recebidos)</p>
-          </div>
-
-          <Separator />
-
           {/* States Filter */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
@@ -197,8 +176,6 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
               </div>
             )}
           </div>
-
-          <Separator />
 
           {/* Item Count Range */}
           <div className="space-y-2">
@@ -228,6 +205,7 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
                       },
                     }));
                   }}
+                  className="bg-transparent"
                 />
               </div>
               <div>
@@ -251,6 +229,7 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
                       },
                     }));
                   }}
+                  className="bg-transparent"
                 />
               </div>
             </div>
@@ -264,8 +243,6 @@ export function SupplierFilters({ open, onOpenChange, filters, onFilterChange }:
               </div>
             )}
           </div>
-
-          <Separator />
 
           {/* Created At Date Range */}
           <div className="space-y-3">

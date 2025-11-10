@@ -3,7 +3,7 @@
 import { formatCurrency, formatCurrencyWithoutSymbol, parseCurrency, roundToDecimals, isValidNumber, isPositiveNumber, calculateSum } from "../../../../utils";
 import type { ExternalWithdrawalCreateFormData } from "../../../../schemas";
 import type { Item, ExternalWithdrawal } from "../../../../types";
-import { EXTERNAL_WITHDRAWAL_STATUS } from "../../../../constants";
+import { EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_TYPE } from "../../../../constants";
 
 // =====================
 // TYPE DEFINITIONS
@@ -39,7 +39,7 @@ export interface ExternalWithdrawalFormItem {
 
 export interface ExternalWithdrawalFormData {
   withdrawerName: string;
-  willReturn: boolean;
+  type: EXTERNAL_WITHDRAWAL_TYPE;
   notes?: string | null;
   selectedItems: Map<string, ExternalWithdrawalFormItem>;
   quantities: Record<string, number>;
@@ -126,12 +126,12 @@ export function calculateExternalWithdrawalTotals(
   selectedItems: Map<string, ExternalWithdrawalFormItem>,
   quantities: Record<string, number>,
   prices: Record<string, number>,
-  willReturn: boolean = false,
+  type: EXTERNAL_WITHDRAWAL_TYPE,
 ): ExternalWithdrawalTotals {
   const itemCalculations: TotalCalculation[] = [];
 
-  // If items will be returned, no price calculation needed
-  if (willReturn) {
+  // If not chargeable, no price calculation needed
+  if (type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
     const totalItems = selectedItems.size;
     const totalQuantity = Array.from(selectedItems.keys()).reduce((total, itemId) => {
       return total + (quantities[itemId] || 1);
@@ -270,7 +270,7 @@ export function transformFormDataForAPI(formData: ExternalWithdrawalFormData): E
   // Transform selected items
   formData.selectedItems.forEach((item, itemId) => {
     const quantity = formData.quantities[itemId] || 1;
-    const price = formData.willReturn ? null : formData.prices[itemId] || getBestItemPrice(item);
+    const price = formData.type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? null : formData.prices[itemId] || getBestItemPrice(item);
 
     items.push({
       itemId,
@@ -281,7 +281,7 @@ export function transformFormDataForAPI(formData: ExternalWithdrawalFormData): E
 
   return {
     withdrawerName: formData.withdrawerName.trim(),
-    willReturn: formData.willReturn,
+    type: formData.type,
     status: EXTERNAL_WITHDRAWAL_STATUS.PENDING,
     notes: formData.notes?.trim() || null,
     nfeId: formData.nfeId || null,
@@ -332,7 +332,7 @@ export function transformAPIDataToFormData(externalWithdrawal: ExternalWithdrawa
 
   return {
     withdrawerName: externalWithdrawal.withdrawerName,
-    willReturn: externalWithdrawal.willReturn,
+    type: externalWithdrawal.type,
     notes: externalWithdrawal.notes,
     nfeId: externalWithdrawal.nfeId,
     receiptId: externalWithdrawal.receiptId,
@@ -348,7 +348,7 @@ export function transformAPIDataToFormData(externalWithdrawal: ExternalWithdrawa
 export function cloneFormData(formData: ExternalWithdrawalFormData): ExternalWithdrawalFormData {
   return {
     withdrawerName: formData.withdrawerName,
-    willReturn: formData.willReturn,
+    type: formData.type,
     notes: formData.notes,
     nfeId: formData.nfeId,
     receiptId: formData.receiptId,
@@ -435,13 +435,13 @@ export function validateItemSelection(selectedItems: Map<string, ExternalWithdra
 }
 
 /**
- * Validate prices for non-returnable items
+ * Validate prices for chargeable items
  */
-export function validateItemPrices(selectedItems: Map<string, ExternalWithdrawalFormItem>, prices: Record<string, number>, willReturn: boolean): ValidationError[] {
+export function validateItemPrices(selectedItems: Map<string, ExternalWithdrawalFormItem>, prices: Record<string, number>, type: EXTERNAL_WITHDRAWAL_TYPE): ValidationError[] {
   const errors: ValidationError[] = [];
 
-  // No price validation needed for returnable items
-  if (willReturn) {
+  // No price validation needed for non-chargeable items
+  if (type !== EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
     return errors;
   }
 
@@ -534,14 +534,14 @@ export function validateExternalWithdrawalForm(
   errors.push(...itemErrors);
 
   // Validate prices for non-returnable items
-  const priceErrors = validateItemPrices(formData.selectedItems, formData.prices, formData.willReturn);
+  const priceErrors = validateItemPrices(formData.selectedItems, formData.prices, formData.type);
   errors.push(...priceErrors);
 
   // Calculate totals for additional validations
-  const totals = calculateExternalWithdrawalTotals(formData.selectedItems, formData.quantities, formData.prices, formData.willReturn);
+  const totals = calculateExternalWithdrawalTotals(formData.selectedItems, formData.quantities, formData.prices, formData.type);
 
   // Validate total value if needed
-  if (!formData.willReturn && options.maxTotal && totals.grandTotal > options.maxTotal) {
+  if (formData.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && options.maxTotal && totals.grandTotal > options.maxTotal) {
     errors.push({
       field: "total",
       message: `Valor total (${formatCurrency(totals.grandTotal)}) excede o limite permitido (${formatCurrency(options.maxTotal)})`,
@@ -550,7 +550,7 @@ export function validateExternalWithdrawalForm(
   }
 
   // Add warnings
-  if (!formData.willReturn && totals.hasItemsWithoutPrice) {
+  if (formData.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && totals.hasItemsWithoutPrice) {
     warnings.push({
       field: "prices",
       message: "Alguns itens não possuem preço definido",
@@ -707,7 +707,7 @@ export function formatItemsCount(count: number): string {
 /**
  * Generate summary text for selected items
  */
-export function generateSelectionSummary(selectedItems: Map<string, ExternalWithdrawalFormItem>, quantities: Record<string, number>, willReturn: boolean): string {
+export function generateSelectionSummary(selectedItems: Map<string, ExternalWithdrawalFormItem>, quantities: Record<string, number>, type: EXTERNAL_WITHDRAWAL_TYPE): string {
   const totalItems = selectedItems.size;
   const totalQuantity = Array.from(selectedItems.keys()).reduce((sum, itemId) => sum + (quantities[itemId] || 1), 0);
 
@@ -717,7 +717,7 @@ export function generateSelectionSummary(selectedItems: Map<string, ExternalWith
 
   const itemText = formatItemsCount(totalItems);
   const quantityText = `${totalQuantity.toLocaleString("pt-BR")} unidades`;
-  const returnText = willReturn ? " (para devolução)" : "";
+  const returnText = type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE ? " (para devolução)" : type === EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY ? " (cortesia)" : "";
 
   return `${itemText} - ${quantityText}${returnText}`;
 }
@@ -734,7 +734,7 @@ export function debugFormData(formData: ExternalWithdrawalFormData, label?: stri
     return;
   }
 
-  console.group(`🔍 External Withdrawal Form Data${label ? ` - ${label}` : ""}`););const totals = calculateExternalWithdrawalTotals(formData.selectedItems, formData.quantities, formData.prices, formData.willReturn);console.groupEnd();
+  console.group(`🔍 External Withdrawal Form Data${label ? ` - ${label}` : ""}`););const totals = calculateExternalWithdrawalTotals(formData.selectedItems, formData.quantities, formData.prices, formData.type);console.groupEnd();
 }
 
 /**

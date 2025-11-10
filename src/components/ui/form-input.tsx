@@ -78,26 +78,20 @@ export function FormInput<T extends Record<string, any>>({
   const handleCepLookup = React.useCallback(
     (data: any) => {
       if (type === "cep" && data && !data.erro) {
-        // Get current form values
-        const currentValues = form.getValues();
-
-        // Helper to check if a field should be filled (only fill if empty)
-        const shouldFillField = (fieldValue: any) => fieldValue === null || fieldValue === undefined || fieldValue === "";
-
-        // Auto-fill address fields only if they're empty
-        if (data.logradouro && addressFieldName && shouldFillField(currentValues[addressFieldName])) {
-          form.setValue(addressFieldName, data.logradouro as any, { shouldDirty: true });
+        // Auto-fill address fields, allowing updates to existing data
+        if (data.street && addressFieldName) {
+          form.setValue(addressFieldName, data.street as any, { shouldDirty: true });
         }
-        if (data.logradouroType && logradouroFieldName && shouldFillField(currentValues[logradouroFieldName])) {
-          form.setValue(logradouroFieldName, data.logradouroType as any, { shouldDirty: true });
+        if (data.streetType && logradouroFieldName) {
+          form.setValue(logradouroFieldName, data.streetType as any, { shouldDirty: true });
         }
-        if (data.bairro && neighborhoodFieldName && shouldFillField(currentValues[neighborhoodFieldName])) {
+        if (data.bairro && neighborhoodFieldName) {
           form.setValue(neighborhoodFieldName, data.bairro as any, { shouldDirty: true });
         }
-        if (data.localidade && cityFieldName && shouldFillField(currentValues[cityFieldName])) {
+        if (data.localidade && cityFieldName) {
           form.setValue(cityFieldName, data.localidade as any, { shouldDirty: true });
         }
-        if (data.uf && stateFieldName && shouldFillField(currentValues[stateFieldName])) {
+        if (data.uf && stateFieldName) {
           form.setValue(stateFieldName, data.uf as any, { shouldDirty: true });
         }
       }

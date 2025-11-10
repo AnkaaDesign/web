@@ -4,12 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IconPackage, IconUser, IconCalendar, IconCalendarCheck, IconCurrencyReal, IconFileText, IconNotes, IconHash, IconArrowBack, IconFileInvoice, IconReceipt, IconLayoutGrid, IconList } from "@tabler/icons-react";
 import type { ExternalWithdrawal } from "../../../../types";
-import { EXTERNAL_WITHDRAWAL_STATUS } from "../../../../constants";
+import { EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
 import { formatDateTime } from "../../../../utils";
 import { ExternalWithdrawalStatusBadge } from "../common/external-withdrawal-status-badge";
-import { WillReturnBadge } from "../common/will-return-badge";
 import { cn } from "@/lib/utils";
-import { FileItem, type FileViewMode } from "@/components/file";
+import { FileItem, type FileViewMode } from "@/components/common/file";
 
 interface ExternalWithdrawalInfoCardProps {
   withdrawal: ExternalWithdrawal;
@@ -61,10 +60,12 @@ export function ExternalWithdrawalInfoCard({ withdrawal, className }: ExternalWi
                   <IconArrowBack className="h-4 w-4" />
                   Tipo de Retirada
                 </span>
-                <WillReturnBadge willReturn={withdrawal.willReturn} />
+                <Badge variant={withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE ? "default" : withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE ? "destructive" : "secondary"}>
+                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[withdrawal.type]}
+                </Badge>
               </div>
 
-              {!withdrawal.willReturn && (
+              {withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCurrencyReal className="h-4 w-4" />

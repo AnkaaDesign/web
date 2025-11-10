@@ -316,7 +316,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     site: "Site",
 
     // Address fields
-    logradouro: "Logradouro",
+    streetType: "Tipo de Logradouro",
     address: "Endereço",
     addressNumber: "Número",
     addressComplement: "Complemento",
@@ -621,7 +621,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     tags: "Tags",
 
     // Address fields
-    logradouro: "Logradouro",
+    streetType: "Tipo de Logradouro",
     address: "Endereço",
     addressNumber: "Número",
     addressComplement: "Complemento",
@@ -633,7 +633,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     // Additional fields
     logoId: "Logo",
     economicActivityId: "Atividade Econômica",
-    situacaoCadastral: "Situação Cadastral",
+    registrationStatus: "Situação Cadastral",
 
     // Nested relationship fields
     "logo.filename": "Nome do Logo",
@@ -868,6 +868,37 @@ interface FieldMetadata {
  */
 export function formatFieldValue(value: ComplexFieldValue, field?: string | null, entityType?: CHANGE_LOG_ENTITY_TYPE, metadata?: FieldMetadata): string {
   if (value === null || value === undefined) return "Nenhum";
+
+  // First, try to parse JSON-encoded strings (double-encoded values from backend)
+  if (typeof value === "string") {
+    // Check if it's a JSON-encoded string (starts and ends with quotes)
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      try {
+        value = JSON.parse(value);
+      } catch (e) {
+        // Not a valid JSON string, continue with the original value
+      }
+    }
+  }
+
+  // Parse string numbers for specific numeric fields
+  if (typeof value === "string" && field) {
+    const numericFields = [
+      "pricePerLiter", "density", "price", "totalPrice", "unitCost", "averageCost",
+      "lastPurchasePrice", "suggestedPrice", "totalAmount", "remuneration", "cost",
+      "icms", "ipi", "margin", "minimumMargin", "monthlyConsumptionTrendPercent", "ratio",
+      "quantity", "maxQuantity", "boxQuantity", "reorderPoint", "reorderQuantity",
+      "orderedQuantity", "receivedQuantity", "withdrawedQuantity", "returnedQuantity",
+      "viscosity", "weight", "volume", "volumeLiters"
+    ];
+
+    if (numericFields.includes(field)) {
+      const parsed = parseFloat(value);
+      if (!isNaN(parsed)) {
+        value = parsed;
+      }
+    }
+  }
 
   // Special handling for item returned quantity from metadata
   if (metadata?.fieldType === "item_returned_quantity" && typeof value === "number") {
@@ -1211,9 +1242,9 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return xyzLabels[value] || value;
   }
 
-  // Handle logradouro type (street type) for Supplier and Customer
-  if (field === "logradouro" && typeof value === "string") {
-    const logradouroLabels: Record<string, string> = {
+  // Handle street type for Supplier and Customer
+  if (field === "streetType" && typeof value === "string") {
+    const streetTypeLabels: Record<string, string> = {
       RUA: "Rua",
       AVENIDA: "Avenida",
       ALAMEDA: "Alameda",
@@ -1235,11 +1266,11 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       PARQUE: "Parque",
       FAZENDA: "Fazenda",
     };
-    return logradouroLabels[value] || value;
+    return streetTypeLabels[value] || value;
   }
 
-  // Handle registration status (situação cadastral) for Customer
-  if (field === "situacaoCadastral" && typeof value === "string") {
+  // Handle registration status for Customer
+  if (field === "registrationStatus" && typeof value === "string") {
     const registrationStatusLabels: Record<string, string> = {
       ATIVA: "Ativa",
       SUSPENSA: "Suspensa",

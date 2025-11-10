@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileItem } from "@/components/file/file-item";
-import { useFileViewer } from "@/components/file/file-viewer";
+import { FileItem } from "@/components/common/file/file-item";
+import { useFileViewer } from "@/components/common/file/file-viewer";
 import { IconAlertCircle, IconCalendar, IconUser, IconTruck, IconFileText, IconBuildingFactory, IconCircleCheck } from "@tabler/icons-react";
 import { type Observation } from "../../../../types";
 import { formatDate, formatRelativeTime } from "../../../../utils";

@@ -7,7 +7,7 @@ import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, Icon
 import { cn } from "@/lib/utils";
 import { formatDate, formatDateTime, formatCNPJ } from "../../../../utils";
 import type { Order } from "../../../../types";
-import { FilePreviewCard } from "@/components/file";
+import { FilePreviewCard } from "@/components/common/file";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
 interface OrderInfoCardProps {

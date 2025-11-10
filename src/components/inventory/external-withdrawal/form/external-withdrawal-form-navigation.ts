@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useExternalWithdrawalFormUrlState } from "@/hooks/use-external-withdrawal-form-url-state";
 import type { ExternalWithdrawalFormStage } from "@/hooks/use-external-withdrawal-form-url-state";
-import { routes } from "../../../../constants";
+import { routes, EXTERNAL_WITHDRAWAL_TYPE } from "../../../../constants";
 
 /**
  * Navigation and Data Persistence Logic for External Withdrawal Form
@@ -105,7 +105,7 @@ export function useExternalWithdrawalFormNavigation(options: ExternalWithdrawalF
         selectedItems?: Set<string>;
         quantities?: Record<string, number>;
         prices?: Record<string, number>;
-        willReturn?: boolean;
+        type?: EXTERNAL_WITHDRAWAL_TYPE;
       },
     ): ExternalWithdrawalFormValidationState => {
       const {
@@ -113,7 +113,7 @@ export function useExternalWithdrawalFormNavigation(options: ExternalWithdrawalF
         selectedItems = urlState.selectedItems,
         quantities = urlState.quantities,
         prices = urlState.prices,
-        willReturn = urlState.willReturn,
+        type = urlState.type,
       } = data || {};
 
       const errors: ExternalWithdrawalFormValidationState["errors"] = {};
@@ -166,8 +166,8 @@ export function useExternalWithdrawalFormNavigation(options: ExternalWithdrawalF
           return false;
         }
 
-        // Validate prices for sale (willReturn = false)
-        if (!willReturn) {
+        // Validate prices for chargeable type
+        if (type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
           const priceErrors: Record<string, string> = {};
           for (const itemId of selectedItems) {
             const price = prices[itemId];
@@ -468,7 +468,7 @@ export function validateExternalWithdrawalFormData(data: {
   selectedItems: Set<string>;
   quantities: Record<string, number>;
   prices: Record<string, number>;
-  willReturn: boolean;
+  type: EXTERNAL_WITHDRAWAL_TYPE;
 }): ExternalWithdrawalFormValidationState {
   const errors: ExternalWithdrawalFormValidationState["errors"] = {};
 
@@ -495,7 +495,7 @@ export function validateExternalWithdrawalFormData(data: {
         quantityErrors[itemId] = "Quantidade inválida";
       }
 
-      if (!data.willReturn) {
+      if (data.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
         const price = data.prices[itemId];
         if (!price || price < 0) {
           priceErrors[itemId] = "Preço deve ser informado";

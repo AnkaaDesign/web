@@ -4,7 +4,7 @@ import { routes } from "./constants";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { AuthProvider } from "@/contexts/auth-context";
 import { FavoritesProvider } from "@/contexts/favorites-context";
-import { FileViewerProvider } from "@/components/file/file-viewer";
+import { FileViewerProvider } from "@/components/common/file/file-viewer";
 import { AutoPrivilegeRoute } from "@/components/navigation/auto-privilege-route";
 import { MainLayout } from "@/layouts/main-layout";
 import { AuthLayout } from "@/layouts/auth-layout";
@@ -205,7 +205,6 @@ const ProductionAirbrushing = lazy(() => import("@/pages/production/airbrushing/
 const ProductionAirbrushingCreate = lazy(() => import("@/pages/production/airbrushing/create").then((module) => ({ default: module.AirbrushingCreate })));
 const ProductionAirbrushingEdit = lazy(() => import("@/pages/production/airbrushing/edit/[id]").then((module) => ({ default: module.AirbrushingEdit })));
 const ProductionAirbrushingDetails = lazy(() => import("@/pages/production/airbrushing/details/[id]").then((module) => ({ default: module.AirbrushingDetails })));
-const ProductionGarages = lazy(() => import("@/pages/production/garages"));
 const ProductionCutting = lazy(() => import("@/pages/production/cutting/list").then((module) => ({ default: module.default })));
 const ProductionCuttingDetails = lazy(() => import("@/pages/production/cutting/details/[id]").then((module) => ({ default: module.CuttingDetailsPage })));
 
@@ -443,14 +442,6 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ProductionCuttingDetails />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path="/production/garages/*"
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <ProductionGarages />
                     </Suspense>
                   }
                 />

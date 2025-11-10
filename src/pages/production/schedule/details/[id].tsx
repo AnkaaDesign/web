@@ -84,8 +84,8 @@ import {
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CanvasNormalMapRenderer } from "@/components/paint/effects/canvas-normal-map-renderer";
-import { FileItem, FilePreviewModal, useFileViewer, type FileViewMode } from "@/components/file";
+import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
+import { FileItem, FilePreviewModal, useFileViewer, type FileViewMode } from "@/components/common/file";
 
 // Component to display truck layout SVG preview
 const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?: string }) => {

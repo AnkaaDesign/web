@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { FileItem } from "@/components/file";
+import { FileItem } from "@/components/common/file";
 import {
   IconBrush,
   IconCalendar,

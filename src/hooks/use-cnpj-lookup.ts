@@ -35,8 +35,8 @@ interface CnpjData {
   phones: string[];
   economicActivityCode: string;
   economicActivityDescription: string;
-  situacaoCadastral: "ATIVA" | "SUSPENSA" | "INAPTA" | "ATIVA_NAO_REGULAR" | "BAIXADA" | null;
-  logradouroType: string | null;
+  registrationStatus: "ATIVA" | "SUSPENSA" | "INAPTA" | "ATIVA_NAO_REGULAR" | "BAIXADA" | null;
+  streetType: string | null;
 }
 
 interface UseCnpjLookupOptions {
@@ -76,11 +76,11 @@ function extractLogradouroType(street: string): { type: string | null; address: 
 
   for (const type of LOGRADOURO_TYPES) {
     if (normalized.startsWith(type + " ")) {
-      // Extract the remaining address after the logradouro type
+      // Extract the remaining address after the street type
       const remainingAddress = street.substring(type.length + 1).trim();
 
       // Check if the address starts with a preposition (do, da, dos, das, de)
-      // If so, keep the full address including the logradouro type
+      // If so, keep the full address including the street type
       const hasPreposition = /^(d[oae]s?)\s/i.test(remainingAddress);
 
       return {
@@ -159,7 +159,7 @@ export function useCnpjLookup(options?: UseCnpjLookupOptions) {
 
         const brasilApiData: BrasilApiCnpjData = await response.json();
 
-        // Extract logradouro type from street name
+        // Extract street type from street name
         const { type, address } = extractLogradouroType(brasilApiData.logradouro);
 
         // Collect all available phones
@@ -186,8 +186,8 @@ export function useCnpjLookup(options?: UseCnpjLookupOptions) {
           phones: phones,
           economicActivityCode: brasilApiData.cnae_fiscal.toString(),
           economicActivityDescription: brasilApiData.cnae_fiscal_descricao,
-          situacaoCadastral: mapSituacaoCadastral(brasilApiData.situacao_cadastral),
-          logradouroType: type,
+          registrationStatus: mapSituacaoCadastral(brasilApiData.situacao_cadastral),
+          streetType: type,
         };
 
         options?.onSuccess?.(data);

@@ -46,7 +46,7 @@ import { MultiCutSelector, type MultiCutSelectorRef } from "./multi-cut-selector
 import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./multi-airbrushing-selector";
-import { FileUploadField, type FileWithPreview } from "@/components/file";
+import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { LayoutForm } from "@/components/production/layout/layout-form";

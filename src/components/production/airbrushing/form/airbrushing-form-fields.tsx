@@ -1,7 +1,7 @@
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { FileUploadField, type FileWithPreview } from "@/components/file";
+import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import type { AirbrushingCreateFormData, AirbrushingUpdateFormData } from "../../../../schemas";
 import type { FieldErrors } from "react-hook-form";

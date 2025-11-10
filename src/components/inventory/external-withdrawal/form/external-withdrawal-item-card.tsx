@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { Badge } from "@/components/ui/badge";
+import { EXTERNAL_WITHDRAWAL_TYPE } from "../../../../constants";
 
 interface ExternalWithdrawalItemCardProps {
   itemId: string;
@@ -15,7 +16,7 @@ interface ExternalWithdrawalItemCardProps {
   itemPrice?: number | null;
   quantity: number;
   unitPrice?: number | null;
-  willReturn: boolean;
+  type: EXTERNAL_WITHDRAWAL_TYPE;
   onQuantityChange: (quantity: number) => void;
   onPriceChange?: (price: number | undefined) => void;
   onRemove: () => void;
@@ -31,7 +32,7 @@ export function ExternalWithdrawalItemCard({
   itemPrice,
   quantity,
   unitPrice,
-  willReturn,
+  type,
   onQuantityChange,
   onPriceChange,
   onRemove,
@@ -83,8 +84,8 @@ export function ExternalWithdrawalItemCard({
           <span className={isNegativeStock ? "text-destructive font-medium" : ""}>Estoque após retirada: {finalStock}</span>
         </div>
 
-        {/* Price information (only if not willReturn) */}
-        {!willReturn && (
+        {/* Price information (only if type is CHARGEABLE) */}
+        {type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
             <span>Preço item: R$ {(itemPrice ?? 0).toFixed(2)}</span>
             {unitPrice && unitPrice !== itemPrice && (
@@ -111,8 +112,8 @@ export function ExternalWithdrawalItemCard({
           />
         </div>
 
-        {/* Price input (only if willReturn is false) */}
-        {!willReturn && (
+        {/* Price input (only if type is CHARGEABLE) */}
+        {type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && (
           <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Preço unitário</span>
             <div className="w-32">

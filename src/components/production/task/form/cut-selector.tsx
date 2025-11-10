@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { useController } from "react-hook-form";
 import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
 import { CUT_TYPE_LABELS, CUT_TYPE, CUT_ORIGIN } from "../../../../constants";
-import { FileUploadField } from "@/components/file";
-import type { FileWithPreview } from "@/components/file";
+import { FileUploadField } from "@/components/common/file";
+import type { FileWithPreview } from "@/components/common/file";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface CutSelectorProps {
