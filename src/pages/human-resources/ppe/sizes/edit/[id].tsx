@@ -1,5 +1,5 @@
-import { UnderConstruction } from "@/components/under-construction";
+import { UnderConstruction } from "@/components/navigation/under-construction";
 
 export const PpeSizeEditPage = () => {
-  return <UnderConstruction />;
+  return <UnderConstruction title="Editar Tamanho de EPI" />;
 };

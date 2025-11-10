@@ -1,7 +1,6 @@
 import { SECTOR_PRIVILEGES } from "./enums";
 
-export type { MenuItem };
-interface MenuItem {
+export interface MenuItem {
   id: string;
   title: string;
   icon: string; // Icon name (generic, will be mapped to platform-specific icons)
@@ -10,7 +9,6 @@ interface MenuItem {
   requiredPrivilege?: SECTOR_PRIVILEGES | SECTOR_PRIVILEGES[]; // Support single privilege or array
   isControlPanel?: boolean; // Indicates if this is a control panel/dashboard
   isDynamic?: boolean; // Indicates if this is a dynamic route
-  onlyInStaging?: boolean; // Only show in staging environment
 }
 
 // Comprehensive Tabler icon mapping for Brazilian manufacturing system
@@ -197,7 +195,6 @@ export const TABLER_ICONS = {
   database: "IconDatabase",
   sync: "IconRefresh",
   refresh: "IconRefresh",
-  repeat: "IconRepeat",
   calculator: "IconCalculator",
 
   // Notifications
@@ -461,10 +458,11 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Clientes",
         icon: "users",
         path: "/administracao/clientes",
+        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN],
         children: [
-          { id: "clientes-cadastrar", title: "Cadastrar", icon: "plus", path: "/administracao/clientes/cadastrar" },
+          { id: "clientes-cadastrar", title: "Cadastrar", icon: "plus", path: "/administracao/clientes/cadastrar", requiredPrivilege: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN] },
           { id: "clientes-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/clientes/detalhes/:id", isDynamic: true },
-          { id: "clientes-editar", title: "Editar", icon: "edit", path: "/administracao/clientes/editar/:id", isDynamic: true },
+          { id: "clientes-editar", title: "Editar", icon: "edit", path: "/administracao/clientes/editar/:id", isDynamic: true, requiredPrivilege: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN] },
         ],
       },
 
@@ -494,6 +492,18 @@ export const NAVIGATION_MENU: MenuItem[] = [
       },
 
       {
+        id: "registros-de-alteracoes",
+        title: "Registros de Alterações",
+        icon: "auditLog",
+        path: "/administracao/registros-de-alteracoes",
+        children: [
+          { id: "registros-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/registros-de-alteracoes/detalhes/:id", isDynamic: true },
+          { id: "registros-entidade", title: "Por Entidade", icon: "entity", path: "/administracao/registros-de-alteracoes/entidade", isDynamic: false },
+        ],
+        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
+      },
+
+      {
         id: "setores",
         title: "Setores",
         icon: "building",
@@ -514,6 +524,55 @@ export const NAVIGATION_MENU: MenuItem[] = [
     path: "/pintura/catalogo-basico",
     requiredPrivilege: [SECTOR_PRIVILEGES.LEADER],
     children: [{ id: "catalogo-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/catalogo-basico/detalhes/:id", isDynamic: true }],
+  },
+
+  // FINANCEIRO
+  {
+    id: "financeiro",
+    title: "Financeiro",
+    icon: "financial",
+    path: "/financeiro",
+    requiredPrivilege: SECTOR_PRIVILEGES.FINANCIAL,
+    children: [
+      {
+        id: "clientes-financeiro",
+        title: "Clientes",
+        icon: "users",
+        path: "/financeiro/clientes",
+      },
+      {
+        id: "producao-financeiro",
+        title: "Produção",
+        icon: "factory",
+        path: "/financeiro/producao",
+        children: [
+          {
+            id: "aerografia-financeiro",
+            title: "Aerografia",
+            icon: "paintBrush",
+            path: "/financeiro/producao/aerografia",
+          },
+          {
+            id: "cronograma-financeiro",
+            title: "Cronograma",
+            icon: "clock",
+            path: "/financeiro/producao/cronograma",
+          },
+          {
+            id: "em-espera-financeiro",
+            title: "Em Espera",
+            icon: "pause",
+            path: "/financeiro/producao/em-espera",
+          },
+          {
+            id: "historico-tarefas-financeiro",
+            title: "Histórico de Tarefas",
+            icon: "history",
+            path: "/financeiro/producao/historico-tarefas",
+          },
+        ],
+      },
+    ],
   },
 
   // ESTATÍSTICAS
@@ -866,6 +925,63 @@ export const NAVIGATION_MENU: MenuItem[] = [
     ],
   },
 
+  // PESSOAL
+  {
+    id: "pessoal",
+    title: "Pessoal",
+    icon: "userCircle",
+    path: "/pessoal",
+    requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.MAINTENANCE],
+    children: [
+      {
+        id: "meus-avisos",
+        title: "Meus Avisos",
+        icon: "announcement",
+        path: "/pessoal/meus-avisos",
+        children: [{ id: "meus-avisos-detalhes", title: "Detalhes", icon: "eye", path: "/pessoal/meus-avisos/detalhes/:id", isDynamic: true }],
+      },
+
+      {
+        id: "meus-emprestimos",
+        title: "Meus Empréstimos",
+        icon: "box",
+        path: "/pessoal/meus-emprestimos",
+        children: [{ id: "meus-emprestimos-detalhes", title: "Detalhes", icon: "eye", path: "/pessoal/meus-emprestimos/detalhes/:id", isDynamic: true }],
+      },
+
+      {
+        id: "meus-epis",
+        title: "Meus EPIs",
+        icon: "safety",
+        path: "/pessoal/meus-epis",
+        children: [{ id: "meus-epis-solicitar", title: "Solicitar EPI", icon: "plus", path: "/pessoal/meus-epis/solicitar" }],
+      },
+
+      {
+        id: "meus-feriados",
+        title: "Meus Feriados",
+        icon: "calendar",
+        path: "/pessoal/meus-feriados",
+      },
+
+
+      {
+        id: "minhas-ferias",
+        title: "Minhas Férias",
+        icon: "calendar",
+        path: "/pessoal/minhas-ferias",
+        children: [{ id: "minhas-ferias-detalhes", title: "Detalhes", icon: "eye", path: "/pessoal/minhas-ferias/detalhes/:id", isDynamic: true }],
+      },
+
+      {
+        id: "minhas-notificacoes",
+        title: "Minhas Notificações",
+        icon: "notification",
+        path: "/pessoal/minhas-notificacoes",
+        children: [{ id: "minhas-notificacoes-detalhes", title: "Detalhes", icon: "eye", path: "/pessoal/minhas-notificacoes/detalhes/:id", isDynamic: true }],
+      },
+    ],
+  },
 
   // PINTURA
   {
@@ -873,15 +989,56 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Pintura",
     icon: "palette",
     path: "/pintura",
-    requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
+    requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
     children: [
       {
         id: "catalogo",
         title: "Catálogo",
         icon: "catalog",
         path: "/pintura/catalogo",
-        // No requiredPrivilege - inherits from parent (Pintura menu)
-        // No children - direct link to catalog page (dynamic routes handled by React Router)
+        requiredPrivilege: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
+        children: [
+          {
+            id: "catalogo-cadastrar",
+            title: "Cadastrar",
+            icon: "plus",
+            path: "/pintura/catalogo/cadastrar",
+            requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
+          },
+          {
+            id: "catalogo-detalhes",
+            title: "Detalhes",
+            icon: "eye",
+            path: "/pintura/catalogo/detalhes/:id",
+            isDynamic: true,
+            children: [
+              {
+                id: "catalogo-formula-detalhes",
+                title: "Detalhes da Fórmula",
+                icon: "eye",
+                path: "/pintura/catalogo/detalhes/:paintId/formulas/detalhes/:formulaId",
+                isDynamic: true,
+                requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
+              },
+              {
+                id: "catalogo-formulas",
+                title: "Fórmulas",
+                icon: "beaker",
+                path: "/pintura/catalogo/detalhes/:paintId/formulas",
+                isDynamic: true,
+                requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
+              },
+            ],
+          },
+          {
+            id: "catalogo-editar",
+            title: "Editar",
+            icon: "edit",
+            path: "/pintura/catalogo/editar/:id",
+            isDynamic: true,
+            requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
+          },
+        ],
       },
 
       {
@@ -919,20 +1076,19 @@ export const NAVIGATION_MENU: MenuItem[] = [
     ],
   },
 
-  // PRODUÇÃO (Only for PRODUCTION, WAREHOUSE, LEADER, HUMAN_RESOURCES, ADMIN - others see direct menu items)
+  // PRODUÇÃO
   {
     id: "producao",
     title: "Produção",
     icon: "factory",
     path: "/producao",
-    requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
+    requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
     children: [
       {
         id: "aerografia",
         title: "Aerografia",
         icon: "paintBrush",
         path: "/producao/aerografia",
-        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
         children: [
           {
             id: "aerografia-cadastrar",
@@ -972,7 +1128,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
             icon: "edit",
             path: "/producao/cronograma/editar/:id",
             isDynamic: true,
-            requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
+            requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN],
           },
           {
             id: "cronograma-cadastrar",
@@ -989,7 +1145,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Em Espera",
         icon: "pause",
         path: "/producao/em-espera",
-        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC], // WAREHOUSE excluded
+        requiredPrivilege: SECTOR_PRIVILEGES.ADMIN,
       },
 
       {
@@ -997,7 +1153,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Garagens",
         icon: "warehouse",
         path: "/producao/garagens",
-        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN],
         children: [
           {
             id: "garagens-cadastrar",
@@ -1029,7 +1184,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Histórico",
         icon: "history",
         path: "/producao/historico",
-        // No requiredPrivilege - inherits from parent (Production menu)
+        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
       },
 
       {
@@ -1037,7 +1192,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Observações",
         icon: "note",
         path: "/producao/observacoes",
-        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN],
         children: [
           {
             id: "observacoes-cadastrar",
@@ -1063,85 +1217,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Recorte",
         icon: "scissors",
         path: "/producao/recorte",
-        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN],
+        requiredPrivilege: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
       },
     ],
-  },
-
-  // ============================================================
-  // TOP-LEVEL MENU ITEMS FOR DESIGNER, FINANCIAL, AND LOGISTIC
-  // ============================================================
-
-  // Cronograma - Direct access for DESIGNER, FINANCIAL, LOGISTIC
-  {
-    id: "cronograma-direct",
-    title: "Cronograma",
-    icon: "clock",
-    path: "/producao/cronograma",
-    requiredPrivilege: [SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC],
-  },
-
-  // Em Espera - Direct access for PRODUCTION, DESIGNER, FINANCIAL, LOGISTIC (WAREHOUSE excluded)
-  {
-    id: "em-espera-direct",
-    title: "Em Espera",
-    icon: "pause",
-    path: "/producao/em-espera",
-    requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC],
-  },
-
-  // Histórico - Direct access for DESIGNER, FINANCIAL, LOGISTIC
-  {
-    id: "historico-direct",
-    title: "Histórico",
-    icon: "history",
-    path: "/producao/historico",
-    requiredPrivilege: [SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC],
-  },
-
-  // Recorte - Direct access for DESIGNER only
-  {
-    id: "recorte-direct",
-    title: "Recorte",
-    icon: "scissors",
-    path: "/producao/recorte",
-    requiredPrivilege: [SECTOR_PRIVILEGES.DESIGNER],
-  },
-
-  // Garagens - Direct access for LOGISTIC only
-  {
-    id: "garagens-direct",
-    title: "Garagens",
-    icon: "warehouse",
-    path: "/producao/garagens",
-    requiredPrivilege: [SECTOR_PRIVILEGES.LOGISTIC],
-  },
-
-  // Aerografia - Direct access for FINANCIAL only
-  {
-    id: "aerografia-direct",
-    title: "Aerografia",
-    icon: "paintBrush",
-    path: "/producao/aerografia",
-    requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL],
-  },
-
-  // Catálogo de Tintas - Direct access for DESIGNER only
-  {
-    id: "catalogo-tintas-direct",
-    title: "Catálogo de Tintas",
-    icon: "palette",
-    path: "/pintura/catalogo",
-    requiredPrivilege: [SECTOR_PRIVILEGES.DESIGNER],
-  },
-
-  // Clientes - Direct access for FINANCIAL only
-  {
-    id: "clientes-direct",
-    title: "Clientes",
-    icon: "users",
-    path: "/financeiro/clientes",
-    requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL],
   },
 
   // RECURSOS HUMANOS
@@ -1318,13 +1396,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         path: "/servidor/backup",
       },
       {
-        id: "servidor-sincronizacao-bd",
-        title: "Sincronização BD",
-        icon: "repeat",
-        path: "/servidor/sincronizacao-bd",
-        onlyInStaging: true,
-      },
-      {
         id: "servidor-implantacoes",
         title: "Implantações",
         icon: "rocket",
@@ -1364,21 +1435,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         icon: "systemUsers",
         path: "/servidor/usuarios",
         children: [{ id: "servidor-usuarios-cadastrar", title: "Criar Usuário", icon: "plus", path: "/servidor/usuarios/cadastrar" }],
-      },
-      {
-        id: "servidor-rate-limiting",
-        title: "Rate Limiting",
-        icon: "shield",
-        path: "/servidor/rate-limiting",
-      },
-      {
-        id: "registros-de-alteracoes",
-        title: "Registros de Alterações",
-        icon: "auditLog",
-        path: "/servidor/registros-de-alteracoes",
-        children: [
-          { id: "registros-detalhes", title: "Detalhes", icon: "eye", path: "/servidor/registros-de-alteracoes/detalhes/:id", isDynamic: true },
-        ],
       },
     ],
   },

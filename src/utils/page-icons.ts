@@ -32,7 +32,7 @@ import {
   IconStar
 } from "@tabler/icons-react";
 import type { Icon } from "@tabler/icons-react";
-import { FAVORITE_PAGES } from "../constants";
+import { FAVORITE_PAGES } from '@constants';
 
 // Map of page paths to icons and colors
 export const PAGE_ICON_MAP: Record<string, { icon: Icon; color: string }> = {

@@ -1,7 +1,5 @@
 import { toast } from "sonner";
-import type { BatchOperationResult, BatchOperationSuccess, BatchOperationError } from "../types";
-
-export type { BatchOperationResult, BatchOperationSuccess, BatchOperationError } from "../types";
+import type { BatchOperationResult, BatchOperationSuccess, BatchOperationError } from '@types';
 
 export interface BatchToastOptions {
   entityName: string; // e.g., "empréstimo", "atividade"

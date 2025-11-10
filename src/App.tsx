@@ -170,7 +170,7 @@ const PersonalMyNotifications = lazy(() => import("@/pages/personal/my-notificat
 const PersonalPreferences = lazy(() => import("@/pages/personal/preferences").then((module) => ({ default: module.PreferencesPage })));
 const PersonalMyWarnings = lazy(() => import("@/pages/personal/my-warnings").then((module) => ({ default: module.MyWarningsPage })));
 
-// Paint
+// Painting (Pintura)
 const Paint = lazy(() => import("@/pages/painting/root").then((module) => ({ default: module.Painting })));
 const PaintCatalog = lazy(() => import("@/pages/painting/catalog/list").then((module) => ({ default: module.CatalogListPage })));
 const PaintCatalogCreate = lazy(() => import("@/pages/painting/catalog/create").then((module) => ({ default: module.CatalogCreatePage })));
@@ -275,7 +275,7 @@ const MyTeamLoans = lazy(() => import("@/pages/my-team/loans").then((module) => 
 
 // Server
 const Server = lazy(() => import("@/pages/server/root").then((module) => ({ default: module.ServerRootPage })));
-const ServerBackup = lazy(() => import("@/pages/admin/backup").then((module) => ({ default: module.BackupManagementPage })));
+const ServerBackup = lazy(() => import("@/pages/server/backup").then((module) => ({ default: module.BackupManagementPage })));
 const ServerDatabaseSync = lazy(() => import("@/pages/server/database-sync").then((module) => ({ default: module.DatabaseSyncPage })));
 const ServerDeployments = lazy(() => import("@/pages/server/deployments").then((module) => ({ default: module.DeploymentListPage })));
 const ServerDeploymentDetails = lazy(() => import("@/pages/server/deployments/[id]").then((module) => ({ default: module.DeploymentDetailPage })));

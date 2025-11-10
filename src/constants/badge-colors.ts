@@ -58,8 +58,7 @@ import {
  * Badge Variant Types
  * These are the available badge variants in the UI components
  */
-export type { BadgeVariant };
-type BadgeVariant =
+export type BadgeVariant =
   | "default"
   | "primary"
   | "secondary"
@@ -77,17 +76,10 @@ type BadgeVariant =
   | "cancelled"
   | "onHold"
   | "inProgress"
-  | "invoiced"
-  | "settled"
-  | "purple"
-  | "blue"
-  | "orange"
-  | "green"
   | "teal"
-  | "indigo"
-  | "pink"
   | "yellow"
-  | "amber";
+  | "amber"
+  | "purple";
 
 /**
  * Badge Color Definitions
@@ -127,70 +119,70 @@ export const BADGE_COLORS: Record<
 
   // Primary/Info variants (Blue tones)
   primary: {
-    bg: "bg-blue-700",
+    bg: "bg-blue-600",
     text: "text-white",
-    hover: "hover:bg-blue-800",
+    hover: "hover:bg-blue-700",
   },
   info: {
-    bg: "bg-blue-700",
+    bg: "bg-sky-500",
     text: "text-white",
-    hover: "hover:bg-blue-800",
+    hover: "hover:bg-sky-600",
   },
   inProgress: {
-    bg: "bg-blue-700",
+    bg: "bg-blue-500",
     text: "text-white",
-    hover: "hover:bg-blue-800",
+    hover: "hover:bg-blue-600",
   },
 
   // Success variants (Green tones - positive actions)
   success: {
-    bg: "bg-green-700",
+    bg: "bg-green-600",
     text: "text-white",
-    hover: "hover:bg-green-800",
+    hover: "hover:bg-green-700",
   },
   completed: {
-    bg: "bg-green-700",
+    bg: "bg-green-600",
     text: "text-white",
-    hover: "hover:bg-green-800",
+    hover: "hover:bg-green-700",
   },
   active: {
-    bg: "bg-green-700",
+    bg: "bg-green-600",
     text: "text-white",
-    hover: "hover:bg-green-800",
+    hover: "hover:bg-green-700",
   },
 
   // Warning variants (Orange/Amber tones - attention needed)
   warning: {
-    bg: "bg-orange-600",
+    bg: "bg-orange-500",
     text: "text-white",
-    hover: "hover:bg-orange-700",
+    hover: "hover:bg-orange-600",
   },
   pending: {
-    bg: "bg-amber-600",
+    bg: "bg-amber-500",
     text: "text-white",
-    hover: "hover:bg-amber-700",
+    hover: "hover:bg-amber-600",
   },
   onHold: {
-    bg: "bg-orange-600",
+    bg: "bg-orange-500",
     text: "text-white",
-    hover: "hover:bg-orange-700",
+    hover: "hover:bg-orange-600",
   },
 
   // Error/Destructive variants (Red tones - negative actions)
   error: {
-    bg: "bg-red-700",
+    bg: "bg-red-600",
     text: "text-white",
-    hover: "hover:bg-red-800",
+    hover: "hover:bg-red-700",
   },
   destructive: {
-    bg: "bg-red-700",
+    bg: "bg-red-600",
     text: "text-white",
-    hover: "hover:bg-red-800",
+    hover: "hover:bg-red-700",
   },
   cancelled: {
-    bg: "bg-red-700",
+    bg: "bg-red-600",
     text: "text-white",
-    hover: "hover:bg-red-800",
+    hover: "hover:bg-red-700",
   },
 
   // Inactive variant (Gray - disabled/inactive states)
@@ -200,63 +192,32 @@ export const BADGE_COLORS: Record<
     hover: "hover:bg-gray-600",
   },
 
-  // Financial variants - financial states
-  invoiced: {
-    bg: "bg-cyan-600",
-    text: "text-white",
-    hover: "hover:bg-cyan-700",
-  },
-  settled: {
-    bg: "bg-emerald-600",
-    text: "text-white",
-    hover: "hover:bg-emerald-700",
-  },
-
-  // Additional color variants for unique sector privileges
-  purple: {
-    bg: "bg-purple-600",
-    text: "text-white",
-    hover: "hover:bg-purple-700",
-  },
-  blue: {
-    bg: "bg-blue-600",
-    text: "text-white",
-    hover: "hover:bg-blue-700",
-  },
-  orange: {
-    bg: "bg-orange-500",
-    text: "text-white",
-    hover: "hover:bg-orange-600",
-  },
-  green: {
-    bg: "bg-green-600",
-    text: "text-white",
-    hover: "hover:bg-green-700",
-  },
+  // Teal variant (Teal tones - partially received orders)
   teal: {
     bg: "bg-teal-500",
     text: "text-white",
     hover: "hover:bg-teal-600",
   },
-  indigo: {
-    bg: "bg-indigo-600",
-    text: "text-white",
-    hover: "hover:bg-indigo-700",
-  },
-  pink: {
-    bg: "bg-pink-600",
-    text: "text-white",
-    hover: "hover:bg-pink-700",
-  },
+
+  // Yellow variant (Yellow tones - partially fulfilled orders)
   yellow: {
     bg: "bg-yellow-500",
     text: "text-white",
     hover: "hover:bg-yellow-600",
   },
+
+  // Amber variant (Amber tones - fulfilled orders)
   amber: {
     bg: "bg-amber-500",
     text: "text-white",
     hover: "hover:bg-amber-600",
+  },
+
+  // Purple variant (Purple tones - overdue orders)
+  purple: {
+    bg: "bg-purple-600",
+    text: "text-white",
+    hover: "hover:bg-purple-700",
   },
 };
 
@@ -268,10 +229,10 @@ export const ENTITY_BADGE_CONFIG = {
   // Order Status
   ORDER: {
     [ORDER_STATUS.CREATED]: "primary" as BadgeVariant,
-    [ORDER_STATUS.PARTIALLY_FULFILLED]: "yellow" as BadgeVariant, // Yellow-500 - Parcialmente Feito
-    [ORDER_STATUS.FULFILLED]: "amber" as BadgeVariant, // Amber-500 - Feito
-    [ORDER_STATUS.OVERDUE]: "purple" as BadgeVariant, // Purple-600 - Atrasado
-    [ORDER_STATUS.PARTIALLY_RECEIVED]: "teal" as BadgeVariant, // Teal-500 - Parcialmente Recebido
+    [ORDER_STATUS.PARTIALLY_FULFILLED]: "yellow" as BadgeVariant, // Yellow-500 for partially fulfilled
+    [ORDER_STATUS.FULFILLED]: "amber" as BadgeVariant, // Amber-500 for fulfilled orders
+    [ORDER_STATUS.OVERDUE]: "purple" as BadgeVariant, // Purple-600 for overdue orders
+    [ORDER_STATUS.PARTIALLY_RECEIVED]: "teal" as BadgeVariant, // Teal-500 for partial receipt
     [ORDER_STATUS.RECEIVED]: "success" as BadgeVariant,
     [ORDER_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
@@ -282,8 +243,6 @@ export const ENTITY_BADGE_CONFIG = {
     [TASK_STATUS.IN_PRODUCTION]: "inProgress" as BadgeVariant,
     [TASK_STATUS.ON_HOLD]: "onHold" as BadgeVariant,
     [TASK_STATUS.COMPLETED]: "completed" as BadgeVariant,
-    [TASK_STATUS.INVOICED]: "invoiced" as BadgeVariant,
-    [TASK_STATUS.SETTLED]: "settled" as BadgeVariant,
     [TASK_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
 
@@ -298,8 +257,8 @@ export const ENTITY_BADGE_CONFIG = {
 
   // User Status
   USER: {
-    [USER_STATUS.EXPERIENCE_PERIOD_1]: "pending" as BadgeVariant,  // Yellow (amber-500) - matches LOW stock
-    [USER_STATUS.EXPERIENCE_PERIOD_2]: "warning" as BadgeVariant,  // Orange (orange-500) - matches CRITICAL stock
+    [USER_STATUS.EXPERIENCE_PERIOD_1]: "pending" as BadgeVariant,  // Yellow - first trial period
+    [USER_STATUS.EXPERIENCE_PERIOD_2]: "primary" as BadgeVariant,  // Blue - second trial period
     [USER_STATUS.CONTRACTED]: "success" as BadgeVariant,           // Green - fully hired
     [USER_STATUS.DISMISSED]: "destructive" as BadgeVariant,        // Red - dismissed
   },
@@ -310,6 +269,8 @@ export const ENTITY_BADGE_CONFIG = {
     [EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED]: "warning" as BadgeVariant, // Orange - partial
     [EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED]: "success" as BadgeVariant, // Green - completed
     [EXTERNAL_WITHDRAWAL_STATUS.CHARGED]: "primary" as BadgeVariant, // Blue - charged
+    [EXTERNAL_WITHDRAWAL_STATUS.LIQUIDATED]: "success" as BadgeVariant, // Green - paid
+    [EXTERNAL_WITHDRAWAL_STATUS.DELIVERED]: "completed" as BadgeVariant, // Purple - delivered
     [EXTERNAL_WITHDRAWAL_STATUS.CANCELLED]: "cancelled" as BadgeVariant, // Red - cancelled
   },
 
@@ -556,19 +517,16 @@ export const ENTITY_BADGE_CONFIG = {
   },
 
   // Sector Privileges
-  // Sector Privileges - Each privilege has a unique color
   SECTOR_PRIVILEGES: {
-    [SECTOR_PRIVILEGES.ADMIN]: "destructive" as BadgeVariant, // Red - highest privilege
-    [SECTOR_PRIVILEGES.LEADER]: "warning" as BadgeVariant, // Orange/Yellow - leadership role
-    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: "purple" as BadgeVariant, // Purple - HR specific
-    [SECTOR_PRIVILEGES.PRODUCTION]: "blue" as BadgeVariant, // Blue - production role
-    [SECTOR_PRIVILEGES.MAINTENANCE]: "orange" as BadgeVariant, // Dark Orange - maintenance role
-    [SECTOR_PRIVILEGES.WAREHOUSE]: "green" as BadgeVariant, // Green - warehouse role
-    [SECTOR_PRIVILEGES.FINANCIAL]: "teal" as BadgeVariant, // Teal - financial role
-    [SECTOR_PRIVILEGES.LOGISTIC]: "indigo" as BadgeVariant, // Indigo - logistics role
-    [SECTOR_PRIVILEGES.DESIGNER]: "pink" as BadgeVariant, // Pink - designer role
-    [SECTOR_PRIVILEGES.EXTERNAL]: "secondary" as BadgeVariant, // Light Gray - external access
-    [SECTOR_PRIVILEGES.BASIC]: "default" as BadgeVariant, // Gray - basic access
+    [SECTOR_PRIVILEGES.BASIC]: "muted" as BadgeVariant,
+    [SECTOR_PRIVILEGES.MAINTENANCE]: "secondary" as BadgeVariant,
+    [SECTOR_PRIVILEGES.WAREHOUSE]: "default" as BadgeVariant,
+    [SECTOR_PRIVILEGES.ADMIN]: "primary" as BadgeVariant,
+    [SECTOR_PRIVILEGES.PRODUCTION]: "info" as BadgeVariant,
+    [SECTOR_PRIVILEGES.LEADER]: "inProgress" as BadgeVariant,
+    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: "warning" as BadgeVariant,
+    [SECTOR_PRIVILEGES.FINANCIAL]: "success" as BadgeVariant,
+    [SECTOR_PRIVILEGES.EXTERNAL]: "outline" as BadgeVariant,
   },
 
   // Commission Status
