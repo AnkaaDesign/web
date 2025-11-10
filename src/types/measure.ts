@@ -87,6 +87,7 @@ export const MEASURE_CATEGORIES = {
   WEIGHT: "Peso",
   VOLUME: "Volume",
   LENGTH: "Comprimento",
+  WIDTH: "Largura",
   AREA: "Área",
   COUNT: "Contagem",
   PACKAGING: "Embalagem",

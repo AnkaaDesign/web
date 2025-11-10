@@ -341,9 +341,7 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     (desc: string) => {
       // Always set the value, even if empty
       // Use empty string to preserve the field in URL
-      console.log('[updateDescription] Called with:', desc);
       setFilter("description", desc);
-      console.log('[updateDescription] setFilter called');
     },
     [setFilter],
   );
@@ -813,10 +811,6 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
       prices: undefined,
       icmses: undefined,
       ipis: undefined,
-      description: undefined,
-      supplierId: undefined,
-      forecast: undefined,
-      notes: undefined,
     });
   }, [setFilters]);
 

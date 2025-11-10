@@ -36,11 +36,12 @@ export interface Task extends BaseEntity {
   sectorId: string | null;
   createdById: string | null;
   priority?: string | null;
+  price?: number | null; // Calculated from budget total
 
   // Relations
   sector?: Sector;
   customer?: Customer;
-  budget?: Budget[]; // Budget items relation
+  budget?: Budget; // Budget with items
   budgets?: File[]; // Many-to-many relation (budget files)
   invoices?: File[]; // Many-to-many relation
   receipts?: File[]; // Many-to-many relation

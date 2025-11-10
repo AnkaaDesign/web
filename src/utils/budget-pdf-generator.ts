@@ -1,18 +1,43 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { Task } from '@types';
+import type { Task, Truck } from '@types';
 import type { Budget } from '../types/budget';
+import logoImage from '../assets/logo.png';
+
+// Convert image to base64 for embedding in PDF
+const getBase64FromImage = async (imgSrc: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        const dataURL = canvas.toDataURL('image/png');
+        resolve(dataURL);
+      } else {
+        reject(new Error('Could not get canvas context'));
+      }
+    };
+    img.onerror = reject;
+    img.src = imgSrc;
+  });
+};
 
 export interface BudgetPDFData {
-  task: Pick<Task, 'id' | 'name' | 'serialNumber' | 'customer'> & {
-    budget?: Budget[];
+  task: Pick<Task, 'id' | 'name' | 'serialNumber' | 'chassisNumber' | 'plate' | 'customer'> & {
+    budget?: Budget;
+    truck?: Partial<Truck>;
   };
 }
 
-export function generateBudgetPDF(data: BudgetPDFData): void {
+export async function generateBudgetPDF(data: BudgetPDFData): Promise<void> {
   const { task } = data;
 
-  if (!task.budget || task.budget.length === 0) {
+  if (!task.budget || !task.budget.items || task.budget.items.length === 0) {
     console.warn('No budget data available to generate PDF');
     return;
   }
@@ -28,35 +53,50 @@ export function generateBudgetPDF(data: BudgetPDFData): void {
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
 
-  // Ankaa Logo - Using placeholder text for now
-  // You can replace this with a base64 encoded logo
-  doc.setFontSize(24);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(30, 58, 138); // Blue color
-  doc.text('ANKAA', margin, 25);
+  // Add company logo (maintain aspect ratio)
+  try {
+    const logoBase64 = await getBase64FromImage(logoImage);
+    const logoWidth = 35;
+    const logoHeight = 15; // Maintain proper aspect ratio
+    doc.addImage(logoBase64, 'PNG', margin, 12, logoWidth, logoHeight);
+  } catch (error) {
+    console.warn('Could not load company logo:', error);
+    // Fallback to text logo
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('ANKAA', margin, 22);
+  }
 
-  // Subtitle
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 116, 139); // Gray color
-  doc.text('Sistema de Gestão', margin, 32);
+  // Add customer logo if available (on the right side, maintain aspect ratio)
+  if (task.customer?.logo?.url) {
+    try {
+      const customerLogoUrl = task.customer.logo.url;
+      const customerLogoBase64 = await getBase64FromImage(customerLogoUrl);
+      const customerLogoWidth = 35;
+      const customerLogoHeight = 15;
+      doc.addImage(customerLogoBase64, 'PNG', pageWidth - margin - customerLogoWidth, 12, customerLogoWidth, customerLogoHeight);
+    } catch (error) {
+      console.warn('Could not load customer logo:', error);
+    }
+  }
 
   // Add a line below header
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.5);
-  doc.line(margin, 38, pageWidth - margin, 38);
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.line(margin, 32, pageWidth - margin, 32);
 
   // Document title
-  doc.setFontSize(18);
+  doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(15, 23, 42); // Dark gray
-  doc.text('Orçamento Detalhado', margin, 50);
+  doc.setTextColor(0, 0, 0);
+  doc.text('Orçamento Detalhado', margin, 42);
 
   // Task Information
-  let yPosition = 60;
+  let yPosition = 52;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(71, 85, 105);
+  doc.setTextColor(60, 60, 60);
 
   // Task Name
   doc.setFont('helvetica', 'bold');
@@ -83,68 +123,120 @@ export function generateBudgetPDF(data: BudgetPDFData): void {
     yPosition += 7;
   }
 
+  // Chassis Number
+  if (task.chassisNumber) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Chassi:', margin, yPosition);
+    doc.setFont('helvetica', 'normal');
+    doc.text(task.chassisNumber, margin + 25, yPosition);
+    yPosition += 7;
+  }
+
+  // Plate
+  if (task.plate) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Placa:', margin, yPosition);
+    doc.setFont('helvetica', 'normal');
+    doc.text(task.plate, margin + 25, yPosition);
+    yPosition += 7;
+  }
+
+  // Layout dimensions (Tamanho) if truck has layouts
+  if (task.truck) {
+    const layouts = [task.truck.leftSideLayout, task.truck.rightSideLayout, task.truck.backSideLayout].filter(Boolean);
+    if (layouts.length > 0 && layouts[0]) {
+      const layout = layouts[0];
+      if (layout.height && layout.layoutSections && layout.layoutSections.length > 0) {
+        // Calculate total width from sections
+        const totalWidth = layout.layoutSections.reduce((sum, section) => sum + (section.width || 0), 0);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Tamanho:', margin, yPosition);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${totalWidth.toFixed(2).replace('.', ',')} x ${layout.height.toFixed(2).replace('.', ',')} m`, margin + 25, yPosition);
+        yPosition += 7;
+      }
+    }
+  }
+
+  // Add expiration date if available
+  if (task.budget.expiresIn) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Validade:', margin, yPosition);
+    doc.setFont('helvetica', 'normal');
+    const expiryDate = new Date(task.budget.expiresIn);
+    doc.text(expiryDate.toLocaleDateString('pt-BR'), margin + 25, yPosition);
+    yPosition += 7;
+  }
+
   yPosition += 5;
 
   // Prepare table data
-  const tableData = task.budget.map((item) => {
-    const value = typeof item.valor === 'number' ? item.valor : Number(item.valor) || 0;
+  const tableData = task.budget.items.map((item) => {
+    const value = typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0;
     return [
-      item.referencia,
+      item.description,
       `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     ];
   });
 
-  // Calculate total - match UI logic for consistency
-  const total = task.budget.reduce((sum, item) => {
-    const value = typeof item.valor === 'number' ? item.valor : Number(item.valor) || 0;
-    return sum + value;
-  }, 0);
+  // Use the total from the budget entity
+  const total = typeof task.budget.total === 'number' ? task.budget.total : Number(task.budget.total) || 0;
 
-  // Add budget table
+  // Add budget table with clean design
   autoTable(doc, {
     startY: yPosition,
-    head: [['Referência', 'Valor']],
+    head: [['Descrição', 'Valor']],
     body: tableData,
-    theme: 'striped',
+    theme: 'plain',
     headStyles: {
-      fillColor: [30, 58, 138], // Blue
-      textColor: [255, 255, 255], // White
+      fillColor: [245, 245, 245],
+      textColor: [0, 0, 0],
       fontStyle: 'bold',
-      fontSize: 11,
+      fontSize: 10,
       halign: 'left',
+      lineWidth: 0.5,
+      lineColor: [220, 220, 220],
     },
     bodyStyles: {
       fontSize: 10,
-      textColor: [51, 65, 85],
+      textColor: [40, 40, 40],
+      lineWidth: 0.1,
+      lineColor: [230, 230, 230],
     },
     columnStyles: {
-      0: { cellWidth: 'auto' }, // Referência
-      1: { cellWidth: 40, halign: 'right' }, // Valor
+      0: { cellWidth: 'auto', halign: 'left' }, // Descrição
+      1: { cellWidth: 45, halign: 'right', fontStyle: 'bold' }, // Valor
     },
     margin: { left: margin, right: margin },
     styles: {
-      cellPadding: 5,
-      lineColor: [226, 232, 240],
+      cellPadding: 4,
+      lineColor: [230, 230, 230],
       lineWidth: 0.1,
     },
     alternateRowStyles: {
-      fillColor: [248, 250, 252],
+      fillColor: [252, 252, 252],
     },
   });
 
-  // Total row
+  // Total row with clean design
   const finalY = (doc as any).lastAutoTable?.finalY || yPosition + 50;
 
-  doc.setFillColor(241, 245, 249); // Light gray background
-  doc.rect(margin, finalY + 2, pageWidth - 2 * margin, 12, 'F');
+  // Draw border for total row
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.5);
+  doc.rect(margin, finalY + 3, pageWidth - 2 * margin, 10);
+
+  // Total background
+  doc.setFillColor(250, 250, 250);
+  doc.rect(margin, finalY + 3, pageWidth - 2 * margin, 10, 'F');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(15, 23, 42);
-  doc.text('TOTAL:', margin + 5, finalY + 10);
+  doc.setFontSize(11);
+  doc.setTextColor(0, 0, 0);
+  doc.text('TOTAL:', margin + 4, finalY + 10);
   doc.text(
     `R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-    pageWidth - margin - 5,
+    pageWidth - margin - 4,
     finalY + 10,
     { align: 'right' }
   );
@@ -159,8 +251,8 @@ export function generateBudgetPDF(data: BudgetPDFData): void {
   });
 
   doc.setFontSize(8);
-  doc.setFont('helvetica', 'italic');
-  doc.setTextColor(148, 163, 184);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(120, 120, 120);
   doc.text(
     `Gerado em: ${generationDate}`,
     pageWidth / 2,

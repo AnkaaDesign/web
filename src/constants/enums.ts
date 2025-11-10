@@ -181,6 +181,12 @@ export enum EXTERNAL_WITHDRAWAL_STATUS {
   CANCELLED = "CANCELLED",
 }
 
+export enum EXTERNAL_WITHDRAWAL_TYPE {
+  RETURNABLE = "RETURNABLE",
+  CHARGEABLE = "CHARGEABLE",
+  COMPLIMENTARY = "COMPLIMENTARY",
+}
+
 // =====================
 // Analytics & Trends
 // =====================
@@ -652,6 +658,7 @@ export enum MEASURE_TYPE {
   WEIGHT = "WEIGHT",
   VOLUME = "VOLUME",
   LENGTH = "LENGTH",
+  WIDTH = "WIDTH",
   AREA = "AREA",
   COUNT = "COUNT",
   DIAMETER = "DIAMETER",

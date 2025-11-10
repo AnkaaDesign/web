@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { z } from "zod";
 import { useUrlFilters } from "./use-url-filters";
+import { EXTERNAL_WITHDRAWAL_TYPE } from "../constants";
 
 /**
  * External Withdrawal Form URL State Hook
@@ -8,7 +9,7 @@ import { useUrlFilters } from "./use-url-filters";
  * Important behaviors:
  * - Manages 3-stage form navigation (Basic Info → Item Selection → Review)
  * - Manages selected items, their quantities and prices in URL state
- * - Manages form data (withdrawerName, willReturn, notes) in URL state
+ * - Manages form data (withdrawerName, type, notes) in URL state
  * - Handles form validation state across stages
  * - Persists all state in URL for page refresh recovery
  * - Use preserveQuantitiesOnDeselect option to keep values when deselecting items
@@ -38,7 +39,7 @@ interface UseExternalWithdrawalFormUrlStateOptions {
   validateOnStageChange?: boolean;
   initialData?: {
     withdrawerName?: string;
-    willReturn?: boolean;
+    type?: EXTERNAL_WITHDRAWAL_TYPE;
     notes?: string;
     selectedItems?: Set<string>;
     quantities?: Record<string, number>;
@@ -78,9 +79,9 @@ const externalWithdrawalFormFilterConfig = {
     defaultValue: "",
     debounceMs: 0, // Immediate update for better typing experience
   },
-  willReturn: {
-    schema: z.coerce.boolean().default(true),
-    defaultValue: true,
+  type: {
+    schema: z.nativeEnum(EXTERNAL_WITHDRAWAL_TYPE).default(EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE),
+    defaultValue: EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE,
     debounceMs: 0,
   },
   notes: {
@@ -165,10 +166,10 @@ export function useExternalWithdrawalFormUrlState(options: UseExternalWithdrawal
           defaultValue: initialData.withdrawerName as any,
         };
       }
-      if (initialData.willReturn !== undefined) {
-        config.willReturn = {
-          ...config.willReturn,
-          defaultValue: initialData.willReturn as any,
+      if (initialData.type !== undefined) {
+        config.type = {
+          ...config.type,
+          defaultValue: initialData.type as any,
         };
       }
       if (initialData.notes !== undefined) {
@@ -212,7 +213,7 @@ export function useExternalWithdrawalFormUrlState(options: UseExternalWithdrawal
   const quantities = filters.quantities || {};
   const prices = filters.prices || {};
   const withdrawerName = filters.withdrawerName || "";
-  const willReturn = filters.willReturn !== undefined ? filters.willReturn : true;
+  const type = filters.type !== undefined ? filters.type : EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE;
   const notes = filters.notes || "";
   const formTouched = filters.formTouched !== undefined ? filters.formTouched : false;
   const showSelectedOnly = filters.showSelectedOnly !== undefined ? filters.showSelectedOnly : false;
@@ -259,9 +260,9 @@ export function useExternalWithdrawalFormUrlState(options: UseExternalWithdrawal
     [setFilter],
   );
 
-  const updateWillReturn = useCallback(
-    (value: boolean) => {
-      setFilter("willReturn", value === true ? undefined : value);
+  const updateType = useCallback(
+    (value: EXTERNAL_WITHDRAWAL_TYPE) => {
+      setFilter("type", value === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE ? undefined : value);
     },
     [setFilter],
   );
@@ -577,7 +578,7 @@ export function useExternalWithdrawalFormUrlState(options: UseExternalWithdrawal
   const getFormData = useCallback(() => {
     return {
       withdrawerName: withdrawerName?.trim() || "",
-      willReturn,
+      type,
       notes: notes?.trim() || undefined,
       items: getSelectedItemsWithData().map((item) => ({
         itemId: item.id,
@@ -585,7 +586,7 @@ export function useExternalWithdrawalFormUrlState(options: UseExternalWithdrawal
         unitPrice: item.price > 0 ? item.price : undefined,
       })),
     };
-  }, [withdrawerName, willReturn, notes, getSelectedItemsWithData]);
+  }, [withdrawerName, type, notes, getSelectedItemsWithData]);
 
   const resetForm = useCallback(() => {
     setFilters({
@@ -594,7 +595,7 @@ export function useExternalWithdrawalFormUrlState(options: UseExternalWithdrawal
       quantities: undefined,
       prices: undefined,
       withdrawerName: undefined,
-      willReturn: undefined,
+      type: undefined,
       notes: undefined,
       formTouched: undefined,
     });
@@ -603,7 +604,7 @@ export function useExternalWithdrawalFormUrlState(options: UseExternalWithdrawal
   const resetFormData = useCallback(() => {
     setFilters({
       withdrawerName: undefined,
-      willReturn: undefined,
+      type: undefined,
       notes: undefined,
       formTouched: undefined,
     });
@@ -611,17 +612,17 @@ export function useExternalWithdrawalFormUrlState(options: UseExternalWithdrawal
 
   // Check if form has any data
   const hasFormData = useMemo(() => {
-    return (withdrawerName?.trim() || "") !== "" || willReturn !== true || (notes?.trim() || "") !== "" || selectedItems.size > 0;
-  }, [withdrawerName, willReturn, notes, selectedItems.size]);
+    return (withdrawerName?.trim() || "") !== "" || type !== EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE || (notes?.trim() || "") !== "" || selectedItems.size > 0;
+  }, [withdrawerName, type, notes, selectedItems.size]);
 
   // Check if specific stages have data
   const stageHasData = useMemo(() => {
     return {
-      stage1: (withdrawerName?.trim() || "") !== "" || willReturn !== true || (notes?.trim() || "") !== "",
+      stage1: (withdrawerName?.trim() || "") !== "" || type !== EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE || (notes?.trim() || "") !== "",
       stage2: selectedItems.size > 0,
       stage3: true, // Review stage always accessible if previous stages are valid
     };
-  }, [withdrawerName, willReturn, notes, selectedItems.size]);
+  }, [withdrawerName, type, notes, selectedItems.size]);
 
   // Form progress calculation
   const formProgress = useMemo(() => {
@@ -652,7 +653,7 @@ export function useExternalWithdrawalFormUrlState(options: UseExternalWithdrawal
     quantities,
     prices,
     withdrawerName,
-    willReturn,
+    type,
     notes,
 
     // Filter and Pagination State
@@ -678,7 +679,7 @@ export function useExternalWithdrawalFormUrlState(options: UseExternalWithdrawal
     updateQuantities,
     updatePrices,
     updateWithdrawerName,
-    updateWillReturn,
+    updateType,
     updateNotes,
 
     // Filter Update Functions

@@ -15,6 +15,8 @@ import {
   markExternalWithdrawalAsPartiallyReturned,
   markExternalWithdrawalAsFullyReturned,
   markExternalWithdrawalAsCharged,
+  markExternalWithdrawalAsLiquidated,
+  markExternalWithdrawalAsDelivered,
   cancelExternalWithdrawal,
   // ExternalWithdrawalItem functions
   getExternalWithdrawalItems,
@@ -330,6 +332,30 @@ export function useExternalWithdrawalStatusMutations() {
     },
   });
 
+  const markAsLiquidatedMutation = useMutation({
+    mutationFn: ({ id, data, queryParams }: { id: string; data?: Pick<ExternalWithdrawalUpdateFormData, "notes">; queryParams?: any }) =>
+      markExternalWithdrawalAsLiquidated(id, data, queryParams),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: externalWithdrawalKeys.all });
+      queryClient.invalidateQueries({ queryKey: externalWithdrawalKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: itemKeys.all });
+      queryClient.invalidateQueries({ queryKey: activityKeys.all });
+      queryClient.invalidateQueries({ queryKey: changeLogKeys.all });
+    },
+  });
+
+  const markAsDeliveredMutation = useMutation({
+    mutationFn: ({ id, data, queryParams }: { id: string; data?: Pick<ExternalWithdrawalUpdateFormData, "notes">; queryParams?: any }) =>
+      markExternalWithdrawalAsDelivered(id, data, queryParams),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: externalWithdrawalKeys.all });
+      queryClient.invalidateQueries({ queryKey: externalWithdrawalKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: itemKeys.all });
+      queryClient.invalidateQueries({ queryKey: activityKeys.all });
+      queryClient.invalidateQueries({ queryKey: changeLogKeys.all });
+    },
+  });
+
   const cancelMutation = useMutation({
     mutationFn: ({ id, data, queryParams }: { id: string; data?: Pick<ExternalWithdrawalUpdateFormData, "notes">; queryParams?: any }) =>
       cancelExternalWithdrawal(id, data, queryParams),
@@ -346,6 +372,8 @@ export function useExternalWithdrawalStatusMutations() {
     markAsPartiallyReturned: markAsPartiallyReturnedMutation,
     markAsFullyReturned: markAsFullyReturnedMutation,
     markAsCharged: markAsChargedMutation,
+    markAsLiquidated: markAsLiquidatedMutation,
+    markAsDelivered: markAsDeliveredMutation,
     cancel: cancelMutation,
   };
 }
@@ -364,6 +392,16 @@ export function useMarkExternalWithdrawalAsFullyReturned() {
 export function useMarkExternalWithdrawalAsCharged() {
   const { markAsCharged } = useExternalWithdrawalStatusMutations();
   return markAsCharged;
+}
+
+export function useMarkExternalWithdrawalAsLiquidated() {
+  const { markAsLiquidated } = useExternalWithdrawalStatusMutations();
+  return markAsLiquidated;
+}
+
+export function useMarkExternalWithdrawalAsDelivered() {
+  const { markAsDelivered } = useExternalWithdrawalStatusMutations();
+  return markAsDelivered;
 }
 
 export function useCancelExternalWithdrawal() {

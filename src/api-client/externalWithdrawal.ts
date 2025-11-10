@@ -140,6 +140,36 @@ export class ExternalWithdrawalService {
     );
   }
 
+  async markAsLiquidated(
+    id: string,
+    data?: Pick<ExternalWithdrawalUpdateFormData, "notes">,
+    queryParams?: ExternalWithdrawalQueryFormData,
+  ): Promise<ExternalWithdrawalUpdateResponse> {
+    return this.updateExternalWithdrawal(
+      id,
+      {
+        ...data,
+        status: "LIQUIDATED" as any,
+      },
+      queryParams,
+    );
+  }
+
+  async markAsDelivered(
+    id: string,
+    data?: Pick<ExternalWithdrawalUpdateFormData, "notes">,
+    queryParams?: ExternalWithdrawalQueryFormData,
+  ): Promise<ExternalWithdrawalUpdateResponse> {
+    return this.updateExternalWithdrawal(
+      id,
+      {
+        ...data,
+        status: "DELIVERED" as any,
+      },
+      queryParams,
+    );
+  }
+
   async cancel(id: string, data?: Pick<ExternalWithdrawalUpdateFormData, "notes">, queryParams?: ExternalWithdrawalQueryFormData): Promise<ExternalWithdrawalUpdateResponse> {
     return this.updateExternalWithdrawal(
       id,
@@ -302,6 +332,10 @@ export const markExternalWithdrawalAsFullyReturned = (id: string, data?: Pick<Ex
   externalWithdrawalService.markAsFullyReturned(id, data, queryParams);
 export const markExternalWithdrawalAsCharged = (id: string, data?: Pick<ExternalWithdrawalUpdateFormData, "notes">, queryParams?: ExternalWithdrawalQueryFormData) =>
   externalWithdrawalService.markAsCharged(id, data, queryParams);
+export const markExternalWithdrawalAsLiquidated = (id: string, data?: Pick<ExternalWithdrawalUpdateFormData, "notes">, queryParams?: ExternalWithdrawalQueryFormData) =>
+  externalWithdrawalService.markAsLiquidated(id, data, queryParams);
+export const markExternalWithdrawalAsDelivered = (id: string, data?: Pick<ExternalWithdrawalUpdateFormData, "notes">, queryParams?: ExternalWithdrawalQueryFormData) =>
+  externalWithdrawalService.markAsDelivered(id, data, queryParams);
 export const cancelExternalWithdrawal = (id: string, data?: Pick<ExternalWithdrawalUpdateFormData, "notes">, queryParams?: ExternalWithdrawalQueryFormData) =>
   externalWithdrawalService.cancel(id, data, queryParams);
 

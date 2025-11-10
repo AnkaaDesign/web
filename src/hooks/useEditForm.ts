@@ -77,7 +77,19 @@ function deepCompare(value1: any, value2: any): boolean {
 
   // Handle arrays - IMPORTANT: Order matters for arrays like services
   if (Array.isArray(value1) && Array.isArray(value2)) {
-    if (value1.length !== value2.length) return false;
+    // Debug paintIds array comparison
+    if (value1.length > 0 && typeof value1[0] === "string" && value1[0].length > 20) {
+      console.log('[deepCompare] 🎨 Comparing arrays (likely paintIds):');
+      console.log('  Array1 length:', value1.length, 'items:', value1);
+      console.log('  Array2 length:', value2.length, 'items:', value2);
+    }
+
+    if (value1.length !== value2.length) {
+      if (value1.length > 0 && typeof value1[0] === "string" && value1[0].length > 20) {
+        console.log('[deepCompare] 🎨 Arrays have different lengths - returning false');
+      }
+      return false;
+    }
 
     // For empty arrays, they're equal
     if (value1.length === 0) return true;
@@ -91,7 +103,11 @@ function deepCompare(value1: any, value2: any): boolean {
     // For arrays of primitives (like IDs), DON'T sort - order might matter
     // Only sort for primitive arrays where we're sure order doesn't matter (like paintIds)
     // For now, compare directly to detect any changes
-    return _.isEqual(value1, value2);
+    const result = _.isEqual(value1, value2);
+    if (value1.length > 0 && typeof value1[0] === "string" && value1[0].length > 20) {
+      console.log('[deepCompare] 🎨 Lodash comparison result:', result);
+    }
+    return result;
   }
 
   // Handle objects (but not arrays or dates)
@@ -133,21 +149,15 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
 
   // Update original values when data changes - only on initial mount or when data actually changes
   useEffect(() => {
-    console.log('[useEditForm] Effect running. Has originalData:', !!originalData);
     if (originalData) {
-      console.log('[useEditForm] Calling mapDataToForm with:', originalData);
       const formData = mapDataToForm ? mapDataToForm(originalData) : (originalData as unknown as TFieldValues);
-      console.log('[useEditForm] Mapped form data:', formData);
 
       // Only reset if the data has actually changed (deep comparison)
       if (!_.isEqual(originalRef.current, formData)) {
-        console.log('[useEditForm] Data changed, resetting form');
         // Reset form with new data
         originalRef.current = formData;
         lastResetData.current = formData;
         form.reset(formData as DefaultValues<TFieldValues>);
-      } else {
-        console.log('[useEditForm] Data unchanged, skipping reset');
       }
     }
   }, [originalData, mapDataToForm]); // Removed 'form' from dependencies to avoid circular updates
@@ -156,6 +166,7 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
   const getChangedFields = useCallback(() => {
     const formData = form.getValues();
     const original = originalRef.current;
+
 
     if (!original) return {} as Partial<TFieldValues>;
 
@@ -167,13 +178,28 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
       const currentValue = formData[typedKey];
       const originalValue = original[typedKey];
 
+      // Special debugging for paintIds
+      if (key === "paintIds") {
+        console.log('[useEditForm] 🎨 Checking paintIds:');
+        console.log('  Current:', currentValue);
+        console.log('  Original:', originalValue);
+        console.log('  deepCompare result:', deepCompare(currentValue, originalValue));
+        console.log('  In omit list?', fieldsToOmitIfUnchanged.includes(typedKey));
+      }
+
       // Skip if field is in omit list and hasn't changed
       if (fieldsToOmitIfUnchanged.includes(typedKey) && deepCompare(currentValue, originalValue)) {
+        if (key === "paintIds") {
+          console.log('[useEditForm] 🎨 Skipping paintIds - no change detected');
+        }
         return;
       }
 
       // Check if value has changed
       if (!deepCompare(currentValue, originalValue)) {
+        if (key === "paintIds") {
+          console.log('[useEditForm] 🎨 paintIds CHANGED - including in changedFields');
+        }
         // Special handling for certain fields
         if (key === "services") {
           // Explicitly check if it's an array before using filter
@@ -224,21 +250,14 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
 
   // Handle form submission
   const handleSubmitChanges = (onValid?: (data: Partial<TFieldValues>) => unknown, onInvalid?: (errors: any) => unknown) => {
-    console.log('[useEditForm] handleSubmitChanges CALLED - returning handleSubmit wrapper');
     return form.handleSubmit(() => {
-      console.log('[useEditForm] ========== FORM VALIDATION PASSED - EXECUTING SUBMIT ==========');
       const changedFields = getChangedFields();
 
-      console.log("[useEditForm] Changed fields:", changedFields);
-
       // Call onSubmit with changed fields
-      console.log('[useEditForm] Calling onSubmit with changedFields...');
       const result = onSubmit(changedFields);
       if (onValid) onValid(changedFields);
       return result;
     }, (errors) => {
-      console.error('[useEditForm] ========== FORM VALIDATION FAILED ==========');
-      console.error('[useEditForm] Validation errors:', errors);
       if (onInvalid) onInvalid(errors);
     });
   };
