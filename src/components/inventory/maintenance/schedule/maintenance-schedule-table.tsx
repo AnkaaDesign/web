@@ -26,7 +26,6 @@ import { createMaintenanceScheduleColumns } from "./maintenance-schedule-table-c
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { routes } from "../../../../constants";
-import { toast } from "sonner";
 
 interface MaintenanceScheduleTableProps {
   visibleColumns: Set<string>;
@@ -197,7 +196,6 @@ export function MaintenanceScheduleTable({
 
     const schedulesToActivate = contextMenu.schedules.filter((s) => !s.isActive);
     if (schedulesToActivate.length === 0) {
-      toast.error("Todos os agendamentos selecionados já estão ativos");
       setContextMenu(null);
       return;
     }
@@ -211,16 +209,8 @@ export function MaintenanceScheduleTable({
           })
         )
       );
-
-      const count = schedulesToActivate.length;
-      toast.success(
-        count === 1
-          ? "Agendamento ativado com sucesso"
-          : `${count} agendamentos ativados com sucesso`
-      );
     } catch (error) {
       console.error("Error activating schedules:", error);
-      toast.error("Erro ao ativar agendamentos");
     }
 
     setContextMenu(null);
@@ -231,7 +221,6 @@ export function MaintenanceScheduleTable({
 
     const schedulesToDeactivate = contextMenu.schedules.filter((s) => s.isActive);
     if (schedulesToDeactivate.length === 0) {
-      toast.error("Todos os agendamentos selecionados já estão inativos");
       setContextMenu(null);
       return;
     }
@@ -245,16 +234,8 @@ export function MaintenanceScheduleTable({
           })
         )
       );
-
-      const count = schedulesToDeactivate.length;
-      toast.success(
-        count === 1
-          ? "Agendamento desativado com sucesso"
-          : `${count} agendamentos desativados com sucesso`
-      );
     } catch (error) {
       console.error("Error deactivating schedules:", error);
-      toast.error("Erro ao desativar agendamentos");
     }
 
     setContextMenu(null);

@@ -45,10 +45,6 @@ const VALID_ROUTES = [
   routes.production.history.cancelled,
   routes.production.history.completed,
   routes.production.cutting.root,
-  routes.production.garages.root,
-  routes.production.garages.create,
-  routes.production.garages.edit(":id"),
-  routes.production.garages.details(":id"),
   routes.production.observations.root,
   routes.production.observations.create,
   routes.production.observations.edit(":id"),
@@ -183,10 +179,6 @@ const VALID_ROUTES = [
   routes.humanResources.ppe.schedules.create,
   routes.humanResources.ppe.schedules.edit(":id"),
   routes.humanResources.ppe.schedules.details(":id"),
-  routes.humanResources.ppe.sizes.root,
-  routes.humanResources.ppe.sizes.create,
-  routes.humanResources.ppe.sizes.edit(":id"),
-  routes.humanResources.ppe.sizes.details(":id"),
 
   // Personal routes
   routes.personal.root,
@@ -224,7 +216,6 @@ const VALID_ROUTES = [
  */
 export const ROUTE_FIXES: Record<string, string> = {
   // Production route mappings
-  "/producao/garagens/listar": "/producao/garagens",
   "/producao/ordens-de-servico/listar": "/producao/ordens-de-servico",
   "/producao/observacoes/listar": "/producao/observacoes",
 

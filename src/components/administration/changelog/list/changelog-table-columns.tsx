@@ -40,8 +40,6 @@ const getActionIcon = (action: CHANGE_LOG_ACTION) => {
       return <IconX className="h-3 w-3" />;
     case CHANGE_LOG_ACTION.COMPLETE:
       return <IconCheck className="h-3 w-3" />;
-    case CHANGE_LOG_ACTION.RESCHEDULE:
-      return <IconClock className="h-3 w-3" />;
     case CHANGE_LOG_ACTION.VIEW:
       return <IconEye className="h-3 w-3" />;
     default:
@@ -63,7 +61,6 @@ const getActionVariant = (action: CHANGE_LOG_ACTION): any => {
       return "destructive";
     case CHANGE_LOG_ACTION.UPDATE:
     case CHANGE_LOG_ACTION.BATCH_UPDATE:
-    case CHANGE_LOG_ACTION.RESCHEDULE:
       return "secondary";
     case CHANGE_LOG_ACTION.RESTORE:
     case CHANGE_LOG_ACTION.ROLLBACK:

@@ -25,7 +25,7 @@ interface PpeDeliveryTableProps {
   onDeliver?: (deliveries: PpeDelivery[]) => void;
   onDelete?: (deliveries: PpeDelivery[]) => void;
   filters?: Partial<PpeDeliveryGetManyFormData>;
-  onDataChange?: (data: { items: PpeDelivery[]; totalRecords: number; selectionCount: number; showSelectedOnly: boolean; toggleShowSelectedOnly: () => void }) => void;
+  onDataChange?: (data: { items: PpeDelivery[]; totalRecords: number }) => void;
 }
 
 export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove, onReject, onDeliver, onDelete, filters = {}, onDataChange }: PpeDeliveryTableProps) {
@@ -64,14 +64,17 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
     ],
   });
 
-  // Prepare query parameters
-  const queryFilters: Partial<PpeDeliveryGetManyFormData> = {
-    // When showSelectedOnly is true, don't apply filters
-    ...(showSelectedOnly ? {} : filters),
-    page: page + 1, // Convert 0-based to 1-based for API
-    limit: pageSize,
-    orderBy: convertSortConfigsToOrderBy(sortConfigs),
-    include: {
+  console.log("[PpeDeliveryTable] State:", {
+    selectedIds,
+    selectionCount,
+    showSelectedOnly,
+    page,
+    pageSize,
+  });
+
+  // Memoize include configuration to prevent re-renders
+  const includeConfig = React.useMemo(
+    () => ({
       item: {
         include: {
           brand: true,
@@ -81,35 +84,72 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
       user: true,
       reviewedByUser: true,
       ppeSchedule: true,
-    },
-  };
+    }),
+    [],
+  );
 
-  // Filter to show only selected items if enabled
-  if (showSelectedOnly && selectedIds.length > 0) {
-    queryFilters.where = {
-      id: { in: selectedIds },
-    };
-  }
+  // Memoize query parameters to prevent infinite re-renders
+  const queryFilters = React.useMemo(
+    () => ({
+      // When showSelectedOnly is true, don't apply filters
+      ...(showSelectedOnly ? {} : filters),
+      page: page + 1, // Convert 0-based to 1-based for API
+      limit: pageSize,
+      orderBy: convertSortConfigsToOrderBy(sortConfigs),
+      include: includeConfig,
+      // Filter to show only selected items if enabled
+      ...(showSelectedOnly &&
+        selectedIds.length > 0 && {
+          where: {
+            id: { in: selectedIds },
+          },
+        }),
+    }),
+    [filters, page, pageSize, sortConfigs, includeConfig, showSelectedOnly, selectedIds],
+  );
 
   // Fetch data
   const { data, isLoading, error } = usePpeDeliveries(queryFilters);
 
-  // Update parent component with current data
-  React.useEffect(() => {
-    if (data?.data && onDataChange) {
-      onDataChange({
-        items: data.data,
-        totalRecords: data.meta?.totalRecords || 0,
-        selectionCount,
-        showSelectedOnly,
-        toggleShowSelectedOnly,
-      });
-    }
-  }, [data, onDataChange, selectionCount, showSelectedOnly, toggleShowSelectedOnly]);
-
   const deliveries = data?.data || [];
   const totalPages = data?.meta ? Math.ceil(data.meta.totalRecords / pageSize) : 1;
   const totalRecords = data?.meta?.totalRecords || 0;
+
+  // Update parent component with current data using stable callback pattern
+  const lastNotifiedDataRef = React.useRef<string>("");
+  const isMountedRef = React.useRef(true);
+
+  React.useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (onDataChange && isMountedRef.current) {
+      // Create a unique key for the current data to detect real changes
+      const dataKey = deliveries.length > 0 ? `${totalRecords}-${deliveries.map((d) => d.id).join(",")}` : `empty-${totalRecords}`;
+
+      console.log("[PpeDeliveryTable] onDataChange effect triggered:", {
+        dataKey,
+        lastKey: lastNotifiedDataRef.current,
+        willNotify: dataKey !== lastNotifiedDataRef.current,
+      });
+
+      // Only notify if this exact data hasn't been notified yet
+      if (dataKey !== lastNotifiedDataRef.current) {
+        lastNotifiedDataRef.current = dataKey;
+        console.log("[PpeDeliveryTable] Notifying parent with data:", {
+          itemCount: deliveries.length,
+          totalRecords,
+        });
+        onDataChange({
+          items: deliveries,
+          totalRecords,
+        });
+      }
+    }
+  }, [deliveries, totalRecords, onDataChange]);
 
   // Get visible columns based on selection
   const columns = createPpeDeliveryColumns();
@@ -129,13 +169,15 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
   const allSelected = isAllSelected(currentPageDeliveryIds);
   const partiallySelected = isPartiallySelected(currentPageDeliveryIds);
 
-  const handleSelectAll = () => {
+  const handleSelectAll = React.useCallback(() => {
+    console.log("[PpeDeliveryTable] handleSelectAll called with IDs:", currentPageDeliveryIds);
     toggleSelectAll(currentPageDeliveryIds);
-  };
+  }, [toggleSelectAll, currentPageDeliveryIds]);
 
-  const handleSelectDelivery = (deliveryId: string) => {
+  const handleSelectDelivery = React.useCallback((deliveryId: string) => {
+    console.log("[PpeDeliveryTable] handleSelectDelivery called with ID:", deliveryId);
     toggleSelection(deliveryId);
-  };
+  }, [toggleSelection]);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -401,16 +443,16 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
             {contextMenu?.isBulk && contextMenu.deliveries.length > 1 ? "Editar em lote" : "Editar"}
           </DropdownMenuItem>
 
-          {/* Only show approve option if at least one delivery is not approved */}
-          {contextMenu?.deliveries.some((d) => d.status !== PPE_DELIVERY_STATUS.APPROVED && d.status !== PPE_DELIVERY_STATUS.DELIVERED) && (
+          {/* Only show approve option if at least one delivery is PENDING */}
+          {contextMenu?.deliveries.some((d) => d.status === PPE_DELIVERY_STATUS.PENDING) && (
             <DropdownMenuItem onClick={handleApprove}>
               <IconCheck className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.deliveries.length > 1 ? "Aprovar entregas" : "Aprovar entrega"}
             </DropdownMenuItem>
           )}
 
-          {/* Only show reject option if at least one delivery can be rejected */}
-          {contextMenu?.deliveries.some((d) => d.status !== PPE_DELIVERY_STATUS.DELIVERED && d.status !== PPE_DELIVERY_STATUS.REPROVED) && (
+          {/* Only show reject option if at least one delivery is PENDING or APPROVED (not yet delivered) */}
+          {contextMenu?.deliveries.some((d) => d.status === PPE_DELIVERY_STATUS.PENDING || d.status === PPE_DELIVERY_STATUS.APPROVED) && (
             <DropdownMenuItem onClick={handleReject}>
               <IconX className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.deliveries.length > 1 ? "Reprovar entregas" : "Reprovar entrega"}

@@ -53,9 +53,6 @@ export function PpeList({ className }: PpeListProps) {
     setTableData(data);
   }, []);
 
-  // Track cursor position to maintain it during search operations
-  const cursorPositionRef = useRef<number>(0);
-
   // State from URL params - must be declared before debounced search
   const [searchingFor, setSearchingFor] = useState(() => searchParams.get("search") || "");
   const [displaySearchText, setDisplaySearchText] = useState(() => searchParams.get("search") || "");
@@ -74,32 +71,15 @@ export function PpeList({ className }: PpeListProps) {
     [setSearchingFor],
   );
 
-  // Update cursor position when user interacts with search input
+  // Handle search input change - receives value directly from custom Input component
   const handleSearchInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const target = e.target;
-      cursorPositionRef.current = target.selectionStart || 0;
-      setDisplaySearchText(target.value); // Immediate UI update
-      debouncedSearch(target.value); // Debounced API call
+    (value: string | number | null) => {
+      const stringValue = value?.toString() || "";
+      setDisplaySearchText(stringValue); // Immediate UI update
+      debouncedSearch(stringValue); // Debounced API call
     },
     [debouncedSearch],
   );
-
-  // Keep focus and cursor position stable during search operations
-  useEffect(() => {
-    // Only restore cursor position if the search input is currently focused
-    if (searchInputRef.current && document.activeElement === searchInputRef.current) {
-      // Use requestAnimationFrame to ensure DOM updates are complete
-      requestAnimationFrame(() => {
-        if (searchInputRef.current && document.activeElement === searchInputRef.current) {
-          const input = searchInputRef.current;
-          const savedPosition = cursorPositionRef.current;
-          // Restore cursor position to where the user was typing
-          input.setSelectionRange(savedPosition, savedPosition);
-        }
-      });
-    }
-  }, [displaySearchText]); // Depend on display text changes, not table data
 
   // Load entity data for filter labels
   const { data: categoriesData } = useItemCategories({
@@ -164,10 +144,18 @@ export function PpeList({ className }: PpeListProps) {
       filters.outOfStock = true;
     }
 
-    // Parse show inactive filter
-    const showInactive = searchParams.get("showInactive");
-    if (showInactive === "true") {
-      filters.showInactive = true;
+    // Parse isActive filter (boolean or "all" for ambos)
+    const isActive = searchParams.get("isActive");
+    if (isActive === "true") {
+      filters.isActive = true;
+    } else if (isActive === "false") {
+      filters.isActive = false;
+    } else if (isActive === "all") {
+      // Explicitly showing all (ambos) - don't set isActive
+      filters.isActive = undefined;
+    } else if (isActive === null) {
+      // No parameter = first visit, default to showing only active
+      filters.isActive = true;
     }
 
     return filters;
@@ -198,7 +186,7 @@ export function PpeList({ className }: PpeListProps) {
     newParams.delete("ppeType");
     newParams.delete("lowStock");
     newParams.delete("outOfStock");
-    newParams.delete("showInactive");
+    newParams.delete("isActive");
 
     // Add search parameter
     if (searchingFor) {
@@ -224,8 +212,12 @@ export function PpeList({ className }: PpeListProps) {
       newParams.set("outOfStock", "true");
     }
 
-    if (filters.showInactive) {
-      newParams.set("showInactive", "true");
+    // Serialize isActive (true/false/"all")
+    if (typeof filters.isActive === "boolean") {
+      newParams.set("isActive", String(filters.isActive));
+    } else if (filters.isActive === undefined && filtersInitialized) {
+      // When explicitly showing all (ambos), set to "all"
+      newParams.set("isActive", "all");
     }
 
     setSearchParams(newParams, { replace: true });
@@ -257,6 +249,7 @@ export function PpeList({ className }: PpeListProps) {
   // Handler to clear all filters but keep search
   const handleClearAllFilters = useCallback(() => {
     setFilters({
+      isActive: true, // Reset to default: show only active items
       where: {
         category: {
           type: ITEM_CATEGORY_TYPE.PPE,
@@ -285,15 +278,6 @@ export function PpeList({ className }: PpeListProps) {
       }
     };
   }, [debouncedSearch]);
-
-  // Handle search
-  const handleSearch = useCallback(
-    (value: string) => {
-      setDisplaySearchText(value); // Immediate UI update
-      debouncedSearch(value); // Debounced API call
-    },
-    [debouncedSearch],
-  );
 
   // Get mutation hooks
   const { update } = useItemMutations();

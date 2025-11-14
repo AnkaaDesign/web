@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
-import { TASK_STATUS } from "../../../../constants";
+import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 
 interface TaskScheduleFiltersProps {
   open: boolean;
@@ -94,16 +94,18 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
         <div className="mt-6 space-y-6">
           {/* Sectors */}
           <div className="space-y-2">
-            <Label>Equipes</Label>
+            <Label>Setores</Label>
             <Combobox
               mode="multiple"
-              options={sectors.map((sector) => ({
-                value: sector.id,
-                label: sector.name,
-              }))}
+              options={sectors
+                .filter((sector) => sector.privileges === SECTOR_PRIVILEGES.PRODUCTION)
+                .map((sector) => ({
+                  value: sector.id,
+                  label: sector.name,
+                }))}
               value={localFilters.sectorIds || []}
               onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, sectorIds: value })}
-              placeholder="Selecione as equipes"
+              placeholder="Selecione os setores"
             />
           </div>
 
@@ -135,14 +137,14 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
           </div>
 
           {/* Show Overdue Only */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 mb-4">
             <Switch id="overdue" checked={localFilters.isOverdue || false} onCheckedChange={(checked) => setLocalFilters({ ...localFilters, isOverdue: checked })} />
             <Label htmlFor="overdue">Mostrar apenas tarefas atrasadas</Label>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2 pt-4 border-t">
+        <div className="flex gap-2 mt-6 pt-4 border-t">
           <Button variant="outline" onClick={handleReset} className="flex-1">
             <IconX className="h-4 w-4 mr-2" />
             Limpar

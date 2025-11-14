@@ -227,6 +227,8 @@ export const BorrowItemSelector = ({
       ...(!showSelectedOnlyProp && {
         searchingFor: debouncedSearchTerm,
       }),
+      // Map showInactive to isActive at root level
+      ...(!showSelectedOnlyProp && typeof showInactive === "boolean" && { isActive: !showInactive }),
       where: {
         // When showSelectedOnly is true, only filter by selected IDs
         ...(showSelectedOnlyProp && selectedItems.size > 0
@@ -238,8 +240,6 @@ export const BorrowItemSelector = ({
           : {
               // Apply all filters when not showing selected only
               category: { type: "TOOL" },
-              // Filter by active status: only show inactive items when showInactive is true
-              ...(!showInactive && { isActive: true }),
               ...(categoryIds.length && { categoryId: { in: categoryIds } }),
               ...(brandIds.length && { brandId: { in: brandIds } }),
               ...(supplierIds.length && { supplierId: { in: supplierIds } }),

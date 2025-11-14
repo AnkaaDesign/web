@@ -44,6 +44,11 @@ const isEpsFile = (file: AnkaaFile): boolean => {
   return epsMimeTypes.includes(file.mimetype.toLowerCase());
 };
 
+// SVG file detection utility
+const isSvgFile = (file: AnkaaFile): boolean => {
+  return file.mimetype.toLowerCase() === "image/svg+xml" || getFileExtension(file.filename).toLowerCase() === "svg";
+};
+
 // Check if file can be previewed (images, videos, PDFs, or EPS with thumbnails)
 const isPreviewableFile = (file: AnkaaFile): boolean => {
   const isPdf = getFileExtension(file.filename).toLowerCase() === "pdf";
@@ -152,23 +157,42 @@ export function FilePreviewModal({
     }
   }, [currentIndex, files, baseUrl]);
 
-  // Calculate PDF iframe height
+  // Calculate PDF iframe height to fill available space
   React.useEffect(() => {
     const currentFile = files[currentIndex];
     const isPdfFile = currentFile && getFileExtension(currentFile.filename).toLowerCase() === "pdf";
 
-    if (containerRef.current && isPdfFile) {
+    // Only calculate when PDF blob is loaded and modal is open
+    if (containerRef.current && isPdfFile && open && pdfBlobUrl) {
       const updateHeight = () => {
         if (containerRef.current) {
-          const height = containerRef.current.clientHeight - 160;
-          setPdfIframeHeight(Math.max(height, 600));
+          // Get the viewport height
+          const viewportHeight = window.innerHeight;
+
+          // Calculate all fixed UI elements that take space
+          const topPadding = 90; // Reduced top padding for PDF
+          const bottomPadding = totalImages > 1 ? 100 : 20; // Bottom thumbnails or minimal space
+          const verticalMargin = 10; // Minimal breathing room
+
+          // Available height = viewport - all fixed elements
+          const availableHeight = viewportHeight - topPadding - bottomPadding - verticalMargin;
+
+          setPdfIframeHeight(Math.max(availableHeight, 400));
         }
       };
-      updateHeight();
+
+      // Wait for PDF blob to load and DOM to settle before calculating
+      const timeoutId = setTimeout(updateHeight, 150);
+
       window.addEventListener('resize', updateHeight);
-      return () => window.removeEventListener('resize', updateHeight);
+      return () => {
+        clearTimeout(timeoutId);
+        window.removeEventListener('resize', updateHeight);
+      };
+    } else if (!isPdfFile) {
+      setPdfIframeHeight(0);
     }
-  }, [currentIndex, files]);
+  }, [currentIndex, files, totalImages, open, isFullscreen, pdfBlobUrl]);
 
   // Initialize current index
   React.useEffect(() => {
@@ -232,13 +256,14 @@ export function FilePreviewModal({
       const img = imageRef.current;
       const container = containerRef.current;
 
-      // Calculate available space
-      const headerHeight = 80;
-      const thumbnailStripHeight = showThumbnailStrip && totalImages > 1 ? 80 : 0;
-      const padding = 40;
+      // Calculate available space with proper margins
+      const headerHeight = 100; // Fixed header at top
+      const thumbnailStripHeight = showThumbnailStrip && totalImages > 1 ? 100 : 20; // Thumbnail strip or minimal bottom padding
+      const horizontalMargin = 40; // 20px margin on each side
+      const verticalMargin = 20; // Additional vertical spacing
 
-      const availableWidth = container.clientWidth - padding;
-      const availableHeight = container.clientHeight - headerHeight - thumbnailStripHeight - padding;
+      const availableWidth = container.clientWidth - horizontalMargin;
+      const availableHeight = container.clientHeight - headerHeight - thumbnailStripHeight - verticalMargin;
 
       // Calculate optimal scale considering rotation
       let imgWidth = img.naturalWidth;
@@ -249,8 +274,12 @@ export function FilePreviewModal({
         [imgWidth, imgHeight] = [imgHeight, imgWidth];
       }
 
+      // Calculate scale factors for both dimensions
       const scaleX = availableWidth / imgWidth;
       const scaleY = availableHeight / imgHeight;
+
+      // Choose the limiting dimension - use the smaller scale to ensure the image fits
+      // This ensures maximum size while maintaining aspect ratio and margins
       const optimalScale = Math.min(scaleX, scaleY, 1);
 
       setFitZoom(optimalScale);
@@ -480,6 +509,7 @@ export function FilePreviewModal({
   const isPDF = getFileExtension(currentFile.filename).toLowerCase() === "pdf";
   const isEPS = isEpsFile(currentFile);
   const isVideo = isVideoFile(currentFile);
+  const isSVG = isSvgFile(currentFile);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -623,10 +653,10 @@ export function FilePreviewModal({
             ref={containerRef}
             className={cn("absolute inset-0 flex items-center justify-center overflow-hidden transition-all duration-300", isDragging && "cursor-grabbing")}
             style={{
-              paddingTop: isFullscreen ? "60px" : "100px",
-              paddingBottom: showThumbnailStrip && totalImages > 1 ? "100px" : "20px",
-              paddingLeft: "20px",
-              paddingRight: "20px",
+              paddingTop: isPDF ? "90px" : (isFullscreen ? "60px" : "100px"),
+              paddingBottom: isPDF ? (showThumbnailStrip && totalImages > 1 ? "100px" : "20px") : (showThumbnailStrip && totalImages > 1 ? "100px" : "20px"),
+              paddingLeft: isPDF ? "10px" : "20px",
+              paddingRight: isPDF ? "10px" : "20px",
             }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -636,14 +666,16 @@ export function FilePreviewModal({
             {isCurrentFilePreviewable ? (
               isPDF ? (
                 // Native PDF Viewer using blob URL to bypass X-Frame-Options
-                <div className="w-full h-full flex items-center justify-center">
+                <div className="w-full flex items-center justify-center">
                   {pdfBlobUrl ? (
                     <iframe
-                      src={`${pdfBlobUrl}#toolbar=1&navpanes=1&scrollbar=1`}
-                      className="w-full rounded-lg shadow-2xl bg-white"
+                      src={`${pdfBlobUrl}#view=Fit&pagemode=none&toolbar=1`}
+                      className="rounded-lg shadow-2xl"
                       style={{
-                        height: `${pdfIframeHeight > 0 ? pdfIframeHeight : 600}px`,
-                        maxHeight: '85vh',
+                        width: '100%',
+                        height: `${pdfIframeHeight}px`,
+                        maxWidth: '100%',
+                        backgroundColor: 'white',
                         border: 'none'
                       }}
                       title={currentFile.filename}
@@ -701,17 +733,23 @@ export function FilePreviewModal({
                     <img
                       ref={imageRef}
                       src={
-                        isEPS && currentFile.thumbnailUrl
+                        // Always use direct file URL for SVG files
+                        isSVG
+                          ? getFileUrl(currentFile, baseUrl)
+                          : // Use thumbnail for EPS files if available
+                          isEPS && currentFile.thumbnailUrl
                           ? currentFile.thumbnailUrl.startsWith("http")
                             ? currentFile.thumbnailUrl
                             : `${baseUrl || (typeof window !== 'undefined' && (window as any).__ANKAA_API_URL__) || ''}/files/thumbnail/${currentFile.id}?size=large`
-                          : getFileUrl(currentFile, baseUrl)
+                          : // Use direct file URL for all other images
+                            getFileUrl(currentFile, baseUrl)
                       }
                       alt={currentFile.filename}
                       className={cn(
                         "transition-all duration-200 rounded-lg shadow-2xl select-none",
                         zoom > fitZoom ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
                         isEPS && "ring-2 ring-indigo-400 ring-opacity-60",
+                        isSVG && "bg-white p-4",
                       )}
                       style={{
                         transform: `
@@ -770,21 +808,36 @@ export function FilePreviewModal({
                 {previewableFiles.map(({ file, originalIndex }, index) => {
                   const isActive = originalIndex === currentIndex;
                   const isLoaded = !imageLoading || originalIndex !== currentIndex;
+                  const isFilePdf = getFileExtension(file.filename).toLowerCase() === "pdf";
+                  const isFileEps = isEpsFile(file);
+
+                  // Determine thumbnail URL
+                  let thumbnailSrc: string;
+                  if (isFilePdf || (isFileEps && file.thumbnailUrl)) {
+                    // For PDFs and EPS with thumbnails, use the thumbnail endpoint
+                    const apiUrl = baseUrl || (typeof window !== 'undefined' && (window as any).__ANKAA_API_URL__) || '';
+                    thumbnailSrc = file.thumbnailUrl && file.thumbnailUrl.startsWith("http")
+                      ? file.thumbnailUrl
+                      : `${apiUrl}/files/thumbnail/${file.id}?size=small`;
+                  } else {
+                    // For regular images, use the thumbnail utility or direct URL
+                    thumbnailSrc = getFileThumbnailUrl(file, "small", baseUrl) || getFileUrl(file, baseUrl);
+                  }
 
                   return (
                     <button
-                      key={file.id}
+                      key={`${file.id}-${originalIndex}`}
                       onClick={() => setCurrentIndex(originalIndex)}
                       className={cn(
                         "relative flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border-2 transition-all duration-200",
                         "bg-black/30 hover:scale-105 active:scale-95",
-                        isActive ? "border-white shadow-lg shadow-white/25 scale-105" : "border-white/30 hover:border-white/60",
+                        isActive ? "border-primary scale-105" : "border-white/30 hover:border-white/60",
                       )}
                       title={`${file.filename} (${index + 1}/${totalImages})`}
                     >
                       {isLoaded ? (
                         <img
-                          src={getFileThumbnailUrl(file, "small", baseUrl) || getFileUrl(file, baseUrl)}
+                          src={thumbnailSrc}
                           alt={`Miniatura ${index + 1}`}
                           className="absolute inset-0 w-full h-full object-cover transition-opacity duration-200"
                           loading="lazy"
@@ -794,8 +847,6 @@ export function FilePreviewModal({
                           <div className="animate-spin rounded-full h-4 w-4 border border-white border-t-transparent" />
                         </div>
                       )}
-
-                      {isActive && <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />}
                     </button>
                   );
                 })}

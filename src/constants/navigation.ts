@@ -65,7 +65,6 @@ export const TABLER_ICONS = {
   // Production Tools
   scissors: "IconScissors",
   cutting: "IconScissors",
-  garage: "IconBuildingWarehouse",
   truck: "IconTruck",
   serviceWrench: "IconTool",
   maintenance: "IconTools",
@@ -1137,37 +1136,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
       },
 
       {
-        id: "garagens",
-        title: "Garagens",
-        icon: "warehouse",
-        path: "/producao/garagens",
-        children: [
-          {
-            id: "garagens-cadastrar",
-            title: "Cadastrar",
-            icon: "plus",
-            path: "/producao/garagens/cadastrar",
-            requiredPrivilege: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN],
-          },
-          {
-            id: "garagens-detalhes",
-            title: "Detalhes",
-            icon: "eye",
-            path: "/producao/garagens/detalhes/:id",
-            isDynamic: true,
-          },
-          {
-            id: "garagens-editar",
-            title: "Editar",
-            icon: "edit",
-            path: "/producao/garagens/editar/:id",
-            isDynamic: true,
-            requiredPrivilege: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN],
-          },
-        ],
-      },
-
-      {
         id: "historico",
         title: "Histórico",
         icon: "history",
@@ -1299,22 +1267,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
               },
               { id: "epi-rh-entregas-detalhes", title: "Detalhes", icon: "eye", path: "/recursos-humanos/epi/entregas/detalhes/:id", isDynamic: true },
               { id: "epi-rh-entregas-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/epi/entregas/editar/:id", isDynamic: true },
-            ],
-          },
-
-          {
-            id: "epi-rh-tamanhos",
-            title: "Tamanhos",
-            icon: "sizes",
-            path: "/recursos-humanos/epi/tamanhos",
-            children: [
-              {
-                id: "epi-rh-tamanhos-cadastrar",
-                title: "Cadastrar",
-                icon: "plus",
-                path: "/recursos-humanos/epi/tamanhos/cadastrar",
-              },
-              { id: "epi-rh-tamanhos-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/epi/tamanhos/editar/:id", isDynamic: true },
             ],
           },
         ],

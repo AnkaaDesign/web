@@ -5,8 +5,10 @@ import { routes, EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconPackageExport, IconCheck, IconPlus } from "@tabler/icons-react";
+import { IconChevronUp, IconChevronDown, IconEdit, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconPackageExport, IconCheck, IconPlus, IconCurrencyReal } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +31,6 @@ import { formatCurrency, formatDate } from "../../../../utils";
 import { ExternalWithdrawalStatusBadge } from "../common/external-withdrawal-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { ExternalWithdrawalTableSkeleton } from "./external-withdrawal-table-skeleton";
-import { ContextMenuTrigger, type ContextMenuItem } from "@/components/ui/context-menu";
 
 interface ExternalWithdrawalTableProps {
   visibleColumns: Set<string>;
@@ -157,10 +158,10 @@ const createExternalWithdrawalColumns = (): ExternalWithdrawalColumn[] => [
         }, 0);
         return <span className="text-sm font-semibold tabular-nums">{formatCurrency(total)}</span>;
       }
-      return <span className="text-sm text-muted-foreground tabular-nums text-right w-full inline-block">-</span>;
+      return <span className="text-sm text-muted-foreground tabular-nums">-</span>;
     },
     sortable: false,
-    align: "right",
+    align: "left",
     className: "w-36",
   },
   {
@@ -177,40 +178,6 @@ const createExternalWithdrawalColumns = (): ExternalWithdrawalColumn[] => [
     align: "center",
     className: "w-36",
   },
-  // Fields not available in ExternalWithdrawal type - commented out to fix TypeScript errors
-  // {
-  //   key: "expectedReturnDate",
-  //   header: "Data Prevista Devolução",
-  //   accessor: (withdrawal) => (
-  //     <span className="text-sm text-muted-foreground">
-  //       {withdrawal.expectedReturnDate ? formatDate(withdrawal.expectedReturnDate) : "-"}
-  //     </span>
-  //   ),
-  //   sortable: true,
-  //   className: "min-w-[160px]",
-  // },
-  // {
-  //   key: "actualReturnDate",
-  //   header: "Data Real Devolução",
-  //   accessor: (withdrawal) => (
-  //     <span className="text-sm text-muted-foreground">
-  //       {withdrawal.actualReturnDate ? formatDate(withdrawal.actualReturnDate) : "-"}
-  //     </span>
-  //   ),
-  //   sortable: true,
-  //   className: "min-w-[160px]",
-  // },
-  // {
-  //   key: "withdrawalDate",
-  //   header: "Data da Retirada",
-  //   accessor: (withdrawal) => (
-  //     <span className="text-sm text-muted-foreground">
-  //       {withdrawal.withdrawalDate ? formatDate(withdrawal.withdrawalDate) : "-"}
-  //     </span>
-  //   ),
-  //   sortable: true,
-  //   className: "min-w-[140px]",
-  // },
   {
     key: "createdAt",
     header: "DATA DE CRIAÇÃO",
@@ -238,7 +205,14 @@ export function getAllColumns(): ExternalWithdrawalColumn[] {
 export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _onEdit, onDelete: _onDelete, filters = {}, onDataChange }: ExternalWithdrawalTableProps) {
   const navigate = useNavigate();
   const { delete: deleteWithdrawal } = useExternalWithdrawalMutations();
-  const { markAsFullyReturned } = useExternalWithdrawalStatusMutations();
+  const { markAsFullyReturned, markAsCharged, markAsLiquidated, markAsDelivered } = useExternalWithdrawalStatusMutations();
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = React.useState<{
+    x: number;
+    y: number;
+    withdrawal: ExternalWithdrawal;
+  } | null>(null);
 
   // Delete confirmation dialog state
   const [deleteDialog, setDeleteDialog] = React.useState<{
@@ -366,41 +340,89 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
     [navigate],
   );
 
-  // Handle actions
-  const handleView = React.useCallback(
-    (withdrawal: ExternalWithdrawal) => {
-      navigate(routes.inventory.externalWithdrawals?.details?.(withdrawal.id) || `/inventory/external-withdrawals/details/${withdrawal.id}`);
-    },
-    [navigate],
-  );
+  // Context menu handlers
+  const handleContextMenu = React.useCallback(
+    (e: React.MouseEvent, withdrawal: ExternalWithdrawal) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-  const handleEdit = React.useCallback(
-    (withdrawal: ExternalWithdrawal) => {
-      navigate(routes.inventory.externalWithdrawals?.edit?.(withdrawal.id) || `/inventory/external-withdrawals/edit/${withdrawal.id}`);
-    },
-    [navigate],
-  );
-
-  const handleMarkAsReturned = React.useCallback(
-    async (withdrawal: ExternalWithdrawal) => {
-      if (withdrawal.type !== EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE) return;
-
-      try {
-        await markAsFullyReturned.mutateAsync({ id: withdrawal.id });
-        refetch();
-      } catch (error) {
-        // Error handled by API client
-      }
-    },
-    [markAsFullyReturned, refetch],
-  );
-
-  const handleDelete = React.useCallback(
-    async (withdrawal: ExternalWithdrawal) => {
-      setDeleteDialog({ withdrawal });
+      setContextMenu({
+        x: e.clientX,
+        y: e.clientY,
+        withdrawal,
+      });
     },
     [],
   );
+
+  const handleViewDetails = React.useCallback(() => {
+    if (contextMenu) {
+      navigate(routes.inventory.externalWithdrawals?.details?.(contextMenu.withdrawal.id) || `/inventory/external-withdrawals/details/${contextMenu.withdrawal.id}`);
+      setContextMenu(null);
+    }
+  }, [contextMenu, navigate]);
+
+  const handleEditWithdrawal = React.useCallback(() => {
+    if (contextMenu) {
+      navigate(routes.inventory.externalWithdrawals?.edit?.(contextMenu.withdrawal.id) || `/inventory/external-withdrawals/edit/${contextMenu.withdrawal.id}`);
+      setContextMenu(null);
+    }
+  }, [contextMenu, navigate]);
+
+  const handleMarkAsReturnedFromMenu = React.useCallback(async () => {
+    if (contextMenu && contextMenu.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE) {
+      try {
+        await markAsFullyReturned.mutateAsync({ id: contextMenu.withdrawal.id });
+        refetch();
+        setContextMenu(null);
+      } catch (error) {
+        // Error handled by API client
+      }
+    }
+  }, [contextMenu, markAsFullyReturned, refetch]);
+
+  const handleMarkAsChargedFromMenu = React.useCallback(async () => {
+    if (contextMenu && contextMenu.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
+      try {
+        await markAsCharged.mutateAsync({ id: contextMenu.withdrawal.id });
+        refetch();
+        setContextMenu(null);
+      } catch (error) {
+        // Error handled by API client
+      }
+    }
+  }, [contextMenu, markAsCharged, refetch]);
+
+  const handleMarkAsLiquidatedFromMenu = React.useCallback(async () => {
+    if (contextMenu && contextMenu.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
+      try {
+        await markAsLiquidated.mutateAsync({ id: contextMenu.withdrawal.id });
+        refetch();
+        setContextMenu(null);
+      } catch (error) {
+        // Error handled by API client
+      }
+    }
+  }, [contextMenu, markAsLiquidated, refetch]);
+
+  const handleMarkAsDeliveredFromMenu = React.useCallback(async () => {
+    if (contextMenu && contextMenu.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY) {
+      try {
+        await markAsDelivered.mutateAsync({ id: contextMenu.withdrawal.id });
+        refetch();
+        setContextMenu(null);
+      } catch (error) {
+        // Error handled by API client
+      }
+    }
+  }, [contextMenu, markAsDelivered, refetch]);
+
+  const handleDeleteFromMenu = React.useCallback(async () => {
+    if (contextMenu) {
+      setDeleteDialog({ withdrawal: contextMenu.withdrawal });
+      setContextMenu(null);
+    }
+  }, [contextMenu]);
 
   const confirmDelete = React.useCallback(async () => {
     if (!deleteDialog) return;
@@ -413,6 +435,13 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
       // Error handled by API client
     }
   }, [deleteDialog, deleteWithdrawal, refetch]);
+
+  // Close context menu when clicking outside
+  React.useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    document.addEventListener("click", handleClick);
+    return () => document.removeEventListener("click", handleClick);
+  }, []);
 
   const renderSortIndicator = (columnKey: string) => {
     const sortDirection = getSortDirection(columnKey);
@@ -533,74 +562,39 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
               withdrawals.map((withdrawal, index) => {
                 const isWithdrawalSelected = isSelected(withdrawal.id);
 
-                // Create context menu items
-                const contextMenuItems: ContextMenuItem[] = [
-                  {
-                    id: "view",
-                    label: "Visualizar",
-                    icon: <IconEye className="h-4 w-4" />,
-                    onClick: () => handleView(withdrawal),
-                  },
-                  {
-                    id: "edit",
-                    label: "Editar",
-                    icon: <IconEdit className="h-4 w-4" />,
-                    onClick: () => handleEdit(withdrawal),
-                  },
-                ];
-
-                // Add "Marcar como devolvido" if type is RETURNABLE
-                if (withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE && withdrawal.status !== EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED) {
-                  contextMenuItems.push({
-                    id: "mark-returned",
-                    label: "Marcar como devolvido",
-                    icon: <IconCheck className="h-4 w-4" />,
-                    onClick: () => handleMarkAsReturned(withdrawal),
-                  });
-                }
-
-                // Add delete option
-                contextMenuItems.push({
-                  id: "delete",
-                  label: "Excluir",
-                  icon: <IconTrash className="h-4 w-4" />,
-                  onClick: () => handleDelete(withdrawal),
-                  variant: "destructive",
-                });
-
                 return (
-                  <ContextMenuTrigger key={withdrawal.id} items={contextMenuItems}>
-                    <TableRow
-                      className={cn(
-                        "cursor-pointer transition-colors border-b border-border",
-                        // Alternating row colors
-                        index % 2 === 1 && "bg-muted/10",
-                        // Hover state that works with alternating colors
-                        "hover:bg-muted/20",
-                        // Selected state overrides alternating colors
-                        isWithdrawalSelected && "bg-muted/30 hover:bg-muted/40",
-                      )}
-                      onClick={(e) => handleRowClick(withdrawal, e)}
-                    >
-                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={isWithdrawalSelected}
-                            onCheckedChange={() => toggleSelection(withdrawal.id)}
-                            aria-label={`Selecionar retirada de ${withdrawal.withdrawerName}`}
-                            data-checkbox
-                          />
+                  <TableRow
+                    key={withdrawal.id}
+                    className={cn(
+                      "cursor-pointer transition-colors border-b border-border",
+                      // Alternating row colors
+                      index % 2 === 1 && "bg-muted/10",
+                      // Hover state that works with alternating colors
+                      "hover:bg-muted/20",
+                      // Selected state overrides alternating colors
+                      isWithdrawalSelected && "bg-muted/30 hover:bg-muted/40",
+                    )}
+                    onClick={(e) => handleRowClick(withdrawal, e)}
+                    onContextMenu={(e) => handleContextMenu(e, withdrawal)}
+                  >
+                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={isWithdrawalSelected}
+                          onCheckedChange={() => toggleSelection(withdrawal.id)}
+                          aria-label={`Selecionar retirada de ${withdrawal.withdrawerName}`}
+                          data-checkbox
+                        />
+                      </div>
+                    </TableCell>
+                    {filteredColumns.map((column) => (
+                      <TableCell key={column.key} className={cn("p-0 !border-r-0", column.className)}>
+                        <div className={cn("px-4 py-2 text-sm", column.align === "center" && "text-center", column.align === "right" && "text-right")}>
+                          {column.accessor(withdrawal)}
                         </div>
                       </TableCell>
-                      {filteredColumns.map((column) => (
-                        <TableCell key={column.key} className={cn("p-0 !border-r-0", column.className)}>
-                          <div className={cn("px-4 py-2 text-sm", column.align === "center" && "text-center", column.align === "right" && "text-right")}>
-                            {column.accessor(withdrawal)}
-                          </div>
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  </ContextMenuTrigger>
+                    ))}
+                  </TableRow>
                 );
               })
             )}
@@ -612,6 +606,66 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
       <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50">
         <SimplePaginationAdvanced currentPage={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalRecords} onPageChange={setPage} onPageSizeChange={setPageSize} />
       </div>
+
+      {/* Context Menu */}
+      <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
+        <PositionedDropdownMenuContent
+          position={contextMenu}
+          isOpen={!!contextMenu}
+          className="w-56 ![position:fixed]"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          <DropdownMenuItem onClick={handleViewDetails}>
+            <IconEye className="mr-2 h-4 w-4" />
+            Visualizar
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleEditWithdrawal}>
+            <IconEdit className="mr-2 h-4 w-4" />
+            Editar
+          </DropdownMenuItem>
+
+          {/* Conditional actions based on type and status */}
+          {contextMenu?.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE &&
+           contextMenu.withdrawal.status !== EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED && (
+            <DropdownMenuItem onClick={handleMarkAsReturnedFromMenu} className="text-green-700 dark:text-green-400">
+              <IconCheck className="mr-2 h-4 w-4" />
+              Devolução Total
+            </DropdownMenuItem>
+          )}
+
+          {contextMenu?.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE &&
+           (contextMenu.withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PENDING ||
+            contextMenu.withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED) && (
+            <DropdownMenuItem onClick={handleMarkAsChargedFromMenu} className="text-purple-700 dark:text-purple-400">
+              <IconCurrencyReal className="mr-2 h-4 w-4" />
+              Cobrar
+            </DropdownMenuItem>
+          )}
+
+          {contextMenu?.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE &&
+           contextMenu.withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.CHARGED && (
+            <DropdownMenuItem onClick={handleMarkAsLiquidatedFromMenu} className="text-green-700 dark:text-green-400">
+              <IconCheck className="mr-2 h-4 w-4" />
+              Liquidar
+            </DropdownMenuItem>
+          )}
+
+          {contextMenu?.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY &&
+           contextMenu.withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PENDING && (
+            <DropdownMenuItem onClick={handleMarkAsDeliveredFromMenu} className="text-blue-700 dark:text-blue-400">
+              <IconPackageExport className="mr-2 h-4 w-4" />
+              Entregar
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuItem onClick={handleDeleteFromMenu} className="text-destructive">
+            <IconTrash className="mr-2 h-4 w-4" />
+            Excluir
+          </DropdownMenuItem>
+        </PositionedDropdownMenuContent>
+      </DropdownMenu>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>

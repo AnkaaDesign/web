@@ -105,8 +105,8 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
               data: {
                 name: task.name || "",
                 status: task.status,
-                serialNumber: task.serialNumber || "",
-                plate: task.plate || "",
+                serialNumber: task.truck?.serialNumber || "",
+                plate: task.truck?.plate || "",
                 details: task.details || "",
                 entryDate: task.entryDate ? new Date(task.entryDate) : null,
                 term: task.term ? new Date(task.term) : null,
@@ -139,8 +139,8 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
         data: {
           name: task.name || "",
           status: task.status,
-          serialNumber: task.serialNumber || "",
-          plate: task.plate || "",
+          serialNumber: task.truck?.serialNumber || "",
+          plate: task.truck?.plate || "",
           details: task.details || "",
           entryDate: task.entryDate ? new Date(task.entryDate) : null,
           term: task.term ? new Date(task.term) : null,
@@ -169,8 +169,8 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
         const hasChanges =
           task.data.name !== originalTask.name ||
           task.data.status !== originalTask.status ||
-          task.data.serialNumber !== originalTask.serialNumber ||
-          task.data.plate !== originalTask.plate ||
+          task.data.serialNumber !== originalTask.truck?.serialNumber ||
+          task.data.plate !== originalTask.truck?.plate ||
           task.data.customerId !== originalTask.customerId ||
           task.data.sectorId !== originalTask.sectorId ||
           task.data.paintId !== originalTask.generalPainting?.id ||

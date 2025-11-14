@@ -16,10 +16,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconCalendar, IconFileText, IconCurrencyReal } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { FormMoneyInput } from "@/components/ui/form-money-input";
+import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { formatCurrency } from "../../../../utils";
 import type {
   TaskCreateFormData,
   TaskUpdateFormData,
@@ -44,23 +46,37 @@ export const BudgetSelector = forwardRef<
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name: "budget",
+    name: "budget.items",
   });
 
-  // Watch budget values to check for incomplete entries
-  const budgetValues = useWatch({
+  // Watch budget values to check for incomplete entries and calculate total
+  const budgetItems = useWatch({
     control,
-    name: "budget",
+    name: "budget.items",
   });
 
-  // Check if any budget is incomplete
+  const budgetExpiresIn = useWatch({
+    control,
+    name: "budget.expiresIn",
+  });
+
+  // Calculate total from all budget items
+  const calculatedTotal = useMemo(() => {
+    if (!budgetItems || budgetItems.length === 0) return 0;
+    return budgetItems.reduce((sum: number, item: any) => {
+      const amount = typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0;
+      return sum + amount;
+    }, 0);
+  }, [budgetItems]);
+
+  // Check if any budget item is incomplete
   const hasIncompleteBudgets = useMemo(() => {
-    if (!budgetValues || budgetValues.length === 0) return false;
-    return budgetValues.some((budget: any) =>
-      !budget.referencia || budget.referencia.trim() === "" ||
-      !budget.valor || budget.valor === 0
+    if (!budgetItems || budgetItems.length === 0) return false;
+    return budgetItems.some((item: any) =>
+      !item.description || item.description.trim() === "" ||
+      !item.amount || item.amount === 0
     );
-  }, [budgetValues]);
+  }, [budgetItems]);
 
   // Initialize with no rows by default (optional field)
   useEffect(() => {
@@ -72,22 +88,24 @@ export const BudgetSelector = forwardRef<
   // Notify parent about count changes
   useEffect(() => {
     if (onBudgetCountChange) {
-      onBudgetCountChange(fields.length);
+      // Count budget items or 1 if there's budget data (to show the budget card)
+      const count = budgetItems && budgetItems.length > 0 ? 1 : 0;
+      onBudgetCountChange(count);
     }
-  }, [fields.length, onBudgetCountChange]);
+  }, [budgetItems, onBudgetCountChange]);
 
-  const handleAddBudget = useCallback(() => {
+  const handleAddBudgetItem = useCallback(() => {
     append({
-      referencia: "",
-      valor: null,
+      description: "",
+      amount: null,
     });
 
     // Focus on the new input after adding
     setTimeout(() => {
-      const referenciaInput = lastRowRef.current?.querySelector(
-        'input[name^="budget."][name$=".referencia"]',
+      const descriptionInput = lastRowRef.current?.querySelector(
+        'input[name^="budget.items."][name$=".description"]',
       ) as HTMLInputElement;
-      referenciaInput?.focus();
+      descriptionInput?.focus();
     }, 100);
   }, [append]);
 
@@ -95,15 +113,65 @@ export const BudgetSelector = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
-      addBudget: handleAddBudget,
+      addBudget: handleAddBudgetItem,
     }),
-    [handleAddBudget],
+    [handleAddBudgetItem],
   );
 
   const canRemove = fields.length > 0;
 
   return (
     <div className="space-y-4">
+      {/* Expiry Date and Total in same row - Always shown when there are budget items */}
+      {budgetItems && budgetItems.length > 0 && (
+        <div className="flex items-end gap-2">
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Expiry Date Field */}
+            <FormField
+              control={control}
+              name="budget.expiresIn"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <IconCalendar className="h-4 w-4" />
+                    Data de Validade
+                    <span className="text-destructive">*</span>
+                  </FormLabel>
+                  <FormControl>
+                    <DateTimeInput
+                      {...field}
+                      value={field.value || null}
+                      placeholder="Selecione a data de validade"
+                      disabled={disabled}
+                      showTime={false}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Total Field - Looks like input but is read-only */}
+            <FormItem>
+              <FormLabel className="flex items-center gap-2">
+                <IconCurrencyReal className="h-4 w-4" />
+                Valor Total
+              </FormLabel>
+              <FormControl>
+                <Input
+                  value={formatCurrency(calculatedTotal)}
+                  readOnly
+                  className="bg-transparent font-semibold text-primary cursor-not-allowed"
+                />
+              </FormControl>
+            </FormItem>
+          </div>
+
+          {/* Empty spacer to match the trash button width */}
+          <div className="w-10 h-10" />
+        </div>
+      )}
+
       {fields.length > 0 && (
         <div className="space-y-3">
           {fields.map((field, index) => (
@@ -113,13 +181,18 @@ export const BudgetSelector = forwardRef<
               className="flex items-end gap-2"
             >
               <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Referencia Field */}
+                {/* Description Field */}
                 <FormField
                   control={control}
-                  name={`budget.${index}.referencia`}
+                  name={`budget.items.${index}.description`}
                   render={({ field }) => (
                     <FormItem>
-                      {index === 0 && <FormLabel>Referência (Serviços)</FormLabel>}
+                      {index === 0 && (
+                        <FormLabel className="flex items-center gap-2">
+                          <IconFileText className="h-4 w-4" />
+                          Descrição do Item
+                        </FormLabel>
+                      )}
                       <FormControl>
                         <Input
                           {...field}
@@ -134,10 +207,17 @@ export const BudgetSelector = forwardRef<
                   )}
                 />
 
-                {/* Valor Field */}
+                {/* Amount Field */}
                 <FormMoneyInput
-                  name={`budget.${index}.valor`}
-                  {...(index === 0 ? { label: "Valor" } : { label: "" })}
+                  name={`budget.items.${index}.amount`}
+                  {...(index === 0 ? {
+                    label: (
+                      <div className="flex items-center gap-2">
+                        <IconCurrencyReal className="h-4 w-4" />
+                        Valor
+                      </div>
+                    )
+                  } : { label: "" })}
                   placeholder="R$ 0,00"
                   disabled={disabled}
                 />
@@ -151,7 +231,7 @@ export const BudgetSelector = forwardRef<
                 onClick={() => remove(index)}
                 disabled={disabled}
                 className="text-destructive"
-                title="Remover orçamento"
+                title="Remover item"
               >
                 <IconTrash className="h-4 w-4" />
               </Button>
@@ -160,9 +240,12 @@ export const BudgetSelector = forwardRef<
         </div>
       )}
 
+      {/* Validation Alert - Only for incomplete items */}
       {hasIncompleteBudgets && (
         <Alert variant="destructive">
-          <AlertDescription>Alguns orçamentos estão incompletos. Preencha a referência e o valor antes de enviar o formulário.</AlertDescription>
+          <AlertDescription>
+            Alguns itens do orçamento estão incompletos. Preencha a descrição e o valor antes de enviar o formulário.
+          </AlertDescription>
         </Alert>
       )}
     </div>

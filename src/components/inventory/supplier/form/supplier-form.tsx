@@ -21,7 +21,7 @@ import { AddressComplementInput } from "@/components/ui/form-address-complement-
 import { NeighborhoodInput } from "@/components/ui/form-neighborhood-input";
 import { CityInput } from "@/components/ui/form-city-input";
 import { StateSelector } from "@/components/ui/form-state-selector";
-import { LogradouroSelect } from "@/components/ui/form-logradouro-select";
+import { StreetSelect } from "@/components/ui/form-street-select";
 import { LogoInput } from "./logo-input";
 import { TagsInput } from "./tags-input";
 
@@ -392,7 +392,7 @@ export function SupplierForm(props: SupplierFormProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
                 <div className="md:col-span-2">
-                  <LogradouroSelect<SupplierCreateFormData | SupplierUpdateFormData> disabled={isSubmitting} />
+                  <StreetSelect<SupplierCreateFormData | SupplierUpdateFormData> disabled={isSubmitting} />
                 </div>
                 <div className="md:col-span-3">
                   <AddressInput disabled={isSubmitting} required={false} />

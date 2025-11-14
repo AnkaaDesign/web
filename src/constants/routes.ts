@@ -149,12 +149,6 @@ export const routes = {
         edit: (id: string) => `/recursos-humanos/epi/agendamentos/editar/${id}`,
         root: "/recursos-humanos/epi/agendamentos",
       },
-      sizes: {
-        create: "/recursos-humanos/epi/tamanhos/cadastrar",
-        details: (id: string) => `/recursos-humanos/epi/tamanhos/detalhes/${id}`,
-        edit: (id: string) => `/recursos-humanos/epi/tamanhos/editar/${id}`,
-        root: "/recursos-humanos/epi/tamanhos",
-      },
     },
     requisicoes: {
       list: "/recursos-humanos/requisicoes",
@@ -368,13 +362,6 @@ export const routes = {
       list: "/pintura/marcas-de-tinta/listar",
       root: "/pintura/marcas-de-tinta",
     },
-    paintGrounds: {
-      create: "/pintura/bases-de-tinta/cadastrar",
-      details: (id: string) => `/pintura/bases-de-tinta/detalhes/${id}`,
-      edit: (id: string) => `/pintura/bases-de-tinta/editar/${id}`,
-      list: "/pintura/bases-de-tinta/listar",
-      root: "/pintura/bases-de-tinta",
-    },
     productions: {
       create: "/pintura/producoes/cadastrar",
       details: (id: string) => `/pintura/producoes/detalhes/${id}`,
@@ -400,9 +387,6 @@ export const routes = {
     myPpes: {
       request: "/pessoal/meus-epis/solicitar",
       root: "/pessoal/meus-epis",
-    },
-    myProfile: {
-      root: "/pessoal/meu-perfil",
     },
     myVacations: {
       details: (id: string) => `/pessoal/minhas-ferias/detalhes/${id}`,
@@ -433,18 +417,6 @@ export const routes = {
       edit: (id: string) => `/producao/recorte/editar/${id}`,
       list: "/producao/recorte",
       root: "/producao/recorte",
-    },
-    garages: {
-      create: "/producao/garagens/cadastrar",
-      details: (id: string) => `/producao/garagens/detalhes/${id}`,
-      edit: (id: string) => `/producao/garagens/editar/${id}`,
-      lanes: {
-        create: (_garageId: string) => `/producao/garagens/${_garageId}/lanes/cadastrar`,
-        details: (_garageId: string, laneId: string) => `/producao/garagens/lanes/detalhes/${laneId}`,
-        edit: (_garageId: string, laneId: string) => `/producao/garagens/${_garageId}/lanes/editar/${laneId}`,
-      },
-      list: "/producao/garagens",
-      root: "/producao/garagens",
     },
     history: {
       cancelled: "/producao/historico/cancelados",

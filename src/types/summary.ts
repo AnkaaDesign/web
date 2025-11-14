@@ -348,41 +348,6 @@ export interface CustomerDashboardSummary {
   }>;
 }
 
-export interface GarageDashboardSummary {
-  // Garage metrics
-  totalGarages: number;
-  totalCapacity: number;
-  currentOccupancy: number;
-  occupancyRate: number;
-
-  // Efficiency metrics
-  averageStayDuration: number;
-  turnoverRate: number;
-  utilizationRate: number;
-
-  // Charts data
-  occupancyByGarage: Array<{
-    garage: string;
-    totalSpots: number;
-    occupiedSpots: number;
-    rate: number;
-  }>;
-
-  occupancyTrends: Array<{
-    period: string;
-    occupancyRate: number;
-    trend: TREND_DIRECTION;
-  }>;
-
-  currentTrucks: Array<{
-    id: string;
-    taskId: string;
-    garage: string;
-    position: string;
-    entryTime: Date;
-    estimatedExit: Date | null;
-  }>;
-}
 
 // =====================
 // Notification Module Summaries
@@ -493,7 +458,6 @@ export interface WarningSummaryResponse extends BaseSummaryResponse<WarningDashb
 // Work Module Responses
 export interface TaskSummaryResponse extends BaseSummaryResponse<TaskDashboardSummary> {}
 export interface CustomerSummaryResponse extends BaseSummaryResponse<CustomerDashboardSummary> {}
-export interface GarageSummaryResponse extends BaseSummaryResponse<GarageDashboardSummary> {}
 
 // Notification Module Response
 export interface NotificationSummaryResponse extends BaseSummaryResponse<NotificationDashboardSummary> {}

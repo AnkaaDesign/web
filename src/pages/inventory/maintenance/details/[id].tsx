@@ -1,19 +1,27 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMaintenance, useMaintenanceMutations, useFinishMaintenance } from "../../../../hooks";
 import { routes, MAINTENANCE_STATUS, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { Button } from "@/components/ui/button";
 import { IconAlertTriangle, IconSettings, IconCheck, IconTrash, IconPlayerPlay, IconRefresh, IconEdit } from "@tabler/icons-react";
-import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/page-header";
 import { MaintenanceInfoCard } from "@/components/inventory/maintenance/detail/maintenance-info-card";
 import { TargetItemCard } from "@/components/inventory/maintenance/detail/target-item-card";
-import { MaintenanceItemsCard } from "@/components/inventory/maintenance/detail/maintenance-items-card";
-import { LastRunCard } from "@/components/inventory/maintenance/detail/last-run-card";
-import { MaintenanceMetricsCard } from "@/components/inventory/maintenance/detail/maintenance-metrics-card";
+import { ItemsNeededList } from "@/components/inventory/maintenance/common/items-needed-list";
 import { MaintenanceDetailSkeleton } from "@/components/inventory/maintenance/detail/maintenance-detail-skeleton";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditMaintenance } from "@/utils/permissions/entity-permissions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const MaintenanceDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +30,8 @@ const MaintenanceDetailsPage = () => {
   const canEdit = canEditMaintenance(user);
   const { updateAsync, deleteAsync } = useMaintenanceMutations();
   const finishMutation = useFinishMaintenance();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const {
     data: response,
@@ -53,6 +63,13 @@ const MaintenanceDetailsPage = () => {
               },
             },
           },
+        },
+      },
+      maintenanceSchedule: {
+        include: {
+          weeklyConfig: true,
+          monthlyConfig: true,
+          yearlyConfig: true,
         },
       },
       weeklyConfig: true,
@@ -144,19 +161,18 @@ const MaintenanceDetailsPage = () => {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm("Tem certeza que deseja excluir esta manutenção?")) {
-      return;
-    }
-
+    setIsDeleting(true);
     try {
       const result = await deleteAsync(maintenance.id);
 
       if (result.success) {
-        toast.success("Manutenção excluída com sucesso");
         navigate(routes.inventory.maintenance.root);
       }
     } catch (error) {
       console.error("Error deleting maintenance:", error);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
 
@@ -210,7 +226,8 @@ const MaintenanceDetailsPage = () => {
       key: "delete",
       label: "Excluir",
       icon: IconTrash,
-      onClick: handleDelete,
+      onClick: () => setShowDeleteDialog(true),
+      loading: isDeleting,
     });
   }
 
@@ -252,80 +269,50 @@ const MaintenanceDetailsPage = () => {
             </div>
           </div>
 
-          {/* Execution and Metrics Grid */}
-          <div className="animate-in fade-in-50 duration-800">
-            {/* Mobile: Single column stacked */}
-            <div className="block lg:hidden space-y-4">
-              <LastRunCard
-                lastExecution={
-                  maintenance.lastRun
-                    ? {
-                        id: "last-run",
-                        status: "COMPLETED",
-                        executedAt: maintenance.lastRun.toISOString(),
-                        completedAt: maintenance.finishedAt?.toISOString() || null,
-                      }
-                    : undefined
-                }
-                previousExecutions={[]}
-                className="h-full"
-              />
-              <MaintenanceMetricsCard maintenance={maintenance} className="h-full" />
+          {/* Items Needed - Full Width */}
+          {maintenance.itemsNeeded && maintenance.itemsNeeded.length > 0 && (
+            <div className="animate-in fade-in-50 duration-800">
+              <ItemsNeededList itemsConfig={maintenance.itemsNeeded.map((mi: any) => ({
+                itemId: mi.item?.id || mi.itemId,
+                quantity: mi.quantity,
+              }))} />
             </div>
+          )}
 
-            {/* Desktop/Tablet: 2 columns grid */}
-            <div className="hidden lg:block">
-              <div className="grid grid-cols-2 gap-6">
-                <LastRunCard
-                  lastExecution={
-                    maintenance.lastRun
-                      ? {
-                          id: "last-run",
-                          status: "COMPLETED",
-                          executedAt: maintenance.lastRun.toISOString(),
-                          completedAt: maintenance.lastRun.toISOString(),
-                        }
-                      : undefined
-                  }
-                  previousExecutions={[]}
-                  className="h-full"
-                />
-                <MaintenanceMetricsCard maintenance={maintenance} className="h-full" />
-              </div>
-            </div>
-          </div>
-
-          {/* Items Needed and Changelog Grid */}
+          {/* Changelog History - Full Width */}
           <div className="animate-in fade-in-50 duration-900">
-            {/* Mobile: Single column stacked */}
-            <div className="block lg:hidden space-y-4">
-              <MaintenanceItemsCard maintenanceItems={maintenance.itemsNeeded} className="h-full" />
-              <ChangelogHistory
-                entityType={CHANGE_LOG_ENTITY_TYPE.MAINTENANCE}
-                entityId={maintenance.id}
-                entityName={maintenance.name}
-                entityCreatedAt={maintenance.createdAt}
-                className="h-full"
-                maxHeight="500px"
-              />
-            </div>
-
-            {/* Desktop/Tablet: 2 columns grid */}
-            <div className="hidden lg:block">
-              <div className="grid grid-cols-2 gap-6">
-                <MaintenanceItemsCard maintenanceItems={maintenance.itemsNeeded} className="h-full" />
-                <ChangelogHistory
-                  entityType={CHANGE_LOG_ENTITY_TYPE.MAINTENANCE}
-                  entityId={maintenance.id}
-                  entityName={maintenance.name}
-                  entityCreatedAt={maintenance.createdAt}
-                  className="h-full"
-                />
-              </div>
-            </div>
+            <ChangelogHistory
+              entityType={CHANGE_LOG_ENTITY_TYPE.MAINTENANCE}
+              entityId={maintenance.id}
+              entityName={maintenance.name}
+              entityCreatedAt={maintenance.createdAt}
+              maxHeight="500px"
+            />
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Manutenção</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir esta manutenção? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

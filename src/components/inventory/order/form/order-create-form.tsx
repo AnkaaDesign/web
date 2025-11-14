@@ -23,7 +23,8 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Combobox } from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
-import { OrderItemSelector } from "./order-item-selector";
+import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
+import type { ItemGetManyFormData } from "../../../../schemas";
 import { TemporaryItemsInput } from "./temporary-items-input";
 import { useOrderFormUrlState } from "@/hooks/use-order-form-url-state";
 import { formatCurrency, formatDate, formatDateTime, measureUtils } from "../../../../utils";
@@ -381,6 +382,22 @@ export const OrderCreateForm = () => {
     }
   }, [currentStep, form, selectedItems, prices, orderItemMode]);
 
+  // Consolidate filters for ItemSelectorTable
+  const filters = useMemo<Partial<ItemGetManyFormData>>(() => ({
+    showInactive,
+    categoryIds: categoryIds.length > 0 ? categoryIds : undefined,
+    brandIds: brandIds.length > 0 ? brandIds : undefined,
+    supplierIds: supplierIds.length > 0 ? supplierIds : undefined,
+  }), [showInactive, categoryIds, brandIds, supplierIds]);
+
+  // Handle filter changes from ItemSelectorTable
+  const handleFiltersChange = useCallback((newFilters: Partial<ItemGetManyFormData>) => {
+    if (newFilters.showInactive !== undefined) setShowInactive(newFilters.showInactive);
+    if (newFilters.categoryIds !== undefined) setCategoryIds(newFilters.categoryIds);
+    if (newFilters.brandIds !== undefined) setBrandIds(newFilters.brandIds);
+    if (newFilters.supplierIds !== undefined) setSupplierIds(newFilters.supplierIds);
+  }, [setShowInactive, setCategoryIds, setBrandIds, setSupplierIds]);
+
   // Handle file changes
   const handleBudgetFilesChange = useCallback((files: FileWithPreview[]) => {
     setBudgetFiles(files);
@@ -665,7 +682,7 @@ export const OrderCreateForm = () => {
         const measureStrings: string[] = [];
         sortedMeasures.forEach((measure) => {
           if (measure.value !== null && measure.unit !== null) {
-            measureStrings.push(measureUtils.formatMeasure({ value: measure.value, unit: measure.unit }));
+            measureStrings.push(measureUtils.formatMeasure({ value: measure.value, unit: measure.unit }, true, 2, measure.measureType));
           } else if (measure.unit !== null) {
             measureStrings.push(MEASURE_UNIT_LABELS[measure.unit] || measure.unit);
           } else if (measure.value !== null) {
@@ -1029,109 +1046,154 @@ export const OrderCreateForm = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-6">
-                          {/* Description - Full width */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium flex items-center gap-2">
-                              <IconFileText className="h-4 w-4" />
-                              Descrição <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                              placeholder="Nome do pedido (ex: Pedido de materiais de escritório)"
-                              value={form.watch("description") || ""}
-                              onChange={(value) => {
-                                // The custom Input component passes the cleaned value directly
-                                const stringValue = value !== null && value !== undefined ? String(value) : "";
-                                // Update form state (validation will happen onBlur or when touched)
-                                form.setValue("description", stringValue, {
-                                  shouldDirty: true,
-                                  shouldTouch: true,
-                                });
-                                // Update URL state immediately
-                                updateDescription(stringValue);
-                              }}
-                              onBlur={() => form.trigger("description")}
-                              className={`h-10 w-full bg-transparent ${form.formState.errors.description ? "border-red-500" : ""}`}
-                            />
-                            <FormMessage className="text-sm text-red-500">{form.formState.errors.description?.message}</FormMessage>
-                          </div>
-
-                          {/* Supplier, Date and Observations in the same row */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Left Column: Supplier and Date */}
-                            <div className="space-y-6">
-                              {/* Supplier Selection */}
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium flex items-center gap-2">
-                                  <IconTruck className="h-4 w-4" />
-                                  Fornecedor
-                                </Label>
-                                <Combobox
-                                  value={form.watch("supplierId") || ""}
-                                  onValueChange={(value) => {
-                                    form.setValue("supplierId", value || undefined);
-                                    // Update URL state
-                                    updateSupplierId(value || undefined);
-                                  }}
-                                  options={
-                                    suppliers.length === 0
-                                      ? []
-                                      : suppliers.map((supplier) => ({
-                                          value: supplier.id,
-                                          label: supplier.fantasyName,
-                                          logo: supplier.logo,
-                                        }))
-                                  }
-                                  placeholder="Selecione um fornecedor (opcional)"
-                                  emptyText="Nenhum fornecedor encontrado"
-                                  className="w-full"
-                                  renderOption={(option, isSelected) => (
-                                    <div className="flex items-center gap-3 w-full">
-                                      <SupplierLogoDisplay
-                                        logo={(option as any).logo}
-                                        supplierName={option.label}
-                                        size="sm"
-                                        shape="rounded"
-                                        className="flex-shrink-0"
-                                      />
-                                      <div className="flex flex-col gap-1 min-w-0 flex-1">
-                                        <div className="font-medium truncate">{option.label}</div>
-                                      </div>
-                                    </div>
-                                  )}
-                                />
-                              </div>
-
-                              {/* Scheduled Date */}
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium flex items-center gap-2">
-                                  <IconCalendar className="h-4 w-4" />
-                                  Data de Entrega
-                                </Label>
-                                <DateTimeInput
-                                  value={form.watch("forecast") || undefined}
-                                  onChange={(date) => {
-                                    if (date instanceof Date) {
-                                      // Set to 13:00 São Paulo time
-                                      const newDate = new Date(date);
-                                      newDate.setHours(13, 0, 0, 0);
-                                      form.setValue("forecast", newDate);
-                                      // Update URL state
-                                      updateForecast(newDate);
-                                    } else {
-                                      form.setValue("forecast", undefined);
-                                      // Update URL state
-                                      updateForecast(undefined);
-                                    }
-                                  }}
-                                  placeholder="Selecione a data de entrega (opcional)"
-                                  className="w-full"
-                                  mode="date"
-                                  context="forecast"
-                                />
-                              </div>
+                          {/* First Row: Description, Supplier, and Forecast */}
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                            {/* Description - 6/12 width */}
+                            <div className="space-y-2 md:col-span-6">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <IconFileText className="h-4 w-4" />
+                                Descrição <span className="text-red-500">*</span>
+                              </Label>
+                              <Input
+                                placeholder="Nome do pedido (ex: Pedido de materiais de escritório)"
+                                value={form.watch("description") || ""}
+                                onChange={(value) => {
+                                  // The custom Input component passes the cleaned value directly
+                                  const stringValue = value !== null && value !== undefined ? String(value) : "";
+                                  // Update form state (validation will happen onBlur or when touched)
+                                  form.setValue("description", stringValue, {
+                                    shouldDirty: true,
+                                    shouldTouch: true,
+                                  });
+                                  // Update URL state immediately
+                                  updateDescription(stringValue);
+                                }}
+                                onBlur={() => form.trigger("description")}
+                                transparent
+                                className={`h-10 w-full ${form.formState.errors.description ? "border-red-500" : ""}`}
+                              />
+                              <FormMessage className="text-sm text-red-500">{form.formState.errors.description?.message}</FormMessage>
                             </div>
 
-                            {/* Right Column: Observations */}
+                            {/* Supplier - 4/12 width */}
+                            <div className="space-y-2 md:col-span-4">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <IconTruck className="h-4 w-4" />
+                                Fornecedor
+                              </Label>
+                              <Combobox
+                                value={form.watch("supplierId") || ""}
+                                onValueChange={(value) => {
+                                  form.setValue("supplierId", value || undefined);
+                                  // Update URL state
+                                  updateSupplierId(value || undefined);
+                                }}
+                                options={
+                                  suppliers.length === 0
+                                    ? []
+                                    : suppliers.map((supplier) => ({
+                                        value: supplier.id,
+                                        label: supplier.fantasyName,
+                                        logo: supplier.logo,
+                                      }))
+                                }
+                                placeholder="Selecione um fornecedor (opcional)"
+                                emptyText="Nenhum fornecedor encontrado"
+                                className="h-10 w-full"
+                                renderOption={(option, isSelected) => (
+                                  <div className="flex items-center gap-3 w-full">
+                                    <SupplierLogoDisplay
+                                      logo={(option as any).logo}
+                                      supplierName={option.label}
+                                      size="sm"
+                                      shape="rounded"
+                                      className="flex-shrink-0"
+                                    />
+                                    <div className="flex flex-col gap-1 min-w-0 flex-1">
+                                      <div className="font-medium truncate">{option.label}</div>
+                                    </div>
+                                  </div>
+                                )}
+                              />
+                            </div>
+
+                            {/* Forecast Date - 2/12 width */}
+                            <div className="space-y-2 md:col-span-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <IconCalendar className="h-4 w-4" />
+                                Previsão
+                              </Label>
+                              <DateTimeInput
+                                value={form.watch("forecast") || undefined}
+                                onChange={(date) => {
+                                  if (date instanceof Date) {
+                                    // Set to 13:00 São Paulo time
+                                    const newDate = new Date(date);
+                                    newDate.setHours(13, 0, 0, 0);
+                                    form.setValue("forecast", newDate);
+                                    // Update URL state
+                                    updateForecast(newDate);
+                                  } else {
+                                    form.setValue("forecast", undefined);
+                                    // Update URL state
+                                    updateForecast(undefined);
+                                  }
+                                }}
+                                placeholder="Data"
+                                className="w-full"
+                                mode="date"
+                                context="forecast"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Second Row: Type and Observations */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Left: Type selector */}
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium flex items-center gap-2">
+                                <IconClipboardList className="h-4 w-4" />
+                                Tipo de Itens
+                              </Label>
+                              <RadioGroup
+                                value={orderItemMode}
+                                onValueChange={(value) => setOrderItemMode(value as "inventory" | "temporary")}
+                                className="flex flex-col gap-3"
+                              >
+                                <label
+                                  htmlFor="mode-inventory"
+                                  className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
+                                >
+                                  <RadioGroupItem value="inventory" id="mode-inventory" className="mt-0.5" />
+                                  <div className="flex-1 space-y-1">
+                                    <div className="flex items-center gap-2 font-medium group-hover:text-white">
+                                      <IconShoppingCart className="h-4 w-4" />
+                                      Itens do Estoque
+                                    </div>
+                                    <p className="text-sm text-muted-foreground group-hover:text-white/90">
+                                      Selecione itens do inventário
+                                    </p>
+                                  </div>
+                                </label>
+                                <label
+                                  htmlFor="mode-temporary"
+                                  className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
+                                >
+                                  <RadioGroupItem value="temporary" id="mode-temporary" className="mt-0.5" />
+                                  <div className="flex-1 space-y-1">
+                                    <div className="flex items-center gap-2 font-medium group-hover:text-white">
+                                      <IconFileInvoice className="h-4 w-4" />
+                                      Itens Temporários
+                                    </div>
+                                    <p className="text-sm text-muted-foreground group-hover:text-white/90">
+                                      Compras únicas sem inventário
+                                    </p>
+                                  </div>
+                                </label>
+                              </RadioGroup>
+                            </div>
+
+                            {/* Right: Observations */}
                             <div className="space-y-2 flex flex-col">
                               <Label className="text-sm font-medium flex items-center gap-2">
                                 <IconNotes className="h-4 w-4" />
@@ -1151,53 +1213,8 @@ export const OrderCreateForm = () => {
                                   updateNotes(value);
                                 }}
                                 className="resize-none w-full flex-1"
-                                rows={5}
                               />
                             </div>
-                          </div>
-
-                          {/* Mode Switch */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium flex items-center gap-2">
-                              <IconClipboardList className="h-4 w-4" />
-                              Tipo de Itens
-                            </Label>
-                            <RadioGroup
-                              value={orderItemMode}
-                              onValueChange={(value) => setOrderItemMode(value as "inventory" | "temporary")}
-                              className="grid grid-cols-1 md:grid-cols-2 gap-3"
-                            >
-                              <div
-                                className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
-                                onClick={() => setOrderItemMode("inventory")}
-                              >
-                                <RadioGroupItem value="inventory" id="mode-inventory" className="mt-0.5" />
-                                <div className="flex-1 space-y-1">
-                                  <Label htmlFor="mode-inventory" className="flex items-center gap-2 font-medium cursor-pointer group-hover:text-white">
-                                    <IconShoppingCart className="h-4 w-4" />
-                                    Itens do Estoque
-                                  </Label>
-                                  <p className="text-sm text-muted-foreground group-hover:text-white/90">
-                                    Selecione itens do inventário
-                                  </p>
-                                </div>
-                              </div>
-                              <div
-                                className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
-                                onClick={() => setOrderItemMode("temporary")}
-                              >
-                                <RadioGroupItem value="temporary" id="mode-temporary" className="mt-0.5" />
-                                <div className="flex-1 space-y-1">
-                                  <Label htmlFor="mode-temporary" className="flex items-center gap-2 font-medium cursor-pointer group-hover:text-white">
-                                    <IconFileInvoice className="h-4 w-4" />
-                                    Itens Temporários
-                                  </Label>
-                                  <p className="text-sm text-muted-foreground group-hover:text-white/90">
-                                    Compras únicas sem inventário
-                                  </p>
-                                </div>
-                              </div>
-                            </RadioGroup>
                           </div>
 
                           {/* File uploads */}
@@ -1280,43 +1297,43 @@ export const OrderCreateForm = () => {
                 )}
 
                 {currentStep === 2 && orderItemMode === "inventory" && (
-                  <OrderItemSelector
+                  <ItemSelectorTable
                     selectedItems={selectedItems}
                     onSelectItem={handleSelectItem}
                     onSelectAll={() => {}}
-                    onQuantityChange={handleQuantityChange}
-                    onPriceChange={handlePriceChange}
-                    onIcmsChange={handleIcmsChange}
-                    onIpiChange={handleIpiChange}
                     quantities={quantities}
                     prices={prices}
                     icmses={icmses}
                     ipis={ipis}
-                    isSelected={(itemId) => selectedItems.has(itemId)}
-                    showQuantityInput={true}
-                    showPriceInput={true}
-                    showIcmsInput={true}
-                    showIpiInput={true}
-                    showSelectedOnly={showSelectedOnly}
-                    searchTerm={searchTerm}
-                    showInactive={showInactive}
-                    categoryIds={categoryIds}
-                    brandIds={brandIds}
-                    supplierIds={supplierIds}
+                    onQuantityChange={handleQuantityChange}
+                    onPriceChange={handlePriceChange}
+                    onIcmsChange={handleIcmsChange}
+                    onIpiChange={handleIpiChange}
+                    editableColumns={{
+                      showQuantityInput: true,
+                      showPriceInput: true,
+                      showIcmsInput: true,
+                      showIpiInput: true,
+                    }}
+                    fixedColumnsConfig={{
+                      fixedColumns: ['name'],
+                      fixedReasons: {
+                        name: 'Essencial para identificar o item sendo pedido',
+                      },
+                    }}
+                    defaultColumns={['uniCode', 'name', 'quantity', 'price', 'monthlyConsumption']}
+                    storageKey="order-item-selector"
+                    // URL state management
                     page={page}
                     pageSize={pageSize}
-                    totalRecords={totalRecords}
+                    showSelectedOnly={showSelectedOnly}
+                    searchTerm={searchTerm}
+                    filters={filters}
                     onPageChange={setPage}
                     onPageSizeChange={setPageSize}
-                    onTotalRecordsChange={setTotalRecords}
                     onShowSelectedOnlyChange={setShowSelectedOnly}
                     onSearchTermChange={setSearchTerm}
-                    onShowInactiveChange={setShowInactive}
-                    onCategoryIdsChange={setCategoryIds}
-                    onBrandIdsChange={setBrandIds}
-                    onSupplierIdsChange={setSupplierIds}
-                    onBatchFiltersChange={setBatchFilters}
-                    updateSelection={batchUpdateSelection}
+                    onFiltersChange={handleFiltersChange}
                     className="flex-1 min-h-0"
                   />
                 )}

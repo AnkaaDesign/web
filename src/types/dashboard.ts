@@ -496,11 +496,6 @@ export interface ProductionDashboardData {
     customersByType: DashboardChartData; // CPF vs CNPJ
     customersByCity: DashboardChartData;
   };
-  garageUtilization: {
-    totalGarages: DashboardMetric;
-    totalLanes: DashboardMetric;
-    utilizationRate: DashboardMetric; // percentage
-  };
   truckMetrics: {
     totalTrucks: DashboardMetric;
     trucksInProduction: DashboardMetric;

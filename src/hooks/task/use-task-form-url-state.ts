@@ -42,8 +42,6 @@ interface UseTaskFormUrlStateOptions {
     customerId?: string;
     sectorId?: string;
     serialNumber?: string;
-    chassisNumber?: string;
-    plate?: string;
     commission?: string;
     details?: string;
 
@@ -111,16 +109,6 @@ const taskFormFilterConfig = {
     debounceMs: 0,
   },
   serialNumber: {
-    schema: z.string().default(""),
-    defaultValue: "",
-    debounceMs: 800, // Increased debounce to avoid URL updates interfering with typing
-  },
-  chassisNumber: {
-    schema: z.string().default(""),
-    defaultValue: "",
-    debounceMs: 800, // Increased debounce to avoid URL updates interfering with typing
-  },
-  plate: {
     schema: z.string().default(""),
     defaultValue: "",
     debounceMs: 800, // Increased debounce to avoid URL updates interfering with typing
@@ -268,9 +256,6 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
       if (initialData.serialNumber !== undefined) {
         config.serialNumber = { ...config.serialNumber, defaultValue: initialData.serialNumber as "" };
       }
-      if (initialData.plate !== undefined) {
-        config.plate = { ...config.plate, defaultValue: initialData.plate as "" };
-      }
       if (initialData.details !== undefined) {
         config.details = { ...config.details, defaultValue: initialData.details as "" };
       }
@@ -313,8 +298,6 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
   const customerId = filters.customerId;
   const sectorId = filters.sectorId;
   const serialNumber = filters.serialNumber || "";
-  const chassisNumber = filters.chassisNumber || "";
-  const plate = filters.plate || "";
   const details = filters.details || "";
   const entryDate = filters.entryDate;
   const term = filters.term;
@@ -354,21 +337,6 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
     },
     [setFilter],
   );
-
-  const updateChassisNumber = useCallback(
-    (value: string) => {
-      setFilter("chassisNumber", value === "" ? undefined : value);
-    },
-    [setFilter],
-  );
-
-  const updatePlate = useCallback(
-    (value: string) => {
-      setFilter("plate", value === "" ? undefined : value);
-    },
-    [setFilter],
-  );
-
 
   const updateDetails = useCallback(
     (value: string) => {
@@ -600,8 +568,6 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
       customerId: customerId || undefined,
       sectorId: sectorId || undefined,
       serialNumber: serialNumber.trim() || undefined,
-      chassisNumber: chassisNumber.trim() || undefined,
-      plate: plate.trim() || undefined,
       details: details.trim() || undefined,
 
       // Dates
@@ -627,7 +593,7 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
       // Files
       artworkIds: artworkIds.length > 0 ? artworkIds : undefined,
     };
-  }, [name, customerId, sectorId, serialNumber, chassisNumber, plate, details, entryDate, term, services, cuts, airbrushing, generalPaintingId, logoPaintIds, truck, artworkIds]);
+  }, [name, customerId, sectorId, serialNumber, details, entryDate, term, services, cuts, airbrushing, generalPaintingId, logoPaintIds, truck, artworkIds]);
 
   const resetForm = useCallback(() => {
     resetFilters();
@@ -640,8 +606,6 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
       customerId !== undefined ||
       sectorId !== undefined ||
       serialNumber.trim() !== "" ||
-      chassisNumber.trim() !== "" ||
-      plate.trim() !== "" ||
       details.trim() !== "" ||
       entryDate !== undefined ||
       term !== undefined ||
@@ -655,7 +619,7 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
       truck.yPosition !== null ||
       truck.garageId !== null
     );
-  }, [name, customerId, sectorId, serialNumber, chassisNumber, plate, details, entryDate, term, services, cuts, airbrushing, generalPaintingId, logoPaintIds, artworkIds, truck]);
+  }, [name, customerId, sectorId, serialNumber, details, entryDate, term, services, cuts, airbrushing, generalPaintingId, logoPaintIds, artworkIds, truck]);
 
   return {
     // Core Form State
@@ -663,8 +627,6 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
     customerId,
     sectorId,
     serialNumber,
-    chassisNumber,
-    plate,
     details,
     entryDate,
     term,
@@ -682,8 +644,6 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
     updateCustomerId,
     updateSectorId,
     updateSerialNumber,
-    updateChassisNumber,
-    updatePlate,
     updateDetails,
     updateEntryDate,
     updateTerm,

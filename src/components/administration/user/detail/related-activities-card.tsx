@@ -217,11 +217,6 @@ export function RelatedActivitiesCard({ user, className, maxHeight = "500px" }: 
                                     <span className="text-sm text-foreground font-medium">{activity.item.name}</span>
                                   </div>
                                 )}
-
-                                {/* Footer */}
-                                <div className="mt-3 pt-3 border-t border-border text-sm text-muted-foreground">
-                                  <span className="text-muted-foreground">Operação realizada</span>
-                                </div>
                               </div>
                             </div>
                           </div>

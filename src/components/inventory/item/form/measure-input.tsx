@@ -6,6 +6,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { MEASURE_UNIT, MEASURE_TYPE, MEASURE_UNIT_LABELS, MEASURE_TYPE_LABELS } from "../../../../constants";
+import { fractionToDecimal, decimalToFraction } from "../../../../utils/fraction";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
 
 interface MeasureInputProps {
@@ -34,19 +35,9 @@ const UNIT_CATEGORIES = {
     MEASURE_UNIT.SET,
   ],
   [MEASURE_TYPE.DIAMETER]: [
-    MEASURE_UNIT.INCH_1_8,
-    MEASURE_UNIT.INCH_1_4,
-    MEASURE_UNIT.INCH_3_8,
-    MEASURE_UNIT.INCH_1_2,
-    MEASURE_UNIT.INCH_5_8,
-    MEASURE_UNIT.INCH_3_4,
-    MEASURE_UNIT.INCH_7_8,
-    MEASURE_UNIT.INCH_1,
-    MEASURE_UNIT.INCH_1_1_4,
-    MEASURE_UNIT.INCH_1_1_2,
-    MEASURE_UNIT.INCH_2,
     MEASURE_UNIT.MILLIMETER,
     MEASURE_UNIT.CENTIMETER,
+    MEASURE_UNIT.INCHES,
   ],
   [MEASURE_TYPE.THREAD]: [MEASURE_UNIT.THREAD_MM, MEASURE_UNIT.THREAD_TPI],
   [MEASURE_TYPE.ELECTRICAL]: [MEASURE_UNIT.WATT, MEASURE_UNIT.VOLT, MEASURE_UNIT.AMPERE],
@@ -60,6 +51,8 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
     unit: MEASURE_UNIT.KILOGRAM,
     value: 0,
   });
+  // Track input string for INCHES unit (fractions like "1/4")
+  const [inputString, setInputString] = useState<string>("");
 
   // Get existing measure types to avoid duplicates
   const { getValues } = useFormContext<ItemCreateFormData | ItemUpdateFormData>();
@@ -73,16 +66,29 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
   const addMeasure = () => {
     // SIZE type is handled only in PPE config, not here
     // All other types require both value and unit
-    const isValid = newMeasure.value > 0 && newMeasure.unit;
+
+    // For INCHES unit, convert fraction string to decimal
+    let finalValue = newMeasure.value;
+    if (newMeasure.unit === MEASURE_UNIT.INCHES && inputString) {
+      const decimalValue = fractionToDecimal(inputString);
+      if (decimalValue === null || decimalValue <= 0) {
+        // Invalid fraction input
+        return;
+      }
+      finalValue = decimalValue;
+    }
+
+    const isValid = finalValue > 0 && newMeasure.unit;
 
     if (isValid && !existingMeasureTypes.includes(newMeasure.measureType)) {
       append({
-        value: newMeasure.value,
+        value: finalValue,
         unit: newMeasure.unit,
         measureType: newMeasure.measureType,
       });
       // Reset to next suggested type
       setNewMeasure(getNextSuggestedMeasure());
+      setInputString("");
     }
   };
 
@@ -146,18 +152,6 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
       [MEASURE_UNIT.SET]: `${MEASURE_UNIT_LABELS[unit]} - Conjunto`,
       [MEASURE_UNIT.SACK]: `${MEASURE_UNIT_LABELS[unit]} - Saco`,
 
-      // Diameter (fractional inches)
-      [MEASURE_UNIT.INCH_1_8]: `${MEASURE_UNIT_LABELS[unit]} - Um Oitavo de Polegada`,
-      [MEASURE_UNIT.INCH_1_4]: `${MEASURE_UNIT_LABELS[unit]} - Um Quarto de Polegada`,
-      [MEASURE_UNIT.INCH_3_8]: `${MEASURE_UNIT_LABELS[unit]} - Três Oitavos de Polegada`,
-      [MEASURE_UNIT.INCH_1_2]: `${MEASURE_UNIT_LABELS[unit]} - Meia Polegada`,
-      [MEASURE_UNIT.INCH_5_8]: `${MEASURE_UNIT_LABELS[unit]} - Cinco Oitavos de Polegada`,
-      [MEASURE_UNIT.INCH_3_4]: `${MEASURE_UNIT_LABELS[unit]} - Três Quartos de Polegada`,
-      [MEASURE_UNIT.INCH_7_8]: `${MEASURE_UNIT_LABELS[unit]} - Sete Oitavos de Polegada`,
-      [MEASURE_UNIT.INCH_1]: `${MEASURE_UNIT_LABELS[unit]} - Uma Polegada`,
-      [MEASURE_UNIT.INCH_1_1_4]: `${MEASURE_UNIT_LABELS[unit]} - Uma Polegada e Um Quarto`,
-      [MEASURE_UNIT.INCH_1_1_2]: `${MEASURE_UNIT_LABELS[unit]} - Uma Polegada e Meia`,
-      [MEASURE_UNIT.INCH_2]: `${MEASURE_UNIT_LABELS[unit]} - Duas Polegadas`,
 
       // Thread pitch
       [MEASURE_UNIT.THREAD_MM]: `${MEASURE_UNIT_LABELS[unit]} - Milímetros de Passo`,
@@ -214,29 +208,57 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
           />
 
           {/* Value */}
-          <Input
-            type="decimal"
-            value={newMeasure.value || null}
-            onChange={(value) => {
-              setNewMeasure((prev: any) => ({
-                ...prev,
-                value: typeof value === "number" ? value : 0,
-              }));
-            }}
-            placeholder="0"
-            disabled={disabled}
-            className="w-full md:w-32"
-            transparent
-          />
+          {newMeasure.unit === MEASURE_UNIT.INCHES ? (
+            <Input
+              type="text"
+              value={inputString}
+              onChange={(value) => {
+                const stringValue = typeof value === "string" ? value : "";
+                setInputString(stringValue);
+                // Try to convert to decimal for validation
+                const decimal = fractionToDecimal(stringValue);
+                setNewMeasure((prev: any) => ({
+                  ...prev,
+                  value: decimal !== null ? decimal : 0,
+                }));
+              }}
+              placeholder='1/4, 1/2, 1 1/4...'
+              disabled={disabled}
+              className="w-full md:w-32"
+              transparent
+            />
+          ) : (
+            <Input
+              type="decimal"
+              value={newMeasure.value || null}
+              onChange={(value) => {
+                setNewMeasure((prev: any) => ({
+                  ...prev,
+                  value: typeof value === "number" ? value : 0,
+                }));
+              }}
+              placeholder="0"
+              disabled={disabled}
+              className="w-full md:w-32"
+              transparent
+            />
+          )}
 
           {/* Unit */}
           <Combobox
             key={`measure-unit-select-${newMeasure.measureType}`}
             value={newMeasure.unit}
             onValueChange={(value: string) => {
+              const newUnit = value as MEASURE_UNIT;
+              // If switching to INCHES and we have a value, convert to fraction string
+              if (newUnit === MEASURE_UNIT.INCHES && newMeasure.value > 0) {
+                setInputString(decimalToFraction(newMeasure.value));
+              } else {
+                setInputString("");
+              }
               setNewMeasure((prev: any) => ({
                 ...prev,
-                unit: value as MEASURE_UNIT,
+                unit: newUnit,
               }));
             }}
             disabled={disabled}
@@ -294,13 +316,24 @@ function MeasureInputRow({ index, disabled, onRemove }: MeasureInputRowProps) {
     },
   });
 
+  // Format value - show fractions for INCHES
+  const displayValue = () => {
+    if (currentMeasure?.measureType === MEASURE_TYPE.SIZE) {
+      return currentMeasure?.value ? currentMeasure.value : "-";
+    }
+    if (currentMeasure?.unit === MEASURE_UNIT.INCHES && currentMeasure?.value) {
+      return `${decimalToFraction(currentMeasure.value)}"`;
+    }
+    return currentMeasure?.value || 0;
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr,auto] gap-2">
       <div className="px-3 py-2 border border-input bg-muted/50 rounded-md text-sm w-full">
         {currentMeasure?.measureType ? MEASURE_TYPE_LABELS[currentMeasure.measureType as MEASURE_TYPE] : "Tipo"}
       </div>
       <div className="px-3 py-2 border border-input bg-muted/50 rounded-md text-sm text-center w-full md:w-32">
-        {currentMeasure?.measureType === MEASURE_TYPE.SIZE ? (currentMeasure?.value ? currentMeasure.value : "-") : currentMeasure?.value || 0}
+        {displayValue()}
       </div>
       <div className="px-3 py-2 border border-input bg-muted/50 rounded-md text-sm w-full">
         {currentMeasure?.measureType === MEASURE_TYPE.SIZE

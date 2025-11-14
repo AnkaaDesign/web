@@ -148,7 +148,7 @@ export const TaskSelector = ({
         createdBy: true,
         services: true,
         files: true,
-        airbrushing: true,
+        airbrushings: true,
         commissions: true,
       },
     };
@@ -254,7 +254,7 @@ export const TaskSelector = ({
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="flex-1 relative">
           <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar tarefas..." value={searchTerm} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearchChange(e.target.value)} className="pl-10" />
+          <Input placeholder="Buscar tarefas..." value={searchTerm} onChange={(value) => handleSearchChange(value as string)} className="pl-10 bg-transparent" />
         </div>
         <div className="flex gap-2">
           <Dialog open={isFilterModalOpen} onOpenChange={setIsFilterModalOpen}>

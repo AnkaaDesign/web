@@ -54,7 +54,7 @@ export function AddressInfoCard({ customer, className }: AddressInfoCardProps) {
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <IconRoad className="h-4 w-4" />
-                      Logradouro
+                      Street
                     </span>
                     <span className="text-sm font-semibold text-foreground">{customer.address}</span>
                   </div>

@@ -51,7 +51,7 @@ export function getUserStatusColor(status: USER_STATUS): string {
   const colors: Record<USER_STATUS, string> = {
     [USER_STATUS.EXPERIENCE_PERIOD_1]: "orange",
     [USER_STATUS.EXPERIENCE_PERIOD_2]: "orange",
-    [USER_STATUS.CONTRACTED]: "green",
+    [USER_STATUS.EFFECTED]: "green",
     [USER_STATUS.DISMISSED]: "gray",
   };
   return colors[status] || "default";
@@ -185,7 +185,7 @@ export function groupUsersByStatus(users: User[]): Record<USER_STATUS, User[]> {
   const groups = {
     [USER_STATUS.EXPERIENCE_PERIOD_1]: [],
     [USER_STATUS.EXPERIENCE_PERIOD_2]: [],
-    [USER_STATUS.CONTRACTED]: [],
+    [USER_STATUS.EFFECTED]: [],
     [USER_STATUS.DISMISSED]: [],
   } as Record<USER_STATUS, User[]>;
 
@@ -335,13 +335,13 @@ export function canAccessTeamManagement(user: User): boolean {
 
 /**
  * Check if user is eligible for bonus calculation based on:
- * 1. user.status === CONTRACTED (not in experience period or dismissed)
+ * 1. user.status === EFFECTED (not in experience period or dismissed)
  * 2. user.performanceLevel > 0
  * 3. position.bonifiable === true
  */
 export function isUserEligibleForBonus(user: User): boolean {
-  // Check if user is CONTRACTED (not in experience period or dismissed)
-  if (user.status !== USER_STATUS.CONTRACTED) {
+  // Check if user is EFFECTED (not in experience period or dismissed)
+  if (user.status !== USER_STATUS.EFFECTED) {
     return false;
   }
 
@@ -469,8 +469,8 @@ export function getTimeSinceStatusChange(user: User): { years: number; months: n
   const now = new Date();
   let startDate: Date | null = null;
 
-  if (user.status === USER_STATUS.CONTRACTED && user.contractedAt) {
-    startDate = new Date(user.contractedAt);
+  if (user.status === USER_STATUS.EFFECTED && user.effectedAt) {
+    startDate = new Date(user.effectedAt);
   } else if (user.status === USER_STATUS.DISMISSED && user.dismissedAt) {
     startDate = new Date(user.dismissedAt);
   }
@@ -607,7 +607,7 @@ export function getUserStatusBadgeText(user: User): string {
   const statusLabels: Record<USER_STATUS, string> = {
     [USER_STATUS.EXPERIENCE_PERIOD_1]: "Experiencia 1",
     [USER_STATUS.EXPERIENCE_PERIOD_2]: "Experiencia 2",
-    [USER_STATUS.CONTRACTED]: "Contratado",
+    [USER_STATUS.EFFECTED]: "Efetivado",
     [USER_STATUS.DISMISSED]: "Demitido",
   };
 

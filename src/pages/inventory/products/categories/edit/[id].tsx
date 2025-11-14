@@ -101,25 +101,32 @@ const EditCategoryPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="h-full flex flex-col">
+      {/* Fixed Header */}
       <div className="flex-shrink-0">
-        <PageHeader
-          variant="form"
-          title={`Editar ${category.name}`}
-          icon={IconCategory}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Estoque", href: routes.inventory.root },
-            { label: "Produtos", href: routes.inventory.products.root },
-            { label: "Categorias", href: routes.inventory.products.categories.root },
-            { label: category.name, href: routes.inventory.products.categories.details(id!) },
-            { label: "Editar" },
-          ]}
-          actions={actions}
-        />
+        <div className="px-4 pt-4">
+          <div className="max-w-5xl mx-auto">
+            <PageHeader
+              variant="form"
+              title={`Editar ${category.name}`}
+              icon={IconCategory}
+              breadcrumbs={[
+                { label: "Início", href: routes.home },
+                { label: "Estoque", href: routes.inventory.root },
+                { label: "Produtos", href: routes.inventory.products.root },
+                { label: "Categorias", href: routes.inventory.products.categories.root },
+                { label: category.name, href: routes.inventory.products.categories.details(id!) },
+                { label: "Editar" },
+              ]}
+              actions={actions}
+            />
+          </div>
+        </div>
       </div>
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto p-4">
+
+      {/* Scrollable Form Container */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="max-w-5xl mx-auto h-full">
           <CategoryForm
             mode="update"
             defaultValues={{

@@ -140,22 +140,19 @@ export const useActiveBorrows = createSpecializedQueryHook<Partial<BorrowGetMany
   staleTime: 1000 * 60 * 3, // 3 minutes - active borrows are important
 });
 
-// Late borrows (overdue)
-export const useLateBorrows = createSpecializedQueryHook<Partial<BorrowGetManyFormData>, BorrowGetManyResponse>({
-  queryKeyFn: (filters) => borrowKeys.late(filters),
-  queryFn: (filters) =>
-    getBorrows({
-      ...filters,
-      where: {
-        ...filters?.where,
-        status: BORROW_STATUS.ACTIVE,
-        expectedReturnAt: {
-          lt: new Date().toISOString(),
-        },
-      },
-    }),
-  staleTime: 1000 * 60 * 3, // 3 minutes - late borrows need attention
-});
+// Late borrows (overdue) - Currently disabled as expectedReturnAt field doesn't exist
+// export const useLateBorrows = createSpecializedQueryHook<Partial<BorrowGetManyFormData>, BorrowGetManyResponse>({
+//   queryKeyFn: (filters) => borrowKeys.late(filters),
+//   queryFn: (filters) =>
+//     getBorrows({
+//       ...filters,
+//       where: {
+//         ...filters?.where,
+//         status: BORROW_STATUS.ACTIVE,
+//       },
+//     }),
+//   staleTime: 1000 * 60 * 3, // 3 minutes - late borrows need attention
+// });
 
 // Borrows by item
 export const useBorrowsByItem = createSpecializedQueryHook<{ itemId: string; filters?: Partial<BorrowGetManyFormData> }, BorrowGetManyResponse>({

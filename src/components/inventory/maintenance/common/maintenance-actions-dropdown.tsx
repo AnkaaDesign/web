@@ -37,7 +37,6 @@ interface MaintenanceActionsDropdownProps {
   onPause?: (maintenance: MaintenanceWithSchedule) => void;
   onCancel?: (maintenance: MaintenanceWithSchedule) => void;
   onReactivate?: (maintenance: MaintenanceWithSchedule) => void;
-  onReschedule?: (maintenance: MaintenanceWithSchedule) => void;
   onActivate?: (maintenance: MaintenanceWithSchedule) => void;
   onDeactivate?: (maintenance: MaintenanceWithSchedule) => void;
   onDelete?: (maintenance: MaintenanceWithSchedule) => void;
@@ -53,7 +52,6 @@ export function MaintenanceActionsDropdown({
   onPause,
   onCancel,
   onReactivate,
-  onReschedule,
   onActivate,
   onDeactivate,
   onDelete,
@@ -74,7 +72,6 @@ export function MaintenanceActionsDropdown({
   const canReactivate = status === MAINTENANCE_STATUS.CANCELLED;
   const canEdit = status !== MAINTENANCE_STATUS.COMPLETED;
   const canDelete = status === MAINTENANCE_STATUS.CANCELLED || status === MAINTENANCE_STATUS.COMPLETED;
-  const canReschedule = status === MAINTENANCE_STATUS.PENDING && !isOverdue; // Only allow reschedule if not overdue
   const isActive = maintenance.isActive ?? maintenance.maintenanceSchedule?.isActive ?? false;
   const canActivate = !isActive && status !== MAINTENANCE_STATUS.COMPLETED && status !== MAINTENANCE_STATUS.CANCELLED;
   const canDeactivate = isActive && status !== MAINTENANCE_STATUS.IN_PROGRESS; // Can't deactivate while in progress
@@ -128,14 +125,6 @@ export function MaintenanceActionsDropdown({
           <DropdownMenuItem onClick={() => onPause(maintenance)}>
             <IconPlayerPause className="mr-2 h-4 w-4 text-orange-600" />
             <span className="text-orange-600">Pausar</span>
-          </DropdownMenuItem>
-        )}
-
-        {/* Reschedule Action */}
-        {onReschedule && canReschedule && (
-          <DropdownMenuItem onClick={() => onReschedule(maintenance)}>
-            <IconCalendar className="mr-2 h-4 w-4 text-blue-600" />
-            <span className="text-blue-600">Reagendar</span>
           </DropdownMenuItem>
         )}
 

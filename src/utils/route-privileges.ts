@@ -129,9 +129,6 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   [routes.production.cutting.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // Cutting detail
 
   // Other production routes
-  [routes.production.garages.root]: ["PRODUCTION", "LOGISTIC", "LEADER", "ADMIN"], // LOGISTIC has read access, Warehouse excluded
-  [routes.production.garages.create]: ["PRODUCTION", "LEADER", "ADMIN"], // LOGISTIC excluded (read-only), Warehouse excluded
-  [routes.production.garages.edit(":id")]: ["PRODUCTION", "LEADER", "ADMIN"], // LOGISTIC excluded (read-only), Warehouse excluded
   [routes.production.observations.root]: ["PRODUCTION", "WAREHOUSE"], // WAREHOUSE has full access
   [routes.production.observations.create]: ["PRODUCTION", "WAREHOUSE"], // WAREHOUSE can create
   [routes.production.observations.edit(":id")]: ["PRODUCTION", "WAREHOUSE"], // WAREHOUSE can edit

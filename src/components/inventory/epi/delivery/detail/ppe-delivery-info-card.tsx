@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { IconCalendar, IconShield, IconUser, IconPackage, IconHash, IconAlertCircle, IconCircleCheck, IconCircleX, IconTruck } from "@tabler/icons-react";
+import { IconCalendar, IconShield, IconUser, IconPackage, IconTruck, IconCircleCheck } from "@tabler/icons-react";
 import type { PpeDelivery } from "../../../../../types";
-import { PPE_DELIVERY_STATUS, PPE_DELIVERY_STATUS_LABELS, PPE_TYPE_LABELS } from "../../../../../constants";
-import { formatDate, formatDateTime, formatRelativeTime } from "../../../../../utils";
+import { PPE_DELIVERY_STATUS_LABELS, getBadgeVariant } from "../../../../../constants";
+import { formatDateTime } from "../../../../../utils";
 import { cn } from "@/lib/utils";
 
 interface PpeDeliveryInfoCardProps {
@@ -12,31 +12,8 @@ interface PpeDeliveryInfoCardProps {
 }
 
 export function PpeDeliveryInfoCard({ ppeDelivery, className }: PpeDeliveryInfoCardProps) {
-  const getStatusColor = (status: PPE_DELIVERY_STATUS) => {
-    switch (status) {
-      case PPE_DELIVERY_STATUS.PENDING:
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
-      case PPE_DELIVERY_STATUS.DELIVERED:
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
-      case PPE_DELIVERY_STATUS.CANCELLED:
-        return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400";
-    }
-  };
-
-  const getStatusIcon = (status: PPE_DELIVERY_STATUS) => {
-    switch (status) {
-      case PPE_DELIVERY_STATUS.PENDING:
-        return <IconAlertCircle className="h-4 w-4" />;
-      case PPE_DELIVERY_STATUS.DELIVERED:
-        return <IconCircleCheck className="h-4 w-4" />;
-      case PPE_DELIVERY_STATUS.CANCELLED:
-        return <IconCircleX className="h-4 w-4" />;
-      default:
-        return <IconAlertCircle className="h-4 w-4" />;
-    }
-  };
+  const statusLabel = PPE_DELIVERY_STATUS_LABELS[ppeDelivery.status] || ppeDelivery.status;
+  const statusVariant = getBadgeVariant(ppeDelivery.status, "PPE_DELIVERY");
 
   return (
     <Card className={cn("shadow-sm border border-border", className)} level={1}>
@@ -51,92 +28,79 @@ export function PpeDeliveryInfoCard({ ppeDelivery, className }: PpeDeliveryInfoC
 
       <CardContent className="space-y-6">
         {/* Status */}
-        <div className="flex items-center justify-between">
+        <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
           <span className="text-sm font-medium text-muted-foreground">Status</span>
-          <Badge className={cn("gap-1.5", getStatusColor(ppeDelivery.status))}>
-            {getStatusIcon(ppeDelivery.status)}
-            {PPE_DELIVERY_STATUS_LABELS[ppeDelivery.status]}
+          <Badge variant={statusVariant} className="whitespace-nowrap">
+            {statusLabel}
           </Badge>
         </div>
 
-        {/* ID da Entrega */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <IconHash className="h-4 w-4" />
-            ID da Entrega
-          </div>
-          <span className="font-mono text-sm">#{ppeDelivery.id.slice(-8)}</span>
-        </div>
-
         {/* Item */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <IconPackage className="h-4 w-4" />
-            Item
+        <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+          <div className="flex items-center gap-2">
+            <IconPackage className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">Item</span>
           </div>
-          <div className="text-right">
-            <p className="font-medium">{ppeDelivery.item?.name || "-"}</p>
-            {ppeDelivery.item?.ppeType && <p className="text-xs text-muted-foreground">{PPE_TYPE_LABELS[ppeDelivery.item.ppeType]}</p>}
-          </div>
+          <span className="text-sm font-semibold text-foreground">{ppeDelivery.item?.name || "-"}</span>
         </div>
 
         {/* Funcionário */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <IconUser className="h-4 w-4" />
-            Funcionário
+        <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+          <div className="flex items-center gap-2">
+            <IconUser className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">Funcionário</span>
           </div>
-          <div className="text-right">
-            <p className="font-medium">{ppeDelivery.user?.name || "-"}</p>
-            {ppeDelivery.user?.position && <p className="text-xs text-muted-foreground">{ppeDelivery.user.position.name}</p>}
-          </div>
+          <span className="text-sm font-semibold text-foreground">{ppeDelivery.user?.name || "-"}</span>
         </div>
 
+        {/* Aprovado Por */}
+        {ppeDelivery.reviewedByUser && (
+          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+            <div className="flex items-center gap-2">
+              <IconCircleCheck className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Aprovado Por</span>
+            </div>
+            <span className="text-sm font-semibold text-foreground">{ppeDelivery.reviewedByUser.name}</span>
+          </div>
+        )}
+
         {/* Quantidade */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <IconPackage className="h-4 w-4" />
-            Quantidade
+        <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+          <div className="flex items-center gap-2">
+            <IconPackage className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">Quantidade</span>
           </div>
           <span className="font-mono font-semibold text-lg">{ppeDelivery.quantity || 0}</span>
         </div>
 
-        {/* Data de Criação */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <IconCalendar className="h-4 w-4" />
-            Data de Criação
+        {/* Data de Requisição */}
+        <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+          <div className="flex items-center gap-2">
+            <IconCalendar className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-muted-foreground">Data de Requisição</span>
           </div>
-          <div className="text-right">
-            <p className="text-sm">{formatDate(ppeDelivery.createdAt)}</p>
-            <p className="text-xs text-muted-foreground">{formatRelativeTime(ppeDelivery.createdAt)}</p>
-          </div>
+          <span className="text-sm font-semibold text-foreground">{formatDateTime(ppeDelivery.createdAt)}</span>
         </div>
 
-        {/* Data de Entrega */}
-        {ppeDelivery.actualDeliveryDate && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <IconTruck className="h-4 w-4" />
-              Data de Entrega
+        {/* Data de Aprovação */}
+        {ppeDelivery.reviewedBy && ppeDelivery.updatedAt && (
+          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+            <div className="flex items-center gap-2">
+              <IconCircleCheck className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Data de Aprovação</span>
             </div>
-            <div className="text-right">
-              <p className="text-sm">{formatDateTime(ppeDelivery.actualDeliveryDate)}</p>
-              <p className="text-xs text-muted-foreground">{formatRelativeTime(ppeDelivery.actualDeliveryDate)}</p>
-            </div>
+            <span className="text-sm font-semibold text-foreground">{formatDateTime(ppeDelivery.updatedAt)}</span>
           </div>
         )}
 
-        {/* Revisado Por */}
-        {ppeDelivery.reviewedByUser && (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <IconCircleCheck className="h-4 w-4" />
-              Revisado por
+        {/* Data de Entrega */}
+        {ppeDelivery.actualDeliveryDate && (
+          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+            <div className="flex items-center gap-2">
+              <IconTruck className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Data de Entrega</span>
             </div>
-            <div className="text-right">
-              <p className="font-medium">{ppeDelivery.reviewedByUser.name}</p>
-            </div>
+            <span className="text-sm font-semibold text-foreground">{formatDateTime(ppeDelivery.actualDeliveryDate)}</span>
           </div>
         )}
       </CardContent>

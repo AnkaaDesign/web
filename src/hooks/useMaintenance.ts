@@ -321,6 +321,7 @@ export function useFinishMaintenance() {
     onSuccess: () => {
       // Invalidate related queries to refresh data after finish
       queryClient.invalidateQueries({ queryKey: maintenanceKeys.all });
+      queryClient.invalidateQueries({ queryKey: maintenanceScheduleKeys.all }); // Schedules might be affected
       queryClient.invalidateQueries({ queryKey: itemKeys.all }); // Items might be affected by activity creation
       queryClient.invalidateQueries({ queryKey: changeLogKeys.all }); // Change logs are affected by maintenance operations
     },
@@ -458,3 +459,4 @@ export const useDeleteMaintenanceSchedule = () => {
   const { deleteMutation } = useMaintenanceScheduleMutations();
   return deleteMutation;
 };
+

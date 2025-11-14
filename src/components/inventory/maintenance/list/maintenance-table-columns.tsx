@@ -64,9 +64,13 @@ export const createMaintenanceColumns = (): MaintenanceColumn[] => [
     key: "timeTaken",
     header: "TEMPO GASTO",
     accessor: (maintenance: Maintenance) => (
-      <div className="truncate text-sm">
+      <div className="truncate text-sm tabular-nums">
         {maintenance.timeTaken ? (
-          <span className="text-green-700 font-medium">{formatMaintenanceDuration(maintenance.timeTaken)}</span>
+          (() => {
+            const hours = Math.floor(maintenance.timeTaken / 3600);
+            const minutes = Math.floor((maintenance.timeTaken % 3600) / 60);
+            return <span className="text-green-700 font-medium">{String(hours).padStart(2, '0')}:{String(minutes).padStart(2, '0')}</span>;
+          })()
         ) : (
           <span className="text-muted-foreground">-</span>
         )}

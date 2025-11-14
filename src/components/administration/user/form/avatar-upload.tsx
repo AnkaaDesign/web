@@ -5,6 +5,16 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { uploadPhoto, deletePhoto } from "@/api-client";
 import type { User } from "@/types";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface AvatarUploadProps {
   user?: User;
@@ -16,6 +26,7 @@ export function AvatarUpload({ user, disabled, onAvatarChange }: AvatarUploadPro
   const [isUploading, setIsUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatar?.url || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const getInitials = (name?: string) => {
     if (!name) return "U";
@@ -77,10 +88,6 @@ export function AvatarUpload({ user, disabled, onAvatarChange }: AvatarUploadPro
   };
 
   const handleDeleteAvatar = async () => {
-    if (!window.confirm("Remover foto de perfil?")) {
-      return;
-    }
-
     try {
       setIsUploading(true);
       const response = await deletePhoto();
@@ -94,6 +101,7 @@ export function AvatarUpload({ user, disabled, onAvatarChange }: AvatarUploadPro
       toast.error(error?.response?.data?.message || "Erro ao remover foto");
     } finally {
       setIsUploading(false);
+      setShowDeleteDialog(false);
     }
   };
 
@@ -141,7 +149,7 @@ export function AvatarUpload({ user, disabled, onAvatarChange }: AvatarUploadPro
             variant="destructive"
             size="sm"
             disabled={disabled || isUploading}
-            onClick={handleDeleteAvatar}
+            onClick={() => setShowDeleteDialog(true)}
           >
             <Trash2 className="w-4 h-4 mr-2" />
             Remover Foto
@@ -152,6 +160,28 @@ export function AvatarUpload({ user, disabled, onAvatarChange }: AvatarUploadPro
       <p className="text-xs text-muted-foreground text-center">
         JPG, PNG, GIF, WEBP • Máximo 5MB
       </p>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover Foto de Perfil</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover a foto de perfil? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUploading}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteAvatar}
+              disabled={isUploading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isUploading ? "Removendo..." : "Remover"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

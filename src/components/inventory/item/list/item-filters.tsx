@@ -18,6 +18,7 @@ import { getStockLevelTextColor } from "../../../../utils";
 import { getItemCategories, getItemBrands, getSuppliers } from "../../../../api-client";
 import type { ItemCategory, ItemBrand, Supplier } from "../../../../types";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
+import { cn } from "@/lib/utils";
 
 interface ItemFiltersProps {
   open: boolean;
@@ -59,8 +60,19 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
     if (!open) return;
 
     const where = filters.where || {};
+
+    // Convert isActive API filter to showInactive UI state
+    let showInactive: boolean | undefined;
+    if (typeof filters.isActive === "boolean") {
+      showInactive = !filters.isActive;
+      console.log("[ItemFilters] Initializing from isActive:", filters.isActive, "-> showInactive:", showInactive);
+    } else {
+      showInactive = undefined;
+      console.log("[ItemFilters] No isActive filter, setting showInactive to undefined");
+    }
+
     setLocalState({
-      showInactive: filters.showInactive,
+      showInactive,
       shouldAssignToUser: where.shouldAssignToUser,
       stockLevels: filters.stockLevels as STOCK_LEVEL[] | undefined,
       categoryIds: filters.categoryIds ? (Array.isArray(filters.categoryIds) ? filters.categoryIds : [filters.categoryIds]) : where.categoryId ? [where.categoryId as string] : [],
@@ -71,7 +83,7 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
       quantityRange: filters.quantityRange,
       totalPriceRange: filters.totalPriceRange,
     });
-  }, [open]); // Only depend on 'open' to avoid re-initializing when filters change
+  }, [open, filters]); // Depend on filters to reinitialize when they change
 
   // Query function for categories
   const queryCategoriesFn = useCallback(async (searchTerm: string, page = 1) => {
@@ -179,17 +191,36 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
   }, []);
 
   const handleApply = () => {
+    console.log("[ItemFilters] handleApply - localState.showInactive:", localState.showInactive);
+
+    // Start with existing filters but REMOVE isActive to ensure clean state
+    const baseFilters = { ...filters };
+    delete baseFilters.isActive;
+    delete baseFilters.showInactive;
+
     // Build the filters object from local state
     const newFilters: Partial<ItemGetManyFormData> = {
+      ...baseFilters,
       limit: filters.limit,
       orderBy: filters.orderBy,
-      // Add showInactive filter
-      ...(localState.showInactive && { showInactive: true }),
       // Add stock levels array filter
       ...(localState.stockLevels && localState.stockLevels.length > 0 && { stockLevels: localState.stockLevels }),
       quantityRange: localState.quantityRange,
       totalPriceRange: localState.totalPriceRange,
     };
+
+    // Map showInactive UI state to isActive API filter (at root level)
+    // - showInactive: false → isActive: true (only active items)
+    // - showInactive: true → isActive: false (only inactive items)
+    // - showInactive: undefined → no isActive filter (both active and inactive)
+    if (typeof localState.showInactive === "boolean") {
+      newFilters.isActive = !localState.showInactive;
+      console.log("[ItemFilters] Setting isActive:", newFilters.isActive);
+    } else {
+      console.log("[ItemFilters] showInactive is undefined, NOT setting isActive filter");
+      // Explicitly ensure isActive is not set
+      delete newFilters.isActive;
+    }
 
     // Build where clause
     const where: any = {};
@@ -305,7 +336,11 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
                 { value: "ativo", label: "Ativo" },
                 { value: "inativo", label: "Inativo" },
               ]}
-              value={localState.showInactive ? "inativo" : "ativo"}
+              value={
+                localState.showInactive === true ? "inativo" :
+                localState.showInactive === false ? "ativo" :
+                "ambos"
+              }
               onValueChange={(value) => {
                 setLocalState((prev) => ({
                   ...prev,
@@ -367,8 +402,8 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
                 const Icon = option.icon;
                 return (
                   <div className="flex items-center gap-2">
-                    {Icon && <Icon className={`h-4 w-4 ${option.className}`} />}
-                    <span className={option.className}>{option.label}</span>
+                    {Icon && <Icon className={cn("h-4 w-4", option.className, "group-hover:!text-white")} />}
+                    <span className={cn(option.className, "group-hover:!text-white")}>{option.label}</span>
                   </div>
                 );
               }}
@@ -612,7 +647,7 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
           {/* This could be expanded based on specific requirements */}
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-4 border-t">
+          <div className="flex gap-2 mt-6 pt-4 border-t">
             <Button variant="outline" onClick={handleReset} className="flex-1">
               <IconX className="h-4 w-4 mr-2" />
               Limpar todos

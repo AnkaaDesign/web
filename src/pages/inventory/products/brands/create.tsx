@@ -17,12 +17,9 @@ const CreateBrandPage = () => {
 
   const handleSubmit = async (data: ItemBrandCreateFormData) => {
     try {
-      const result = await createAsync(data);
-
-      if (result.success) {
-        // Clear URL parameters on successful submission
-        navigate(routes.inventory.products.brands.root, { replace: true });
-      }
+      await createAsync(data);
+      // If we reach here, the creation was successful
+      navigate(routes.inventory.products.brands.root, { replace: true });
     } catch (error) {
       // Error handled by mutation hook
       console.error("Error creating brand:", error);
@@ -58,7 +55,7 @@ const CreateBrandPage = () => {
       {/* Fixed Header */}
       <div className="flex-shrink-0">
         <div className="px-4 pt-4">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-5xl mx-auto">
             <PageHeaderWithFavorite
               title="Cadastrar Marca"
               icon={IconTag}
@@ -78,7 +75,7 @@ const CreateBrandPage = () => {
 
       {/* Scrollable Form Container */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-3xl mx-auto h-full">
+        <div className="max-w-5xl mx-auto h-full">
           <BrandForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
         </div>
       </div>

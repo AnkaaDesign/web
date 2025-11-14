@@ -23,7 +23,18 @@ export function useColumnVisibility(storageKey: string, defaultColumns: Set<stri
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          return new Set(parsed);
+          const storedSet = new Set(parsed);
+
+          // Merge strategy: Keep user preferences but ensure new required columns are added
+          // Required columns are: checkbox, editable inputs (quantityInput, priceInput, etc.)
+          const requiredColumns = Array.from(defaultColumns).filter(col =>
+            col === 'checkbox' || col.endsWith('Input')
+          );
+
+          // Add any required columns that are missing from stored data
+          requiredColumns.forEach(col => storedSet.add(col));
+
+          return storedSet;
         }
       }
     } catch (error) {
@@ -46,20 +57,9 @@ export function useColumnVisibility(storageKey: string, defaultColumns: Set<stri
     [storageKey]
   );
 
-  // Sync with localStorage when storage key changes (shouldn't happen in practice)
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setVisibleColumnsState(new Set(parsed));
-        }
-      }
-    } catch (error) {
-      console.error(`Failed to sync column visibility from localStorage for key "${storageKey}":`, error);
-    }
-  }, [storageKey]);
+  // Note: The useEffect for syncing localStorage was removed to prevent infinite loops.
+  // Initial state (useState with lazy initialization) already handles loading from localStorage.
+  // If localStorage updates are needed from external sources, implement a storage event listener instead.
 
   return {
     visibleColumns,

@@ -261,13 +261,17 @@ export function ItemSelectorDropdown({ value, onChange, placeholder = "Selecione
           }
 
           // Add size (or brand for OUTROS type) with bullet separator
+          // Only add if it's different from unicode to avoid duplication
           if (meta.ppeType === PPE_TYPE.OUTROS) {
-            if (meta.brandName) {
+            if (meta.brandName && meta.brandName !== meta.uniCode) {
               label += (label ? ' • ' : '') + meta.brandName;
             }
           } else if (meta.size) {
             const sizeLabel = PPE_SIZE_LABELS[meta.size as keyof typeof PPE_SIZE_LABELS] || meta.size;
-            label += (label ? ' • ' : '') + sizeLabel;
+            // Only add size if it's different from unicode (to avoid showing "46" twice)
+            if (sizeLabel !== meta.uniCode) {
+              label += (label ? ' • ' : '') + sizeLabel;
+            }
           }
 
           return (

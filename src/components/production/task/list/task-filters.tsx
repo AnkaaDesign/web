@@ -813,7 +813,7 @@ export function TaskFilters({ open, onOpenChange, filters, onFilterChange }: Tas
             </Collapsible>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-4 border-t">
+          <div className="flex gap-2 mt-6 pt-4 border-t">
             <Button variant="outline" onClick={handleReset} className="flex-1">
               <IconX className="h-4 w-4 mr-2" />
               Limpar filtros

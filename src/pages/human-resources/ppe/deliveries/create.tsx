@@ -1,26 +1,41 @@
 import { useNavigate } from "react-router-dom";
 import { routes, PPE_DELIVERY_STATUS, FAVORITE_PAGES } from "../../../../constants";
-import { usePpeDeliveryMutations, useAuth } from "../../../../hooks";
+import { useBatchCreatePpeDeliveries, useAuth } from "../../../../hooks";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconShield, IconX, IconCheck, IconLoader2 } from "@tabler/icons-react";
-import type { PpeDeliveryCreateFormData } from "../../../../schemas";
+import type { PpeDeliveryBatchCreateFormData } from "../../../../schemas";
 import { PpeDeliveryForm } from "@/components/inventory/epi/delivery/ppe-delivery-form";
+import { useBatchResultDialog } from "@/hooks/use-batch-result-dialog";
+import { PpeDeliveryBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
 
 export const EPIDeliveryCreate = () => {
   const navigate = useNavigate();
-  const { createAsync, createMutation } = usePpeDeliveryMutations();
+  const batchCreateMutation = useBatchCreatePpeDeliveries();
   const { data: currentUser } = useAuth();
 
-  const handleSubmit = async (data: PpeDeliveryCreateFormData) => {
-    // For admin users, auto-approve the delivery
-    const createData: PpeDeliveryCreateFormData = {
-      ...data,
-      status: PPE_DELIVERY_STATUS.APPROVED, // Auto-approve when admin creates
-      reviewedBy: currentUser?.id || "", // Set current admin as reviewer
-    };
+  // Batch result dialog
+  const { isOpen: isResultDialogOpen, result: batchResult, openDialog: openResultDialog, closeDialog: closeResultDialog } = useBatchResultDialog();
 
-    await createAsync(createData);
-    navigate(routes.humanResources.ppe.deliveries.root);
+  const handleSubmit = async (data: PpeDeliveryBatchCreateFormData) => {
+    try {
+      const response = await batchCreateMutation.mutateAsync({ data });
+
+      // Extract the BatchOperationResult from the response - matches borrow form pattern
+      if (response.data) {
+        // Always show the dialog to display results (like borrow form does)
+        openResultDialog(response.data);
+      }
+    } catch (error) {
+      // Error is handled by mutation and API client
+    }
+  };
+
+  const handleDialogClose = (shouldNavigate: boolean = true) => {
+    closeResultDialog();
+    // Navigate to list after closing dialog if requested
+    if (shouldNavigate) {
+      navigate(routes.humanResources.ppe.deliveries.root);
+    }
   };
 
   const handleCancel = () => {
@@ -34,41 +49,51 @@ export const EPIDeliveryCreate = () => {
       icon: IconX,
       onClick: handleCancel,
       variant: "outline" as const,
-      disabled: createMutation.isPending,
+      disabled: batchCreateMutation.isPending,
     },
     {
       key: "submit",
       label: "Criar",
-      icon: createMutation.isPending ? IconLoader2 : IconCheck,
+      icon: batchCreateMutation.isPending ? IconLoader2 : IconCheck,
       onClick: () => document.getElementById("ppe-delivery-form-submit")?.click(),
       variant: "default" as const,
-      disabled: createMutation.isPending,
-      loading: createMutation.isPending,
+      disabled: batchCreateMutation.isPending,
+      loading: batchCreateMutation.isPending,
     },
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="max-w-5xl mx-auto">
-          <PageHeader
-            variant="form"
-            title="Nova Entrega de EPI"
-            icon={IconShield}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "RH", href: routes.humanResources.root },
-              { label: "EPI", href: routes.humanResources.ppe.root },
-              { label: "Entregas", href: routes.humanResources.ppe.deliveries.root },
-              { label: "Nova Entrega" },
-            ]}
-            actions={actions}
-            favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR}
-          />
+    <>
+      <div className="space-y-4">
+        <div className="max-w-5xl mx-auto">
+            <PageHeader
+              variant="form"
+              title="Nova Entrega de EPI"
+              icon={IconShield}
+              breadcrumbs={[
+                { label: "Início", href: routes.home },
+                { label: "RH", href: routes.humanResources.root },
+                { label: "EPI", href: routes.humanResources.ppe.root },
+                { label: "Entregas", href: routes.humanResources.ppe.deliveries.root },
+                { label: "Nova Entrega" },
+              ]}
+              actions={actions}
+              favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR}
+            />
+        </div>
+
+        <div className="max-w-5xl mx-auto">
+          <PpeDeliveryForm mode="create" onSubmit={handleSubmit} isSubmitting={batchCreateMutation.isPending} />
+        </div>
       </div>
 
-      <div className="max-w-5xl mx-auto">
-        <PpeDeliveryForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
-      </div>
-    </div>
+      {/* Batch Result Dialog */}
+      <PpeDeliveryBatchResultDialog
+        open={isResultDialogOpen}
+        onOpenChange={() => handleDialogClose(true)}
+        result={batchResult}
+        operationType="create"
+      />
+    </>
   );
 };

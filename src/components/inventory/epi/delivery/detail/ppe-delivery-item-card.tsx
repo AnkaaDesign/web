@@ -1,12 +1,12 @@
 import { useNavigate } from "react-router-dom";
-import { IconExternalLink, IconAlertCircle, IconPackage, IconCurrencyDollar, IconBoxMultiple, IconShield, IconTag, IconCategory } from "@tabler/icons-react";
+import { IconExternalLink, IconAlertCircle, IconPackage, IconBoxMultiple, IconShield, IconTag, IconCategory, IconRuler } from "@tabler/icons-react";
 import type { PpeDelivery } from "../../../../../types";
-import { formatCurrency } from "../../../../../utils";
 import { routes, MEASURE_UNIT_LABELS, PPE_TYPE_LABELS } from "../../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { MeasureDisplayCompact } from "@/components/inventory/item/common/measure-display";
 
 interface PpeDeliveryItemCardProps {
   ppeDelivery: PpeDelivery;
@@ -39,9 +39,6 @@ export function PpeDeliveryItemCard({ ppeDelivery, className }: PpeDeliveryItemC
 
   const { item } = ppeDelivery;
 
-  // Get the most recent price from the prices array
-  const currentPrice = item.prices && item.prices.length > 0 ? item.prices[0].value : null;
-
   const handleViewItem = () => {
     navigate(routes.inventory.ppe.details(item.id));
   };
@@ -63,106 +60,85 @@ export function PpeDeliveryItemCard({ ppeDelivery, className }: PpeDeliveryItemC
         </div>
       </CardHeader>
       <CardContent className="pt-0 flex-1">
-        <div className="space-y-6">
-          {/* Product Information Section */}
-          <div>
-            <h3 className="text-base font-semibold mb-4 text-foreground">Informações do Produto</h3>
-            <div className="space-y-4">
-              {/* Item Name */}
-              <div className="bg-muted/30 rounded-lg p-4">
-                <p className="text-base font-semibold text-foreground">
-                  {item.uniCode && (
-                    <>
-                      <span className="font-mono text-sm text-muted-foreground">{item.uniCode}</span>
-                      <span className="mx-2 text-muted-foreground">-</span>
-                    </>
-                  )}
-                  {item.name}
-                </p>
-              </div>
-
-              {/* PPE Type */}
-              {item.ppeType && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <IconShield className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-muted-foreground">Tipo de EPI</span>
-                  </div>
-                  <Badge variant="secondary">{PPE_TYPE_LABELS[item.ppeType]}</Badge>
-                </div>
+        <div className="space-y-4">
+          {/* Item Name */}
+          <div className="bg-muted/30 rounded-lg p-4">
+            <p className="text-base font-semibold text-foreground">
+              {item.uniCode && (
+                <>
+                  <span className="font-mono text-sm text-muted-foreground">{item.uniCode}</span>
+                  <span className="mx-2 text-muted-foreground">-</span>
+                </>
               )}
-
-              {/* PPE Size */}
-              {item.ppeSize && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground">Tamanho</span>
-                  <Badge variant="outline">{item.ppeSize}</Badge>
-                </div>
-              )}
-
-              {/* Brand */}
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <IconTag className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Marca</span>
-                </div>
-                <span className="text-sm font-semibold text-foreground">{item.brand ? item.brand.name : <span className="text-muted-foreground italic">Não definida</span>}</span>
-              </div>
-
-              {/* Category */}
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <IconCategory className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Categoria</span>
-                </div>
-                <span className="text-sm font-semibold text-foreground">
-                  {item.category ? item.category.name : <span className="text-muted-foreground italic">Não definida</span>}
-                </span>
-              </div>
-            </div>
+              {item.name}
+            </p>
           </div>
 
-          {/* Quantity and Price Section */}
-          <div className="pt-6 border-t border-border/50">
-            <h3 className="text-base font-semibold mb-4 text-foreground">Quantidade e Preço</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-muted/30 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <IconBoxMultiple className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Quantidade Entregue</span>
-                </div>
-                <p className="text-2xl font-bold text-foreground">{ppeDelivery.quantity}</p>
-                {item.measureUnit && <p className="text-sm text-muted-foreground mt-1">{MEASURE_UNIT_LABELS[item.measureUnit]}</p>}
+          {/* PPE Type */}
+          {item.ppeType && (
+            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2">
+                <IconShield className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Tipo de EPI</span>
               </div>
-              <div className="bg-muted/30 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <IconCurrencyDollar className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Preço Unitário</span>
-                </div>
-                {currentPrice !== null && currentPrice !== undefined ? (
-                  <p className="text-2xl font-bold text-foreground">{formatCurrency(currentPrice)}</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Não definido</p>
-                )}
-              </div>
+              <Badge variant="secondary">{PPE_TYPE_LABELS[item.ppeType]}</Badge>
             </div>
+          )}
+
+          {/* PPE Size */}
+          {item.ppeSize && (
+            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">Tamanho</span>
+              </div>
+              <Badge variant="outline">{item.ppeSize}</Badge>
+            </div>
+          )}
+
+          {/* Measures */}
+          {item.measures && item.measures.length > 0 && (
+            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2">
+                <IconRuler className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Tamanho</span>
+              </div>
+              <MeasureDisplayCompact item={item} className="text-sm font-semibold text-foreground" />
+            </div>
+          )}
+
+          {/* Brand */}
+          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+            <div className="flex items-center gap-2">
+              <IconTag className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Marca</span>
+            </div>
+            <span className="text-sm font-semibold text-foreground">{item.brand ? item.brand.name : <span className="text-muted-foreground italic">Não definida</span>}</span>
           </div>
 
-          {/* Stock Info */}
+          {/* Category */}
+          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+            <div className="flex items-center gap-2">
+              <IconCategory className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Categoria</span>
+            </div>
+            <span className="text-sm font-semibold text-foreground">
+              {item.category ? item.category.name : <span className="text-muted-foreground italic">Não definida</span>}
+            </span>
+          </div>
+
+          {/* Estoque Atual */}
           {item.quantity !== undefined && (
-            <div className="pt-6 border-t border-border/50">
-              <h3 className="text-base font-semibold mb-4 text-foreground">Estoque</h3>
-              <div className="bg-muted/30 rounded-lg p-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-muted-foreground">Estoque Atual do Item</span>
-                  <p className="text-lg font-bold text-foreground">
-                    {item.quantity % 1 === 0
-                      ? item.quantity.toLocaleString("pt-BR")
-                      : item.quantity.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    {item.measureUnit && <span className="text-sm font-normal text-muted-foreground ml-1">{MEASURE_UNIT_LABELS[item.measureUnit]}</span>}
-                  </p>
-                </div>
+            <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2">
+                <IconBoxMultiple className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Estoque Atual</span>
               </div>
+              <span className="text-sm font-semibold text-foreground">
+                {item.quantity % 1 === 0
+                  ? item.quantity.toLocaleString("pt-BR")
+                  : item.quantity.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {item.measureUnit && <span className="text-sm font-normal text-muted-foreground ml-1">{MEASURE_UNIT_LABELS[item.measureUnit]}</span>}
+              </span>
             </div>
           )}
         </div>

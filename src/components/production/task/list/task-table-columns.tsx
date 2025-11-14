@@ -133,7 +133,7 @@ export const createTaskColumns = (): TaskColumn[] => [
   {
     id: "plate",
     header: "PLACA",
-    accessorKey: "plate",
+    accessorFn: (row) => row.truck?.plate || "",
     sortable: true,
     filterable: true,
     defaultVisible: false,
@@ -159,7 +159,7 @@ export const createTaskColumns = (): TaskColumn[] => [
   {
     id: "chassisNumber",
     header: "Nº CHASSI",
-    accessorKey: "chassisNumber",
+    accessorFn: (row) => row.truck?.chassisNumber || "",
     sortable: true,
     filterable: true,
     defaultVisible: false,

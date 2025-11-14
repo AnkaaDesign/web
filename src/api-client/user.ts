@@ -56,16 +56,33 @@ export class UserService {
   // Mutation Operations
   // =====================
 
-  async createUser(data: UserCreateFormData, query?: UserQueryFormData): Promise<UserCreateResponse> {
+  async createUser(data: UserCreateFormData | FormData, query?: UserQueryFormData): Promise<UserCreateResponse> {
+    console.log('[UserService.createUser] Data type check:', {
+      isFormData: data instanceof FormData,
+      dataType: data?.constructor?.name,
+      hasQuery: !!query,
+    });
+
+    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
     const response = await apiClient.post<UserCreateResponse>(this.basePath, data, {
       params: query,
+      headers,
     });
     return response.data;
   }
 
-  async updateUser(id: string, data: UserUpdateFormData, query?: UserQueryFormData): Promise<UserUpdateResponse> {
+  async updateUser(id: string, data: UserUpdateFormData | FormData, query?: UserQueryFormData): Promise<UserUpdateResponse> {
+    console.log('[UserService.updateUser] Data type check:', {
+      isFormData: data instanceof FormData,
+      dataType: data?.constructor?.name,
+      hasQuery: !!query,
+      id,
+    });
+
+    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
     const response = await apiClient.put<UserUpdateResponse>(`${this.basePath}/${id}`, data, {
       params: query,
+      headers,
     });
     return response.data;
   }

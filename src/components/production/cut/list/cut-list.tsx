@@ -14,6 +14,9 @@ import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { FilterIndicators } from "./filter-indicator";
 import { buildFilterTags } from "./filter-utils";
 import { useTableFilters } from "@/hooks/use-table-filters";
+import { ColumnVisibilityManager } from "./column-visibility-manager";
+import { createCutColumns } from "./cut-item-table-columns";
+import { useColumnVisibility } from "@/hooks/use-column-visibility";
 
 interface CutListProps {
   className?: string;
@@ -41,6 +44,16 @@ export function CutList({ className }: CutListProps) {
     defaultPageSize: DEFAULT_PAGE_SIZE,
     resetSelectionOnPageChange: false,
   });
+
+  // Visible columns state with localStorage persistence
+  // By default, all columns are visible except "reason"
+  const { visibleColumns, setVisibleColumns } = useColumnVisibility(
+    "cut-list-visible-columns",
+    new Set(["filePreview", "fileName", "task.name", "status", "type", "origin", "startedAt", "completedAt"])
+  );
+
+  // Get all available columns for column visibility manager
+  const allColumns = useMemo(() => createCutColumns(), []);
 
   // Custom deserializer for cut filters
   const deserializeCutFilters = useCallback((params: URLSearchParams): Partial<CutGetManyFormData> => {
@@ -202,6 +215,7 @@ export function CutList({ className }: CutListProps) {
                 Filtros{hasActiveFilters ? ` (${Object.keys(filters.where || {}).length + (filters.createdAt ? 1 : 0)})` : ""}
               </span>
             </Button>
+            <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
           </div>
         </div>
 
@@ -210,7 +224,7 @@ export function CutList({ className }: CutListProps) {
 
         {/* Paginated table */}
         <div className="flex-1 min-h-0">
-          <CutItemTable filters={queryFilters} className="h-full" onDataChange={handleTableDataChange} />
+          <CutItemTable filters={queryFilters} className="h-full" onDataChange={handleTableDataChange} visibleColumns={visibleColumns} />
         </div>
       </CardContent>
 

@@ -42,7 +42,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
     resolver: zodResolver(duplicateSchema),
     defaultValues: {
       serialNumber: "",
-      plate: task?.plate || "",
+      plate: task?.truck?.plate || "",
     },
   });
 
@@ -51,7 +51,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
     if (newOpen && task) {
       form.reset({
         serialNumber: "",
-        plate: task.plate || "",
+        plate: task.truck?.plate || "",
       });
     }
     onOpenChange(newOpen);
@@ -111,7 +111,6 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
           ? {
               xPosition: task.truck.xPosition,
               yPosition: task.truck.yPosition,
-              garageId: task.truck.garageId,
             }
           : null,
 

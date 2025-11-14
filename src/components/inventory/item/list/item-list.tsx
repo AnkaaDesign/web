@@ -89,9 +89,13 @@ export function ItemList({ className }: ItemListProps) {
     }
 
     // Parse boolean filters
-    const showInactive = params.get("showInactive");
-    if (showInactive === "true") {
-      filters.showInactive = true;
+    // Read isActive from URL
+    const isActive = params.get("isActive");
+    if (isActive !== null) {
+      filters.isActive = isActive === "true";
+      console.log("[ItemList] Deserializing isActive from URL:", filters.isActive);
+    } else {
+      console.log("[ItemList] No isActive in URL, not setting filter");
     }
 
     const shouldAssignToUser = params.get("shouldAssignToUser");
@@ -201,7 +205,10 @@ export function ItemList({ className }: ItemListProps) {
     else if (filters.where?.supplierId) params.supplier = filters.where.supplierId as string;
 
     // Boolean filters
-    if (filters.showInactive) params.showInactive = "true";
+    // Store isActive in URL for proper API communication
+    if (typeof filters.isActive === "boolean") {
+      params.isActive = String(filters.isActive);
+    }
     if (typeof filters.where?.shouldAssignToUser === "boolean") {
       params.shouldAssignToUser = String(filters.where.shouldAssignToUser);
     }
@@ -243,6 +250,7 @@ export function ItemList({ className }: ItemListProps) {
   } = useTableFilters<ItemGetManyFormData>({
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
+      isActive: true, // Show only active items by default
     },
     searchDebounceMs: 300,
     searchParamName: "search", // Use "search" for URL compatibility
@@ -260,6 +268,10 @@ export function ItemList({ className }: ItemListProps) {
   // Get all available columns for column visibility manager
   const allColumns = useMemo(() => createItemColumns(), []);
 
+  // Create a stable reference for filters using a ref to prevent infinite re-renders
+  const queryFiltersRef = useRef<Partial<ItemGetManyFormData>>({});
+  const queryFiltersStringRef = useRef("");
+
   // Query filters to pass to the paginated table
   const queryFilters = useMemo(() => {
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
@@ -267,13 +279,8 @@ export function ItemList({ className }: ItemListProps) {
     console.log("[ItemList] baseQueryFilters:", baseQueryFilters);
     console.log("[ItemList] filterWithoutOrderBy:", filterWithoutOrderBy);
 
-    // Build where clause with default active filter
+    // Build where clause - don't add default isActive filter, use what's in filters
     const where = filterWithoutOrderBy.where || {};
-
-    // Only show active items by default, unless showInactive is true
-    if (!filterWithoutOrderBy.showInactive) {
-      where.isActive = true;
-    }
 
     const result = {
       ...filterWithoutOrderBy,
@@ -282,7 +289,15 @@ export function ItemList({ className }: ItemListProps) {
     };
 
     console.log("[ItemList] queryFilters result:", result);
-    return result;
+
+    // Only update the ref if the content actually changed
+    const currentFiltersString = JSON.stringify(result);
+    if (currentFiltersString !== queryFiltersStringRef.current) {
+      queryFiltersStringRef.current = currentFiltersString;
+      queryFiltersRef.current = result;
+    }
+
+    return queryFiltersRef.current;
   }, [baseQueryFilters]);
 
   // Handle filter changes

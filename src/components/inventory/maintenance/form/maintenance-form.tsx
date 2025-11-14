@@ -103,15 +103,28 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
   //   }
   // }, [mode, fields.length, append]);
 
+  // Watch required fields for custom validation
+  const watchName = form.watch("name");
+  const watchItemId = form.watch("itemId");
+  const watchScheduledFor = form.watch("scheduledFor");
+
+  // Custom validation check for enabling submit button without triggering schema errors
+  const checkRequiredFields = useMemo(() => {
+    if (mode !== "create") return true; // For update mode, always allow submit
+
+    // Check all required fields
+    return !!(watchName?.trim() && watchItemId && watchScheduledFor);
+  }, [mode, watchName, watchItemId, watchScheduledFor]);
+
   // Track form state changes for submit button
   useEffect(() => {
     if (onFormStateChange) {
       onFormStateChange({
-        isValid: form.formState.isValid,
+        isValid: checkRequiredFields,
         isDirty: form.formState.isDirty,
       });
     }
-  }, [form.formState.isValid, form.formState.isDirty, onFormStateChange]);
+  }, [checkRequiredFields, form.formState.isDirty, onFormStateChange]);
 
   const handleSubmit = async (data: any) => {
     try {

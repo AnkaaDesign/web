@@ -389,7 +389,7 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-4 border-t">
+          <div className="flex gap-2 mt-6 pt-4 border-t">
             <Button
               variant="outline"
               onClick={handleClear}

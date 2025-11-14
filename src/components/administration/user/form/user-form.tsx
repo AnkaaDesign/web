@@ -27,7 +27,8 @@ import { CityInput } from "@/components/ui/form-city-input";
 import { StateSelector } from "@/components/ui/form-state-selector";
 import { PayrollNumberInput } from "./payroll-number-input";
 import { PpeSizesSection } from "./ppe-sizes-section";
-import { AvatarUpload } from "./avatar-upload";
+import { AvatarInput } from "./avatar-input";
+import { createUserFormData } from "@/utils/form-data-helper";
 
 interface BaseUserFormProps {
   isSubmitting?: boolean;
@@ -93,7 +94,7 @@ export function UserForm(props: UserFormProps) {
     exp1EndAt: null,
     exp2StartAt: null,
     exp2EndAt: null,
-    contractedAt: null,
+    effectedAt: null,
     dismissedAt: null,
 
     // Payroll info
@@ -146,7 +147,7 @@ export function UserForm(props: UserFormProps) {
       exp1EndAt: null,
       exp2StartAt: null,
       exp2EndAt: null,
-      contractedAt: null,
+      effectedAt: null,
       dismissedAt: null,
       payrollNumber: null,
       avatarId: null,
@@ -237,10 +238,58 @@ export function UserForm(props: UserFormProps) {
 
   const onSubmit = async (data: UserCreateFormData | UserUpdateFormData) => {
     try {
-      if (mode === "create") {
-        await (props as CreateUserFormProps).onSubmit(data as UserCreateFormData);
+      // Check if we have an avatar file to upload
+      const avatarFile = (data as any).avatarFile || form.getValues('avatarFile' as any);
+
+      console.log('[UserForm] onSubmit - avatarFile check:', {
+        hasAvatarFile: !!avatarFile,
+        isFile: avatarFile instanceof File,
+        avatarFileType: avatarFile?.constructor?.name,
+        fileName: avatarFile?.name,
+        fileSize: avatarFile?.size,
+        mode: mode,
+        userName: data.name,
+      });
+
+      // If we have a file, create FormData with proper context
+      if (avatarFile && avatarFile instanceof File) {
+        console.log('[UserForm] Creating FormData with avatarFile:', {
+          fileName: avatarFile.name,
+          fileSize: avatarFile.size,
+          fileType: avatarFile.type,
+          userId: mode === "update" ? defaultValues?.id : undefined,
+          userName: data.name,
+        });
+        // Extract avatarFile from data and prepare clean data object
+        const { avatarFile: _, ...dataWithoutFile } = data as any;
+
+        // Create FormData with proper context for file organization
+        const formData = createUserFormData(
+          dataWithoutFile,
+          avatarFile,
+          {
+            id: mode === "update" ? defaultValues?.id : undefined,
+            name: data.name,
+          }
+        );
+
+        if (mode === "create") {
+          await (props as CreateUserFormProps).onSubmit(formData as any);
+        } else {
+          await (props as UpdateUserFormProps).onSubmit(formData as any);
+        }
+
+        console.log('[UserForm] FormData submission completed successfully');
       } else {
-        await (props as UpdateUserFormProps).onSubmit(data as UserUpdateFormData);
+        console.log('[UserForm] No avatar file, sending as JSON');
+        // No file, send as regular JSON (remove avatarFile field if present)
+        const { avatarFile: _, ...dataWithoutFile } = data as any;
+
+        if (mode === "create") {
+          await (props as CreateUserFormProps).onSubmit(dataWithoutFile as UserCreateFormData);
+        } else {
+          await (props as UpdateUserFormProps).onSubmit(dataWithoutFile as UserUpdateFormData);
+        }
       }
     } catch (error) {
       // Error is handled by the parent component
@@ -252,23 +301,18 @@ export function UserForm(props: UserFormProps) {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           {/* Avatar Upload */}
-          {mode === "update" && defaultValues && (
-            <Card className="bg-transparent">
-              <CardHeader>
-                <CardTitle>Foto de Perfil</CardTitle>
-                <CardDescription>Foto do colaborador</CardDescription>
-              </CardHeader>
-              <CardContent className="flex justify-center">
-                <AvatarUpload
-                  user={defaultValues as any}
-                  disabled={isSubmitting}
-                  onAvatarChange={(avatarId) => {
-                    form.setValue("avatarId", avatarId, { shouldDirty: true });
-                  }}
-                />
-              </CardContent>
-            </Card>
-          )}
+          <Card className="bg-transparent">
+            <CardHeader>
+              <CardTitle>Foto de Perfil</CardTitle>
+              <CardDescription>Foto do colaborador</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AvatarInput
+                disabled={isSubmitting}
+                existingAvatarId={defaultValues?.avatarId}
+              />
+            </CardContent>
+          </Card>
 
           {/* Basic Information */}
           <Card className="bg-transparent">

@@ -31,7 +31,6 @@ const actionConfig: Record<CHANGE_LOG_ACTION, { icon: React.ElementType; color: 
   [CHANGE_LOG_ACTION.REJECT]: { icon: IconX, color: "text-red-600" },
   [CHANGE_LOG_ACTION.CANCEL]: { icon: IconX, color: "text-red-600" },
   [CHANGE_LOG_ACTION.COMPLETE]: { icon: IconCheck, color: "text-green-600" },
-  [CHANGE_LOG_ACTION.RESCHEDULE]: { icon: IconClock, color: "text-neutral-600" },
   [CHANGE_LOG_ACTION.BATCH_CREATE]: { icon: IconPlus, color: "text-green-600" },
   [CHANGE_LOG_ACTION.BATCH_UPDATE]: { icon: IconEdit, color: "text-neutral-600" },
   [CHANGE_LOG_ACTION.BATCH_DELETE]: { icon: IconTrash, color: "text-red-600" },

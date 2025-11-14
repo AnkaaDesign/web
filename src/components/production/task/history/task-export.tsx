@@ -47,7 +47,7 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
   },
   { id: "observation", label: "Observação", getValue: (task: Task) => task.observation?.description || "" },
   { id: "generalPainting.name", label: "Tinta", getValue: (task: Task) => task.generalPainting?.name || "" },
-  { id: "plate", label: "Placa", getValue: (task: Task) => task.plate || "" },
+  { id: "plate", label: "Placa", getValue: (task: Task) => task.truck?.plate || "" },
   { id: "createdBy.name", label: "Criado por", getValue: (task: Task) => task.createdBy?.name || "" },
   { id: "createdAt", label: "Criado em", getValue: (task: Task) => formatDate(new Date(task.createdAt)) },
   { id: "updatedAt", label: "Atualizado em", getValue: (task: Task) => formatDate(new Date(task.updatedAt)) },

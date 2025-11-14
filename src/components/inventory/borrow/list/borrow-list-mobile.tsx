@@ -11,8 +11,6 @@ import { BorrowEmptyState } from "./borrow-empty-state";
 import { formatDate } from "../../../../utils";
 import { IconUser, IconPackage, IconCalendar, IconClock } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-// import {differenceInDays, parseISO} from "date-fns"; // Removed since expectedReturnAt field doesn't exist
-// import {BORROW_STATUS} from "../../../../constants"; // Removed since not used anymore
 
 interface BorrowListMobileProps {
   onEdit: (borrow: Borrow) => void;
@@ -115,15 +113,7 @@ interface BorrowCardProps {
 }
 
 function BorrowCard({ borrow, onEdit, onDelete }: BorrowCardProps) {
-  // Check if overdue - disabled since expectedReturnAt field doesn't exist in Borrow model
-  const isOverdue = React.useMemo(() => {
-    return false;
-  }, [borrow.status]);
-
-  // Calculate days until return or overdue - disabled since expectedReturnAt field doesn't exist in Borrow model
-  // const daysInfo = React.useMemo(() => {
-  //   return null;
-  // }, [borrow.status, isOverdue]);
+  const isOverdue = false;
 
   return (
     <Card className={cn("transition-all hover:shadow-md", isOverdue && "border-destructive/50 bg-destructive/5")}>
@@ -162,20 +152,10 @@ function BorrowCard({ borrow, onEdit, onDelete }: BorrowCardProps) {
               )}
             </div>
 
-            {/* Status and warnings */}
+            {/* Status */}
             <div className="flex items-center gap-2">
               <BorrowStatusBadge status={borrow.status} isOverdue={isOverdue} />
-
-              {/* Days info disabled since expectedReturnAt field doesn't exist */}
-              {/* {daysInfo && (
-                <div className={cn("flex items-center gap-1 text-xs font-medium", daysInfo.isOverdue && "text-destructive", daysInfo.isWarning && "text-warning")}>
-                  <IconAlertCircle className="h-3.5 w-3.5" />
-                  {daysInfo.text}
-                </div>
-              )} */}
             </div>
-
-            {/* Notes section disabled - notes field doesn't exist in Borrow model */}
           </div>
 
           {/* Actions */}

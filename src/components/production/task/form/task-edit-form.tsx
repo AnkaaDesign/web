@@ -366,7 +366,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       }
 
       console.log('[TaskEditForm] Processing', cuts.length, 'cuts from separate query');
-      const cutMap = new Map<string, { fileId: string; type: string; quantity: number; file?: any }>();
+      const cutMap = new Map<string, { id: string; fileId: string; type: string; quantity: number; file?: any; origin: string }>();
 
       for (const cut of cuts) {
         const fileId = cut.file?.id || cut.fileId || "";
@@ -377,11 +377,19 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           const existing = cutMap.get(key)!;
           existing.quantity += 1;
         } else {
+          // Convert file entity to FileWithPreview
+          const convertedFile = cut.file ? (() => {
+            const fileArray = convertToFileWithPreview(cut.file);
+            return fileArray.length > 0 ? fileArray[0] : undefined;
+          })() : undefined;
+
           cutMap.set(key, {
+            id: `cut-${fileId}-${type}`, // Stable ID for useFieldArray
             fileId: fileId || "",
             type,
             quantity: 1,
-            file: cut.file ? convertToFileWithPreview(cut.file)[0] : undefined,
+            file: convertedFile,
+            origin: cut.origin || CUT_ORIGIN.PLAN,
           });
         }
       }
@@ -397,8 +405,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       name: taskData.name || "",
       status: taskData.status || TASK_STATUS.PENDING,
       serialNumber: taskData.serialNumber || null,
-      chassisNumber: taskData.chassisNumber || null,
-      plate: taskData.plate || null,
       details: taskData.details || null,
       entryDate: taskData.entryDate ? new Date(taskData.entryDate) : null,
       term: taskData.term ? new Date(taskData.term) : null,
@@ -408,10 +414,14 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       sectorId: taskData.sectorId || null,
       paintId: taskData.paintId || null,
       budgetId: taskData.budgetId || null,
-      budget: taskData.budget?.map((b) => ({
-        referencia: b.referencia || "",
-        valor: typeof b.valor === 'number' ? b.valor : (b.valor ? Number(b.valor) : 0),
-      })) || [],
+      budget: taskData.budget ? {
+        expiresIn: taskData.budget.expiresIn ? new Date(taskData.budget.expiresIn) : null,
+        items: taskData.budget.items?.map((item) => ({
+          id: item.id,
+          description: item.description || "",
+          amount: typeof item.amount === 'number' ? item.amount : (item.amount ? Number(item.amount) : 0),
+        })) || [],
+      } : undefined,  // Schema expects optional (undefined), not null
       nfeId: taskData.nfeId || null,
       receiptId: taskData.receiptId || null,
       services:
@@ -455,6 +465,13 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     async (changedData: Partial<TaskUpdateFormData>) => {
       try {
         setIsSubmitting(true);
+
+        // Set entry date to 7:30 if provided (since the date picker only allows date selection)
+        if (changedData.entryDate) {
+          const entryDate = new Date(changedData.entryDate);
+          entryDate.setHours(7, 30, 0, 0);
+          changedData.entryDate = entryDate;
+        }
 
         // DEBUG: Log what fields are in changedData
         console.log('[TaskEditForm] ========== FORM SUBMISSION ==========');
@@ -500,15 +517,26 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           console.log('[TaskEditForm] ✅ All cuts have files - validation passed');
         }
 
-        // Validate that all budgets are complete
-        const budgets = form.getValues('budget') as any[] || [];
-        if (budgets.length > 0 && budgets.some((budget) => {
-          const hasRef = budget.referencia && budget.referencia.trim() !== "";
-          const hasVal = budget.valor !== null && budget.valor !== undefined && budget.valor !== 0;
-          return !hasRef || !hasVal;
-        })) {
-          toast.error("Alguns orçamentos estão incompletos. Preencha a referência e o valor antes de enviar o formulário.");
-          return;
+        // Validate that budget is complete (if it exists)
+        const budget = form.getValues('budget') as any;
+        if (budget && budget.items && budget.items.length > 0) {
+          // Check if any item is incomplete
+          const hasIncompleteItems = budget.items.some((item: any) => {
+            const hasDescription = item.description && item.description.trim() !== "";
+            const hasAmount = item.amount !== null && item.amount !== undefined && item.amount !== 0;
+            return !hasDescription || !hasAmount;
+          });
+
+          if (hasIncompleteItems) {
+            toast.error("Alguns itens do orçamento estão incompletos. Preencha a descrição e o valor antes de enviar o formulário.");
+            return;
+          }
+
+          // Check if expiry date is missing
+          if (!budget.expiresIn) {
+            toast.error("A data de validade do orçamento é obrigatória.");
+            return;
+          }
         }
 
         // Check if there's a layout width error
@@ -833,6 +861,25 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           dataForFormData.invoiceIds = currentInvoiceIds;
           dataForFormData.receiptIds = currentReceiptIds;
 
+          // CRITICAL: Add back excluded fields if they actually changed
+          // These were excluded to optimize payload size but need to be sent if modified
+          if ('paintIds' in changedData) {
+            dataForFormData.paintIds = changedData.paintIds;
+            console.log('[TaskEditForm] Including changed paintIds:', changedData.paintIds);
+          }
+          if ('services' in changedData) {
+            dataForFormData.services = changedData.services;
+            console.log('[TaskEditForm] Including changed services:', changedData.services?.length);
+          }
+          if ('reimbursementIds' in changedData) {
+            dataForFormData.reimbursementIds = changedData.reimbursementIds;
+            console.log('[TaskEditForm] Including changed reimbursementIds:', changedData.reimbursementIds);
+          }
+          if ('reimbursementInvoiceIds' in changedData) {
+            dataForFormData.reimbursementInvoiceIds = changedData.reimbursementInvoiceIds;
+            console.log('[TaskEditForm] Including changed reimbursementInvoiceIds:', changedData.reimbursementInvoiceIds);
+          }
+
           console.log('[TaskEditForm] Setting file IDs to keep:', {
             artworks: currentArtworkIds.length,
             budgets: currentBudgetIds.length,
@@ -899,6 +946,9 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           submitData.budgetIds = currentBudgetIds;
           submitData.invoiceIds = currentInvoiceIds;
           submitData.receiptIds = currentReceiptIds;
+
+          // CRITICAL: paintIds is already in changedData (not excluded in JSON path)
+          // No need to add it separately like in FormData path
 
           console.log('[TaskEditForm] Setting file IDs to keep (JSON):', {
             artworks: currentArtworkIds.length,
@@ -1074,20 +1124,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     ],
   });
 
-  // Debug: Log form values after initialization
-  useEffect(() => {
-    console.log('[TaskEditForm] Form initialized. Cuts value:', form.getValues('cuts'));
-  }, []);
-
-  // Debug: Watch cuts field
-  useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      if (name === 'cuts') {
-        console.log('[TaskEditForm] Cuts field changed to:', value.cuts);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [form]);
 
   // Helper to update file in list
   const updateFileInList = (files: FileWithPreview[], fileId: string, updates: Partial<FileWithPreview>) => {
@@ -1176,10 +1212,24 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   // Get form state
   const { formState } = form;
 
-  // Check if there are changes (form fields, layout, or files)
+  // Check if there are changes (form fields, layout, files, or cuts to create)
   // This will be recalculated on every form value change thanks to form.watch() above
   const formFieldChanges = getChangedFields();
-  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges;
+
+  // Check if there are new cuts with files to create
+  // Only count cuts with NEW files (not already uploaded)
+  const hasCutsToCreate = useMemo(() => {
+    const cuts = cutsValues as any[] || [];
+    return cuts.length > 0 && cuts.some((cut) => {
+      if (!cut.file) return false;
+      // Check if it's a new file (File instance without uploaded flag)
+      const isNewFile = cut.file instanceof File && !cut.file.uploaded && !cut.file.uploadedFileId;
+      return isNewFile;
+    });
+  }, [cutsValues]);
+
+  // Compute hasChanges including cuts to create
+  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasCutsToCreate;
 
   // Log whenever hasChanges evaluation happens
   useEffect(() => {
@@ -1192,11 +1242,12 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     });
     console.log('[TaskEditForm SUBMIT BUTTON] hasLayoutChanges:', hasLayoutChanges);
     console.log('[TaskEditForm SUBMIT BUTTON] hasFileChanges:', hasFileChanges);
+    console.log('[TaskEditForm SUBMIT BUTTON] hasCutsToCreate:', hasCutsToCreate);
     console.log('[TaskEditForm SUBMIT BUTTON] ➡️  hasChanges (FINAL):', hasChanges);
     console.log('[TaskEditForm SUBMIT BUTTON] Submit button will be:', hasChanges ? '✅ ENABLED' : '❌ DISABLED');
     console.log('▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲');
     console.log('');
-  }, [hasChanges, hasLayoutChanges, hasFileChanges, formFieldChanges]);
+  }, [hasChanges, hasLayoutChanges, hasFileChanges, hasCutsToCreate, formFieldChanges]);
 
   // Check for validation errors that should prevent submission
   const hasCutsWithoutFiles = useMemo(() => {
@@ -1205,13 +1256,26 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   }, [cutsValues]);
 
   const hasIncompleteBudgets = useMemo(() => {
-    const budgets = budgetValues as any[] || [];
-    return budgets.length > 0 && budgets.some((budget) => {
-      const hasRef = budget.referencia && budget.referencia.trim() !== "";
-      const hasVal = budget.valor !== null && budget.valor !== undefined && budget.valor !== 0;
-      return !hasRef || !hasVal;
+    const budget = budgetValues as any;
+    if (!budget || !budget.items || budget.items.length === 0) return false;
+
+    // Only validate budget if it's being changed (in formFieldChanges)
+    // This prevents existing incomplete budgets from blocking unrelated edits
+    const isBudgetBeingChanged = 'budget' in formFieldChanges;
+    if (!isBudgetBeingChanged) return false;
+
+    // Check if any item is incomplete
+    const hasIncompleteItems = budget.items.some((item: any) => {
+      const hasDescription = item.description && item.description.trim() !== "";
+      const hasAmount = item.amount !== null && item.amount !== undefined && item.amount !== 0;
+      return !hasDescription || !hasAmount;
     });
-  }, [budgetValues]);
+
+    // Check if expiry date is missing
+    const missingExpiryDate = !budget.expiresIn;
+
+    return hasIncompleteItems || missingExpiryDate;
+  }, [budgetValues, formFieldChanges]);
 
   const hasIncompleteObservation = useMemo(() => {
     // Only validate if observation section is open
@@ -1239,7 +1303,14 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       key: "submit",
       label: "Salvar Alterações",
       icon: isSubmitting ? IconLoader2 : IconCheck,
-      onClick: handleSubmitChanges(),
+      onClick: handleSubmitChanges(
+        undefined,
+        (errors) => {
+          console.error('[TaskEditForm] ❌ FORM VALIDATION FAILED');
+          console.error('[TaskEditForm] Validation errors:', errors);
+          console.error('[TaskEditForm] Detailed errors:', JSON.stringify(errors, null, 2));
+        }
+      ),
       variant: "default" as const,
       disabled: isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompleteBudgets || hasIncompleteObservation || !!layoutWidthError,
       loading: isSubmitting,
@@ -1317,14 +1388,14 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                       <CustomerSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} required initialCustomer={task.customer} />
                     </div>
 
-                    {/* Serial Number, Plate and Chassis Number */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Serial Number */}
+                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                       {/* Serial Number - EDITABLE by Financial users */}
                       <FormField
                         control={form.control}
                         name="serialNumber"
                         render={({ field }) => (
-                          <FormItem className="md:col-span-1">
+                          <FormItem>
                             <FormLabel className="flex items-center gap-2">
                               <IconHash className="h-4 w-4" />
                               Número de Série
@@ -1336,49 +1407,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                                 placeholder="Ex: ABC-123456"
                                 className="uppercase bg-transparent"
                                 onChange={(value) => field.onChange(typeof value === "string" ? value.toUpperCase() : "")}
-                                disabled={isSubmitting || isWarehouseUser || isDesignerUser}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {/* Plate (optional) - EDITABLE by Financial users, DISABLED for Designer */}
-                      <FormField
-                        control={form.control}
-                        name="plate"
-                        render={({ field }) => (
-                          <FormItem className="md:col-span-1">
-                            <FormLabel className="flex items-center gap-2">
-                              <IconLicense className="h-4 w-4" />
-                              Placa
-                            </FormLabel>
-                            <FormControl>
-                              <Input type="plate" {...field} value={field.value || ""} disabled={isSubmitting || isWarehouseUser || isDesignerUser} className="bg-transparent" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {/* Chassis Number - EDITABLE by Financial users */}
-                      <FormField
-                        control={form.control}
-                        name="chassisNumber"
-                        render={({ field }) => (
-                          <FormItem className="md:col-span-2">
-                            <FormLabel className="flex items-center gap-2">
-                              <IconId className="h-4 w-4" />
-                              Número do Chassi (17 caracteres)
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                type="chassis"
-                                value={field.value || ""}
-                                placeholder="Ex: 9BW ZZZ37 7V T004251"
-                                className="bg-transparent"
                                 disabled={isSubmitting || isWarehouseUser || isDesignerUser}
                               />
                             </FormControl>

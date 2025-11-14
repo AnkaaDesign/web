@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -18,14 +18,7 @@ interface ColumnVisibilityManagerProps {
 export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityChange }: ColumnVisibilityManagerProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [localVisible, setLocalVisible] = useState(() => new Set(visibleColumns));
-
-  // Sync local state with props when popover opens
-  useEffect(() => {
-    if (open) {
-      setLocalVisible(new Set(visibleColumns));
-    }
-  }, [open]); // Remove visibleColumns from deps to avoid infinite loop
+  const [localVisible, setLocalVisible] = useState(visibleColumns);
 
   const filteredColumns = useMemo(() => {
     if (!searchQuery) return columns;
@@ -88,7 +81,7 @@ export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityC
 
           <div className="relative">
             <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input type="text" placeholder="Buscar coluna..." value={searchQuery} onChange={(e) => setSearchQuery(e?.target?.value || "")} className="pl-9 h-9 bg-transparent" />
+            <Input type="text" placeholder="Buscar coluna..." value={searchQuery} onChange={(value) => setSearchQuery(String(value || ""))} className="pl-9 h-9 bg-transparent" />
           </div>
 
           <div className="flex gap-2 mt-2">
@@ -104,9 +97,13 @@ export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityC
         <ScrollArea className="h-[300px]">
           <div className="space-y-1 p-2">
             {filteredColumns.map((column) => (
-              <Label key={column.id} className="flex items-center space-x-2 p-2 hover:bg-accent rounded-md cursor-pointer">
+              <Label
+                key={column.id}
+                className="flex items-center justify-between space-x-3 p-2 hover:bg-accent hover:text-accent-foreground rounded-md cursor-pointer"
+                htmlFor={`column-${column.id}`}
+              >
+                <span className="text-sm">{column.header}</span>
                 <Switch id={`column-${column.id}`} checked={localVisible.has(column.id)} onCheckedChange={(checked) => handleToggle(column.id, checked)} />
-                <span className="flex-1 text-sm">{column.header}</span>
               </Label>
             ))}
           </div>

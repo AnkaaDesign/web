@@ -61,8 +61,8 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
 
   // Custom sort function for serialNumberOrPlate (multi-field)
   const sortSerialNumberOrPlate = useCallback((a: TaskRow, b: TaskRow, direction: SortDirection): number => {
-    const aValue = a.serialNumber || a.plate || "";
-    const bValue = b.serialNumber || b.plate || "";
+    const aValue = a.truck?.serialNumber || a.truck?.plate || "";
+    const bValue = b.truck?.serialNumber || b.truck?.plate || "";
     return TableSortUtils.compareValues(aValue, bValue, direction);
   }, []);
 
@@ -94,7 +94,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
         key: "serialNumberOrPlate",
         header: "Nº SÉRIE",
         sortable: true,
-        accessor: (task: TaskRow) => task.serialNumber || task.plate || "",
+        accessor: (task: TaskRow) => task.truck?.serialNumber || task.truck?.plate || "",
         customSortFunction: sortSerialNumberOrPlate,
         dataType: "custom",
       },
@@ -102,7 +102,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
         key: "chassisNumber",
         header: "Nº CHASSI",
         sortable: true,
-        accessor: "chassisNumber",
+        accessor: (task: TaskRow) => task.truck?.chassisNumber || "",
         dataType: "string",
       },
       {
@@ -445,7 +445,6 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
         ? {
             xPosition: taskToDuplicate.truck.xPosition,
             yPosition: taskToDuplicate.truck.yPosition,
-            garageId: taskToDuplicate.truck.garageId,
           }
         : null,
 
@@ -629,8 +628,8 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
                             );
                           })()
                         : "-")}
-                    {column.id === "serialNumberOrPlate" && <span className="truncate block font-mono">{task.serialNumber || task.plate || "-"}</span>}
-                    {column.id === "chassisNumber" && <span className="truncate block font-mono">{task.chassisNumber || "-"}</span>}
+                    {column.id === "serialNumberOrPlate" && <span className="truncate block font-mono">{task.truck?.serialNumber || task.truck?.plate || "-"}</span>}
+                    {column.id === "chassisNumber" && <span className="truncate block font-mono">{task.truck?.chassisNumber || "-"}</span>}
                     {column.id === "sector.name" && <span className="truncate block">{task.sector?.name || "-"}</span>}
                     {column.id === "entryDate" && <span className="truncate block">{task.entryDate ? formatDate(task.entryDate) : "-"}</span>}
                     {column.id === "startedAt" && <span className="truncate block">{task.startedAt ? formatDate(task.startedAt) : "-"}</span>}

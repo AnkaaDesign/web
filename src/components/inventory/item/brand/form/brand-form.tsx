@@ -184,45 +184,52 @@ export function BrandForm(props: BrandFormProps) {
 
   return (
     <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-      <Form {...form}>
-        <form id="brand-form" onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col flex-1">
-          {/* Hidden submit button for programmatic form submission */}
-          <button type="submit" id="brand-form-submit" className="hidden" aria-hidden="true" disabled={isSubmitting || !form.formState.isValid} />
-          <CardHeader>
-            <CardTitle>Informações da Marca</CardTitle>
-            <CardDescription>{mode === "create" ? "Preencha os dados para criar uma nova marca" : "Atualize os dados da marca"}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 flex-1 overflow-y-auto">
-            <NameInput control={form.control} disabled={isSubmitting} required={isRequired} />
+      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
+        <Form {...form}>
+          <form id="brand-form" onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-y-auto space-y-6">
+            {/* Hidden submit button for programmatic form submission */}
+            <button type="submit" id="brand-form-submit" className="hidden" aria-hidden="true" disabled={isSubmitting || !form.formState.isValid} />
+            {/* Basic Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Informações da Marca</CardTitle>
+                <CardDescription>{mode === "create" ? "Preencha os dados para criar uma nova marca" : "Atualize os dados da marca"}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <NameInput control={form.control} disabled={isSubmitting} required={isRequired} />
 
-            <FormField
-              control={form.control}
-              name="itemIds"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Produtos Associados</FormLabel>
-                  <FormControl>
-                    <Combobox
-                      mode="multiple"
-                      async={true}
-                      value={field.value || []}
-                      onValueChange={field.onChange}
-                      placeholder="Selecione produtos para associar à marca"
-                      emptyText="Nenhum produto encontrado"
-                      queryKey={["brand-form-items"]}
-                      disabled={isSubmitting}
-                      queryFn={searchItems}
-                      formatDisplay="category"
-                      initialOptions={initialOptions}
-                      minSearchLength={0}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-          </CardContent>
-        </form>
-      </Form>
+                <FormField
+                  control={form.control}
+                  name="itemIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Produtos Associados</FormLabel>
+                      <FormControl>
+                        <Combobox
+                          mode="multiple"
+                          async={true}
+                          value={field.value || []}
+                          onValueChange={field.onChange}
+                          placeholder="Selecione produtos para associar à marca"
+                          emptyText="Nenhum produto encontrado"
+                          queryKey={["brand-form-items"]}
+                          disabled={isSubmitting}
+                          queryFn={searchItems}
+                          formatDisplay="category"
+                          initialOptions={initialOptions}
+                          minSearchLength={0}
+                          getOptionLabel={getOptionLabel}
+                          getOptionValue={getOptionValue}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+          </form>
+        </Form>
+      </CardContent>
     </Card>
   );
 }

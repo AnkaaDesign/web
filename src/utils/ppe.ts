@@ -25,8 +25,23 @@ import {
 // Clothing sizes (P to XG) - used for shirts, sleeves, and masks
 const CLOTHING_SIZES: PPE_SIZE[] = [PPE_SIZE.P, PPE_SIZE.M, PPE_SIZE.G, PPE_SIZE.GG, PPE_SIZE.XG];
 
-// Numeric sizes (36 to 48) - used for pants and boots
-const NUMERIC_SIZES: PPE_SIZE[] = [PPE_SIZE.SIZE_36, PPE_SIZE.SIZE_38, PPE_SIZE.SIZE_40, PPE_SIZE.SIZE_42, PPE_SIZE.SIZE_44, PPE_SIZE.SIZE_46, PPE_SIZE.SIZE_48];
+// Numeric sizes (35 to 48) - used for pants and boots
+const NUMERIC_SIZES: PPE_SIZE[] = [
+  PPE_SIZE.SIZE_35,
+  PPE_SIZE.SIZE_36,
+  PPE_SIZE.SIZE_37,
+  PPE_SIZE.SIZE_38,
+  PPE_SIZE.SIZE_39,
+  PPE_SIZE.SIZE_40,
+  PPE_SIZE.SIZE_41,
+  PPE_SIZE.SIZE_42,
+  PPE_SIZE.SIZE_43,
+  PPE_SIZE.SIZE_44,
+  PPE_SIZE.SIZE_45,
+  PPE_SIZE.SIZE_46,
+  PPE_SIZE.SIZE_47,
+  PPE_SIZE.SIZE_48,
+];
 
 /**
  * Validates if a given size is valid for a specific PPE type.
@@ -53,11 +68,8 @@ export function isValidSizeForPpeType(size: PPE_SIZE, ppeType: PPE_TYPE): boolea
 
     case PPE_TYPE.PANTS:
     case PPE_TYPE.BOOTS:
-      return NUMERIC_SIZES.includes(size);
-
     case PPE_TYPE.RAIN_BOOTS:
-      // Galocha uses 36-46 sizes (not 48)
-      return [PPE_SIZE.SIZE_36, PPE_SIZE.SIZE_38, PPE_SIZE.SIZE_40, PPE_SIZE.SIZE_42, PPE_SIZE.SIZE_44, PPE_SIZE.SIZE_46].includes(size);
+      return NUMERIC_SIZES.includes(size);
 
     default:
       return false;
@@ -87,11 +99,8 @@ export function getValidSizesForPpeType(ppeType: PPE_TYPE): PPE_SIZE[] {
 
     case PPE_TYPE.PANTS:
     case PPE_TYPE.BOOTS:
-      return [...NUMERIC_SIZES];
-
     case PPE_TYPE.RAIN_BOOTS:
-      // Galocha uses 36-46 sizes (not 48)
-      return [PPE_SIZE.SIZE_36, PPE_SIZE.SIZE_38, PPE_SIZE.SIZE_40, PPE_SIZE.SIZE_42, PPE_SIZE.SIZE_44, PPE_SIZE.SIZE_46];
+      return [...NUMERIC_SIZES];
 
     default:
       return [];

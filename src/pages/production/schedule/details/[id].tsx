@@ -29,7 +29,7 @@ import {
   AIRBRUSHING_STATUS_LABELS,
   COMMISSION_STATUS_LABELS,
 } from "../../../../constants";
-import { formatDate, formatDateTime, formatCurrency, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
+import { formatDate, formatDateTime, formatCurrency, formatChassis, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { generateBudgetPDF } from "../../../../utils/budget-pdf-generator";
 import { usePageTracker } from "@/hooks/use-page-tracker";
@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import {
   IconClipboardList,
   IconEdit,
@@ -52,6 +53,11 @@ import {
   IconCheck,
   IconClock,
   IconCalendar,
+  IconCalendarPlus,
+  IconCalendarEvent,
+  IconCalendarStats,
+  IconCalendarCheck,
+  IconCalendarWeek,
   IconUser,
   IconBuilding,
   IconBuildingFactory,
@@ -780,199 +786,206 @@ export const TaskDetailsPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {/* Overview Card */}
               <Card className="border flex flex-col animate-in fade-in-50 duration-700" level={1}>
-                <CardHeader className="pb-4">
+                <CardHeader className="pb-6">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                      <IconClipboardList className="h-5 w-5 text-muted-foreground" />
+                    <CardTitle className="flex items-center gap-3 text-xl">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <IconClipboardList className="h-5 w-5 text-primary" />
+                      </div>
                       Informações Gerais
                     </CardTitle>
                     <Badge variant={getBadgeVariantFromStatus(task.status, "task")}>{TASK_STATUS_LABELS[task.status] || task.status}</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0 flex-1">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      {/* Customer */}
-                      {task.customer && (
-                        <div className="flex items-start gap-3">
-                          <IconBuilding className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-muted-foreground">Cliente</p>
-                            <p className="text-sm font-semibold">{task.customer.fantasyName}</p>
+                  <div className="space-y-4">
+                        {/* Customer */}
+                        {task.customer && (
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-1.5">
+                            <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <IconBuilding className="h-4 w-4" />
+                              Cliente
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <CustomerLogoDisplay
+                                logo={task.customer.logo}
+                                customerName={task.customer.fantasyName}
+                                size="sm"
+                                shape="rounded"
+                                className="flex-shrink-0"
+                              />
+                              <span className="text-sm font-semibold text-foreground text-right">{task.customer.fantasyName}</span>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Sector */}
-                      {task.sector && (
-                        <div className="flex items-start gap-3">
-                          <IconBuildingFactory className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-muted-foreground">Setor</p>
-                            <p className="text-sm font-semibold">{task.sector.name}</p>
-                          </div>
+                        {/* Sector */}
+                        <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                          <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                            <IconBuildingFactory className="h-4 w-4" />
+                            Setor
+                          </span>
+                          <span className={`text-sm font-semibold ${task.sector ? "text-foreground" : "text-muted-foreground italic"}`}>
+                            {task.sector ? task.sector.name : "Indefinido"}
+                          </span>
                         </div>
-                      )}
 
-                      {/* Commission Status */}
-                      {task.commission && (
-                        <div className="flex items-start gap-3">
-                          <IconCoin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-muted-foreground">Comissão</p>
-                            <Badge variant={ENTITY_BADGE_CONFIG.COMMISSION_STATUS?.[task.commission] || "default"} className="mt-1">
+                        {/* Commission Status */}
+                        {task.commission && (
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                            <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <IconCoin className="h-4 w-4" />
+                              Comissão
+                            </span>
+                            <Badge variant={ENTITY_BADGE_CONFIG.COMMISSION_STATUS?.[task.commission] || "default"}>
                               {COMMISSION_STATUS_LABELS[task.commission]}
                             </Badge>
                           </div>
-                        </div>
-                      )}
-                    </div>
+                        )}
 
-                    <div className="space-y-4">
-                      {/* Serial Number */}
-                      {task.serialNumber && (
-                        <div className="flex items-start gap-3">
-                          <IconHash className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-muted-foreground">Número de Série</p>
-                            <p className="text-sm font-semibold font-mono">{task.serialNumber}</p>
+                        {/* Serial Number */}
+                        {task.serialNumber && (
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                            <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <IconHash className="h-4 w-4" />
+                              Número de Série
+                            </span>
+                            <span className="text-sm font-semibold text-foreground font-mono">{task.serialNumber}</span>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Plate */}
-                      {task.plate && (
-                        <div className="flex items-start gap-3">
-                          <IconCar className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-muted-foreground">Placa</p>
-                            <p className="text-sm font-semibold font-mono uppercase">{task.plate}</p>
+                        {/* Plate */}
+                        {task.plate && (
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                            <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <IconCar className="h-4 w-4" />
+                              Placa
+                            </span>
+                            <span className="text-sm font-semibold text-foreground font-mono uppercase">{task.plate}</span>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Chassis Number */}
-                      {task.chassisNumber && (
-                        <div className="flex items-start gap-3">
-                          <IconBarcode className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-muted-foreground">Nº Chassi</p>
-                            <p className="text-sm font-semibold font-mono">{task.chassisNumber}</p>
+                        {/* Chassis Number */}
+                        {task.chassisNumber && (
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                            <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <IconBarcode className="h-4 w-4" />
+                              Nº Chassi
+                            </span>
+                            <span className="text-sm font-semibold text-foreground">{formatChassis(task.chassisNumber)}</span>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Truck */}
-                      {task.truck && truckDimensions && (
-                        <div className="flex items-start gap-3">
-                          <IconTruck className="h-5 w-5 text-muted-foreground mt-0.5" />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-muted-foreground">Caminhão</p>
-                            <p className="text-sm font-semibold">
+                        {/* Truck */}
+                        {task.truck && truckDimensions && (
+                          <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                            <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                              <IconTruck className="h-4 w-4" />
+                              Caminhão
+                            </span>
+                            <span className="text-sm font-semibold text-foreground">
                               {truckDimensions.width}cm × {truckDimensions.height}cm
-                            </p>
+                            </span>
                           </div>
-                        </div>
-                      )}
-                    </div>
+                        )}
                   </div>
 
                   {/* Details */}
                   {task.details && (
-                    <>
-                      <Separator className="my-6" />
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <IconFileText className="h-5 w-5 text-muted-foreground" />
-                          <h3 className="text-sm font-semibold">Detalhes</h3>
-                        </div>
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/50 rounded-lg p-4">{task.details}</p>
+                    <div className="mt-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <IconFileText className="h-5 w-5 text-muted-foreground" />
+                        <h3 className="text-sm font-semibold">Detalhes</h3>
                       </div>
-                    </>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/50 rounded-lg p-4">{task.details}</p>
+                    </div>
                   )}
                 </CardContent>
               </Card>
 
               {/* Dates Card */}
               <Card className="border flex flex-col animate-in fade-in-50 duration-800" level={1}>
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                    <IconCalendar className="h-5 w-5 text-muted-foreground" />
+                <CardHeader className="pb-6">
+                  <CardTitle className="flex items-center gap-3 text-xl">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <IconCalendarWeek className="h-5 w-5 text-primary" />
+                    </div>
                     Datas
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0 flex-1 space-y-4">
-                  {task.entryDate && (
-                    <div className="flex items-start gap-3">
-                      <IconCalendar className="h-5 w-5 text-muted-foreground mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-muted-foreground">Entrada</p>
-                        <p className="text-sm font-semibold">{formatDate(task.entryDate)}</p>
+                <CardContent className="pt-0 flex-1">
+                  <div className="space-y-4">
+                    {/* Created At */}
+                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <IconCalendarPlus className="h-4 w-4" />
+                        Criado
+                      </span>
+                      <div className="text-right">
+                        <span className="text-sm font-semibold text-foreground">{formatDateTime(task.createdAt)}</span>
+                        {task.createdBy && <p className="text-xs text-muted-foreground mt-0.5">por {task.createdBy.name}</p>}
                       </div>
                     </div>
-                  )}
 
-                  {task.term && (
-                    <div className="flex items-start gap-3">
-                      <IconCalendar className={cn("h-5 w-5 mt-0.5", isOverdue ? "text-destructive" : "text-muted-foreground")} />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-muted-foreground">Prazo</p>
-                        <p className={cn("text-sm font-semibold", isOverdue && "text-destructive")}>
-                          {formatDate(task.term)}
+                    {/* Entry Date */}
+                    {task.entryDate && (
+                      <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                        <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <IconCalendar className="h-4 w-4" />
+                          Entrada
+                        </span>
+                        <span className="text-sm font-semibold text-foreground">{formatDateTime(task.entryDate)}</span>
+                      </div>
+                    )}
+
+                    {/* Term */}
+                    {task.term && (
+                      <div className={cn("flex justify-between items-center rounded-lg px-4 py-2.5", isOverdue ? "bg-red-50/50 dark:bg-red-900/20 border border-red-200/40 dark:border-red-700/40" : "bg-muted/50")}>
+                        <span className={cn("text-sm font-medium flex items-center gap-2", isOverdue ? "text-red-700 dark:text-red-300" : "text-muted-foreground")}>
+                          <IconCalendarEvent className="h-4 w-4" />
+                          Prazo
+                        </span>
+                        <span className={cn("text-sm font-semibold", isOverdue ? "text-red-800 dark:text-red-200" : "text-foreground")}>
+                          {formatDateTime(task.term)}
                           {isOverdue && " (Atrasado)"}
-                        </p>
+                        </span>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {task.startedAt && (
-                    <div className="flex items-start gap-3">
-                      <IconClock className="h-5 w-5 text-muted-foreground mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-muted-foreground">Iniciado</p>
-                        <p className="text-sm font-semibold">{formatDateTime(task.startedAt)}</p>
+                    {/* Started At */}
+                    {task.startedAt && (
+                      <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                        <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <IconCalendarStats className="h-4 w-4" />
+                          Iniciado
+                        </span>
+                        <span className="text-sm font-semibold text-foreground">{formatDateTime(task.startedAt)}</span>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {task.finishedAt && (
-                    <div className="flex items-start gap-3">
-                      <IconCheck className="h-5 w-5 text-green-600 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-muted-foreground">Finalizado</p>
-                        <p className="text-sm font-semibold">{formatDateTime(task.finishedAt)}</p>
+                    {/* Finished At */}
+                    {task.finishedAt && (
+                      <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                        <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                          <IconCalendarCheck className="h-4 w-4" />
+                          Finalizado
+                        </span>
+                        <span className="text-sm font-semibold text-foreground">{formatDateTime(task.finishedAt)}</span>
                       </div>
-                    </div>
-                  )}
-
-                  <Separator />
-
-                  <div className="flex items-start gap-3">
-                    <IconClock className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-muted-foreground">Criado</p>
-                      <p className="text-sm font-semibold">{formatDateTime(task.createdAt)}</p>
-                      {task.createdBy && <p className="text-xs text-muted-foreground">por {task.createdBy.name}</p>}
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <IconClock className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-muted-foreground">Atualizado</p>
-                      <p className="text-sm font-semibold">{formatDateTime(task.updatedAt)}</p>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
 
               {/* Budget Card - Hidden for Warehouse sector users */}
-              {!isWarehouseSector && task.budget && task.budget.length > 0 && (
+              {!isWarehouseSector && task.budget && task.budget.items && task.budget.items.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-825" level={1}>
-                  <CardHeader className="pb-4">
+                  <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                        <IconFileInvoice className="h-5 w-5 text-muted-foreground" />
+                      <CardTitle className="flex items-center gap-3 text-xl">
+                        <div className="p-2 rounded-lg bg-primary/10">
+                          <IconFileInvoice className="h-5 w-5 text-primary" />
+                        </div>
                         Orçamento Detalhado
                       </CardTitle>
                       <Button
@@ -988,13 +1001,21 @@ export const TaskDetailsPage = () => {
                   </CardHeader>
                   <CardContent className="pt-0 flex-1">
                     <div className="space-y-4">
+                      {/* Budget validity date */}
+                      {task.budget.expiresIn && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+                          <IconCalendar className="h-4 w-4" />
+                          <span>Validade: <span className="font-medium text-foreground">{formatDate(task.budget.expiresIn)}</span></span>
+                        </div>
+                      )}
+
                       {/* Budget items table */}
                       <div className="border rounded-lg overflow-hidden">
                         <table className="w-full">
                           <thead className="bg-muted/50">
                             <tr>
                               <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">
-                                Referência
+                                Descrição
                               </th>
                               <th className="px-4 py-3 text-right text-sm font-semibold text-muted-foreground w-32">
                                 Valor
@@ -1002,11 +1023,11 @@ export const TaskDetailsPage = () => {
                             </tr>
                           </thead>
                           <tbody className="divide-y">
-                            {task.budget.map((item, index) => (
+                            {task.budget.items.map((item, index) => (
                               <tr key={item.id || index} className="hover:bg-muted/30 transition-colors">
-                                <td className="px-4 py-3 text-sm">{item.referencia}</td>
+                                <td className="px-4 py-3 text-sm">{item.description}</td>
                                 <td className="px-4 py-3 text-sm text-right font-medium">
-                                  {formatCurrency(item.valor)}
+                                  {formatCurrency(item.amount)}
                                 </td>
                               </tr>
                             ))}
@@ -1020,10 +1041,7 @@ export const TaskDetailsPage = () => {
                           <span className="text-base font-bold text-foreground">TOTAL</span>
                           <span className="text-lg font-bold text-primary">
                             {formatCurrency(
-                              task.budget.reduce((sum, item) => {
-                                const value = typeof item.valor === 'number' ? item.valor : Number(item.valor) || 0;
-                                return sum + value;
-                              }, 0)
+                              typeof task.budget.total === 'number' ? task.budget.total : Number(task.budget.total) || 0
                             )}
                           </span>
                         </div>
@@ -1036,11 +1054,30 @@ export const TaskDetailsPage = () => {
               {/* Truck Layout Card */}
               {task.truck && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-850" level={1}>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                      <IconLayoutGrid className="h-5 w-5 text-muted-foreground" />
+                  <CardHeader className="pb-6">
+                    <CardTitle className="flex items-center gap-3 text-xl">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <IconLayoutGrid className="h-5 w-5 text-primary" />
+                      </div>
                       Layout do Caminhão
                     </CardTitle>
+                    {/* Display truck dimensions from layout */}
+                    {(() => {
+                      const layouts = [task.truck.leftSideLayout, task.truck.rightSideLayout, task.truck.backSideLayout].filter(Boolean);
+                      if (layouts.length > 0 && layouts[0]) {
+                        const layout = layouts[0];
+                        if (layout.height && layout.layoutSections && layout.layoutSections.length > 0) {
+                          const totalWidth = layout.layoutSections.reduce((sum: number, section: any) => sum + (section.width || 0), 0);
+                          return (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
+                              <IconRuler className="h-4 w-4" />
+                              <span>Medidas: <span className="font-medium text-foreground">{totalWidth.toFixed(2).replace('.', ',')} x {layout.height.toFixed(2).replace('.', ',')} m</span></span>
+                            </div>
+                          );
+                        }
+                      }
+                      return null;
+                    })()}
                   </CardHeader>
                   <CardContent className="pt-0">
                     <TruckLayoutPreview truckId={task.truck.id} taskName={task.name} />
@@ -1051,9 +1088,11 @@ export const TaskDetailsPage = () => {
               {/* Service Orders Card - Hidden for Financial, Designer, Logistic sectors */}
               {!shouldHideServiceOrdersAndArtworks && filteredServiceOrders.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-900" level={1}>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                      <IconClipboardList className="h-5 w-5 text-muted-foreground" />
+                  <CardHeader className="pb-6">
+                    <CardTitle className="flex items-center gap-3 text-xl">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <IconClipboardList className="h-5 w-5 text-primary" />
+                      </div>
                       Ordens de Serviço
                       <Badge variant="secondary" className="ml-auto">
                         {filteredServiceOrders.length}
@@ -1061,11 +1100,11 @@ export const TaskDetailsPage = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-0 flex-1">
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {filteredServiceOrders.map((serviceOrder) => (
-                        <div key={serviceOrder.id} className="bg-muted/50 rounded-lg p-4">
+                        <div key={serviceOrder.id} className="bg-muted/50 rounded-lg px-3 py-2">
                           <div className="flex items-center justify-between gap-4">
-                            <div className="flex-1 space-y-2">
+                            <div className="flex-1 space-y-1.5">
                               <div className="flex items-center gap-2">
                                 <h4 className="text-sm font-semibold">{serviceOrder.description}</h4>
                               </div>
@@ -1102,7 +1141,7 @@ export const TaskDetailsPage = () => {
                                   ]}
                                   placeholder="Selecione o status"
                                   searchable={false}
-                                  className="w-40"
+                                  className="w-40 h-8"
                                 />
                               ) : (
                                 <Badge variant={getBadgeVariantFromStatus(serviceOrder.status)}>
@@ -1121,10 +1160,12 @@ export const TaskDetailsPage = () => {
               {/* Cuts Card - Hidden for Financial sector users */}
               {!isFinancialSector && cuts.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-950 lg:col-span-1" level={1}>
-                  <CardHeader className="pb-4">
+                  <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                        <IconCut className="h-5 w-5 text-muted-foreground" />
+                      <CardTitle className="flex items-center gap-3 text-xl">
+                        <div className="p-2 rounded-lg bg-primary/10">
+                          <IconCut className="h-5 w-5 text-primary" />
+                        </div>
                         Recortes
                         <Badge variant="secondary" className="ml-2">
                           {cuts.length}
@@ -1196,10 +1237,12 @@ export const TaskDetailsPage = () => {
               {/* Artworks Card - 1/2 width - Hidden for Financial, Designer, Logistic sectors */}
               {!shouldHideServiceOrdersAndArtworks && task.artworks && task.artworks.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1" level={1}>
-                  <CardHeader className="pb-4">
+                  <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                        <IconFiles className="h-5 w-5 text-muted-foreground" />
+                      <CardTitle className="flex items-center gap-3 text-xl">
+                        <div className="p-2 rounded-lg bg-primary/10">
+                          <IconFiles className="h-5 w-5 text-primary" />
+                        </div>
                         Artes
                         <Badge variant="secondary" className="ml-2">
                           {task.artworks?.length ?? 0}
@@ -1270,10 +1313,12 @@ export const TaskDetailsPage = () => {
               {/* Documents Card - Budget, NFE, Receipt - Hidden for Warehouse sector users */}
               {!isWarehouseSector && ((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0)) && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1050" level={1}>
-                  <CardHeader className="pb-4">
+                  <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                        <IconFileText className="h-5 w-5 text-muted-foreground" />
+                      <CardTitle className="flex items-center gap-3 text-xl">
+                        <div className="p-2 rounded-lg bg-primary/10">
+                          <IconFileText className="h-5 w-5 text-primary" />
+                        </div>
                         Documentos
                         <Badge variant="secondary" className="ml-2">
                           {[...(task.budgets || []), ...(task.invoices || []), ...(task.receipts || [])].length}
@@ -1372,9 +1417,11 @@ export const TaskDetailsPage = () => {
               {/* Paints Card - Show only if task has general painting or logo paints */}
               {(task.generalPainting || (task.logoPaints && task.logoPaints.length > 0)) && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1150" level={1}>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                      <IconPaint className="h-5 w-5 text-muted-foreground" />
+                  <CardHeader className="pb-6">
+                    <CardTitle className="flex items-center gap-3 text-xl">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <IconPaint className="h-5 w-5 text-primary" />
+                      </div>
                       Tintas
                     </CardTitle>
                   </CardHeader>
@@ -1503,7 +1550,7 @@ export const TaskDetailsPage = () => {
 
                       {/* Logo Paints - Only show if there are logo paints */}
                       {task.logoPaints && task.logoPaints.length > 0 && (
-                        <div className="pt-6 border-t border-border">
+                        <div>
                           <div className="flex items-center gap-2 mb-3">
                             <IconPaint className="h-4 w-4 text-muted-foreground" />
                             <h4 className="text-sm font-semibold">Tintas da Logo</h4>
@@ -1582,9 +1629,11 @@ export const TaskDetailsPage = () => {
               {/* Observation Card */}
               {task.observation && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1200" level={1}>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                      <IconAlertCircle className="h-5 w-5 text-yellow-500" />
+                  <CardHeader className="pb-6">
+                    <CardTitle className="flex items-center gap-3 text-xl">
+                      <div className="p-2 rounded-lg bg-yellow-500/10">
+                        <IconAlertCircle className="h-5 w-5 text-yellow-500" />
+                      </div>
                       Observação
                       {task.observation.files && task.observation.files.length > 0 && (
                         <Badge variant="secondary" className="ml-auto">
@@ -1634,9 +1683,11 @@ export const TaskDetailsPage = () => {
               {/* Airbrushings Card - Only show if task has airbrushings */}
               {airbrushings.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1250 lg:col-span-1" level={1}>
-                  <CardHeader className="pb-4">
-                    <CardTitle className="flex items-center gap-2 text-lg font-medium">
-                      <IconSpray className="h-5 w-5 text-muted-foreground" />
+                  <CardHeader className="pb-6">
+                    <CardTitle className="flex items-center gap-3 text-xl">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <IconSpray className="h-5 w-5 text-primary" />
+                      </div>
                       Aerografias
                       <Badge variant="secondary" className="ml-2">
                         {airbrushings.length}

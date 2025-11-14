@@ -669,21 +669,14 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
 
       const newQuantities = { ...quantities, [itemId]: quantity };
 
-      // Include current prices and taxes to avoid losing them in race conditions
-      const currentPrices = { ...prices };
-      const currentIcmses = { ...icmses };
-      const currentIpis = { ...ipis };
-
-      // Batch update to avoid race conditions - include all related state
+      // Batch update - only update selectedItems and quantities
+      // Don't include prices/taxes to avoid race conditions
       setFilters({
         selectedItems: Array.from(newSelected),
         quantities: Object.keys(newQuantities).length > 0 ? newQuantities : undefined,
-        prices: Object.keys(currentPrices).length > 0 ? currentPrices : undefined,
-        icmses: Object.keys(currentIcmses).length > 0 ? currentIcmses : undefined,
-        ipis: Object.keys(currentIpis).length > 0 ? currentIpis : undefined,
       });
     },
-    [quantities, selectedItems, prices, icmses, ipis, setFilters],
+    [quantities, selectedItems, setFilters],
   );
 
   // Helper to set price for an item
@@ -699,21 +692,14 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
 
       const newPrices = { ...prices, [itemId]: price };
 
-      // Include current quantities and taxes to avoid losing them in race conditions
-      const currentQuantities = { ...quantities };
-      const currentIcmses = { ...icmses };
-      const currentIpis = { ...ipis };
-
-      // Batch update to avoid race conditions - include all related state
+      // Batch update - only update selectedItems and prices
+      // Don't include quantities/taxes to avoid race conditions
       setFilters({
         selectedItems: Array.from(newSelected),
-        quantities: Object.keys(currentQuantities).length > 0 ? currentQuantities : undefined,
         prices: Object.keys(newPrices).length > 0 ? newPrices : undefined,
-        icmses: Object.keys(currentIcmses).length > 0 ? currentIcmses : undefined,
-        ipis: Object.keys(currentIpis).length > 0 ? currentIpis : undefined,
       });
     },
-    [prices, selectedItems, quantities, icmses, ipis, setFilters],
+    [prices, selectedItems, setFilters],
   );
 
   // Helper to set ICMS for an item
@@ -729,21 +715,14 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
 
       const newIcmses = { ...icmses, [itemId]: icms };
 
-      // Include current quantities, prices, and IPI to avoid losing them in race conditions
-      const currentQuantities = { ...quantities };
-      const currentPrices = { ...prices };
-      const currentIpis = { ...ipis };
-
-      // Batch update to avoid race conditions - include all related state
+      // Batch update - only update selectedItems and icmses
+      // Don't include quantities/prices/IPI to avoid race conditions
       setFilters({
         selectedItems: Array.from(newSelected),
-        quantities: Object.keys(currentQuantities).length > 0 ? currentQuantities : undefined,
-        prices: Object.keys(currentPrices).length > 0 ? currentPrices : undefined,
         icmses: Object.keys(newIcmses).length > 0 ? newIcmses : undefined,
-        ipis: Object.keys(currentIpis).length > 0 ? currentIpis : undefined,
       });
     },
-    [icmses, selectedItems, quantities, prices, ipis, setFilters],
+    [icmses, selectedItems, setFilters],
   );
 
   // Helper to set IPI for an item
@@ -759,21 +738,14 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
 
       const newIpis = { ...ipis, [itemId]: ipi };
 
-      // Include current quantities, prices, and ICMS to avoid losing them in race conditions
-      const currentQuantities = { ...quantities };
-      const currentPrices = { ...prices };
-      const currentIcmses = { ...icmses };
-
-      // Batch update to avoid race conditions - include all related state
+      // Batch update - only update selectedItems and ipis
+      // Don't include quantities/prices/ICMS to avoid race conditions
       setFilters({
         selectedItems: Array.from(newSelected),
-        quantities: Object.keys(currentQuantities).length > 0 ? currentQuantities : undefined,
-        prices: Object.keys(currentPrices).length > 0 ? currentPrices : undefined,
-        icmses: Object.keys(currentIcmses).length > 0 ? currentIcmses : undefined,
         ipis: Object.keys(newIpis).length > 0 ? newIpis : undefined,
       });
     },
-    [ipis, selectedItems, quantities, prices, icmses, setFilters],
+    [ipis, selectedItems, setFilters],
   );
 
   // Get selected items with data

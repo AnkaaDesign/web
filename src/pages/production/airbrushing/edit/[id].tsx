@@ -174,8 +174,9 @@ export const AirbrushingEdit = () => {
             ]}
           />
         </div>
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden pt-6">
           <AirbrushingForm
+            className="h-full"
             ref={formRef}
             mode="edit"
             airbrushingId={id!}

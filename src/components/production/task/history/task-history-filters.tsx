@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { IconFilter, IconX, IconChecklist } from "@tabler/icons-react";
+import { useState, useEffect, useMemo } from "react";
+import { IconFilter, IconX, IconChecklist, IconCalendar, IconBuilding } from "@tabler/icons-react";
 import {
   Sheet,
   SheetContent,
@@ -9,13 +9,14 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Combobox } from "@/components/ui/combobox";
-import { useSectors, useCustomers, useUsers } from "../../../../hooks";
+import { useSectors, useCustomers } from "../../../../hooks";
 import type { TaskGetManyFormData } from "../../../../schemas";
-import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
-import { formatCurrency } from "../../../../utils";
+import { TASK_STATUS, TASK_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { formatDate } from "../../../../utils";
+import { getBonusPeriodStart, getBonusPeriodEnd } from "../../../../utils/bonus";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import type { Customer } from "../../../../types";
 
@@ -24,40 +25,61 @@ interface TaskHistoryFiltersProps {
   onOpenChange: (open: boolean) => void;
   filters: Partial<TaskGetManyFormData>;
   onFilterChange: (filters: Partial<TaskGetManyFormData>) => void;
-  canViewPrice?: boolean;
 }
 
-export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange, canViewPrice = true }: TaskHistoryFiltersProps) {
+export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange }: TaskHistoryFiltersProps) {
   // Load data for selectors
-  const { data: sectorsData } = useSectors({ orderBy: { name: "asc" } });
-  const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" }, include: { logo: true } });
-  const { data: usersData } = useUsers({
+  const { data: sectorsData } = useSectors({
     orderBy: { name: "asc" },
-    where: {
-      // Only show users who have created tasks
-      createdTasks: {
-        some: {
-          status: "COMPLETED",
-        },
-      },
-    },
+    privilege: SECTOR_PRIVILEGES.PRODUCTION
   });
+  const { data: customersData } = useCustomers({ orderBy: { fantasyName: "asc" }, include: { logo: true } });
 
   // Local state for filters
   const [localFilters, setLocalFilters] = useState<Partial<TaskGetManyFormData>>({
     ...filters,
   });
 
-  // Price range state
-  const [priceMin, setPriceMin] = useState(filters.priceRange?.from?.toString() || "");
-  const [priceMax, setPriceMax] = useState(filters.priceRange?.to?.toString() || "");
+  // Year and month state
+  const [selectedYear, setSelectedYear] = useState<number | undefined>(undefined);
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+
+  // Generate year options (current year and 3 years back)
+  const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let i = 0; i <= 3; i++) {
+      const year = currentYear - i;
+      years.push({
+        value: year.toString(),
+        label: year.toString(),
+      });
+    }
+    return years;
+  }, []);
+
+  // Month options
+  const monthOptions = [
+    { value: "01", label: "Janeiro" },
+    { value: "02", label: "Fevereiro" },
+    { value: "03", label: "Março" },
+    { value: "04", label: "Abril" },
+    { value: "05", label: "Maio" },
+    { value: "06", label: "Junho" },
+    { value: "07", label: "Julho" },
+    { value: "08", label: "Agosto" },
+    { value: "09", label: "Setembro" },
+    { value: "10", label: "Outubro" },
+    { value: "11", label: "Novembro" },
+    { value: "12", label: "Dezembro" },
+  ];
 
   // Reset local state when dialog opens
   useEffect(() => {
     if (open) {
       setLocalFilters({ ...filters });
-      setPriceMin(filters.priceRange?.from?.toString() || "");
-      setPriceMax(filters.priceRange?.to?.toString() || "");
+      setSelectedYear(undefined);
+      setSelectedMonths([]);
     }
   }, [open, filters]);
 
@@ -65,14 +87,23 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
   const handleApply = () => {
     const updatedFilters = { ...localFilters };
 
-    // Handle price range
-    if (priceMin || priceMax) {
-      updatedFilters.priceRange = {
-        ...(priceMin && { from: parseFloat(priceMin) }),
-        ...(priceMax && { to: parseFloat(priceMax) }),
+    // Handle year and month period (26th to 25th cycle)
+    if (selectedYear && selectedMonths.length > 0) {
+      // Convert year and months to date range using bonus period logic
+      const monthNumbers = selectedMonths.map(m => parseInt(m));
+      const minMonth = Math.min(...monthNumbers);
+      const maxMonth = Math.max(...monthNumbers);
+
+      // Start date: 26th of the previous month of the earliest selected month
+      const fromDate = getBonusPeriodStart(selectedYear, minMonth);
+
+      // End date: 25th of the latest selected month
+      const toDate = getBonusPeriodEnd(selectedYear, maxMonth);
+
+      updatedFilters.finishedDateRange = {
+        from: fromDate,
+        to: toDate,
       };
-    } else {
-      delete updatedFilters.priceRange;
     }
 
     onFilterChange(updatedFilters);
@@ -82,8 +113,8 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
   // Handle clear filters
   const handleClear = () => {
     setLocalFilters({});
-    setPriceMin("");
-    setPriceMax("");
+    setSelectedYear(undefined);
+    setSelectedMonths([]);
   };
 
   // Status options
@@ -123,9 +154,69 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
             />
           </div>
 
+          {/* Sector Filter */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <IconBuilding className="h-4 w-4" />
+              Setores
+            </Label>
+            <Combobox
+              mode="multiple"
+              placeholder="Selecione os setores"
+              emptyText="Nenhum setor encontrado"
+              value={localFilters.sectorIds || []}
+              onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, sectorIds: value })}
+              options={
+                sectorsData?.data?.map((sector) => ({
+                  value: sector.id,
+                  label: sector.name,
+                })) || []
+              }
+            />
+          </div>
+
+          {/* Customer Filter */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <IconBuilding className="h-4 w-4" />
+              Clientes
+            </Label>
+            <Combobox
+              mode="multiple"
+              placeholder="Selecione os clientes"
+              emptyText="Nenhum cliente encontrado"
+              value={localFilters.customerIds || []}
+              onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, customerIds: value })}
+              options={
+                customersData?.data?.map((customer) => ({
+                  value: customer.id,
+                  label: customer.fantasyName,
+                  logo: customer.logo,
+                })) || []
+              }
+              renderOption={(option, isSelected) => (
+                <div className="flex items-center gap-3 w-full">
+                  <CustomerLogoDisplay
+                    logo={(option as any).logo}
+                    customerName={option.label}
+                    size="sm"
+                    shape="rounded"
+                    className="flex-shrink-0"
+                  />
+                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                    <div className="font-medium truncate">{option.label}</div>
+                  </div>
+                </div>
+              )}
+            />
+          </div>
+
           {/* Date Range Filter - Finished Date */}
           <div className="space-y-3">
-            <div className="text-sm font-medium">Data de Finalização</div>
+            <Label className="flex items-center gap-2">
+              <IconCalendar className="h-4 w-4" />
+              Data de Finalização
+            </Label>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
@@ -176,104 +267,68 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
             </div>
           </div>
 
-          {/* Sector Filter */}
+          {/* Year and Month Period Selection */}
           <div className="space-y-2">
-            <Label>Setores</Label>
-            <Combobox
-              mode="multiple"
-              placeholder="Selecione os setores"
-              emptyText="Nenhum setor encontrado"
-              value={localFilters.sectorIds || []}
-              onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, sectorIds: value })}
-              options={
-                sectorsData?.data?.map((sector) => ({
-                  value: sector.id,
-                  label: sector.name,
-                })) || []
-              }
-            />
-          </div>
-
-          {/* Customer Filter */}
-          <div className="space-y-2">
-            <Label>Clientes</Label>
-            <Combobox
-              mode="multiple"
-              placeholder="Selecione os clientes"
-              emptyText="Nenhum cliente encontrado"
-              value={localFilters.customerIds || []}
-              onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, customerIds: value })}
-              options={
-                customersData?.data?.map((customer) => ({
-                  value: customer.id,
-                  label: customer.fantasyName,
-                  logo: customer.logo,
-                })) || []
-              }
-              renderOption={(option, isSelected) => (
-                <div className="flex items-center gap-3 w-full">
-                  <CustomerLogoDisplay
-                    logo={(option as any).logo}
-                    customerName={option.label}
-                    size="sm"
-                    shape="rounded"
-                    className="flex-shrink-0"
-                  />
-                  <div className="flex flex-col gap-1 min-w-0 flex-1">
-                    <div className="font-medium truncate">{option.label}</div>
-                  </div>
-                </div>
-              )}
-            />
-          </div>
-
-          {/* User Filter - Who completed the task */}
-          <div className="space-y-2">
-            <Label>Finalizado por</Label>
-            <Combobox
-              mode="multiple"
-              placeholder="Selecione os usuários"
-              emptyText="Nenhum usuário encontrado"
-              value={localFilters.assigneeIds || []}
-              onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, assigneeIds: value })}
-              options={
-                usersData?.data?.map((user) => ({
-                  value: user.id,
-                  label: user.name,
-                })) || []
-              }
-            />
-          </div>
-
-          {/* Price Range - Only for Admin and Leader */}
-          {canViewPrice && (
-            <div className="space-y-2">
-              <Label>Faixa de Valor</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Mínimo</Label>
-                  <Input type="number" placeholder="0,00" value={priceMin} onChange={(value) => setPriceMin(value as string)} min="0" step="0.01" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm text-muted-foreground">Máximo</Label>
-                  <Input type="number" placeholder="0,00" value={priceMax} onChange={(value) => setPriceMax(value as string)} min="0" step="0.01" />
-                </div>
+            <Label className="flex items-center gap-2">
+              <IconCalendar className="h-4 w-4" />
+              Período
+            </Label>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="col-span-1">
+                <Combobox
+                  value={selectedYear?.toString() || ""}
+                  onValueChange={(year) => {
+                    const newYear = year ? parseInt(year) : undefined;
+                    setSelectedYear(newYear);
+                    if (!newYear) {
+                      setSelectedMonths([]);
+                    }
+                  }}
+                  options={yearOptions}
+                  placeholder="Ano..."
+                  searchable={false}
+                  clearable={true}
+                />
               </div>
-              {(priceMin || priceMax) && (
-                <p className="text-sm text-muted-foreground">
-                  {priceMin && priceMax
-                    ? `Entre ${formatCurrency(Number(priceMin))} e ${formatCurrency(Number(priceMax))}`
-                    : priceMin
-                      ? `Acima de ${formatCurrency(Number(priceMin))}`
-                      : `Até ${formatCurrency(Number(priceMax))}`}
-                </p>
-              )}
+              <div className="col-span-2">
+                <Combobox
+                  mode="multiple"
+                  value={selectedMonths}
+                  onValueChange={(months) => setSelectedMonths(months)}
+                  options={monthOptions}
+                  placeholder={selectedYear ? "Selecione os meses..." : "Selecione um ano primeiro"}
+                  searchPlaceholder="Buscar meses..."
+                  emptyText="Nenhum mês encontrado"
+                  disabled={!selectedYear}
+                  searchable={true}
+                  clearable={true}
+                />
+              </div>
             </div>
-          )}
+            {selectedMonths.length > 0 && (() => {
+              const monthNumbers = selectedMonths.map(m => parseInt(m));
+              const minMonth = Math.min(...monthNumbers);
+              const maxMonth = Math.max(...monthNumbers);
+
+              const fromDate = getBonusPeriodStart(selectedYear!, minMonth);
+              const toDate = getBonusPeriodEnd(selectedYear!, maxMonth);
+
+              return (
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    {selectedMonths.length} mês{selectedMonths.length !== 1 ? "es" : ""} selecionado{selectedMonths.length !== 1 ? "s" : ""}
+                  </p>
+                  <Badge variant="secondary" className="text-xs font-normal">
+                    Finalizado: De {formatDate(fromDate)} até {formatDate(toDate)}
+                  </Badge>
+                </div>
+              );
+            })()}
+          </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2 pt-4 border-t">
+        <div className="flex gap-2 mt-6 pt-4 border-t">
           <Button variant="outline" onClick={handleClear} className="flex-1">
             <IconX className="h-4 w-4 mr-2" />
             Limpar Filtros

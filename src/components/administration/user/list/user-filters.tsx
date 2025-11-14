@@ -176,7 +176,7 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
             )}
           </SheetTitle>
           <SheetDescription>
-            Filtre os usuários por status, cargo, setor e datas
+            Filtre os usuários por status, cargo, setor, datas de nascimento, demissão e contratação
           </SheetDescription>
         </SheetHeader>
 
@@ -347,10 +347,64 @@ export function UserFilters({ open, onOpenChange, filters, onFilterChange }: Use
                   </div>
                 </div>
               </div>
+
+              {/* Exp1 End Date Range */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <IconCalendar className="h-4 w-4" />
+                  Data de Contratação
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">De</Label>
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.exp1EndAt?.gte}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.exp1EndAt?.lte) {
+                          setLocalFilters({ ...localFilters, exp1EndAt: undefined });
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            exp1EndAt: {
+                              ...(date && { gte: date }),
+                              ...(localFilters.exp1EndAt?.lte && { lte: localFilters.exp1EndAt.lte }),
+                            },
+                          });
+                        }
+                      }}
+                      hideLabel
+                      placeholder="Selecionar data inicial..."
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-1 block">Até</Label>
+                    <DateTimeInput
+                      mode="date"
+                      value={localFilters.exp1EndAt?.lte}
+                      onChange={(date: Date | null) => {
+                        if (!date && !localFilters.exp1EndAt?.gte) {
+                          setLocalFilters({ ...localFilters, exp1EndAt: undefined });
+                        } else {
+                          setLocalFilters({
+                            ...localFilters,
+                            exp1EndAt: {
+                              ...(localFilters.exp1EndAt?.gte && { gte: localFilters.exp1EndAt.gte }),
+                              ...(date && { lte: date }),
+                            },
+                          });
+                        }
+                      }}
+                      hideLabel
+                      placeholder="Selecionar data final..."
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-2 pt-4 border-t">
+            <div className="flex gap-2 mt-6 pt-4 border-t">
               <Button variant="outline" onClick={handleResetFilters} className="flex-1">
                 <IconX className="h-4 w-4 mr-2" />
                 Limpar Filtros

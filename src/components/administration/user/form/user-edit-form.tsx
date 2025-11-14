@@ -77,7 +77,7 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
         rainBoots: null,
       },
       // Status tracking timestamps - properly convert to Date objects
-      contractedAt: toDate(user.contractedAt),
+      effectedAt: toDate(user.effectedAt),
       exp1StartAt: toDate(user.exp1StartAt),
       exp1EndAt: toDate(user.exp1EndAt),
       exp2StartAt: toDate(user.exp2StartAt),
@@ -121,7 +121,7 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
         typedKey === "exp1EndAt" ||
         typedKey === "exp2StartAt" ||
         typedKey === "exp2EndAt" ||
-        typedKey === "contractedAt" ||
+        typedKey === "effectedAt" ||
         typedKey === "dismissedAt"
       ) {
         const newDate = newValue instanceof Date ? newValue.toISOString() : newValue;

@@ -44,6 +44,7 @@ export function CategoryEditForm({ category, onSubmit, onCancel, isSubmitting }:
                       ref={field.ref}
                       placeholder="Digite o nome da categoria"
                       autoFocus
+                      transparent
                     />
                   </FormControl>
                   <FormMessage />

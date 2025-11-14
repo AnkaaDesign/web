@@ -1,87 +1,126 @@
-import { Button } from "@/components/ui/button";
+import React, { useState, useMemo } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { IconColumns } from "@tabler/icons-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
+import { IconColumns, IconSearch, IconRefresh } from "@tabler/icons-react";
 import type { MaintenanceScheduleColumn } from "./types";
+
+// Function to get default visible columns for maintenance schedules
+export function getDefaultVisibleColumns(): Set<string> {
+  return new Set(["name", "item.name", "frequency", "nextRun", "isActive"]);
+}
 
 interface ColumnVisibilityManagerProps {
   columns: MaintenanceScheduleColumn[];
   visibleColumns: Set<string>;
-  onVisibilityChange: (visibleColumns: Set<string>) => void;
+  onVisibilityChange: (columns: Set<string>) => void;
 }
 
-export function ColumnVisibilityManager({
-  columns,
-  visibleColumns,
-  onVisibilityChange,
-}: ColumnVisibilityManagerProps) {
-  const toggleColumn = (columnKey: string) => {
-    const newVisibleColumns = new Set(visibleColumns);
-    if (newVisibleColumns.has(columnKey)) {
-      newVisibleColumns.delete(columnKey);
+export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityChange }: ColumnVisibilityManagerProps) {
+  const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [localVisible, setLocalVisible] = useState(visibleColumns);
+
+  const filteredColumns = useMemo(() => {
+    if (!searchQuery) return columns;
+    return columns.filter((col) => col.header.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [columns, searchQuery]);
+
+  const handleToggle = (columnKey: string, checked: boolean | undefined) => {
+    const newVisible = new Set(localVisible);
+    // Explicitly convert to boolean to handle undefined/null cases
+    const isChecked = checked === true;
+    if (isChecked) {
+      newVisible.add(columnKey);
     } else {
-      newVisibleColumns.add(columnKey);
+      newVisible.delete(columnKey);
     }
-    onVisibilityChange(newVisibleColumns);
+    setLocalVisible(newVisible);
   };
 
-  const toggleAll = () => {
-    if (visibleColumns.size === columns.length) {
-      // If all are visible, hide all
-      onVisibilityChange(new Set());
-    } else {
-      // Otherwise, show all
-      onVisibilityChange(new Set(columns.map((col) => col.key)));
-    }
+  const handleSelectAll = () => {
+    setLocalVisible(new Set(columns.map((col) => col.key)));
   };
 
-  const allVisible = visibleColumns.size === columns.length;
-  const someVisible = visibleColumns.size > 0 && visibleColumns.size < columns.length;
+  const handleDeselectAll = () => {
+    setLocalVisible(new Set());
+  };
+
+  const handleReset = () => {
+    setLocalVisible(getDefaultVisibleColumns());
+  };
+
+  const handleApply = () => {
+    onVisibilityChange(localVisible);
+    setOpen(false);
+  };
+
+  const handleClose = () => {
+    setLocalVisible(visibleColumns); // Reset to original state
+    setOpen(false);
+  };
+
+  const visibleCount = localVisible.size;
+  const totalCount = columns.length;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="default" className="gap-2">
           <IconColumns className="h-4 w-4" />
-          Colunas
+          Colunas ({visibleCount}/{totalCount})
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-64" align="end">
-        <div className="space-y-4">
-          <div className="font-semibold text-sm">Visibilidade das Colunas</div>
-
-          {/* Toggle All Checkbox */}
-          <div className="flex items-center space-x-2 pb-2 border-b">
-            <Checkbox
-              id="toggle-all"
-              checked={allVisible}
-              indeterminate={someVisible}
-              onCheckedChange={toggleAll}
-            />
-            <Label htmlFor="toggle-all" className="text-sm font-medium cursor-pointer">
-              {allVisible ? "Desmarcar Todas" : "Marcar Todas"}
-            </Label>
+      <PopoverContent className="w-80 p-0" align="end">
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="font-medium text-sm">Gerenciar Colunas</h4>
+            <Button variant="ghost" size="sm" onClick={handleReset} className="h-7 px-2 text-xs">
+              <IconRefresh className="h-3 w-3 mr-1" />
+              Restaurar
+            </Button>
           </div>
 
-          {/* Individual Column Checkboxes */}
-          <div className="space-y-2 max-h-96 overflow-y-auto">
-            {columns.map((column) => (
-              <div key={column.key} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`column-${column.key}`}
-                  checked={visibleColumns.has(column.key)}
-                  onCheckedChange={() => toggleColumn(column.key)}
-                />
-                <Label
-                  htmlFor={`column-${column.key}`}
-                  className="text-sm font-normal cursor-pointer flex-1"
-                >
-                  {column.header}
-                </Label>
-              </div>
+          <div className="relative">
+            <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input type="text" placeholder="Buscar coluna..." value={searchQuery} onChange={(value) => setSearchQuery(String(value || ""))} className="pl-9 h-9 bg-transparent" />
+          </div>
+
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" size="sm" onClick={handleSelectAll} className="flex-1 h-7 text-xs">
+              Selecionar Todas
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDeselectAll} className="flex-1 h-7 text-xs">
+              Desmarcar Todas
+            </Button>
+          </div>
+        </div>
+
+        <ScrollArea className="h-[300px]">
+          <div className="space-y-1 p-2">
+            {filteredColumns.map((column) => (
+              <Label
+                key={column.key}
+                className="flex items-center justify-between space-x-3 p-2 hover:bg-accent hover:text-accent-foreground rounded-md cursor-pointer"
+                htmlFor={`column-${column.key}`}
+              >
+                <span className="text-sm">{column.header}</span>
+                <Switch id={`column-${column.key}`} checked={localVisible.has(column.key)} onCheckedChange={(checked) => handleToggle(column.key, checked)} />
+              </Label>
             ))}
           </div>
+        </ScrollArea>
+
+        <div className="p-4 border-t flex justify-between">
+          <Button variant="outline" size="sm" onClick={handleClose}>
+            Cancelar
+          </Button>
+          <Button size="sm" onClick={handleApply}>
+            Aplicar
+          </Button>
         </div>
       </PopoverContent>
     </Popover>

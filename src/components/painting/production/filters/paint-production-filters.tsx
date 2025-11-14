@@ -297,7 +297,7 @@ export function PaintProductionFilters({ open, onOpenChange, filters, onFiltersC
           </div>
         </div>
 
-        <div className="flex gap-2 pt-4 border-t">
+        <div className="flex gap-2 mt-6 pt-4 border-t">
           <Button variant="outline" onClick={handleClear} className="flex-1 flex items-center gap-2">
             <IconX className="h-4 w-4" />
             Limpar Tudo

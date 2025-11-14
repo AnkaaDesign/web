@@ -74,7 +74,7 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
     resetSelectionOnPageChange: false,
     defaultSort: [
       { column: "status", direction: "asc" }, // PENDING comes first
-      { column: "scheduledFor", direction: "asc" }, // Then by date
+      { column: "scheduledFor", direction: "desc" }, // Then by date (newest first)
     ],
   });
 

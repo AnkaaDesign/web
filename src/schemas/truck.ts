@@ -1,9 +1,8 @@
 // packages/schemas/src/truck.ts
 
 import { z } from "zod";
-import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, createNameSchema } from "./common";
+import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy } from "./common";
 import type { Truck } from "../types";
-import { TRUCK_MANUFACTURER } from "../constants";
 
 // =====================
 // Include Schema Based on Prisma Schema (Second Level Only)
@@ -32,19 +31,6 @@ export const truckIncludeSchema = z
               services: z.boolean().optional(),
               truck: z.boolean().optional(),
               airbrushing: z.boolean().optional(),
-            })
-            .optional(),
-        }),
-      ])
-      .optional(),
-    garage: z
-      .union([
-        z.boolean(),
-        z.object({
-          include: z
-            .object({
-              lanes: z.boolean().optional(),
-              trucks: z.boolean().optional(),
             })
             .optional(),
         }),
@@ -101,12 +87,10 @@ export const truckOrderBySchema = z.union([
       // Truck direct fields
       id: orderByDirectionSchema.optional(),
       plate: orderByDirectionSchema.optional(),
-      model: orderByDirectionSchema.optional(),
-      manufacturer: orderByDirectionSchema.optional(),
+      chassisNumber: orderByDirectionSchema.optional(),
       xPosition: orderByDirectionSchema.optional(),
       yPosition: orderByDirectionSchema.optional(),
       taskId: orderByDirectionSchema.optional(),
-      garageId: orderByDirectionSchema.optional(),
       createdAt: orderByDirectionSchema.optional(),
       updatedAt: orderByDirectionSchema.optional(),
 
@@ -126,18 +110,6 @@ export const truckOrderBySchema = z.union([
           updatedAt: orderByDirectionSchema.optional(),
         })
         .optional(),
-
-      // Nested relation ordering - Garage
-      garage: z
-        .object({
-          id: orderByDirectionSchema.optional(),
-          name: orderByDirectionSchema.optional(),
-          width: orderByDirectionSchema.optional(),
-          length: orderByDirectionSchema.optional(),
-          createdAt: orderByDirectionSchema.optional(),
-          updatedAt: orderByDirectionSchema.optional(),
-        })
-        .optional(),
     })
     .partial(),
 
@@ -147,12 +119,10 @@ export const truckOrderBySchema = z.union([
       .object({
         id: orderByDirectionSchema.optional(),
         plate: orderByDirectionSchema.optional(),
-        model: orderByDirectionSchema.optional(),
-        manufacturer: orderByDirectionSchema.optional(),
+        chassisNumber: orderByDirectionSchema.optional(),
         xPosition: orderByDirectionSchema.optional(),
         yPosition: orderByDirectionSchema.optional(),
         taskId: orderByDirectionSchema.optional(),
-        garageId: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
       })
@@ -197,7 +167,8 @@ export const truckWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      garageId: z
+      // String fields
+      plate: z
         .union([
           z.string(),
           z.null(),
@@ -206,19 +177,6 @@ export const truckWhereSchema: z.ZodSchema = z.lazy(() =>
             not: z.union([z.string(), z.null()]).optional(),
             in: z.array(z.string()).optional(),
             notIn: z.array(z.string()).optional(),
-          }),
-        ])
-        .optional(),
-
-      // String fields
-      plate: z
-        .union([
-          z.string(),
-          z.object({
-            equals: z.string().optional(),
-            not: z.string().optional(),
-            in: z.array(z.string()).optional(),
-            notIn: z.array(z.string()).optional(),
             contains: z.string().optional(),
             startsWith: z.string().optional(),
             endsWith: z.string().optional(),
@@ -227,31 +185,19 @@ export const truckWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      model: z
+      chassisNumber: z
         .union([
           z.string(),
+          z.null(),
           z.object({
-            equals: z.string().optional(),
-            not: z.string().optional(),
+            equals: z.union([z.string(), z.null()]).optional(),
+            not: z.union([z.string(), z.null()]).optional(),
             in: z.array(z.string()).optional(),
             notIn: z.array(z.string()).optional(),
             contains: z.string().optional(),
             startsWith: z.string().optional(),
             endsWith: z.string().optional(),
             mode: z.enum(["default", "insensitive"]).optional(),
-          }),
-        ])
-        .optional(),
-
-      // Enum fields
-      manufacturer: z
-        .union([
-          z.nativeEnum(TRUCK_MANUFACTURER),
-          z.object({
-            equals: z.nativeEnum(TRUCK_MANUFACTURER).optional(),
-            not: z.nativeEnum(TRUCK_MANUFACTURER).optional(),
-            in: z.array(z.nativeEnum(TRUCK_MANUFACTURER)).optional(),
-            notIn: z.array(z.nativeEnum(TRUCK_MANUFACTURER)).optional(),
           }),
         ])
         .optional(),
@@ -331,13 +277,6 @@ export const truckWhereSchema: z.ZodSchema = z.lazy(() =>
           isNot: z.any().optional(),
         })
         .optional(),
-
-      garage: z
-        .object({
-          is: z.any().optional(),
-          isNot: z.any().optional(),
-        })
-        .optional(),
     })
     .partial(),
 );
@@ -350,13 +289,8 @@ const truckFilters = {
   // Search and filtering
   searchingFor: z.string().optional(),
   taskIds: z.array(z.string()).optional(),
-  garageIds: z.array(z.string()).optional(),
-  manufacturers: z.array(z.nativeEnum(TRUCK_MANUFACTURER)).optional(),
   plates: z.array(z.string()).optional(),
-  models: z.array(z.string()).optional(),
-  hasGarage: z.boolean().optional(),
   hasPosition: z.boolean().optional(),
-  isParked: z.boolean().optional(),
 
   // Position ranges
   xPositionRange: z
@@ -396,10 +330,8 @@ const truckTransform = (data: any) => {
     andConditions.push({
       OR: [
         { plate: { contains: data.searchingFor.trim(), mode: "insensitive" } },
-        { model: { contains: data.searchingFor.trim(), mode: "insensitive" } },
         { task: { name: { contains: data.searchingFor.trim(), mode: "insensitive" } } },
         { task: { serialNumber: { contains: data.searchingFor.trim(), mode: "insensitive" } } },
-        { garage: { name: { contains: data.searchingFor.trim(), mode: "insensitive" } } },
         { task: { customer: { fantasyName: { contains: data.searchingFor.trim(), mode: "insensitive" } } } },
         { task: { customer: { corporateName: { contains: data.searchingFor.trim(), mode: "insensitive" } } } },
       ],
@@ -413,38 +345,10 @@ const truckTransform = (data: any) => {
     delete data.taskIds;
   }
 
-  // Handle garageIds filter
-  if (data.garageIds && Array.isArray(data.garageIds) && data.garageIds.length > 0) {
-    andConditions.push({ garageId: { in: data.garageIds } });
-    delete data.garageIds;
-  }
-
-  // Handle manufacturers filter
-  if (data.manufacturers && Array.isArray(data.manufacturers) && data.manufacturers.length > 0) {
-    andConditions.push({ manufacturer: { in: data.manufacturers } });
-    delete data.manufacturers;
-  }
-
   // Handle plates filter
   if (data.plates && Array.isArray(data.plates) && data.plates.length > 0) {
     andConditions.push({ plate: { in: data.plates } });
     delete data.plates;
-  }
-
-  // Handle models filter
-  if (data.models && Array.isArray(data.models) && data.models.length > 0) {
-    andConditions.push({ model: { in: data.models } });
-    delete data.models;
-  }
-
-  // Handle hasGarage filter
-  if (typeof data.hasGarage === "boolean") {
-    if (data.hasGarage) {
-      andConditions.push({ garageId: { not: null } });
-    } else {
-      andConditions.push({ garageId: null });
-    }
-    delete data.hasGarage;
   }
 
   // Handle hasPosition filter
@@ -460,21 +364,6 @@ const truckTransform = (data: any) => {
     }
     delete data.hasPosition;
   }
-
-  // Handle isParked filter
-  if (typeof data.isParked === "boolean") {
-    if (data.isParked) {
-      andConditions.push({
-        AND: [{ garageId: { not: null } }, { xPosition: { not: null } }, { yPosition: { not: null } }],
-      });
-    } else {
-      andConditions.push({
-        OR: [{ garageId: null }, { xPosition: null }, { yPosition: null }],
-      });
-    }
-    delete data.isParked;
-  }
-
 
   // Handle position ranges
   if (data.xPositionRange && typeof data.xPositionRange === "object") {
@@ -568,19 +457,20 @@ const brazilianPlateRegex = /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$|^[A-Z]{3}-?[0-9]{4}
 // =====================
 
 export const truckCreateSchema = z.object({
-  // Required identification fields
+  // Optional identification fields
   plate: z
     .string()
-    .min(1, "Placa é obrigatória")
     .max(8, "Placa deve ter no máximo 8 caracteres")
     .transform((val) => val.toUpperCase().replace(/[^A-Z0-9]/g, ""))
-    .refine((val) => brazilianPlateRegex.test(val), "Formato de placa inválido (ex: ABC1234 ou ABC-1234)"),
-
-  model: createNameSchema(1, 100, "Modelo"),
-
-  manufacturer: z.enum(Object.values(TRUCK_MANUFACTURER) as [string, ...string[]], {
-    errorMap: () => ({ message: "Montadora inválida" }),
-  }),
+    .refine((val) => brazilianPlateRegex.test(val), "Formato de placa inválido (ex: ABC1234 ou ABC-1234)")
+    .nullable()
+    .optional()
+    .transform((val) => (val === "" ? null : val)),
+  chassisNumber: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((val) => (val === "" ? null : val)),
 
   // Optional position fields
   xPosition: z.number().nullable().optional(),
@@ -590,8 +480,6 @@ export const truckCreateSchema = z.object({
   taskId: z.string().uuid("Tarefa inválida"),
 
   // Optional relations
-  garageId: z.string().uuid("Garagem inválida").nullable().optional(),
-  laneId: z.string().uuid("Faixa inválida").nullable().optional(),
   leftSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
   rightSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
   backSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
@@ -601,19 +489,17 @@ export const truckUpdateSchema = z.object({
   // Optional identification fields
   plate: z
     .string()
-    .min(1, "Placa é obrigatória")
     .max(8, "Placa deve ter no máximo 8 caracteres")
     .transform((val) => val.toUpperCase().replace(/[^A-Z0-9]/g, ""))
     .refine((val) => brazilianPlateRegex.test(val), "Formato de placa inválido (ex: ABC1234 ou ABC-1234)")
-    .optional(),
-
-  model: createNameSchema(1, 100, "Modelo").optional(),
-
-  manufacturer: z
-    .enum(Object.values(TRUCK_MANUFACTURER) as [string, ...string[]], {
-      errorMap: () => ({ message: "Montadora inválida" }),
-    })
-    .optional(),
+    .nullable()
+    .optional()
+    .transform((val) => (val === "" ? null : val)),
+  chassisNumber: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((val) => (val === "" ? null : val)),
 
   // Optional position fields
   xPosition: z.number().nullable().optional(),
@@ -621,8 +507,6 @@ export const truckUpdateSchema = z.object({
 
   // Optional relations
   taskId: z.string().uuid("Tarefa inválida").optional(),
-  garageId: z.string().uuid("Garagem inválida").nullable().optional(),
-  laneId: z.string().uuid("Faixa inválida").nullable().optional(),
   leftSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
   rightSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
   backSideLayoutId: z.string().uuid("Layout inválido").nullable().optional(),
@@ -694,13 +578,11 @@ export type TruckBatchQueryFormData = z.infer<typeof truckBatchQuerySchema>;
 // =====================
 
 export const mapTruckToFormData = createMapToFormDataHelper<Truck, TruckUpdateFormData>((truck) => ({
-  plate: truck.plate,
-  model: truck.model,
-  manufacturer: truck.manufacturer,
+  plate: truck.plate || undefined,
+  chassisNumber: truck.chassisNumber || undefined,
   xPosition: truck.xPosition || undefined,
   yPosition: truck.yPosition || undefined,
   taskId: truck.taskId,
-  garageId: truck.garageId || undefined,
   leftSideLayoutId: truck.leftSideLayoutId || undefined,
   rightSideLayoutId: truck.rightSideLayoutId || undefined,
   backSideLayoutId: truck.backSideLayoutId || undefined,

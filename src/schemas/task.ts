@@ -178,7 +178,6 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
             include: z
               .object({
                 task: z.boolean().optional(),
-                garage: z.boolean().optional(),
               })
               .optional(),
           }),
@@ -264,8 +263,6 @@ export const taskOrderBySchema = z
       status: orderByDirectionSchema.optional(),
       statusOrder: orderByDirectionSchema.optional(),
       serialNumber: orderByDirectionSchema.optional(),
-      chassisNumber: orderByDirectionSchema.optional(),
-      plate: orderByDirectionSchema.optional(),
       entryDate: orderByDirectionSchema.optional(),
       term: orderByDirectionSchema.optional(),
       startedAt: orderByDirectionSchema.optional(),
@@ -280,8 +277,6 @@ export const taskOrderBySchema = z
         status: orderByDirectionSchema.optional(),
         statusOrder: orderByDirectionSchema.optional(),
         serialNumber: orderByDirectionSchema.optional(),
-        chassisNumber: orderByDirectionSchema.optional(),
-        plate: orderByDirectionSchema.optional(),
         entryDate: orderByDirectionSchema.optional(),
         term: orderByDirectionSchema.optional(),
         startedAt: orderByDirectionSchema.optional(),
@@ -308,8 +303,6 @@ export const taskWhereSchema: z.ZodSchema<any> = z.lazy(() =>
       status: z.union([z.nativeEnum(TASK_STATUS), z.object({ in: z.array(z.nativeEnum(TASK_STATUS)).optional() })]).optional(),
       statusOrder: z.union([z.number(), z.object({ gte: z.number().optional(), lte: z.number().optional() })]).optional(),
       serialNumber: z.union([z.string(), z.object({ contains: z.string().optional() })]).optional(),
-      chassisNumber: z.union([z.string(), z.object({ contains: z.string().optional() })]).optional(),
-      plate: z.union([z.string(), z.object({ contains: z.string().optional() })]).optional(),
       details: z.union([z.string(), z.object({ contains: z.string().optional() })]).optional(),
       commission: z.union([z.string(), z.object({ in: z.array(z.string()).optional(), notIn: z.array(z.string()).optional() })]).optional(),
       entryDate: z.object({ gte: z.coerce.date().optional(), lte: z.coerce.date().optional() }).optional(),
@@ -444,15 +437,12 @@ const taskTransform = (data: any): any => {
         // Direct task fields
         { name: { contains: searchTerm, mode: "insensitive" } },
         { serialNumber: { contains: searchTerm, mode: "insensitive" } },
-        { chassisNumber: { contains: searchTerm, mode: "insensitive" } },
-        { plate: { contains: searchTerm, mode: "insensitive" } },
         { details: { contains: searchTerm, mode: "insensitive" } },
         // Related entities
         { customer: { fantasyName: { contains: searchTerm, mode: "insensitive" } } },
         { customer: { corporateName: { contains: searchTerm, mode: "insensitive" } } },
         { sector: { name: { contains: searchTerm, mode: "insensitive" } } },
         { createdBy: { name: { contains: searchTerm, mode: "insensitive" } } },
-        // Note: Truck model doesn't have a model or plate field - removed invalid search
         { observation: { description: { contains: searchTerm, mode: "insensitive" } } },
         // ServiceOrder only has description field, no name field
         { services: { some: { description: { contains: searchTerm, mode: "insensitive" } } } },
@@ -1094,7 +1084,6 @@ const taskServiceOrderCreateSchema = z.object({
 const taskTruckCreateSchema = z.object({
   xPosition: z.number().nullable().optional(),
   yPosition: z.number().nullable().optional(),
-  garageId: z.string().uuid("Garagem inválida").nullable().optional(),
 });
 
 // =====================
@@ -1118,30 +1107,6 @@ export const taskCreateSchema = z
       .transform((val) => (val === "" ? null : val))
       .refine((val) => !val || /^[A-Z0-9-]+$/.test(val), {
         message: "Número de série deve conter apenas letras maiúsculas, números e hífens",
-      }),
-    chassisNumber: z
-      .string()
-      .optional()
-      .nullable()
-      .refine(
-        (val) => {
-          if (!val) return true; // Allow empty/null
-          // Remove spaces and validate: must be exactly 17 alphanumeric characters
-          const cleaned = val.replace(/\s/g, "").toUpperCase();
-          return /^[A-Z0-9]{17}$/.test(cleaned);
-        },
-        {
-          message: "Chassi deve conter exatamente 17 caracteres alfanuméricos",
-        }
-      )
-      .transform((val) => (val === "" ? null : val)),
-    plate: z
-      .string()
-      .optional()
-      .nullable()
-      .transform((val) => (val === "" ? null : val))
-      .refine((val) => !val || /^[A-Z0-9-]+$/.test(val), {
-        message: "A placa deve conter apenas letras maiúsculas, números e hífens",
       }),
     details: createDescriptionSchema(1, 1000, false).nullable().optional(),
     entryDate: nullableDate.optional(),
@@ -1168,7 +1133,7 @@ export const taskCreateSchema = z
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings
-    budget: z.array(budgetCreateNestedSchema).optional(),
+    budget: budgetCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
   })
   .superRefine((data, ctx) => {
     if (data.entryDate && data.term && data.term <= data.entryDate) {
@@ -1237,26 +1202,6 @@ export const taskUpdateSchema = z
       .regex(/^[A-Z0-9-]+$/, "Número de série deve conter apenas letras maiúsculas, números e hífens")
       .nullable()
       .optional(),
-    chassisNumber: z
-      .string()
-      .nullable()
-      .optional()
-      .refine(
-        (val) => {
-          if (!val) return true; // Allow empty/null
-          // Remove spaces and validate: must be exactly 17 alphanumeric characters
-          const cleaned = val.replace(/\s/g, "").toUpperCase();
-          return /^[A-Z0-9]{17}$/.test(cleaned);
-        },
-        {
-          message: "Chassi deve conter exatamente 17 caracteres alfanuméricos",
-        }
-      ),
-    plate: z
-      .string()
-      .regex(/^[A-Z0-9-]+$/, "A placa deve conter apenas letras maiúsculas, números e hífens")
-      .nullable()
-      .optional(),
     details: createDescriptionSchema(1, 1000, false).nullable().optional(),
     entryDate: nullableDate.optional(),
     term: nullableDate.optional(),
@@ -1282,7 +1227,7 @@ export const taskUpdateSchema = z
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings
-    budget: z.array(budgetCreateNestedSchema).optional(),
+    budget: budgetCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
   })
   .superRefine((data, ctx) => {
     if (data.entryDate && data.term && data.term <= data.entryDate) {
@@ -1411,8 +1356,6 @@ export const mapTaskToFormData = createMapToFormDataHelper<Task, TaskUpdateFormD
   status: task.status,
   statusOrder: task.statusOrder || undefined,
   serialNumber: task.serialNumber,
-  chassisNumber: task.chassisNumber,
-  plate: task.plate,
   details: task.details,
   entryDate: task.entryDate,
   term: task.term,

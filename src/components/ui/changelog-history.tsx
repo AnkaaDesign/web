@@ -111,7 +111,6 @@ const actionConfig: Record<CHANGE_LOG_ACTION, { icon: React.ElementType; color: 
   [CHANGE_LOG_ACTION.REJECT]: { icon: IconX, color: "text-red-600" },
   [CHANGE_LOG_ACTION.CANCEL]: { icon: IconX, color: "text-red-600" },
   [CHANGE_LOG_ACTION.COMPLETE]: { icon: IconCheck, color: "text-green-600" },
-  [CHANGE_LOG_ACTION.RESCHEDULE]: { icon: IconClock, color: "text-neutral-600" },
   [CHANGE_LOG_ACTION.BATCH_CREATE]: { icon: IconPlus, color: "text-green-600" },
   [CHANGE_LOG_ACTION.BATCH_UPDATE]: { icon: IconEdit, color: "text-neutral-600" },
   [CHANGE_LOG_ACTION.BATCH_DELETE]: { icon: IconTrash, color: "text-red-600" },
@@ -409,7 +408,6 @@ const ChangelogTimelineItem = ({
     files: Map<string, string>;
     observations: Map<string, string>;
     trucks: Map<string, string>;
-    garages: Map<string, string>;
   };
   onRollback?: (changeLogId: string, fieldName: string) => void;
   rollbackLoading?: string | null;
@@ -485,9 +483,6 @@ const ChangelogTimelineItem = ({
         if (field === "truckId" && entityDetails.trucks.has(value)) {
           return entityDetails.trucks.get(value) || "Caminhão";
         }
-        if (field === "garageId" && entityDetails.garages.has(value)) {
-          return entityDetails.garages.get(value) || "Garagem";
-        }
       }
 
       // If entity details not available, show a placeholder
@@ -503,7 +498,6 @@ const ChangelogTimelineItem = ({
       if (field === "budgetId" || field === "nfeId" || field === "receiptId") return "Arquivo (carregando...)";
       if (field === "observationId") return "Observação (carregando...)";
       if (field === "truckId") return "Caminhão (carregando...)";
-      if (field === "garageId") return "Garagem (carregando...)";
     }
 
     // Special handling for logoId fields - render as images
@@ -573,7 +567,14 @@ const ChangelogTimelineItem = ({
 
           {/* Field changes */}
           <div className="space-y-3">
-            {changelogGroup.map((changelog, index) => {
+            {changelogGroup
+              .filter((changelog) => {
+                // Exclude internal/system fields from display
+                if (changelog.field === "statusOrder") return false;
+                if (changelog.field === "colorOrder") return false;
+                return true;
+              })
+              .map((changelog, index) => {
               if (!changelog.field) {
                 return null;
               }
@@ -584,18 +585,11 @@ const ChangelogTimelineItem = ({
                 <div key={changelog.id}>
                   {showSeparator && <Separator className="my-3" />}
 
-                  {/* Field name - simplify status field */}
+                  {/* Field name */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="text-sm text-muted-foreground">
-                      {changelog.field === "status" ? (
-                        // For status field, just show "Status" without "Campo:"
-                        <span className="text-foreground font-medium">Status</span>
-                      ) : (
-                        <>
-                          <span className="text-muted-foreground">Campo: </span>
-                          <span className="text-foreground font-medium">{getFieldLabel(changelog.field, entityType)}</span>
-                        </>
-                      )}
+                      <span className="text-muted-foreground">Campo: </span>
+                      <span className="text-foreground font-medium">{getFieldLabel(changelog.field, entityType)}</span>
                     </div>
 
                     {/* Rollback button */}
@@ -1116,7 +1110,6 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
     const fileIds = new Set<string>();
     const observationIds = new Set<string>();
     const truckIds = new Set<string>();
-    const garageIds = new Set<string>();
 
     changelogs.forEach((changelog) => {
       if (changelog.field === "categoryId") {
@@ -1182,9 +1175,6 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
       } else if (changelog.field === "truckId") {
         if (changelog.oldValue && typeof changelog.oldValue === "string") truckIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string") truckIds.add(changelog.newValue);
-      } else if (changelog.field === "garageId") {
-        if (changelog.oldValue && typeof changelog.oldValue === "string") garageIds.add(changelog.oldValue);
-        if (changelog.newValue && typeof changelog.newValue === "string") garageIds.add(changelog.newValue);
       }
     });
 
@@ -1201,7 +1191,6 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
       fileIds: Array.from(fileIds),
       observationIds: Array.from(observationIds),
       truckIds: Array.from(truckIds),
-      garageIds: Array.from(garageIds),
     };
   }, [changelogs]);
 
@@ -1280,7 +1269,7 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1} style={{ maxHeight }}>
+    <Card className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)} level={1} style={maxHeight ? { maxHeight, height: maxHeight } : undefined}>
       <CardHeader className="pb-4 flex-shrink-0">
         <CardTitle className="flex items-center gap-3 text-xl">
           <div className="p-2 rounded-lg bg-primary/10">
@@ -1332,13 +1321,13 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
         )}
       </CardHeader>
 
-      <CardContent className="pt-0 flex-grow flex flex-col min-h-0 overflow-hidden">
+      <CardContent className="pt-0 flex-1 flex flex-col min-h-0 overflow-hidden">
         {isLoading ? (
           <ChangelogSkeleton />
         ) : changelogs.length === 0 ? (
           <EmptyState entityType={entityType} />
         ) : (
-          <ScrollArea className="pr-4 flex-1">
+          <ScrollArea className="pr-4 h-full">
             <div className="space-y-6">
               {groupedChangelogs.map(([date, dayChangelogGroups], groupIndex) => {
                 const isLastGroup = groupIndex === groupedChangelogs.length - 1;

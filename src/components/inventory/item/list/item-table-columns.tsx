@@ -1,10 +1,9 @@
 import { formatCurrency } from "../../../../utils";
-import { PPE_TYPE_LABELS, PPE_SIZE_LABELS } from "../../../../constants";
+import { PPE_TYPE_LABELS } from "../../../../constants";
 import type { Item } from "../../../../types";
 import { Badge } from "../../../ui/badge";
 import { StockStatusIndicator } from "./stock-status-indicator";
 import { MeasureDisplayCompact } from "../common/measure-display";
-import { AbcXyzBadge } from "../common/abc-xyz-badge";
 import { TABLE_LAYOUT } from "../../../ui/table-constants";
 import type { ItemColumn } from "./types";
 import { IconTrendingUp, IconTrendingDown, IconMinus } from "@tabler/icons-react";
@@ -53,7 +52,7 @@ export const createItemColumns = (): ItemColumn[] => [
     header: "CÓDIGO",
     accessor: (item: Item) => <div className="text-sm truncate">{item.uniCode || "-"}</div>,
     sortable: true,
-    className: TABLE_LAYOUT.firstDataColumn.className,
+    className: "w-24",
     align: "left",
   },
   {
@@ -126,18 +125,6 @@ export const createItemColumns = (): ItemColumn[] => [
   },
   // Secondary columns
   {
-    key: "abcxyz",
-    header: "ABC/XYZ",
-    accessor: (item: Item) => (
-      <div className="flex">
-        <AbcXyzBadge item={item} showBoth={true} size="sm" />
-      </div>
-    ),
-    sortable: false,
-    className: "w-24",
-    align: "left",
-  },
-  {
     key: "CA",
     header: "CA",
     accessor: (item: Item) => <div className="text-sm truncate">{item.ppeCA || "-"}</div>,
@@ -178,38 +165,6 @@ export const createItemColumns = (): ItemColumn[] => [
           ? item.reorderPoint % 1 === 0
             ? item.reorderPoint.toLocaleString("pt-BR")
             : item.reorderPoint.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : "-"}
-      </div>
-    ),
-    sortable: true,
-    className: "w-28",
-    align: "left",
-  },
-  {
-    key: "reorderQuantity",
-    header: "QTD. DE REPOSIÇÃO",
-    accessor: (item: Item) => (
-      <div className="text-muted-foreground truncate">
-        {item.reorderQuantity !== null && item.reorderQuantity !== undefined
-          ? item.reorderQuantity % 1 === 0
-            ? item.reorderQuantity.toLocaleString("pt-BR")
-            : item.reorderQuantity.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : "-"}
-      </div>
-    ),
-    sortable: true,
-    className: "w-28",
-    align: "left",
-  },
-  {
-    key: "boxQuantity",
-    header: "QTD. POR CAIXA",
-    accessor: (item: Item) => (
-      <div className="text-muted-foreground truncate">
-        {item.boxQuantity !== null && item.boxQuantity !== undefined
-          ? item.boxQuantity % 1 === 0
-            ? item.boxQuantity.toLocaleString("pt-BR")
-            : item.boxQuantity.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
           : "-"}
       </div>
     ),
@@ -272,24 +227,6 @@ export const createItemColumns = (): ItemColumn[] => [
     align: "left",
   },
   {
-    key: "ppeSize",
-    header: "TAMANHO EPI",
-    accessor: (item: Item) => {
-      const ppeSize = item.ppeSize;
-      if (!ppeSize) {
-        return <div className="text-muted-foreground">-</div>;
-      }
-      return (
-        <Badge variant="outline" className="text-xs">
-          {PPE_SIZE_LABELS[ppeSize] || ppeSize.replace("SIZE_", "")}
-        </Badge>
-      );
-    },
-    sortable: false,
-    className: "w-32",
-    align: "left",
-  },
-  {
     key: "shouldAssignToUser",
     header: "ATRIBUIR AO USUÁRIO",
     accessor: (item: Item) => (
@@ -336,45 +273,9 @@ export const createItemColumns = (): ItemColumn[] => [
     align: "center",
   },
   {
-    key: "borrowsCount",
-    header: "EMPRÉSTIMOS",
-    accessor: (item: Item) => (
-      <div className="text-center">
-        <Badge variant="outline" className="font-mono">
-          {(item as any)._count?.borrows || 0}
-        </Badge>
-      </div>
-    ),
-    sortable: false,
-    className: "w-28",
-    align: "center",
-  },
-  {
-    key: "pricesCount",
-    header: "HISTÓRICO PREÇOS",
-    accessor: (item: Item) => (
-      <div className="text-center">
-        <Badge variant="outline" className="font-mono">
-          {(item as any)._count?.prices || 0}
-        </Badge>
-      </div>
-    ),
-    sortable: false,
-    className: "w-32",
-    align: "center",
-  },
-  {
     key: "createdAt",
     header: "CRIADO EM",
     accessor: (item: Item) => <div className="text-sm text-muted-foreground">{new Date(item.createdAt).toLocaleDateString("pt-BR")}</div>,
-    sortable: true,
-    className: "w-32",
-    align: "left",
-  },
-  {
-    key: "updatedAt",
-    header: "ATUALIZADO EM",
-    accessor: (item: Item) => <div className="text-sm text-muted-foreground">{new Date(item.updatedAt).toLocaleDateString("pt-BR")}</div>,
     sortable: true,
     className: "w-32",
     align: "left",

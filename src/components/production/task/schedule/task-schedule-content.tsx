@@ -121,8 +121,8 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
         task.name?.toLowerCase().includes(searchLower) ||
         task.customer?.fantasyName?.toLowerCase().includes(searchLower) ||
         task.customer?.corporateName?.toLowerCase().includes(searchLower) ||
-        task.serialNumber?.toLowerCase().includes(searchLower) ||
-        task.plate?.toLowerCase().includes(searchLower) ||
+        task.truck?.serialNumber?.toLowerCase().includes(searchLower) ||
+        task.truck?.plate?.toLowerCase().includes(searchLower) ||
         task.sector?.name?.toLowerCase().includes(searchLower)
       );
     });

@@ -351,16 +351,19 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
               Status
             </Label>
             <Combobox
-              value={localFilters.where?.status || "all"}
-              onValueChange={(value) =>
+              value={localFilters.where?.status ? String(localFilters.where.status) : "all"}
+              onValueChange={(value) => {
+                const newWhere = { ...localFilters.where };
+                if (value === "all") {
+                  delete newWhere.status;
+                } else {
+                  newWhere.status = value as BORROW_STATUS;
+                }
                 setLocalFilters({
                   ...localFilters,
-                  where: {
-                    ...localFilters.where,
-                    status: value === "all" ? undefined : (value as BORROW_STATUS),
-                  },
-                })
-              }
+                  where: Object.keys(newWhere).length > 0 ? newWhere : undefined,
+                });
+              }}
               options={[
                 { label: "Todos os status", value: "all" },
                 ...Object.entries(BORROW_STATUS_LABELS).map(([value, label]) => ({
@@ -462,7 +465,7 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
           </div>
         </div>
 
-        <div className="flex gap-2 pt-4 border-t">
+        <div className="flex gap-2 mt-6 pt-4 border-t">
           <Button variant="outline" onClick={handleClear} className="flex-1 flex items-center gap-2">
             <IconX className="h-4 w-4" />
             Limpar Tudo

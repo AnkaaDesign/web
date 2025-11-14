@@ -101,18 +101,13 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
     [],
   );
 
-  // Memoize query parameters to prevent infinite re-renders
-  const queryParams = React.useMemo(() => {
-    console.log("[ItemTable] Building queryParams:", {
-      filters: Object.keys(filters || {}),
-      page,
-      pageSize,
-      showSelectedOnly,
-      selectedIdsCount: selectedIds.length,
-      sortConfigs,
-      currentURL: window.location.search
-    });
+  // Create a stable representation of query parameters using a ref to prevent infinite re-renders
+  const queryParamsRef = React.useRef<any>({});
+  const queryParamsStringRef = React.useRef("");
 
+  // Memoize query parameters with content-based comparison
+  const queryParams = React.useMemo(() => {
+    // Build params object
     const params = {
       // When showSelectedOnly is true, don't apply filters
       ...(showSelectedOnly ? {} : filters),
@@ -132,14 +127,15 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
         }),
     };
 
-    console.log("[ItemTable] Final queryParams:", {
-      page: params.page,
-      limit: params.limit,
-      hasOrderBy: !!params.orderBy,
-      hasWhere: !!params.where,
-      filterKeys: Object.keys(params)
-    });
-    return params;
+    // Only update the ref if the content actually changed
+    const currentParamsString = JSON.stringify(params);
+    if (currentParamsString !== queryParamsStringRef.current) {
+      console.log("[ItemTable] QueryParams content changed, updating ref");
+      queryParamsStringRef.current = currentParamsString;
+      queryParamsRef.current = params;
+    }
+
+    return queryParamsRef.current;
   }, [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds]);
 
   // Use the items hook with memoized parameters

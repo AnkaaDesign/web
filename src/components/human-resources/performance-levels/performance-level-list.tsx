@@ -93,7 +93,7 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
     defaultFilters: {
       limit: DEFAULT_PAGE_SIZE,
       where: {
-        status: USER_STATUS.CONTRACTED,  // Only CONTRACTED users (not dismissed, not inactive)
+        status: USER_STATUS.EFFECTED,  // Only EFFECTED users (not dismissed, not inactive)
         position: {
           is: {
             bonifiable: true  // Only users with bonifiable positions

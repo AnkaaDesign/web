@@ -13,7 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { IconLoader2, IconCheck, IconCurrencyReal, IconX, IconPackageExport } from "@tabler/icons-react";
-import { EXTERNAL_WITHDRAWAL_STATUS } from "../../../../constants";
+import { EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_TYPE } from "../../../../constants";
 import { useExternalWithdrawalStatusMutations, usePrivileges } from "../../../../hooks";
 import type { ExternalWithdrawal } from "../../../../types";
 import { formatDateTime } from "../../../../utils";
@@ -25,14 +25,21 @@ interface ExternalWithdrawalActionsProps {
   variant?: "default" | "compact";
 }
 
-type ActionType = "PARTIAL_RETURN" | "FULL_RETURN" | "CHARGE" | "CANCEL";
+type ActionType = "PARTIAL_RETURN" | "FULL_RETURN" | "CHARGE" | "LIQUIDATE" | "DELIVER" | "CANCEL";
 
 export function ExternalWithdrawalActions({ withdrawal, className, variant = "default" }: ExternalWithdrawalActionsProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [actionType, setActionType] = useState<ActionType | null>(null);
   const [notes, setNotes] = useState("");
 
-  const statusMutations = useExternalWithdrawalStatusMutations();
+  const {
+    markAsPartiallyReturned,
+    markAsFullyReturned,
+    markAsCharged,
+    markAsLiquidated,
+    markAsDelivered,
+    cancel,
+  } = useExternalWithdrawalStatusMutations();
   const { canManageWarehouse } = usePrivileges();
 
   // Only show for active/partially returned withdrawals and users with warehouse permissions
@@ -57,16 +64,22 @@ export function ExternalWithdrawalActions({ withdrawal, className, variant = "de
 
       switch (actionType) {
         case "PARTIAL_RETURN":
-          await statusMutations.markAsPartiallyReturned.mutateAsync({ id: withdrawal.id, data });
+          await markAsPartiallyReturned.mutateAsync({ id: withdrawal.id, data });
           break;
         case "FULL_RETURN":
-          await statusMutations.markAsFullyReturned.mutateAsync({ id: withdrawal.id, data });
+          await markAsFullyReturned.mutateAsync({ id: withdrawal.id, data });
           break;
         case "CHARGE":
-          await statusMutations.markAsCharged.mutateAsync({ id: withdrawal.id, data });
+          await markAsCharged.mutateAsync({ id: withdrawal.id, data });
+          break;
+        case "LIQUIDATE":
+          await markAsLiquidated.mutateAsync({ id: withdrawal.id, data });
+          break;
+        case "DELIVER":
+          await markAsDelivered.mutateAsync({ id: withdrawal.id, data });
           break;
         case "CANCEL":
-          await statusMutations.cancel.mutateAsync({ id: withdrawal.id, data });
+          await cancel.mutateAsync({ id: withdrawal.id, data });
           break;
       }
 
@@ -104,14 +117,36 @@ export function ExternalWithdrawalActions({ withdrawal, className, variant = "de
         };
       case "CHARGE":
         return {
-          label: "Cobrar Valor",
+          label: "Cobrar",
           icon: IconCurrencyReal,
           variant: "secondary" as const,
           className: undefined,
-          description: "Cobrar o valor dos itens não devolvidos",
+          description: "Cobrar o valor dos itens",
           confirmTitle: "Confirmar Cobrança",
           confirmText: "Esta ação marcará os itens como cobrados do responsável.",
-          requiresNotes: true,
+          requiresNotes: false,
+        };
+      case "LIQUIDATE":
+        return {
+          label: "Liquidar",
+          icon: IconCheck,
+          variant: "default" as const,
+          className: undefined,
+          description: "Liquidar o valor cobrado",
+          confirmTitle: "Confirmar Liquidação",
+          confirmText: "Esta ação marcará o valor como liquidado.",
+          requiresNotes: false,
+        };
+      case "DELIVER":
+        return {
+          label: "Entregar",
+          icon: IconPackageExport,
+          variant: "default" as const,
+          className: undefined,
+          description: "Marcar como entregue",
+          confirmTitle: "Confirmar Entrega",
+          confirmText: "Esta ação marcará a retirada como entregue.",
+          requiresNotes: false,
         };
       case "CANCEL":
         return {
@@ -128,19 +163,34 @@ export function ExternalWithdrawalActions({ withdrawal, className, variant = "de
   };
 
   const isLoading =
-    statusMutations.markAsPartiallyReturned.isPending ||
-    statusMutations.markAsFullyReturned.isPending ||
-    statusMutations.markAsCharged.isPending ||
-    statusMutations.cancel.isPending;
+    markAsPartiallyReturned.isPending ||
+    markAsFullyReturned.isPending ||
+    markAsCharged.isPending ||
+    markAsLiquidated.isPending ||
+    markAsDelivered.isPending ||
+    cancel.isPending;
 
   const currentActionConfig = actionType ? getActionConfig(actionType) : null;
 
-  // Available actions based on current status
+  // Available actions based on current type and status
   const availableActions: ActionType[] = [];
-  if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PENDING) {
-    availableActions.push("PARTIAL_RETURN", "FULL_RETURN", "CHARGE", "CANCEL");
-  } else if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED) {
-    availableActions.push("FULL_RETURN", "CHARGE", "CANCEL");
+
+  if (withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE) {
+    if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PENDING) {
+      availableActions.push("PARTIAL_RETURN", "FULL_RETURN", "CANCEL");
+    } else if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED) {
+      availableActions.push("FULL_RETURN", "CANCEL");
+    }
+  } else if (withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE) {
+    if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PENDING) {
+      availableActions.push("CHARGE", "CANCEL");
+    } else if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.CHARGED) {
+      availableActions.push("LIQUIDATE", "CANCEL");
+    }
+  } else if (withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY) {
+    if (withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PENDING) {
+      availableActions.push("DELIVER", "CANCEL");
+    }
   }
 
   if (variant === "compact") {

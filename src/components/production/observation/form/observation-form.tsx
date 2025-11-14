@@ -20,7 +20,7 @@ import { TaskSelector } from "./task-selector";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { IconAlertCircle, IconPaperclip, IconArrowLeft, IconArrowRight, IconCheck, IconX, IconFile, IconUser, IconBuildingFactory, IconHash } from "@tabler/icons-react";
+import { IconAlertCircle, IconPaperclip, IconCheck, IconX, IconFile, IconUser, IconBuildingFactory, IconHash } from "@tabler/icons-react";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { cn, backendFileToFileWithPreview } from "@/lib/utils";
 import { toast } from "sonner";
@@ -806,7 +806,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="flex flex-col h-full">
       <div className="flex-shrink-0">
         <PageHeaderWithFavorite
           title={mode === "create" ? "Nova Observação" : "Editar Observação"}
@@ -822,30 +822,17 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
             {
               key: "cancel",
               label: "Cancelar",
-              icon: IconArrowLeft,
               onClick: onCancel || (() => navigate(routes.production.observations.root)),
               variant: "outline",
             },
             // Show different actions based on mode and step
             ...(mode === "create"
               ? [
-                  // Previous button (only show if not first step)
-                  ...(!isFirstStep
-                    ? [
-                        {
-                          key: "prev",
-                          label: "Anterior",
-                          icon: IconArrowLeft,
-                          onClick: prevStep,
-                          variant: "outline" as const,
-                        },
-                      ]
-                    : []),
                   // Next/Submit button
                   {
                     key: isLastStep ? "submit" : "next",
                     label: isLastStep ? "Cadastrar" : "Próximo",
-                    icon: isLastStep ? IconCheck : IconArrowRight,
+                    icon: isLastStep ? IconCheck : undefined,
                     onClick: isLastStep ? form.handleSubmit(handleSubmit) : handleNext,
                     variant: "default" as const,
                     disabled: form.formState.isSubmitting,
@@ -867,8 +854,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       </div>
 
       <div className={cn(
-        "flex-1 min-h-0",
-        mode === "create" ? "px-4" : "",
+        "flex-1 min-h-0 pt-6",
         mode === "create" && currentStep === 2 ? "flex flex-col overflow-hidden" : mode === "create" ? "overflow-y-auto" : "",
         mode === "edit" ? "flex flex-col overflow-hidden" : ""
       )}>

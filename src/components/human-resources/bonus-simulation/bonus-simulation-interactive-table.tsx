@@ -220,11 +220,11 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
 
   const { data: currentPeriodTasks } = useTasks(taskQuery);
 
-  // Fetch all contracted users for bonus simulation
+  // Fetch all effected users for bonus simulation
   // Client-side filters will handle eligibility, sectors, positions, etc.
   const { data: usersData } = useUsers({
     where: {
-      status: USER_STATUS.CONTRACTED, // Only CONTRACTED users (not dismissed, not inactive)
+      status: USER_STATUS.EFFECTED, // Only EFFECTED users (not dismissed, not inactive)
     },
     include: {
       position: true,
@@ -316,7 +316,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
       setSimulatedUsers(users);
       setIsLoading(false);
     }
-  }, [usersData, taskQuantity]); // Added taskQuantity back to recalculate on task changes
+  }, [usersData]); // Only reinitialize when usersData changes, not when taskQuantity changes
 
   // Apply filters to get visible users
   const filteredUsers = useMemo(() => {
@@ -325,7 +325,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
     // Apply eligibility filter
     // A user is eligible if:
     // 1. They have a bonifiable position
-    // 2. They are CONTRACTED status (already filtered in the query)
+    // 2. They are EFFECTED status (already filtered in the query)
     // 3. They have a performance level > 0
     if (filters.showOnlyEligible) {
       filtered = filtered.filter(user => {

@@ -295,6 +295,50 @@ export function extractActiveFilters(
     });
   }
 
+  if (filters.dismissedAt?.gte || filters.dismissedAt?.lte) {
+    const gte = filters.dismissedAt.gte;
+    const lte = filters.dismissedAt.lte;
+    let value = "";
+
+    if (gte && lte) {
+      value = `${formatDate(gte)} - ${formatDate(lte)}`;
+    } else if (gte) {
+      value = `≥ ${formatDate(gte)}`;
+    } else if (lte) {
+      value = `≤ ${formatDate(lte)}`;
+    }
+
+    activeFilters.push({
+      key: "dismissedAt",
+      label: "Data Demissão",
+      value,
+      iconType: "calendar",
+      onRemove: () => onRemoveFilter("dismissedAt"),
+    });
+  }
+
+  if (filters.exp1EndAt?.gte || filters.exp1EndAt?.lte) {
+    const gte = filters.exp1EndAt.gte;
+    const lte = filters.exp1EndAt.lte;
+    let value = "";
+
+    if (gte && lte) {
+      value = `${formatDate(gte)} - ${formatDate(lte)}`;
+    } else if (gte) {
+      value = `≥ ${formatDate(gte)}`;
+    } else if (lte) {
+      value = `≤ ${formatDate(lte)}`;
+    }
+
+    activeFilters.push({
+      key: "exp1EndAt",
+      label: "Data de Contratação",
+      value,
+      iconType: "calendar",
+      onRemove: () => onRemoveFilter("exp1EndAt"),
+    });
+  }
+
   return activeFilters;
 }
 
@@ -398,6 +442,12 @@ export function createFilterRemover(currentFilters: Partial<UserGetManyFormData>
         break;
       case "lastLoginAt":
         delete newFilters.lastLoginAt;
+        break;
+      case "dismissedAt":
+        delete newFilters.dismissedAt;
+        break;
+      case "exp1EndAt":
+        delete newFilters.exp1EndAt;
         break;
     }
 

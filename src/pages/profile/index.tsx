@@ -16,6 +16,16 @@ import { PageHeader } from "@/components/ui/page-header";
 import { routes } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
 import { useCepLookup } from "@/hooks/use-cep-lookup";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
@@ -24,6 +34,7 @@ export function ProfilePage() {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [showDeletePhotoDialog, setShowDeletePhotoDialog] = useState(false);
   const { refreshUser } = useAuth();
 
   const form = useForm<UserUpdateFormData>({
@@ -192,10 +203,6 @@ export function ProfilePage() {
   };
 
   const handleDeletePhoto = async () => {
-    if (!window.confirm("Tem certeza que deseja remover sua foto de perfil?")) {
-      return;
-    }
-
     try {
       setIsUploadingPhoto(true);
       const response = await deletePhoto();
@@ -209,6 +216,7 @@ export function ProfilePage() {
       toast.error(error?.response?.data?.message || "Erro ao remover foto");
     } finally {
       setIsUploadingPhoto(false);
+      setShowDeletePhotoDialog(false);
     }
   };
 
@@ -325,7 +333,7 @@ export function ProfilePage() {
                     size="sm"
                     className="w-full"
                     disabled={isUploadingPhoto}
-                    onClick={handleDeletePhoto}
+                    onClick={() => setShowDeletePhotoDialog(true)}
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Remover Foto
@@ -525,6 +533,28 @@ export function ProfilePage() {
         </div>
       </div>
       </div>
+
+      {/* Delete Photo Confirmation Dialog */}
+      <AlertDialog open={showDeletePhotoDialog} onOpenChange={setShowDeletePhotoDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover Foto de Perfil</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover sua foto de perfil? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUploadingPhoto}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeletePhoto}
+              disabled={isUploadingPhoto}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isUploadingPhoto ? "Removendo..." : "Remover"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

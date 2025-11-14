@@ -159,7 +159,6 @@ const InventoryProductsBrandsBatchEdit = lazy(() => import("@/pages/inventory/pr
 
 // Personal
 const Personal = lazy(() => import("@/pages/personal/root").then((module) => ({ default: module.Personal })));
-const PersonalMyProfile = lazy(() => import("@/pages/personal/my-profile").then((module) => ({ default: module.MyProfilePage })));
 const PersonalMyLoans = lazy(() => import("@/pages/personal/my-loans").then((module) => ({ default: module.MyLoansPage })));
 const PersonalMyPpes = lazy(() => import("@/pages/personal/my-ppes").then((module) => ({ default: module.MyPpesPage })));
 const PersonalMyPpesRequest = lazy(() => import("@/pages/personal/my-ppes").then((module) => ({ default: module.PersonalMyPpesRequest })));
@@ -238,9 +237,6 @@ const HumanResourcesPpeDeliveries = lazy(() => import("@/pages/human-resources/p
 const HumanResourcesPpeDeliveriesCreate = lazy(() => import("@/pages/human-resources/ppe/deliveries/create").then((module) => ({ default: module.EPIDeliveryCreate })));
 const HumanResourcesPpeDeliveriesEdit = lazy(() => import("@/pages/human-resources/ppe/deliveries/edit/[id]").then((module) => ({ default: module.EPIDeliveryEdit })));
 const HumanResourcesPpeDeliveriesDetails = lazy(() => import("@/pages/human-resources/ppe/deliveries/details/[id]").then((module) => ({ default: module.EPIDeliveryDetails })));
-const HumanResourcesPpeSizes = lazy(() => import("@/pages/human-resources/ppe/sizes/list").then((module) => ({ default: module.PpeSizeListPage })));
-const HumanResourcesPpeSizesCreate = lazy(() => import("@/pages/human-resources/ppe/sizes/create").then((module) => ({ default: module.PpeSizeCreate })));
-const HumanResourcesPpeSizesEdit = lazy(() => import("@/pages/human-resources/ppe/sizes/edit/[id]").then((module) => ({ default: module.PpeSizeEditPage })));
 const HumanResourcesPpeSchedules = lazy(() => import("@/pages/human-resources/ppe/schedules/list").then((module) => ({ default: module.PPESchedulesListPage })));
 const HumanResourcesPpeSchedulesCreate = lazy(() => import("@/pages/human-resources/ppe/schedules/create").then((module) => ({ default: module.PPEScheduleCreatePage })));
 const HumanResourcesPpeSchedulesEdit = lazy(() => import("@/pages/human-resources/ppe/schedules/edit/[id]").then((module) => ({ default: module.PPEScheduleEditPage })));
@@ -261,10 +257,6 @@ const HumanResourcesPerformanceLevels = lazy(() => import("@/pages/human-resourc
 // Catalog
 const CatalogList = lazy(() => import("@/pages/catalog/list").then((module) => ({ default: module.default })));
 const CatalogDetails = lazy(() => import("@/pages/catalog/details/[id]").then((module) => ({ default: module.default })));
-
-// Maintenance
-const Maintenance = lazy(() => import("@/pages/maintenance/index").then((module) => ({ default: module.default })));
-const MaintenanceDetails = lazy(() => import("@/pages/maintenance/details/[id]").then((module) => ({ default: module.default })));
 
 // My Team
 const MyTeam = lazy(() => import("@/pages/my-team/index").then((module) => ({ default: module.default })));
@@ -1304,14 +1296,6 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.personal.myProfile.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonalMyProfile />
-                    </Suspense>
-                  }
-                />
-                <Route
                   path={routes.personal.myLoans.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -1724,30 +1708,6 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.ppe.sizes.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeSizes />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.humanResources.ppe.sizes.create}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeSizesCreate />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.humanResources.ppe.sizes.edit(":id")}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <HumanResourcesPpeSizesEdit />
-                    </Suspense>
-                  }
-                />
-                <Route
                   path={routes.humanResources.ppe.schedules.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -1899,7 +1859,7 @@ function App() {
                   path={routes.maintenance.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <Maintenance />
+                      <InventoryMaintenance />
                     </Suspense>
                   }
                 />
@@ -1923,7 +1883,7 @@ function App() {
                   path={routes.maintenance.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <MaintenanceDetails />
+                      <InventoryMaintenanceDetails />
                     </Suspense>
                   }
                 />

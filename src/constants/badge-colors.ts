@@ -259,7 +259,7 @@ export const ENTITY_BADGE_CONFIG = {
   USER: {
     [USER_STATUS.EXPERIENCE_PERIOD_1]: "pending" as BadgeVariant,  // Yellow - first trial period
     [USER_STATUS.EXPERIENCE_PERIOD_2]: "primary" as BadgeVariant,  // Blue - second trial period
-    [USER_STATUS.CONTRACTED]: "success" as BadgeVariant,           // Green - fully hired
+    [USER_STATUS.EFFECTED]: "success" as BadgeVariant,             // Green - fully hired/effected
     [USER_STATUS.DISMISSED]: "destructive" as BadgeVariant,        // Red - dismissed
   },
 

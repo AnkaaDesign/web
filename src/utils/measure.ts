@@ -400,8 +400,8 @@ export function getPrimaryMeasure(measureValue: number | null, measureUnit: MEAS
  * Format a measure value with Brazilian conventions
  */
 export function formatMeasure(measure: MeasureValue, includeUnit: boolean = true, decimals: number = 2, measureType?: MEASURE_TYPE): string {
-  // For DIAMETER with INCHES, format as fraction with inch symbol
-  if (measureType === MEASURE_TYPE.DIAMETER && measure.unit === MEASURE_UNIT.INCHES) {
+  // For INCHES (any measure type), format as fraction with inch symbol
+  if (measure.unit === MEASURE_UNIT.INCHES) {
     const fractionValue = decimalToFraction(measure.value);
     return includeUnit ? `${fractionValue}"` : fractionValue;
   }

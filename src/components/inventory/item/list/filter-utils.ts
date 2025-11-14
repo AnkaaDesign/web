@@ -36,16 +36,18 @@ export function extractActiveFilters(
     });
   }
 
-  // Boolean filters
-  if (filters.showInactive) {
+  // Boolean filters - show status filter indicator only when explicitly set
+  // Use isActive field from API (not showInactive)
+  if (typeof filters.isActive === "boolean") {
     activeFilters.push({
-      key: "showInactive",
+      key: "isActive",
       label: "Status",
-      value: "Incluindo desativados",
+      value: filters.isActive ? "Apenas ativos" : "Apenas inativos",
       iconType: "eye",
-      onRemove: () => onRemoveFilter("showInactive"),
+      onRemove: () => onRemoveFilter("isActive"),
     });
   }
+  // When undefined (ambos), we don't show an indicator since that's the default state
 
   if (filters.where?.shouldAssignToUser !== undefined) {
     activeFilters.push({
@@ -386,8 +388,8 @@ export function createFilterRemover(currentFilters: Partial<ItemGetManyFormData>
       case "searchingFor":
         delete newFilters.searchingFor;
         break;
-      case "showInactive":
-        delete newFilters.showInactive;
+      case "isActive":
+        delete newFilters.isActive;
         break;
       case "shouldAssignToUser":
         delete newWhere.shouldAssignToUser;

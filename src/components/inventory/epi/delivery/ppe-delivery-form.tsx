@@ -8,13 +8,28 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { IconLoader, IconPackage, IconUser } from "@tabler/icons-react";
+import { z } from "zod";
 import { ppeDeliveryCreateSchema, ppeDeliveryUpdateSchema, type PpeDeliveryCreateFormData, type PpeDeliveryUpdateFormData } from "../../../../schemas";
 import { useAuth } from "../../../../hooks";
 import { type PpeDelivery } from "../../../../types";
 import { PPE_DELIVERY_STATUS, PPE_DELIVERY_STATUS_LABELS, routes, SECTOR_PRIVILEGES } from "../../../../constants";
 import { ItemSelectorDropdown } from "./item-selector-dropdown";
 import { UserSelectorDropdown } from "./user-selector-dropdown";
+import { MultiDeliveryInput } from "./multi-delivery-input";
 import { hasPrivilege } from "../../../../utils";
+
+// Batch create schema for multiple deliveries
+const ppeDeliveryBatchCreateSchema = z.object({
+  ppeDeliveries: z.array(
+    z.object({
+      userId: z.string().uuid("Funcionário inválido").min(1, "Selecione um funcionário"),
+      itemId: z.string().uuid("EPI inválido").min(1, "Selecione um EPI"),
+      quantity: z.number().positive("Quantidade deve ser positiva").int("Quantidade deve ser um número inteiro"),
+    })
+  ).min(1, "Adicione pelo menos uma entrega"),
+});
+
+type PpeDeliveryBatchCreateFormData = z.infer<typeof ppeDeliveryBatchCreateSchema>;
 
 interface BasePpeDeliveryFormProps {
   isSubmitting?: boolean;
@@ -22,8 +37,8 @@ interface BasePpeDeliveryFormProps {
 
 interface CreatePpeDeliveryFormProps extends BasePpeDeliveryFormProps {
   mode: "create";
-  onSubmit: (data: PpeDeliveryCreateFormData) => Promise<void>;
-  defaultValues?: Partial<PpeDeliveryCreateFormData>;
+  onSubmit: (data: PpeDeliveryBatchCreateFormData) => Promise<void>;
+  defaultValues?: Partial<PpeDeliveryBatchCreateFormData>;
 }
 
 interface UpdatePpeDeliveryFormProps extends BasePpeDeliveryFormProps {
@@ -45,18 +60,13 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
   const currentStatus = mode === "update" ? props.ppeDelivery.status : PPE_DELIVERY_STATUS.APPROVED;
 
   // Setup form based on mode
-  const form = useForm<PpeDeliveryCreateFormData | PpeDeliveryUpdateFormData>({
-    resolver: zodResolver(mode === "create" ? ppeDeliveryCreateSchema : ppeDeliveryUpdateSchema),
+  const form = useForm<PpeDeliveryBatchCreateFormData | PpeDeliveryUpdateFormData>({
+    resolver: zodResolver(mode === "create" ? ppeDeliveryBatchCreateSchema : ppeDeliveryUpdateSchema),
     mode: "onBlur", // Validate on blur for better UX
     defaultValues:
       mode === "create"
         ? {
-            itemId: "",
-            userId: "",
-            quantity: 1,
-            status: PPE_DELIVERY_STATUS.APPROVED, // Auto-approve for admin
-            actualDeliveryDate: null,
-            ...props.defaultValues,
+            ppeDeliveries: props.defaultValues?.ppeDeliveries || [],
           }
         : {
             quantity: props.ppeDelivery.quantity,
@@ -76,19 +86,25 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
     }
   }, [watchStatus, form]);
 
-  const handleSubmit = async (data: PpeDeliveryCreateFormData | PpeDeliveryUpdateFormData) => {
+  const handleSubmit = async (data: PpeDeliveryBatchCreateFormData | PpeDeliveryUpdateFormData) => {
     try {
       if (mode === "create") {
-        const createData: PpeDeliveryCreateFormData = {
-          ...(data as PpeDeliveryCreateFormData),
-          reviewedBy: currentUser?.id ?? "",
-          status: PPE_DELIVERY_STATUS.APPROVED, // Auto-approve when admin creates
+        const batchData = data as PpeDeliveryBatchCreateFormData;
+        // Add reviewedBy and status to each delivery
+        const deliveriesWithStatus = {
+          ppeDeliveries: batchData.ppeDeliveries.map((delivery) => ({
+            ...delivery,
+            reviewedBy: currentUser?.id ?? "",
+            status: PPE_DELIVERY_STATUS.APPROVED, // Auto-approve when admin creates
+          })),
         };
-        await props.onSubmit(createData);
+        await props.onSubmit(deliveriesWithStatus);
+        // Don't navigate here - let parent component handle navigation after showing dialog
       } else {
         await props.onSubmit(data as PpeDeliveryUpdateFormData);
+        // For update mode, navigate after success
+        navigate(routes.inventory.ppe.deliveries.root);
       }
-      navigate(routes.inventory.ppe.deliveries.root);
     } catch (error) {
       console.error("Error submitting form:", error);
     }
@@ -119,83 +135,9 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
           <form id="ppe-delivery-form" onSubmit={form.handleSubmit(handleSubmit, handleError)} className="space-y-6">
             {/* Hidden submit button for programmatic form submission */}
             <button type="submit" id="ppe-delivery-form-submit" className="hidden" aria-hidden="true" />
-              {/* User, Item and Quantity Selection (only for create mode) */}
+              {/* Multi Delivery Input (only for create mode) */}
               {canEditItemAndUser && (
-                <div className="grid grid-cols-1 md:grid-cols-[1.5fr,2.5fr,150px] gap-4">
-                  <FormField
-                    control={form.control}
-                    name="userId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <IconUser className="h-4 w-4" />
-                          Funcionário <span className="text-destructive">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <UserSelectorDropdown
-                            value={field.value}
-                            onChange={(value) => {
-                              field.onChange(value);
-                              setSelectedUserId(value);
-                              // Clear item selection when user changes
-                              form.setValue("itemId", "");
-                            }}
-                            placeholder="Selecione o funcionário"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="itemId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-2">
-                          <IconPackage className="h-4 w-4" />
-                          EPI <span className="text-destructive">*</span>
-                        </FormLabel>
-                        <FormControl>
-                          <ItemSelectorDropdown value={field.value} onChange={field.onChange} placeholder="Selecione o EPI" userId={selectedUserId} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="quantity"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Quantidade <span className="text-destructive">*</span></FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={999}
-                            value={field.value}
-                            onChange={(e) => {
-                              const value = parseInt(e.target.value);
-                              if (isNaN(value) || value < 1) {
-                                field.onChange(1);
-                              } else if (value > 999) {
-                                field.onChange(999);
-                              } else {
-                                field.onChange(value);
-                              }
-                            }}
-                            placeholder="Quantidade"
-                            className="bg-transparent"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <MultiDeliveryInput control={form.control} disabled={isSubmitting} />
               )}
 
               {/* Quantity field for update mode */}

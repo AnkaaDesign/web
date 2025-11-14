@@ -59,12 +59,11 @@ export function Breadcrumb({ items }: BreadcrumbProps = {}) {
       {breadcrumbs.map((crumb: { id: string; title: string; path?: string }, index: number) => {
         const isLast = index === breadcrumbs.length - 1;
         const canNavigate = crumb.path && !isLast;
-        const showSeparator = index > 0 || (showHomeIcon && index === 0);
         const isHome = crumb.title === "Início" && index === 0;
 
         return (
           <React.Fragment key={crumb.id}>
-            {showSeparator && index > 0 && <IconChevronRight className="w-4 h-4" />}
+            {index > 0 && <IconChevronRight className="w-4 h-4" />}
             {canNavigate ? (
               <button onClick={() => handleBreadcrumbClick(crumb.path)} className="flex items-center gap-1 hover:text-foreground transition-colors max-w-[200px]" title={crumb.title}>
                 {isHome && <IconHome2 className="w-4 h-4 shrink-0" />}

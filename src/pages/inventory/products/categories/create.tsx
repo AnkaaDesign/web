@@ -22,11 +22,9 @@ const CreateCategoryPage = () => {
 
   const handleSubmit = async (data: ItemCategoryCreateFormData) => {
     try {
-      const result = await createAsync(data);
-
-      if (result.success) {
-        navigate(routes.inventory.products.categories.root);
-      }
+      await createAsync(data);
+      // If we reach here, the creation was successful
+      navigate(routes.inventory.products.categories.root);
     } catch (error) {
       // Error handled by mutation hook
       console.error("Error creating category:", error);
@@ -63,7 +61,7 @@ const CreateCategoryPage = () => {
       {/* Fixed Header */}
       <div className="flex-shrink-0">
         <div className="px-4 pt-4">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-5xl mx-auto">
             <PageHeaderWithFavorite
               title="Cadastrar Categoria"
               icon={IconCategory}
@@ -83,7 +81,7 @@ const CreateCategoryPage = () => {
 
       {/* Scrollable Form Container */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-3xl mx-auto h-full">
+        <div className="max-w-5xl mx-auto h-full">
           <CategoryForm mode="create" defaultValues={defaultValues} onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
         </div>
       </div>

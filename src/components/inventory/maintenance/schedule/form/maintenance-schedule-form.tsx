@@ -66,6 +66,45 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
   });
 
   const watchFrequency = form.watch("frequency");
+  const watchItemId = form.watch("itemId");
+  const watchName = form.watch("name");
+  const watchDayOfWeek = form.watch("dayOfWeek");
+  const watchDayOfMonth = form.watch("dayOfMonth");
+  const watchMonth = form.watch("month");
+  const watchSpecificDate = form.watch("specificDate");
+  const watchNextRun = form.watch("nextRun");
+
+  // Custom validation check for enabling submit button without triggering schema errors
+  const checkRequiredFields = useMemo(() => {
+    if (mode !== "create") return true; // For update mode, always allow submit
+
+    // Check basic required fields
+    if (!watchName?.trim() || !watchItemId) return false;
+
+    // Check frequency-specific requirements
+    switch (watchFrequency) {
+      case SCHEDULE_FREQUENCY.ONCE:
+        return !!watchSpecificDate;
+      case SCHEDULE_FREQUENCY.WEEKLY:
+      case SCHEDULE_FREQUENCY.BIWEEKLY:
+        return !!watchDayOfWeek || !!watchNextRun;
+      case SCHEDULE_FREQUENCY.MONTHLY:
+      case SCHEDULE_FREQUENCY.BIMONTHLY:
+      case SCHEDULE_FREQUENCY.QUARTERLY:
+      case SCHEDULE_FREQUENCY.TRIANNUAL:
+      case SCHEDULE_FREQUENCY.QUADRIMESTRAL:
+      case SCHEDULE_FREQUENCY.SEMI_ANNUAL:
+        return !!watchDayOfMonth || !!watchNextRun;
+      case SCHEDULE_FREQUENCY.ANNUAL:
+        return (!!watchDayOfMonth && !!watchMonth) || !!watchNextRun;
+      case SCHEDULE_FREQUENCY.DAILY:
+        return true; // Daily doesn't require additional fields
+      case SCHEDULE_FREQUENCY.CUSTOM:
+        return !!watchNextRun; // Custom requires nextRun
+      default:
+        return true;
+    }
+  }, [mode, watchName, watchItemId, watchFrequency, watchDayOfWeek, watchDayOfMonth, watchMonth, watchSpecificDate, watchNextRun]);
 
   // Group frequencies by their behavior for optimized rendering
   const frequencyGroups = useMemo(
@@ -199,11 +238,11 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
   useEffect(() => {
     if (onFormStateChange) {
       onFormStateChange({
-        isValid: form.formState.isValid,
+        isValid: checkRequiredFields,
         isDirty: form.formState.isDirty,
       });
     }
-  }, [form.formState.isValid, form.formState.isDirty, onFormStateChange]);
+  }, [checkRequiredFields, form.formState.isDirty, onFormStateChange]);
 
   const isRequired = mode === "create";
 

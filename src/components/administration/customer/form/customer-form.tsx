@@ -27,7 +27,7 @@ import { FormInput } from "@/components/ui/form-input";
 import { LogoInput } from "./logo-input";
 import { TagsInput } from "./tags-input";
 import { SituacaoCadastralSelect } from "./situacao-cadastral-select";
-import { LogradouroTypeSelect } from "./logradouro-type-select";
+import { StreetTypeSelect } from "./street-type-select";
 import { EconomicActivitySelect } from "./economic-activity-select";
 
 interface BaseCustomerFormProps {
@@ -412,7 +412,7 @@ export function CustomerForm(props: CustomerFormProps) {
               {/* Second row: street type (2/6), address (3/6), number (1/6) */}
               <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
                 <div className="md:col-span-2">
-                  <LogradouroTypeSelect />
+                  <StreetTypeSelect />
                 </div>
                 <div className="md:col-span-3">
                   <AddressInput disabled={isSubmitting} required={false} />

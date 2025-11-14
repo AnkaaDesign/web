@@ -488,23 +488,21 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   // Navigation helpers
   const nextStep = useCallback(() => {
     if (currentStep < steps.length) {
-      // Skip Step 2 (Item Selection) if in temporary mode
-      const newStep = currentStep === 1 && orderItemMode === "temporary" ? 3 : currentStep + 1;
+      const newStep = currentStep + 1;
       setCurrentStep(newStep);
       // Use functional form to ensure we have the latest params
       setSearchParams((prevParams) => setStepInUrl(prevParams, newStep), { replace: true });
     }
-  }, [currentStep, orderItemMode, setSearchParams]);
+  }, [currentStep, setSearchParams]);
 
   const prevStep = useCallback(() => {
     if (currentStep > 1) {
-      // Skip Step 2 (Item Selection) if in temporary mode and coming from Step 3
-      const newStep = currentStep === 3 && orderItemMode === "temporary" ? 1 : currentStep - 1;
+      const newStep = currentStep - 1;
       setCurrentStep(newStep);
       // Use functional form to ensure we have the latest params
       setSearchParams((prevParams) => setStepInUrl(prevParams, newStep), { replace: true });
     }
-  }, [currentStep, orderItemMode, setSearchParams]);
+  }, [currentStep, setSearchParams]);
 
   // File change handlers
   const handleBudgetFilesChange = useCallback((files: FileWithPreview[]) => {
@@ -579,31 +577,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
           return false;
         }
 
-        // If in temporary mode, validate temporary items
-        if (orderItemMode === "temporary") {
-          const tempItems = form.getValues("temporaryItems") || temporaryItemsState || [];
-          if (tempItems.length === 0) {
-            toast.error("Pelo menos um item temporário deve ser adicionado");
-            return false;
-          }
-
-          // Validate each temporary item
-          const hasInvalidItems = tempItems.some((item: any) =>
-            !item.temporaryItemDescription || item.temporaryItemDescription.trim() === "" ||
-            !item.orderedQuantity || item.orderedQuantity <= 0 ||
-            item.price === undefined || item.price === null || item.price < 0
-          );
-
-          if (hasInvalidItems) {
-            toast.error("Preencha todos os campos dos itens temporários (descrição, quantidade e preço)");
-            return false;
-          }
-        }
-
         return true;
 
       case 2:
-        // Validate item selection (only for inventory mode)
+        // Validate item selection based on mode
         if (orderItemMode === "inventory") {
           if (selectionCount === 0) {
             toast.error("Selecione pelo menos um item");
@@ -619,6 +596,25 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
 
           if (invalidItems.length > 0) {
             toast.error(`Defina quantidade e preço válidos para todos os itens`);
+            return false;
+          }
+        } else {
+          // Validate temporary items
+          const tempItems = form.getValues("temporaryItems") || temporaryItemsState || [];
+          if (tempItems.length === 0) {
+            toast.error("Pelo menos um item temporário deve ser adicionado");
+            return false;
+          }
+
+          // Validate each temporary item
+          const hasInvalidItems = tempItems.some((item: any) =>
+            !item.temporaryItemDescription || item.temporaryItemDescription.trim() === "" ||
+            !item.orderedQuantity || item.orderedQuantity <= 0 ||
+            item.price === undefined || item.price === null || item.price < 0
+          );
+
+          if (hasInvalidItems) {
+            toast.error("Preencha todos os campos dos itens temporários (descrição, quantidade e preço)");
             return false;
           }
         }
@@ -1243,150 +1239,147 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-6">
-                        {/* Description - Full width */}
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium flex items-center gap-2">
-                            <IconFileText className="h-4 w-4" />
-                            Descrição <span className="text-red-500">*</span>
-                          </Label>
-                          <Input
-                            placeholder="Digite a descrição do pedido"
-                            value={description}
-                            onChange={(value) => {
-                              // Custom Input component passes value directly, not event object
-                              const newValue = value?.toString() || "";
-                              console.log('[DESCRIPTION CHANGE] User typed:', newValue);
-                              updateDescription(newValue);
-                              // Form will be synced by useEffect, no need to set it here
-                              // Trigger validation after state update
-                              setTimeout(() => form.trigger(), 0);
-                            }}
-                            transparent
-                            className={`h-10 w-full ${form.formState.errors.description ? "border-red-500" : ""}`}
-                          />
-                          <FormMessage className="text-sm text-red-500">{form.formState.errors.description?.message}</FormMessage>
-                        </div>
+                        {/* First Row: Description, Supplier, and Forecast */}
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                          {/* Description - 6/12 width */}
+                          <div className="space-y-2 md:col-span-6">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <IconFileText className="h-4 w-4" />
+                              Descrição <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              placeholder="Digite a descrição do pedido"
+                              value={description}
+                              onChange={(value) => {
+                                // Custom Input component passes value directly, not event object
+                                const newValue = value?.toString() || "";
+                                console.log('[DESCRIPTION CHANGE] User typed:', newValue);
+                                updateDescription(newValue);
+                                // Form will be synced by useEffect, no need to set it here
+                                // Trigger validation after state update
+                                setTimeout(() => form.trigger(), 0);
+                              }}
+                              transparent
+                              className={`h-10 w-full ${form.formState.errors.description ? "border-red-500" : ""}`}
+                            />
+                            <FormMessage className="text-sm text-red-500">{form.formState.errors.description?.message}</FormMessage>
+                          </div>
 
-                        {/* Mode Switch - Read-only */}
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium flex items-center gap-2">
-                            <IconClipboardList className="h-4 w-4" />
-                            Tipo de Itens
-                          </Label>
-                          <RadioGroup
-                            value={orderItemMode}
-                            disabled={true}
-                            className="grid grid-cols-1 md:grid-cols-2 gap-3 opacity-60 pointer-events-none"
-                          >
-                            <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 group">
-                              <RadioGroupItem value="inventory" id="edit-mode-inventory" className="mt-0.5" />
-                              <div className="flex-1 space-y-1">
-                                <Label htmlFor="edit-mode-inventory" className="flex items-center gap-2 font-medium group-hover:text-white">
-                                  <IconShoppingCart className="h-4 w-4" />
-                                  Itens do Estoque
-                                </Label>
-                                <p className="text-sm text-muted-foreground group-hover:text-white/90">
-                                  Itens do inventário
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 group">
-                              <RadioGroupItem value="temporary" id="edit-mode-temporary" className="mt-0.5" />
-                              <div className="flex-1 space-y-1">
-                                <Label htmlFor="edit-mode-temporary" className="flex items-center gap-2 font-medium group-hover:text-white">
-                                  <IconFileInvoice className="h-4 w-4" />
-                                  Itens Temporários
-                                </Label>
-                                <p className="text-sm text-muted-foreground group-hover:text-white/90">
-                                  Compras únicas
-                                </p>
-                              </div>
-                            </div>
-                          </RadioGroup>
-                          <p className="text-xs text-muted-foreground text-center">
-                            Não é possível alterar o tipo de itens durante a edição
-                          </p>
-                        </div>
+                          {/* Supplier - 4/12 width */}
+                          <div className="space-y-2 md:col-span-4">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <IconTruck className="h-4 w-4" />
+                              Fornecedor
+                            </Label>
+                            <Combobox<ComboboxOption>
+                              placeholder="Selecione um fornecedor (opcional)"
+                              options={suppliers.map((supplier) => ({
+                                value: supplier.id,
+                                label: supplier.fantasyName,
+                                logo: supplier.logo,
+                              }))}
+                              value={supplierId}
+                              onValueChange={(value) => {
+                                const newValue = typeof value === "string" ? value : undefined;
+                                updateSupplierId(newValue);
+                                // Form will be synced by useEffect
+                                // Trigger validation after state update
+                                setTimeout(() => form.trigger(), 0);
+                              }}
+                              className="h-10 w-full"
+                              mode="single"
+                              searchable={true}
+                              clearable={true}
+                              renderOption={(option, isSelected) => (
+                                <div className="flex items-center gap-3 w-full">
+                                  <SupplierLogoDisplay
+                                    logo={(option as any).logo}
+                                    supplierName={option.label}
+                                    size="sm"
+                                    shape="rounded"
+                                    className="flex-shrink-0"
+                                  />
+                                  <div className="flex flex-col gap-1 min-w-0 flex-1">
+                                    <div className="font-medium truncate">{option.label}</div>
+                                  </div>
+                                </div>
+                              )}
+                            />
+                          </div>
 
-                        {/* Supplier, Date and Observations in the same row */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* Left Column: Supplier and Date */}
-                          <div className="space-y-6">
-                            {/* Supplier */}
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium flex items-center gap-2">
-                                <IconTruck className="h-4 w-4" />
-                                Fornecedor
-                              </Label>
-                              <Combobox<ComboboxOption>
-                                placeholder="Selecione um fornecedor (opcional)"
-                                options={suppliers.map((supplier) => ({
-                                  value: supplier.id,
-                                  label: supplier.fantasyName,
-                                  logo: supplier.logo,
-                                }))}
-                                value={supplierId}
-                                onValueChange={(value) => {
-                                  const newValue = typeof value === "string" ? value : undefined;
-                                  updateSupplierId(newValue);
+                          {/* Forecast Date - 2/12 width */}
+                          <div className="space-y-2 md:col-span-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <IconCalendar className="h-4 w-4" />
+                              Previsão
+                            </Label>
+                            <DateTimeInput
+                              value={forecast ? (forecast instanceof Date ? forecast : new Date(forecast)) : undefined}
+                              onChange={(date) => {
+                                if (date) {
+                                  // Set to 13:00 São Paulo time
+                                  const newDate = new Date(date);
+                                  newDate.setHours(13, 0, 0, 0);
+                                  updateForecast(newDate);
                                   // Form will be synced by useEffect
                                   // Trigger validation after state update
                                   setTimeout(() => form.trigger(), 0);
-                                }}
-                                className="h-10 w-full"
-                                mode="single"
-                                searchable={true}
-                                clearable={true}
-                                renderOption={(option, isSelected) => (
-                                  <div className="flex items-center gap-3 w-full">
-                                    <SupplierLogoDisplay
-                                      logo={(option as any).logo}
-                                      supplierName={option.label}
-                                      size="sm"
-                                      shape="rounded"
-                                      className="flex-shrink-0"
-                                    />
-                                    <div className="flex flex-col gap-1 min-w-0 flex-1">
-                                      <div className="font-medium truncate">{option.label}</div>
-                                    </div>
-                                  </div>
-                                )}
-                              />
-                            </div>
+                                } else {
+                                  updateForecast(null);
+                                  // Form will be synced by useEffect
+                                  // Trigger validation after state update
+                                  setTimeout(() => form.trigger(), 0);
+                                }
+                              }}
+                              context="delivery"
+                              placeholder="Data"
+                              showClearButton={true}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
 
-                            {/* Forecast Date */}
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium flex items-center gap-2">
-                                <IconCalendar className="h-4 w-4" />
-                                Previsão de Entrega
-                              </Label>
-                              <DateTimeInput
-                                value={forecast ? (forecast instanceof Date ? forecast : new Date(forecast)) : undefined}
-                                onChange={(date) => {
-                                  if (date) {
-                                    // Set to 13:00 São Paulo time
-                                    const newDate = new Date(date);
-                                    newDate.setHours(13, 0, 0, 0);
-                                    updateForecast(newDate);
-                                    // Form will be synced by useEffect
-                                    // Trigger validation after state update
-                                    setTimeout(() => form.trigger(), 0);
-                                  } else {
-                                    updateForecast(null);
-                                    // Form will be synced by useEffect
-                                    // Trigger validation after state update
-                                    setTimeout(() => form.trigger(), 0);
-                                  }
-                                }}
-                                context="delivery"
-                                placeholder="Selecione a data prevista (opcional)"
-                                showClearButton={true}
-                                className="w-full"
-                              />
-                            </div>
+                        {/* Second Row: Type and Observations */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Left: Type selector */}
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <IconClipboardList className="h-4 w-4" />
+                              Tipo de Itens
+                            </Label>
+                            <RadioGroup
+                              value={orderItemMode}
+                              disabled={true}
+                              className="flex flex-col gap-3 opacity-60 pointer-events-none"
+                            >
+                              <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 group">
+                                <RadioGroupItem value="inventory" id="edit-mode-inventory" className="mt-0.5" />
+                                <div className="flex-1 space-y-1">
+                                  <Label htmlFor="edit-mode-inventory" className="flex items-center gap-2 font-medium group-hover:text-white">
+                                    <IconShoppingCart className="h-4 w-4" />
+                                    Itens do Estoque
+                                  </Label>
+                                  <p className="text-sm text-muted-foreground group-hover:text-white/90">
+                                    Itens do inventário
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 group">
+                                <RadioGroupItem value="temporary" id="edit-mode-temporary" className="mt-0.5" />
+                                <div className="flex-1 space-y-1">
+                                  <Label htmlFor="edit-mode-temporary" className="flex items-center gap-2 font-medium group-hover:text-white">
+                                    <IconFileInvoice className="h-4 w-4" />
+                                    Itens Temporários
+                                  </Label>
+                                  <p className="text-sm text-muted-foreground group-hover:text-white/90">
+                                    Compras únicas
+                                  </p>
+                                </div>
+                              </div>
+                            </RadioGroup>
                           </div>
 
-                          {/* Right Column: Observations */}
+                          {/* Right: Observations */}
                           <div className="space-y-2 flex flex-col">
                             <Label className="text-sm font-medium flex items-center gap-2">
                               <IconNotes className="h-4 w-4" />
@@ -1402,24 +1395,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 setTimeout(() => form.trigger(), 0);
                               }}
                               className="resize-none w-full flex-1"
-                              rows={3}
                             />
                           </div>
                         </div>
-
-                        {/* Temporary Items Input (only shown in temporary mode) */}
-                        {orderItemMode === "temporary" && (
-                          <div className="space-y-4">
-                            <Separator />
-                            <div className="space-y-3">
-                              <Label className="text-sm font-medium flex items-center gap-2">
-                                <IconFileInvoice className="h-4 w-4" />
-                                Itens Temporários
-                              </Label>
-                              <TemporaryItemsInput control={form.control} />
-                            </div>
-                          </div>
-                        )}
 
                         {/* File uploads */}
                         <div className="space-y-4">
@@ -1539,6 +1517,22 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                     }}
                     className="flex-1 min-h-0"
                   />
+                )}
+
+                {currentStep === 2 && orderItemMode === "temporary" && (
+                  <div className="space-y-6">
+                    <Card className="w-full">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <IconFileInvoice className="h-5 w-5" />
+                          Itens Temporários
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <TemporaryItemsInput control={form.control} disabled={isSubmitting} />
+                      </CardContent>
+                    </Card>
+                  </div>
                 )}
 
                 {currentStep === 3 && (

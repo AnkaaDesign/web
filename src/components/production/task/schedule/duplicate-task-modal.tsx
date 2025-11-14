@@ -31,16 +31,16 @@ export function DuplicateTaskModal({ open, onOpenChange, task, onConfirm }: Dupl
   } = useForm<DuplicateTaskFormData>({
     resolver: zodResolver(duplicateTaskSchema),
     defaultValues: {
-      serialNumber: task?.serialNumber || "",
-      plate: task?.plate || "",
+      serialNumber: task?.truck?.serialNumber || "",
+      plate: task?.truck?.plate || "",
     },
   });
 
   React.useEffect(() => {
     if (task) {
       reset({
-        serialNumber: task.serialNumber || "",
-        plate: task.plate || "",
+        serialNumber: task.truck?.serialNumber || "",
+        plate: task.truck?.plate || "",
       });
     }
   }, [task, reset]);

@@ -194,7 +194,7 @@ export function ChangelogFilters({ isOpen, onClose, filters, onFiltersChange, on
             </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-4 border-t">
+          <div className="flex gap-2 mt-6 pt-4 border-t">
             <Button variant="outline" onClick={handleReset} disabled={activeFilterCount === 0} className="flex-1">
               <IconX className="h-4 w-4 mr-2" />
               Limpar Filtros

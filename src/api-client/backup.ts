@@ -15,6 +15,11 @@ interface BackupMetadata {
   compressionLevel?: number;
   encrypted?: boolean;
   progress?: number; // Progress percentage (0-100)
+  autoDelete?: {
+    enabled: boolean;
+    retention: '1_day' | '3_days' | '1_week' | '2_weeks' | '1_month' | '3_months' | '6_months' | '1_year';
+    deleteAfter?: string; // ISO date string when backup should be deleted
+  };
 }
 
 interface CreateBackupRequest {
@@ -26,6 +31,10 @@ interface CreateBackupRequest {
   raidAware?: boolean;
   compressionLevel?: number;
   encrypted?: boolean;
+  autoDelete?: {
+    enabled: boolean;
+    retention: '1_day' | '3_days' | '1_week' | '2_weeks' | '1_month' | '3_months' | '6_months' | '1_year';
+  };
 }
 
 interface ScheduleBackupRequest extends CreateBackupRequest {

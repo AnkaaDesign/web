@@ -13,12 +13,19 @@ export const PPE_SIZE_TO_NUMERIC: Record<string, number> = {
   [PPE_SIZE.XG]: 5,
 
   // Boots and Pants sizes (numeric)
+  [PPE_SIZE.SIZE_35]: 35,
   [PPE_SIZE.SIZE_36]: 36,
+  [PPE_SIZE.SIZE_37]: 37,
   [PPE_SIZE.SIZE_38]: 38,
+  [PPE_SIZE.SIZE_39]: 39,
   [PPE_SIZE.SIZE_40]: 40,
+  [PPE_SIZE.SIZE_41]: 41,
   [PPE_SIZE.SIZE_42]: 42,
+  [PPE_SIZE.SIZE_43]: 43,
   [PPE_SIZE.SIZE_44]: 44,
+  [PPE_SIZE.SIZE_45]: 45,
   [PPE_SIZE.SIZE_46]: 46,
+  [PPE_SIZE.SIZE_47]: 47,
   [PPE_SIZE.SIZE_48]: 48,
 };
 

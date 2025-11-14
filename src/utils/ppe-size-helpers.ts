@@ -4,16 +4,23 @@ import { MEASURE_TYPE } from "../constants";
 /**
  * Maps PPE size enum values to numeric values
  * Letter sizes (P, M, G) are stored as unit field
- * Numeric sizes (36, 38, 40) are stored as value field
+ * Numeric sizes (35-48) are stored as value field
  */
 export const PPE_SIZE_TO_NUMERIC: Record<string, number> = {
   // Boots and Pants sizes (numeric) - stored in value field
+  SIZE_35: 35,
   SIZE_36: 36,
+  SIZE_37: 37,
   SIZE_38: 38,
+  SIZE_39: 39,
   SIZE_40: 40,
+  SIZE_41: 41,
   SIZE_42: 42,
+  SIZE_43: 43,
   SIZE_44: 44,
+  SIZE_45: 45,
   SIZE_46: 46,
+  SIZE_47: 47,
   SIZE_48: 48,
 };
 

@@ -13,6 +13,16 @@ import { IconSearch, IconFilter, IconUpload } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useTableState } from "@/hooks/use-table-state";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface FileListProps {
   className?: string;
@@ -46,6 +56,11 @@ export function FileList({ className }: FileListProps) {
   // Single source of truth for search input - no dual state!
   const [searchInput, setSearchInput] = useState(() => searchParams.get("search") || "");
   const [showFilterModal, setShowFilterModal] = useState(false);
+
+  // Delete dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [filesToDelete, setFilesToDelete] = useState<File[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Get table state for selected items functionality
   const { selectionCount, showSelectedOnly, toggleShowSelectedOnly } = useTableState({
@@ -242,16 +257,22 @@ export function FileList({ className }: FileListProps) {
     }
   };
 
-  const handleBulkDelete = async (files: File[]) => {
+  const handleBulkDelete = (files: File[]) => {
+    setFilesToDelete(files);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = async () => {
     try {
-      const confirmed = window.confirm(`Tem certeza que deseja deletar ${files.length} arquivo${files.length > 1 ? "s" : ""}?`);
-
-      if (!confirmed) return;
-
-      const ids = files.map((file) => file.id);
+      setIsDeleting(true);
+      const ids = filesToDelete.map((file) => file.id);
       await batchDelete({ fileIds: ids });
     } catch (error) {
       console.error("Error deleting file(s):", error);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setFilesToDelete([]);
     }
   };
 
@@ -341,6 +362,29 @@ export function FileList({ className }: FileListProps) {
           )}
         </div>
       </CardContent>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Arquivo{filesToDelete.length > 1 ? "s" : ""}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja deletar {filesToDelete.length} arquivo{filesToDelete.length > 1 ? "s" : ""}?
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

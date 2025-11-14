@@ -18,7 +18,16 @@ import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useTableState } from "@/hooks/use-table-state";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
-import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface MaintenanceScheduleListProps {
   className?: string;
@@ -51,13 +60,15 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
     totalRecords: 0,
   });
 
+  // Delete dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [schedulesToDelete, setSchedulesToDelete] = useState<MaintenanceSchedule[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Stable callback for table data updates
   const handleTableDataChange = useCallback((data: { items: MaintenanceSchedule[]; totalRecords: number }) => {
     setTableData(data);
   }, []);
-
-  // Track cursor position to maintain it during search operations
-  const cursorPositionRef = useRef<number>(0);
 
   // State from URL params - must be declared before debounced search
   const [searchingFor, setSearchingFor] = useState(() => searchParams.get("search") || "");
@@ -77,32 +88,15 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
     [setSearchingFor]
   );
 
-  // Update cursor position when user interacts with search input
+  // Handle search input change
   const handleSearchInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const target = e.target;
-      cursorPositionRef.current = target.selectionStart || 0;
-      setDisplaySearchText(target.value); // Immediate UI update
-      debouncedSearch(target.value); // Debounced API call
+    (value: string | number | null) => {
+      const strValue = value?.toString() || "";
+      setDisplaySearchText(strValue); // Immediate UI update
+      debouncedSearch(strValue); // Debounced API call
     },
     [debouncedSearch]
   );
-
-  // Keep focus and cursor position stable during search operations
-  useEffect(() => {
-    // Only restore cursor position if the search input is currently focused
-    if (searchInputRef.current && document.activeElement === searchInputRef.current) {
-      // Use requestAnimationFrame to ensure DOM updates are complete
-      requestAnimationFrame(() => {
-        if (searchInputRef.current && document.activeElement === searchInputRef.current) {
-          const input = searchInputRef.current;
-          const savedPosition = cursorPositionRef.current;
-          // Restore cursor position to where the user was typing
-          input.setSelectionRange(savedPosition, savedPosition);
-        }
-      });
-    }
-  }, [displaySearchText]); // Depend on display text changes, not table data
 
   // Load entity data for filter labels
   const { data: itemsData } = useItems({
@@ -291,7 +285,6 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
   const handleBulkActivate = async (schedules: MaintenanceSchedule[]) => {
     const schedulesToActivate = schedules.filter((s) => !s.isActive);
     if (schedulesToActivate.length === 0) {
-      toast.error("Todos os agendamentos selecionados já estão ativos");
       return;
     }
 
@@ -304,23 +297,14 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
           })
         )
       );
-
-      const count = schedulesToActivate.length;
-      toast.success(
-        count === 1
-          ? "Agendamento ativado com sucesso"
-          : `${count} agendamentos ativados com sucesso`
-      );
     } catch (error) {
       console.error("Error activating schedules:", error);
-      toast.error("Erro ao ativar agendamentos");
     }
   };
 
   const handleBulkDeactivate = async (schedules: MaintenanceSchedule[]) => {
     const schedulesToDeactivate = schedules.filter((s) => s.isActive);
     if (schedulesToDeactivate.length === 0) {
-      toast.error("Todos os agendamentos selecionados já estão inativos");
       return;
     }
 
@@ -333,37 +317,26 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
           })
         )
       );
-
-      const count = schedulesToDeactivate.length;
-      toast.success(
-        count === 1
-          ? "Agendamento desativado com sucesso"
-          : `${count} agendamentos desativados com sucesso`
-      );
     } catch (error) {
       console.error("Error deactivating schedules:", error);
-      toast.error("Erro ao desativar agendamentos");
     }
   };
 
-  const handleBulkDelete = async (schedules: MaintenanceSchedule[]) => {
-    const count = schedules.length;
-    const message =
-      count === 1
-        ? `Tem certeza que deseja excluir o agendamento "${schedules[0].name}"?`
-        : `Tem certeza que deseja excluir ${count} agendamentos?`;
+  const handleBulkDelete = (schedules: MaintenanceSchedule[]) => {
+    setSchedulesToDelete(schedules);
+    setShowDeleteDialog(true);
+  };
 
-    if (!window.confirm(message)) return;
-
+  const confirmDelete = async () => {
     try {
-      await Promise.all(schedules.map((schedule) => deleteMutation.mutateAsync(schedule.id)));
-
-      toast.success(
-        count === 1 ? "Agendamento excluído com sucesso" : `${count} agendamentos excluídos com sucesso`
-      );
+      setIsDeleting(true);
+      await Promise.all(schedulesToDelete.map((schedule) => deleteMutation.mutateAsync(schedule.id)));
     } catch (error) {
       console.error("Error deleting schedules:", error);
-      toast.error("Erro ao excluir agendamentos");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setSchedulesToDelete([]);
     }
   };
 
@@ -380,6 +353,7 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
               placeholder="Buscar por nome, item, descrição..."
               value={displaySearchText}
               onChange={handleSearchInputChange}
+              transparent
               className="pl-10"
             />
           </div>
@@ -433,6 +407,31 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
         filters={filters}
         onFilterChange={handleFilterChange}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Agendamento{schedulesToDelete.length > 1 ? "s" : ""}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {schedulesToDelete.length === 1
+                ? `Tem certeza que deseja excluir o agendamento "${schedulesToDelete[0]?.name}"?`
+                : `Tem certeza que deseja excluir ${schedulesToDelete.length} agendamentos?`}
+              {" "}Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

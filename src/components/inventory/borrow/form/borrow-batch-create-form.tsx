@@ -1,17 +1,17 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { IconLoader2, IconCheck, IconPackage } from "@tabler/icons-react";
-import type { BorrowCreateFormData } from "../../../../schemas";
+import type { BorrowCreateFormData, ItemGetManyFormData } from "../../../../schemas";
 import { useBorrowBatchMutations, useUsers } from "../../../../hooks";
 import { routes, FAVORITE_PAGES, USER_STATUS } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
-import { BorrowItemSelector } from "./borrow-item-selector";
+import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import { useBorrowFormUrlState } from "@/hooks/use-borrow-form-url-state";
 import { BorrowBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { useBatchResultDialog } from "@/hooks/use-batch-result-dialog";
@@ -106,7 +106,7 @@ export const BorrowBatchCreateForm = () => {
     statuses: [
       USER_STATUS.EXPERIENCE_PERIOD_1,
       USER_STATUS.EXPERIENCE_PERIOD_2,
-      USER_STATUS.CONTRACTED
+      USER_STATUS.EFFECTED
     ],
     orderBy: { name: "asc" },
     take: 100,
@@ -117,6 +117,22 @@ export const BorrowBatchCreateForm = () => {
 
   // Batch result dialog
   const { isOpen, result, openDialog, closeDialog } = useBatchResultDialog();
+
+  // Consolidate filters for ItemSelectorTable
+  const filters = useMemo<Partial<ItemGetManyFormData>>(() => ({
+    showInactive,
+    categoryIds: categoryIds.length > 0 ? categoryIds : undefined,
+    brandIds: brandIds.length > 0 ? brandIds : undefined,
+    supplierIds: supplierIds.length > 0 ? supplierIds : undefined,
+  }), [showInactive, categoryIds, brandIds, supplierIds]);
+
+  // Handle filter changes from ItemSelectorTable
+  const handleFiltersChange = useCallback((newFilters: Partial<ItemGetManyFormData>) => {
+    if (newFilters.showInactive !== undefined) setShowInactive(newFilters.showInactive);
+    if (newFilters.categoryIds !== undefined) setCategoryIds(newFilters.categoryIds);
+    if (newFilters.brandIds !== undefined) setBrandIds(newFilters.brandIds);
+    if (newFilters.supplierIds !== undefined) setSupplierIds(newFilters.supplierIds);
+  }, [setShowInactive, setCategoryIds, setBrandIds, setSupplierIds]);
 
   // Sync URL state with form
   useEffect(() => {
@@ -137,7 +153,8 @@ export const BorrowBatchCreateForm = () => {
 
   // Handle item selection
   const handleSelectItem = useCallback(
-    (itemId: string) => {
+    (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => {
+      // Borrow form only uses quantity, but accept all params for compatibility
       toggleItemSelection(itemId);
     },
     [toggleItemSelection],
@@ -332,36 +349,43 @@ export const BorrowBatchCreateForm = () => {
                 </div>
 
                 {/* Paginated Item Selector */}
-                <div className="flex-1 min-h-0 overflow-y-auto">
-                  <BorrowItemSelector
+                <div className="flex-1 min-h-0">
+                  <ItemSelectorTable
                     selectedItems={selectedItems}
                     onSelectItem={handleSelectItem}
                     onSelectAll={handleSelectAll}
-                    onQuantityChange={handleQuantityChange}
                     quantities={quantities}
-                    isSelected={(itemId) => selectedItems.has(itemId)}
-                    showQuantityInput={true}
-                    showSelectedOnly={showSelectedOnly}
-                    searchTerm={searchTerm}
-                    showInactive={showInactive}
-                    categoryIds={categoryIds}
-                    brandIds={brandIds}
-                    supplierIds={supplierIds}
-                    onSearchTermChange={setSearchTerm}
-                    onShowInactiveChange={setShowInactive}
-                    onCategoryIdsChange={setCategoryIds}
-                    onBrandIdsChange={setBrandIds}
-                    onSupplierIdsChange={setSupplierIds}
-                    onShowSelectedOnlyChange={setShowSelectedOnly}
-                    // Pagination props
+                    onQuantityChange={handleQuantityChange}
+                    editableColumns={{
+                      showQuantityInput: true,
+                    }}
+                    fixedColumnsConfig={{
+                      fixedColumns: ['name', 'quantity'],
+                      fixedReasons: {
+                        name: 'Essencial para identificar o item',
+                        quantity: 'Necessário para verificar estoque disponível e evitar empréstimos acima do estoque',
+                      },
+                    }}
+                    defaultColumns={['uniCode', 'name', 'category.name', 'brand.name', 'measures', 'quantity']}
+                    storageKey="borrow-item-selector"
+                    additionalFilters={{
+                      where: {
+                        category: {
+                          type: 'TOOL',
+                        },
+                      },
+                    }}
+                    // URL state management
                     page={page}
                     pageSize={pageSize}
-                    totalRecords={totalRecords}
+                    showSelectedOnly={showSelectedOnly}
+                    searchTerm={searchTerm}
+                    filters={filters}
                     onPageChange={setPage}
                     onPageSizeChange={setPageSize}
-                    onTotalRecordsChange={setTotalRecords}
-                    // Batch selection function for atomic updates
-                    updateSelectedItems={urlState.batchUpdateSelection}
+                    onShowSelectedOnlyChange={setShowSelectedOnly}
+                    onSearchTermChange={setSearchTerm}
+                    onFiltersChange={handleFiltersChange}
                     className="h-full"
                   />
                 </div>

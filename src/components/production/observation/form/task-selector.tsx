@@ -130,11 +130,8 @@ export const TaskSelector = ({
   const currentPageSize = pageSizeProp || 20;
 
   // Use props or internal state for pagination
-  // currentPage is 0-based for SimplePaginationAdvanced component
+  // currentPage is 0-based for SimplePaginationAdvanced component and API
   const currentPage = pageProp !== undefined ? pageProp : internalPage;
-
-  // API expects 1-based page numbers
-  const apiPage = currentPage + 1;
 
   // Handle page change
   const handlePageChange = (newPage: number) => {
@@ -154,7 +151,7 @@ export const TaskSelector = ({
   const taskQuery = useMemo(() => {
     const query: any = {
       searchingFor: debouncedSearchTerm || undefined,
-      page: apiPage,
+      page: currentPage,
       limit: currentPageSize,
       status: [TASK_STATUS.COMPLETED], // Only show completed tasks
       include: {
@@ -190,7 +187,7 @@ export const TaskSelector = ({
     }
 
     return query;
-  }, [debouncedSearchTerm, apiPage, currentPageSize, statusIds, customerIds, userIds, sectorIds, sortConfigs]);
+  }, [debouncedSearchTerm, currentPage, currentPageSize, statusIds, customerIds, userIds, sectorIds, sortConfigs]);
 
   // Fetch tasks
   const { data: taskResponse, isLoading } = useTasks(taskQuery);
@@ -304,7 +301,7 @@ export const TaskSelector = ({
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="flex-1 relative">
           <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar tarefas..." value={searchTerm} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearchChange(e.target.value)} className="pl-10" />
+          <Input placeholder="Buscar tarefas..." value={searchTerm} onChange={(value) => handleSearchChange(value as string)} className="pl-10 bg-transparent" />
         </div>
         <div className="flex gap-2">
           <Dialog open={isFilterModalOpen} onOpenChange={setIsFilterModalOpen}>

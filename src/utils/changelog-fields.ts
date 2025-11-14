@@ -13,7 +13,7 @@ import {
 } from '@constants';
 import { formatDateTime } from "./date";
 import { formatCurrency } from "./number";
-import { formatBrazilianPhone, formatCPF, formatCNPJ } from "./formatters";
+import { formatBrazilianPhone, formatCPF, formatCNPJ, formatChassis } from "./formatters";
 
 // Common field name mapping for all entities
 const commonFields: Record<string, string> = {
@@ -209,7 +209,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     statusOrder: "Ordem do Status",
     isActive: "Ativo",
     admissional: "Data de Admissão",
-    contractedAt: "Data de Contratação",
+    effectedAt: "Data de Contratação",
     exp1StartAt: "Início da Experiência 1",
     exp1EndAt: "Fim da Experiência 1",
     exp2StartAt: "Início da Experiência 2",
@@ -444,7 +444,6 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     notes: "Observações",
     totalPrice: "Valor Total",
     withdrawalDate: "Data da Retirada",
-    expectedReturnDate: "Data Prevista de Devolução",
     actualReturnDate: "Data Real de Devolução",
     totalValue: "Valor Total",
     isPaid: "Pago",
@@ -502,22 +501,6 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     positions: "Cargos",
     tasks: "Tarefas",
   },
-  [CHANGE_LOG_ENTITY_TYPE.GARAGE_LANE]: {
-    width: "Largura",
-    length: "Comprimento",
-    xPosition: "Posição X",
-    yPosition: "Posição Y",
-    garageId: "Garagem",
-    "garage.name": "Nome da Garagem",
-  },
-  [CHANGE_LOG_ENTITY_TYPE.PARKING_SPOT]: {
-    name: "Número",
-    length: "Comprimento",
-    garageLaneId: "Faixa da Garagem",
-    "garageLane.id": "ID da Faixa",
-    "garageLane.xPosition": "Posição X da Faixa",
-    "garageLane.yPosition": "Posição Y da Faixa",
-  },
   [CHANGE_LOG_ENTITY_TYPE.MAINTENANCE]: {
     type: "Tipo",
     truckId: "Caminhão",
@@ -526,7 +509,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     startedAt: "Iniciado em",
     finishedAt: "Finalizado em",
     completedAt: "Concluído em",
-    timeTaken: "Tempo gasto (min)",
+    timeTaken: "Tempo gasto",
     cost: "Custo",
     maintenanceScheduleId: "Cronograma de Manutenção",
     itemId: "Equipamento",
@@ -889,7 +872,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       "icms", "ipi", "margin", "minimumMargin", "monthlyConsumptionTrendPercent", "ratio",
       "quantity", "maxQuantity", "boxQuantity", "reorderPoint", "reorderQuantity",
       "orderedQuantity", "receivedQuantity", "withdrawedQuantity", "returnedQuantity",
-      "viscosity", "weight", "volume", "volumeLiters"
+      "viscosity", "weight", "volume", "volumeLiters", "timeTaken"
     ];
 
     if (numericFields.includes(field)) {
@@ -1058,7 +1041,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     const userStatusLabels: Record<string, string> = {
       EXPERIENCE_PERIOD_1: "Experiência - 1º Período",
       EXPERIENCE_PERIOD_2: "Experiência - 2º Período",
-      CONTRACTED: "Contratado",
+      EFFECTED: "Efetivado",
       DISMISSED: "Demitido",
     };
     return userStatusLabels[value] || value;
@@ -1272,11 +1255,11 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   // Handle registration status for Customer
   if (field === "registrationStatus" && typeof value === "string") {
     const registrationStatusLabels: Record<string, string> = {
-      ATIVA: "Ativa",
-      SUSPENSA: "Suspensa",
-      INAPTA: "Inapta",
-      ATIVA_NAO_REGULAR: "Ativa Não Regular",
-      BAIXADA: "Baixada",
+      ACTIVE: "Active",
+      SUSPENDED: "Suspended",
+      UNFIT: "Unfit",
+      ACTIVE_NOT_REGULAR: "Active Not Regular",
+      DEREGISTERED: "Deregistered",
     };
     return registrationStatusLabels[value] || value;
   }
@@ -1625,6 +1608,11 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return formatCNPJ(value);
   }
 
+  // Handle Chassis Number field
+  if (field === "chassisNumber" && typeof value === "string") {
+    return formatChassis(value);
+  }
+
   // Handle payrollNumber field
   if (field === "payrollNumber" && typeof value === "number") {
     return value.toString();
@@ -1701,9 +1689,11 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       return `${value} ${value === 1 ? "dia" : "dias"}`;
     }
 
-    // Time fields (minutes)
+    // Time fields (seconds to HH:MM format)
     if (field === "timeTaken") {
-      return `${value} ${value === 1 ? "minuto" : "minutos"}`;
+      const hours = Math.floor(value / 3600);
+      const minutes = Math.floor((value % 3600) / 60);
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     }
 
     // Quantity fields
@@ -1816,7 +1806,7 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     field === "sentAt" ||
     field === "scheduledAt" ||
     field === "seenAt" ||
-    field === "contractedAt" ||
+    field === "effectedAt" ||
     field === "dismissedAt"
   ) {
     const date = new Date(value as any);
@@ -1860,6 +1850,30 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       }
     }
 
+    // Special handling for delivery_completed field in PPE_DELIVERY
+    if (field === "delivery_completed" && entityType === CHANGE_LOG_ENTITY_TYPE.PPE_DELIVERY) {
+      const data = value as any;
+      if (data.itemName && data.userName && data.quantity) {
+        return `${data.itemName} entregue para ${data.userName} (Quantidade: ${data.quantity})`;
+      }
+    }
+
+    // Special handling for batch_approval field in PPE_DELIVERY
+    if (field === "batch_approval" && entityType === CHANGE_LOG_ENTITY_TYPE.PPE_DELIVERY) {
+      const data = value as any;
+      if (data.approvedCount) {
+        return `${data.approvedCount} ${data.approvedCount === 1 ? "entrega aprovada" : "entregas aprovadas"}`;
+      }
+    }
+
+    // Special handling for batch_rejection field in PPE_DELIVERY
+    if (field === "batch_rejection" && entityType === CHANGE_LOG_ENTITY_TYPE.PPE_DELIVERY) {
+      const data = value as any;
+      if (data.rejectedCount) {
+        return `${data.rejectedCount} ${data.rejectedCount === 1 ? "entrega rejeitada" : "entregas rejeitadas"}`;
+      }
+    }
+
     return JSON.stringify(value, null, 2);
   }
 
@@ -1881,7 +1895,6 @@ export const actionConfig: Record<CHANGE_LOG_ACTION, { label: string }> = {
   [CHANGE_LOG_ACTION.REJECT]: { label: "Rejeitado" },
   [CHANGE_LOG_ACTION.CANCEL]: { label: "Cancelado" },
   [CHANGE_LOG_ACTION.COMPLETE]: { label: "Concluído" },
-  [CHANGE_LOG_ACTION.RESCHEDULE]: { label: "Reagendado" },
   [CHANGE_LOG_ACTION.BATCH_CREATE]: { label: "Criação em Lote" },
   [CHANGE_LOG_ACTION.BATCH_UPDATE]: { label: "Atualização em Lote" },
   [CHANGE_LOG_ACTION.BATCH_DELETE]: { label: "Exclusão em Lote" },

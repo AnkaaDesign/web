@@ -245,23 +245,23 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
         } else {
           // Fallback to direct API calls
           if (contextMenu.isBulk && contextMenu.users.length > 1) {
-            // Bulk mark as contracted
+            // Bulk mark as effected
             const users = contextMenu.users.map((user) => ({
               id: user.id,
-              data: { status: USER_STATUS.CONTRACTED },
+              data: { status: USER_STATUS.EFFECTED },
             }));
             await batchUpdate({ users });
           } else {
-            // Single mark as contracted
+            // Single mark as effected
             await updateUser({
               id: contextMenu.users[0].id,
-              data: { status: USER_STATUS.CONTRACTED },
+              data: { status: USER_STATUS.EFFECTED },
             });
           }
         }
         setContextMenu(null);
       } catch (error) {
-        console.error("Error marking user(s) as contracted:", error);
+        console.error("Error marking user(s) as effected:", error);
       }
     }
   };

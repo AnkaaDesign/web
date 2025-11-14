@@ -943,6 +943,111 @@ export function UserBatchResultDialog(props: Omit<BatchOperationResultDialogProp
   return <BatchOperationResultDialog {...props} entityName="colaborador" successItemDisplay={successItemDisplay} failedItemDisplay={failedItemDisplay} />;
 }
 
+// Specialized version for PPE Deliveries
+interface PpeDeliveryBatchResult {
+  itemName?: string;
+  userName?: string;
+  quantity?: number;
+  status?: string;
+  [key: string]: any;
+}
+
+export function PpeDeliveryBatchResultDialog(
+  props: Omit<BatchOperationResultDialogProps<PpeDeliveryBatchResult, PpeDeliveryBatchResult>, "entityName" | "successItemDisplay" | "failedItemDisplay">,
+) {
+  const successItemDisplay = (item: PpeDeliveryBatchResult) => {
+    // Handle both cases: data directly on item or nested
+    const itemData = item as any;
+    const itemName = itemData.itemName || itemData.item?.name || itemData.data?.itemName || "Item desconhecido";
+    const userName = itemData.userName || itemData.user?.name || itemData.data?.userName || "Funcionário desconhecido";
+    const quantity = itemData.quantity || itemData.data?.quantity || 0;
+
+    return (
+      <div className="flex-1">
+        <p className="font-semibold text-base">{itemName}</p>
+        <p className="text-sm text-muted-foreground mt-1">{userName}</p>
+        <p className="text-sm text-muted-foreground">
+          Quantidade: {quantity}
+        </p>
+      </div>
+    );
+  };
+
+  const failedItemDisplay = (error: BatchOperationError<PpeDeliveryBatchResult>) => {
+    // Handle both cases: data in error.data or directly on error object
+    const errorData = error as any;
+    const item = error.data as PpeDeliveryBatchResult;
+
+    const itemName = errorData.itemName || item?.itemName || errorData.data?.itemName || "Item desconhecido";
+    const userName = errorData.userName || item?.userName || errorData.data?.userName || "Funcionário desconhecido";
+
+    // Parse error message for better formatting
+    let errorDisplay;
+    if (error.error.includes("excede o estoque disponível")) {
+      // Parse the stock error message - matches the new format from backend
+      const match = error.error.match(/Quantidade solicitada \((\d+)\) excede o estoque disponível \((-?\d+)\).*Estoque total: (\d+), Reservado: (\d+)/);
+      if (match) {
+        const requested = parseInt(match[1]);
+        const available = parseInt(match[2]);
+        const total = parseInt(match[3]);
+        const reserved = parseInt(match[4]);
+
+        errorDisplay = (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-destructive">Estoque insuficiente</p>
+            <div className="text-sm space-y-1">
+              <p>
+                Solicitado: <span className="font-semibold">{requested}</span>
+              </p>
+              <p>
+                Disponível: <span className="font-semibold">{available}</span>
+              </p>
+              {reserved > 0 && (
+                <p className="text-muted-foreground text-xs mt-2">
+                  Estoque total: {total} <span className="font-enhanced-unicode">•</span> Já reservado: {reserved}
+                </p>
+              )}
+              {reserved === 0 && total > 0 && (
+                <p className="text-muted-foreground text-xs mt-2">
+                  Estoque total: {total}
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      } else {
+        errorDisplay = <p className="text-sm text-destructive">{error.error}</p>;
+      }
+    } else {
+      // Default error display
+      const errorLines = error.error.split("\n").filter((line) => line.trim());
+      if (errorLines.length > 1) {
+        errorDisplay = (
+          <div className="text-sm text-destructive space-y-1">
+            {errorLines.map((line, idx) => (
+              <p key={idx} className={cn(line.includes("•") && "ml-2")}>
+                {line.trim()}
+              </p>
+            ))}
+          </div>
+        );
+      } else {
+        errorDisplay = <p className="text-sm text-destructive">{error.error}</p>;
+      }
+    }
+
+    return (
+      <div className="flex-1">
+        <p className="font-semibold text-base">{itemName}</p>
+        <p className="text-sm text-muted-foreground mt-1 mb-3">{userName}</p>
+        {errorDisplay}
+      </div>
+    );
+  };
+
+  return <BatchOperationResultDialog {...props} entityName="entrega" successItemDisplay={successItemDisplay} failedItemDisplay={failedItemDisplay} />;
+}
+
 // Specialized version for Suppliers
 interface SupplierBatchResult {
   fantasyName?: string;

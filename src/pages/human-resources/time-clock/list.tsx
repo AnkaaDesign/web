@@ -194,7 +194,7 @@ export default function TimeClockListPage() {
     statuses: [
       USER_STATUS.EXPERIENCE_PERIOD_1,
       USER_STATUS.EXPERIENCE_PERIOD_2,
-      USER_STATUS.CONTRACTED
+      USER_STATUS.EFFECTED
     ],
     orderBy: { name: "asc" },
     take: 100,

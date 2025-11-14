@@ -1,9 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
-import { IconUser, IconMail, IconPhone, IconBrandWhatsapp } from "@tabler/icons-react";
+import { IconUser, IconMail, IconPhone, IconBrandWhatsapp, IconId, IconShieldCheck } from "@tabler/icons-react";
 import type { User } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { formatBrazilianPhone, getUserStatusBadgeText } from "../../../../utils";
+import { UserAvatarDisplay } from "@/components/ui/avatar-display";
 
 interface BasicInfoCardProps {
   user: User;
@@ -12,6 +13,13 @@ interface BasicInfoCardProps {
 
 export function BasicInfoCard({ user, className }: BasicInfoCardProps) {
   const statusVariant = getBadgeVariantFromStatus(user.status, "USER");
+
+  console.log('[BasicInfoCard] User avatar data:', {
+    hasAvatar: !!user.avatar,
+    avatarId: user.avatarId,
+    avatarUrl: user.avatar?.url,
+    userName: user.name,
+  });
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
@@ -25,12 +33,26 @@ export function BasicInfoCard({ user, className }: BasicInfoCardProps) {
       </CardHeader>
       <CardContent className="pt-0 flex-1">
         <div className="space-y-6">
+          {/* Avatar Section */}
+          <div className="flex justify-center mb-6">
+            <UserAvatarDisplay
+              avatar={user.avatar}
+              userName={user.name}
+              size="2xl"
+              shape="rounded"
+              bordered={true}
+            />
+          </div>
+
           {/* Basic Information Section */}
           <div>
             <h3 className="text-base font-semibold mb-4 text-foreground">Identificação</h3>
             <div className="space-y-4">
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-muted-foreground">Nome</span>
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconId className="h-4 w-4" />
+                  Nome
+                </span>
                 <span className="text-sm font-semibold text-foreground">{user.name}</span>
               </div>
 
@@ -70,7 +92,10 @@ export function BasicInfoCard({ user, className }: BasicInfoCardProps) {
               )}
 
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-muted-foreground">Status</span>
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconShieldCheck className="h-4 w-4" />
+                  Status
+                </span>
                 <Badge variant={statusVariant}>{getUserStatusBadgeText(user)}</Badge>
               </div>
             </div>

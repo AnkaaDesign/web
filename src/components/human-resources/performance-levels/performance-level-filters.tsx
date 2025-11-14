@@ -76,11 +76,11 @@ export function PerformanceLevelFilters({
     showOnlyBonifiable: true, // Default to showing only bonifiable positions
   });
 
-  // Fetch all active contracted users for the user filters
+  // Fetch all active effected users for the user filters
   const { data: allUsersData } = useUsers({
     include: { position: true, sector: true },
     where: {
-      status: USER_STATUS.CONTRACTED, // Only contracted users (not dismissed, not inactive)
+      status: USER_STATUS.EFFECTED, // Only effected users (not dismissed, not inactive)
     },
     orderBy: { name: "asc" },
     limit: 100, // API maximum limit
@@ -243,9 +243,9 @@ export function PerformanceLevelFilters({
 
   const handleApply = useCallback(() => {
     const newWhere: any = {
-      // Preserve existing where conditions (especially status: CONTRACTED)
+      // Preserve existing where conditions (especially status: EFFECTED)
       ...filters.where,
-      status: USER_STATUS.CONTRACTED, // Always filter to CONTRACTED users
+      status: USER_STATUS.EFFECTED, // Always filter to EFFECTED users
     };
 
     // Add performance level filter if not default
@@ -486,7 +486,7 @@ export function PerformanceLevelFilters({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-4 border-t">
+          <div className="flex gap-2 mt-6 pt-4 border-t">
             <Button
               variant="outline"
               onClick={handleClear}

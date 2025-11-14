@@ -57,11 +57,11 @@ export function BonusSimulationFilters({
 
   const positions = positionsData?.data || [];
 
-  // Fetch all active contracted users for the user filters
+  // Fetch all active effected users for the user filters
   const { data: allUsersData } = useUsers({
     include: { position: true, sector: true },
     where: {
-      status: USER_STATUS.CONTRACTED, // Only contracted users (not dismissed, not inactive)
+      status: USER_STATUS.EFFECTED, // Only effected users (not dismissed, not inactive)
     },
     orderBy: { name: "asc" },
     limit: 100, // API maximum limit
@@ -348,7 +348,7 @@ export function BonusSimulationFilters({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-4 border-t">
+          <div className="flex gap-2 mt-6 pt-4 border-t">
             <Button
               variant="outline"
               onClick={handleClear}

@@ -216,7 +216,6 @@ export const ProductionRootPage = () => {
       return {
         tasksByType: [],
         productionWeekly: [],
-        garagesByStatus: [],
         productivityShift: [],
       };
     }
@@ -243,7 +242,6 @@ export const ProductionRootPage = () => {
           value: value || 0,
         })) || [],
       productionWeekly: productionByDay,
-      garagesByStatus: [],
       productivityShift: data.productivityMetrics?.tasksByShift?.datasets?.[0]?.data?.map((value, index) => ({
         label: data.productivityMetrics.tasksByShift.labels[index] || `Turno ${index + 1}`,
         value: value || 0,

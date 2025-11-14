@@ -1,3 +1,4 @@
+import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   IconAlertTriangle,
@@ -22,6 +23,12 @@ import {
   IconRepeat,
   IconClipboardList,
   IconAlertTriangleFilled,
+  IconBox,
+  IconExternalLink,
+  IconCurrencyDollar,
+  IconBoxMultiple,
+  IconPlayerPause,
+  IconHourglass,
 } from "@tabler/icons-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,9 +38,11 @@ import { Alert } from "@/components/ui/alert";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatDate, formatDateTime, formatRelativeTime } from "../../../../../utils";
+import { ItemsNeededList } from "@/components/inventory/maintenance/common/items-needed-list";
+import { MaintenanceHistoryTable } from "@/components/inventory/maintenance/common/maintenance-history-table";
+import { formatDate, formatDateTime, formatRelativeTime, determineStockLevel, getStockLevelMessage, formatCurrency } from "../../../../../utils";
 import { useMaintenanceSchedule, useItems } from "../../../../../hooks";
-import { MAINTENANCE_STATUS, MAINTENANCE_STATUS_LABELS, routes, getDynamicFrequencyLabel, CHANGE_LOG_ENTITY_TYPE } from "../../../../../constants";
+import { MAINTENANCE_STATUS, MAINTENANCE_STATUS_LABELS, routes, getDynamicFrequencyLabel, CHANGE_LOG_ENTITY_TYPE, STOCK_LEVEL_LABELS, MEASURE_UNIT_LABELS, ORDER_STATUS, MEASURE_UNIT, STOCK_LEVEL } from "../../../../../constants";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { useState } from "react";
 import {
@@ -46,7 +55,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export function MaintenanceScheduleDetailPage() {
@@ -66,6 +74,18 @@ export function MaintenanceScheduleDetailPage() {
         include: {
           brand: true,
           category: true,
+          supplier: true,
+          prices: {
+            orderBy: {
+              createdAt: "desc",
+            },
+            take: 1,
+          },
+          orderItems: {
+            include: {
+              order: true,
+            },
+          },
         },
       },
       maintenances: {
@@ -86,6 +106,45 @@ export function MaintenanceScheduleDetailPage() {
   });
 
   const schedule = response?.data;
+
+  // Extract item IDs for cost calculation - always return an array, even when schedule is not loaded
+  const itemIdsForCost = React.useMemo(() => {
+    if (!schedule?.maintenanceItemsConfig || !Array.isArray(schedule.maintenanceItemsConfig)) return [];
+    return schedule.maintenanceItemsConfig.map((item: any) => item.itemId).filter(Boolean);
+  }, [schedule?.maintenanceItemsConfig]);
+
+  // Hook must always be called in the same position - enabled flag handles when to fetch
+  const { data: itemsForCostResponse } = useItems({
+    where: {
+      id: { in: itemIdsForCost },
+    },
+    include: {
+      prices: {
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 1,
+      },
+    },
+    enabled: itemIdsForCost.length > 0 && !!schedule,
+  });
+
+  // Calculate total cost - must be called before any early returns
+  const totalCost = React.useMemo(() => {
+    if (!itemsForCostResponse?.data || itemIdsForCost.length === 0) return 0;
+
+    const itemsMap = new Map(itemsForCostResponse.data.map((item) => [item.id, item]));
+
+    const itemsConfig = schedule?.maintenanceItemsConfig;
+    if (!itemsConfig || !Array.isArray(itemsConfig)) return 0;
+
+    return itemsConfig.reduce((sum: number, configItem: any) => {
+      const itemData = itemsMap.get(configItem.itemId);
+      const price = itemData?.prices?.[0]?.value || 0;
+      const quantity = configItem.quantity || 0;
+      return sum + (price * quantity);
+    }, 0);
+  }, [itemsForCostResponse, schedule?.maintenanceItemsConfig, itemIdsForCost]);
 
   if (isLoading) {
     return (
@@ -171,23 +230,22 @@ export function MaintenanceScheduleDetailPage() {
     setIsDeleting(true);
     try {
       // TODO: Implement delete
-      toast.success("Agendamento excluído com sucesso");
       navigate(routes.inventory.maintenance.schedules.root);
     } catch (error) {
-      toast.error("Erro ao excluir agendamento");
+      console.error("Error deleting schedule:", error);
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
     }
   };
 
-  const itemsNeededConfig = schedule.maintenanceItemsConfig as any;
-  const hasItemsNeeded = itemsNeededConfig && Array.isArray(itemsNeededConfig.items) && itemsNeededConfig.items.length > 0;
+  const itemsNeededConfig = schedule?.maintenanceItemsConfig as any;
+  const hasItemsNeeded = itemsNeededConfig && Array.isArray(itemsNeededConfig) && itemsNeededConfig.length > 0;
 
   // Get next maintenance
-  const nextMaintenance = schedule.maintenances?.find((m) => m.status === MAINTENANCE_STATUS.PENDING && new Date(m.scheduledFor!) > new Date());
+  const nextMaintenance = schedule?.maintenances?.find((m) => m.status === MAINTENANCE_STATUS.PENDING && new Date(m.scheduledFor!) > new Date());
 
-  const isOverdue = schedule.nextRun ? new Date(schedule.nextRun) < new Date() : false;
+  const isOverdue = schedule?.nextRun ? new Date(schedule.nextRun) < new Date() : false;
 
   return (
     <div className="space-y-6">
@@ -226,19 +284,6 @@ export function MaintenanceScheduleDetailPage() {
               loading: isDeleting,
             },
           ]}
-          metrics={[
-            {
-              label: "Total de Manutenções",
-              value: schedule.maintenances?.length || 0,
-              icon: IconTools,
-            },
-            {
-              label: "Próxima Execução",
-              value: schedule.nextRun ? formatRelativeTime(new Date(schedule.nextRun)) : "Não agendada",
-              icon: IconCalendar,
-              // variant: isOverdue ? "destructive" : "default",  // Comment out - metrics don't have variant prop
-            },
-          ]}
         />
       </div>
 
@@ -246,48 +291,38 @@ export function MaintenanceScheduleDetailPage() {
       <div className="animate-in fade-in-50 duration-700">
         {/* Mobile: Single column stacked */}
         <div className="block lg:hidden space-y-4">
-          <ScheduleConfigurationCard schedule={schedule} isOverdue={isOverdue} className="h-full" />
+          <ScheduleConfigurationCard schedule={schedule} isOverdue={isOverdue} totalCost={totalCost} className="h-full" />
           <MaintenanceItemCard schedule={schedule} className="h-full" />
         </div>
 
         {/* Desktop/Tablet: 2 columns grid */}
         <div className="hidden lg:block">
           <div className="grid grid-cols-2 gap-6">
-            <ScheduleConfigurationCard schedule={schedule} isOverdue={isOverdue} className="h-full" />
+            <ScheduleConfigurationCard schedule={schedule} isOverdue={isOverdue} totalCost={totalCost} className="h-full" />
             <MaintenanceItemCard schedule={schedule} className="h-full" />
           </div>
         </div>
       </div>
 
-      {/* History and Items Needed Grid */}
+      {/* Maintenance History - Full Width */}
       <div className="animate-in fade-in-50 duration-800">
-        {/* Mobile: Single column stacked */}
-        <div className="block lg:hidden space-y-4">
-          <MaintenanceHistoryCard schedule={schedule} nextMaintenance={nextMaintenance} className="h-full" />
-          {hasItemsNeeded && <ItemsNeededCard itemsNeededConfig={itemsNeededConfig} className="h-full" />}
-        </div>
-
-        {/* Desktop/Tablet: 2 columns grid or full width */}
-        <div className="hidden lg:block">
-          {hasItemsNeeded ? (
-            <div className="grid grid-cols-2 gap-6">
-              <MaintenanceHistoryCard schedule={schedule} nextMaintenance={nextMaintenance} className="h-full" />
-              <ItemsNeededCard itemsNeededConfig={itemsNeededConfig} className="h-full" />
-            </div>
-          ) : (
-            <MaintenanceHistoryCard schedule={schedule} nextMaintenance={nextMaintenance} />
-          )}
-        </div>
+        <MaintenanceHistoryCard schedule={schedule} nextMaintenance={nextMaintenance} />
       </div>
 
+      {/* Items Needed - Full Width */}
+      {hasItemsNeeded && (
+        <div className="animate-in fade-in-50 duration-900">
+          <ItemsNeededList itemsConfig={itemsNeededConfig} />
+        </div>
+      )}
+
       {/* Changelog History - Full Width */}
-      <div className="animate-in fade-in-50 duration-900">
+      <div className="animate-in fade-in-50 duration-1000">
         <ChangelogHistory
           entityType={CHANGE_LOG_ENTITY_TYPE.MAINTENANCE_SCHEDULE}
           entityId={schedule.id}
           entityName={schedule.name}
           entityCreatedAt={schedule.createdAt}
-          className="h-full"
           maxHeight="500px"
         />
       </div>
@@ -311,14 +346,18 @@ export function MaintenanceScheduleDetailPage() {
 }
 
 // Schedule Configuration Card Component
-function ScheduleConfigurationCard({ schedule, isOverdue, className }: { schedule: any; isOverdue: boolean; className?: string }) {
+function ScheduleConfigurationCard({ schedule, isOverdue, totalCost, className }: { schedule: any; isOverdue: boolean; totalCost: number; className?: string }) {
   const getScheduleDetails = () => {
     if (schedule.weeklyConfig) {
       const days = schedule.weeklyConfig.daysOfWeek?.map((day: string) => day).join(", ") || "";
       return `Dias: ${days}`;
     }
-    if (schedule.monthlyConfig) {
+    if (schedule.monthlyConfig && schedule.monthlyConfig.dayOfMonth) {
       return `Dia ${schedule.monthlyConfig.dayOfMonth} de cada mês`;
+    }
+    // Fallback: check if dayOfMonth is directly on schedule for monthly frequency
+    if (schedule.frequency === 'MONTHLY' && schedule.dayOfMonth) {
+      return `Dia ${schedule.dayOfMonth} de cada mês`;
     }
     if (schedule.yearlyConfig) {
       return `${schedule.yearlyConfig.dayOfMonth}/${schedule.yearlyConfig.month}`;
@@ -331,12 +370,12 @@ function ScheduleConfigurationCard({ schedule, isOverdue, className }: { schedul
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
-      <CardHeader className="pb-6">
+      <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-3 text-xl">
           <div className="p-2 rounded-lg bg-primary/10">
             <IconCalendarEvent className="h-5 w-5 text-primary" />
           </div>
-          Configuração do Agendamento
+          Informações do Agendamento
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
@@ -344,73 +383,90 @@ function ScheduleConfigurationCard({ schedule, isOverdue, className }: { schedul
           {/* Description */}
           {schedule.description && (
             <div>
-              <h3 className="text-base font-semibold mb-4 text-foreground">Descrição</h3>
-              <div className="bg-card-nested rounded-lg px-4 py-3 border border-border">
-                <p className="text-sm text-foreground">{schedule.description}</p>
-              </div>
+              <p className="text-sm text-muted-foreground">{schedule.description}</p>
             </div>
           )}
 
           {/* Frequency */}
-          <div className={schedule.description ? "pt-6 border-t border-border/50" : ""}>
-            <h3 className="text-base font-semibold mb-4 text-foreground">Periodicidade</h3>
-            <div className="bg-card-nested rounded-lg p-4 border border-border">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 rounded-lg bg-muted/50">
-                  <IconRepeat className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-foreground">{getDynamicFrequencyLabel(schedule.frequency, schedule.frequencyCount)}</p>
-                  {schedule.interval && <p className="text-xs text-muted-foreground mt-1">Intervalo: {schedule.interval} dias</p>}
-                  {getScheduleDetails() && <p className="text-xs text-muted-foreground mt-1">{getScheduleDetails()}</p>}
+          <div className={cn(schedule.description && "pt-4 border-t border-border/50")}>
+            <h4 className="text-sm font-semibold mb-3 text-foreground">Periodicidade</h4>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconRepeat className="h-4 w-4" />
+                  Frequência
+                </span>
+                <div className="text-right">
+                  <span className="text-sm font-semibold text-foreground">{getDynamicFrequencyLabel(schedule.frequency, schedule.frequencyCount)}</span>
+                  {getScheduleDetails() && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {getScheduleDetails()}
+                    </div>
+                  )}
                 </div>
               </div>
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconCircleCheck className="h-4 w-4" />
+                  Status
+                </span>
+                <Badge variant={schedule.isActive !== false ? "success" : "secondary"}>{schedule.isActive !== false ? "Ativo" : "Inativo"}</Badge>
+              </div>
+              {totalCost > 0 && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCurrencyDollar className="h-4 w-4" />
+                    Custo Estimado
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{formatCurrency(totalCost)}</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Schedule Dates */}
-          <div className="pt-6 border-t border-border/50">
-            <h3 className="text-base font-semibold mb-4 text-foreground">Datas do Agendamento</h3>
+          {/* Dates Section */}
+          <div className="pt-4 border-t border-border/50">
+            <h4 className="text-sm font-semibold mb-3 text-foreground">Datas do Sistema</h4>
             <div className="space-y-3">
               {schedule.nextRun && (
-                <div
-                  className={cn(
-                    "bg-card-nested rounded-lg p-4 border",
-                    isOverdue ? "border-orange-200/40 dark:border-orange-700/40 bg-orange-50/80 dark:bg-orange-900/20" : "border-border",
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn("p-2 rounded-lg", isOverdue ? "bg-orange-100 dark:bg-orange-900/30" : "bg-muted/50")}>
-                      <IconCalendarClock className={cn("h-4 w-4", isOverdue ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground")} />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs font-medium text-muted-foreground">Próxima Execução</p>
-                      <p className={cn("text-sm font-semibold", isOverdue ? "text-orange-600 dark:text-orange-400" : "text-foreground")}>
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCalendarClock className="h-4 w-4" />
+                    Próxima Execução
+                  </span>
+                  <div className="text-right">
+                    <div className="flex items-center gap-2">
+                      <span className={cn("text-sm font-semibold", isOverdue && "text-orange-600 dark:text-orange-400")}>
                         {formatDateTime(new Date(schedule.nextRun))}
-                      </p>
-                      <p className={cn("text-xs mt-1", isOverdue ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground")}>
-                        {isOverdue && <IconAlertTriangle className="inline h-3 w-3 mr-1" />}
-                        {formatRelativeTime(new Date(schedule.nextRun))}
-                      </p>
+                      </span>
+                      {isOverdue && (
+                        <div className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400">
+                          <IconAlertTriangle className="h-3 w-3" />
+                          <span>Atrasada</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               )}
 
               {schedule.lastRun && (
-                <div className="bg-card-nested rounded-lg p-4 border border-border">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-muted/50">
-                      <IconCalendarCheck className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs font-medium text-muted-foreground">Última Execução</p>
-                      <p className="text-sm font-semibold text-foreground">{formatDateTime(new Date(schedule.lastRun))}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{formatRelativeTime(new Date(schedule.lastRun))}</p>
-                    </div>
-                  </div>
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCalendarCheck className="h-4 w-4" />
+                    Última Execução
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{formatDateTime(new Date(schedule.lastRun))}</span>
                 </div>
               )}
+
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconCalendar className="h-4 w-4" />
+                  Criada em
+                </span>
+                <span className="text-sm font-semibold text-foreground">{formatDateTime(new Date(schedule.createdAt))}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -422,86 +478,174 @@ function ScheduleConfigurationCard({ schedule, isOverdue, className }: { schedul
 // Maintenance Item Card Component
 function MaintenanceItemCard({ schedule, className }: { schedule: any; className?: string }) {
   const navigate = useNavigate();
+  const item = schedule.item;
+
+  if (!item) {
+    return (
+      <Card className={cn("shadow-sm border border-border", className)} level={1}>
+        <CardHeader className="pb-6">
+          <CardTitle className="flex items-center gap-3 text-xl">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <IconBox className="h-5 w-5 text-primary" />
+            </div>
+            Equipamento da Manutenção
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="text-center py-12">
+            <IconInfoCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="text-muted-foreground">Nenhum equipamento especificado para esta manutenção.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Get the most recent price from the prices array
+  const currentPrice = item.prices && item.prices.length > 0 ? item.prices[0].value : null;
+
+  // Check if item has active orders
+  const activeOrderStatuses = [ORDER_STATUS.CREATED, ORDER_STATUS.PARTIALLY_FULFILLED, ORDER_STATUS.FULFILLED, ORDER_STATUS.PARTIALLY_RECEIVED];
+
+  const hasActiveOrder = item.orderItems?.some((orderItem: any) => orderItem.order && activeOrderStatuses.includes(orderItem.order.status)) || false;
+
+  // Determine stock level using the unified algorithm
+  const stockLevel = determineStockLevel(item.quantity || 0, item.reorderPoint || null, item.maxQuantity || null, hasActiveOrder);
+
+  // Get color based on stock level
+  const getStockColor = () => {
+    switch (stockLevel) {
+      case STOCK_LEVEL.NEGATIVE_STOCK:
+        return "text-neutral-500";
+      case STOCK_LEVEL.OUT_OF_STOCK:
+        return "text-red-700";
+      case STOCK_LEVEL.CRITICAL:
+        return "text-orange-500";
+      case STOCK_LEVEL.LOW:
+        return "text-yellow-500";
+      case STOCK_LEVEL.OPTIMAL:
+        return "text-green-700";
+      case STOCK_LEVEL.OVERSTOCKED:
+        return "text-purple-600";
+      default:
+        return "text-neutral-500";
+    }
+  };
+
+  const stockStatus = {
+    color: getStockColor(),
+    label: STOCK_LEVEL_LABELS[stockLevel],
+    description: getStockLevelMessage(stockLevel, item.quantity || 0, item.reorderPoint || null),
+  };
+
+  const handleViewItem = () => {
+    navigate(routes.inventory.products.details(item.id));
+  };
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconPackage className="h-5 w-5 text-primary" />
-          </div>
-          Item
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-3 text-xl">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <IconBox className="h-5 w-5 text-primary" />
+            </div>
+            Equipamento da Manutenção
+          </CardTitle>
+          <Button variant="ghost" size="sm" onClick={handleViewItem} className="text-xs">
+            <IconExternalLink className="h-3 w-3 mr-1" />
+            Ver detalhes
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="pt-0 flex-1">
-        {schedule.item ? (
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-base font-semibold mb-4 text-foreground">Informações do Item</h3>
-
-              <div className="space-y-4">
-                {/* Item Code */}
-                {schedule.item.uniCode && (
-                  <div className="bg-muted/30 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <IconFileCheck className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium text-muted-foreground">Código Único</span>
-                    </div>
-                    <span className="text-base font-semibold text-foreground font-mono">#{schedule.item.uniCode}</span>
-                  </div>
-                )}
-
-                {/* Item Name */}
-                <div className="bg-muted/30 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <IconPackage className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-muted-foreground">Item</span>
-                  </div>
-                  <TruncatedTextWithTooltip text={schedule.item.name} className="text-base font-semibold text-foreground" />
-                </div>
-
-                {/* Brand and Category in Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {schedule.item.brand && (
-                    <div className="bg-muted/30 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <IconInfoCircle className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium text-muted-foreground">Marca</span>
-                      </div>
-                      <span className="text-base font-semibold text-foreground">{schedule.item.brand.name}</span>
-                    </div>
+        <div className="space-y-6">
+          {/* Product Information Section */}
+          <div>
+            <h3 className="text-base font-semibold mb-4 text-foreground">Informações do Produto</h3>
+            <div className="space-y-4">
+              {/* Item Name */}
+              <div className="bg-muted/30 rounded-lg p-4">
+                <p className="text-base font-semibold text-foreground">
+                  {item.uniCode && (
+                    <>
+                      <span className="font-mono text-sm text-muted-foreground">{item.uniCode}</span>
+                      <span className="mx-2 text-muted-foreground">-</span>
+                    </>
                   )}
+                  {item.name}
+                </p>
+              </div>
 
-                  {schedule.item.category && (
-                    <div className="bg-muted/30 rounded-lg p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <IconInfoCircle className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium text-muted-foreground">Categoria</span>
-                      </div>
-                      <Badge variant="secondary" className="mt-1">
-                        {schedule.item.category.name}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
+              {/* Brand */}
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground">Marca</span>
+                <span className="text-sm font-semibold text-foreground">{item.brand ? item.brand.name : <span className="text-muted-foreground italic">Não definida</span>}</span>
+              </div>
+
+              {/* Category */}
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground">Categoria</span>
+                <span className="text-sm font-semibold text-foreground">
+                  {item.category ? item.category.name : <span className="text-muted-foreground italic">Não definida</span>}
+                </span>
+              </div>
+
+              {/* Supplier */}
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground">Fornecedor</span>
+                <span className="text-sm font-semibold text-foreground">
+                  {item.supplier ? item.supplier.fantasyName || item.supplier.name : <span className="text-muted-foreground italic">Não definido</span>}
+                </span>
               </div>
             </div>
+          </div>
 
-            <div className="pt-6 border-t border-border/50">
-              <Button variant="outline" size="sm" className="w-full" onClick={() => navigate(routes.inventory.products.details(schedule.item!.id))}>
-                <IconArrowRight className="mr-2 h-4 w-4" />
-                Ver Detalhes do Item
-              </Button>
+          {/* Stock and Price Section */}
+          <div className="pt-6 border-t border-border/50">
+            <h3 className="text-base font-semibold mb-4 text-foreground">Estoque e Preço</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-muted/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <IconBoxMultiple className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">Estoque Atual</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <IconAlertTriangleFilled className={cn("w-5 h-5 flex-shrink-0", stockStatus.color)} aria-label={stockStatus.label} />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <div className="space-y-1">
+                          <p className="font-semibold">{stockStatus.label}</p>
+                          <p className="text-xs">{stockStatus.description}</p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <p className="text-2xl font-bold text-foreground">
+                    {item.quantity % 1 === 0
+                      ? item.quantity.toLocaleString("pt-BR")
+                      : item.quantity.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                {item.measureUnit && <p className="text-sm text-muted-foreground mt-1">{MEASURE_UNIT_LABELS[item.measureUnit as MEASURE_UNIT]}</p>}
+              </div>
+              <div className="bg-muted/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <IconCurrencyDollar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">Preço Unitário</span>
+                </div>
+                {currentPrice !== null && currentPrice !== undefined ? (
+                  <p className="text-2xl font-bold text-foreground">{formatCurrency(currentPrice)}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Não definido</p>
+                )}
+              </div>
             </div>
           </div>
-        ) : (
-          <Alert className="border-dashed">
-            <IconAlertCircle className="h-4 w-4" />
-            <div className="ml-2">
-              <p className="text-sm">Nenhum item associado a este agendamento</p>
-            </div>
-          </Alert>
-        )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -512,156 +656,43 @@ function MaintenanceHistoryCard({ schedule, nextMaintenance, className }: { sche
   const navigate = useNavigate();
   const maintenanceHistory = schedule.maintenances || [];
 
-  // Get status config
-  const getStatusVariant = (status: MAINTENANCE_STATUS) => {
-    switch (status) {
-      case MAINTENANCE_STATUS.COMPLETED:
-        return "success";
-      case MAINTENANCE_STATUS.CANCELLED:
-        return "destructive";
-      case MAINTENANCE_STATUS.IN_PROGRESS:
-        return "default";
-      case MAINTENANCE_STATUS.OVERDUE:
-        return "destructive";
-      default:
-        return "secondary";
-    }
-  };
+  // Calculate statistics
+  const statistics = React.useMemo(() => {
+    const totalMaintenances = maintenanceHistory.length;
+    const completedMaintenances = maintenanceHistory.filter((m: any) => m.status === MAINTENANCE_STATUS.COMPLETED).length;
+    const pendingMaintenances = maintenanceHistory.filter((m: any) => m.status === MAINTENANCE_STATUS.PENDING).length;
 
-  const getStatusIcon = (status: MAINTENANCE_STATUS) => {
-    switch (status) {
-      case MAINTENANCE_STATUS.COMPLETED:
-        return IconCircleCheck;
-      case MAINTENANCE_STATUS.CANCELLED:
-        return IconX;
-      case MAINTENANCE_STATUS.IN_PROGRESS:
-        return IconRefresh;
-      case MAINTENANCE_STATUS.OVERDUE:
-        return IconAlertTriangle;
-      default:
-        return IconClock;
-    }
-  };
-
-  const getStatusBgColor = (status: MAINTENANCE_STATUS) => {
-    switch (status) {
-      case MAINTENANCE_STATUS.COMPLETED:
-        return "bg-green-50/80 dark:bg-green-900/20 border-green-200/40 dark:border-green-700/40";
-      case MAINTENANCE_STATUS.CANCELLED:
-        return "bg-red-50/80 dark:bg-red-900/20 border-red-200/40 dark:border-red-700/40";
-      case MAINTENANCE_STATUS.IN_PROGRESS:
-        return "bg-blue-50/80 dark:bg-blue-900/20 border-blue-200/40 dark:border-blue-700/40";
-      case MAINTENANCE_STATUS.OVERDUE:
-        return "bg-orange-50/80 dark:bg-orange-900/20 border-orange-200/40 dark:border-orange-700/40";
-      default:
-        return "bg-gray-50/80 dark:bg-gray-900/20 border-gray-200/40 dark:border-gray-700/40";
-    }
-  };
+    return {
+      totalMaintenances,
+      completedMaintenances,
+      pendingMaintenances,
+    };
+  }, [maintenanceHistory]);
 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
-      <CardHeader className="pb-6">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconHistory className="h-5 w-5 text-primary" />
-          </div>
-          Histórico de Manutenções
-        </CardTitle>
+      <CardHeader className="pb-4">
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-3 text-xl">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <IconHistory className="h-5 w-5 text-primary" />
+            </div>
+            Histórico de Manutenções
+          </CardTitle>
+          {schedule._count?.maintenances && schedule._count.maintenances > 50 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(routes.inventory.maintenance.list + `?scheduleId=${schedule.id}`)}
+            >
+              Ver todas ({schedule._count?.maintenances ?? 0})
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="pt-0 flex-grow flex flex-col min-h-0">
-        {/* Statistics Section */}
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          <div className="bg-card-nested rounded-lg p-3 border border-border text-center">
-            <span className="text-xs font-medium text-muted-foreground block">Total</span>
-            <p className="text-xl font-bold mt-1">{maintenanceHistory.length}</p>
-          </div>
-          <div className="bg-green-50/80 dark:bg-green-900/20 rounded-lg p-3 border border-green-200/40 dark:border-green-700/40 text-center">
-            <span className="text-xs font-medium text-green-800 dark:text-green-200 block">Concluídas</span>
-            <p className="text-xl font-bold mt-1 text-green-800 dark:text-green-200">{maintenanceHistory.filter((m: any) => m.status === MAINTENANCE_STATUS.COMPLETED).length}</p>
-          </div>
-        </div>
-
-        {nextMaintenance && (
-          <Alert className="mb-6 border-blue-200 bg-blue-50/50 dark:bg-blue-900/20">
-            <IconCalendarTime className="h-4 w-4 text-blue-600" />
-            <div className="ml-2">
-              <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">Próxima Manutenção</p>
-              <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
-                {nextMaintenance.name} - {formatDateTime(new Date(nextMaintenance.scheduledFor!))}
-              </p>
-              <Button
-                variant="link"
-                size="sm"
-                className="mt-2 p-0 h-auto text-blue-600 hover:text-blue-700"
-                onClick={() => navigate(routes.inventory.maintenance.details(nextMaintenance.id))}
-              >
-                Ver Detalhes <IconArrowRight className="ml-1 h-3 w-3" />
-              </Button>
-            </div>
-          </Alert>
-        )}
-
         {maintenanceHistory.length > 0 ? (
-          <ScrollArea className="pr-4 flex-grow" style={{ maxHeight: "400px" }}>
-            <div className="grid grid-cols-1 gap-3">
-              {maintenanceHistory.map((maintenance: any) => {
-                const StatusIcon = getStatusIcon(maintenance.status as MAINTENANCE_STATUS);
-                const statusBgColor = getStatusBgColor(maintenance.status as MAINTENANCE_STATUS);
-
-                return (
-                  <div
-                    key={maintenance.id}
-                    className={cn("rounded-lg p-4 transition-all duration-200 cursor-pointer border", statusBgColor, "hover:shadow-md")}
-                    onClick={() => navigate(routes.inventory.maintenance.details(maintenance.id))}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 mt-0.5">
-                        <StatusIcon className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-1">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-sm text-foreground">{maintenance.name}</h4>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {maintenance.status === MAINTENANCE_STATUS.COMPLETED && maintenance.finishedAt
-                                ? `Concluída em ${formatDateTime(new Date(maintenance.finishedAt))}`
-                                : `Agendada para ${formatDateTime(new Date(maintenance.scheduledFor!))}`}
-                            </p>
-                          </div>
-                          <Badge variant={getStatusVariant(maintenance.status as MAINTENANCE_STATUS)} className="text-xs ml-2">
-                            {MAINTENANCE_STATUS_LABELS[maintenance.status as MAINTENANCE_STATUS]}
-                          </Badge>
-                        </div>
-
-                        {maintenance.notes && <p className="text-xs text-muted-foreground mt-2 bg-background/60 rounded px-2 py-1">{maintenance.notes}</p>}
-
-                        <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <IconClock className="h-3 w-3" />
-                            {formatRelativeTime(new Date(maintenance.scheduledFor!))}
-                          </div>
-                          {maintenance.item && (
-                            <div className="flex items-center gap-1">
-                              <IconPackage className="h-3 w-3" />
-                              {maintenance.item.name}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {schedule._count?.maintenances && schedule._count.maintenances > 50 && (
-              <div className="mt-4 text-center">
-                <Button variant="outline" size="sm" onClick={() => navigate(routes.inventory.maintenance.list + `?scheduleId=${schedule.id}`)}>
-                  Ver todas ({schedule._count?.maintenances ?? 0})
-                </Button>
-              </div>
-            )}
-          </ScrollArea>
+          <MaintenanceHistoryTable maintenances={maintenanceHistory} />
         ) : (
           <div className="text-center py-12">
             <div className="p-4 bg-muted/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
@@ -671,159 +702,6 @@ function MaintenanceHistoryCard({ schedule, nextMaintenance, className }: { sche
             <p className="text-sm text-muted-foreground">As manutenções executadas aparecerão aqui.</p>
           </div>
         )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// Items Needed Card Component
-function ItemsNeededCard({ itemsNeededConfig, className }: { itemsNeededConfig: any; className?: string }) {
-  const navigate = useNavigate();
-
-  // Extract all item IDs from the config
-  const itemIds = itemsNeededConfig.items?.map((item: any) => item.itemId).filter(Boolean) || [];
-
-  // Fetch all items data
-  const { data: itemsResponse } = useItems({
-    where: {
-      id: { in: itemIds },
-    },
-    include: {
-      brand: true,
-      category: true,
-      count: true,
-    },
-    enabled: itemIds.length > 0,
-  });
-
-  const itemsData = itemsResponse?.data || [];
-
-  // Create a map of item data for quick lookup
-  const itemsMap = new Map(itemsData.map((item) => [item.id, item]));
-
-  // Enrich the items config with actual item data
-  const enrichedItems = itemsNeededConfig.items.map((configItem: any) => {
-    const itemData = itemsMap.get(configItem.itemId);
-    return {
-      ...configItem,
-      name: itemData?.name || "Item não encontrado",
-      uniCode: itemData?.uniCode,
-      brand: itemData?.brand,
-      category: itemData?.category,
-      currentStock: itemData?.quantity || 0,
-      unit: itemData?.measureUnit || "un", // Use measureUnit field from Item type
-    };
-  });
-
-  // Calculate statistics
-  const statistics = {
-    totalItems: enrichedItems.length,
-    itemsWithStock: enrichedItems.filter((item: any) => item.currentStock >= item.quantity).length,
-    itemsWithoutStock: enrichedItems.filter((item: any) => item.currentStock < item.quantity).length,
-  };
-
-  return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
-      <CardHeader className="pb-6">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconClipboardList className="h-5 w-5 text-primary" />
-          </div>
-          Itens Necessários
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pt-0 flex-grow flex flex-col min-h-0">
-        {/* Statistics Summary */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-card-nested rounded-lg p-3 border border-border">
-            <span className="text-xs font-medium text-muted-foreground block">Total de Itens</span>
-            <p className="text-xl font-bold mt-1">{statistics.totalItems}</p>
-          </div>
-
-          <div className="bg-green-50/80 dark:bg-green-900/20 rounded-lg p-3 border border-green-200/40 dark:border-green-700/40">
-            <span className="text-xs font-medium text-green-800 dark:text-green-200 block">Com Estoque</span>
-            <p className="text-xl font-bold mt-1 text-green-800 dark:text-green-200">{statistics.itemsWithStock}</p>
-          </div>
-
-          <div className="bg-red-50/80 dark:bg-red-900/20 rounded-lg p-3 border border-red-200/40 dark:border-red-700/40">
-            <span className="text-xs font-medium text-red-800 dark:text-red-200 block">Sem Estoque</span>
-            <p className="text-xl font-bold mt-1 text-red-800 dark:text-red-200">{statistics.itemsWithoutStock}</p>
-          </div>
-        </div>
-
-        {/* Items Grid */}
-        <ScrollArea className="pr-4 flex-grow" style={{ maxHeight: "320px" }}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {enrichedItems.map((item: any, index: number) => {
-              const hasEnoughStock = item.currentStock >= item.quantity;
-              const stockTextColor = hasEnoughStock ? "text-green-700 dark:text-green-600" : "text-red-700 dark:text-red-600";
-
-              return (
-                <div key={item.itemId || index} className="block">
-                  <div
-                    className="group relative overflow-hidden rounded-lg border border-border/50 dark:border-border/40 bg-card hover:bg-muted/50 transition-colors cursor-pointer min-h-[140px] flex flex-col"
-                    onClick={() => item.itemId && navigate(routes.inventory.products.details(item.itemId))}
-                  >
-                    <div className="p-3 flex-1 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-sm text-foreground truncate">{item.name}</h4>
-                          </div>
-                        </div>
-
-                        {item.uniCode && <p className="text-xs text-muted-foreground truncate">Código: {item.uniCode}</p>}
-
-                        {item.brand && <p className="text-xs text-muted-foreground truncate">Marca: {item.brand.name}</p>}
-
-                        {item.currentStock < item.quantity && (
-                          <div className="flex flex-wrap items-center gap-1 mt-1">
-                            <Badge variant="destructive" className="text-xs">
-                              Estoque Insuficiente
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <IconAlertTriangleFilled
-                                    className={cn("w-4 h-4 flex-shrink-0", stockTextColor)}
-                                    aria-label={hasEnoughStock ? "Estoque suficiente" : "Estoque insuficiente"}
-                                  />
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <div className="space-y-1">
-                                    <p className="font-semibold">{hasEnoughStock ? "Estoque Suficiente" : "Estoque Insuficiente"}</p>
-                                    <p className="text-xs">
-                                      Disponível: {item.currentStock} {item.unit} | Necessário: {item.quantity} {item.unit}
-                                    </p>
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-
-                            <span className="font-medium tabular-nums text-sm">
-                              {item.currentStock.toLocaleString("pt-BR")} {item.unit}
-                            </span>
-                          </div>
-
-                          <p className="text-xs text-muted-foreground font-medium">
-                            Necessário: {item.quantity.toLocaleString("pt-BR")} {item.unit}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </ScrollArea>
       </CardContent>
     </Card>
   );

@@ -3,7 +3,6 @@ export { MyPpesPage } from "./my-ppes";
 export { MyVacationsPage } from "./my-vacations";
 export { MyWarningsPage } from "./my-warnings";
 export { MyNotificationsPage } from "./my-notifications";
-export { MyProfilePage } from "./my-profile";
 export { MyLoansPage } from "./my-loans";
 export { MyHolidaysPage } from "./my-holidays";
 export { PreferencesPage } from "./preferences";

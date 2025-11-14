@@ -1,4 +1,4 @@
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -23,7 +23,6 @@ import { LeadTimeInput } from "@/components/inventory/item/form/lead-time-input"
 import { PriceInput } from "@/components/inventory/item/form/price-input";
 import { IcmsInput } from "@/components/inventory/item/form/icms-input";
 import { IpiInput } from "@/components/inventory/item/form/ipi-input";
-import { MeasureInput } from "@/components/inventory/item/form/measure-input";
 import { BarcodeManager } from "@/components/inventory/item/form/barcode-manager";
 import { AssignToUserToggle } from "@/components/inventory/item/form/assign-to-user-toggle";
 import { PpeConfigSection } from "@/components/inventory/item/form/ppe-config-section";
@@ -81,7 +80,6 @@ export function EpiForm(props: EpiFormProps) {
     ipi: 0,
     measureValue: null,
     measureUnit: null,
-    measures: [], // Initialize with empty measures array
     barcodes: [],
     shouldAssignToUser: true,
     abcCategory: null,
@@ -100,13 +98,12 @@ export function EpiForm(props: EpiFormProps) {
     ...defaultValues,
   };
 
-  // Ensure defaultValues has barcodes and measures as arrays for update mode
+  // Ensure defaultValues has barcodes as arrays for update mode
   const processedDefaultValues =
     mode === "update" && defaultValues
       ? {
           ...defaultValues,
           barcodes: Array.isArray(defaultValues.barcodes) ? defaultValues.barcodes : [],
-          measures: Array.isArray(defaultValues.measures) ? defaultValues.measures : [],
         }
       : defaultValues;
 
@@ -115,12 +112,6 @@ export function EpiForm(props: EpiFormProps) {
     resolver: zodResolver(mode === "create" ? itemCreateSchema : itemUpdateSchema),
     defaultValues: mode === "create" ? (createDefaults as ItemCreateFormData) : processedDefaultValues,
     mode: "onBlur", // Validate on blur for better UX
-  });
-
-  // useFieldArray for measures
-  const measuresFieldArray = useFieldArray({
-    control: form.control,
-    name: "measures",
   });
 
   // Debounced function to update URL parameters
@@ -167,16 +158,11 @@ export function EpiForm(props: EpiFormProps) {
     }
   }, [form, debouncedUpdateUrl, mode]);
 
-  // Ensure barcodes and measures are initialized as arrays
+  // Ensure barcodes are initialized as arrays
   React.useEffect(() => {
     const currentBarcodes = form.getValues("barcodes");
     if (!Array.isArray(currentBarcodes)) {
       form.setValue("barcodes", [], { shouldValidate: false });
-    }
-
-    const currentMeasures = form.getValues("measures");
-    if (!Array.isArray(currentMeasures)) {
-      form.setValue("measures", [], { shouldValidate: false });
     }
   }, [form]);
 
@@ -190,22 +176,10 @@ export function EpiForm(props: EpiFormProps) {
 
   const handleSubmit = async (data: ItemCreateFormData | ItemUpdateFormData) => {
     try {
-      // Convert measures object to array if needed
-      let measuresArray: Array<{ value?: number | null; unit?: string | null; measureType: string }> = [];
-      if (data.measures) {
-        if (Array.isArray(data.measures)) {
-          measuresArray = data.measures;
-        } else if (typeof data.measures === "object") {
-          // Convert object with numeric keys to array
-          measuresArray = Object.values(data.measures);
-        }
-      }
-
-      // Ensure barcodes and measures are always arrays before submitting
+      // Ensure barcodes are always arrays before submitting
       const processedData = {
         ...data,
         barcodes: Array.isArray(data.barcodes) ? data.barcodes : [],
-        measures: measuresArray,
       };
 
       if (mode === "create") {
@@ -297,9 +271,6 @@ export function EpiForm(props: EpiFormProps) {
               </CardContent>
             </Card>
 
-            {/* Multiple Measures */}
-            <MeasureInput control={form.control} fieldArray={measuresFieldArray} disabled={isSubmitting} required={isRequired} categoryId={selectedCategoryId} />
-
             {/* PPE Configuration - Always show for EPI forms */}
             <PpeConfigSection control={form.control} disabled={isSubmitting} required={isRequired} />
             {/* Display PPE configuration validation errors */}
@@ -364,8 +335,7 @@ export function EpiForm(props: EpiFormProps) {
                           {field === "ppeCA" && "Certificado de Aprovação:"}
                           {field === "ppeDeliveryMode" && "Modo de Entrega:"}
                           {field === "barcodes" && "Códigos de Barras:"}
-                          {field === "measures" && "Medidas:"}
-                          {!["name", "quantity", "price", "ppeType", "ppeCA", "ppeDeliveryMode", "barcodes", "measures"].includes(field) && `${field}:`}
+                          {!["name", "quantity", "price", "ppeType", "ppeCA", "ppeDeliveryMode", "barcodes"].includes(field) && `${field}:`}
                         </span>
                         <span className="flex-1">{error?.message || "Campo inválido"}</span>
                       </li>

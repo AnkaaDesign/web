@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { format, isToday, isYesterday } from "date-fns";
 import { IconFileOff } from "@tabler/icons-react";
@@ -24,6 +24,8 @@ import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { CutItemListSkeleton } from "./cut-item-list-skeleton";
 import { CutTableContextMenu, type CutAction } from "./cut-table-context-menu";
 import { useFileViewer } from "@/components/common/file";
+import { createCutColumns } from "./cut-item-table-columns";
+import type { CutColumn } from "./types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,9 +41,10 @@ interface CutItemTableProps {
   filters?: Partial<CutGetManyFormData>;
   className?: string;
   onDataChange?: (data: { items: Cut[]; totalRecords: number }) => void;
+  visibleColumns: Set<string>;
 }
 
-export function CutItemTable({ filters = {}, className, onDataChange }: CutItemTableProps) {
+export function CutItemTable({ filters = {}, className, onDataChange, visibleColumns }: CutItemTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canEdit = canEditCuts(user); // WAREHOUSE, DESIGNER, ADMIN can edit cuts
@@ -81,6 +84,12 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
       fileViewerContext.actions.viewFile(file);
     }
   };
+
+  // Get all columns and filter by visibility
+  const allColumns = useMemo(() => createCutColumns(), []);
+  const displayedColumns = useMemo(() => {
+    return allColumns.filter((col) => visibleColumns.has(col.key));
+  }, [allColumns, visibleColumns]);
 
   const {
     page,
@@ -409,81 +418,25 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
                 </TableHead>
               )}
 
-              {/* File preview column */}
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-20">
-                <div className="flex items-center justify-center h-full min-h-[2.5rem] px-2 py-2">
-                  <TruncatedTextWithTooltip text="ARQUIVO" />
-                </div>
-              </TableHead>
-
-              {/* Task column */}
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-48">
-                <button
-                  onClick={() => toggleSort("task.name")}
-                  className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
-                  disabled={isLoading || items.length === 0}
-                >
-                  <TruncatedTextWithTooltip text="TAREFA" />
-                  {renderSortIndicator("task.name")}
-                </button>
-              </TableHead>
-
-              {/* Status column */}
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-28">
-                <button
-                  onClick={() => toggleSort("status")}
-                  className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
-                  disabled={isLoading || items.length === 0}
-                >
-                  <TruncatedTextWithTooltip text="STATUS" />
-                  {renderSortIndicator("status")}
-                </button>
-              </TableHead>
-
-              {/* Type column */}
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-32">
-                <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                  <TruncatedTextWithTooltip text="TIPO" />
-                </div>
-              </TableHead>
-
-              {/* Source column */}
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-32">
-                <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                  <TruncatedTextWithTooltip text="ORIGEM" />
-                </div>
-              </TableHead>
-
-              {/* Reason column */}
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-48">
-                <div className="flex items-center h-full min-h-[2.5rem] px-4 py-2">
-                  <TruncatedTextWithTooltip text="MOTIVO" />
-                </div>
-              </TableHead>
-
-              {/* Started at column */}
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-32">
-                <button
-                  onClick={() => toggleSort("startedAt")}
-                  className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
-                  disabled={isLoading || items.length === 0}
-                >
-                  <TruncatedTextWithTooltip text="INICIADO EM" />
-                  {renderSortIndicator("startedAt")}
-                </button>
-              </TableHead>
-
-              {/* Completed at column */}
-              <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0 w-32">
-                <button
-                  onClick={() => toggleSort("completedAt")}
-                  className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
-                  disabled={isLoading || items.length === 0}
-                >
-                  <TruncatedTextWithTooltip text="FINALIZADO EM" />
-                  {renderSortIndicator("completedAt")}
-                </button>
-              </TableHead>
+              {/* Dynamic columns based on visibility */}
+              {displayedColumns.map((column) => (
+                <TableHead key={column.key} className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs p-0 bg-muted !border-r-0", column.className)}>
+                  {column.sortable ? (
+                    <button
+                      onClick={() => toggleSort(column.key)}
+                      className="flex items-center gap-1 w-full h-full min-h-[2.5rem] px-4 py-2 hover:bg-muted/80 transition-colors cursor-pointer text-left border-0 bg-transparent"
+                      disabled={isLoading || items.length === 0}
+                    >
+                      <TruncatedTextWithTooltip text={column.header} />
+                      {renderSortIndicator(column.key)}
+                    </button>
+                  ) : (
+                    <div className={cn("flex items-center h-full min-h-[2.5rem] py-2", column.key === "filePreview" ? "justify-center px-2" : "px-4")}>
+                      <TruncatedTextWithTooltip text={column.header} />
+                    </div>
+                  )}
+                </TableHead>
+              ))}
 
               {/* Scrollbar spacer - only show if not overlay scrollbar */}
               {!isOverlay && (
@@ -500,7 +453,7 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
           <TableBody>
             {error ? (
               <TableRow>
-                <TableCell colSpan={9} className="p-0">
+                <TableCell colSpan={displayedColumns.length + (canEdit ? 1 : 0)} className="p-0">
                   <div className="flex flex-col items-center justify-center p-8 text-center text-destructive">
                     <IconScissors className="h-8 w-8 mb-4" />
                     <div className="text-lg font-medium mb-2">Não foi possível carregar os cortes</div>
@@ -510,7 +463,7 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
               </TableRow>
             ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="p-0">
+                <TableCell colSpan={displayedColumns.length + (canEdit ? 1 : 0)} className="p-0">
                   <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
                     <IconScissors className="h-12 w-12 text-muted-foreground/50 mb-4" />
                     <div className="text-lg font-medium mb-2">Nenhum item de corte encontrado</div>
@@ -547,84 +500,34 @@ export function CutItemTable({ filters = {}, className, onDataChange }: CutItemT
                       </TableCell>
                     )}
 
-                    {/* File preview column */}
-                    <TableCell className="w-20 p-0 !border-r-0">
-                      <div className="flex items-center justify-center px-2 py-2">
-                        {item.file ? (
+                    {/* Dynamic columns based on visibility */}
+                    {displayedColumns.map((column) => (
+                      <TableCell key={column.key} className={cn("p-0 !border-r-0", column.className)}>
+                        {column.key === "filePreview" ? (
                           <div
+                            className="flex items-center justify-center px-2 py-2"
                             onClick={(e) => {
-                              e.stopPropagation();
-                              handleFileClick(item.file);
+                              if (item.file) {
+                                e.stopPropagation();
+                                handleFileClick(item.file);
+                              }
                             }}
-                            className="w-12 h-12 rounded-md overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                           >
-                            <img
-                              src={getThumbnailUrl(item.file)}
-                              alt={item.file.filename}
-                              className="w-full h-full object-cover"
-                            />
+                            {item.file ? (
+                              <div className="w-12 h-12 rounded-md overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary transition-all">
+                                <img src={getThumbnailUrl(item.file)} alt={item.file.filename} className="w-full h-full object-cover" />
+                              </div>
+                            ) : (
+                              <div className="w-12 h-12 rounded-md bg-muted/20 flex items-center justify-center">
+                                <IconFileOff className="w-5 h-5 text-muted-foreground/50" />
+                              </div>
+                            )}
                           </div>
                         ) : (
-                          <div className="w-12 h-12 rounded-md bg-muted/20 flex items-center justify-center">
-                            <IconFileOff className="w-5 h-5 text-muted-foreground/50" />
-                          </div>
+                          column.accessor(item)
                         )}
-                      </div>
-                    </TableCell>
-
-                    {/* Task column */}
-                    <TableCell className="w-48 p-0 !border-r-0">
-                      <div className="px-4 py-2">
-                        <TruncatedTextWithTooltip text={getTaskName(item)} className="font-medium" />
-                      </div>
-                    </TableCell>
-
-                    {/* Status column */}
-                    <TableCell className="w-28 p-0 !border-r-0">
-                      <div className="px-4 py-2">
-                        <Badge variant={item.status === CUT_STATUS.PENDING ? "secondary" : item.status === CUT_STATUS.CUTTING ? "default" : "success"}>
-                          {CUT_STATUS_LABELS[item.status]}
-                        </Badge>
-                      </div>
-                    </TableCell>
-
-                    {/* Type column */}
-                    <TableCell className="w-32 p-0 !border-r-0">
-                      <div className="px-4 py-2">
-                        {item.type ? (
-                          <div className="flex items-center gap-2">
-                            <IconScissors className="h-4 w-4 text-muted-foreground" />
-                            <span>{CUT_TYPE_LABELS[item.type]}</span>
-                          </div>
-                        ) : (
-                          "-"
-                        )}
-                      </div>
-                    </TableCell>
-
-                    {/* Source column */}
-                    <TableCell className="w-32 p-0 !border-r-0">
-                      <div className="px-4 py-2">
-                        <Badge variant="outline">{getSourceType(item)}</Badge>
-                      </div>
-                    </TableCell>
-
-                    {/* Reason column */}
-                    <TableCell className="w-48 p-0 !border-r-0">
-                      <div className="px-4 py-2">
-                        <TruncatedTextWithTooltip text={getReason(item)} />
-                      </div>
-                    </TableCell>
-
-                    {/* Started at column */}
-                    <TableCell className="w-32 p-0 !border-r-0">
-                      <div className="px-4 py-2 text-sm">{formatDateDisplay(item.startedAt)}</div>
-                    </TableCell>
-
-                    {/* Completed at column */}
-                    <TableCell className="w-32 p-0 !border-r-0">
-                      <div className="px-4 py-2 text-sm">{formatDateDisplay(item.completedAt)}</div>
-                    </TableCell>
+                      </TableCell>
+                    ))}
                   </TableRow>
                 );
               })

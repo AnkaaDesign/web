@@ -76,6 +76,16 @@ export function extractActiveFilters(
     });
   }
 
+  // Status filter (isActive)
+  if (typeof filters.isActive === "boolean") {
+    activeFilters.push({
+      key: "isActive",
+      label: "Status",
+      value: filters.isActive ? "Apenas ativos" : "Apenas inativos",
+      onRemove: () => onRemoveFilter("isActive"),
+    });
+  }
+
   // Stock filters
   if (filters.lowStock) {
     activeFilters.push({
@@ -164,6 +174,11 @@ export function createFilterRemover(setFilters: React.Dispatch<React.SetStateAct
 
         case "outOfStock":
           delete newFilters.outOfStock;
+          break;
+
+        case "isActive":
+          // Reset to default: show only active items
+          newFilters.isActive = true;
           break;
 
         case "createdAt":

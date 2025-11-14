@@ -5,7 +5,6 @@ import type { PpeDelivery } from "../../../../types";
 import type { PpeDeliveryGetManyFormData } from "../../../../schemas";
 import { routes, PPE_DELIVERY_STATUS, ITEM_CATEGORY_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
 import { hasPrivilege } from "../../../../utils";
-import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,10 +15,12 @@ import { FilterIndicators } from "./filter-indicators";
 import { extractActiveFilters, createFilterRemover } from "./filter-utils";
 import { cn } from "@/lib/utils";
 import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
-import { Badge } from "@/components/ui/badge";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { createPpeDeliveryColumns, getDefaultVisibleColumns } from "./ppe-delivery-table-columns";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useTableState } from "@/hooks/use-table-state";
+import { useBatchResultDialog } from "@/hooks/use-batch-result-dialog";
+import { BatchOperationResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
 interface PpeDeliveryListProps {
@@ -53,30 +54,39 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   const { data: currentUser } = useAuth();
   const [deleteDialog, setDeleteDialog] = useState<{ items: PpeDelivery[]; isBulk: boolean } | null>(null);
 
-  // State to hold current page items and table state from the table component
+  // Get table state for selected items functionality - shared with table component via URL
+  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds } = useTableState({
+    defaultPageSize: DEFAULT_PAGE_SIZE,
+    resetSelectionOnPageChange: false,
+  });
+
+  console.log("[PpeDeliveryList] State:", {
+    selectedIds,
+    selectionCount,
+    showSelectedOnly,
+  });
+
+  // State to hold current page items from the table component
   const [tableData, setTableData] = useState<{
     items: PpeDelivery[];
     totalRecords: number;
-    selectionCount: number;
-    showSelectedOnly: boolean;
-    toggleShowSelectedOnly?: () => void;
   }>({
     items: [],
     totalRecords: 0,
-    selectionCount: 0,
-    showSelectedOnly: false,
   });
 
   // Stable callback for table data updates
   const handleTableDataChange = useCallback(
-    (data: { items: PpeDelivery[]; totalRecords: number; selectionCount: number; showSelectedOnly: boolean; toggleShowSelectedOnly: () => void }) => {
+    (data: { items: PpeDelivery[]; totalRecords: number }) => {
+      console.log("[PpeDeliveryList] handleTableDataChange called with:", {
+        itemCount: data.items.length,
+        totalRecords: data.totalRecords,
+        itemIds: data.items.map(i => i.id),
+      });
       setTableData(data);
     },
     [],
   );
-
-  // Track cursor position to maintain it during search operations
-  const cursorPositionRef = useRef<number>(0);
 
   // State from URL params - must be declared before any callbacks that use them
   const [searchingFor, setSearchingFor] = useState(() => searchParams.get("search") || "");
@@ -141,32 +151,15 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     [setSearchingFor],
   );
 
-  // Update cursor position when user interacts with search input
+  // Handle search input change - receives value directly from custom Input component
   const handleSearchInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const target = e.target;
-      cursorPositionRef.current = target.selectionStart || 0;
-      setDisplaySearchText(target.value); // Immediate UI update
-      debouncedSearch(target.value); // Debounced API call
+    (value: string | number | null) => {
+      const stringValue = value?.toString() || "";
+      setDisplaySearchText(stringValue); // Immediate UI update
+      debouncedSearch(stringValue); // Debounced API call
     },
     [debouncedSearch],
   );
-
-  // Keep focus and cursor position stable during search operations
-  useEffect(() => {
-    // Only restore cursor position if the search input is currently focused
-    if (searchInputRef.current && document.activeElement === searchInputRef.current) {
-      // Use requestAnimationFrame to ensure DOM updates are complete
-      requestAnimationFrame(() => {
-        if (searchInputRef.current && document.activeElement === searchInputRef.current) {
-          const input = searchInputRef.current;
-          const savedPosition = cursorPositionRef.current;
-          // Restore cursor position to where the user was typing
-          input.setSelectionRange(savedPosition, savedPosition);
-        }
-      });
-    }
-  }, [displaySearchText]); // Depend on display text changes, not table data
 
   // Load entity data for filter labels
   const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
@@ -205,45 +198,59 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   useEffect(() => {
     if (!filtersInitialized) return;
 
-    const newParams = new URLSearchParams();
+    setSearchParams((prevParams) => {
+      const newParams = new URLSearchParams(prevParams);
 
-    // Add search parameter
-    if (searchingFor) {
-      newParams.set("search", searchingFor);
-    }
+      // Remove all filter-related params first
+      newParams.delete("search");
+      newParams.delete("itemId");
+      newParams.delete("itemIds");
+      newParams.delete("userId");
+      newParams.delete("userIds");
+      newParams.delete("status");
+      newParams.delete("scheduledAfter");
+      newParams.delete("scheduledBefore");
+      newParams.delete("deliveredAfter");
+      newParams.delete("deliveredBefore");
 
-    // Add filter parameters
-    if (filters.itemIds?.length) {
-      newParams.set("itemIds", filters.itemIds.join(","));
-    } else if (filters.where?.itemId) {
-      newParams.set("itemId", filters.where.itemId);
-    }
+      // Add search parameter
+      if (searchingFor) {
+        newParams.set("search", searchingFor);
+      }
 
-    if (filters.userIds?.length) {
-      newParams.set("userIds", filters.userIds.join(","));
-    } else if (filters.where?.userId) {
-      newParams.set("userId", filters.where.userId);
-    }
+      // Add filter parameters
+      if (filters.itemIds?.length) {
+        newParams.set("itemIds", filters.itemIds.join(","));
+      } else if (filters.where?.itemId) {
+        newParams.set("itemId", filters.where.itemId);
+      }
 
-    if (filters.status?.length) {
-      newParams.set("status", filters.status.join(","));
-    }
+      if (filters.userIds?.length) {
+        newParams.set("userIds", filters.userIds.join(","));
+      } else if (filters.where?.userId) {
+        newParams.set("userId", filters.where.userId);
+      }
 
-    if (filters.scheduledDateRange?.gte) {
-      newParams.set("scheduledAfter", filters.scheduledDateRange.gte.toISOString());
-    }
-    if (filters.scheduledDateRange?.lte) {
-      newParams.set("scheduledBefore", filters.scheduledDateRange.lte.toISOString());
-    }
+      if (filters.status?.length) {
+        newParams.set("status", filters.status.join(","));
+      }
 
-    if (filters.actualDeliveryDateRange?.gte) {
-      newParams.set("deliveredAfter", filters.actualDeliveryDateRange.gte.toISOString());
-    }
-    if (filters.actualDeliveryDateRange?.lte) {
-      newParams.set("deliveredBefore", filters.actualDeliveryDateRange.lte.toISOString());
-    }
+      if (filters.scheduledDateRange?.gte) {
+        newParams.set("scheduledAfter", filters.scheduledDateRange.gte.toISOString());
+      }
+      if (filters.scheduledDateRange?.lte) {
+        newParams.set("scheduledBefore", filters.scheduledDateRange.lte.toISOString());
+      }
 
-    setSearchParams(newParams, { replace: true });
+      if (filters.actualDeliveryDateRange?.gte) {
+        newParams.set("deliveredAfter", filters.actualDeliveryDateRange.gte.toISOString());
+      }
+      if (filters.actualDeliveryDateRange?.lte) {
+        newParams.set("deliveredBefore", filters.actualDeliveryDateRange.lte.toISOString());
+      }
+
+      return newParams;
+    }, { replace: true });
   }, [filters, searchingFor, setSearchParams, filtersInitialized]);
 
   // Query filters to send to API
@@ -320,17 +327,8 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     };
   }, [debouncedSearch]);
 
-  // Handle search
-  const handleSearch = useCallback(
-    (value: string) => {
-      setDisplaySearchText(value); // Immediate UI update
-      debouncedSearch(value); // Debounced API call
-    },
-    [debouncedSearch],
-  );
-
-  // Context menu handlers
-  const handleBulkEdit = (deliveries: PpeDelivery[]) => {
+  // Context menu handlers - memoized to prevent unnecessary re-renders
+  const handleBulkEdit = useCallback((deliveries: PpeDelivery[]) => {
     if (deliveries.length === 1) {
       // Single delivery - navigate to edit page
       navigate(routes.inventory.ppe.deliveries.edit(deliveries[0].id));
@@ -339,20 +337,28 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
       const ids = deliveries.map((delivery) => delivery.id).join(",");
       navigate(`/estoque/epi/entregas/editar-lote?ids=${ids}`);
     }
-  };
+  }, [navigate]);
 
-  const handleBulkApprove = async (deliveries: PpeDelivery[]) => {
+  const handleBulkApprove = useCallback(async (deliveries: PpeDelivery[]) => {
     // Check permissions
     if (!currentUser || !hasPrivilege(currentUser, SECTOR_PRIVILEGES.WAREHOUSE)) {
-      toast.error("Você não tem permissão para aprovar entregas");
       return;
     }
 
-    // Filter only deliveries that can be approved (not already approved or delivered)
-    const deliveriesToApprove = deliveries.filter((d) => d.status !== PPE_DELIVERY_STATUS.APPROVED && d.status !== PPE_DELIVERY_STATUS.DELIVERED);
+    // Filter only deliveries that can be approved (PENDING only)
+    // Cannot approve: APPROVED, DELIVERED, REPROVED, CANCELLED
+    const deliveriesToApprove = deliveries.filter(
+      (d) => d.status === PPE_DELIVERY_STATUS.PENDING
+    );
+
+    console.log("[handleBulkApprove] Filtered deliveries:", {
+      total: deliveries.length,
+      toApprove: deliveriesToApprove.length,
+      filtered: deliveriesToApprove.map(d => ({ id: d.id, status: d.status })),
+    });
 
     if (deliveriesToApprove.length === 0) {
-      toast.error("Nenhuma entrega está disponível para aprovação");
+      console.warn("[handleBulkApprove] No deliveries eligible for approval");
       return;
     }
 
@@ -368,33 +374,22 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
             reviewedBy: currentUser.id,
           },
         });
-        toast.success("Entrega aprovada com sucesso");
       } else {
         // Multiple deliveries - use batch operation
         const deliveryIds = deliveriesToApprove.map((d) => d.id);
-        const result = await batchApproveMutation.mutateAsync({
+        await batchApproveMutation.mutateAsync({
           deliveryIds,
           approvedBy: currentUser.id,
         });
-
-        if (result.success > 0) {
-          toast.success(`${result.success} entregas aprovadas com sucesso`);
-        }
-
-        if (result.failed > 0) {
-          toast.error(`${result.failed} entregas não puderam ser aprovadas`);
-        }
       }
     } catch (error) {
-      console.error("Error approving deliveries:", error);
-      toast.error("Erro ao aprovar entregas");
+      console.error("[handleBulkApprove] Error approving deliveries:", error);
     }
-  };
+  }, [currentUser, updateAsync, batchApproveMutation]);
 
-  const handleBulkDeliver = async (deliveries: PpeDelivery[]) => {
+  const handleBulkDeliver = useCallback(async (deliveries: PpeDelivery[]) => {
     // Check permissions
     if (!currentUser || !hasPrivilege(currentUser, SECTOR_PRIVILEGES.WAREHOUSE)) {
-      toast.error("Você não tem permissão para marcar entregas como entregues");
       return;
     }
 
@@ -402,7 +397,6 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     const deliveriesToMark = deliveries.filter((d) => d.status === PPE_DELIVERY_STATUS.APPROVED);
 
     if (deliveriesToMark.length === 0) {
-      toast.error("Nenhuma entrega está no status 'Aprovado' para ser marcada como entregue");
       return;
     }
 
@@ -416,27 +410,34 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
           }),
         ),
       );
-
-      const count = deliveriesToMark.length;
-      toast.success(count === 1 ? "Entrega marcada como entregue com sucesso" : `${count} entregas marcadas como entregues com sucesso`);
     } catch (error) {
       // Error is handled by the API client with detailed message
       console.error("Error marking deliveries as delivered:", error);
     }
-  };
+  }, [currentUser, markAsDeliveredMutation]);
 
-  const handleBulkReject = async (deliveries: PpeDelivery[]) => {
+  const handleBulkReject = useCallback(async (deliveries: PpeDelivery[]) => {
     // Check permissions
     if (!currentUser || !hasPrivilege(currentUser, SECTOR_PRIVILEGES.WAREHOUSE)) {
-      toast.error("Você não tem permissão para reprovar entregas");
       return;
     }
 
-    // Filter only deliveries that can be rejected (not already delivered or reproved)
-    const deliveriesToReject = deliveries.filter((d) => d.status !== PPE_DELIVERY_STATUS.DELIVERED && d.status !== PPE_DELIVERY_STATUS.REPROVED);
+    // Filter only deliveries that can be rejected (PENDING or APPROVED only)
+    // Cannot reject: DELIVERED, REPROVED, CANCELLED
+    const deliveriesToReject = deliveries.filter(
+      (d) =>
+        d.status === PPE_DELIVERY_STATUS.PENDING ||
+        d.status === PPE_DELIVERY_STATUS.APPROVED
+    );
+
+    console.log("[handleBulkReject] Filtered deliveries:", {
+      total: deliveries.length,
+      toReject: deliveriesToReject.length,
+      filtered: deliveriesToReject.map(d => ({ id: d.id, status: d.status })),
+    });
 
     if (deliveriesToReject.length === 0) {
-      toast.error("Nenhuma entrega está disponível para reprovação");
+      console.warn("[handleBulkReject] No deliveries eligible for rejection");
       return;
     }
 
@@ -452,35 +453,25 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
             reviewedBy: currentUser.id,
           },
         });
-        toast.success("Entrega reprovada com sucesso");
       } else {
         // Multiple deliveries - use batch operation
         const deliveryIds = deliveriesToReject.map((d) => d.id);
-        const result = await batchRejectMutation.mutateAsync({
+        await batchRejectMutation.mutateAsync({
           deliveryIds,
           reviewedBy: currentUser.id,
         });
-
-        if (result.success > 0) {
-          toast.success(`${result.success} entregas reprovadas com sucesso`);
-        }
-
-        if (result.failed > 0) {
-          toast.error(`${result.failed} entregas não puderam ser reprovadas`);
-        }
       }
     } catch (error) {
-      console.error("Error rejecting deliveries:", error);
-      toast.error("Erro ao reprovar entregas");
+      console.error("[handleBulkReject] Error rejecting deliveries:", error);
     }
-  };
+  }, [currentUser, updateAsync, batchRejectMutation]);
 
-  const handleBulkDelete = (deliveries: PpeDelivery[]) => {
+  const handleBulkDelete = useCallback((deliveries: PpeDelivery[]) => {
     setDeleteDialog({
       items: deliveries,
       isBulk: deliveries.length > 1,
     });
-  };
+  }, []);
 
   const confirmDelete = async () => {
     if (!deleteDialog) return;
@@ -488,12 +479,6 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     try {
       const ids = deleteDialog.items.map((delivery) => delivery.id);
       await batchDeleteMutation.mutateAsync({ ppeDeliveryIds: ids });
-
-      toast.success(
-        deleteDialog.isBulk && deleteDialog.items.length > 1
-          ? `${deleteDialog.items.length} entregas deletadas com sucesso`
-          : "Entrega deletada com sucesso"
-      );
     } catch (error) {
       // Error is handled by the API client with detailed message
       console.error("Error deleting delivery(ies):", error);
@@ -515,11 +500,12 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
               placeholder="Buscar por item, usuário, observações..."
               value={displaySearchText}
               onChange={handleSearchInputChange}
+              transparent={true}
               className="pl-10"
             />
           </div>
           <div className="flex gap-2">
-            <ShowSelectedToggle showSelectedOnly={tableData.showSelectedOnly} onToggle={tableData.toggleShowSelectedOnly || (() => {})} selectionCount={tableData.selectionCount} />
+            <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
             <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)}>
               <IconFilter className="h-4 w-4" />
               <span>

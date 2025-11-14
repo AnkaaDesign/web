@@ -79,9 +79,15 @@ const parseFromHTMLInput = (value: string, mode: DateTimeMode): Date | null => {
   if (!value) return null;
 
   try {
+    let parsedDate: Date | null = null;
     switch (mode) {
       case "date":
-        return parse(value, "yyyy-MM-dd", new Date());
+        parsedDate = parse(value, "yyyy-MM-dd", new Date());
+        // Set default time to 13:00 for date-only mode
+        if (parsedDate && isValid(parsedDate)) {
+          parsedDate.setHours(13, 0, 0, 0);
+        }
+        return parsedDate;
       case "datetime":
         return parse(value, "yyyy-MM-dd'T'HH:mm", new Date());
       case "time":
@@ -252,6 +258,12 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
         if (mode === "datetime" && currentValue instanceof Date) {
           const newDate = new Date(date);
           newDate.setHours(currentValue.getHours(), currentValue.getMinutes(), 0, 0);
+          date = newDate;
+        }
+        // For date mode, set default time to 13:00
+        else if (mode === "date") {
+          const newDate = new Date(date);
+          newDate.setHours(13, 0, 0, 0);
           date = newDate;
         }
 
@@ -703,7 +715,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
 
             {/* Clear button */}
             {showClearButton && currentValue && (
-              <div className="px-3 pb-3 border-t border-border">
+              <div className="px-3 pb-3 pt-3 border-t border-border">
                 <Button
                   type="button"
                   variant="outline"

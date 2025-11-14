@@ -539,17 +539,14 @@ export function useExternalWithdrawalFormUrlState(options: UseExternalWithdrawal
 
       const newQuantities = { ...quantities, [itemId]: quantity };
 
-      // Include all related state to avoid race conditions
-      const currentPrices = { ...prices };
-
-      // Batch update to avoid race conditions - include all related state
+      // Batch update - only update selectedItems and quantities
+      // Don't include prices to avoid race conditions
       setFilters({
         selectedItems: Array.from(newSelected),
         quantities: Object.keys(newQuantities).length > 0 ? newQuantities : undefined,
-        prices: Object.keys(currentPrices).length > 0 ? currentPrices : undefined,
       });
     },
-    [quantities, selectedItems, prices, setFilters],
+    [quantities, selectedItems, setFilters],
   );
 
   // Helper to set price for an item

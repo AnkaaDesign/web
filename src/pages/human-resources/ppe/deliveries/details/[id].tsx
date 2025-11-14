@@ -4,7 +4,7 @@ import { routes, PPE_DELIVERY_STATUS, SECTOR_PRIVILEGES } from "../../../../../c
 import { usePpeDelivery, usePpeDeliveryMutations, useMarkPpeDeliveryAsDelivered, useAuth } from "../../../../../hooks";
 import { PpeDeliveryInfoCard, PpeDeliveryScheduleCard, PpeDeliveryChangelogCard, PpeDeliveryItemCard } from "@/components/inventory/epi/delivery/detail";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconShield, IconEdit, IconCheck, IconX, IconRefresh, IconTrash, IconTruck, IconAlertTriangle } from "@tabler/icons-react";
+import { IconShield, IconEdit, IconCheck, IconX, IconTrash, IconTruck, IconAlertTriangle } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -56,6 +56,7 @@ const EPIDeliveryDetails = () => {
         include: {
           brand: true,
           category: true,
+          measures: true,
           prices: {
             orderBy: {
               updatedAt: "desc",
@@ -70,7 +71,7 @@ const EPIDeliveryDetails = () => {
           sector: true,
         },
       },
-      approvedByUser: true,
+      reviewedByUser: true,
       ppeSchedule: true,
     },
     enabled: !!id,
@@ -83,10 +84,6 @@ const EPIDeliveryDetails = () => {
     if (ppeDelivery && canManageWarehouse) {
       navigate(routes.humanResources.ppe.deliveries.edit(ppeDelivery.id));
     }
-  };
-
-  const handleRefresh = () => {
-    refetch();
   };
 
   const handleMarkDelivered = async () => {
@@ -256,7 +253,7 @@ const EPIDeliveryDetails = () => {
         <div className="animate-in fade-in-50 duration-500">
           <PageHeader
             variant="detail"
-            title={`Entrega de EPI #${ppeDelivery.id.slice(-8)}`}
+            title={`${ppeDelivery.item?.name || "Item"} - ${ppeDelivery.user?.name || "Usuário"}`}
             icon={IconShield}
             className="shadow-lg"
             breadcrumbs={[
@@ -264,15 +261,9 @@ const EPIDeliveryDetails = () => {
               { label: "RH", href: routes.humanResources.root },
               { label: "EPIs", href: routes.humanResources.ppe.root },
               { label: "Entregas", href: routes.humanResources.ppe.deliveries.root },
-              { label: `#${ppeDelivery.id.slice(-8)}` },
+              { label: `${ppeDelivery.item?.name || "Item"} - ${ppeDelivery.user?.name || "Usuário"}` },
             ]}
             actions={[
-              {
-                key: "refresh",
-                label: "Atualizar",
-                icon: IconRefresh,
-                onClick: handleRefresh,
-              },
               ...(canEdit
                 ? [
                     {
@@ -301,7 +292,7 @@ const EPIDeliveryDetails = () => {
               {/* Second Row: Schedule (if available) and Changelog (1/2 each) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {ppeDelivery.ppeSchedule && <PpeDeliveryScheduleCard schedule={ppeDelivery.ppeSchedule} className="h-full" />}
-                <PpeDeliveryChangelogCard deliveryId={ppeDelivery.id} className={ppeDelivery.ppeSchedule ? "h-full" : "lg:col-span-2 h-full"} />
+                <PpeDeliveryChangelogCard delivery={ppeDelivery} className={ppeDelivery.ppeSchedule ? "h-full" : "lg:col-span-2 h-full"} />
               </div>
             </div>
           </div>

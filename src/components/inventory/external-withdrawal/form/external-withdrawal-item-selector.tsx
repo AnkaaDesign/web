@@ -216,14 +216,14 @@ export const ExternalWithdrawalItemSelector = ({
       ...(!showSelectedOnly && {
         searchingFor: debouncedSearchTerm,
       }),
+      // Map showInactive to isActive at root level
+      ...(!showSelectedOnly && typeof showInactive === "boolean" && { isActive: !showInactive }),
       where: {
         // When showSelectedOnly is true, only filter by selected IDs
         ...(showSelectedOnly && selectedItems.size > 0
           ? { id: { in: Array.from(selectedItems) } }
           : {
               // Apply other filters only when not showing selected only
-              // Filter by active status: only show inactive items when showInactive is true
-              ...(!showInactive && { isActive: true }),
               ...(categoryIds.length && { categoryId: { in: categoryIds } }),
               ...(brandIds.length && { brandId: { in: brandIds } }),
               ...(supplierIds.length && { supplierId: { in: supplierIds } }),

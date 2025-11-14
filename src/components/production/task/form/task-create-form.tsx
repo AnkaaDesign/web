@@ -95,7 +95,6 @@ export const TaskCreateForm = () => {
       truck: {
         xPosition: null,
         yPosition: null,
-        garageId: null,
       },
       services: [],
       cuts: [],
@@ -128,8 +127,6 @@ export const TaskCreateForm = () => {
       customerId: urlState.customerId || "",
       sectorId: urlState.sectorId || undefined,
       serialNumber: urlState.serialNumber,
-      chassisNumber: urlState.chassisNumber,
-      plate: urlState.plate,
       details: urlState.details,
       entryDate: urlState.entryDate || null,
       term: urlState.term || null,
@@ -195,6 +192,13 @@ export const TaskCreateForm = () => {
     async (data: TaskCreateFormData) => {
       try {
         setIsSubmitting(true);
+
+        // Set entry date to 7:30 if provided (since the date picker only allows date selection)
+        if (data.entryDate) {
+          const entryDate = new Date(data.entryDate);
+          entryDate.setHours(7, 30, 0, 0);
+          data.entryDate = entryDate;
+        }
 
         // Get customer data for file organization
         const customerId = data.customerId;
@@ -608,14 +612,14 @@ export const TaskCreateForm = () => {
                       <CustomerSelector control={form.control} disabled={isSubmitting} required />
                     </div>
 
-                    {/* Serial Number, Plate and Chassis Number */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Serial Number */}
+                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                       {/* Serial Number */}
                       <FormField
                         control={form.control}
                         name="serialNumber"
                         render={({ field }) => (
-                          <FormItem className="md:col-span-1">
+                          <FormItem>
                             <FormLabel className="flex items-center gap-2">
                               <IconHash className="h-4 w-4" />
                               Número de Série
@@ -629,62 +633,6 @@ export const TaskCreateForm = () => {
                                   const upperValue = (value || "").toUpperCase();
                                   field.onChange(upperValue);
                                   urlState.updateSerialNumber(upperValue);
-                                }}
-                                disabled={isSubmitting}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {/* Plate (optional) */}
-                      <FormField
-                        control={form.control}
-                        name="plate"
-                        render={({ field }) => (
-                          <FormItem className="md:col-span-1">
-                            <FormLabel className="flex items-center gap-2">
-                              <IconLicense className="h-4 w-4" />
-                              Placa
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                type="plate"
-                                value={field.value || ""}
-                                onChange={(value) => {
-                                  // Input component with type="plate" passes the cleaned value directly
-                                  field.onChange(value || null);
-                                  urlState.updatePlate(value ? String(value) : "");
-                                }}
-                                disabled={isSubmitting}
-                                className="bg-transparent"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {/* Chassis Number */}
-                      <FormField
-                        control={form.control}
-                        name="chassisNumber"
-                        render={({ field }) => (
-                          <FormItem className="md:col-span-2">
-                            <FormLabel className="flex items-center gap-2">
-                              <IconId className="h-4 w-4" />
-                              Número do Chassi (17 caracteres)
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                type="chassis"
-                                value={field.value || ""}
-                                placeholder="Ex: 9BW ZZZ37 7V T004251"
-                                className="bg-transparent"
-                                onChange={(value) => {
-                                  field.onChange(value || null);
-                                  urlState.updateChassisNumber(value ? String(value) : "");
                                 }}
                                 disabled={isSubmitting}
                               />

@@ -177,15 +177,25 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
                   { value: "com", label: "Com usuário atribuído" },
                   { value: "sem", label: "Sem usuário atribuído" },
                 ]}
-                value={localFilters.hasUser === true ? "com" : localFilters.hasUser === false ? "sem" : "ambos"}
+                value={
+                  localFilters.hasUser === true ? "com" :
+                  localFilters.hasUser === false ? "sem" :
+                  "ambos"
+                }
                 onValueChange={(value) => {
-                  setLocalFilters({
-                    ...localFilters,
-                    hasUser: value === "com" ? true : value === "sem" ? false : undefined,
-                  });
+                  const newFilters = { ...localFilters };
+                  if (value === "com") {
+                    newFilters.hasUser = true;
+                  } else if (value === "sem") {
+                    newFilters.hasUser = false;
+                  } else {
+                    delete newFilters.hasUser;
+                  }
+                  setLocalFilters(newFilters);
                 }}
                 placeholder="Selecione..."
                 emptyText="Nenhuma opção encontrada"
+                searchable={false}
               />
             </div>
 
@@ -210,13 +220,19 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
                       : "ambos"
                 }
                 onValueChange={(value) => {
-                  setLocalFilters({
-                    ...localFilters,
-                    operations: value === "entrada" ? [ACTIVITY_OPERATION.INBOUND] : value === "saida" ? [ACTIVITY_OPERATION.OUTBOUND] : undefined,
-                  });
+                  const newFilters = { ...localFilters };
+                  if (value === "entrada") {
+                    newFilters.operations = [ACTIVITY_OPERATION.INBOUND];
+                  } else if (value === "saida") {
+                    newFilters.operations = [ACTIVITY_OPERATION.OUTBOUND];
+                  } else {
+                    delete newFilters.operations;
+                  }
+                  setLocalFilters(newFilters);
                 }}
                 placeholder="Selecione..."
                 emptyText="Nenhuma opção encontrada"
+                searchable={false}
               />
             </div>
           </div>
@@ -428,7 +444,7 @@ export const ActivityFilters = ({ open, onOpenChange, filters, onApply, onReset 
           </div>
         </div>
 
-        <div className="flex gap-2 pt-4 border-t">
+        <div className="flex gap-2 mt-6 pt-4 border-t">
           <Button variant="outline" onClick={handleClear} className="flex-1 flex items-center gap-2">
             <IconX className="h-4 w-4" />
             Limpar Tudo

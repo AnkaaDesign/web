@@ -356,19 +356,14 @@ export function useActivityFormUrlState(options: UseActivityFormUrlStateOptions 
 
       const newQuantities = { ...quantities, [itemId]: quantity };
 
-      // Include all related state to avoid race conditions
-      const currentOperations = { ...operations };
-      const currentUserIds = { ...userIds };
-
-      // Batch update to avoid race conditions - include all related state
+      // Batch update - only update selectedItems and quantities
+      // Don't include operations/userIds to avoid race conditions
       setFilters({
         selectedItems: Array.from(newSelected),
         quantities: Object.keys(newQuantities).length > 0 ? newQuantities : undefined,
-        operations: Object.keys(currentOperations).length > 0 ? currentOperations : undefined,
-        userIds: Object.keys(currentUserIds).length > 0 ? currentUserIds : undefined,
       });
     },
-    [quantities, selectedItems, operations, userIds, setFilters],
+    [quantities, selectedItems, setFilters],
   );
 
   // Helper to set operation for an item

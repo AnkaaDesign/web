@@ -286,7 +286,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
       const measureStrings: string[] = [];
       sortedMeasures.forEach((measure) => {
         if (measure.value !== null && measure.unit !== null) {
-          measureStrings.push(measureUtils.formatMeasure({ value: measure.value, unit: measure.unit }));
+          measureStrings.push(measureUtils.formatMeasure({ value: measure.value, unit: measure.unit }, true, 2, measure.measureType));
         } else if (measure.unit !== null) {
           measureStrings.push(MEASURE_UNIT_LABELS[measure.unit] || measure.unit);
         } else if (measure.value !== null) {

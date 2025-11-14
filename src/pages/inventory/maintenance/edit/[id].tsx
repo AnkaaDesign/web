@@ -79,9 +79,6 @@ export const EditMaintenancePage = () => {
                 { label: "Manutenções", href: routes.inventory.maintenance.list },
                 { label: "Editar" },
               ]}
-              backButton={{
-                onClick: () => navigate(routes.inventory.maintenance.list),
-              }}
             />
           </div>
         </div>
@@ -118,9 +115,6 @@ export const EditMaintenancePage = () => {
                 { label: "Manutenções", href: routes.inventory.maintenance.list },
                 { label: "Editar" },
               ]}
-              backButton={{
-                onClick: () => navigate(routes.inventory.maintenance.list),
-              }}
             />
           </div>
         </div>
@@ -180,9 +174,6 @@ export const EditMaintenancePage = () => {
               { label: "Manutenções", href: routes.inventory.maintenance.list },
               { label: "Editar" },
             ]}
-            backButton={{
-              onClick: () => navigate(routes.inventory.maintenance.details(id!)),
-            }}
             actions={actions}
           />
         </div>

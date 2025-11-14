@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import type { File as AnkaaFile } from "../../../types";
 import { FilePreviewCard } from "./file-preview-card";
-import { FilePreview } from "./file-preview";
+import { FilePreview } from "./file-preview-modal";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

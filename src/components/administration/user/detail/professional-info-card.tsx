@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconBriefcase, IconBuilding, IconCalendar, IconUserCog, IconCake, IconHash } from "@tabler/icons-react";
+import { IconBriefcase, IconBuilding, IconUserCog, IconCalendarTime, IconCalendarShare, IconCalendarCheck, IconCalendarCancel } from "@tabler/icons-react";
 import type { User } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { formatDate, getAge } from "../../../../utils";
+import { formatDate } from "../../../../utils";
 
 interface ProfessionalInfoCardProps {
   user: User;
@@ -17,41 +17,13 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
           <div className="p-2 rounded-lg bg-primary/10">
             <IconBriefcase className="h-5 w-5 text-primary" />
           </div>
-          Informações Profissionais
+          Dados Profissionais
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0 flex-1">
         <div className="space-y-6">
-          {/* Personal Information */}
-          <div>
-            <h3 className="text-base font-semibold mb-4 text-foreground">Dados Pessoais</h3>
-            <div className="space-y-4">
-              {user.birth && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconCake className="h-4 w-4" />
-                    Data de Nascimento
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {formatDate(user.birth)} ({getAge(user.birth)} anos)
-                  </span>
-                </div>
-              )}
-
-              {user.payrollNumber && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconHash className="h-4 w-4" />
-                    Número da Folha
-                  </span>
-                  <span className="text-sm font-semibold text-foreground">{user.payrollNumber}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Professional Information */}
-          <div className="pt-6 border-t border-border/50">
+          <div>
             <h3 className="text-base font-semibold mb-4 text-foreground">Dados Funcionais</h3>
             <div className="space-y-4">
               {user.position && (
@@ -87,7 +59,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               {user.exp1StartAt && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconCalendar className="h-4 w-4" />
+                    <IconCalendarTime className="h-4 w-4" />
                     Início Experiência 1
                   </span>
                   <span className="text-sm font-semibold text-foreground">{formatDate(user.exp1StartAt)}</span>
@@ -97,7 +69,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               {user.exp1EndAt && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconCalendar className="h-4 w-4" />
+                    <IconCalendarShare className="h-4 w-4" />
                     Fim Experiência 1
                   </span>
                   <span className="text-sm font-semibold text-foreground">{formatDate(user.exp1EndAt)}</span>
@@ -107,7 +79,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               {user.exp2StartAt && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconCalendar className="h-4 w-4" />
+                    <IconCalendarTime className="h-4 w-4" />
                     Início Experiência 2
                   </span>
                   <span className="text-sm font-semibold text-foreground">{formatDate(user.exp2StartAt)}</span>
@@ -117,27 +89,27 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               {user.exp2EndAt && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconCalendar className="h-4 w-4" />
+                    <IconCalendarShare className="h-4 w-4" />
                     Fim Experiência 2
                   </span>
                   <span className="text-sm font-semibold text-foreground">{formatDate(user.exp2EndAt)}</span>
                 </div>
               )}
 
-              {user.contractedAt && (
+              {user.effectedAt && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconCalendar className="h-4 w-4" />
+                    <IconCalendarCheck className="h-4 w-4" />
                     Data de Contratação
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{formatDate(user.contractedAt)}</span>
+                  <span className="text-sm font-semibold text-foreground">{formatDate(user.effectedAt)}</span>
                 </div>
               )}
 
               {user.dismissedAt && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <IconCalendar className="h-4 w-4" />
+                    <IconCalendarCancel className="h-4 w-4" />
                     Data de Demissão
                   </span>
                   <span className="text-sm font-semibold text-foreground">{formatDate(user.dismissedAt)}</span>

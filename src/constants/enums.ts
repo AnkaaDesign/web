@@ -49,38 +49,89 @@ export enum SECTOR_PRIVILEGES {
 export enum USER_STATUS {
   EXPERIENCE_PERIOD_1 = "EXPERIENCE_PERIOD_1",
   EXPERIENCE_PERIOD_2 = "EXPERIENCE_PERIOD_2",
-  CONTRACTED = "CONTRACTED",
+  EFFECTED = "EFFECTED",
   DISMISSED = "DISMISSED",
 }
 
 export const REGISTRATION_STATUS_OPTIONS = [
-  { value: "ATIVA", label: "Ativa" },
-  { value: "SUSPENSA", label: "Suspensa" },
-  { value: "INAPTA", label: "Inapta" },
-  { value: "ATIVA_NAO_REGULAR", label: "Ativa Não Regular" },
-  { value: "BAIXADA", label: "Baixada" },
+  { value: "ACTIVE", label: "Ativa" },
+  { value: "SUSPENDED", label: "Suspensa" },
+  { value: "UNFIT", label: "Inapta" },
+  { value: "ACTIVE_NOT_REGULAR", label: "Ativa Não Regular" },
+  { value: "DEREGISTERED", label: "Baixada" },
 ] as const;
 
-export const LOGRADOURO_TYPE_OPTIONS = [
-  { value: "RUA", label: "Rua" },
-  { value: "AVENIDA", label: "Avenida" },
-  { value: "ALAMEDA", label: "Alameda" },
-  { value: "TRAVESSA", label: "Travessa" },
-  { value: "PRACA", label: "Praça" },
-  { value: "RODOVIA", label: "Rodovia" },
-  { value: "ESTRADA", label: "Estrada" },
-  { value: "MARGINAL", label: "Marginal" },
-  { value: "VIA", label: "Via" },
-  { value: "PASSARELA", label: "Passarela" },
-  { value: "VIELA", label: "Viela" },
-  { value: "BECO", label: "Beco" },
+// Map for converting old values to new values (for migration)
+export const REGISTRATION_STATUS_MIGRATION_MAP = {
+  ATIVA: "ACTIVE",
+  SUSPENSA: "SUSPENDED",
+  INAPTA: "UNFIT",
+  ATIVA_NAO_REGULAR: "ACTIVE_NOT_REGULAR",
+  BAIXADA: "DEREGISTERED",
+} as const;
+
+export const STREET_TYPE_OPTIONS = [
+  { value: "STREET", label: "Street" },
+  { value: "AVENUE", label: "Avenue" },
+  { value: "ALLEY", label: "Alley" },
+  { value: "CROSSING", label: "Crossing" },
+  { value: "SQUARE", label: "Square" },
+  { value: "HIGHWAY", label: "Highway" },
+  { value: "ROAD", label: "Road" },
+  { value: "WAY", label: "Way" },
+  { value: "PLAZA", label: "Plaza" },
+  { value: "LANE", label: "Lane" },
+  { value: "DEADEND", label: "Deadend" },
+  { value: "SMALL_STREET", label: "Small Street" },
+  { value: "PATH", label: "Path" },
+  { value: "PASSAGE", label: "Passage" },
+  { value: "GARDEN", label: "Garden" },
+  { value: "BLOCK", label: "Block" },
+  { value: "LOT", label: "Lot" },
+  { value: "SITE", label: "Site" },
+  { value: "PARK", label: "Park" },
+  { value: "FARM", label: "Farm" },
+  { value: "RANCH", label: "Ranch" },
+  { value: "CONDOMINIUM", label: "Condominium" },
+  { value: "COMPLEX", label: "Complex" },
+  { value: "RESIDENTIAL", label: "Residential" },
+  { value: "OTHER", label: "Other" },
 ] as const;
+
+// Map for converting old values to new values (for migration)
+export const STREET_TYPE_MIGRATION_MAP = {
+  RUA: "STREET",
+  AVENIDA: "AVENUE",
+  ALAMEDA: "ALLEY",
+  TRAVESSA: "CROSSING",
+  PRACA: "SQUARE",
+  RODOVIA: "HIGHWAY",
+  ESTRADA: "ROAD",
+  VIA: "WAY",
+  LARGO: "PLAZA",
+  VIELA: "LANE",
+  BECO: "DEADEND",
+  RUELA: "SMALL_STREET",
+  CAMINHO: "PATH",
+  PASSAGEM: "PASSAGE",
+  JARDIM: "GARDEN",
+  QUADRA: "BLOCK",
+  LOTE: "LOT",
+  SITIO: "SITE",
+  PARQUE: "PARK",
+  FAZENDA: "FARM",
+  CHACARA: "RANCH",
+  CONDOMINIO: "CONDOMINIUM",
+  CONJUNTO: "COMPLEX",
+  RESIDENCIAL: "RESIDENTIAL",
+  OUTRO: "OTHER",
+} as const;
 
 // Helper constants for common user status queries
 export const ACTIVE_USER_STATUSES = [
   USER_STATUS.EXPERIENCE_PERIOD_1,
   USER_STATUS.EXPERIENCE_PERIOD_2,
-  USER_STATUS.CONTRACTED,
+  USER_STATUS.EFFECTED,
 ] as const;
 
 export enum TASK_STATUS {
@@ -725,12 +776,6 @@ export enum TRUCK_MANUFACTURER {
   IVECO = "IVECO",
 }
 
-export enum GARAGE_STATUS {
-  ACTIVE = "ACTIVE",
-  MAINTENANCE = "MAINTENANCE",
-  INACTIVE = "INACTIVE",
-}
-
 // =====================
 // Operations & Actions
 // =====================
@@ -771,9 +816,6 @@ export enum ENTITY_TYPE {
   EXTERNAL_WITHDRAWAL = "EXTERNAL_WITHDRAWAL",
   EXTERNAL_WITHDRAWAL_ITEM = "EXTERNAL_WITHDRAWAL_ITEM",
   FILE = "FILE",
-  FUEL = "FUEL",
-  GARAGE = "GARAGE",
-  GARAGE_LANE = "GARAGE_LANE",
   HOLIDAY = "HOLIDAY",
   ITEM = "ITEM",
   ITEM_BRAND = "ITEM_BRAND",
@@ -932,7 +974,6 @@ export enum CHANGE_TRIGGERED_BY {
   VERIFICATION_RESEND = "VERIFICATION_RESEND",
   VEHICLE_MOVEMENT = "VEHICLE_MOVEMENT",
   PARKING_ASSIGNMENT = "PARKING_ASSIGNMENT",
-  GARAGE_CAPACITY_CHANGE = "GARAGE_CAPACITY_CHANGE",
   OBSERVATION_CREATE = "OBSERVATION_CREATE",
   OBSERVATION_DELETE = "OBSERVATION_DELETE",
   SCHEDULED_JOB = "SCHEDULED_JOB",
@@ -1391,7 +1432,6 @@ export enum CHANGE_LOG_ENTITY_TYPE {
   EXTERNAL_WITHDRAWAL = "EXTERNAL_WITHDRAWAL",
   EXTERNAL_WITHDRAWAL_ITEM = "EXTERNAL_WITHDRAWAL_ITEM",
   FILE = "FILE",
-  GARAGE_LANE = "GARAGE_LANE",
   ITEM = "ITEM",
   ITEM_BRAND = "ITEM_BRAND",
   ITEM_CATEGORY = "ITEM_CATEGORY",
@@ -1844,7 +1884,6 @@ export enum FAVORITE_PAGES {
   RECURSOS_HUMANOS_EPI_LISTAR = "/recursos-humanos/epi",
   RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR = "/recursos-humanos/epi/entregas",
   RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR = "/recursos-humanos/epi/agendamentos",
-  RECURSOS_HUMANOS_EPI_TAMANHOS_LISTAR = "/recursos-humanos/epi/tamanhos",
   RECURSOS_HUMANOS_SETORES_LISTAR = "/recursos-humanos/setores",
 
   // Human Resources - Create Pages
@@ -1855,7 +1894,6 @@ export enum FAVORITE_PAGES {
   RECURSOS_HUMANOS_EPI_CADASTRAR = "/recursos-humanos/epi/cadastrar",
   RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR = "/recursos-humanos/epi/entregas/cadastrar",
   RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR = "/recursos-humanos/epi/agendamentos/cadastrar",
-  RECURSOS_HUMANOS_EPI_TAMANHOS_CADASTRAR = "/recursos-humanos/epi/tamanhos/cadastrar",
   RECURSOS_HUMANOS_SETORES_CADASTRAR = "/recursos-humanos/setores/cadastrar",
 
   // Personal - List Pages

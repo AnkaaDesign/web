@@ -43,12 +43,18 @@ const EditCollaboratorPage = () => {
 
   const { updateAsync: update, isUpdating } = useUserMutations();
 
-  const handleSubmit = async (data: UserUpdateFormData) => {
+  const handleSubmit = async (data: UserUpdateFormData | FormData) => {
     if (!id) return;
 
     try {
-      // Remove currentStatus before sending to API (it's only used for validation)
-      const { currentStatus, ...dataToSend } = data;
+      // If data is FormData, send it as-is (for file uploads)
+      // Otherwise, remove currentStatus before sending to API (it's only used for validation)
+      const dataToSend = data instanceof FormData
+        ? data
+        : (() => {
+            const { currentStatus, ...rest } = data as UserUpdateFormData;
+            return rest;
+          })();
 
       const response = await update({ id, data: dataToSend });
 
@@ -117,7 +123,7 @@ const EditCollaboratorPage = () => {
       dismissal: parseLocalDate(user.dismissedAt),
 
       // Status tracking dates (CRITICAL - these were missing before!)
-      contractedAt: parseLocalDate(user.contractedAt),
+      effectedAt: parseLocalDate(user.effectedAt),
       exp1StartAt: parseLocalDate(user.exp1StartAt),
       exp1EndAt: parseLocalDate(user.exp1EndAt),
       exp2StartAt: parseLocalDate(user.exp2StartAt),

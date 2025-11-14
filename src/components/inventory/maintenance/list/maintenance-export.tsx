@@ -1,5 +1,4 @@
 import { BaseExportPopover, type ExportFormat, type ExportColumn } from "@/components/ui/export-popover";
-import { toast } from "@/components/ui/sonner";
 import { maintenanceService } from "../../../../api-client";
 import { formatDate, formatDateTime } from "../../../../utils";
 import { MAINTENANCE_STATUS_LABELS } from "../../../../constants";
@@ -69,7 +68,6 @@ export function MaintenanceExport({ className, filters, currentMaintenance = [],
       return allMaintenance;
     } catch (error) {
       console.error("Error fetching all maintenance:", error);
-      toast.error("Erro ao buscar manutenções para exportação");
       throw error;
     }
   };
@@ -81,7 +79,6 @@ export function MaintenanceExport({ className, filters, currentMaintenance = [],
       // For now, we'll let the BaseExportPopover handle it
     } catch (error) {
       console.error("Export error:", error);
-      toast.error("Erro ao exportar dados");
       throw error;
     }
   };

@@ -82,26 +82,23 @@ export function PpeItemsConfiguration({ value = [], onChange, className }: PpeIt
   const allTypesUsed = value.length === Object.values(PPE_TYPE).length;
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("space-y-3 w-full", className)}>
       {/* Items list */}
       {sortedItems.map((item, displayIndex) => {
         const originalIndex = value.findIndex((v) => v.ppeType === item.ppeType);
         return (
-          <div key={item.ppeType} className="flex items-center gap-1.5">
-            {/* Vestuarios combobox */}
-            <div className="flex-1 min-w-0">
-              <Combobox
-                value={item.ppeType}
-                onValueChange={(newType) => updatePpeItem(originalIndex, "ppeType", newType)}
-                options={getAvailableTypes(originalIndex).map((type) => ({
-                  label: PPE_TYPE_LABELS[type],
-                  value: type,
-                }))}
-                placeholder="Selecione o EPI"
-                searchPlaceholder="Buscar..."
-                className="bg-transparent w-full"
-              />
-            </div>
+          <div key={item.ppeType} className="grid grid-cols-[1fr,auto,auto,auto,auto] items-center gap-1.5 w-full">
+            {/* Vestuarios combobox - grows to fill available space */}
+            <Combobox
+              value={item.ppeType}
+              onValueChange={(newType) => updatePpeItem(originalIndex, "ppeType", newType)}
+              options={getAvailableTypes(originalIndex).map((type) => ({
+                label: PPE_TYPE_LABELS[type],
+                value: type,
+              }))}
+              placeholder="Selecione o EPI"
+              searchPlaceholder="Buscar..."
+            />
 
             {/* - button */}
             <Button
@@ -170,6 +167,15 @@ export function PpeItemsConfiguration({ value = [], onChange, className }: PpeIt
 
       {allTypesUsed && (
         <p className="text-xs text-muted-foreground text-center">Todos os tipos de EPI foram adicionados</p>
+      )}
+
+      {/* Helper text explaining automatic size matching */}
+      {value.length > 0 && (
+        <div className="mt-2 p-3 bg-muted/50 rounded-md border border-border">
+          <p className="text-xs text-muted-foreground">
+            <span className="font-enhanced-unicode">ℹ</span> Os tamanhos dos EPIs serão automaticamente correspondidos com base na configuração de tamanhos de cada funcionário. EPIs sem tamanho específico (luvas, outros) serão entregues sem distinção de tamanho.
+          </p>
+        </div>
       )}
     </div>
   );

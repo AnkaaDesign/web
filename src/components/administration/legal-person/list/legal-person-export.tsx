@@ -34,7 +34,7 @@ const EXPORT_FIELDS: ExportField[] = [
   { key: "email", label: "E-mail", description: "E-mail de contato" },
   { key: "website", label: "Website", description: "Site da empresa" },
   { key: "phonesList", label: "Telefones", description: "Lista de telefones" },
-  { key: "address", label: "Endereço", description: "Logradouro" },
+  { key: "address", label: "Endereço", description: "Street" },
   { key: "addressNumber", label: "Número", description: "Número do endereço" },
   { key: "addressComplement", label: "Complemento", description: "Complemento do endereço" },
   { key: "neighborhood", label: "Bairro", description: "Bairro" },

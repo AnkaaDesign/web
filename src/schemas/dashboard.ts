@@ -56,7 +56,6 @@ export type PaintDashboardQueryFormData = z.infer<typeof paintDashboardQuerySche
 export const productionDashboardQuerySchema = baseDashboardQuerySchema.extend({
   customerId: z.string().uuid().optional(),
   sectorId: z.string().uuid().optional(),
-  garageId: z.string().uuid().optional(),
   includeServiceOrders: z.coerce.boolean().optional().default(true),
   includeCuts: z.coerce.boolean().optional().default(true),
   includeAirbrush: z.coerce.boolean().optional().default(true),

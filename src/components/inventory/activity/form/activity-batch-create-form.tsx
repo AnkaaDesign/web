@@ -1,7 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconLoader2, IconArrowUp, IconArrowDown, IconCheck, IconPackage } from "@tabler/icons-react";
-import type { ActivityCreateFormData } from "../../../../schemas";
+import type { ActivityCreateFormData, ItemGetManyFormData } from "../../../../schemas";
 import { ACTIVITY_OPERATION, ACTIVITY_REASON, ACTIVITY_REASON_LABELS, USER_STATUS } from "../../../../constants";
 import { useActivityBatchMutations, useUsers } from "../../../../hooks";
 import { routes, FAVORITE_PAGES } from "../../../../constants";
@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
-import { ItemSelector } from "./item-selector";
+import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import { useActivityFormUrlState } from "@/hooks/use-activity-form-url-state";
 import { ActivityBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { useBatchResultDialog } from "@/hooks/use-batch-result-dialog";
@@ -74,9 +74,26 @@ export const ActivityBatchCreateForm = () => {
   // Batch result dialog
   const { isOpen, result, openDialog, closeDialog } = useBatchResultDialog();
 
+  // Consolidate filters for ItemSelectorTable
+  const filters = useMemo<Partial<ItemGetManyFormData>>(() => ({
+    showInactive,
+    categoryIds: categoryIds.length > 0 ? categoryIds : undefined,
+    brandIds: brandIds.length > 0 ? brandIds : undefined,
+    supplierIds: supplierIds.length > 0 ? supplierIds : undefined,
+  }), [showInactive, categoryIds, brandIds, supplierIds]);
+
+  // Handle filter changes from ItemSelectorTable
+  const handleFiltersChange = useCallback((newFilters: Partial<ItemGetManyFormData>) => {
+    if (newFilters.showInactive !== undefined) setShowInactive(newFilters.showInactive);
+    if (newFilters.categoryIds !== undefined) setCategoryIds(newFilters.categoryIds);
+    if (newFilters.brandIds !== undefined) setBrandIds(newFilters.brandIds);
+    if (newFilters.supplierIds !== undefined) setSupplierIds(newFilters.supplierIds);
+  }, [setShowInactive, setCategoryIds, setBrandIds, setSupplierIds]);
+
   // Handle item selection
   const handleSelectItem = useCallback(
-    (itemId: string) => {
+    (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => {
+      // Activity form only uses quantity, but accept all params for compatibility
       toggleItemSelection(itemId);
     },
     [toggleItemSelection],
@@ -111,14 +128,11 @@ export const ActivityBatchCreateForm = () => {
   // Handle quantity change
   const handleQuantityChange = useCallback(
     (itemId: string, quantity: number | null) => {
-      // Only update if we have a valid number
-      // Don't update on null/undefined - let the field stay empty
-      if (quantity !== null && quantity !== undefined && quantity > 0) {
-        const validQuantity = Math.max(0.01, quantity);
+      // Always update immediately like the working forms (order, external withdrawal)
+      if (quantity !== null && quantity !== undefined) {
+        const validQuantity = Math.max(0.01, Number(quantity));
         setItemQuantity(itemId, validQuantity);
       }
-      // If quantity is null, don't update - keeps the existing value in state
-      // This allows the user to clear and retype without the field auto-filling
     },
     [setItemQuantity],
   );
@@ -263,36 +277,35 @@ export const ActivityBatchCreateForm = () => {
             </div>
 
             {/* Paginated Item Selector */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              <ItemSelector
+            <div className="flex-1 min-h-0">
+              <ItemSelectorTable
                 selectedItems={selectedItems}
                 onSelectItem={handleSelectItem}
                 onSelectAll={handleSelectAll}
-                onQuantityChange={handleQuantityChange}
                 quantities={quantities}
-                isSelected={(itemId) => selectedItems.has(itemId)}
-                showQuantityInput={true}
-                showSelectedOnly={showSelectedOnly}
-                searchTerm={searchTerm}
-                showInactive={showInactive}
-                categoryIds={categoryIds}
-                brandIds={brandIds}
-                supplierIds={supplierIds}
-                onSearchTermChange={setSearchTerm}
-                onShowInactiveChange={setShowInactive}
-                onCategoryIdsChange={setCategoryIds}
-                onBrandIdsChange={setBrandIds}
-                onSupplierIdsChange={setSupplierIds}
-                onShowSelectedOnlyChange={setShowSelectedOnly}
-                // Pagination props
+                onQuantityChange={handleQuantityChange}
+                editableColumns={{
+                  showQuantityInput: true,
+                }}
+                fixedColumnsConfig={{
+                  fixedColumns: ['name'],
+                  fixedReasons: {
+                    name: 'Essencial para identificar o item sendo movimentado',
+                  },
+                }}
+                defaultColumns={['uniCode', 'name', 'category.name', 'brand.name', 'measures', 'quantity']}
+                storageKey="activity-item-selector"
+                // URL state management
                 page={page}
                 pageSize={pageSize}
-                totalRecords={totalRecords}
+                showSelectedOnly={showSelectedOnly}
+                searchTerm={searchTerm}
+                filters={filters}
                 onPageChange={setPage}
                 onPageSizeChange={setPageSize}
-                onTotalRecordsChange={setTotalRecords}
-                // Batch selection function for atomic updates
-                updateSelectedItems={urlState.batchUpdateSelection}
+                onShowSelectedOnlyChange={setShowSelectedOnly}
+                onSearchTermChange={setSearchTerm}
+                onFiltersChange={handleFiltersChange}
                 className="h-full"
               />
             </div>

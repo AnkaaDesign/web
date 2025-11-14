@@ -690,7 +690,7 @@ export const customerCreateSchema = z
     tags: z.array(z.string()).default([]),
     logoId: z.string().uuid("Logo inválido").nullable().optional(),
     economicActivityId: z.string().uuid("Atividade econômica inválida").nullable().optional(),
-    registrationStatus: z.enum(["ATIVA", "SUSPENSA", "INAPTA", "ATIVA_NAO_REGULAR", "BAIXADA"]).nullable().optional(),
+    registrationStatus: z.enum(["ACTIVE", "SUSPENDED", "UNFIT", "ACTIVE_NOT_REGULAR", "DEREGISTERED"]).nullable().optional(),
   })
   .transform(toFormData)
   .refine(
@@ -738,7 +738,7 @@ export const customerUpdateSchema = z
     tags: z.array(z.string()).optional(),
     logoId: z.string().uuid("Logo inválido").nullable().optional(),
     economicActivityId: z.string().uuid("Atividade econômica inválida").nullable().optional(),
-    registrationStatus: z.enum(["ATIVA", "SUSPENSA", "INAPTA", "ATIVA_NAO_REGULAR", "BAIXADA"]).nullable().optional(),
+    registrationStatus: z.enum(["ACTIVE", "SUSPENDED", "UNFIT", "ACTIVE_NOT_REGULAR", "DEREGISTERED"]).nullable().optional(),
   })
   .transform(toFormData);
 

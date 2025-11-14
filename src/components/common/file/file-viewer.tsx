@@ -2,7 +2,7 @@ import * as React from "react";
 import type { File as AnkaaFile } from "../../../types";
 import { fileViewerService } from "../../../utils/file-viewer";
 import type { FileViewerConfig } from "../../../utils/file-viewer";
-import { FilePreview } from "./file-preview";
+import { FilePreview } from "./file-preview-modal";
 import { VideoPlayer } from "./video-player";
 import { PDFViewer } from "./pdf-viewer";
 import { toast } from "sonner";

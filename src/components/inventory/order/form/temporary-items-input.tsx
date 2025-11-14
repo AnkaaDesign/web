@@ -137,7 +137,8 @@ export const TemporaryItemsInput = forwardRef<
                           value={field.value || ""}
                           placeholder="Ex: Parafuso 5mm, Material de consumo"
                           disabled={disabled}
-                          className="bg-transparent h-10"
+                          transparent
+                          className="h-10"
                           maxLength={500}
                         />
                       </FormControl>
@@ -202,7 +203,8 @@ export const TemporaryItemsInput = forwardRef<
                           step={0.01}
                           placeholder="0"
                           disabled={disabled}
-                          className="bg-transparent h-10"
+                          transparent
+                          className="h-10"
                         />
                       </FormControl>
                       <FormMessage />
@@ -229,7 +231,8 @@ export const TemporaryItemsInput = forwardRef<
                           step={0.01}
                           placeholder="0"
                           disabled={disabled}
-                          className="bg-transparent h-10"
+                          transparent
+                          className="h-10"
                         />
                       </FormControl>
                       <FormMessage />

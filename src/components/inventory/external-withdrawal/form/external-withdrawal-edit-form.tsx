@@ -17,7 +17,7 @@ import { Form } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
@@ -879,7 +879,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                               placeholder="Digite o nome da pessoa que está retirando"
                               value={withdrawerName}
                               onChange={(e) => updateWithdrawerName(e.target.value)}
-                              className="h-10"
+                              className="h-10 bg-transparent"
                               maxLength={200}
                             />
                             {withdrawerName && (withdrawerName.trim().length || 0) < 2 && <p className="text-sm text-destructive">Nome deve ter pelo menos 2 caracteres</p>}
@@ -891,27 +891,31 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                             <Label className="text-sm font-medium">
                               Tipo de Retirada <span className="text-destructive">*</span>
                             </Label>
-                            <Select
+                            <Combobox
                               value={withdrawalType}
-                              onValueChange={(value: EXTERNAL_WITHDRAWAL_TYPE) => {
-                                updateType(value);
+                              onValueChange={(value: string | string[] | null | undefined) => {
+                                const typeValue = value as EXTERNAL_WITHDRAWAL_TYPE;
+                                updateType(typeValue);
                               }}
-                            >
-                              <SelectTrigger className="h-10">
-                                <SelectValue placeholder="Selecione o tipo" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value={EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE}>
-                                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE]}
-                                </SelectItem>
-                                <SelectItem value={EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE}>
-                                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE]}
-                                </SelectItem>
-                                <SelectItem value={EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY}>
-                                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY]}
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
+                              options={[
+                                {
+                                  value: EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE,
+                                  label: EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE],
+                                },
+                                {
+                                  value: EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE,
+                                  label: EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE],
+                                },
+                                {
+                                  value: EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY,
+                                  label: EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY],
+                                },
+                              ]}
+                              placeholder="Selecione o tipo"
+                              className="h-10"
+                              searchable={false}
+                              clearable={false}
+                            />
                             <p className="text-xs text-muted-foreground">
                               {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE && "Itens serão devolvidos (sem cobrança)"}
                               {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && "Itens não serão devolvidos (com cobrança)"}

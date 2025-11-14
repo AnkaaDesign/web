@@ -18,7 +18,7 @@ export function NameInput({ control, disabled, required }: NameInputProps) {
         <FormItem>
           <FormLabel>Nome da Marca {required && <span className="text-destructive">*</span>}</FormLabel>
           <FormControl>
-            <Input {...field} placeholder="Digite o nome da marca" disabled={disabled} typewriterPlaceholder={false} naturalTyping={false} typingSpeed={40} />
+            <Input {...field} placeholder="Digite o nome da marca" disabled={disabled} typewriterPlaceholder={false} naturalTyping={false} typingSpeed={40} transparent />
           </FormControl>
           <FormMessage />
         </FormItem>

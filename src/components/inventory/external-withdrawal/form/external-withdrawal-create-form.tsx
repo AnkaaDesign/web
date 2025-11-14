@@ -1,9 +1,9 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconUser, IconArrowBack, IconPackage, IconPackageExport, IconDownload, IconFileInvoice, IconReceipt } from "@tabler/icons-react";
-import type { ExternalWithdrawalCreateFormData } from "../../../../schemas";
+import type { ExternalWithdrawalCreateFormData, ItemGetManyFormData } from "../../../../schemas";
 import { externalWithdrawalCreateSchema } from "../../../../schemas";
 import { useExternalWithdrawalMutations, useItems } from "../../../../hooks";
 import { routes, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
@@ -16,12 +16,12 @@ import { Form } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { ExternalWithdrawalItemSelector } from "./external-withdrawal-item-selector";
+import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import { useExternalWithdrawalFormUrlState } from "@/hooks/use-external-withdrawal-form-url-state";
 import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
@@ -171,6 +171,22 @@ export const ExternalWithdrawalCreateForm = () => {
       }, 0)
     : 0;
 
+  // Consolidate filters for ItemSelectorTable
+  const filters = useMemo<Partial<ItemGetManyFormData>>(() => ({
+    showInactive,
+    categoryIds: categoryIds.length > 0 ? categoryIds : undefined,
+    brandIds: brandIds.length > 0 ? brandIds : undefined,
+    supplierIds: supplierIds.length > 0 ? supplierIds : undefined,
+  }), [showInactive, categoryIds, brandIds, supplierIds]);
+
+  // Handle filter changes from ItemSelectorTable
+  const handleFiltersChange = useCallback((newFilters: Partial<ItemGetManyFormData>) => {
+    if (newFilters.showInactive !== undefined) setShowInactive(newFilters.showInactive);
+    if (newFilters.categoryIds !== undefined) setCategoryIds(newFilters.categoryIds);
+    if (newFilters.brandIds !== undefined) setBrandIds(newFilters.brandIds);
+    if (newFilters.supplierIds !== undefined) setSupplierIds(newFilters.supplierIds);
+  }, [setShowInactive, setCategoryIds, setBrandIds, setSupplierIds]);
+
   // Navigation helpers
   const nextStep = useCallback(() => {
     if (currentStep < steps.length) {
@@ -298,7 +314,8 @@ export const ExternalWithdrawalCreateForm = () => {
 
   // Handle item selection
   const handleSelectItem = useCallback(
-    (itemId: string, quantity?: number, price?: number) => {
+    (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => {
+      // External withdrawal uses quantity and price, accept icms/ipi for compatibility
       toggleItemSelection(itemId, quantity, price);
     },
     [toggleItemSelection],
@@ -1031,7 +1048,7 @@ export const ExternalWithdrawalCreateForm = () => {
                                 // Update URL state when form changes
                                 updateWithdrawerName(stringValue);
                               }}
-                              className="h-10"
+                              className="h-10 bg-transparent"
                               maxLength={200}
                             />
                             {form.formState.errors.withdrawerName && <p className="text-sm text-destructive">{form.formState.errors.withdrawerName.message}</p>}
@@ -1045,32 +1062,36 @@ export const ExternalWithdrawalCreateForm = () => {
                             <Label className="text-sm font-medium">
                               Tipo de Retirada <span className="text-destructive">*</span>
                             </Label>
-                            <Select
+                            <Combobox
                               value={withdrawalType}
-                              onValueChange={(value: EXTERNAL_WITHDRAWAL_TYPE) => {
-                                form.setValue("type", value, {
+                              onValueChange={(value: string | string[] | null | undefined) => {
+                                const typeValue = value as EXTERNAL_WITHDRAWAL_TYPE;
+                                form.setValue("type", typeValue, {
                                   shouldValidate: true,
                                   shouldDirty: true,
                                   shouldTouch: true,
                                 });
-                                updateType(value);
+                                updateType(typeValue);
                               }}
-                            >
-                              <SelectTrigger className="h-10">
-                                <SelectValue placeholder="Selecione o tipo" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value={EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE}>
-                                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE]}
-                                </SelectItem>
-                                <SelectItem value={EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE}>
-                                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE]}
-                                </SelectItem>
-                                <SelectItem value={EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY}>
-                                  {EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY]}
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
+                              options={[
+                                {
+                                  value: EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE,
+                                  label: EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE],
+                                },
+                                {
+                                  value: EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE,
+                                  label: EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE],
+                                },
+                                {
+                                  value: EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY,
+                                  label: EXTERNAL_WITHDRAWAL_TYPE_LABELS[EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY],
+                                },
+                              ]}
+                              placeholder="Selecione o tipo"
+                              className="h-10"
+                              searchable={false}
+                              clearable={false}
+                            />
                             <p className="text-xs text-muted-foreground">
                               {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE && "Itens serão devolvidos (sem cobrança)"}
                               {withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE && "Itens não serão devolvidos (com cobrança)"}
@@ -1150,39 +1171,39 @@ export const ExternalWithdrawalCreateForm = () => {
                 )}
 
                 {currentStep === 2 && (
-                  <>
-                    <ExternalWithdrawalItemSelector
-                      selectedItems={selectedItems}
-                      onSelectItem={handleSelectItem}
-                      onSelectAll={() => {}}
-                      onQuantityChange={handleQuantityChange}
-                      onPriceChange={handlePriceChange}
-                      quantities={quantities}
-                      prices={prices}
-                      isSelected={(itemId) => selectedItems.has(itemId)}
-                      showQuantityInput={true}
-                      showPriceInput={withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE}
-                      showSelectedOnly={showSelectedOnly}
-                      searchTerm={searchTerm}
-                      showInactive={showInactive}
-                      categoryIds={categoryIds}
-                      brandIds={brandIds}
-                      supplierIds={supplierIds}
-                      page={page}
-                      pageSize={pageSize}
-                      totalRecords={totalRecords}
-                      onPageChange={setPage}
-                      onPageSizeChange={setPageSize}
-                      onTotalRecordsChange={setTotalRecords}
-                      onShowSelectedOnlyChange={setShowSelectedOnly}
-                      onSearchTermChange={setSearchTerm}
-                      onShowInactiveChange={setShowInactive}
-                      onCategoryIdsChange={setCategoryIds}
-                      onBrandIdsChange={setBrandIds}
-                      onSupplierIdsChange={setSupplierIds}
-                      className="h-full flex-1"
-                    />
-                  </>
+                  <ItemSelectorTable
+                    selectedItems={selectedItems}
+                    onSelectItem={handleSelectItem}
+                    onSelectAll={() => {}}
+                    quantities={quantities}
+                    prices={prices}
+                    onQuantityChange={handleQuantityChange}
+                    onPriceChange={handlePriceChange}
+                    editableColumns={{
+                      showQuantityInput: true,
+                      showPriceInput: withdrawalType === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE,
+                    }}
+                    fixedColumnsConfig={{
+                      fixedColumns: ['name'],
+                      fixedReasons: {
+                        name: 'Essencial para identificar o item sendo retirado',
+                      },
+                    }}
+                    defaultColumns={['uniCode', 'name', 'brand.name', 'measures', 'quantity']}
+                    storageKey="external-withdrawal-item-selector"
+                    // URL state management
+                    page={page}
+                    pageSize={pageSize}
+                    showSelectedOnly={showSelectedOnly}
+                    searchTerm={searchTerm}
+                    filters={filters}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPageSize}
+                    onShowSelectedOnlyChange={setShowSelectedOnly}
+                    onSearchTermChange={setSearchTerm}
+                    onFiltersChange={handleFiltersChange}
+                    className="h-full flex-1"
+                  />
                 )}
 
                 {currentStep === 3 && (

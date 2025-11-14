@@ -227,7 +227,8 @@ export function ChangelogList({ onDataChange }: ChangelogListProps) {
               type="text"
               placeholder="Buscar por entidade, ação, campo, motivo ou usuário..."
               value={displaySearchText}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(value) => handleSearch(value as string)}
+              transparent={true}
               className="pl-10"
             />
           </div>

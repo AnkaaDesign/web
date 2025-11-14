@@ -139,9 +139,6 @@ export const maintenanceOrderBySchema = z.union([
       startedAt: orderByDirectionSchema.optional(),
       timeTaken: orderByDirectionSchema.optional(),
       isActive: orderByDirectionSchema.optional(),
-      rescheduleCount: orderByDirectionSchema.optional(),
-      originalDate: orderByDirectionSchema.optional(),
-      lastRescheduleDate: orderByDirectionSchema.optional(),
       createdAt: orderByDirectionSchema.optional(),
       updatedAt: orderByDirectionSchema.optional(),
     })
@@ -158,9 +155,6 @@ export const maintenanceOrderBySchema = z.union([
         lastRun: orderByDirectionSchema.optional(),
         finishedAt: orderByDirectionSchema.optional(),
         isActive: orderByDirectionSchema.optional(),
-        rescheduleCount: orderByDirectionSchema.optional(),
-        originalDate: orderByDirectionSchema.optional(),
-        lastRescheduleDate: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
       })
@@ -351,35 +345,6 @@ export const maintenanceWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      originalDate: z
-        .union([
-          z.date(),
-          z.null(),
-          z.object({
-            equals: z.union([z.date(), z.null()]).optional(),
-            not: z.union([z.date(), z.null()]).optional(),
-            lt: z.coerce.date().optional(),
-            lte: z.coerce.date().optional(),
-            gt: z.coerce.date().optional(),
-            gte: z.coerce.date().optional(),
-          }),
-        ])
-        .optional(),
-
-      lastRescheduleDate: z
-        .union([
-          z.date(),
-          z.null(),
-          z.object({
-            equals: z.union([z.date(), z.null()]).optional(),
-            not: z.union([z.date(), z.null()]).optional(),
-            lt: z.coerce.date().optional(),
-            lte: z.coerce.date().optional(),
-            gt: z.coerce.date().optional(),
-            gte: z.coerce.date().optional(),
-          }),
-        ])
-        .optional(),
 
       // Boolean fields
       isActive: z
@@ -392,20 +357,6 @@ export const maintenanceWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      // Number fields for new scheduling features
-      rescheduleCount: z
-        .union([
-          z.number(),
-          z.object({
-            equals: z.number().optional(),
-            not: z.number().optional(),
-            lt: z.number().optional(),
-            lte: z.number().optional(),
-            gt: z.number().optional(),
-            gte: z.number().optional(),
-          }),
-        ])
-        .optional(),
 
       createdAt: z
         .union([
@@ -547,11 +498,9 @@ const maintenanceFilters = {
   isLate: z.boolean().optional(),
   isActive: z.boolean().optional(),
   isCompleted: z.boolean().optional(),
-  isRescheduled: z.boolean().optional(),
   nextRunRange: dateRangeSchema.optional(),
   lastRunRange: dateRangeSchema.optional(),
   finishedAtRange: dateRangeSchema.optional(),
-  originalDateRange: dateRangeSchema.optional(),
 };
 
 const maintenanceItemFilters = {
@@ -637,12 +586,6 @@ const maintenanceTransform = (data: any): any => {
     delete data.isCompleted;
   }
 
-  // Handle isRescheduled filter
-  if (data.isRescheduled === true) {
-    andConditions.push({ rescheduleCount: { gt: 0 } });
-    delete data.isRescheduled;
-  }
-
   // Handle nextRunRange filter
   if (data.nextRunRange && typeof data.nextRunRange === "object") {
     const nextRunCondition: any = {};
@@ -716,31 +659,6 @@ const maintenanceTransform = (data: any): any => {
       andConditions.push({ finishedAt: finishedAtCondition });
     }
     delete data.finishedAtRange;
-  }
-
-  // Handle originalDateRange filter
-  if (data.originalDateRange && typeof data.originalDateRange === "object") {
-    const originalDateCondition: any = {};
-    if (data.originalDateRange.gte) {
-      const fromDate = data.originalDateRange.gte instanceof Date
-        ? data.originalDateRange.gte
-        : new Date(data.originalDateRange.gte);
-      // Set to start of day (00:00:00)
-      fromDate.setHours(0, 0, 0, 0);
-      originalDateCondition.gte = fromDate;
-    }
-    if (data.originalDateRange.lte) {
-      const toDate = data.originalDateRange.lte instanceof Date
-        ? data.originalDateRange.lte
-        : new Date(data.originalDateRange.lte);
-      // Set to end of day (23:59:59.999)
-      toDate.setHours(23, 59, 59, 999);
-      originalDateCondition.lte = toDate;
-    }
-    if (Object.keys(originalDateCondition).length > 0) {
-      andConditions.push({ originalDate: originalDateCondition });
-    }
-    delete data.originalDateRange;
   }
 
   // Handle date filters
@@ -1057,6 +975,7 @@ export const maintenanceQuerySchema = z.object({
 export const maintenanceItemQuerySchema = z.object({
   include: maintenanceItemIncludeSchema.optional(),
 });
+
 
 // =====================
 // Type Exports
@@ -1649,12 +1568,6 @@ export const maintenanceScheduleUpdateSchema = z
     dayOfWeek: z.string().nullable().optional(),
     month: z.string().nullable().optional(),
     customMonths: z.array(z.string()).optional(),
-
-    // Reschedule fields
-    rescheduleCount: z.number().int().min(0).optional(),
-    originalDate: z.coerce.date().nullable().optional(),
-    lastRescheduleDate: z.coerce.date().nullable().optional(),
-    rescheduleReason: z.string().optional(), // RescheduleReason enum
 
     // Schedule configuration IDs
     weeklyConfigId: z.string().uuid().nullable().optional(),

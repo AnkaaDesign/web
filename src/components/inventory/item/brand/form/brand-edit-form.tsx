@@ -43,7 +43,7 @@ export function BrandEditForm({ brand, onSubmit, onCancel, isSubmitting }: Brand
                 <FormItem>
                   <FormLabel>Nome da Marca</FormLabel>
                   <FormControl>
-                    <Input value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} placeholder="Digite o nome da marca" autoFocus />
+                    <Input value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} placeholder="Digite o nome da marca" autoFocus transparent />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

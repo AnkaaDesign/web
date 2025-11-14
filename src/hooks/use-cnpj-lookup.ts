@@ -35,7 +35,7 @@ interface CnpjData {
   phones: string[];
   economicActivityCode: string;
   economicActivityDescription: string;
-  registrationStatus: "ATIVA" | "SUSPENSA" | "INAPTA" | "ATIVA_NAO_REGULAR" | "BAIXADA" | null;
+  registrationStatus: "ACTIVE" | "SUSPENDED" | "UNFIT" | "ACTIVE_NOT_REGULAR" | "DEREGISTERED" | null;
   streetType: string | null;
 }
 
@@ -44,7 +44,7 @@ interface UseCnpjLookupOptions {
   onError?: (error: Error) => void;
 }
 
-const LOGRADOURO_TYPES = [
+const STREET_TYPES = [
   "RUA",
   "AVENIDA",
   "ALAMEDA",
@@ -71,10 +71,10 @@ const LOGRADOURO_TYPES = [
   "RESIDENCIAL",
 ];
 
-function extractLogradouroType(street: string): { type: string | null; address: string } {
+function extractStreetType(street: string): { type: string | null; address: string } {
   const normalized = street.toUpperCase().trim();
 
-  for (const type of LOGRADOURO_TYPES) {
+  for (const type of STREET_TYPES) {
     if (normalized.startsWith(type + " ")) {
       // Extract the remaining address after the street type
       const remainingAddress = street.substring(type.length + 1).trim();
@@ -93,12 +93,12 @@ function extractLogradouroType(street: string): { type: string | null; address: 
   return { type: null, address: street };
 }
 
-function mapSituacaoCadastral(code: number): "ATIVA" | "SUSPENSA" | "INAPTA" | "ATIVA_NAO_REGULAR" | "BAIXADA" | null {
-  const mapping: Record<number, "ATIVA" | "SUSPENSA" | "INAPTA" | "ATIVA_NAO_REGULAR" | "BAIXADA"> = {
-    2: "ATIVA",
-    3: "SUSPENSA",
-    4: "INAPTA",
-    8: "BAIXADA",
+function mapSituacaoCadastral(code: number): "ACTIVE" | "SUSPENDED" | "UNFIT" | "ACTIVE_NOT_REGULAR" | "DEREGISTERED" | null {
+  const mapping: Record<number, "ACTIVE" | "SUSPENDED" | "UNFIT" | "ACTIVE_NOT_REGULAR" | "DEREGISTERED"> = {
+    2: "ACTIVE",
+    3: "SUSPENDED",
+    4: "UNFIT",
+    8: "DEREGISTERED",
   };
   return mapping[code] || null;
 }
@@ -160,7 +160,7 @@ export function useCnpjLookup(options?: UseCnpjLookupOptions) {
         const brasilApiData: BrasilApiCnpjData = await response.json();
 
         // Extract street type from street name
-        const { type, address } = extractLogradouroType(brasilApiData.logradouro);
+        const { type, address } = extractStreetType(brasilApiData.logradouro);
 
         // Collect all available phones
         const phones: string[] = [];

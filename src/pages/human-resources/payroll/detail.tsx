@@ -223,7 +223,7 @@ export default function PayrollDetailPage() {
 
     // If we have the direct statistics from backend, use them
     if (payrollData.bonus?.totalTasks !== undefined) {
-      // Backend now sends correct data with proper filtering (CONTRACTED + bonifiable + performance > 0)
+      // Backend now sends correct data with proper filtering (EFFECTED + bonifiable + performance > 0)
       const averagePerUser = payrollData.bonus.weightedTaskCount || 0;
       const totalTasks = payrollData.bonus.totalTasks;
       const totalParticipants = payrollData.bonus.totalUsers || users.length || 0;

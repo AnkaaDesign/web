@@ -10,7 +10,6 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/producao/servicos": FAVORITE_PAGES.PRODUCAO_SERVICOS_LISTAR,
   "/producao/observacoes": FAVORITE_PAGES.PRODUCAO_OBSERVACOES_LISTAR,
   "/producao/aerografia/listar": FAVORITE_PAGES.PRODUCAO_AEROGRAFIA_LISTAR,
-  "/producao/garagens": FAVORITE_PAGES.PRODUCAO_GARAGENS_LISTAR,
   "/producao/ordens-de-servico": FAVORITE_PAGES.PRODUCAO_ORDENS_SERVICO_LISTAR,
   "/producao/historico": FAVORITE_PAGES.PRODUCAO_HISTORICO_LISTAR,
 
@@ -20,7 +19,6 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/producao/servicos/cadastrar": FAVORITE_PAGES.PRODUCAO_SERVICOS_CADASTRAR,
   "/producao/observacoes/cadastrar": FAVORITE_PAGES.PRODUCAO_OBSERVACOES_CADASTRAR,
   "/producao/aerografia/cadastrar": FAVORITE_PAGES.PRODUCAO_AEROGRAFIA_CADASTRAR,
-  "/producao/garagens/cadastrar": FAVORITE_PAGES.PRODUCAO_GARAGENS_CADASTRAR,
   "/producao/ordens-de-servico/cadastrar": FAVORITE_PAGES.PRODUCAO_ORDENS_SERVICO_CADASTRAR,
 
   // Inventory - List Pages
@@ -98,7 +96,6 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/recursos-humanos/epi": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_LISTAR,
   "/recursos-humanos/epi/entregas": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_LISTAR,
   "/recursos-humanos/epi/agendamentos": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_LISTAR,
-  "/recursos-humanos/epi/tamanhos": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_TAMANHOS_LISTAR,
   "/recursos-humanos/setores": FAVORITE_PAGES.RECURSOS_HUMANOS_SETORES_LISTAR,
 
   // Human Resources - Create Pages
@@ -109,7 +106,6 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/recursos-humanos/epi/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_CADASTRAR,
   "/recursos-humanos/epi/entregas/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_ENTREGAS_CADASTRAR,
   "/recursos-humanos/epi/agendamentos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR,
-  "/recursos-humanos/epi/tamanhos/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_TAMANHOS_CADASTRAR,
   "/recursos-humanos/setores/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_SETORES_CADASTRAR,
 
   // Personal - List Pages
@@ -167,7 +163,6 @@ export function getEntityDisplayName(entity: string): string {
     servicos: "Serviço",
     observacoes: "Observação",
     aerografia: "Aerografia",
-    garagens: "Garagem",
     "ordens-de-servico": "Ordem de Serviço",
 
     // Inventory
@@ -206,7 +201,6 @@ export function getEntityDisplayName(entity: string): string {
     ferias: "Férias",
     feriados: "Feriado",
     avisos: "Aviso",
-    tamanhos: "Tamanho",
   };
 
   return entityMap[entity] || entity;
@@ -396,7 +390,6 @@ export function getFavoritePageIcon(favoritePage: FAVORITE_PAGES): string {
   if (favoritePage.includes("SERVICOS")) return "🔧";
   if (favoritePage.includes("OBSERVACOES")) return "📝";
   if (favoritePage.includes("AEROGRAFIA")) return "🎨";
-  if (favoritePage.includes("GARAGENS")) return "🚗";
   if (favoritePage.includes("ORDENS_SERVICO")) return "📋";
 
   // Inventory icons

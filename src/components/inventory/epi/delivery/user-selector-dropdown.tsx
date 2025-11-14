@@ -76,11 +76,15 @@ export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione
       minSearchLength={0}
       pageSize={50}
       debounceMs={300}
-      renderOption={(option: ComboboxOption) => (
+      renderOption={(option: ComboboxOption, isSelected: boolean) => (
         <div className="flex items-center justify-between w-full">
           <div className="flex flex-col">
             <span className="font-medium">{option.label}</span>
-            {option.metadata?.department && <span className="text-xs text-muted-foreground group-hover:text-white group-data-[state=checked]:text-white">{option.metadata.department}</span>}
+            {option.metadata?.department && (
+              <span className={isSelected ? "text-xs text-accent-foreground/80" : "text-xs text-muted-foreground group-hover:text-white"}>
+                {option.metadata.department}
+              </span>
+            )}
           </div>
         </div>
       )}

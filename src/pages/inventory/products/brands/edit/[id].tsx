@@ -106,7 +106,7 @@ const EditBrandPage = () => {
       {/* Fixed Header */}
       <div className="flex-shrink-0">
         <div className="px-4 pt-4">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-5xl mx-auto">
             <PageHeader
               variant="form"
               title={`Editar ${brand.name}`}
@@ -126,8 +126,8 @@ const EditBrandPage = () => {
       </div>
 
       {/* Scrollable Form Container */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="max-w-5xl mx-auto h-full">
           <BrandForm
             mode="update"
             defaultValues={{

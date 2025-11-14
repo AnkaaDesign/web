@@ -174,6 +174,24 @@ export function UserList({ className }: UserListProps) {
       };
     }
 
+    const dismissedAfter = params.get("dismissedAfter");
+    const dismissedBefore = params.get("dismissedBefore");
+    if (dismissedAfter || dismissedBefore) {
+      filters.dismissedAt = {
+        ...(dismissedAfter && { gte: new Date(dismissedAfter) }),
+        ...(dismissedBefore && { lte: new Date(dismissedBefore) }),
+      };
+    }
+
+    const exp1EndAfter = params.get("exp1EndAfter");
+    const exp1EndBefore = params.get("exp1EndBefore");
+    if (exp1EndAfter || exp1EndBefore) {
+      filters.exp1EndAt = {
+        ...(exp1EndAfter && { gte: new Date(exp1EndAfter) }),
+        ...(exp1EndBefore && { lte: new Date(exp1EndBefore) }),
+      };
+    }
+
     // Parse range filters
 
     return filters;
@@ -220,6 +238,10 @@ export function UserList({ className }: UserListProps) {
     if (filters.birth?.lte) params.birthBefore = filters.birth.lte.toISOString();
     if (filters.lastLoginAt?.gte) params.lastLoginAfter = filters.lastLoginAt.gte.toISOString();
     if (filters.lastLoginAt?.lte) params.lastLoginBefore = filters.lastLoginAt.lte.toISOString();
+    if (filters.dismissedAt?.gte) params.dismissedAfter = filters.dismissedAt.gte.toISOString();
+    if (filters.dismissedAt?.lte) params.dismissedBefore = filters.dismissedAt.lte.toISOString();
+    if (filters.exp1EndAt?.gte) params.exp1EndAfter = filters.exp1EndAt.gte.toISOString();
+    if (filters.exp1EndAt?.lte) params.exp1EndBefore = filters.exp1EndAt.lte.toISOString();
 
     // Range filters
 
@@ -266,6 +288,11 @@ export function UserList({ className }: UserListProps) {
       Array.isArray(filterWithoutOrderBy.status) &&
       filterWithoutOrderBy.status.length > 0;
 
+    // Check if dismissedAt filter is active
+    const hasDismissedAtFilter =
+      filterWithoutOrderBy.dismissedAt &&
+      (filterWithoutOrderBy.dismissedAt.gte || filterWithoutOrderBy.dismissedAt.lte);
+
     // Build result object - preserve searchingFor from baseQueryFilters
     const result: Partial<UserGetManyFormData> = {
       ...filterWithoutOrderBy,
@@ -307,6 +334,9 @@ export function UserList({ className }: UserListProps) {
     if (hasExplicitStatusFilter) {
       // User has explicitly selected statuses - use only those
       result.statuses = [...filterWithoutOrderBy.status!];
+    } else if (hasDismissedAtFilter) {
+      // If filtering by dismissedAt without explicit status filter, include DISMISSED status
+      result.statuses = [USER_STATUS.DISMISSED];
     } else if (result.isActive === undefined) {
       // No explicit filter - default to active users only
       result.isActive = true;
@@ -425,8 +455,8 @@ export function UserList({ className }: UserListProps) {
       const updateUsers = contractDialog.items.map((user) => ({
         id: user.id,
         data: {
-          status: USER_STATUS.CONTRACTED,
-          contractedAt: new Date(),
+          status: USER_STATUS.EFFECTED,
+          effectedAt: new Date(),
         },
       }));
 
@@ -434,7 +464,7 @@ export function UserList({ className }: UserListProps) {
       setContractDialog(null);
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error("Error marking user(s) as contracted:", error);
+      console.error("Error marking user(s) as effected:", error);
     }
   };
 

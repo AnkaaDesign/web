@@ -14,6 +14,16 @@ import type { PaintGetManyFormData } from "../../../../schemas";
 import { CanvasNormalMapRenderer } from "../../effects/canvas-normal-map-renderer";
 import { usePaintSelection } from "./paint-selection-context";
 import { cn } from "@/lib/utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface PaintCardProps {
   paint: Paint;
@@ -37,6 +47,10 @@ export function PaintCard({ paint, onFilterChange, currentFilters, showEffects =
     y: number;
   } | null>(null);
 
+  // Delete dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
   // Use viewport boundary checking hook
   
   // Get labels
@@ -52,17 +66,23 @@ export function PaintCard({ paint, onFilterChange, currentFilters, showEffects =
     setContextMenu(null);
   };
 
-  // Handle delete action
-  const handleDelete = async (e?: React.MouseEvent) => {
+  // Handle delete action - open dialog
+  const handleDeleteClick = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     setContextMenu(null);
+    setShowDeleteDialog(true);
+  };
 
-    if (window.confirm(`Tem certeza que deseja excluir a tinta "${paint.name}"? Esta ação não pode ser desfeita.`)) {
-      try {
-        await deletePaint(paint.id);
-      } catch (error) {
-        // Error is handled by the API client
-      }
+  // Confirm delete action
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true);
+      await deletePaint(paint.id);
+    } catch (error) {
+      // Error is handled by the API client
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
 
@@ -328,12 +348,34 @@ export function PaintCard({ paint, onFilterChange, currentFilters, showEffects =
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+          <DropdownMenuItem onClick={handleDeleteClick} className="text-destructive">
             <IconTrash className="mr-2 h-4 w-4" />
             Excluir
           </DropdownMenuItem>
         </PositionedDropdownMenuContent>
       </DropdownMenu>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Tinta</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a tinta "{paint.name}"? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

@@ -109,8 +109,11 @@ import type {
   PpeDeliveryScheduleBatchCreateResponse,
   PpeDeliveryScheduleBatchUpdateResponse,
   PpeDeliveryScheduleBatchDeleteResponse,
+  // Batch operation types
+  BatchOperationResult,
+  BatchOperationError,
 } from "../types";
-import { ppeSizeKeys, ppeDeliveryKeys, /* ppeConfigKeys, */ ppeDeliveryScheduleKeys, userKeys, itemKeys } from "./queryKeys";
+import { ppeSizeKeys, ppeDeliveryKeys, /* ppeConfigKeys, */ ppeDeliveryScheduleKeys, userKeys, itemKeys, changeLogKeys } from "./queryKeys";
 import { createEntityHooks, createSpecializedQueryHook } from "./createEntityHooks";
 
 // =====================================================
@@ -214,7 +217,7 @@ const basePpeDeliveryHooks = createEntityHooks<
   queryKeys: ppeDeliveryKeys,
   service: ppeDeliveryService,
   staleTime: 1000 * 60 * 5, // 5 minutes
-  relatedQueryKeys: [userKeys, itemKeys, ppeDeliveryScheduleKeys], // Invalidate related entities - items for stock updates, users for delivery history
+  relatedQueryKeys: [userKeys, itemKeys, ppeDeliveryScheduleKeys, changeLogKeys], // Invalidate related entities - items for stock updates, users for delivery history, changelogs
 });
 
 // Export base hooks with standard names
@@ -224,16 +227,50 @@ export const usePpeDelivery = basePpeDeliveryHooks.useDetail;
 export const usePpeDeliveryMutations = basePpeDeliveryHooks.useMutations;
 export const usePpeDeliveryBatchMutations = basePpeDeliveryHooks.useBatchMutations;
 
-// Custom batch approve hook
+// Custom batch approve hook - returns BatchOperationResult format
 export const useBatchApprovePpeDeliveries = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<{ success: number; failed: number; results: any[] }, Error, { deliveryIds: string[]; approvedBy?: string }>({
-    mutationFn: ({ deliveryIds, approvedBy }) => batchApprovePpeDeliveries(deliveryIds, approvedBy),
+  return useMutation<BatchOperationResult<any, any>, Error, { deliveryIds: string[]; approvedBy?: string }>({
+    mutationFn: async ({ deliveryIds, approvedBy }) => {
+      const apiResult = await batchApprovePpeDeliveries(deliveryIds, approvedBy);
+
+      // Transform API response to BatchOperationResult format
+      const success: any[] = [];
+      const failed: BatchOperationError[] = [];
+
+      apiResult.results.forEach((result: any, index: number) => {
+        if (result.success) {
+          success.push(result.data);
+        } else {
+          failed.push({
+            index,
+            id: deliveryIds[index],
+            error: result.error || "Erro desconhecido",
+          });
+        }
+      });
+
+      const batchResult: BatchOperationResult<any, any> = {
+        success,
+        failed,
+        totalProcessed: apiResult.results.length,
+        totalSuccess: apiResult.success,
+        totalFailed: apiResult.failed,
+        partialSuccess: apiResult.success > 0 && apiResult.failed > 0,
+      };
+
+      return batchResult;
+    },
     onSuccess: () => {
       // Invalidate PPE delivery queries
       queryClient.invalidateQueries({
         queryKey: ppeDeliveryKeys.all,
+      });
+
+      // Invalidate changelog queries
+      queryClient.invalidateQueries({
+        queryKey: changeLogKeys.all,
       });
 
       // Related queries to invalidate
@@ -243,23 +280,54 @@ export const useBatchApprovePpeDeliveries = () => {
       queryClient.invalidateQueries({
         queryKey: itemKeys.all,
       });
-    },
-    onError: (error) => {
-      console.error("Batch approve error:", error);
     },
   });
 };
 
-// Custom batch reject hook
+// Custom batch reject hook - returns BatchOperationResult format
 export const useBatchRejectPpeDeliveries = () => {
   const queryClient = useQueryClient();
 
-  return useMutation<{ success: number; failed: number; results: any[] }, Error, { deliveryIds: string[]; reviewedBy?: string; reason?: string }>({
-    mutationFn: ({ deliveryIds, reviewedBy, reason }) => batchRejectPpeDeliveries(deliveryIds, reviewedBy, reason),
+  return useMutation<BatchOperationResult<any, any>, Error, { deliveryIds: string[]; reviewedBy?: string; reason?: string }>({
+    mutationFn: async ({ deliveryIds, reviewedBy, reason }) => {
+      const apiResult = await batchRejectPpeDeliveries(deliveryIds, reviewedBy, reason);
+
+      // Transform API response to BatchOperationResult format
+      const success: any[] = [];
+      const failed: BatchOperationError[] = [];
+
+      apiResult.results.forEach((result: any, index: number) => {
+        if (result.success) {
+          success.push(result.data);
+        } else {
+          failed.push({
+            index,
+            id: deliveryIds[index],
+            error: result.error || "Erro desconhecido",
+          });
+        }
+      });
+
+      const batchResult: BatchOperationResult<any, any> = {
+        success,
+        failed,
+        totalProcessed: apiResult.results.length,
+        totalSuccess: apiResult.success,
+        totalFailed: apiResult.failed,
+        partialSuccess: apiResult.success > 0 && apiResult.failed > 0,
+      };
+
+      return batchResult;
+    },
     onSuccess: () => {
       // Invalidate PPE delivery queries
       queryClient.invalidateQueries({
         queryKey: ppeDeliveryKeys.all,
+      });
+
+      // Invalidate changelog queries
+      queryClient.invalidateQueries({
+        queryKey: changeLogKeys.all,
       });
 
       // Related queries to invalidate
@@ -269,9 +337,6 @@ export const useBatchRejectPpeDeliveries = () => {
       queryClient.invalidateQueries({
         queryKey: itemKeys.all,
       });
-    },
-    onError: (error) => {
-      console.error("Batch reject error:", error);
     },
   });
 };
@@ -709,6 +774,9 @@ export function useMarkPpeDeliveryAsDelivered() {
       // Invalidate PPE delivery queries using correct key structure
       queryClient.invalidateQueries({ queryKey: ppeDeliveryKeys.all });
       queryClient.invalidateQueries({ queryKey: ppeDeliveryKeys.detail(variables.id) });
+
+      // Invalidate changelog queries
+      queryClient.invalidateQueries({ queryKey: changeLogKeys.all });
 
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: userKeys.all });

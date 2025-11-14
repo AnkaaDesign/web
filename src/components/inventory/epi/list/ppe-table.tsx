@@ -95,12 +95,9 @@ export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeac
     },
   };
 
-  // Hide inactive items by default unless showInactive is true
-  if (!cleanFilters.showInactive && !showSelectedOnly) {
-    queryFilters.where = {
-      ...queryFilters.where,
-      isActive: true,
-    };
+  // Map showInactive to isActive at root level
+  if (!showSelectedOnly && typeof cleanFilters.showInactive === "boolean") {
+    queryFilters.isActive = !cleanFilters.showInactive;
   }
 
   // Filter to show only selected items if enabled

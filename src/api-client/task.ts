@@ -125,7 +125,6 @@ export class TaskService {
     data: {
       xPosition?: number | null;
       yPosition?: number | null;
-      garageId?: string | null;
       laneId?: string | null;
     },
     query?: TaskQueryFormData
@@ -142,7 +141,6 @@ export class TaskService {
         taskId: string;
         xPosition?: number | null;
         yPosition?: number | null;
-        garageId?: string | null;
         laneId?: string | null;
       }>;
     },
@@ -200,7 +198,7 @@ export const rollbackFieldChange = (data: { changeLogId: string }) => taskServic
 export const getInProductionTasks = (query?: TaskQueryFormData) => taskService.getInProductionTasks(query);
 export const updateTaskPosition = (
   id: string,
-  data: { xPosition?: number | null; yPosition?: number | null; garageId?: string | null; laneId?: string | null },
+  data: { xPosition?: number | null; yPosition?: number | null; laneId?: string | null },
   query?: TaskQueryFormData
 ) => taskService.updateTaskPosition(id, data, query);
 export const bulkUpdatePositions = (
@@ -209,7 +207,6 @@ export const bulkUpdatePositions = (
       taskId: string;
       xPosition?: number | null;
       yPosition?: number | null;
-      garageId?: string | null;
       laneId?: string | null;
     }>;
   },

@@ -1,4 +1,4 @@
-import { formatDate, formatDateTime } from "../../../../utils";
+import { formatDateTime } from "../../../../utils";
 import { PPE_DELIVERY_STATUS_LABELS, getBadgeVariant } from "../../../../constants";
 import type { PpeDelivery } from "../../../../types";
 import { Badge } from "../../../ui/badge";
@@ -20,7 +20,7 @@ export const createPpeDeliveryColumns = (): PpeDeliveryColumn[] => [
     header: "ITEM",
     accessor: (delivery: PpeDelivery) => <div className="font-medium truncate">{delivery.item?.name || "-"}</div>,
     sortable: true,
-    className: "w-64",
+    className: "w-52",
     align: "left",
   },
   {
@@ -68,14 +68,15 @@ export const createPpeDeliveryColumns = (): PpeDeliveryColumn[] => [
   },
   {
     key: "createdAt",
-    header: "DATA",
+    header: "DATA DE REQUISIÇÃO",
     accessor: (delivery: PpeDelivery) => {
       if (!delivery.createdAt) return <div className="truncate text-muted-foreground">-</div>;
 
-      return <div className="truncate">{formatDate(new Date(delivery.createdAt))}</div>;
+      const formatted = formatDateTime(new Date(delivery.createdAt)).replace(",", " -");
+      return <div className="truncate">{formatted}</div>;
     },
     sortable: true,
-    className: "w-32",
+    className: "w-44",
     align: "left",
   },
   // Secondary columns
@@ -97,10 +98,11 @@ export const createPpeDeliveryColumns = (): PpeDeliveryColumn[] => [
     accessor: (delivery: PpeDelivery) => {
       if (!delivery.actualDeliveryDate) return <div className="truncate text-muted-foreground">-</div>;
 
-      return <div className="truncate">{formatDate(new Date(delivery.actualDeliveryDate))}</div>;
+      const formatted = formatDateTime(new Date(delivery.actualDeliveryDate)).replace(",", " -");
+      return <div className="truncate">{formatted}</div>;
     },
     sortable: true,
-    className: "w-40",
+    className: "w-44",
     align: "left",
   },
   {

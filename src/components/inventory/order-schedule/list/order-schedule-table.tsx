@@ -172,21 +172,6 @@ export function OrderScheduleTable({ data, isLoading = false, onEdit, onView, on
         sortable: true,
       },
 
-      // Reschedule Count
-      {
-        key: "rescheduleCount",
-        header: "Reagendamentos",
-        accessor: (schedule: OrderScheduleWithDisplayInfo) => {
-          const count = schedule.rescheduleCount || 0;
-          return (
-            <Badge variant={count > 0 ? "secondary" : "outline"} className="text-xs">
-              {count}
-            </Badge>
-          );
-        },
-        sortable: true,
-      },
-
       // Actions
       {
         key: "actions",

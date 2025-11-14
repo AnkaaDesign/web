@@ -32,6 +32,7 @@ const CollaboratorDetailsPage = () => {
       sector: true,
       managedSector: true,
       ppeSize: true,
+      avatar: true,
       activities: {
         include: {
           item: true,

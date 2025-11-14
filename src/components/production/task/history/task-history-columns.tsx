@@ -39,7 +39,7 @@ const renderDuration = (startedAt: Date | null, finishedAt: Date | null) => {
 
   return (
     <div className="flex items-center gap-1">
-      <span className="font-mono text-sm">{duration}</span>
+      <span>{duration}</span>
     </div>
   );
 };
@@ -217,7 +217,7 @@ export const createTaskHistoryColumns = (options?: { canViewPrice?: boolean }): 
   {
     id: "plate",
     header: "PLACA",
-    accessorKey: "plate",
+    accessorFn: (row) => row.truck?.plate || "",
     sortable: true,
     filterable: true,
     defaultVisible: false,
@@ -230,7 +230,7 @@ export const createTaskHistoryColumns = (options?: { canViewPrice?: boolean }): 
   {
     id: "chassisNumber",
     header: "Nº CHASSI",
-    accessorKey: "chassisNumber",
+    accessorFn: (row) => row.truck?.chassisNumber || "",
     sortable: true,
     filterable: true,
     defaultVisible: false,

@@ -34,6 +34,7 @@ export const budgetIncludeSchema = z
         }),
       ])
       .optional(),
+    items: z.boolean().optional(),
   })
   .partial();
 
@@ -46,8 +47,8 @@ export const budgetOrderBySchema = z
     z
       .object({
         id: orderByDirectionSchema.optional(),
-        referencia: orderByDirectionSchema.optional(),
-        valor: orderByDirectionSchema.optional(),
+        total: orderByDirectionSchema.optional(),
+        expiresIn: orderByDirectionSchema.optional(),
         taskId: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
@@ -72,8 +73,8 @@ export const budgetOrderBySchema = z
       z
         .object({
           id: orderByDirectionSchema.optional(),
-          referencia: orderByDirectionSchema.optional(),
-          valor: orderByDirectionSchema.optional(),
+          total: orderByDirectionSchema.optional(),
+          expiresIn: orderByDirectionSchema.optional(),
           taskId: orderByDirectionSchema.optional(),
           createdAt: orderByDirectionSchema.optional(),
           updatedAt: orderByDirectionSchema.optional(),
@@ -106,23 +107,7 @@ export const budgetWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      referencia: z
-        .union([
-          z.string(),
-          z.object({
-            equals: z.string().optional(),
-            not: z.string().optional(),
-            in: z.array(z.string()).optional(),
-            notIn: z.array(z.string()).optional(),
-            contains: z.string().optional(),
-            startsWith: z.string().optional(),
-            endsWith: z.string().optional(),
-            mode: z.enum(["default", "insensitive"]).optional(),
-          }),
-        ])
-        .optional(),
-
-      valor: z
+      total: z
         .union([
           z.number(),
           z.object({
@@ -132,6 +117,20 @@ export const budgetWhereSchema: z.ZodSchema = z.lazy(() =>
             gte: z.number().optional(),
             lt: z.number().optional(),
             lte: z.number().optional(),
+          }),
+        ])
+        .optional(),
+
+      expiresIn: z
+        .union([
+          z.date(),
+          z.object({
+            equals: z.date().optional(),
+            not: z.date().optional(),
+            gt: z.coerce.date().optional(),
+            gte: z.coerce.date().optional(),
+            lt: z.coerce.date().optional(),
+            lte: z.coerce.date().optional(),
           }),
         ])
         .optional(),
@@ -180,6 +179,16 @@ export const budgetWhereSchema: z.ZodSchema = z.lazy(() =>
 );
 
 // =====================
+// BudgetItem Schema
+// =====================
+
+export const budgetItemSchema = z.object({
+  id: z.string().uuid().optional(),
+  description: z.string().min(1, "Descrição é obrigatória").max(400, "Máximo de 400 caracteres atingido"),
+  amount: moneySchema,
+});
+
+// =====================
 // Convenience Filters
 // =====================
 
@@ -187,7 +196,6 @@ const budgetFilters = {
   searchingFor: z.string().optional(),
   taskId: z.string().uuid("Tarefa inválida").optional(),
   hasTask: z.boolean().optional(),
-  referenciaContains: z.string().optional(),
 };
 
 // =====================
@@ -208,20 +216,16 @@ const budgetTransform = (data: any) => {
 
   const andConditions: any[] = [];
 
-  // Handle searchingFor - search in referencia
+  // Handle searchingFor - search in items descriptions
   if (data.searchingFor && typeof data.searchingFor === "string" && data.searchingFor.trim()) {
     andConditions.push({
-      referencia: { contains: data.searchingFor.trim(), mode: "insensitive" },
+      items: {
+        some: {
+          description: { contains: data.searchingFor.trim(), mode: "insensitive" },
+        },
+      },
     });
     delete data.searchingFor;
-  }
-
-  // Handle referenciaContains filter
-  if (data.referenciaContains && typeof data.referenciaContains === "string" && data.referenciaContains.trim()) {
-    andConditions.push({
-      referencia: { contains: data.referenciaContains.trim(), mode: "insensitive" },
-    });
-    delete data.referenciaContains;
   }
 
   // Handle taskId filter
@@ -249,6 +253,11 @@ const budgetTransform = (data: any) => {
   if (data.updatedAt) {
     andConditions.push({ updatedAt: data.updatedAt });
     delete data.updatedAt;
+  }
+
+  if (data.expiresIn) {
+    andConditions.push({ expiresIn: data.expiresIn });
+    delete data.expiresIn;
   }
 
   // Merge with existing where conditions
@@ -300,16 +309,35 @@ export const budgetGetManySchema = z
         lte: z.coerce.date().optional(),
       })
       .optional(),
+    expiresIn: z
+      .object({
+        gte: z.coerce.date().optional(),
+        lte: z.coerce.date().optional(),
+      })
+      .optional(),
   })
   .transform(budgetTransform);
 
 // =====================
-// Nested Schemas for Relations
+// Nested Schemas for Relations (used in Task create/update)
 // =====================
 
 export const budgetCreateNestedSchema = z.object({
-  referencia: z.string().min(1, "Referência é obrigatória").max(400, "Máximo de 400 caracteres atingido"),
-  valor: moneySchema,
+  expiresIn: z.coerce.date({
+    required_error: "Data de validade é obrigatória",
+    invalid_type_error: "Data de validade inválida",
+  }),
+  items: z
+    .array(budgetItemSchema)
+    .min(1, "Pelo menos um item do orçamento é obrigatório")
+    .refine(
+      (items) => items.every((item) => item.description && item.description.trim().length > 0),
+      { message: "Todos os itens devem ter uma descrição" }
+    )
+    .refine(
+      (items) => items.every((item) => item.amount && item.amount > 0),
+      { message: "Todos os itens devem ter um valor maior que zero" }
+    ),
 });
 
 // =====================
@@ -317,15 +345,27 @@ export const budgetCreateNestedSchema = z.object({
 // =====================
 
 export const budgetCreateSchema = z.object({
-  referencia: z.string().min(1, "Referência é obrigatória").max(400, "Máximo de 400 caracteres atingido"),
-  valor: moneySchema,
+  total: moneySchema,
+  expiresIn: z.coerce.date({
+    required_error: "Data de validade é obrigatória",
+    invalid_type_error: "Data de validade inválida",
+  }),
   taskId: z.string().uuid("Tarefa inválida"),
+  items: z
+    .array(budgetItemSchema)
+    .min(1, "Pelo menos um item do orçamento é obrigatório"),
 });
 
 export const budgetUpdateSchema = z.object({
-  referencia: z.string().min(1, "Referência é obrigatória").max(400, "Máximo de 400 caracteres atingido").optional(),
-  valor: moneySchema.optional(),
+  total: moneySchema.optional(),
+  expiresIn: z.coerce.date({
+    invalid_type_error: "Data de validade inválida",
+  }).optional(),
   taskId: z.string().uuid("Tarefa inválida").optional(),
+  items: z
+    .array(budgetItemSchema)
+    .min(1, "Pelo menos um item do orçamento é obrigatório")
+    .optional(),
 });
 
 // =====================
@@ -394,12 +434,20 @@ export type BudgetInclude = z.infer<typeof budgetIncludeSchema>;
 // Nested budget create schema type
 export type BudgetCreateNestedFormData = z.infer<typeof budgetCreateNestedSchema>;
 
+// Budget item type
+export type BudgetItemFormData = z.infer<typeof budgetItemSchema>;
+
 // =====================
 // Helper Functions
 // =====================
 
 export const mapBudgetToFormData = createMapToFormDataHelper<Budget, BudgetUpdateFormData>((budget) => ({
-  referencia: budget.referencia,
-  valor: budget.valor,
+  total: budget.total,
+  expiresIn: budget.expiresIn,
   taskId: budget.taskId,
+  items: budget.items?.map(item => ({
+    id: item.id,
+    description: item.description,
+    amount: item.amount,
+  })),
 }));

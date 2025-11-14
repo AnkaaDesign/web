@@ -182,7 +182,11 @@ export function CategoryForm(props: CategoryFormProps) {
                 <CardDescription>{mode === "create" ? "Preencha os dados para criar uma nova categoria" : "Atualize os dados da categoria"}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <NameInput control={form.control} disabled={isSubmitting} required={isRequired} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <NameInput control={form.control} disabled={isSubmitting} required={isRequired} />
+
+                  <TypeSelector control={form.control} disabled={isSubmitting} />
+                </div>
 
                 <FormField
                   control={form.control}
@@ -211,8 +215,6 @@ export function CategoryForm(props: CategoryFormProps) {
                     </FormItem>
                   )}
                 />
-
-                <TypeSelector control={form.control} disabled={isSubmitting} />
               </CardContent>
             </Card>
           </form>

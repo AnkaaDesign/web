@@ -70,7 +70,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
   const form = useFormContext<UserCreateFormData | UserUpdateFormData>();
   const status = form.watch("status");
   const exp1StartAt = form.watch("exp1StartAt");
-  const contractedAt = form.watch("contractedAt");
+  const effectedAt = form.watch("effectedAt");
 
   // Track previous values to detect actual changes (not just initial mount)
   const prevExp1StartAtRef = useRef<Date | null | undefined>(undefined);
@@ -120,16 +120,16 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
 
     prevStatusRef.current = status;
 
-    if (status === USER_STATUS.CONTRACTED && !contractedAt) {
-      // Set contractedAt to today if transitioning to CONTRACTED
-      form.setValue("contractedAt", startOfDay(new Date()), { shouldValidate: false });
+    if (status === USER_STATUS.EFFECTED && !effectedAt) {
+      // Set effectedAt to today if transitioning to EFFECTED
+      form.setValue("effectedAt", startOfDay(new Date()), { shouldValidate: false });
     }
 
     if (status === USER_STATUS.DISMISSED && !form.getValues("dismissedAt")) {
       // Set dismissedAt to today if transitioning to DISMISSED
       form.setValue("dismissedAt", startOfDay(new Date()), { shouldValidate: false });
     }
-  }, [status, contractedAt, form]);
+  }, [status, effectedAt, form]);
 
   // Don't show section if status is not set
   if (!status) {
@@ -139,17 +139,17 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
   const showExp1Dates = [
     USER_STATUS.EXPERIENCE_PERIOD_1,
     USER_STATUS.EXPERIENCE_PERIOD_2,
-    USER_STATUS.CONTRACTED,
+    USER_STATUS.EFFECTED,
     USER_STATUS.DISMISSED,
   ].includes(status);
 
   const showExp2Dates = [
     USER_STATUS.EXPERIENCE_PERIOD_2,
-    USER_STATUS.CONTRACTED,
+    USER_STATUS.EFFECTED,
     USER_STATUS.DISMISSED,
   ].includes(status);
 
-  const showContractedDate = [USER_STATUS.CONTRACTED, USER_STATUS.DISMISSED].includes(status);
+  const showContractedDate = [USER_STATUS.EFFECTED, USER_STATUS.DISMISSED].includes(status);
   const showDismissedDate = status === USER_STATUS.DISMISSED;
 
   // Don't render if no dates should be shown
@@ -252,7 +252,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pl-6">
               <FormField
                 control={form.control}
-                name="contractedAt"
+                name="effectedAt"
                 render={({ field }) => (
                   <DateTimeInput
                     field={field}

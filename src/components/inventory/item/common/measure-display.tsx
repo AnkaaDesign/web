@@ -88,12 +88,12 @@ export function MeasureDisplay({ item, showConversions = false, compact = false,
     setExpandedGroups(newExpanded);
   };
 
-  const renderMeasureValue = (value: number | null, unit: MEASURE_UNIT | null, measureId?: string) => {
+  const renderMeasureValue = (value: number | null, unit: MEASURE_UNIT | null, measureId?: string, measureType?: MEASURE_TYPE) => {
     // Handle PPE sizes that only have unit (letter sizes) or value (numeric sizes)
     let formatted: string;
     if (value !== null && unit !== null) {
       const measure = { value, unit };
-      formatted = measureUtils.formatMeasure(measure);
+      formatted = measureUtils.formatMeasure(measure, true, 2, measureType);
     } else if (unit !== null) {
       // For PPE sizes that only have unit (like P, M, G)
       formatted = MEASURE_UNIT_LABELS[unit] || unit;
@@ -162,7 +162,7 @@ export function MeasureDisplay({ item, showConversions = false, compact = false,
         {firstMeasure && (
           <div className="flex items-center gap-1">
             <IconRuler className="h-3 w-3 text-muted-foreground" />
-            {renderMeasureValue(firstMeasure.value, firstMeasure.unit, firstMeasure.id)}
+            {renderMeasureValue(firstMeasure.value, firstMeasure.unit, firstMeasure.id, firstMeasure.measureType)}
           </div>
         )}
         {additionalCount > 0 && (
@@ -183,7 +183,7 @@ export function MeasureDisplay({ item, showConversions = false, compact = false,
             <Badge variant="outline" className="text-xs">
               {MEASURE_TYPE_LABELS[measure.measureType]}
             </Badge>
-            {renderMeasureValue(measure.value, measure.unit, measure.id)}
+            {renderMeasureValue(measure.value, measure.unit, measure.id, measure.measureType)}
           </div>
         ))}
       </div>
@@ -222,12 +222,12 @@ export function MeasureDisplay({ item, showConversions = false, compact = false,
                   {isExpanded ? (
                     group.measures.map((measure) => (
                       <div key={measure.id} className="flex items-center gap-2">
-                        {renderMeasureValue(measure.value, measure.unit, measure.id)}
+                        {renderMeasureValue(measure.value, measure.unit, measure.id, measure.measureType)}
                       </div>
                     ))
                   ) : (
                     <div className="flex items-center gap-2">
-                      {renderMeasureValue(group.measures[0].value, group.measures[0].unit, group.measures[0].id)}
+                      {renderMeasureValue(group.measures[0].value, group.measures[0].unit, group.measures[0].id, group.measures[0].measureType)}
                       {group.measures.length > 1 && <span className="text-xs text-muted-foreground">+{group.measures.length - 1} mais</span>}
                     </div>
                   )}
@@ -262,10 +262,15 @@ export function MeasureDisplayCompact({ item, className }: { item: Item; classNa
     // Only format if both value and unit are present
     if (measure.value !== null && measure.unit !== null) {
       measureStrings.push(
-        measureUtils.formatMeasure({
-          value: measure.value,
-          unit: measure.unit,
-        }),
+        measureUtils.formatMeasure(
+          {
+            value: measure.value,
+            unit: measure.unit,
+          },
+          true,
+          2,
+          measure.measureType,
+        ),
       );
     } else if (measure.unit !== null) {
       // For PPE sizes that only have unit (like P, M, G)

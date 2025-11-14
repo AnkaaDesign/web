@@ -208,4 +208,47 @@ export const CustomerLogoDisplay: React.FC<CustomerLogoDisplayProps> = ({
   );
 };
 
+/**
+ * UserAvatarDisplay Component
+ *
+ * Specialized variant for user avatars with consistent styling
+ */
+export interface UserAvatarDisplayProps {
+  avatar?: AnkaaFile | null;
+  userName: string;
+  size?: AvatarDisplaySize;
+  className?: string;
+  shape?: "circle" | "square" | "rounded";
+  bordered?: boolean;
+}
+
+export const UserAvatarDisplay: React.FC<UserAvatarDisplayProps> = ({
+  avatar,
+  userName,
+  size = "md",
+  className,
+  shape = "rounded",
+  bordered = true,
+}) => {
+  const initials = React.useMemo(() => {
+    const words = userName.trim().split(/\s+/);
+    if (words.length >= 2) {
+      return `${words[0][0]}${words[1][0]}`.toUpperCase();
+    }
+    return userName.substring(0, 2).toUpperCase();
+  }, [userName]);
+
+  return (
+    <AvatarDisplay
+      file={avatar}
+      alt={`${userName} avatar`}
+      fallback={initials}
+      size={size}
+      shape={shape}
+      bordered={bordered}
+      className={className}
+    />
+  );
+};
+
 export default AvatarDisplay;

@@ -7,7 +7,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { IconFilter, IconX, IconShield, IconBrandApple, IconCalendarPlus, IconXboxX } from "@tabler/icons-react";
+import { IconFilter, IconX, IconShield, IconBrandApple, IconCalendarPlus, IconTriangleInverted } from "@tabler/icons-react";
 import { getItemBrands } from "../../../../api-client";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { PPE_TYPE, PPE_TYPE_LABELS, ITEM_CATEGORY_TYPE } from "../../../../constants";
@@ -43,13 +43,19 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
   useEffect(() => {
     if (!open) return;
 
+    // Convert isActive API filter to showInactive UI state
+    let showInactive: boolean | undefined;
+    if (typeof filters.isActive === "boolean") {
+      showInactive = !filters.isActive;
+    }
+
     setLocalState({
       brandIds: filters.brandIds || [],
       ppeType: filters.ppeType || [],
       createdAtRange: filters.createdAt,
-      showInactive: filters.showInactive,
+      showInactive,
     });
-  }, [open]);
+  }, [open, filters]);
 
   // Async query function for brands
   const queryBrands = useCallback(async (searchTerm: string, page = 1) => {
@@ -101,8 +107,13 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
   }, [localState.brandIds]);
 
   const handleApply = () => {
+    // Start with existing filters but REMOVE isActive to ensure clean state
+    const baseFilters = { ...filters };
+    delete baseFilters.isActive;
+
     // Build the filters object from local state
     const newFilters: Partial<ItemGetManyFormData> = {
+      ...baseFilters,
       limit: filters.limit,
       orderBy: filters.orderBy,
       include: filters.include,
@@ -113,6 +124,13 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
         },
       },
     };
+
+    // Map showInactive UI state to isActive API filter (at root level)
+    if (typeof localState.showInactive === "boolean") {
+      newFilters.isActive = !localState.showInactive;
+    } else {
+      delete newFilters.isActive;
+    }
 
     // Add non-empty filters
     if (localState.brandIds?.length) {
@@ -126,11 +144,6 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
     // Date range filters
     if (localState.createdAtRange?.gte || localState.createdAtRange?.lte) {
       newFilters.createdAt = localState.createdAtRange;
-    }
-
-    // Show inactive filter
-    if (localState.showInactive) {
-      newFilters.showInactive = true;
     }
 
     onFilterChange(newFilters);
@@ -160,7 +173,7 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
     if (localState.brandIds?.length) count++;
     if (localState.ppeType?.length) count++;
     if (localState.createdAtRange?.gte || localState.createdAtRange?.lte) count++;
-    if (localState.showInactive) count++;
+    if (typeof localState.showInactive === "boolean") count++;
     return count;
   };
 
@@ -248,16 +261,32 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
             )}
           </div>
 
-          {/* Show Inactive Toggle */}
-          <div className="flex items-center justify-between">
-            <Label htmlFor="showInactive" className="text-sm font-normal flex items-center gap-2">
-              <IconXboxX className="h-4 w-4 text-muted-foreground" />
-              Mostrar também desativados
+          {/* Status Filter */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <IconTriangleInverted className="h-4 w-4" />
+              Status
             </Label>
-            <Switch
-              id="showInactive"
-              checked={localState.showInactive ?? false}
-              onCheckedChange={(checked) => setLocalState((prev) => ({ ...prev, showInactive: checked }))}
+            <Combobox
+              mode="single"
+              options={[
+                { value: "ambos", label: "Ambos" },
+                { value: "ativo", label: "Ativo" },
+                { value: "inativo", label: "Inativo" },
+              ]}
+              value={
+                localState.showInactive === true ? "inativo" :
+                localState.showInactive === false ? "ativo" :
+                "ambos"
+              }
+              onValueChange={(value) => {
+                setLocalState((prev) => ({
+                  ...prev,
+                  showInactive: value === "inativo" ? true : value === "ativo" ? false : undefined,
+                }));
+              }}
+              placeholder="Selecione..."
+              emptyText="Nenhuma opção encontrada"
             />
           </div>
 
@@ -316,7 +345,7 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
           </div>
         </div>
 
-        <div className="flex gap-2 pt-4 border-t">
+        <div className="flex gap-2 mt-6 pt-4 border-t">
           <Button variant="outline" onClick={handleReset} className="flex-1 flex items-center gap-2">
             <IconX className="h-4 w-4" />
             Limpar Tudo

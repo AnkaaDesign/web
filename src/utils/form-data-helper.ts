@@ -320,3 +320,21 @@ export function createUserPhotoFormData(
     }
   );
 }
+
+/**
+ * Helper for User forms with avatar upload
+ */
+export function createUserFormData(
+  data: Record<string, any>,
+  avatarFile?: File | null,
+  user?: FormDataOptions['user']
+): FormData {
+  return createFormDataWithContext(
+    data,
+    { avatar: avatarFile },
+    {
+      entityType: 'user',
+      user,
+    }
+  );
+}

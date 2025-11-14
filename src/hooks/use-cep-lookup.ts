@@ -23,12 +23,14 @@ interface UseCepLookupOptions {
   onError?: (error: Error) => void;
 }
 
-const LOGRADOURO_TYPES = [
+// Portuguese street type prefixes for parsing API responses
+const STREET_TYPE_PREFIXES = [
   "RUA",
   "AVENIDA",
   "ALAMEDA",
   "TRAVESSA",
   "PRAÇA",
+  "PRACA", // Without accent for matching
   "RODOVIA",
   "ESTRADA",
   "VIA",
@@ -41,14 +43,46 @@ const LOGRADOURO_TYPES = [
   "JARDIM",
   "QUADRA",
   "LOTE",
-  "SÍTIO",
+  "SITIO", // Without accent for matching
   "PARQUE",
   "FAZENDA",
-  "CHÁCARA",
-  "CONDOMÍNIO",
+  "CHACARA", // Without accent for matching
+  "CONDOMINIO", // Without accent for matching
   "CONJUNTO",
   "RESIDENCIAL",
 ];
+
+// Map Portuguese street types to English enum values
+const STREET_TYPE_PT_TO_EN: Record<string, string> = {
+  RUA: "STREET",
+  AVENIDA: "AVENUE",
+  ALAMEDA: "ALLEY",
+  TRAVESSA: "CROSSING",
+  PRACA: "SQUARE",
+  PRAÇA: "SQUARE",
+  RODOVIA: "HIGHWAY",
+  ESTRADA: "ROAD",
+  VIA: "WAY",
+  LARGO: "PLAZA",
+  VIELA: "LANE",
+  BECO: "DEADEND",
+  RUELA: "SMALL_STREET",
+  CAMINHO: "PATH",
+  PASSAGEM: "PASSAGE",
+  JARDIM: "GARDEN",
+  QUADRA: "BLOCK",
+  LOTE: "LOT",
+  SITIO: "SITE",
+  SÍTIO: "SITE",
+  PARQUE: "PARK",
+  FAZENDA: "FARM",
+  CHACARA: "RANCH",
+  CHÁCARA: "RANCH",
+  CONDOMINIO: "CONDOMINIUM",
+  CONDOMÍNIO: "CONDOMINIUM",
+  CONJUNTO: "COMPLEX",
+  RESIDENCIAL: "RESIDENTIAL",
+};
 
 function toTitleCase(str: string): string {
   if (!str) return str;
@@ -81,7 +115,7 @@ function toTitleCase(str: string): string {
     .join(' ');
 }
 
-function extractLogradouroType(street: string | null | undefined): { type: string | null; address: string } {
+function extractStreetType(street: string | null | undefined): { type: string | null; address: string } {
   // Handle null or undefined street
   if (!street) {
     return { type: null, address: "" };
@@ -89,7 +123,7 @@ function extractLogradouroType(street: string | null | undefined): { type: strin
 
   const normalized = street.toUpperCase().trim();
 
-  for (const type of LOGRADOURO_TYPES) {
+  for (const type of STREET_TYPES) {
     if (normalized.startsWith(type + " ")) {
       // Extract the remaining address after the street type
       const remainingAddress = street.substring(type.length + 1).trim();
@@ -134,7 +168,7 @@ export function useCepLookup(options?: UseCepLookupOptions) {
         const brasilApiData: BrasilApiCepData = await response.json();
 
         // Extract street type from street name
-        const { type, address } = extractLogradouroType(brasilApiData.street);
+        const { type, address } = extractStreetType(brasilApiData.street);
 
         // Convert to ViaCEP format for compatibility
         const data: CepData = {

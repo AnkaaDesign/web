@@ -12,7 +12,6 @@ import type {
   ExternalWithdrawalItemGetManyFormData,
   FileGetManyFormData,
   GarageGetManyFormData,
-  GarageLaneGetManyFormData,
   ItemGetManyFormData,
   ItemBrandGetManyFormData,
   ItemCategoryGetManyFormData,
@@ -342,7 +341,6 @@ export const artworkKeys = fileKeys;
 // =====================================================
 
 export const garageKeys = createQueryKeyStore<GarageGetManyFormData>("garages");
-export const garageLaneKeys = createQueryKeyStore<GarageLaneGetManyFormData>("garageLanes");
 
 // =====================================================
 // Item Query Keys
