@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useCut, useCutMutations, useCuts } from "../../../../hooks";
+import { useCut, useCutMutations, useCuts, useAuth } from "../../../../hooks";
 import type { CutUpdateFormData } from "../../../../schemas";
+import { canEditCuts } from "@/utils/permissions/entity-permissions";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -65,10 +66,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 export const CuttingDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { update } = useCutMutations();
   const [isUpdating, setIsUpdating] = useState(false);
   const [statusChangeDialogOpen, setStatusChangeDialogOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<CUT_STATUS | null>(null);
+
+  // Permission checks
+  const canEdit = canEditCuts(user);
 
   // Fetch cut details with all relations
   const {
@@ -253,7 +258,7 @@ export const CuttingDetailsPage = () => {
                 icon: IconRefresh,
                 onClick: () => refetch(),
               },
-              ...(cut.status === CUT_STATUS.PENDING
+              ...(canEdit && cut.status === CUT_STATUS.PENDING
                 ? [
                     {
                       key: "start",
@@ -264,7 +269,7 @@ export const CuttingDetailsPage = () => {
                     },
                   ]
                 : []),
-              ...(cut.status === CUT_STATUS.CUTTING
+              ...(canEdit && cut.status === CUT_STATUS.CUTTING
                 ? [
                     {
                       key: "complete",

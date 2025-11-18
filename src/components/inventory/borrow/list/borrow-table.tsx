@@ -4,6 +4,8 @@ import type { Borrow } from "../../../../types";
 import { routes, BORROW_STATUS, BORROW_STATUS_LABELS, getBadgeVariant } from "../../../../constants";
 import type { BORROW_STATUS as BorrowStatusType } from "../../../../constants";
 import { formatDate, formatRelativeTime } from "../../../../utils";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditBorrows, canDeleteBorrows, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -69,8 +71,14 @@ const formatDateWithRelative = (date: Date | string) => {
 
 export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDelete, filters = {}, onDataChange }: BorrowTableProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { deleteMutation, markAsLostMutation } = useBorrowMutations();
   const { batchDelete, batchUpdate } = useBorrowBatchMutations();
+
+  // Permission checks
+  const canEdit = canEditBorrows(user);
+  const canDelete = canDeleteBorrows(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'borrows');
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -524,17 +532,19 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
               {/* Selection column */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={partiallySelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all items"
-                    disabled={isLoading || borrows.length === 0}
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={partiallySelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all items"
+                      disabled={isLoading || borrows.length === 0}
+                    />
+                  </div>
+                </TableHead>
+              )}
 
               {/* Data columns */}
               {columns.map((column) => (
@@ -622,16 +632,18 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
                     onContextMenu={(e) => handleContextMenu(e, borrow)}
                   >
                     {/* Selection checkbox */}
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={borrowIsSelected}
-                          onCheckedChange={() => handleSelectBorrow(borrow.id)}
-                          aria-label={`Select ${borrow.item?.name || "borrow"}`}
-                          data-checkbox
-                        />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={borrowIsSelected}
+                            onCheckedChange={() => handleSelectBorrow(borrow.id)}
+                            aria-label={`Select ${borrow.item?.name || "borrow"}`}
+                            data-checkbox
+                          />
+                        </div>
+                      </TableCell>
+                    )}
 
                     {/* Data columns */}
                     {columns.map((column) => (
@@ -697,13 +709,15 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
               </DropdownMenuItem>
             )}
 
-            <DropdownMenuItem onClick={handleEdit}>
-              <IconEdit className="mr-2 h-4 w-4" />
-              {contextMenu?.items.length === 1 ? "Editar" : "Editar em lote"}
-            </DropdownMenuItem>
+            {canEdit && (
+              <DropdownMenuItem onClick={handleEdit}>
+                <IconEdit className="mr-2 h-4 w-4" />
+                {contextMenu?.items.length === 1 ? "Editar" : "Editar em lote"}
+              </DropdownMenuItem>
+            )}
 
             {/* Show return option only for active items */}
-            {contextMenu &&
+            {canEdit && contextMenu &&
               (contextMenu.isBulk ? contextMenu.items.some((item) => item.status === BORROW_STATUS.ACTIVE) : contextMenu.items[0].status === BORROW_STATUS.ACTIVE) && (
                 <DropdownMenuItem onClick={handleReturn} className="text-green-700 focus:text-white focus:bg-green-700 hover:text-white hover:bg-green-700">
                   <IconPackageImport className="mr-2 h-4 w-4" />
@@ -712,19 +726,21 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
               )}
 
             {/* Show mark as lost option only for active items */}
-            {contextMenu && (contextMenu.isBulk ? contextMenu.items.some((item) => item.status === BORROW_STATUS.ACTIVE) : contextMenu.items[0].status === BORROW_STATUS.ACTIVE) && (
+            {canEdit && contextMenu && (contextMenu.isBulk ? contextMenu.items.some((item) => item.status === BORROW_STATUS.ACTIVE) : contextMenu.items[0].status === BORROW_STATUS.ACTIVE) && (
               <DropdownMenuItem onClick={handleMarkAsLost} className="text-destructive">
                 <IconX className="mr-2 h-4 w-4" />
                 Marcar como perdidos
               </DropdownMenuItem>
             )}
 
-            <DropdownMenuSeparator />
+            {(canEdit || canDelete) && <DropdownMenuSeparator />}
 
-            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-              <IconTrash className="mr-2 h-4 w-4" />
-              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Deletar selecionados" : "Deletar"}
-            </DropdownMenuItem>
+            {canDelete && (
+              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                <IconTrash className="mr-2 h-4 w-4" />
+                {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Deletar selecionados" : "Deletar"}
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       )}

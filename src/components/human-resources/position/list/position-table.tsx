@@ -5,6 +5,8 @@ import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, Icon
 import type { Position } from "../../../../types";
 import type { PositionGetManyFormData } from "../../../../schemas";
 import { routes } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { formatDate, formatCurrency } from "../../../../utils";
 import { usePositionMutations, usePositions } from "../../../../hooks";
 
@@ -49,6 +51,12 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ items: Position[]; isBulk: boolean } | null>(null);
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditHrEntities(user);
+  const canDelete = canDeleteHrEntities(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'hr-entities');
 
   // Use URL state management for pagination and selection
   const {
@@ -359,18 +367,20 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={someSelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Selecionar todos"
-                    disabled={isLoading || positions.length === 0}
-                    data-checkbox
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={someSelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Selecionar todos"
+                      disabled={isLoading || positions.length === 0}
+                      data-checkbox
+                    />
+                  </div>
+                </TableHead>
+              )}
               {columns.map((column) => (
                 <TableHead
                   key={column.key}
@@ -457,16 +467,18 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
                     onClick={(e) => handleRowClick(position, e)}
                     onContextMenu={(e) => handleContextMenu(e, position)}
                   >
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={isPositionSelected}
-                          onCheckedChange={() => handleSelectPosition(position.id)}
-                          aria-label={`Selecionar cargo ${position.name}`}
-                          data-checkbox
-                        />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isPositionSelected}
+                            onCheckedChange={() => handleSelectPosition(position.id)}
+                            aria-label={`Selecionar cargo ${position.name}`}
+                            data-checkbox
+                          />
+                        </div>
+                      </TableCell>
+                    )}
                     {columns.map((column) => (
                       <TableCell key={column.key} className={cn("p-0 !border-r-0", column.className)}>
                         <div className={cn("px-4 py-2 text-sm")}>{column.accessor(position)}</div>
@@ -506,35 +518,45 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
                     <IconEye className="mr-2 h-4 w-4" />
                     Visualizar
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleEdit(contextMenu.positions[0])}>
-                    <IconEdit className="mr-2 h-4 w-4" />
-                    Editar
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(contextMenu.positions)} className="text-destructive">
-                    <IconTrash className="mr-2 h-4 w-4" />
-                    Excluir
-                  </DropdownMenuItem>
+                  {canEdit && (
+                    <DropdownMenuItem onClick={() => handleEdit(contextMenu.positions[0])}>
+                      <IconEdit className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                  )}
+                  {(canEdit || canDelete) && <DropdownMenuSeparator />}
+                  {canDelete && (
+                    <DropdownMenuItem onClick={() => handleDelete(contextMenu.positions)} className="text-destructive">
+                      <IconTrash className="mr-2 h-4 w-4" />
+                      Excluir
+                    </DropdownMenuItem>
+                  )}
                 </>
               ) : (
                 <>
                   <div className="px-2 py-1.5 text-sm font-medium">{contextMenu.positions.length} cargos</div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      const ids = contextMenu.positions.map((p) => p.id).join(",");
-                      navigate(`${routes.humanResources.positions.batchEdit}?ids=${ids}`);
-                      setContextMenu(null);
-                    }}
-                  >
-                    <IconEdit className="mr-2 h-4 w-4" />
-                    Editar em lote
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(contextMenu.positions)} className="text-destructive">
-                    <IconTrash className="mr-2 h-4 w-4" />
-                    Excluir selecionados
-                  </DropdownMenuItem>
+                  {canEdit && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const ids = contextMenu.positions.map((p) => p.id).join(",");
+                          navigate(`${routes.humanResources.positions.batchEdit}?ids=${ids}`);
+                          setContextMenu(null);
+                        }}
+                      >
+                        <IconEdit className="mr-2 h-4 w-4" />
+                        Editar em lote
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {(canEdit || canDelete) && <DropdownMenuSeparator />}
+                  {canDelete && (
+                    <DropdownMenuItem onClick={() => handleDelete(contextMenu.positions)} className="text-destructive">
+                      <IconTrash className="mr-2 h-4 w-4" />
+                      Excluir selecionados
+                    </DropdownMenuItem>
+                  )}
                 </>
               )}
             </DropdownMenuContent>

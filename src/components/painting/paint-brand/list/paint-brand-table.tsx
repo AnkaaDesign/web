@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { PaintBrand } from "../../../../types";
 import { routes } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditPaints, canDeletePaints, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { IconChevronUp, IconChevronDown, IconSelector, IconEdit, IconTrash, IconEye, IconAlertTriangle, IconTag } from "@tabler/icons-react";
@@ -42,6 +44,12 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
   const navigate = useNavigate();
   const { delete: deletePaintBrand } = usePaintBrandMutations();
   const { batchDelete } = usePaintBrandBatchMutations();
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditPaints(user);
+  const canDelete = canDeletePaints(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'paints');
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -323,17 +331,19 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
               {/* Selection column */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={partiallySelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all paint brands"
-                    disabled={isLoading || paintBrands.length === 0}
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={partiallySelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all paint brands"
+                      disabled={isLoading || paintBrands.length === 0}
+                    />
+                  </div>
+                </TableHead>
+              )}
 
               {/* Data columns */}
               {columns.map((column) => (
@@ -410,16 +420,18 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
                     onContextMenu={(e) => handleContextMenu(e, paintBrand)}
                   >
                     {/* Selection checkbox */}
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={paintBrandIsSelected}
-                          onCheckedChange={() => handleSelectPaintBrand(paintBrand.id)}
-                          aria-label={`Select ${paintBrand.name}`}
-                          data-checkbox
-                        />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={paintBrandIsSelected}
+                            onCheckedChange={() => handleSelectPaintBrand(paintBrand.id)}
+                            aria-label={`Select ${paintBrand.name}`}
+                            data-checkbox
+                          />
+                        </div>
+                      </TableCell>
+                    )}
 
                     {/* Data columns */}
                     {columns.map((column) => (
@@ -478,17 +490,21 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuItem onClick={handleEdit}>
-            <IconEdit className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.paintBrands.length > 1 ? "Editar em lote" : "Editar"}
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem onClick={handleEdit}>
+              <IconEdit className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.paintBrands.length > 1 ? "Editar em lote" : "Editar"}
+            </DropdownMenuItem>
+          )}
 
-          <DropdownMenuSeparator />
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
 
-          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-            <IconTrash className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.paintBrands.length > 1 ? "Excluir selecionados" : "Excluir"}
-          </DropdownMenuItem>
+          {canDelete && (
+            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.paintBrands.length > 1 ? "Excluir selecionados" : "Excluir"}
+            </DropdownMenuItem>
+          )}
         </PositionedDropdownMenuContent>
       </DropdownMenu>
 

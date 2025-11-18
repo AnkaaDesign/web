@@ -5,6 +5,8 @@ import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, Icon
 import type { Warning } from "../../../../types";
 import type { WarningGetManyFormData } from "../../../../schemas";
 import { routes, WARNING_SEVERITY_LABELS, WARNING_CATEGORY_LABELS } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { formatDate } from "../../../../utils";
 import { useWarningMutations, useWarnings } from "../../../../hooks";
 
@@ -48,6 +50,12 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ items: Warning[]; isBulk: boolean } | null>(null);
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditHrEntities(user);
+  const canDelete = canDeleteHrEntities(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'hr-entities');
 
   // Use URL state management for pagination and selection
   const {
@@ -336,18 +344,20 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={someSelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Selecionar todos"
-                    disabled={isLoading || warnings.length === 0}
-                    data-checkbox
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={someSelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Selecionar todos"
+                      disabled={isLoading || warnings.length === 0}
+                      data-checkbox
+                    />
+                  </div>
+                </TableHead>
+              )}
               {columns.map((column) => (
                 <TableHead
                   key={column.key}
@@ -425,11 +435,13 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
                     onClick={(e) => handleRowClick(warning, e)}
                     onContextMenu={(e) => handleContextMenu(e, warning)}
                   >
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={isWarningSelected} onCheckedChange={() => handleSelectWarning(warning.id)} aria-label={`Selecionar advertência`} data-checkbox />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={isWarningSelected} onCheckedChange={() => handleSelectWarning(warning.id)} aria-label={`Selecionar advertência`} data-checkbox />
+                        </div>
+                      </TableCell>
+                    )}
                     {columns.map((column) => (
                       <TableCell key={column.key} className={cn("p-0 !border-r-0", column.className)}>
                         <div className={cn("px-4 py-2 text-sm", column.align === "center" && "text-center")}>{column.accessor(warning)}</div>
@@ -462,35 +474,45 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
                     <IconEye className="mr-2 h-4 w-4" />
                     Visualizar
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleEdit(contextMenu.warnings[0])}>
-                    <IconEdit className="mr-2 h-4 w-4" />
-                    Editar
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(contextMenu.warnings)} className="text-destructive">
-                    <IconTrash className="mr-2 h-4 w-4" />
-                    Excluir
-                  </DropdownMenuItem>
+                  {canEdit && (
+                    <DropdownMenuItem onClick={() => handleEdit(contextMenu.warnings[0])}>
+                      <IconEdit className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                  )}
+                  {(canEdit || canDelete) && <DropdownMenuSeparator />}
+                  {canDelete && (
+                    <DropdownMenuItem onClick={() => handleDelete(contextMenu.warnings)} className="text-destructive">
+                      <IconTrash className="mr-2 h-4 w-4" />
+                      Excluir
+                    </DropdownMenuItem>
+                  )}
                 </>
               ) : (
                 <>
                   <div className="px-2 py-1.5 text-sm font-medium">{contextMenu.warnings.length} advertências</div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      const ids = contextMenu.warnings.map((w: Warning) => w.id).join(",");
-                      navigate(`${routes.humanResources.warnings.batchEdit}?ids=${ids}`);
-                      setContextMenu(null);
-                    }}
-                  >
-                    <IconEdit className="mr-2 h-4 w-4" />
-                    Editar em lote
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(contextMenu.warnings)} className="text-destructive">
-                    <IconTrash className="mr-2 h-4 w-4" />
-                    Excluir selecionadas
-                  </DropdownMenuItem>
+                  {canEdit && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const ids = contextMenu.warnings.map((w: Warning) => w.id).join(",");
+                          navigate(`${routes.humanResources.warnings.batchEdit}?ids=${ids}`);
+                          setContextMenu(null);
+                        }}
+                      >
+                        <IconEdit className="mr-2 h-4 w-4" />
+                        Editar em lote
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {(canEdit || canDelete) && <DropdownMenuSeparator />}
+                  {canDelete && (
+                    <DropdownMenuItem onClick={() => handleDelete(contextMenu.warnings)} className="text-destructive">
+                      <IconTrash className="mr-2 h-4 w-4" />
+                      Excluir selecionadas
+                    </DropdownMenuItem>
+                  )}
                 </>
               )}
             </DropdownMenuContent>

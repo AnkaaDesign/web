@@ -5,6 +5,8 @@ import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, Icon
 import type { Vacation } from "../../../../types";
 import type { VacationGetManyFormData } from "../../../../schemas";
 import { routes, VACATION_STATUS_LABELS } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { formatDate, getWorkdaysBetween } from "../../../../utils";
 import { useVacationMutations, useVacations } from "../../../../hooks";
 
@@ -49,6 +51,12 @@ export function VacationTable({ filters, onDataChange, className }: VacationTabl
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ items: Vacation[]; isBulk: boolean } | null>(null);
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditHrEntities(user);
+  const canDelete = canDeleteHrEntities(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'hr-entities');
 
   // Use viewport boundary checking hook
   
@@ -329,18 +337,20 @@ export function VacationTable({ filters, onDataChange, className }: VacationTabl
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={someSelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Selecionar todos"
-                    disabled={isLoading || vacations.length === 0}
-                    data-checkbox
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={someSelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Selecionar todos"
+                      disabled={isLoading || vacations.length === 0}
+                      data-checkbox
+                    />
+                  </div>
+                </TableHead>
+              )}
               {columns.map((column) => (
                 <TableHead
                   key={column.key}
@@ -418,16 +428,18 @@ export function VacationTable({ filters, onDataChange, className }: VacationTabl
                     onClick={(e) => handleRowClick(vacation, e)}
                     onContextMenu={(e) => handleContextMenu(e, vacation)}
                   >
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={isVacationSelected}
-                          onCheckedChange={() => handleSelectVacation(vacation.id)}
-                          aria-label={`Selecionar férias de ${vacation.user?.name}`}
-                          data-checkbox
-                        />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isVacationSelected}
+                            onCheckedChange={() => handleSelectVacation(vacation.id)}
+                            aria-label={`Selecionar férias de ${vacation.user?.name}`}
+                            data-checkbox
+                          />
+                        </div>
+                      </TableCell>
+                    )}
                     {columns.map((column) => (
                       <TableCell key={column.key} className={cn("p-0 !border-r-0", column.className)}>
                         <div className={cn("px-4 py-2 text-sm", column.align === "center" && "text-center")}>{column.accessor(vacation)}</div>
@@ -472,35 +484,47 @@ export function VacationTable({ filters, onDataChange, className }: VacationTabl
                     <IconEye className="mr-2 h-4 w-4" />
                     Visualizar
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleEdit(contextMenu.vacations[0])}>
-                    <IconEdit className="mr-2 h-4 w-4" />
-                    Editar
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(contextMenu.vacations)} className="text-destructive">
-                    <IconTrash className="mr-2 h-4 w-4" />
-                    Excluir
-                  </DropdownMenuItem>
+                  {canEdit && (
+                    <DropdownMenuItem onClick={() => handleEdit(contextMenu.vacations[0])}>
+                      <IconEdit className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                  )}
+                  {(canEdit || canDelete) && <DropdownMenuSeparator />}
+                  {canDelete && (
+                    <DropdownMenuItem onClick={() => handleDelete(contextMenu.vacations)} className="text-destructive">
+                      <IconTrash className="mr-2 h-4 w-4" />
+                      Excluir
+                    </DropdownMenuItem>
+                  )}
                 </>
               ) : (
                 <>
                   <div className="px-2 py-1.5 text-sm font-medium">{contextMenu.vacations.length} férias</div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      const ids = contextMenu.vacations.map((v) => v.id).join(",");
-                      navigate(`${routes.humanResources.vacations.batchEdit}?ids=${ids}`);
-                      setContextMenu(null);
-                    }}
-                  >
-                    <IconEdit className="mr-2 h-4 w-4" />
-                    Editar em lote
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(contextMenu.vacations)} className="text-destructive">
-                    <IconTrash className="mr-2 h-4 w-4" />
-                    Excluir selecionadas
-                  </DropdownMenuItem>
+                  {canEdit && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const ids = contextMenu.vacations.map((v) => v.id).join(",");
+                          navigate(`${routes.humanResources.vacations.batchEdit}?ids=${ids}`);
+                          setContextMenu(null);
+                        }}
+                      >
+                        <IconEdit className="mr-2 h-4 w-4" />
+                        Editar em lote
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {canDelete && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleDelete(contextMenu.vacations)} className="text-destructive">
+                        <IconTrash className="mr-2 h-4 w-4" />
+                        Excluir selecionadas
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </>
               )}
             </PositionedDropdownMenuContent>

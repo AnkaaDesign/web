@@ -4,6 +4,8 @@ import { IconChevronDown, IconChevronUp, IconSelector, IconEdit, IconTrash, Icon
 
 import type { Sector, SectorGetManyFormData, SectorOrderBy } from "../../../../types";
 import { routes, SECTOR_PRIVILEGES_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { formatDate } from "../../../../utils";
 import { useSectorMutations, useSectors } from "../../../../hooks";
 
@@ -88,6 +90,12 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
   const navigate = useNavigate();
   const { delete: deleteSector } = useSectorMutations();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditHrEntities(user);
+  const canDelete = canDeleteHrEntities(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'hr-entities');
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -395,18 +403,20 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={someSelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Selecionar todos"
-                    disabled={isLoading || sectors.length === 0}
-                    data-checkbox
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={someSelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Selecionar todos"
+                      disabled={isLoading || sectors.length === 0}
+                      data-checkbox
+                    />
+                  </div>
+                </TableHead>
+              )}
               {columns.map((column) => (
                 <TableHead
                   key={column.key}
@@ -502,11 +512,13 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
                     onClick={(e) => handleRowClick(sector, e)}
                     onContextMenu={(e) => handleContextMenu(e, sector)}
                   >
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={isSectorSelected} onCheckedChange={() => handleSelectSector(sector.id)} aria-label={`Selecionar setor ${sector.name}`} data-checkbox />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={isSectorSelected} onCheckedChange={() => handleSelectSector(sector.id)} aria-label={`Selecionar setor ${sector.name}`} data-checkbox />
+                        </div>
+                      </TableCell>
+                    )}
                     {columns.map((column) => (
                       <TableCell
                         key={column.key}
@@ -558,17 +570,21 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuItem onClick={handleEdit}>
-            <IconEdit className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.sectors.length > 1 ? "Editar em lote" : "Editar"}
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem onClick={handleEdit}>
+              <IconEdit className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.sectors.length > 1 ? "Editar em lote" : "Editar"}
+            </DropdownMenuItem>
+          )}
 
-          <DropdownMenuSeparator />
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
 
-          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-            <IconTrash className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.sectors.length > 1 ? "Excluir selecionados" : "Excluir"}
-          </DropdownMenuItem>
+          {canDelete && (
+            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.sectors.length > 1 ? "Excluir selecionados" : "Excluir"}
+            </DropdownMenuItem>
+          )}
         </PositionedDropdownMenuContent>
       </DropdownMenu>
 

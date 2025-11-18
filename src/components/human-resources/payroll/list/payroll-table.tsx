@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { StandardizedTable, type StandardizedColumn } from "@/components/ui/standardized-table";
 import { IconUsers } from "@tabler/icons-react";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { usePayrollBonuses } from "../../../../hooks";
 import { createPayrollColumns } from "./payroll-table-columns";
 import type { PayrollColumn, PayrollUserRow } from "./payroll-table-columns";
@@ -35,6 +37,12 @@ export function PayrollTable({
   refreshInterval = 30000
 }: PayrollTableProps) {
   const navigate = useNavigate();
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditHrEntities(user);
+  const canDelete = canDeleteHrEntities(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'hr-entities');
 
   // Handle row click to navigate to payroll details
   const handleRowClick = (row: PayrollUserRow) => {

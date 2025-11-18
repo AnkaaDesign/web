@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Item } from "../../../../types";
 import { routes } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditPpeDeliveries, canDeletePpeDeliveries, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { IconChevronUp, IconChevronDown, IconRefresh, IconEdit, IconTrash, IconSelector, IconAlertTriangle, IconShield, IconEye, IconCheck, IconX } from "@tabler/icons-react";
@@ -39,6 +41,12 @@ interface PpeTableProps {
 
 export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeactivate, filters = {}, onDataChange }: PpeTableProps) {
   const navigate = useNavigate();
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditPpeDeliveries(user);
+  const canDelete = canDeletePpeDeliveries(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'ppe');
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -228,17 +236,19 @@ export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeac
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
               {/* Selection column */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={partiallySelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all items"
-                    disabled={isLoading || items.length === 0}
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={partiallySelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all items"
+                      disabled={isLoading || items.length === 0}
+                    />
+                  </div>
+                </TableHead>
+              )}
 
               {/* Data columns */}
               {visibleColumnConfigs.map((column) => (
@@ -338,11 +348,13 @@ export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeac
                     onContextMenu={(e) => handleContextMenu(e, item)}
                   >
                     {/* Selection checkbox */}
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select ${item.name}`} data-checkbox />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select ${item.name}`} data-checkbox />
+                        </div>
+                      </TableCell>
+                    )}
 
                     {/* Data columns */}
                     {visibleColumnConfigs.map((column) => (
@@ -410,42 +422,46 @@ export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeac
             Visualizar
           </DropdownMenuItem>
 
-          <DropdownMenuItem onClick={handleEdit}>
-            <IconEdit className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Editar em lote" : "Editar"}
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem onClick={handleEdit}>
+              <IconEdit className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Editar em lote" : "Editar"}
+            </DropdownMenuItem>
+          )}
 
-          {contextMenu?.items.some((item) => !item.isActive) && (
+          {canEdit && contextMenu?.items.some((item) => !item.isActive) && (
             <DropdownMenuItem onClick={handleActivate} className="text-green-700">
               <IconCheck className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Ativar selecionados" : "Ativar"}
             </DropdownMenuItem>
           )}
 
-          {contextMenu?.items.some((item) => item.isActive) && (
+          {canEdit && contextMenu?.items.some((item) => item.isActive) && (
             <DropdownMenuItem onClick={handleDeactivate} className="text-destructive">
               <IconX className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Desativar selecionados" : "Desativar"}
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuSeparator />
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
 
-          <DropdownMenuItem
-            onClick={() => {
-              if (contextMenu?.items) {
-                setDeleteDialog({
-                  items: contextMenu.items,
-                  isBulk: contextMenu.isBulk,
-                });
-              }
-              setContextMenu(null);
-            }}
-            className="text-destructive focus:text-destructive"
-          >
-            <IconTrash className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Excluir em lote" : "Excluir"}
-          </DropdownMenuItem>
+          {canDelete && (
+            <DropdownMenuItem
+              onClick={() => {
+                if (contextMenu?.items) {
+                  setDeleteDialog({
+                    items: contextMenu.items,
+                    isBulk: contextMenu.isBulk,
+                  });
+                }
+                setContextMenu(null);
+              }}
+              className="text-destructive focus:text-destructive"
+            >
+              <IconTrash className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Excluir em lote" : "Excluir"}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

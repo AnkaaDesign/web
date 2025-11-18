@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Maintenance } from "../../../../types";
 import { routes, MAINTENANCE_STATUS } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditMaintenance, canDeleteMaintenance, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -45,6 +47,12 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
   const finishMutation = useFinishMaintenance();
   const batchFinishMutation = useBatchFinishMaintenances();
   const batchStartMutation = useBatchStartMaintenances();
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditMaintenance(user);
+  const canDelete = canDeleteMaintenance(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'maintenance');
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -280,17 +288,19 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
               {/* Selection column */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all maintenances"
-                    className={cn("h-4 w-4", partiallySelected && "data-[state=checked]:bg-muted data-[state=checked]:text-muted-foreground")}
-                    disabled={isLoading || maintenances.length === 0}
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all maintenances"
+                      className={cn("h-4 w-4", partiallySelected && "data-[state=checked]:bg-muted data-[state=checked]:text-muted-foreground")}
+                      disabled={isLoading || maintenances.length === 0}
+                    />
+                  </div>
+                </TableHead>
+              )}
 
               {/* Data columns */}
               {visibleColumnConfigs.map((column) => (
@@ -400,11 +410,13 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
                     onContextMenu={(e) => handleContextMenu(e, maintenance)}
                   >
                     {/* Selection checkbox */}
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={maintenanceIsSelected} onCheckedChange={() => handleSelectMaintenance(maintenance.id)} aria-label={`Select ${maintenance.name}`} />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={maintenanceIsSelected} onCheckedChange={() => handleSelectMaintenance(maintenance.id)} aria-label={`Select ${maintenance.name}`} />
+                        </div>
+                      </TableCell>
+                    )}
 
                     {/* Data columns */}
                     {visibleColumnConfigs.map((column) => (
@@ -459,13 +471,15 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
         >
           {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.maintenances.length} manutenções selecionadas</div>}
 
-          <DropdownMenuItem onClick={handleEdit}>
-            <IconEdit className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.maintenances.length > 1 ? "Editar em lote" : "Editar"}
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem onClick={handleEdit}>
+              <IconEdit className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.maintenances.length > 1 ? "Editar em lote" : "Editar"}
+            </DropdownMenuItem>
+          )}
 
           {/* Show start option for pending maintenances */}
-          {contextMenu?.maintenances.some((m) => m.status === MAINTENANCE_STATUS.PENDING) && (
+          {canEdit && contextMenu?.maintenances.some((m) => m.status === MAINTENANCE_STATUS.PENDING) && (
             <DropdownMenuItem onClick={handleStart}>
               <IconPlayerPlay className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.maintenances.length > 1 ? "Iniciar manutenções" : "Iniciar manutenção"}
@@ -473,19 +487,21 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
           )}
 
           {/* Show finish option only for in-progress maintenances */}
-          {contextMenu?.maintenances.some((m) => m.status === MAINTENANCE_STATUS.IN_PROGRESS) && (
+          {canEdit && contextMenu?.maintenances.some((m) => m.status === MAINTENANCE_STATUS.IN_PROGRESS) && (
             <DropdownMenuItem onClick={handleMarkAsFinished}>
               <IconCheck className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.maintenances.length > 1 ? "Concluir manutenções" : "Concluir manutenção"}
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuSeparator />
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
 
-          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-            <IconTrash className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.maintenances.length > 1 ? "Deletar selecionadas" : "Deletar"}
-          </DropdownMenuItem>
+          {canDelete && (
+            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.maintenances.length > 1 ? "Deletar selecionadas" : "Deletar"}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

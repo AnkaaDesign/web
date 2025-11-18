@@ -21,6 +21,7 @@ import type { CustomerColumn } from "./customer-table-columns";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { CustomerListSkeleton } from "./customer-list-skeleton";
 import { useAuth } from "@/contexts/auth-context";
+import { canEditCustomers, canDeleteCustomers, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { getCustomerDetailRoute, getCustomerEditRoute } from "@/utils/sector-routes";
 
 interface CustomerTableProps {
@@ -38,6 +39,11 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
   const { user } = useAuth();
   const { delete: deleteCustomer } = useCustomerMutations();
   const { batchDelete } = useCustomerBatchMutations();
+
+  // Permission checks
+  const canEdit = canEditCustomers(user);
+  const canDelete = canDeleteCustomers(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'customers');
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -289,18 +295,20 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
               {/* Selection column */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2 min-h-[2.5rem]">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={partiallySelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all customers"
-                    disabled={isLoading || customers.length === 0}
-                    data-checkbox
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2 min-h-[2.5rem]">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={partiallySelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all customers"
+                      disabled={isLoading || customers.length === 0}
+                      data-checkbox
+                    />
+                  </div>
+                </TableHead>
+              )}
 
               {/* Data columns */}
               {columns.map((column) => (
@@ -395,16 +403,18 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
                     onContextMenu={(e) => handleContextMenu(e, customer)}
                   >
                     {/* Selection checkbox */}
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={customerIsSelected}
-                          onCheckedChange={() => handleSelectCustomer(customer.id)}
-                          aria-label={`Select ${customer.fantasyName}`}
-                          data-checkbox
-                        />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={customerIsSelected}
+                            onCheckedChange={() => handleSelectCustomer(customer.id)}
+                            aria-label={`Select ${customer.fantasyName}`}
+                            data-checkbox
+                          />
+                        </div>
+                      </TableCell>
+                    )}
 
                     {/* Data columns */}
                     {columns.map((column) => (
@@ -463,12 +473,14 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuItem onClick={handleEdit}>
-            <IconEdit className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.customers.length > 1 ? "Editar em lote" : "Editar"}
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem onClick={handleEdit}>
+              <IconEdit className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.customers.length > 1 ? "Editar em lote" : "Editar"}
+            </DropdownMenuItem>
+          )}
 
-          {contextMenu?.isBulk && contextMenu.customers.length > 1 && onMerge && (
+          {canEdit && contextMenu?.isBulk && contextMenu.customers.length > 1 && onMerge && (
             <DropdownMenuItem onClick={() => {
               if (contextMenu) {
                 onMerge(contextMenu.customers);
@@ -480,12 +492,14 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuSeparator />
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
 
-          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-            <IconTrash className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.customers.length > 1 ? "Deletar selecionados" : "Deletar"}
-          </DropdownMenuItem>
+          {canDelete && (
+            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.customers.length > 1 ? "Deletar selecionados" : "Deletar"}
+            </DropdownMenuItem>
+          )}
         </PositionedDropdownMenuContent>
       </DropdownMenu>
     </div>

@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { User } from "../../../../types";
 import { routes, USER_STATUS } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditUsers, canDeleteUsers, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,12 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
   const navigate = useNavigate();
   const { delete: deleteUser, updateAsync: updateUser } = useUserMutations();
   const { batchDelete, batchUpdateAsync: batchUpdate } = useUserBatchMutations();
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditUsers(user);
+  const canDelete = canDeleteUsers(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'users');
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -351,17 +359,19 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
               {/* Selection column */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all users"
-                    disabled={isLoading || users.length === 0}
-                    indeterminate={partiallySelected}
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all users"
+                      disabled={isLoading || users.length === 0}
+                      indeterminate={partiallySelected}
+                    />
+                  </div>
+                </TableHead>
+              )}
 
               {/* Data columns */}
               {columns.map((column) => (
@@ -459,11 +469,13 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
                     onContextMenu={(e) => handleContextMenu(e, user)}
                   >
                     {/* Selection checkbox */}
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={userIsSelected} onCheckedChange={() => handleSelectUser(user.id)} aria-label={`Select ${user.name}`} data-checkbox />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={userIsSelected} onCheckedChange={() => handleSelectUser(user.id)} aria-label={`Select ${user.name}`} data-checkbox />
+                        </div>
+                      </TableCell>
+                    )}
 
                     {/* Data columns */}
                     {columns.map((column) => (
@@ -522,12 +534,14 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuItem onClick={handleEdit}>
-            <IconEdit className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Editar em lote" : "Editar"}
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem onClick={handleEdit}>
+              <IconEdit className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Editar em lote" : "Editar"}
+            </DropdownMenuItem>
+          )}
 
-          {contextMenu?.isBulk && contextMenu.users.length > 1 && onMerge && (
+          {canEdit && contextMenu?.isBulk && contextMenu.users.length > 1 && onMerge && (
             <DropdownMenuItem onClick={() => {
               if (contextMenu) {
                 onMerge(contextMenu.users);
@@ -539,30 +553,36 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuSeparator />
+          {canEdit && (
+            <>
+              <DropdownMenuSeparator />
 
-          {/* Show efetivar option if any user is in experience period */}
-          {contextMenu?.users.some((user) => user.status === USER_STATUS.EXPERIENCE_PERIOD_1 || user.status === USER_STATUS.EXPERIENCE_PERIOD_2) && (
-            <DropdownMenuItem onClick={handleMarkAsContracted}>
-              <IconUserCheck className="mr-2 h-4 w-4" />
-              {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Efetivar selecionados" : "Efetivar"}
-            </DropdownMenuItem>
+              {/* Show efetivar option if any user is in experience period */}
+              {contextMenu?.users.some((user) => user.status === USER_STATUS.EXPERIENCE_PERIOD_1 || user.status === USER_STATUS.EXPERIENCE_PERIOD_2) && (
+                <DropdownMenuItem onClick={handleMarkAsContracted}>
+                  <IconUserCheck className="mr-2 h-4 w-4" />
+                  {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Efetivar selecionados" : "Efetivar"}
+                </DropdownMenuItem>
+              )}
+
+              {/* Show dismiss option if any user is not dismissed */}
+              {contextMenu?.users.some((user) => user.status !== USER_STATUS.DISMISSED) && (
+                <DropdownMenuItem onClick={handleMarkAsDismissed}>
+                  <IconUserX className="mr-2 h-4 w-4" />
+                  {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Demitir selecionados" : "Demitir"}
+                </DropdownMenuItem>
+              )}
+            </>
           )}
 
-          {/* Show dismiss option if any user is not dismissed */}
-          {contextMenu?.users.some((user) => user.status !== USER_STATUS.DISMISSED) && (
-            <DropdownMenuItem onClick={handleMarkAsDismissed}>
-              <IconUserX className="mr-2 h-4 w-4" />
-              {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Demitir selecionados" : "Demitir"}
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
+
+          {canDelete && (
+            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Deletar selecionados" : "Deletar"}
             </DropdownMenuItem>
           )}
-
-          <DropdownMenuSeparator />
-
-          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-            <IconTrash className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.users.length > 1 ? "Deletar selecionados" : "Deletar"}
-          </DropdownMenuItem>
         </PositionedDropdownMenuContent>
       </DropdownMenu>
     </div>

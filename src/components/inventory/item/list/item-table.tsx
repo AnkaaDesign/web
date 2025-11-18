@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Item } from "../../../../types";
 import { routes } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditItems, canDeleteItems, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,8 +37,14 @@ interface ItemTableProps {
 
 export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDeactivate, onDelete, onMerge, onStockBalance, filters = {}, onDataChange }: ItemTableProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { delete: deleteItem } = useItemMutations();
   const { batchDelete } = useItemBatchMutations();
+
+  // Permission checks
+  const canEdit = canEditItems(user);
+  const canDelete = canDeleteItems(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'items');
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -591,17 +599,19 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
               {/* Selection column */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
                     indeterminate={partiallySelected}
                     onCheckedChange={handleSelectAll}
                     aria-label="Select all items"
                     disabled={isLoading || items.length === 0}
                   />
                 </div>
-              </TableHead>
+                </TableHead>
+              )}
 
               {/* Data columns */}
               {columns.map((column) => (
@@ -699,11 +709,13 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
                     onContextMenu={(e) => handleContextMenu(e, item)}
                   >
                     {/* Selection checkbox */}
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select ${item.name}`} data-checkbox />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select ${item.name}`} data-checkbox />
+                        </div>
+                      </TableCell>
+                    )}
 
                     {/* Data columns */}
                     {columns.map((column) => (
@@ -758,50 +770,56 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
         >
           {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.items.length} itens selecionados</div>}
 
-          <DropdownMenuItem onClick={handleEdit}>
-            <IconEdit className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Editar em lote" : "Editar"}
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem onClick={handleEdit}>
+              <IconEdit className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Editar em lote" : "Editar"}
+            </DropdownMenuItem>
+          )}
 
-          {contextMenu?.isBulk && contextMenu.items.length >= 1 && (
+          {canEdit && contextMenu?.isBulk && contextMenu.items.length >= 1 && (
             <DropdownMenuItem onClick={handleStockBalance}>
               <IconClipboardCheck className="mr-2 h-4 w-4" />
               Balanço de estoque
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuItem onClick={handlePriceAdjustment}>
-            <IconPercentage className="mr-2 h-4 w-4" />
-            Aplicar Ajuste
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem onClick={handlePriceAdjustment}>
+              <IconPercentage className="mr-2 h-4 w-4" />
+              Aplicar Ajuste
+            </DropdownMenuItem>
+          )}
 
-          {contextMenu?.isBulk && contextMenu.items.length >= 2 && (
+          {canEdit && contextMenu?.isBulk && contextMenu.items.length >= 2 && (
             <DropdownMenuItem onClick={handleMerge}>
               <IconGitMerge className="mr-2 h-4 w-4" />
               Mesclar Itens
             </DropdownMenuItem>
           )}
 
-          {contextMenu?.items.some((item) => !item.isActive) && (
+          {canEdit && contextMenu?.items.some((item) => !item.isActive) && (
             <DropdownMenuItem onClick={handleActivate} className="text-green-700">
               <IconCheck className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Ativar selecionados" : "Ativar"}
             </DropdownMenuItem>
           )}
 
-          {contextMenu?.items.some((item) => item.isActive) && (
+          {canEdit && contextMenu?.items.some((item) => item.isActive) && (
             <DropdownMenuItem onClick={handleDeactivate} className="text-destructive">
               <IconX className="mr-2 h-4 w-4" />
               {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Desativar selecionados" : "Desativar"}
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuSeparator />
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
 
-          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-            <IconTrash className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Deletar selecionados" : "Deletar"}
-          </DropdownMenuItem>
+          {canDelete && (
+            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Deletar selecionados" : "Deletar"}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 

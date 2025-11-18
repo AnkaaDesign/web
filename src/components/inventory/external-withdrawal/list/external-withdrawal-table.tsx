@@ -2,6 +2,8 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import type { ExternalWithdrawal } from "../../../../types";
 import { routes, EXTERNAL_WITHDRAWAL_STATUS, EXTERNAL_WITHDRAWAL_TYPE, EXTERNAL_WITHDRAWAL_TYPE_LABELS } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditExternalWithdrawals, canDeleteExternalWithdrawals, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -206,6 +208,12 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
   const navigate = useNavigate();
   const { delete: deleteWithdrawal } = useExternalWithdrawalMutations();
   const { markAsFullyReturned, markAsCharged, markAsLiquidated, markAsDelivered } = useExternalWithdrawalStatusMutations();
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditExternalWithdrawals(user);
+  const canDelete = canDeleteExternalWithdrawals(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'external-withdrawals');
 
   // Context menu state
   const [contextMenu, setContextMenu] = React.useState<{
@@ -471,18 +479,20 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={someSelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Selecionar todos"
-                    disabled={isLoading || withdrawals.length === 0}
-                    data-checkbox
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={someSelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Selecionar todos"
+                      disabled={isLoading || withdrawals.length === 0}
+                      data-checkbox
+                    />
+                  </div>
+                </TableHead>
+              )}
               {filteredColumns.map((column) => (
                 <TableHead
                   key={column.key}
@@ -577,16 +587,18 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
                     onClick={(e) => handleRowClick(withdrawal, e)}
                     onContextMenu={(e) => handleContextMenu(e, withdrawal)}
                   >
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={isWithdrawalSelected}
-                          onCheckedChange={() => toggleSelection(withdrawal.id)}
-                          aria-label={`Selecionar retirada de ${withdrawal.withdrawerName}`}
-                          data-checkbox
-                        />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isWithdrawalSelected}
+                            onCheckedChange={() => toggleSelection(withdrawal.id)}
+                            aria-label={`Selecionar retirada de ${withdrawal.withdrawerName}`}
+                            data-checkbox
+                          />
+                        </div>
+                      </TableCell>
+                    )}
                     {filteredColumns.map((column) => (
                       <TableCell key={column.key} className={cn("p-0 !border-r-0", column.className)}>
                         <div className={cn("px-4 py-2 text-sm", column.align === "center" && "text-center", column.align === "right" && "text-right")}>
@@ -619,13 +631,15 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
             <IconEye className="mr-2 h-4 w-4" />
             Visualizar
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleEditWithdrawal}>
-            <IconEdit className="mr-2 h-4 w-4" />
-            Editar
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem onClick={handleEditWithdrawal}>
+              <IconEdit className="mr-2 h-4 w-4" />
+              Editar
+            </DropdownMenuItem>
+          )}
 
           {/* Conditional actions based on type and status */}
-          {contextMenu?.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE &&
+          {canEdit && contextMenu?.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.RETURNABLE &&
            contextMenu.withdrawal.status !== EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED && (
             <DropdownMenuItem onClick={handleMarkAsReturnedFromMenu} className="text-green-700 dark:text-green-400">
               <IconCheck className="mr-2 h-4 w-4" />
@@ -633,7 +647,7 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
             </DropdownMenuItem>
           )}
 
-          {contextMenu?.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE &&
+          {canEdit && contextMenu?.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE &&
            (contextMenu.withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PENDING ||
             contextMenu.withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED) && (
             <DropdownMenuItem onClick={handleMarkAsChargedFromMenu} className="text-purple-700 dark:text-purple-400">
@@ -642,7 +656,7 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
             </DropdownMenuItem>
           )}
 
-          {contextMenu?.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE &&
+          {canEdit && contextMenu?.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.CHARGEABLE &&
            contextMenu.withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.CHARGED && (
             <DropdownMenuItem onClick={handleMarkAsLiquidatedFromMenu} className="text-green-700 dark:text-green-400">
               <IconCheck className="mr-2 h-4 w-4" />
@@ -650,7 +664,7 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
             </DropdownMenuItem>
           )}
 
-          {contextMenu?.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY &&
+          {canEdit && contextMenu?.withdrawal.type === EXTERNAL_WITHDRAWAL_TYPE.COMPLIMENTARY &&
            contextMenu.withdrawal.status === EXTERNAL_WITHDRAWAL_STATUS.PENDING && (
             <DropdownMenuItem onClick={handleMarkAsDeliveredFromMenu} className="text-blue-700 dark:text-blue-400">
               <IconPackageExport className="mr-2 h-4 w-4" />
@@ -658,12 +672,14 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuSeparator />
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
 
-          <DropdownMenuItem onClick={handleDeleteFromMenu} className="text-destructive">
-            <IconTrash className="mr-2 h-4 w-4" />
-            Excluir
-          </DropdownMenuItem>
+          {canDelete && (
+            <DropdownMenuItem onClick={handleDeleteFromMenu} className="text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              Excluir
+            </DropdownMenuItem>
+          )}
         </PositionedDropdownMenuContent>
       </DropdownMenu>
 

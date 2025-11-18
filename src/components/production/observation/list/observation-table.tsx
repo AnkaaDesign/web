@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Observation } from "../../../../types";
 import { routes } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditObservations, canDeleteObservations, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -49,6 +51,12 @@ interface ObservationTableProps {
 export function ObservationTable({ visibleColumns, className, filters = {}, onDataChange }: ObservationTableProps) {
   const navigate = useNavigate();
   const { delete: deleteObservation } = useObservationMutations();
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditObservations(user);
+  const canDelete = canDeleteObservations(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'observations');
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -323,18 +331,20 @@ export function ObservationTable({ visibleColumns, className, filters = {}, onDa
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
               {/* Selection column */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={partiallySelected}
-                    onCheckedChange={() => toggleSelectAll(currentPageItemIds)}
-                    aria-label="Select all items"
-                    disabled={isLoading || items.length === 0}
-                    data-checkbox
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={partiallySelected}
+                      onCheckedChange={() => toggleSelectAll(currentPageItemIds)}
+                      aria-label="Select all items"
+                      disabled={isLoading || items.length === 0}
+                      data-checkbox
+                    />
+                  </div>
+                </TableHead>
+              )}
 
               {/* Data columns */}
               {displayColumns.map((column) => {
@@ -436,11 +446,13 @@ export function ObservationTable({ visibleColumns, className, filters = {}, onDa
                     onContextMenu={(e) => handleContextMenu(e, item)}
                   >
                     {/* Selection checkbox */}
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0 relative z-20")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select observation`} data-checkbox />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0 relative z-20")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select observation`} data-checkbox />
+                        </div>
+                      </TableCell>
+                    )}
 
                     {/* Data columns */}
                     {displayColumns.map((column) => (
@@ -501,17 +513,21 @@ export function ObservationTable({ visibleColumns, className, filters = {}, onDa
             </>
           )}
 
-          <DropdownMenuItem onClick={handleEdit}>
-            <IconEdit className="h-4 w-4 mr-2" />
-            Editar
-          </DropdownMenuItem>
+          {canEdit && (
+            <DropdownMenuItem onClick={handleEdit}>
+              <IconEdit className="h-4 w-4 mr-2" />
+              Editar
+            </DropdownMenuItem>
+          )}
 
-          <DropdownMenuSeparator />
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
 
-          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-            <IconTrash className="h-4 w-4 mr-2" />
-            Deletar
-          </DropdownMenuItem>
+          {canDelete && (
+            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+              <IconTrash className="h-4 w-4 mr-2" />
+              Deletar
+            </DropdownMenuItem>
+          )}
         </PositionedDropdownMenuContent>
       </DropdownMenu>
 

@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Order } from "../../../../types";
 import { routes, ORDER_STATUS } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditOrders, canDeleteOrders, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -40,8 +42,14 @@ interface OrderTableProps {
 
 export function OrderTable({ visibleColumns, className, onEdit, filters = {}, onDataChange }: OrderTableProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { delete: deleteOrder, updateAsync: updateOrder } = useOrderMutations();
   const { batchDelete } = useOrderBatchMutations();
+
+  // Permission checks
+  const canEdit = canEditOrders(user);
+  const canDelete = canDeleteOrders(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'orders');
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -402,17 +410,19 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={someSelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Selecionar todos"
-                    disabled={isLoading || orders.length === 0}
-                  />
-                </div>
-              </TableHead>
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={someSelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Selecionar todos"
+                      disabled={isLoading || orders.length === 0}
+                    />
+                  </div>
+                </TableHead>
+              )}
               {filteredColumns.map((column) => (
                 <TableHead key={column.key} className={cn("whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0", column.className)}>
                   {column.sortable ? (
@@ -505,11 +515,13 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
                     onClick={(e) => handleRowClick(order, e)}
                     onContextMenu={(e) => handleContextMenu(e, order)}
                   >
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={isOrderSelected} onCheckedChange={() => toggleSelection(order.id)} aria-label={`Selecionar pedido ${order.id.slice(-8)}`} />
-                      </div>
-                    </TableCell>
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={isOrderSelected} onCheckedChange={() => toggleSelection(order.id)} aria-label={`Selecionar pedido ${order.id.slice(-8)}`} />
+                        </div>
+                      </TableCell>
+                    )}
                     {filteredColumns.map((column) => (
                       <TableCell key={column.key} className={cn("p-0 !border-r-0", column.className)}>
                         <div
@@ -554,41 +566,45 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
                 <IconEye className="mr-2 h-4 w-4" />
                 Visualizar
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleEditOrder}>
-                <IconEdit className="mr-2 h-4 w-4" />
-                Editar
-              </DropdownMenuItem>
+              {canEdit && (
+                <DropdownMenuItem onClick={handleEditOrder}>
+                  <IconEdit className="mr-2 h-4 w-4" />
+                  Editar
+                </DropdownMenuItem>
+              )}
 
               {/* Order-specific actions */}
-              {contextMenu?.orders[0] && contextMenu.orders[0].status === ORDER_STATUS.CREATED && (
+              {canEdit && contextMenu?.orders[0] && contextMenu.orders[0].status === ORDER_STATUS.CREATED && (
                 <DropdownMenuItem onClick={handleMarkAsFulfilledFromMenu} className="text-amber-600 dark:text-amber-400">
                   <IconCheck className="mr-2 h-4 w-4" />
                   Marcar como feito
                 </DropdownMenuItem>
               )}
 
-              {contextMenu?.orders[0] && contextMenu.orders[0].status !== ORDER_STATUS.RECEIVED && contextMenu.orders[0].status !== ORDER_STATUS.CANCELLED && (
+              {canEdit && contextMenu?.orders[0] && contextMenu.orders[0].status !== ORDER_STATUS.RECEIVED && contextMenu.orders[0].status !== ORDER_STATUS.CANCELLED && (
                 <DropdownMenuItem onClick={handleMarkAsReceivedFromMenu} className="text-green-700 dark:text-green-400">
                   <IconChecks className="mr-2 h-4 w-4" />
                   Marcar como recebido
                 </DropdownMenuItem>
               )}
 
-              {contextMenu?.orders[0] && contextMenu.orders[0].status !== ORDER_STATUS.CANCELLED && contextMenu.orders[0].status !== ORDER_STATUS.RECEIVED && (
+              {canEdit && contextMenu?.orders[0] && contextMenu.orders[0].status !== ORDER_STATUS.CANCELLED && contextMenu.orders[0].status !== ORDER_STATUS.RECEIVED && (
                 <DropdownMenuItem onClick={handleMarkAsCancelledFromMenu}>
                   <IconX className="mr-2 h-4 w-4" />
                   Cancelar pedido
                 </DropdownMenuItem>
               )}
 
-              <DropdownMenuSeparator />
+              {(canEdit || canDelete) && <DropdownMenuSeparator />}
             </>
           )}
 
-          <DropdownMenuItem onClick={handleDeleteFromMenu} className="text-destructive">
-            <IconTrash className="mr-2 h-4 w-4" />
-            {contextMenu?.isBulk && contextMenu.orders.length > 1 ? "Deletar selecionados" : "Deletar"}
-          </DropdownMenuItem>
+          {canDelete && (
+            <DropdownMenuItem onClick={handleDeleteFromMenu} className="text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.orders.length > 1 ? "Deletar selecionados" : "Deletar"}
+            </DropdownMenuItem>
+          )}
         </PositionedDropdownMenuContent>
       </DropdownMenu>
 

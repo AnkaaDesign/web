@@ -3,7 +3,8 @@ import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { IconAlertCircle, IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
-import { useObservation, useObservationMutations } from "../../../../hooks";
+import { useObservation, useObservationMutations, useAuth } from "../../../../hooks";
+import { canEditObservations, canDeleteObservations } from "@/utils/permissions/entity-permissions";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
@@ -18,7 +19,12 @@ export const ObservationDetailsPage = () => {
   usePageTracker({ title: "observation-detail" });
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  // Permission checks
+  const canEdit = canEditObservations(user);
+  const canDelete = canDeleteObservations(user);
 
   const {
     data: response,
@@ -108,18 +114,18 @@ export const ObservationDetailsPage = () => {
               onClick: handleRefresh,
               loading: isRefetching,
             },
-            {
+            ...(canEdit ? [{
               key: "edit",
               label: "Editar",
               icon: IconEdit,
               onClick: () => navigate(routes.production.observations.edit(id)),
-            },
-            {
+            }] : []),
+            ...(canDelete ? [{
               key: "delete",
               label: "Excluir",
               icon: IconTrash,
               onClick: () => setIsDeleteDialogOpen(true),
-            },
+            }] : []),
           ]}
         />
 

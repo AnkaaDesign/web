@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Airbrushing } from "../../../../types";
 import { routes } from "../../../../constants";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditAirbrushings, canDeleteAirbrushings, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -51,6 +53,12 @@ interface AirbrushingTableProps {
 export function AirbrushingTable({ visibleColumns, className, filters = {}, onDataChange }: AirbrushingTableProps) {
   const navigate = useNavigate();
   const { delete: deleteAirbrushing, update: updateAirbrushing } = useAirbrushingMutations();
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditAirbrushings(user);
+  const canDelete = canDeleteAirbrushings(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'airbrushings');
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -325,17 +333,19 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
             <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
               <TableRow className="bg-muted hover:bg-muted even:bg-muted">
                 {/* Selection column */}
-                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                  <div className="flex items-center justify-center h-full w-full px-2">
-                    <Checkbox
-                      checked={allSelected}
-                      indeterminate={partiallySelected}
-                      onCheckedChange={handleSelectAll}
-                      aria-label="Select all items"
-                      disabled={isLoading || airbrushings.length === 0}
-                    />
-                  </div>
-                </TableHead>
+                {showInteractive && (
+                  <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                    <div className="flex items-center justify-center h-full w-full px-2">
+                      <Checkbox
+                        checked={allSelected}
+                        indeterminate={partiallySelected}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Select all items"
+                        disabled={isLoading || airbrushings.length === 0}
+                      />
+                    </div>
+                  </TableHead>
+                )}
 
                 {/* Data columns */}
                 {columns.map((column) => (
@@ -427,16 +437,18 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
                       onContextMenu={(e) => handleContextMenu(e, airbrushing)}
                     >
                       {/* Selection checkbox */}
-                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={itemIsSelected}
-                            onCheckedChange={() => handleSelectItem(airbrushing.id)}
-                            aria-label={`Select ${airbrushing.task?.name || airbrushing.id}`}
-                            data-checkbox
-                          />
-                        </div>
-                      </TableCell>
+                      {showInteractive && (
+                        <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                          <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={itemIsSelected}
+                              onCheckedChange={() => handleSelectItem(airbrushing.id)}
+                              aria-label={`Select ${airbrushing.task?.name || airbrushing.id}`}
+                              data-checkbox
+                            />
+                          </div>
+                        </TableCell>
+                      )}
 
                       {/* Data columns */}
                       {columns.map((column) => (
@@ -495,26 +507,30 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
               </DropdownMenuItem>
             )}
 
-            {!contextMenu?.isBulk && (
+            {!contextMenu?.isBulk && canEdit && (
               <DropdownMenuItem onClick={handleEdit}>
                 <IconEdit className="mr-2 h-4 w-4" />
                 Editar
               </DropdownMenuItem>
             )}
 
-            {!contextMenu?.isBulk && <DropdownMenuSeparator />}
+            {!contextMenu?.isBulk && canEdit && <DropdownMenuSeparator />}
 
-            <DropdownMenuItem onClick={handleSetStatus}>
-              <IconCheck className="mr-2 h-4 w-4" />
-              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Alterar status" : "Alterar status"}
-            </DropdownMenuItem>
+            {canEdit && (
+              <DropdownMenuItem onClick={handleSetStatus}>
+                <IconCheck className="mr-2 h-4 w-4" />
+                {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Alterar status" : "Alterar status"}
+              </DropdownMenuItem>
+            )}
 
-            <DropdownMenuSeparator />
+            {(canEdit || canDelete) && <DropdownMenuSeparator />}
 
-            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-              <IconTrash className="mr-2 h-4 w-4" />
-              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Deletar selecionados" : "Deletar"}
-            </DropdownMenuItem>
+            {canDelete && (
+              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                <IconTrash className="mr-2 h-4 w-4" />
+                {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Deletar selecionados" : "Deletar"}
+              </DropdownMenuItem>
+            )}
           </PositionedDropdownMenuContent>
         </DropdownMenu>
       </div>

@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { IconCalendar, IconClock, IconDots, IconPackage, IconPlayerPause, IconPlayerPlay, IconEdit, IconEye, IconCircleCheck, IconCircleX, IconTrash } from "@tabler/icons-react";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { useAuth } from "../../../../hooks/useAuth";
+import { canEditOrders, canDeleteOrders, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 
 import { getDynamicFrequencyLabel } from "../../../../constants";
 import type { OrderSchedule } from "../../../../types";
@@ -55,6 +57,12 @@ export function OrderScheduleTable({ data, isLoading = false, onEdit, onView, on
     "order-schedule-table-visible-columns",
     new Set(["status", "target", "frequency", "itemsCount", "nextRun", "lastRun"])
   );
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = canEditOrders(user);
+  const canDelete = canDeleteOrders(user);
+  const showInteractive = shouldShowInteractiveElements(user, 'orders');
 
   const allColumns = React.useMemo(
     () => [
@@ -192,18 +200,17 @@ export function OrderScheduleTable({ data, isLoading = false, onEdit, onView, on
                     Visualizar
                   </DropdownMenuItem>
                 )}
-                {onEdit && (
+                {canEdit && onEdit && (
                   <DropdownMenuItem onClick={() => onEdit(schedule)}>
                     <IconEdit className="mr-2 h-4 w-4" />
                     Editar
                   </DropdownMenuItem>
                 )}
 
-                <DropdownMenuSeparator />
-
                 {/* Status transitions */}
-                {onStatusChange && (
+                {canEdit && onStatusChange && (
                   <>
+                    <DropdownMenuSeparator />
                     {schedule.isActive && !schedule.finishedAt && (
                       <DropdownMenuItem onClick={() => onStatusChange(schedule, "PAUSED")}>
                         <IconPlayerPause className="mr-2 h-4 w-4" />
@@ -234,17 +241,19 @@ export function OrderScheduleTable({ data, isLoading = false, onEdit, onView, on
                   </>
                 )}
 
-                <DropdownMenuSeparator />
+                {(canEdit || canDelete) && <DropdownMenuSeparator />}
 
-                <DropdownMenuItem
-                  onClick={() => {
-                    setDeleteDialog({ items: [schedule], isBulk: false });
-                  }}
-                  className="text-destructive"
-                >
-                  <IconTrash className="mr-2 h-4 w-4" />
-                  Deletar
-                </DropdownMenuItem>
+                {canDelete && (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setDeleteDialog({ items: [schedule], isBulk: false });
+                    }}
+                    className="text-destructive"
+                  >
+                    <IconTrash className="mr-2 h-4 w-4" />
+                    Deletar
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           );
