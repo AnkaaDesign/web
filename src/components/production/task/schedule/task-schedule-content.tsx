@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback, useRef } from "react";
 import { useSectors, useTasks, useCurrentUser } from "../../../../hooks";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
@@ -10,6 +10,7 @@ import { TaskScheduleEmptyState } from "./task-schedule-empty-state";
 import { TaskScheduleFilters } from "./task-schedule-filters";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { TaskScheduleExport } from "./task-schedule-export";
+import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { IconSearch, IconFilter } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,12 @@ interface TaskScheduleContentProps {
 }
 
 export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
+  // Shared selection state across all tables
+  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+
+  // Shared advanced actions ref
+  const advancedActionsRef = useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
+
   // Get current user to check permissions
   const { data: currentUser } = useCurrentUser();
 
@@ -111,6 +118,11 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
 
   const hasActiveFilters = activeFiltersCount > 0;
 
+  // Callback to update selected task IDs
+  const handleSelectedTaskIdsChange = useCallback((ids: Set<string>) => {
+    setSelectedTaskIds(ids);
+  }, []);
+
   // Filter tasks based on search
   const filteredTasks = useMemo(() => {
     if (!searchText) return allTasks;
@@ -121,12 +133,17 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
         task.name?.toLowerCase().includes(searchLower) ||
         task.customer?.fantasyName?.toLowerCase().includes(searchLower) ||
         task.customer?.corporateName?.toLowerCase().includes(searchLower) ||
-        task.truck?.serialNumber?.toLowerCase().includes(searchLower) ||
+        task.serialNumber?.toLowerCase().includes(searchLower) ||
         task.truck?.plate?.toLowerCase().includes(searchLower) ||
         task.sector?.name?.toLowerCase().includes(searchLower)
       );
     });
   }, [allTasks, searchText]);
+
+  // Get all selected tasks (across all tables) as Task objects
+  const selectedTasks = useMemo(() => {
+    return filteredTasks.filter(task => selectedTaskIds.has(task.id));
+  }, [filteredTasks, selectedTaskIds]);
 
   // Group tasks by sector
   const tasksBySector = useMemo(() => {
@@ -207,7 +224,14 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                 return undefinedTasks && undefinedTasks.length > 0 ? (
                   <div>
                     <h3 className="text-lg font-semibold mb-3 text-muted-foreground">Setor Indefinido</h3>
-                    <TaskScheduleTable tasks={undefinedTasks} visibleColumns={visibleColumns} />
+                    <TaskScheduleTable
+                      tasks={undefinedTasks}
+                      visibleColumns={visibleColumns}
+                      selectedTaskIds={selectedTaskIds}
+                      onSelectedTaskIdsChange={handleSelectedTaskIdsChange}
+                      advancedActionsRef={advancedActionsRef}
+                      allSelectedTasks={selectedTasks}
+                    />
                   </div>
                 ) : null;
               })()}
@@ -220,7 +244,14 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                 return (
                   <div key={sector.id}>
                     <h3 className="text-lg font-semibold mb-3">{sector.name}</h3>
-                    <TaskScheduleTable tasks={tasks} visibleColumns={visibleColumns} />
+                    <TaskScheduleTable
+                      tasks={tasks}
+                      visibleColumns={visibleColumns}
+                      selectedTaskIds={selectedTaskIds}
+                      onSelectedTaskIdsChange={handleSelectedTaskIdsChange}
+                      advancedActionsRef={advancedActionsRef}
+                      allSelectedTasks={selectedTasks}
+                    />
                   </div>
                 );
               })}
@@ -235,6 +266,13 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
           filters={filters}
           onFilterChange={setFilters}
           sectors={productionSectors}
+        />
+
+        {/* Shared Advanced Bulk Actions Handler */}
+        <AdvancedBulkActionsHandler
+          ref={advancedActionsRef}
+          selectedTaskIds={selectedTaskIds}
+          onClearSelection={() => setSelectedTaskIds(new Set())}
         />
       </CardContent>
     </Card>

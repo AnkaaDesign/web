@@ -6,6 +6,7 @@ import type { Customer } from "../../../../types";
 import { formatCNPJ } from "../../../../utils";
 import { cn } from "@/lib/utils";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
+import { IconUser } from "@tabler/icons-react";
 
 interface CustomerSelectorProps {
   control: any;
@@ -94,7 +95,8 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
       name="customerId"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>
+          <FormLabel className="flex items-center gap-2">
+            <IconUser className="h-4 w-4" />
             Cliente
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>

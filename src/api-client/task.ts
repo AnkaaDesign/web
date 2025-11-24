@@ -54,19 +54,17 @@ export class TaskService {
   // =====================
 
   async createTask(data: TaskCreateFormData | FormData, query?: TaskQueryFormData): Promise<TaskCreateResponse> {
-    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    // Don't set Content-Type for FormData - let axios handle it automatically
     const response = await apiClient.post<TaskCreateResponse>(this.basePath, data, {
       params: query,
-      headers,
     });
     return response.data;
   }
 
   async updateTask(id: string, data: TaskUpdateFormData | FormData, query?: TaskQueryFormData): Promise<TaskUpdateResponse> {
-    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    // Don't set Content-Type for FormData - let axios handle it automatically
     const response = await apiClient.put<TaskUpdateResponse>(`${this.basePath}/${id}`, data, {
       params: query,
-      headers,
     });
     return response.data;
   }
@@ -85,8 +83,13 @@ export class TaskService {
     return response.data;
   }
 
-  async batchUpdateTasks(data: TaskBatchUpdateFormData, query?: TaskQueryFormData): Promise<TaskBatchUpdateResponse<Task>> {
-    const response = await apiClient.put<TaskBatchUpdateResponse<Task>>(`${this.basePath}/batch`, data, { params: query });
+  async batchUpdateTasks(data: TaskBatchUpdateFormData | FormData, query?: TaskQueryFormData): Promise<TaskBatchUpdateResponse<Task>> {
+    // Don't set Content-Type for FormData - let axios handle it automatically
+    const headers = data instanceof FormData ? {} : {};
+    const response = await apiClient.put<TaskBatchUpdateResponse<Task>>(`${this.basePath}/batch`, data, {
+      params: query,
+      headers,
+    });
     return response.data;
   }
 
@@ -187,7 +190,7 @@ export const deleteTask = (id: string) => taskService.deleteTask(id);
 
 // Batch Operations
 export const batchCreateTasks = (data: TaskBatchCreateFormData, query?: TaskQueryFormData) => taskService.batchCreateTasks(data, query);
-export const batchUpdateTasks = (data: TaskBatchUpdateFormData, query?: TaskQueryFormData) => taskService.batchUpdateTasks(data, query);
+export const batchUpdateTasks = (data: TaskBatchUpdateFormData | FormData, query?: TaskQueryFormData) => taskService.batchUpdateTasks(data, query);
 export const batchDeleteTasks = (data: TaskBatchDeleteFormData, query?: TaskQueryFormData) => taskService.batchDeleteTasks(data, query);
 
 // Special operation exports

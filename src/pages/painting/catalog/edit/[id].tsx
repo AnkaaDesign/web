@@ -1,7 +1,8 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { PaintForm } from "@/components/painting/form/paint-form";
 import type { PaintFormRef } from "@/components/painting/form/paint-form";
-import { usePaint, usePaintMutations, usePaintFormulaMutations, usePaintType } from "../../../../hooks";
+import { usePaint, usePaintFormulaMutations, usePaintType } from "../../../../hooks";
+import { updatePaint } from "../../../../api-client";
 import { routes } from "../../../../constants";
 import { mapPaintToFormData } from "../../../../schemas";
 import type { PaintUpdateFormData, PaintFormulaCreateFormData } from "../../../../schemas";
@@ -16,10 +17,10 @@ import { useState, useRef } from "react";
 export default function CatalogEditPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { update, updateMutation } = usePaintMutations();
   const formulaMutations = usePaintFormulaMutations();
   const [currentStep, setCurrentStep] = useState(1);
   const [currentPaintTypeId, setCurrentPaintTypeId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const paintFormRef = useRef<PaintFormRef>(null);
 
   const {
@@ -52,12 +53,13 @@ export default function CatalogEditPage() {
     enabled: !!(currentPaintTypeId || response?.data?.paintTypeId),
   });
 
-  const handleSubmit = async (data: PaintUpdateFormData, newFormulas?: PaintFormula[]) => {
+  const handleSubmit = async (data: PaintUpdateFormData, newFormulas?: PaintFormula[], colorPreviewFile?: File) => {
     if (!id) return;
 
+    setIsSubmitting(true);
     try {
-      // Update the paint data
-      await update({ id, data });
+      // Update the paint data (with file upload if available)
+      await updatePaint(id, data, undefined, colorPreviewFile);
 
       let formulaCreationResults: { success: number; failed: number; errors: string[] } = {
         success: 0,
@@ -103,6 +105,8 @@ export default function CatalogEditPage() {
       navigate(routes.painting.catalog.details(id));
     } catch (error) {
       // Error is handled by the API client
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -111,8 +115,9 @@ export default function CatalogEditPage() {
   };
 
   // Determine available steps based on current paint type selection
+  // Steps: 1=Basic Info, 2=Preview, 3=Formula, 4=Ground (optional)
   const needsGround = currentPaintType?.data?.needGround ?? response?.data?.paintType?.needGround;
-  const maxSteps = needsGround ? 3 : 2;
+  const maxSteps = needsGround ? 4 : 3;
 
   // Handle step navigation
   const handleNextStep = () => {
@@ -137,7 +142,7 @@ export default function CatalogEditPage() {
       label: "Cancelar",
       onClick: handleCancel,
       variant: "outline" as const,
-      disabled: updateMutation.isPending,
+      disabled: isSubmitting,
     });
 
     // Previous button (if not first step)
@@ -148,7 +153,7 @@ export default function CatalogEditPage() {
         icon: IconArrowLeft,
         onClick: handlePrevStep,
         variant: "outline" as const,
-        disabled: updateMutation.isPending,
+        disabled: isSubmitting,
       });
     }
 
@@ -160,22 +165,22 @@ export default function CatalogEditPage() {
         icon: IconArrowRight,
         onClick: handleNextStep,
         variant: "default" as const,
-        disabled: updateMutation.isPending,
+        disabled: isSubmitting,
         iconPosition: "right" as const,
       });
     } else if (response?.data) {
       actions.push({
         key: "submit",
         label: "Salvar Alterações",
-        icon: updateMutation.isPending ? IconLoader2 : IconCheck,
+        icon: isSubmitting ? IconLoader2 : IconCheck,
         onClick: () => {
           // Trigger form submission
           const submitButton = document.querySelector("[data-paint-form-submit]") as HTMLButtonElement;
           submitButton?.click();
         },
         variant: "default" as const,
-        disabled: updateMutation.isPending,
-        loading: updateMutation.isPending,
+        disabled: isSubmitting,
+        loading: isSubmitting,
       });
     }
 
@@ -286,7 +291,7 @@ export default function CatalogEditPage() {
             mode="update"
             onSubmit={handleSubmit}
             onCancel={handleCancel}
-            isSubmitting={updateMutation.isPending}
+            isSubmitting={isSubmitting}
             defaultValues={defaultValues}
             existingFormulas={paint.formulas}
             paintId={paint.id}

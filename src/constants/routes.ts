@@ -374,30 +374,24 @@ export const routes = {
   // Personal - Pessoal - Personal (User-specific data)
   personal: {
     myHolidays: {
-      root: "/pessoal/meus-feriados",
+      root: "/pessoal/feriados",
+    },
+    myVacations: {
+      details: (id: string) => `/pessoal/ferias/detalhes/${id}`,
+      root: "/pessoal/ferias",
+    },
+    myPpes: {
+      details: (id: string) => `/pessoal/meus-epis/detalhes/${id}`,
+      request: "/pessoal/meus-epis/solicitar",
+      root: "/pessoal/meus-epis",
     },
     myLoans: {
       details: (id: string) => `/pessoal/meus-emprestimos/detalhes/${id}`,
       root: "/pessoal/meus-emprestimos",
     },
-    myNotifications: {
-      details: (id: string) => `/pessoal/minhas-notificacoes/detalhes/${id}`,
-      root: "/pessoal/minhas-notificacoes",
-    },
-    myPpes: {
-      request: "/pessoal/meus-epis/solicitar",
-      root: "/pessoal/meus-epis",
-    },
-    myVacations: {
-      details: (id: string) => `/pessoal/minhas-ferias/detalhes/${id}`,
-      root: "/pessoal/minhas-ferias",
-    },
-    myWarnings: {
-      details: (id: string) => `/pessoal/meus-avisos/detalhes/${id}`,
-      root: "/pessoal/meus-avisos",
-    },
-    preferences: {
-      root: "/pessoal/preferencias",
+    myActivities: {
+      details: (id: string) => `/pessoal/minhas-atividades/detalhes/${id}`,
+      root: "/pessoal/minhas-atividades",
     },
     root: "/pessoal",
   },
@@ -528,6 +522,9 @@ export const routes = {
     edit: (id: string) => `/administracao/colaboradores/editar/${id}`,
     root: "/administracao/colaboradores",
   },
+
+  // Profile - User profile page
+  profile: "/perfil",
 } as const;
 
 // Export types for type safety

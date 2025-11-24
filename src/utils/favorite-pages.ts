@@ -109,13 +109,11 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/recursos-humanos/setores/cadastrar": FAVORITE_PAGES.RECURSOS_HUMANOS_SETORES_CADASTRAR,
 
   // Personal - List Pages
-  "/pessoal/minhas-comissoes": FAVORITE_PAGES.PESSOAL_MINHAS_COMISSOES_LISTAR,
-  "/pessoal/minhas-ferias": FAVORITE_PAGES.PESSOAL_MINHAS_FERIAS_LISTAR,
-  "/pessoal/meus-feriados": FAVORITE_PAGES.PESSOAL_MEUS_FERIADOS_LISTAR,
-  "/pessoal/meus-emprestimos": FAVORITE_PAGES.PESSOAL_MEUS_EMPRESTIMOS_LISTAR,
+  "/pessoal/feriados": FAVORITE_PAGES.PESSOAL_FERIADOS_LISTAR,
+  "/pessoal/ferias": FAVORITE_PAGES.PESSOAL_FERIAS_LISTAR,
   "/pessoal/meus-epis": FAVORITE_PAGES.PESSOAL_MEUS_EPIS_LISTAR,
-  "/pessoal/meus-avisos": FAVORITE_PAGES.PESSOAL_MEUS_AVISOS_LISTAR,
-  "/pessoal/minhas-notificacoes": FAVORITE_PAGES.PESSOAL_MINHAS_NOTIFICACOES_LISTAR,
+  "/pessoal/meus-emprestimos": FAVORITE_PAGES.PESSOAL_MEUS_EMPRESTIMOS_LISTAR,
+  "/pessoal/minhas-atividades": FAVORITE_PAGES.PESSOAL_MINHAS_ATIVIDADES_LISTAR,
 
   // Catalog Basic - List Pages
   "/pintura/catalogo-basico": FAVORITE_PAGES.CATALOGO_BASICO_LISTAR,

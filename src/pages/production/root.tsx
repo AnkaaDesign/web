@@ -540,7 +540,7 @@ export const ProductionRootPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <ActivityPatternCard
                   title="Tarefas por Setor"
-                  data={activityPatterns.tasksByType.length > 0 ? activityPatterns.tasksByType : [{ label: "Sem dados", value: 0 }]}
+                  data={activityPatterns.tasksByType.length > 0 ? activityPatterns.tasksByType : [{ label: "Sem setor", value: 0 }]}
                   icon={IconTool}
                   color="blue"
                 />
@@ -549,6 +549,12 @@ export const ProductionRootPage = () => {
                   data={activityPatterns.productionWeekly}
                   icon={IconCalendar}
                   color="green"
+                />
+                <ActivityPatternCard
+                  title="Produtividade por Turno"
+                  data={activityPatterns.productivityShift.length > 0 ? activityPatterns.productivityShift : [{ label: "Sem dados", value: 0 }]}
+                  icon={IconClock}
+                  color="orange"
                 />
               </div>
             </div>

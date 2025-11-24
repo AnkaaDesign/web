@@ -28,7 +28,7 @@ const getBase64FromImage = async (imgSrc: string): Promise<string> => {
 };
 
 export interface BudgetPDFData {
-  task: Pick<Task, 'id' | 'name' | 'serialNumber' | 'chassisNumber' | 'plate' | 'customer'> & {
+  task: Pick<Task, 'id' | 'name' | 'serialNumber' | 'customer'> & {
     budget?: Budget;
     truck?: Partial<Truck>;
   };
@@ -124,20 +124,20 @@ export async function generateBudgetPDF(data: BudgetPDFData): Promise<void> {
   }
 
   // Chassis Number
-  if (task.chassisNumber) {
+  if (task.truck?.chassisNumber) {
     doc.setFont('helvetica', 'bold');
     doc.text('Chassi:', margin, yPosition);
     doc.setFont('helvetica', 'normal');
-    doc.text(task.chassisNumber, margin + 25, yPosition);
+    doc.text(task.truck.chassisNumber, margin + 25, yPosition);
     yPosition += 7;
   }
 
   // Plate
-  if (task.plate) {
+  if (task.truck?.plate) {
     doc.setFont('helvetica', 'bold');
     doc.text('Placa:', margin, yPosition);
     doc.setFont('helvetica', 'normal');
-    doc.text(task.plate, margin + 25, yPosition);
+    doc.text(task.truck.plate, margin + 25, yPosition);
     yPosition += 7;
   }
 

@@ -241,7 +241,8 @@ export class PpeDeliveryService {
   }
 
   async requestPpeDelivery(data: Omit<PpeDeliveryCreateFormData, "userId" | "status" | "statusOrder">, query?: PpeDeliveryQueryFormData): Promise<PpeDeliveryCreateResponse> {
-    const response = await apiClient.post<PpeDeliveryCreateResponse>(`${this.basePath}/request`, data, {
+    // Use the personal endpoint which automatically uses the authenticated user
+    const response = await apiClient.post<PpeDeliveryCreateResponse>('/personal/my-epis/request', data, {
       params: query,
     });
     return response.data;

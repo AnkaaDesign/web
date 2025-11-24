@@ -539,7 +539,14 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
 
       // Handle FormData - remove Content-Type to let browser set it with boundary
       if (config.data instanceof FormData) {
-        delete config.headers["Content-Type"];
+        // Remove Content-Type header - browser will set it with proper boundary
+        if (config.headers["Content-Type"]) {
+          delete config.headers["Content-Type"];
+        }
+        // Also remove from common headers if present
+        if (config.headers.common && config.headers.common["Content-Type"]) {
+          delete config.headers.common["Content-Type"];
+        }
         if (finalConfig.enableLogging) {
           console.log(`[AXIOS] FormData detected, Content-Type header removed for ${config.url}`);
         }
@@ -548,9 +555,10 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       // Debug logging for batch operations
       if (config.url?.includes("/batch") && config.method?.toLowerCase() === "put") {
         console.log("🔍 BATCH DEBUG: Request interceptor data:");
-        console.log("🔍 BATCH DEBUG: config.data type:", Array.isArray(config.data) ? "direct array" : typeof config.data);
+        console.log("🔍 BATCH DEBUG: config.data type:", Array.isArray(config.data) ? "direct array" : config.data instanceof FormData ? "FormData" : typeof config.data);
         console.log("🔍 BATCH DEBUG: config.data:", config.data);
-        if (config.data && typeof config.data === "object" && !Array.isArray(config.data)) {
+        // Skip object transformation if data is FormData
+        if (config.data && typeof config.data === "object" && !Array.isArray(config.data) && !(config.data instanceof FormData)) {
           // Generic fix for any array field that was serialized as an object
           const fixedData: any = {};
           for (const key in config.data) {
@@ -639,7 +647,11 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         // Additional debugging for batch update requests
         if (config.url?.includes("/batch") && config.method?.toLowerCase() === "put") {
           console.log("=== AXIOS CLIENT LAYER DEBUGGING ===");
-          console.log("Step 24 - Axios interceptor request body:", JSON.stringify(config.data, null, 2));
+          if (config.data instanceof FormData) {
+            console.log("Step 24 - Axios interceptor request body: FormData (see network tab for details)");
+          } else {
+            console.log("Step 24 - Axios interceptor request body:", JSON.stringify(config.data, null, 2));
+          }
           console.log("Step 25 - Axios interceptor request params:", JSON.stringify(config.params, null, 2));
           console.log("Step 26 - Full axios config:", {
             method: config.method,

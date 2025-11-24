@@ -135,15 +135,19 @@ export const createTaskHistoryColumns = (options?: { canViewPrice?: boolean }): 
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="w-16 h-8">
-                  <CanvasNormalMapRenderer
-                    baseColor={paint.hex || "#888888"}
-                    finish={paintFinish || PAINT_FINISH.SOLID}
-                    width={64}
-                    height={32}
-                    quality="medium"
-                    className="w-full h-full rounded-md"
-                  />
+                <div className="w-16 h-8 rounded-md ring-1 ring-border shadow-sm overflow-hidden">
+                  {paint.colorPreview ? (
+                    <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" loading="lazy" />
+                  ) : (
+                    <CanvasNormalMapRenderer
+                      baseColor={paint.hex || "#888888"}
+                      finish={paintFinish || PAINT_FINISH.SOLID}
+                      width={64}
+                      height={32}
+                      quality="medium"
+                      className="w-full h-full"
+                    />
+                  )}
                 </div>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-xs">

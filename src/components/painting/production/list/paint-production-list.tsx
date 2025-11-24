@@ -4,6 +4,8 @@ import { usePaintProductions, usePaintTypes, usePaintProductionMutations, usePai
 import type { PaintProduction } from "../../../../types";
 import type { PaintProductionGetManyFormData } from "../../../../schemas";
 import { routes } from "../../../../constants";
+import { shouldShowInteractiveElements, canEditPaintProductions, canDeletePaintProductions } from "@/utils/permissions/entity-permissions";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TableSearchInput } from "@/components/ui/table-search-input";
@@ -50,6 +52,12 @@ const DEFAULT_PAGE_SIZE = 40;
 export function PaintProductionList({ className }: PaintProductionListProps) {
   const navigate = useNavigate();
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = user ? canEditPaintProductions(user) : false;
+  const canDelete = user ? canDeletePaintProductions(user) : false;
+  const showInteractive = canEdit || canDelete; // Show checkboxes if user can edit or delete
 
   // Use URL state management for pagination, sorting, and selection
   const {
@@ -418,8 +426,8 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
           {/* Show Selected Toggle */}
           {selectionCount > 0 && <ShowSelectedToggle selectionCount={selectionCount} showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} />}
 
-          {/* Delete Selected Button */}
-          {selectionCount > 0 && (
+          {/* Delete Selected Button - only show if user has delete permission */}
+          {canDelete && selectionCount > 0 && (
             <Button
               variant="destructive"
               size="default"
@@ -464,18 +472,20 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
             <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
               <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
                 <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-                  {/* Selection column */}
-                  <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                    <div className="flex items-center justify-center h-full w-full px-2">
-                      <Checkbox
-                        checked={allSelected}
-                        indeterminate={partiallySelected}
-                        onCheckedChange={handleSelectAll}
-                        aria-label="Select all productions"
-                        disabled={isLoading || productions.length === 0}
-                      />
-                    </div>
-                  </TableHead>
+                  {/* Selection column - only show if user has edit/delete permissions */}
+                  {showInteractive && (
+                    <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                      <div className="flex items-center justify-center h-full w-full px-2">
+                        <Checkbox
+                          checked={allSelected}
+                          indeterminate={partiallySelected}
+                          onCheckedChange={handleSelectAll}
+                          aria-label="Select all productions"
+                          disabled={isLoading || productions.length === 0}
+                        />
+                      </div>
+                    </TableHead>
+                  )}
 
                   {/* Data columns */}
                   {filteredVisibleColumns.map((column) => (
@@ -562,17 +572,19 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
                         onClick={() => handleViewDetails(production)}
                         onContextMenu={(e) => handleContextMenu(e, production)}
                       >
-                        {/* Selection checkbox */}
-                        <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                          <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={productionIsSelected}
-                              onCheckedChange={() => handleSelectProduction(production.id)}
-                              aria-label={`Select production ${production.id}`}
-                              data-checkbox
-                            />
-                          </div>
-                        </TableCell>
+                        {/* Selection checkbox - only show if user has edit/delete permissions */}
+                        {showInteractive && (
+                          <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                            <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={productionIsSelected}
+                                onCheckedChange={() => handleSelectProduction(production.id)}
+                                aria-label={`Select production ${production.id}`}
+                                data-checkbox
+                              />
+                            </div>
+                          </TableCell>
+                        )}
 
                         {/* Data columns */}
                         {filteredVisibleColumns.map((column) => (
@@ -631,11 +643,15 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
             <IconExternalLink className="mr-2 h-4 w-4" />
             Ver Detalhes
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-            <IconTrash className="mr-2 h-4 w-4" />
-            Deletar
-          </DropdownMenuItem>
+          {canDelete && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                <IconTrash className="mr-2 h-4 w-4" />
+                Deletar
+              </DropdownMenuItem>
+            </>
+          )}
         </PositionedDropdownMenuContent>
       </DropdownMenu>
 

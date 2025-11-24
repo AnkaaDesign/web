@@ -13,35 +13,89 @@ import { hasAnyPrivilege } from '@/utils';
 // =====================
 
 /**
- * Can user edit/delete tasks?
- * Tasks: LEADER and ADMIN can create/delete
- * PRODUCTION can update (start/finish/move)
- * Others are view-only
+ * Can user create tasks?
+ * Only ADMIN can create new tasks
+ */
+export function canCreateTasks(user: User | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
+/**
+ * Can user edit tasks?
+ * ADMIN can edit all fields
+ * DESIGNER, FINANCIAL, LOGISTIC can edit limited fields (form handles field visibility)
+ * LEADER can start/finish tasks but NOT edit details
+ * PRODUCTION is view-only
  */
 export function canEditTasks(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
-    SECTOR_PRIVILEGES.PRODUCTION,
-    SECTOR_PRIVILEGES.LEADER,
     SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.DESIGNER,
+    SECTOR_PRIVILEGES.FINANCIAL,
+    SECTOR_PRIVILEGES.LOGISTIC,
   ]);
 }
 
+/**
+ * Can user delete tasks?
+ * Only ADMIN can delete tasks
+ */
 export function canDeleteTasks(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
+/**
+ * Can user start/finish tasks?
+ * LEADER can start/finish tasks in their managed sector (or tasks without sector)
+ * ADMIN can start/finish any task
+ */
+export function canManageTaskStatus(user: User | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.LEADER,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
 
+/**
+ * Can user perform batch operations on tasks?
+ * Only ADMIN can batch operate tasks
+ */
 export function canBatchOperateTasks(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
-    SECTOR_PRIVILEGES.PRODUCTION,
-    SECTOR_PRIVILEGES.LEADER,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
+}
+
+/**
+ * Check if LEADER can manage a specific task (sector-based validation)
+ * LEADER can manage tasks in their own sector OR tasks without a sector
+ * When starting a task without sector, it will be assigned to leader's sector
+ * ADMIN can manage any task
+ */
+export function canLeaderManageTask(user: User | null, taskSectorId: string | null | undefined): boolean {
+  if (!user) return false;
+
+  // ADMIN can manage any task
+  if (user.sector?.privileges === SECTOR_PRIVILEGES.ADMIN) return true;
+
+  // LEADER can manage tasks in their sector OR tasks without a sector
+  if (user.sector?.privileges === SECTOR_PRIVILEGES.LEADER) {
+    // Task has no sector - leader can manage it (will assign to their sector on start)
+    if (!taskSectorId) return true;
+    // Task sector matches leader's sector
+    return user.sector?.id === taskSectorId;
+  }
+
+  return false;
 }
 
 // =====================
@@ -49,24 +103,60 @@ export function canBatchOperateTasks(user: User | null): boolean {
 // =====================
 
 /**
- * Can user edit/delete cuts?
- * WAREHOUSE makes the physical cuts (vinyl/stencil)
- * DESIGNER creates cut designs
- * ADMIN has full control
+ * Can user create cuts?
+ * Only ADMIN can create cuts directly
  */
-export function canEditCuts(user: User | null): boolean {
+export function canCreateCuts(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
-    SECTOR_PRIVILEGES.WAREHOUSE,
-    SECTOR_PRIVILEGES.DESIGNER,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
 
+/**
+ * Can user edit cuts?
+ * Only ADMIN can edit cut details
+ */
+export function canEditCuts(user: User | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
+/**
+ * Can user delete cuts?
+ * Only ADMIN can delete cuts
+ */
 export function canDeleteCuts(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
-    SECTOR_PRIVILEGES.DESIGNER,
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
+/**
+ * Can user start/finish cuts (change status)?
+ * WAREHOUSE can start/finish cuts
+ * ADMIN can also manage cut status
+ */
+export function canManageCutStatus(user: User | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
+/**
+ * Can user request a new cut?
+ * LEADER can request cuts for their sector
+ * ADMIN can also request cuts
+ */
+export function canRequestCut(user: User | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.LEADER,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
@@ -76,20 +166,28 @@ export function canDeleteCuts(user: User | null): boolean {
 // =====================
 
 /**
- * Can user edit/delete airbrushings?
- * PRODUCTION and WAREHOUSE manage airbrushings
+ * Can user create/edit/delete airbrushings?
+ * Only ADMIN can manage airbrushings
  */
+export function canCreateAirbrushings(user: User | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
 export function canEditAirbrushings(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
-    SECTOR_PRIVILEGES.PRODUCTION,
-    SECTOR_PRIVILEGES.WAREHOUSE,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
 
 export function canDeleteAirbrushings(user: User | null): boolean {
-  return canEditAirbrushings(user);
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
 }
 
 // =====================
@@ -97,20 +195,28 @@ export function canDeleteAirbrushings(user: User | null): boolean {
 // =====================
 
 /**
- * Can user edit/delete observations?
- * PRODUCTION and WAREHOUSE manage observations
+ * Can user create/edit/delete observations?
+ * Only ADMIN can manage observations
  */
+export function canCreateObservations(user: User | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
 export function canEditObservations(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
-    SECTOR_PRIVILEGES.PRODUCTION,
-    SECTOR_PRIVILEGES.WAREHOUSE,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }
 
 export function canDeleteObservations(user: User | null): boolean {
-  return canEditObservations(user);
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
 }
 
 // =====================
@@ -182,6 +288,22 @@ export function canEditPaintProductions(user: User | null): boolean {
 
 export function canDeletePaintProductions(user: User | null): boolean {
   return canEditPaintProductions(user);
+}
+
+/**
+ * Can user edit/delete paint formulas?
+ * WAREHOUSE manages paint formulas
+ */
+export function canEditPaintFormulas(user: User | null): boolean {
+  if (!user) return false;
+  return hasAnyPrivilege(user, [
+    SECTOR_PRIVILEGES.WAREHOUSE,
+    SECTOR_PRIVILEGES.ADMIN,
+  ]);
+}
+
+export function canDeletePaintFormulas(user: User | null): boolean {
+  return canEditPaintFormulas(user);
 }
 
 // =====================
@@ -402,7 +524,8 @@ export function shouldShowInteractiveElements(
   user: User | null,
   entityType: 'task' | 'cut' | 'item' | 'paint' | 'customer' | 'order' |
                'borrow' | 'ppe' | 'maintenance' | 'externalWithdrawal' |
-               'supplier' | 'hr' | 'user' | 'paintBrand' | 'paintType'
+               'supplier' | 'hr' | 'user' | 'paintBrand' | 'paintType' |
+               'paintFormula' | 'observation' | 'airbrushing'
 ): boolean {
   switch (entityType) {
     case 'task':
@@ -415,6 +538,8 @@ export function shouldShowInteractiveElements(
     case 'paintBrand':
     case 'paintType':
       return canEditPaints(user);
+    case 'paintFormula':
+      return canEditPaintFormulas(user);
     case 'customer':
       return canEditCustomers(user);
     case 'order':
@@ -433,6 +558,10 @@ export function shouldShowInteractiveElements(
       return canEditHrEntities(user);
     case 'user':
       return canEditUsers(user);
+    case 'observation':
+      return canEditObservations(user);
+    case 'airbrushing':
+      return canEditAirbrushings(user);
     default:
       return false;
   }

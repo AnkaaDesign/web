@@ -33,14 +33,14 @@ interface SupplierTableProps {
 
 export function SupplierTable({ visibleColumns, className, onEdit, onDelete, filters = {}, onDataChange }: SupplierTableProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { delete: deleteSupplier } = useSupplierMutations();
   const { delete: batchDelete } = useSupplierBatchMutations();
 
   // Permission checks
-  const canEdit = canEditSuppliers(user);
-  const canDelete = canDeleteSuppliers(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'suppliers');
+  const canEdit = user ? canEditSuppliers(user) : false;
+  const canDelete = user ? canDeleteSuppliers(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'supplier') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();

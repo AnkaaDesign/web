@@ -34,14 +34,15 @@ export function CatalogCreatePage() {
   });
 
   // Determine available steps based on current paint type selection
+  // Steps: 1-Info, 2-Preview, 3-Formula, 4-Ground (if needsGround)
   const needsGround = currentPaintType?.data?.needGround ?? false;
-  const maxSteps = needsGround ? 3 : 2;
+  const maxSteps = needsGround ? 4 : 3;
 
-  const handleSubmit = async (data: PaintCreateFormData, formulas?: PaintFormula[]) => {
+  const handleSubmit = async (data: PaintCreateFormData, formulas?: PaintFormula[], colorPreviewFile?: File) => {
     setIsSubmitting(true);
     try {
-      // Create the paint
-      const response = await createPaint(data);
+      // Create the paint (with file upload if available)
+      const response = await createPaint(data, undefined, false, colorPreviewFile);
       const paintData = response?.data;
       const paintId = paintData?.id;
 

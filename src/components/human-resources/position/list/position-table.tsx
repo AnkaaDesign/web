@@ -53,10 +53,10 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
   const [deleteDialog, setDeleteDialog] = useState<{ items: Position[]; isBulk: boolean } | null>(null);
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditHrEntities(user);
-  const canDelete = canDeleteHrEntities(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'hr-entities');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditHrEntities(user) : false;
+  const canDelete = user ? canDeleteHrEntities(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'hr') : false;
 
   // Use URL state management for pagination and selection
   const {

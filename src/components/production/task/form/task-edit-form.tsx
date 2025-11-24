@@ -434,6 +434,8 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
         })) || [],
       artworkIds: taskData.artworks?.map((f) => f.id) || [],
       truck: {
+        plate: taskData.truck?.plate || null,
+        chassisNumber: taskData.truck?.chassisNumber || null,
         xPosition: taskData.truck?.xPosition || null,
         yPosition: taskData.truck?.yPosition || null,
         garageId: taskData.truck?.garageId || null,
@@ -1388,9 +1390,9 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                       <CustomerSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} required initialCustomer={task.customer} />
                     </div>
 
-                    {/* Serial Number */}
-                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-                      {/* Serial Number - EDITABLE by Financial users */}
+                    {/* Serial Number, Plate, Chassis - in same row with 1/4, 1/4, 2/4 ratio */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      {/* Serial Number - 1/4 - EDITABLE by Financial users */}
                       <FormField
                         control={form.control}
                         name="serialNumber"
@@ -1407,6 +1409,60 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                                 placeholder="Ex: ABC-123456"
                                 className="uppercase bg-transparent"
                                 onChange={(value) => field.onChange(typeof value === "string" ? value.toUpperCase() : "")}
+                                disabled={isSubmitting || isWarehouseUser || isDesignerUser}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Plate - 1/4 */}
+                      <FormField
+                        control={form.control}
+                        name="truck.plate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconLicense className="h-4 w-4" />
+                              Placa
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                value={field.value || ""}
+                                placeholder="Ex: ABC1234"
+                                className="uppercase bg-transparent"
+                                onChange={(value) => {
+                                  const upperValue = (value || "").toUpperCase();
+                                  field.onChange(upperValue);
+                                }}
+                                disabled={isSubmitting || isWarehouseUser || isDesignerUser}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Chassis - 2/4 (col-span-2) */}
+                      <FormField
+                        control={form.control}
+                        name="truck.chassisNumber"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel className="flex items-center gap-2">
+                              <IconId className="h-4 w-4" />
+                              Chassi
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                value={field.value || ""}
+                                placeholder="Ex: 9BWZZZ377VT004251"
+                                className="uppercase bg-transparent"
+                                onChange={(value) => {
+                                  const upperValue = (value || "").toUpperCase();
+                                  field.onChange(upperValue);
+                                }}
                                 disabled={isSubmitting || isWarehouseUser || isDesignerUser}
                               />
                             </FormControl>

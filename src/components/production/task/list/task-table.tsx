@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import type { Task } from "../../../../types";
 import { routes, TASK_STATUS } from "../../../../constants";
 import { isValidTaskStatusTransition, getTaskStatusLabel } from "../../../../utils";
+import { shouldShowInteractiveElements, canEditTasks, canDeleteTasks } from "@/utils/permissions/entity-permissions";
+import { useAuth } from "@/hooks/useAuth";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -56,6 +58,12 @@ export function TaskTable({
   const { toast } = useToast();
   const { update, delete: deleteTask } = useTaskMutations();
   const { batchUpdate, batchDelete } = useTaskBatchMutations();
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = user ? canEditTasks(user) : false;
+  const canDelete = user ? canDeleteTasks(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'task') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -437,19 +445,21 @@ export function TaskTable({
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-              {/* Selection column */}
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={partiallySelected}
-                    onCheckedChange={() => toggleSelectAll(currentPageItemIds)}
-                    aria-label="Select all items"
-                    disabled={isLoading || items.length === 0}
-                    data-checkbox
-                  />
-                </div>
-              </TableHead>
+              {/* Selection column - only show if user has edit permissions */}
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={partiallySelected}
+                      onCheckedChange={() => toggleSelectAll(currentPageItemIds)}
+                      aria-label="Select all items"
+                      disabled={isLoading || items.length === 0}
+                      data-checkbox
+                    />
+                  </div>
+                </TableHead>
+              )}
 
               {/* Data columns */}
               {displayColumns.map((column) => {
@@ -565,12 +575,14 @@ export function TaskTable({
                     }}
                     onContextMenu={(e) => handleContextMenu(e, item)}
                   >
-                    {/* Selection checkbox */}
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0 relative z-20")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select ${item.name}`} data-checkbox />
-                      </div>
-                    </TableCell>
+                    {/* Selection checkbox - only show if user has edit permissions */}
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0 relative z-20")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select ${item.name}`} data-checkbox />
+                        </div>
+                      </TableCell>
+                    )}
 
                     {/* Data columns */}
                     {displayColumns.map((column) => (
@@ -647,67 +659,81 @@ export function TaskTable({
                 <IconEye className="h-4 w-4 mr-2" />
                 Ver detalhes
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDuplicate}>
-                <IconCopy className="h-4 w-4 mr-2" />
-                Duplicar
-              </DropdownMenuItem>
+              {canEdit && (
+                <DropdownMenuItem onClick={handleDuplicate}>
+                  <IconCopy className="h-4 w-4 mr-2" />
+                  Duplicar
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
             </>
           )}
 
-          <DropdownMenuItem onClick={handleEdit}>
-            <IconEdit className="h-4 w-4 mr-2" />
-            Editar
-          </DropdownMenuItem>
-
-          <DropdownMenuItem onClick={handleSetSector}>
-            <IconBuildingFactory2 className="h-4 w-4 mr-2" />
-            Definir Setor
-          </DropdownMenuItem>
-
-          <DropdownMenuSeparator />
-
-          {/* Status change actions */}
-          {contextMenu?.items.some((task) => task.status === TASK_STATUS.PENDING) && (
-            <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.IN_PRODUCTION)}>
-              <IconPlayerPlay className="h-4 w-4 mr-2" />
-              Iniciar produção
-            </DropdownMenuItem>
-          )}
-
-          {contextMenu?.items.some((task) => task.status === TASK_STATUS.IN_PRODUCTION) && (
+          {canEdit && (
             <>
-              <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.COMPLETED)}>
-                <IconCheck className="h-4 w-4 mr-2" />
-                Finalizar
+              <DropdownMenuItem onClick={handleEdit}>
+                <IconEdit className="h-4 w-4 mr-2" />
+                Editar
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.ON_HOLD)}>
-                <IconPlayerPause className="h-4 w-4 mr-2" />
-                Colocar em espera
+
+              <DropdownMenuItem onClick={handleSetSector}>
+                <IconBuildingFactory2 className="h-4 w-4 mr-2" />
+                Definir Setor
               </DropdownMenuItem>
             </>
           )}
 
-          {contextMenu?.items.some((task) => task.status === TASK_STATUS.ON_HOLD) && (
-            <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.IN_PRODUCTION)}>
-              <IconPlayerPlay className="h-4 w-4 mr-2" />
-              Retomar produção
-            </DropdownMenuItem>
+          {canEdit && (
+            <>
+              <DropdownMenuSeparator />
+
+              {/* Status change actions */}
+              {contextMenu?.items.some((task) => task.status === TASK_STATUS.PENDING) && (
+                <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.IN_PRODUCTION)}>
+                  <IconPlayerPlay className="h-4 w-4 mr-2" />
+                  Iniciar produção
+                </DropdownMenuItem>
+              )}
+
+              {contextMenu?.items.some((task) => task.status === TASK_STATUS.IN_PRODUCTION) && (
+                <>
+                  <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.COMPLETED)}>
+                    <IconCheck className="h-4 w-4 mr-2" />
+                    Finalizar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.ON_HOLD)}>
+                    <IconPlayerPause className="h-4 w-4 mr-2" />
+                    Colocar em espera
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {contextMenu?.items.some((task) => task.status === TASK_STATUS.ON_HOLD) && (
+                <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.IN_PRODUCTION)}>
+                  <IconPlayerPlay className="h-4 w-4 mr-2" />
+                  Retomar produção
+                </DropdownMenuItem>
+              )}
+
+              {contextMenu?.items.some((task) => task.status !== TASK_STATUS.COMPLETED && task.status !== TASK_STATUS.CANCELLED) && (
+                <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.CANCELLED)}>
+                  <IconX className="h-4 w-4 mr-2" />
+                  Cancelar
+                </DropdownMenuItem>
+              )}
+            </>
           )}
 
-          {contextMenu?.items.some((task) => task.status !== TASK_STATUS.COMPLETED && task.status !== TASK_STATUS.CANCELLED) && (
-            <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.CANCELLED)}>
-              <IconX className="h-4 w-4 mr-2" />
-              Cancelar
-            </DropdownMenuItem>
+          {canDelete && (
+            <>
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+                <IconTrash className="h-4 w-4 mr-2" />
+                Deletar
+              </DropdownMenuItem>
+            </>
           )}
-
-          <DropdownMenuSeparator />
-
-          <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-            <IconTrash className="h-4 w-4 mr-2" />
-            Deletar
-          </DropdownMenuItem>
         </PositionedDropdownMenuContent>
       </DropdownMenu>
 

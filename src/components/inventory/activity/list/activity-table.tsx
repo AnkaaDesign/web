@@ -4,6 +4,8 @@ import { IconChevronDown, IconChevronUp, IconSelector, IconEye, IconEdit, IconTr
 import type { Activity } from "../../../../types";
 import type { ActivityGetManyFormData } from "../../../../schemas";
 import { useActivityMutations, useActivities } from "../../../../hooks";
+import { shouldShowInteractiveElements, canEditItems, canDeleteItems } from "@/utils/permissions/entity-permissions";
+import { useAuth } from "@/hooks/useAuth";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
@@ -35,6 +37,12 @@ export const ActivityTable = ({ filters, visibleColumns, onDataChange, className
   const { deleteAsync } = useActivityMutations();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = user ? canEditItems(user) : false;
+  const canDelete = user ? canDeleteItems(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'item') : false;
 
   // Use URL state management for pagination and selection
   const {
@@ -250,18 +258,21 @@ export const ActivityTable = ({ filters, visibleColumns, onDataChange, className
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
           <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
             <TableRow className="bg-muted hover:bg-muted even:bg-muted">
-              <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
-                <div className="flex items-center justify-center h-full w-full px-2">
-                  <Checkbox
-                    checked={allSelected}
-                    indeterminate={isPartiallySelected(currentPageActivityIds)}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Selecionar todos"
-                    disabled={isLoading || activities.length === 0}
-                    data-checkbox
-                  />
-                </div>
-              </TableHead>
+              {/* Selection column - only show if user has edit permissions */}
+              {showInteractive && (
+                <TableHead className={cn(TABLE_LAYOUT.checkbox.className, "whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0")}>
+                  <div className="flex items-center justify-center h-full w-full px-2">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={isPartiallySelected(currentPageActivityIds)}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Selecionar todos"
+                      disabled={isLoading || activities.length === 0}
+                      data-checkbox
+                    />
+                  </div>
+                </TableHead>
+              )}
               {filteredColumns.map((column) => (
                 <TableHead
                   key={column.key}
@@ -340,16 +351,19 @@ export const ActivityTable = ({ filters, visibleColumns, onDataChange, className
                     onClick={(e) => handleRowClick(activity, e)}
                     onContextMenu={(e) => handleContextMenu(e, activity)}
                   >
-                    <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={isActivitySelected}
-                          onCheckedChange={() => handleSelectActivity(activity.id)}
-                          aria-label={`Selecionar movimentação ${activity.id}`}
-                          data-checkbox
-                        />
-                      </div>
-                    </TableCell>
+                    {/* Selection checkbox - only show if user has edit permissions */}
+                    {showInteractive && (
+                      <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isActivitySelected}
+                            onCheckedChange={() => handleSelectActivity(activity.id)}
+                            aria-label={`Selecionar movimentação ${activity.id}`}
+                            data-checkbox
+                          />
+                        </div>
+                      </TableCell>
+                    )}
                     {filteredColumns.map((column) => (
                       <TableCell key={column.key} className={cn("p-0 !border-r-0", column.className)}>
                         <div className={cn("px-4 py-2 text-sm", column.align === "center" && "text-center", column.align === "right" && "text-right")}>
@@ -384,35 +398,49 @@ export const ActivityTable = ({ filters, visibleColumns, onDataChange, className
                     <IconEye className="mr-2 h-4 w-4" />
                     Visualizar
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleEdit(contextMenu.activities[0])}>
-                    <IconEdit className="mr-2 h-4 w-4" />
-                    Editar
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(contextMenu.activities)} className="text-destructive">
-                    <IconTrash className="mr-2 h-4 w-4" />
-                    Excluir
-                  </DropdownMenuItem>
+                  {canEdit && (
+                    <DropdownMenuItem onClick={() => handleEdit(contextMenu.activities[0])}>
+                      <IconEdit className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                  )}
+                  {canDelete && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleDelete(contextMenu.activities)} className="text-destructive">
+                        <IconTrash className="mr-2 h-4 w-4" />
+                        Excluir
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </>
               ) : (
                 <>
                   <div className="px-2 py-1.5 text-sm font-medium">{contextMenu.activities.length} movimentações</div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      const ids = contextMenu.activities.map((a) => a.id).join(",");
-                      navigate(`${routes.inventory.movements.batchEdit}?ids=${ids}`);
-                      setContextMenu(null);
-                    }}
-                  >
-                    <IconEdit className="mr-2 h-4 w-4" />
-                    Editar em lote
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => handleDelete(contextMenu.activities)} className="text-destructive">
-                    <IconTrash className="mr-2 h-4 w-4" />
-                    Excluir selecionadas
-                  </DropdownMenuItem>
+                  {canEdit && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => {
+                          const ids = contextMenu.activities.map((a) => a.id).join(",");
+                          navigate(`${routes.inventory.movements.batchEdit}?ids=${ids}`);
+                          setContextMenu(null);
+                        }}
+                      >
+                        <IconEdit className="mr-2 h-4 w-4" />
+                        Editar em lote
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {canDelete && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => handleDelete(contextMenu.activities)} className="text-destructive">
+                        <IconTrash className="mr-2 h-4 w-4" />
+                        Excluir selecionadas
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </>
               )}
             </DropdownMenuContent>

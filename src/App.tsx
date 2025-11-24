@@ -159,15 +159,12 @@ const InventoryProductsBrandsBatchEdit = lazy(() => import("@/pages/inventory/pr
 
 // Personal
 const Personal = lazy(() => import("@/pages/personal/root").then((module) => ({ default: module.Personal })));
-const PersonalMyLoans = lazy(() => import("@/pages/personal/my-loans").then((module) => ({ default: module.MyLoansPage })));
-const PersonalMyPpes = lazy(() => import("@/pages/personal/my-ppes").then((module) => ({ default: module.MyPpesPage })));
-const PersonalMyPpesRequest = lazy(() => import("@/pages/personal/my-ppes").then((module) => ({ default: module.PersonalMyPpesRequest })));
-
 const PersonalMyHolidays = lazy(() => import("@/pages/personal/my-holidays").then((module) => ({ default: module.MyHolidaysPage })));
 const PersonalMyVacations = lazy(() => import("@/pages/personal/my-vacations").then((module) => ({ default: module.MyVacationsPage })));
-const PersonalMyNotifications = lazy(() => import("@/pages/personal/my-notifications").then((module) => ({ default: module.MyNotificationsPage })));
-const PersonalPreferences = lazy(() => import("@/pages/personal/preferences").then((module) => ({ default: module.PreferencesPage })));
-const PersonalMyWarnings = lazy(() => import("@/pages/personal/my-warnings").then((module) => ({ default: module.MyWarningsPage })));
+const PersonalMyPpes = lazy(() => import("@/pages/personal/my-ppes").then((module) => ({ default: module.MyPpesPage })));
+const PersonalMyPpesRequest = lazy(() => import("@/pages/personal/my-ppes").then((module) => ({ default: module.PersonalMyPpesRequest })));
+const PersonalMyLoans = lazy(() => import("@/pages/personal/my-loans").then((module) => ({ default: module.MyLoansPage })));
+const PersonalMyActivities = lazy(() => import("@/pages/personal/my-activities").then((module) => ({ default: module.MyActivitiesPage })));
 
 // Painting (Pintura)
 const Paint = lazy(() => import("@/pages/painting/root").then((module) => ({ default: module.Painting })));
@@ -1296,10 +1293,18 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.personal.myLoans.root}
+                  path={routes.personal.myHolidays.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <PersonalMyLoans />
+                      <PersonalMyHolidays />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personal.myVacations.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonalMyVacations />
                     </Suspense>
                   }
                 />
@@ -1319,46 +1324,19 @@ function App() {
                     </Suspense>
                   }
                 />
-
                 <Route
-                  path={routes.personal.myHolidays.root}
+                  path={routes.personal.myLoans.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <PersonalMyHolidays />
+                      <PersonalMyLoans />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.personal.myVacations.root}
+                  path={routes.personal.myActivities.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <PersonalMyVacations />
-                    </Suspense>
-                  }
-                />
-                <Route
-                  path={routes.personal.myNotifications.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonalMyNotifications />
-                    </Suspense>
-                  }
-                />
-
-                <Route
-                  path={routes.personal.preferences.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonalPreferences />
-                    </Suspense>
-                  }
-                />
-
-                <Route
-                  path={routes.personal.myWarnings.root}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <PersonalMyWarnings />
+                      <PersonalMyActivities />
                     </Suspense>
                   }
                 />

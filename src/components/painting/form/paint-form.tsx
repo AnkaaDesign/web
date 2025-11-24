@@ -1,9 +1,9 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import React, { useState, useEffect, useCallback, useMemo, useImperativeHandle, forwardRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useImperativeHandle, forwardRef, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Form } from "@/components/ui/form";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { FormSteps, type FormStep } from "@/components/ui/form-steps";
 import { paintCreateSchema, paintUpdateSchema, type PaintCreateFormData, type PaintUpdateFormData } from "../../../schemas";
 import type { PaintFormula, Paint } from "../../../types";
@@ -22,6 +22,7 @@ import { PaletteSelector } from "./palette-selector";
 import { TagsInput } from "./tags-input";
 import { GroundSelector } from "./ground-selector";
 import { FormulaManager } from "./formula-manager";
+import { PaintPreviewGenerator, type PaintPreviewGeneratorRef, type PaintFinishType, type PaintPreviewSettings } from "./paint-preview-generator";
 
 interface BaseFormProps {
   onCancel: () => void;
@@ -35,25 +36,41 @@ interface BaseFormProps {
 
 interface CreateFormProps extends BaseFormProps {
   mode: "create";
-  onSubmit: (data: PaintCreateFormData, formulas?: PaintFormula[]) => Promise<void>;
+  onSubmit: (data: PaintCreateFormData, formulas?: PaintFormula[], colorPreviewFile?: File) => Promise<void>;
   defaultValues?: Partial<PaintCreateFormData>;
 }
 
 interface UpdateFormProps extends BaseFormProps {
   mode: "update";
-  onSubmit: (data: PaintUpdateFormData, newFormulas?: PaintFormula[]) => Promise<void>;
+  onSubmit: (data: PaintUpdateFormData, newFormulas?: PaintFormula[], colorPreviewFile?: File) => Promise<void>;
   defaultValues?: Partial<PaintUpdateFormData>;
   existingFormulas?: PaintFormula[];
   paintId: string;
   initialGrounds?: Paint[];
 }
 
+/**
+ * Convert a data URL to a File object
+ */
+function dataUrlToFile(dataUrl: string, filename: string): File {
+  const arr = dataUrl.split(",");
+  const mime = arr[0].match(/:(.*?);/)?.[1] || "image/webp";
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+}
+
 type PaintFormProps = CreateFormProps | UpdateFormProps;
 
 const steps: FormStep[] = [
   { id: 1, name: "Informações Básicas", description: "Dados principais da tinta" },
-  { id: 2, name: "Formulação", description: "Componentes e fórmulas (opcional)" },
-  { id: 3, name: "Fundo da Tinta", description: "Selecione os fundos necessários" },
+  { id: 2, name: "Preview", description: "Gerar imagem de visualização (opcional)" },
+  { id: 3, name: "Formulação", description: "Componentes e fórmulas (opcional)" },
+  { id: 4, name: "Fundo da Tinta", description: "Selecione os fundos necessários" },
 ];
 
 export interface PaintFormRef {
@@ -64,6 +81,19 @@ export interface PaintFormRef {
 export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) => {
   const { defaultValues, mode, onStepChange, onPaintTypeChange } = props;
   const [searchParams, setSearchParams] = useSearchParams();
+  const previewGeneratorRef = useRef<PaintPreviewGeneratorRef>(null);
+
+  // Color preview state - stored separately so it persists across steps
+  const [colorPreviewData, setColorPreviewData] = useState<string | null>(
+    mode === "update" ? (defaultValues?.colorPreview as string | null) || null : null
+  );
+  const [previewModified, setPreviewModified] = useState(false);
+  const originalColorPreview = useRef<string | null>(
+    mode === "update" ? (defaultValues?.colorPreview as string | null) || null : null
+  );
+
+  // Preview settings state - persisted across step changes
+  const [previewSettings, setPreviewSettings] = useState<Partial<PaintPreviewSettings> | undefined>(undefined);
 
   // Initialize state from URL parameters (for both create and update modes)
   const initialUrlState = deserializeUrlParamsToForm(searchParams);
@@ -173,6 +203,22 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     }
   }, [paintTypeId, onPaintTypeChange]);
 
+  // Capture initial preview when entering step 2 (after a short delay to ensure canvas is ready)
+  useEffect(() => {
+    if (currentStep === 2 && !colorPreviewData) {
+      const timer = setTimeout(() => {
+        if (previewGeneratorRef.current) {
+          const img = previewGeneratorRef.current.exportImage();
+          if (img) {
+            setColorPreviewData(img);
+            console.log("[PaintForm] Initial preview captured on step 2");
+          }
+        }
+      }, 500); // Wait for canvas to be fully rendered
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep, colorPreviewData]);
+
   // Sort component items returned from the backend (already filtered by intersection)
   const sortedComponentItems = React.useMemo(() => {
     if (!availableComponentsResponse?.data) return [];
@@ -195,6 +241,49 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
   }, [availableComponentsResponse?.data]);
 
   const handleSubmit = async (data: PaintCreateFormData | PaintUpdateFormData) => {
+    // Use stored colorPreview data (captured when leaving step 2)
+    // Try to get fresh export if ref is available, otherwise use stored state
+    let finalColorPreview = colorPreviewData;
+
+    console.log("[PaintForm] handleSubmit - colorPreviewData:", colorPreviewData ? `${colorPreviewData.substring(0, 50)}...` : null);
+    console.log("[PaintForm] handleSubmit - previewGeneratorRef.current:", !!previewGeneratorRef.current);
+
+    if (previewGeneratorRef.current) {
+      const freshExport = previewGeneratorRef.current.exportImage();
+      console.log("[PaintForm] handleSubmit - freshExport:", freshExport ? `${freshExport.substring(0, 50)}...` : null);
+      if (freshExport) {
+        finalColorPreview = freshExport;
+      }
+    }
+
+    console.log("[PaintForm] handleSubmit - finalColorPreview:", finalColorPreview ? `${finalColorPreview.substring(0, 50)}...` : null);
+    console.log("[PaintForm] handleSubmit - mode:", mode, "previewModified:", previewModified);
+
+    // Convert data URL to File for upload
+    let colorPreviewFile: File | undefined;
+
+    // For create mode, always include colorPreview file
+    // For update mode, only include if modified
+    if (mode === "create") {
+      if (finalColorPreview) {
+        const paintName = (data as PaintCreateFormData).name || "preview";
+        colorPreviewFile = dataUrlToFile(finalColorPreview, `${paintName.replace(/\s+/g, "_")}_preview.webp`);
+        console.log("[PaintForm] handleSubmit - Created colorPreviewFile for create mode:", colorPreviewFile.name);
+      } else {
+        console.warn("[PaintForm] handleSubmit - WARNING: No colorPreview available in create mode!");
+      }
+    } else {
+      // Update mode - only send colorPreview if it was modified
+      if (previewModified && finalColorPreview) {
+        const paintName = (data as PaintUpdateFormData).name || "preview";
+        colorPreviewFile = dataUrlToFile(finalColorPreview, `${paintName.replace(/\s+/g, "_")}_preview.webp`);
+        console.log("[PaintForm] handleSubmit - Created colorPreviewFile for update mode:", colorPreviewFile.name);
+      }
+    }
+
+    // Don't send base64 in data - we'll send the file separately
+    delete data.colorPreview;
+
     // For create mode, we'll handle formulas separately after paint creation
     // For update mode, formulas are already created and managed through the formula API
 
@@ -202,12 +291,12 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
       // Filter valid formulas to pass to the parent
       const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && c.ratio > 0));
 
-      await (props as CreateFormProps).onSubmit(data as PaintCreateFormData, validFormulas);
+      await (props as CreateFormProps).onSubmit(data as PaintCreateFormData, validFormulas, colorPreviewFile);
     } else {
       // In update mode, also handle new formulas if any
       const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && c.ratio > 0));
 
-      await (props as UpdateFormProps).onSubmit(data as PaintUpdateFormData, validFormulas);
+      await (props as UpdateFormProps).onSubmit(data as PaintUpdateFormData, validFormulas, colorPreviewFile);
     }
   };
 
@@ -216,15 +305,15 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     if (paintType?.data?.needGround) {
       return steps;
     }
-    // If paint type doesn't need ground, exclude step 3
-    return steps.filter((step) => step.id !== 3);
+    // If paint type doesn't need ground, exclude step 4 (ground selection)
+    return steps.filter((step) => step.id !== 4);
   }, [paintType?.data?.needGround]);
 
   const validateCurrentStep = useCallback(async (): Promise<boolean> => {
     switch (currentStep) {
       case 1:
-        // Validate basic information fields
-        const step1Valid = await form.trigger(["name", "paintTypeId", "paintBrandId", "finish", "hex"]);
+        // Validate basic information fields (hex moved to step 2)
+        const step1Valid = await form.trigger(["name", "paintTypeId", "paintBrandId", "finish"]);
 
         if (!step1Valid) {
           // Form will show field-specific errors automatically
@@ -241,10 +330,15 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
         return true;
 
       case 2:
+        // Validate hex color field
+        const step2Valid = await form.trigger(["hex"]);
+        return step2Valid;
+
+      case 3:
         // Formula step is optional, always allow progression
         return true;
 
-      case 3:
+      case 4:
         // Ground selection validation
         if (paintType?.data?.needGround) {
           const groundValid = await form.trigger("groundIds");
@@ -269,6 +363,21 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     const isValid = await validateCurrentStep();
     if (!isValid) {
       return;
+    }
+
+    // Capture color preview when leaving step 2
+    console.log("[PaintForm] nextStep - currentStep:", currentStep, "previewGeneratorRef.current:", !!previewGeneratorRef.current);
+    if (currentStep === 2 && previewGeneratorRef.current) {
+      const imageDataUrl = previewGeneratorRef.current.exportImage();
+      console.log("[PaintForm] nextStep - exportImage result:", imageDataUrl ? `${imageDataUrl.substring(0, 50)}...` : null);
+      if (imageDataUrl) {
+        setColorPreviewData(imageDataUrl);
+        console.log("[PaintForm] nextStep - setColorPreviewData called");
+        // Mark as modified in create mode, or if different from original in update mode
+        if (mode === "create") {
+          setPreviewModified(true);
+        }
+      }
     }
 
     const currentIndex = availableSteps.findIndex((step) => step.id === currentStep);
@@ -327,121 +436,147 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
 
           {/* Step Content */}
           {currentStep === 1 && (
-            <div className="space-y-6">
-              <Card className="bg-transparent">
-                <CardHeader>
-                  <CardTitle>Informações Básicas</CardTitle>
-                  <CardDescription>Preencha os dados principais da tinta</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {/* Name and Code in the same row */}
-                    <div className="grid gap-6 md:grid-cols-3">
-                      <div className="md:col-span-2">
-                        <NameInput control={form.control} required />
-                      </div>
-                      <CodeInput control={form.control} />
-                    </div>
-
-                    {/* Layout with 2/3 and 1/3 columns */}
-                    <div className="grid gap-6 md:grid-cols-3">
-                      {/* Left column with form fields - takes 2/3 */}
-                      <div className="md:col-span-2 space-y-4">
-                        {/* All selectors in a single column */}
-                        <PaintBrandSelector control={form.control} required />
-                        <PaintTypeSelector control={form.control} required />
-                        <FinishSelector control={form.control} required />
-                        <ManufacturerSelector control={form.control} />
-                        <PaletteSelector control={form.control} />
-                      </div>
-
-                      {/* Right column with color picker - takes 1/3 */}
-                      <div className="flex flex-col">
-                        <HexColorInput control={form.control} required />
-                      </div>
-                    </div>
-
-                    {/* Tags field spanning full width */}
-                    <TagsInput control={form.control} />
+            <Card>
+              <CardContent className="pt-6 space-y-6">
+                {/* Name and Code in the same row */}
+                <div className="grid gap-6 md:grid-cols-3">
+                  <div className="md:col-span-2">
+                    <NameInput control={form.control} required />
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                  <CodeInput control={form.control} />
+                </div>
+
+                {/* All selectors */}
+                <div className="space-y-4">
+                  <PaintBrandSelector control={form.control} required />
+                  <PaintTypeSelector control={form.control} required />
+                  <FinishSelector control={form.control} required />
+                  <ManufacturerSelector control={form.control} />
+                  <PaletteSelector control={form.control} />
+                </div>
+
+                {/* Tags field spanning full width */}
+                <TagsInput control={form.control} />
+              </CardContent>
+            </Card>
           )}
 
           {currentStep === 2 && (
-            <div className="space-y-6">
-              {/* Show existing formulas in update mode */}
-              {props.mode === "update" && props.existingFormulas && props.existingFormulas.length > 0 && (
-                <Card className="flex flex-col max-h-[400px]">
-                  <CardHeader className="flex-shrink-0">
-                    <CardTitle>Fórmulas Existentes</CardTitle>
-                    <CardDescription>Estas são as fórmulas já cadastradas para esta tinta</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex-1 overflow-y-auto">
-                    <div className="space-y-3">
-                      {props.existingFormulas.map((formula, index) => (
-                        <div key={formula.id} className="p-4 bg-muted/30 rounded-lg border border-border/50">
-                          <h4 className="font-medium mb-2 text-sm">{formula.description || `Fórmula ${index + 1}`}</h4>
-                          {formula.components && formula.components.length > 0 && (
-                            <ul className="space-y-1 text-sm text-muted-foreground">
-                              {formula.components.map((component) => (
-                                <li key={component.id} className="pl-2">
-                                  <span className="font-enhanced-unicode">•</span> {component.item?.name || component.itemId}: {component.ratio.toFixed(2)}%
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+            <Card>
+              <CardContent className="pt-6">
+                {/* Hex Color Input */}
+                <div className="mb-6">
+                  <HexColorInput control={form.control} required hidePreview />
+                </div>
 
-              <Card className="flex flex-col max-h-[600px]">
-                <CardHeader className="flex-shrink-0">
-                  <CardTitle>{props.mode === "update" ? "Adicionar Nova Fórmula" : "Formulação da Tinta"}</CardTitle>
-                  <CardDescription>
-                    {props.mode === "update" ? "Adicione uma nova fórmula para esta tinta (opcional)" : "Gerencie as fórmulas e componentes da tinta (opcional)"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto">
-                  <FormulaManager
-                    formulas={formulas}
-                    onFormulasChange={(newFormulas) => {
-                      setFormulas(newFormulas);
-                      // Immediately update URL when formulas change
-                      if (mode === "create") {
-                        const params = serializeFormToUrlParams(form.getValues(), newFormulas, currentStep);
-                        setSearchParams(params, { replace: true });
+                {/* Original preview indicator and restore button for update mode */}
+                {mode === "update" && originalColorPreview.current && (
+                  <div className="mb-4 flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={originalColorPreview.current}
+                        alt="Preview original"
+                        className="w-16 h-12 object-cover rounded border"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {previewModified ? "Preview modificado" : "Preview original"}
+                      </span>
+                    </div>
+                    {previewModified && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setColorPreviewData(originalColorPreview.current);
+                          setPreviewModified(false);
+                        }}
+                        className="text-sm text-primary hover:underline"
+                      >
+                        Restaurar original
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Preview Generator */}
+                <PaintPreviewGenerator
+                  ref={previewGeneratorRef}
+                  baseColor={form.watch("hex") || "#000000"}
+                  finish={(form.watch("finish") || "SOLID") as PaintFinishType}
+                  initialSettings={previewSettings}
+                  onSettingsChange={(settings) => {
+                    // Store the settings so they persist across step changes
+                    setPreviewSettings(settings);
+                    // Mark as modified when user changes any setting
+                    if (!previewModified) {
+                      setPreviewModified(true);
+                    }
+                    // Capture the image immediately whenever settings change
+                    // This ensures we always have the latest preview in state
+                    setTimeout(() => {
+                      if (previewGeneratorRef.current) {
+                        const img = previewGeneratorRef.current.exportImage();
+                        if (img) {
+                          setColorPreviewData(img);
+                        }
                       }
-                      // In update mode, we don't need to sync formulas to URL since they're new formulas being added
-                    }}
-                    paintId={props.mode === "update" ? props.paintId : undefined}
-                    availableItems={sortedComponentItems}
-                  />
-                </CardContent>
-              </Card>
-            </div>
+                    }, 100); // Small delay to ensure canvas is rendered
+                  }}
+                />
+              </CardContent>
+            </Card>
           )}
 
-          {currentStep === 3 && paintType?.data?.needGround && (
-            <div className="space-y-6">
-              <Card className="bg-transparent">
-                <CardHeader>
-                  <CardTitle>Seleção de Fundo</CardTitle>
-                  <CardDescription>Selecione os fundos necessários para esta tinta</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <GroundSelector
-                    control={form.control}
-                    required
-                    initialPaints={props.mode === "update" ? props.initialGrounds : undefined}
-                  />
-                </CardContent>
-              </Card>
-            </div>
+          {currentStep === 3 && (
+            <Card>
+              <CardContent className="pt-6 space-y-6">
+                {/* Show existing formulas in update mode */}
+                {props.mode === "update" && props.existingFormulas && props.existingFormulas.length > 0 && (
+                  <div className="flex flex-col max-h-[400px] overflow-y-auto space-y-3">
+                    {props.existingFormulas.map((formula, index) => (
+                      <div key={formula.id} className="p-4 bg-muted/30 rounded-lg border border-border/50">
+                        <h4 className="font-medium mb-2 text-sm">{formula.description || `Fórmula ${index + 1}`}</h4>
+                        {formula.components && formula.components.length > 0 && (
+                          <ul className="space-y-1 text-sm text-muted-foreground">
+                            {formula.components.map((component) => (
+                              <li key={component.id} className="pl-2">
+                                <span className="font-enhanced-unicode">•</span> {component.item?.name || component.itemId}: {component.ratio.toFixed(2)}%
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <FormulaManager
+                  formulas={formulas}
+                  onFormulasChange={(newFormulas) => {
+                    setFormulas(newFormulas);
+                    // Immediately update URL when formulas change
+                    if (mode === "create") {
+                      const params = serializeFormToUrlParams(form.getValues(), newFormulas, currentStep);
+                      setSearchParams(params, { replace: true });
+                    }
+                    // In update mode, we don't need to sync formulas to URL since they're new formulas being added
+                  }}
+                  paintId={props.mode === "update" ? props.paintId : undefined}
+                  availableItems={sortedComponentItems}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {currentStep === 4 && paintType?.data?.needGround && (
+            <Card>
+              <CardContent className="pt-6">
+                <GroundSelector
+                  control={form.control}
+                  required
+                  initialPaints={props.mode === "update" ? props.initialGrounds : undefined}
+                />
+              </CardContent>
+            </Card>
           )}
 
           {/* Hidden submit button for external triggering */}

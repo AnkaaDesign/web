@@ -1,6 +1,6 @@
 import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD } from "../../constants";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, PAINT_FINISH_LABELS, PAINT_FINISH } from "../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { usePaintDashboard, usePaintBrands } from "../../hooks";
 import { useNavigate } from "react-router-dom";
@@ -423,22 +423,23 @@ export function Painting() {
                   title="Distribuição por Acabamento"
                   type="COLOR"
                   data={
-                    data?.colorAnalysis?.colorsByFinish?.map((finish) => ({
-                      label: finish.finish,
-                      value: finish.count,
-                      percentage: finish.percentage,
-                      color: finish.finish.includes("Fosco")
-                        ? "bg-gray-500"
-                        : finish.finish.includes("Brilhante")
-                          ? "bg-yellow-500"
-                          : finish.finish.includes("Metálico")
-                            ? "bg-blue-500"
-                            : finish.finish.includes("Perolizado")
-                              ? "bg-purple-500"
-                              : finish.finish.includes("Lisa")
-                                ? "bg-green-500"
-                                : "bg-orange-500",
-                    })) || []
+                    data?.colorAnalysis?.colorsByFinish?.map((finish) => {
+                      const normalizedFinish = finish.finish.toUpperCase() as keyof typeof PAINT_FINISH_LABELS;
+                      const finishLabel = PAINT_FINISH_LABELS[normalizedFinish] || finish.finish;
+                      const colorMap: Record<string, string> = {
+                        [PAINT_FINISH.MATTE]: "bg-gray-500",
+                        [PAINT_FINISH.SATIN]: "bg-yellow-500",
+                        [PAINT_FINISH.METALLIC]: "bg-blue-500",
+                        [PAINT_FINISH.PEARL]: "bg-purple-500",
+                        [PAINT_FINISH.SOLID]: "bg-green-500",
+                      };
+                      return {
+                        label: finishLabel,
+                        value: finish.count,
+                        percentage: finish.percentage,
+                        color: colorMap[normalizedFinish] || "bg-orange-500",
+                      };
+                    }) || []
                   }
                   icon={IconChartPie}
                   onDetailsClick={() => navigate(routes.painting.catalog.root)}

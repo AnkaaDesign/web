@@ -13,6 +13,7 @@ import {
   IconSparkles,
   IconScissors,
   IconPlus,
+  IconX,
   IconCurrencyReal,
   IconReceipt,
   IconFileInvoice,
@@ -72,6 +73,7 @@ export const TaskCreateForm = () => {
   const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
   const [isLayoutOpen, setIsLayoutOpen] = useState(false);
   const [isObservationOpen, setIsObservationOpen] = useState(false);
+  const [isFinancialInfoOpen, setIsFinancialInfoOpen] = useState(false);
   const [layouts, setLayouts] = useState<{
     left?: any;
     right?: any;
@@ -612,9 +614,9 @@ export const TaskCreateForm = () => {
                       <CustomerSelector control={form.control} disabled={isSubmitting} required />
                     </div>
 
-                    {/* Serial Number */}
-                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-                      {/* Serial Number */}
+                    {/* Serial Number, Plate, Chassis - in same row with 1/4, 1/4, 2/4 ratio */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      {/* Serial Number - 1/4 */}
                       <FormField
                         control={form.control}
                         name="serialNumber"
@@ -639,6 +641,81 @@ export const TaskCreateForm = () => {
                             </FormControl>
                             <FormMessage />
                           </FormItem>
+                        )}
+                      />
+
+                      {/* Plate - 1/4 */}
+                      <FormField
+                        control={form.control}
+                        name="truck.plate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconLicense className="h-4 w-4" />
+                              Placa
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                value={field.value || ""}
+                                placeholder="Ex: ABC1234"
+                                className="uppercase bg-transparent"
+                                onChange={(value) => {
+                                  const upperValue = (value || "").toUpperCase();
+                                  field.onChange(upperValue);
+                                }}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Chassis - 2/4 (col-span-2) */}
+                      <FormField
+                        control={form.control}
+                        name="truck.chassisNumber"
+                        render={({ field }) => (
+                          <FormItem className="md:col-span-2">
+                            <FormLabel className="flex items-center gap-2">
+                              <IconId className="h-4 w-4" />
+                              Chassi
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                value={field.value || ""}
+                                placeholder="Ex: 9BWZZZ377VT004251"
+                                className="uppercase bg-transparent"
+                                onChange={(value) => {
+                                  const upperValue = (value || "").toUpperCase();
+                                  field.onChange(upperValue);
+                                }}
+                                disabled={isSubmitting}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    {/* Dates - Entry Date and Deadline */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Entry Date - Date only */}
+                      <FormField
+                        control={form.control}
+                        name="entryDate"
+                        render={({ field }) => (
+                          <DateTimeInput field={field} label={<span className="flex items-center gap-2"><IconCalendar className="h-4 w-4" />Data de Entrada</span>} placeholder="Selecione a data de entrada" disabled={isSubmitting} mode="date" context="start" />
+                        )}
+                      />
+
+                      {/* Deadline - DateTime */}
+                      <FormField
+                        control={form.control}
+                        name="term"
+                        render={({ field }) => (
+                          <DateTimeInput field={field} label={<span className="flex items-center gap-2"><IconCalendar className="h-4 w-4" />Prazo de Entrega</span>} placeholder="Selecione o prazo de entrega" disabled={isSubmitting} mode="datetime" context="due" />
                         )}
                       />
                     </div>
@@ -709,37 +786,6 @@ export const TaskCreateForm = () => {
                   </CardContent>
                 </Card>
 
-                {/* Dates Card */}
-                <Card className="bg-transparent">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <IconCalendar className="h-5 w-5" />
-                      Datas
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Entry Date - Date only */}
-                      <FormField
-                        control={form.control}
-                        name="entryDate"
-                        render={({ field }) => (
-                          <DateTimeInput field={field} label="Data de Entrada" placeholder="Selecione a data de entrada" disabled={isSubmitting} mode="date" context="start" />
-                        )}
-                      />
-
-                      {/* Deadline - DateTime */}
-                      <FormField
-                        control={form.control}
-                        name="term"
-                        render={({ field }) => (
-                          <DateTimeInput field={field} label="Prazo de Entrega" placeholder="Selecione o prazo de entrega" disabled={isSubmitting} mode="datetime" context="due" />
-                        )}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-
                 {/* Services Card */}
                 <Card className="bg-transparent">
                   <CardHeader>
@@ -782,13 +828,13 @@ export const TaskCreateForm = () => {
                 {/* Layout Section - Hidden for Financial sector */}
                 {!isFinancialSector && (
                 <Card className="bg-transparent">
-                  <CardHeader>
+                  <CardHeader className={`transition-all duration-200 ${!isLayoutOpen ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <IconRuler className="h-5 w-5" />
                         Layout do Caminhão
                       </CardTitle>
-                      {!isLayoutOpen && (
+                      {!isLayoutOpen ? (
                         <Button
                           type="button"
                           onClick={() => setIsLayoutOpen(true)}
@@ -797,12 +843,31 @@ export const TaskCreateForm = () => {
                           className="gap-2"
                         >
                           <IconPlus className="h-4 w-4" />
-                          Adicionar Layout
+                          Adicionar
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setIsLayoutOpen(false);
+                            setLayouts({
+                              left: { height: 2.4, sections: [{ width: 8, hasDoor: false }], photoId: null },
+                              right: { height: 2.4, sections: [{ width: 8, hasDoor: false }], photoId: null },
+                              back: { height: 2.42, sections: [{ width: 2.42, hasDoor: false }], photoId: null },
+                            });
+                          }}
+                          disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover layout"
+                        >
+                          <IconX className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className={`transition-all duration-200 ${!isLayoutOpen ? "p-2" : ""}`}>
                     {isLayoutOpen ? (
                       <div className="space-y-4">
                         {/* Layout Side Selector with Total Length */}
@@ -846,275 +911,252 @@ export const TaskCreateForm = () => {
                           disabled={isSubmitting}
                           taskName={form.watch('name')}
                         />
-
-                        <div className="flex justify-end">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setIsLayoutOpen(false);
-                              // Reset layouts to default values
-                              setLayouts({
-                                left: { height: 2.4, sections: [{ width: 8, hasDoor: false }], photoId: null },
-                                right: { height: 2.4, sections: [{ width: 8, hasDoor: false }], photoId: null },
-                                back: { height: 2.42, sections: [{ width: 2.42, hasDoor: false }], photoId: null },
-                              });
-                            }}
-                            disabled={isSubmitting}
-                          >
-                            Remover
-                          </Button>
-                        </div>
                       </div>
                     ) : null}
                   </CardContent>
                 </Card>
                 )}
 
-                {/* Financial Information Card */}
-                <Card className="bg-transparent">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <IconCurrencyReal className="h-5 w-5" />
-                      Informações Financeiras
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Budget File */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                          Orçamento
-                        </label>
-                        <FileUploadField
-                          onFilesChange={handleBudgetFileChange}
-                          maxFiles={5}
-                          disabled={isSubmitting}
-                          showPreview={false}
-                          existingFiles={budgetFile}
-                          variant="compact"
-                          placeholder="Adicionar orçamentos"
-                          label=""
-                        />
-                      </div>
-
-                      {/* NFe File */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <IconFile className="h-4 w-4 text-muted-foreground" />
-                          Nota Fiscal
-                        </label>
-                        <FileUploadField
-                          onFilesChange={handleNfeFileChange}
-                          maxFiles={5}
-                          disabled={isSubmitting}
-                          showPreview={false}
-                          existingFiles={nfeFile}
-                          variant="compact"
-                          placeholder="Adicionar NFes"
-                          label=""
-                        />
-                      </div>
-
-                      {/* Receipt File */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <IconReceipt className="h-4 w-4 text-muted-foreground" />
-                          Recibo
-                        </label>
-                        <FileUploadField
-                          onFilesChange={handleReceiptFileChange}
-                          maxFiles={5}
-                          disabled={isSubmitting}
-                          showPreview={false}
-                          existingFiles={receiptFile}
-                          variant="compact"
-                          placeholder="Adicionar recibos"
-                          label=""
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
                 {/* Budget Card */}
                 <Card className="bg-transparent">
-                  <CardHeader>
+                  <CardHeader className={`transition-all duration-200 ${budgetCount === 0 ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <IconFileInvoice className="h-5 w-5" />
                         Orçamento Detalhado
                       </CardTitle>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          if (budgetSelectorRef.current) {
-                            budgetSelectorRef.current.addBudget();
-                          }
-                        }}
-                        disabled={isSubmitting}
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <IconPlus className="h-4 w-4" />
-                        Adicionar Orçamento ({budgetCount})
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <BudgetSelector ref={budgetSelectorRef} control={form.control} disabled={isSubmitting} onBudgetCountChange={setBudgetCount} />
-                  </CardContent>
-                </Card>
-
-                {/* Observation Section */}
-                <Card className="bg-transparent">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconFile className="h-5 w-5" />
-                        Observação
-                      </CardTitle>
-                      {!isObservationOpen && (
+                      {budgetCount === 0 ? (
                         <Button
                           type="button"
-                          onClick={() => setIsObservationOpen(true)}
+                          onClick={() => {
+                            if (budgetSelectorRef.current) {
+                              budgetSelectorRef.current.addBudget();
+                            }
+                          }}
                           disabled={isSubmitting}
                           size="sm"
                           className="gap-2"
                         >
                           <IconPlus className="h-4 w-4" />
-                          Adicionar Observação
+                          Adicionar
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (budgetSelectorRef.current) {
+                              budgetSelectorRef.current.clearAll();
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover orçamento"
+                        >
+                          <IconX className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    {isObservationOpen ? (
-                      <div className="space-y-4">
-                        <FormField
-                          control={form.control}
-                          name="observation"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="flex items-center gap-2">
-                                <IconNotes className="h-4 w-4" />
-                                Descrição da Observação
-                              </FormLabel>
-                              <FormControl>
-                                <Textarea
-                                  value={field.value?.description || ""}
-                                  onChange={(e) => {
-                                    const description = e.target.value;
-                                    field.onChange(description ? { description } : null);
-                                  }}
-                                  placeholder="Descreva problemas ou observações sobre a tarefa..."
-                                  rows={4}
-                                  disabled={isSubmitting}
-                                  className="bg-transparent"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        {/* Observation Files */}
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium flex items-center gap-2">
-                            <IconFile className="h-4 w-4 text-muted-foreground" />
-                            Arquivos de Evidência (Opcional)
-                          </label>
-                          <FileUploadField
-                            onFilesChange={handleObservationFilesChange}
-                            maxFiles={10}
-                            disabled={isSubmitting}
-                            showPreview={true}
-                            existingFiles={observationFiles}
-                            variant="compact"
-                            placeholder="Adicione fotos, documentos ou outros arquivos"
-                            label="Arquivos anexados"
-                          />
-                        </div>
-
-                        <div className="flex justify-end">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setIsObservationOpen(false);
-                              form.setValue("observation", null);
-                              setObservationFiles([]);
-                            }}
-                            disabled={isSubmitting}
-                          >
-                            Remover
-                          </Button>
-                        </div>
-                      </div>
-                    ) : null}
+                  <CardContent className={`transition-all duration-200 ${budgetCount === 0 ? "p-2" : ""}`}>
+                    <BudgetSelector ref={budgetSelectorRef} control={form.control} disabled={isSubmitting} onBudgetCountChange={setBudgetCount} />
                   </CardContent>
                 </Card>
 
                 {/* Cut Plans Section - Improved Multiple Cuts Support */}
                 <Card className="bg-transparent">
-                  <CardHeader>
+                  <CardHeader className={`transition-all duration-200 ${cutsCount === 0 ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <IconScissors className="h-5 w-5" />
                         Plano de Corte
                       </CardTitle>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          if (multiCutSelectorRef.current) {
-                            multiCutSelectorRef.current.addCut();
-                          } else {
-                            console.error("❌ MultiCutSelector ref not available!");
-                          }
-                        }}
-                        disabled={isSubmitting || cutsCount >= 10}
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <IconPlus className="h-4 w-4" />
-                        Adicionar Recorte ({cutsCount}/10)
-                      </Button>
+                      {cutsCount === 0 ? (
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (multiCutSelectorRef.current) {
+                              multiCutSelectorRef.current.addCut();
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Adicionar
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (multiCutSelectorRef.current) {
+                              multiCutSelectorRef.current.clearAll();
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover todos os recortes"
+                        >
+                          <IconX className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className={`transition-all duration-200 ${cutsCount === 0 ? "p-2" : ""}`}>
                     <MultiCutSelector ref={multiCutSelectorRef} control={form.control} disabled={isSubmitting} onCutsCountChange={handleSetCutsCount} />
                   </CardContent>
                 </Card>
 
                 {/* Airbrushing Section */}
                 <Card className="bg-transparent">
-                  <CardHeader>
+                  <CardHeader className={`transition-all duration-200 ${airbrushingsCount === 0 ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <IconSparkles className="h-5 w-5" />
                         Aerografias
                       </CardTitle>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          if (multiAirbrushingSelectorRef.current) {
-                            multiAirbrushingSelectorRef.current.addAirbrushing();
-                          }
-                        }}
-                        disabled={isSubmitting || airbrushingsCount >= 10}
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <IconPlus className="h-4 w-4" />
-                        Adicionar Aerografia ({airbrushingsCount}/10)
-                      </Button>
+                      {airbrushingsCount === 0 ? (
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (multiAirbrushingSelectorRef.current) {
+                              multiAirbrushingSelectorRef.current.addAirbrushing();
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Adicionar
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (multiAirbrushingSelectorRef.current) {
+                              multiAirbrushingSelectorRef.current.clearAll();
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover todas as aerografias"
+                        >
+                          <IconX className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className={`transition-all duration-200 ${airbrushingsCount === 0 ? "p-2" : ""}`}>
                     <MultiAirbrushingSelector ref={multiAirbrushingSelectorRef} control={form.control} disabled={isSubmitting} onAirbrushingsCountChange={setAirbrushingsCount} />
+                  </CardContent>
+                </Card>
+
+                {/* Financial Information Card */}
+                <Card className="bg-transparent">
+                  <CardHeader className={`transition-all duration-200 ${!isFinancialInfoOpen ? "pt-3 pb-0" : ""}`}>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconCurrencyReal className="h-5 w-5" />
+                        Informações Financeiras
+                      </CardTitle>
+                      {!isFinancialInfoOpen ? (
+                        <Button
+                          type="button"
+                          onClick={() => setIsFinancialInfoOpen(true)}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Adicionar
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setIsFinancialInfoOpen(false);
+                            setBudgetFile([]);
+                            setNfeFile([]);
+                            setReceiptFile([]);
+                          }}
+                          disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover arquivos financeiros"
+                        >
+                          <IconX className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className={`transition-all duration-200 ${!isFinancialInfoOpen ? "p-2" : ""}`}>
+                    {isFinancialInfoOpen ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Budget File */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                              <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
+                              Orçamento
+                            </label>
+                            <FileUploadField
+                              onFilesChange={handleBudgetFileChange}
+                              maxFiles={5}
+                              disabled={isSubmitting}
+                              showPreview={false}
+                              existingFiles={budgetFile}
+                              variant="compact"
+                              placeholder="Adicionar orçamentos"
+                              label=""
+                            />
+                          </div>
+
+                          {/* NFe File */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                              <IconFile className="h-4 w-4 text-muted-foreground" />
+                              Nota Fiscal
+                            </label>
+                            <FileUploadField
+                              onFilesChange={handleNfeFileChange}
+                              maxFiles={5}
+                              disabled={isSubmitting}
+                              showPreview={false}
+                              existingFiles={nfeFile}
+                              variant="compact"
+                              placeholder="Adicionar NFes"
+                              label=""
+                            />
+                          </div>
+
+                          {/* Receipt File */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                              <IconReceipt className="h-4 w-4 text-muted-foreground" />
+                              Recibo
+                            </label>
+                            <FileUploadField
+                              onFilesChange={handleReceiptFileChange}
+                              maxFiles={5}
+                              disabled={isSubmitting}
+                              showPreview={false}
+                              existingFiles={receiptFile}
+                              variant="compact"
+                              placeholder="Adicionar recibos"
+                              label=""
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
                   </CardContent>
                 </Card>
 

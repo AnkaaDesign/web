@@ -38,6 +38,7 @@ export interface Paint extends BaseEntity {
   colorOrder: number;
   paintTypeId: string;
   paintBrandId: string | null;
+  colorPreview: string | null; // Paint preview image URL (WebP)
 
   // Relations (optional, populated based on query)
   paintType?: PaintType;
@@ -53,6 +54,7 @@ export interface Paint extends BaseEntity {
   // Count fields (optional, populated when using _count in include)
   _count?: {
     formulas?: number;
+    paintProduction?: number;
     generalPaintings?: number;
     logoTasks?: number;
     relatedPaints?: number;
@@ -348,6 +350,7 @@ export interface PaintWhere {
 
   // Number fields
   paletteOrder?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number; in?: number[]; notIn?: number[] };
+  colorOrder?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number; in?: number[]; notIn?: number[] };
 
   // Array fields
   tags?: string[] | { has?: string; hasEvery?: string[]; hasSome?: string[]; isEmpty?: boolean };

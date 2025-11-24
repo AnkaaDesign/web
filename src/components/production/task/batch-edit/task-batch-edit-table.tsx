@@ -105,7 +105,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
               data: {
                 name: task.name || "",
                 status: task.status,
-                serialNumber: task.truck?.serialNumber || "",
+                serialNumber: task.serialNumber || "",
                 plate: task.truck?.plate || "",
                 details: task.details || "",
                 entryDate: task.entryDate ? new Date(task.entryDate) : null,
@@ -139,7 +139,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
         data: {
           name: task.name || "",
           status: task.status,
-          serialNumber: task.truck?.serialNumber || "",
+          serialNumber: task.serialNumber || "",
           plate: task.truck?.plate || "",
           details: task.details || "",
           entryDate: task.entryDate ? new Date(task.entryDate) : null,
@@ -169,7 +169,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
         const hasChanges =
           task.data.name !== originalTask.name ||
           task.data.status !== originalTask.status ||
-          task.data.serialNumber !== originalTask.truck?.serialNumber ||
+          task.data.serialNumber !== originalTask.serialNumber ||
           task.data.plate !== originalTask.truck?.plate ||
           task.data.customerId !== originalTask.customerId ||
           task.data.sectorId !== originalTask.sectorId ||

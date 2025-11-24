@@ -4,6 +4,7 @@ export { MyVacationsPage } from "./my-vacations";
 export { MyWarningsPage } from "./my-warnings";
 export { MyNotificationsPage } from "./my-notifications";
 export { MyLoansPage } from "./my-loans";
+export { MyActivitiesPage } from "./my-activities";
 export { MyHolidaysPage } from "./my-holidays";
 export { PreferencesPage } from "./preferences";
 export { Personal } from "./root";

@@ -1,6 +1,9 @@
 import type { CutGetManyFormData } from "../../../../schemas";
 import { CUT_STATUS_LABELS, CUT_TYPE_LABELS, CUT_ORIGIN_LABELS } from "../../../../constants";
 
+// Special value for tasks without a sector
+const UNDEFINED_SECTOR_VALUE = "__UNDEFINED__";
+
 export interface FilterTag {
   key: string;
   label: string;
@@ -73,6 +76,24 @@ export const createFilterRemover = (
         delete newFilters.createdAt;
         break;
 
+      // Sector filter (through task relationship)
+      case "sector":
+        if (newFilters.where?.task?.sectorId) {
+          delete newFilters.where.task;
+          // Clean up empty where
+          if (Object.keys(newFilters.where || {}).length === 0) {
+            delete newFilters.where;
+          }
+        }
+        // Handle OR clause for combined undefined + specific sectors
+        if (newFilters.where?.OR) {
+          delete newFilters.where.OR;
+          if (Object.keys(newFilters.where || {}).length === 0) {
+            delete newFilters.where;
+          }
+        }
+        break;
+
       default:
         break;
     }
@@ -122,6 +143,38 @@ export const buildFilterTags = (
       value: origin,
       displayValue: CUT_ORIGIN_LABELS[origin as keyof typeof CUT_ORIGIN_LABELS] || String(origin),
       onRemove: () => removeFilter("origin"),
+    });
+  }
+
+  // Sector filter (through task relationship)
+  // Check for direct task.sectorId filter
+  if (filters.where?.task?.sectorId !== undefined) {
+    if (filters.where.task.sectorId === null) {
+      tags.push({
+        key: "sector",
+        label: "Setor",
+        value: UNDEFINED_SECTOR_VALUE,
+        displayValue: "Indefinido (sem setor)",
+        onRemove: () => removeFilter("sector"),
+      });
+    } else if ((filters.where.task.sectorId as any)?.in) {
+      tags.push({
+        key: "sector",
+        label: "Setor",
+        value: (filters.where.task.sectorId as any).in,
+        displayValue: `${(filters.where.task.sectorId as any).in.length} setor(es)`,
+        onRemove: () => removeFilter("sector"),
+      });
+    }
+  }
+  // Check for OR clause (undefined + specific sectors combined)
+  if (filters.where?.OR) {
+    tags.push({
+      key: "sector",
+      label: "Setor",
+      value: "mixed",
+      displayValue: "Múltiplos setores",
+      onRemove: () => removeFilter("sector"),
     });
   }
 

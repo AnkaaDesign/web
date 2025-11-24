@@ -35,7 +35,7 @@ export interface DateTimeInputProps<TFieldValues extends FieldValues = FieldValu
   onChange?: (date: Date | null) => void;
   value?: Date | null;
   className?: string;
-  label?: string;
+  label?: React.ReactNode;
   hideLabel?: boolean;
   error?: string;
   numberOfMonths?: number;

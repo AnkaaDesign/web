@@ -69,7 +69,7 @@ export function TasksInBonusCard({
         task.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         task.customer?.fantasyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         task.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        task.plate?.toLowerCase().includes(searchTerm.toLowerCase());
+        task.truck?.plate?.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Status filter
       const matchesStatus = statusFilter === "ALL" ||
@@ -151,11 +151,11 @@ export function TasksInBonusCard({
       accessor: (task) => (
         <div className="space-y-1">
           <div className="font-medium text-sm truncate">{task.name}</div>
-          {(task.serialNumber || task.plate) && (
+          {(task.serialNumber || task.truck?.plate) && (
             <div className="text-xs text-muted-foreground font-mono">
               {task.serialNumber && <span>S/N: {task.serialNumber}</span>}
-              {task.serialNumber && task.plate && <span className="mx-1">•</span>}
-              {task.plate && <span>Placa: {task.plate}</span>}
+              {task.serialNumber && task.truck?.plate && <span className="mx-1">•</span>}
+              {task.truck?.plate && <span>Placa: {task.truck.plate}</span>}
             </div>
           )}
         </div>

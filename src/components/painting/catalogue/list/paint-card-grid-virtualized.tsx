@@ -9,11 +9,10 @@ interface PaintCardGridVirtualizedProps {
   isLoading: boolean;
   onFilterChange?: (filters: Partial<PaintGetManyFormData>) => void;
   currentFilters?: Partial<PaintGetManyFormData>;
-  showEffects?: boolean;
   onMerge?: () => void;
 }
 
-export function PaintCardGridVirtualized({ paints, isLoading, onFilterChange, currentFilters, showEffects = true, onMerge }: PaintCardGridVirtualizedProps) {
+export function PaintCardGridVirtualized({ paints, isLoading, onFilterChange, currentFilters, onMerge }: PaintCardGridVirtualizedProps) {
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4 w-full">
@@ -65,7 +64,7 @@ export function PaintCardGridVirtualized({ paints, isLoading, onFilterChange, cu
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4 w-full">
       {paints.map((paint) => (
-        <PaintCard key={paint.id} paint={paint} onFilterChange={onFilterChange} currentFilters={currentFilters} showEffects={showEffects} onMerge={onMerge} />
+        <PaintCard key={paint.id} paint={paint} onFilterChange={onFilterChange} currentFilters={currentFilters} onMerge={onMerge} />
       ))}
     </div>
   );

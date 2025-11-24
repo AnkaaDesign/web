@@ -41,10 +41,10 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
   const { batchDelete, batchUpdateAsync: batchUpdate } = useUserBatchMutations();
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditUsers(user);
-  const canDelete = canDeleteUsers(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'users');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditUsers(user) : false;
+  const canDelete = user ? canDeleteUsers(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'user') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();

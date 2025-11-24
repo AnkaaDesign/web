@@ -1052,6 +1052,7 @@ export const ppeDeliveryCreateSchema = z.object({
   userId: z.string().uuid("Usuário inválido"),
   itemId: z.string().uuid("Item inválido"),
   quantity: z.number().positive("Quantidade deve ser positiva"),
+  reason: z.string().nullable().optional(),
   reviewedBy: z.string().uuid("Responsável pela revisão inválido").nullable().optional(),
   ppeScheduleId: z.string().uuid("Agendamento inválido").nullable().optional(),
   scheduledDate: z.date().nullable().optional(),
@@ -1066,6 +1067,7 @@ export const ppeDeliveryCreateSchema = z.object({
 export const ppeDeliveryUpdateSchema = z.object({
   itemId: z.string().uuid("Item inválido").optional(),
   quantity: z.number().positive("Quantidade deve ser positiva").optional(),
+  reason: z.string().nullable().optional(),
   scheduledDate: z.date().nullable().optional(),
   actualDeliveryDate: z.date().nullable().optional(),
   reviewedBy: z.string().uuid("Responsável pela revisão inválido").nullable().optional(),

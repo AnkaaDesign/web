@@ -8,7 +8,7 @@ import { batchUpdatePaintColorOrder } from "../../../../api-client/paint";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { IconFilter, IconMaximize, IconMinimize, IconSparkles, IconTrash } from "@tabler/icons-react";
+import { IconFilter, IconMaximize, IconMinimize, IconTrash } from "@tabler/icons-react";
 import { TableSearchInput } from "@/components/ui/table-search-input";
 import { PaintFilters } from "./paint-filters";
 import { PaintGrid } from "./paint-grid";
@@ -58,10 +58,13 @@ function SelectionInfo({ selectedPaints }: SelectionInfoProps) {
           )}
           onClick={() => toggleSelection(paint.id)}
         >
-          <div
-            className="w-3 h-3 rounded-full border border-white/30"
-            style={{ backgroundColor: paint.hex }}
-          />
+          <div className="w-3 h-3 rounded-full border border-white/30 overflow-hidden">
+            {paint.colorPreview ? (
+              <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full" style={{ backgroundColor: paint.hex }} />
+            )}
+          </div>
           <span>{paint.name}</span>
           <IconX className="h-3 w-3 ml-1" />
         </Badge>
@@ -110,11 +113,6 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
     return localStorage.getItem("paintCatalogueView") !== null;
   });
 
-  // Effects state
-  const [showEffects, setShowEffects] = useState(() => {
-    const effects = searchParams.get("effects");
-    return effects !== "false";
-  });
 
   // Color order state
   const [hasOrderChanges, setHasOrderChanges] = useState(false);
@@ -288,21 +286,6 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
     );
   }, [isMinimized, setSearchParams]);
 
-  // Update effects state in URL
-  useEffect(() => {
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        if (showEffects) {
-          params.delete("effects");
-        } else {
-          params.set("effects", "false");
-        }
-        return params;
-      },
-      { replace: true },
-    );
-  }, [showEffects, setSearchParams]);
 
 
   // Query filters
@@ -355,6 +338,9 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
 
   // Fetch paints
   const { data: paintsData, isLoading, refetch } = usePaints(queryFilters);
+
+  // Fetch total count of all paints (without filters)
+  const { data: totalPaintsData } = usePaints({ limit: 1 });
 
   // Process and sort paints for color display
   const sortedPaints = useMemo(() => {
@@ -558,16 +544,17 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
       <Card className={cn("h-full w-full flex flex-col shadow-sm border border-border", className)}>
         <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden w-full">
           {/* Search and controls */}
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="flex-1">
               <TableSearchInput
                 value={displaySearchText}
                 onChange={setSearch}
                 placeholder="Buscar por nome, código hex, marca, tags, tarefas, clientes..."
                 isPending={displaySearchText !== searchingFor}
+                suffix={!isLoading ? `${sortedPaints.length} de ${totalPaintsData?.meta?.totalRecords ?? sortedPaints.length} tintas` : undefined}
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               {/* Filter Button */}
               <Button variant={hasActiveFilters ? "default" : "outline"} size="default" onClick={() => setShowFilterModal(true)}>
                 <IconFilter className="h-4 w-4" />
@@ -579,17 +566,6 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
 
               {/* Sort Selector */}
               <SortSelector currentSort={currentSort} onSortChange={handleSortChange} />
-
-              {/* Effects Toggle Button */}
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setShowEffects(!showEffects)}
-                title={showEffects ? "Desativar efeitos" : "Ativar efeitos"}
-                className={showEffects ? "bg-primary/10" : ""}
-              >
-                <IconSparkles className={`h-4 w-4 ${showEffects ? "text-primary" : ""}`} />
-              </Button>
 
               {/* View Toggle Button */}
               <Button variant="outline" size="icon" onClick={toggleView} title={isMinimized ? "Maximizar" : "Minimizar"}>
@@ -604,12 +580,13 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
           {/* Selection Info */}
           <SelectionInfo selectedPaints={selectedPaints} />
 
+
           {/* Paint display with smooth transitions */}
           <div ref={scrollContainerRef} className="flex-1 min-h-0 relative overflow-auto w-full">
             {isMinimized ? (
-              <PaintGrid key={gridResetKey} paints={sortedPaints} isLoading={isLoading} onPaintClick={handlePaintClick} showEffects={showEffects} onOrderChange={handleOrderChange} />
+              <PaintGrid key={gridResetKey} paints={sortedPaints} isLoading={isLoading} onPaintClick={handlePaintClick} onOrderChange={handleOrderChange} />
             ) : (
-              <PaintCardGridVirtualized paints={sortedPaints} isLoading={isLoading} onFilterChange={handleFilterChange} currentFilters={filters} showEffects={showEffects} onMerge={handleMerge} />
+              <PaintCardGridVirtualized paints={sortedPaints} isLoading={isLoading} onFilterChange={handleFilterChange} currentFilters={filters} onMerge={handleMerge} />
             )}
           </div>
         </CardContent>

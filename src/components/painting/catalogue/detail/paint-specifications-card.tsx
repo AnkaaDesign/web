@@ -9,6 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+
+// Tag badge style - inverted (dark in light mode, light in dark mode)
+const TAG_BADGE_STYLE = "border-0 bg-neutral-700 text-neutral-100 dark:bg-neutral-300 dark:text-neutral-800 hover:border-0 hover:bg-neutral-700 hover:text-neutral-100 dark:hover:bg-neutral-300 dark:hover:text-neutral-800";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { cn } from "@/lib/utils";
 
@@ -106,9 +110,16 @@ export function PaintSpecificationsCard({ paint, className }: PaintSpecification
           </h3>
           <div className="bg-muted/50 rounded-lg p-4">
             <div className="flex items-start gap-6">
-              {/* Color Preview - Increased size with effects based on finish */}
-              <div className="w-32 h-32 rounded-lg shadow-inner border-2 border-muted flex-shrink-0 relative overflow-hidden">
-                {paint.finish ? (
+              {/* Color Preview - Use stored colorPreview image if available */}
+              <div className="w-32 h-32 rounded-md ring-1 ring-border shadow-sm flex-shrink-0 relative overflow-hidden">
+                {paint.colorPreview ? (
+                  <img
+                    src={paint.colorPreview}
+                    alt={paint.name}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : paint.finish ? (
                   <CanvasNormalMapRenderer baseColor={paint.hex} finish={paint.finish as PAINT_FINISH} width={128} height={128} className="w-full h-full" quality="high" />
                 ) : (
                   <div className="w-full h-full" style={{ backgroundColor: paint.hex }} />
@@ -188,14 +199,16 @@ export function PaintSpecificationsCard({ paint, className }: PaintSpecification
               </div>
             )}
             {paint.tags && paint.tags.length > 0 && (
-              <div className="flex justify-between items-start bg-muted/50 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-muted-foreground">Tags</span>
-                <div className="flex flex-wrap gap-1 justify-end max-w-[60%]">
-                  {paint.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex-shrink-0 mr-4">Tags</span>
+                <div className="max-w-[70%] overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  <div className="flex gap-1 whitespace-nowrap">
+                    {paint.tags.map((tag) => (
+                      <Badge key={tag} className={cn("text-xs flex-shrink-0", TAG_BADGE_STYLE)}>
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

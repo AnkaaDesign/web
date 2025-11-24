@@ -7,11 +7,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { formatHexColor, getContrastingTextColor } from "./color-utils";
-import { routes, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH, TRUCK_MANUFACTURER } from "../../../../constants";
-import { IconFlask, IconTag, IconTruckLoading, IconSparkles, IconEdit, IconTrash, IconCheck, IconX, IconGitMerge, IconEye, IconDroplet, IconClipboardList } from "@tabler/icons-react";
+import { routes, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, TRUCK_MANUFACTURER, PAINT_FINISH } from "../../../../constants";
+import { IconFlask, IconEdit, IconTrash, IconCheck, IconX, IconGitMerge, IconEye, IconClipboardList } from "@tabler/icons-react";
 import { usePaintMutations } from "../../../../hooks";
 import type { PaintGetManyFormData } from "../../../../schemas";
-import { CanvasNormalMapRenderer } from "../../effects/canvas-normal-map-renderer";
 import { usePaintSelection } from "./paint-selection-context";
 import { cn } from "@/lib/utils";
 import {
@@ -24,16 +23,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+
+// Badge style - unified neutral, more subtle (for type, brand, finish, manufacturer)
+const BADGE_STYLE = "border-0 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:border-0 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300";
+// Tag badge style - inverted (dark in light mode, light in dark mode)
+const TAG_BADGE_STYLE = "border-0 bg-neutral-700 text-neutral-100 dark:bg-neutral-300 dark:text-neutral-800 hover:border-0 hover:bg-neutral-700 hover:text-neutral-100 dark:hover:bg-neutral-300 dark:hover:text-neutral-800";
 
 interface PaintCardProps {
   paint: Paint;
   onFilterChange?: (filters: Partial<PaintGetManyFormData>) => void;
   currentFilters?: Partial<PaintGetManyFormData>;
-  showEffects?: boolean;
   onMerge?: () => void;
 }
 
-export function PaintCard({ paint, onFilterChange, currentFilters, showEffects = true, onMerge }: PaintCardProps) {
+export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: PaintCardProps) {
   const navigate = useNavigate();
   const { delete: deletePaint } = usePaintMutations();
   const { isSelected, toggleSelection, selectedCount } = usePaintSelection();
@@ -51,13 +55,30 @@ export function PaintCard({ paint, onFilterChange, currentFilters, showEffects =
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
   const [isDeleting, setIsDeleting] = React.useState(false);
 
-  // Use viewport boundary checking hook
-  
   // Get labels
   const paintTypeLabel = paint.paintType?.name || "";
   const finishLabel = PAINT_FINISH_LABELS[paint.finish] || paint.finish;
   const brandLabel = paint.paintBrand?.name || "";
   const manufacturerLabel = paint.manufacturer ? TRUCK_MANUFACTURER_LABELS[paint.manufacturer] || paint.manufacturer : null;
+
+  // Get adaptive background for paint code overlay
+  // Dark colors need light background, light colors need dark background
+  const getCodeOverlayStyle = () => {
+    // If text should be white (dark paint), use white bg with black text
+    // If text should be black (light paint), use black bg with white text
+    if (textColor === "#FFFFFF") {
+      // Dark paint - use white/light background
+      return { backgroundColor: "rgba(255,255,255,0.9)", color: "#000000" };
+    } else {
+      // Light paint - use dark background
+      return { backgroundColor: "rgba(0,0,0,0.75)", color: "#FFFFFF" };
+    }
+  };
+  const codeOverlayStyle = getCodeOverlayStyle();
+
+  // Formula and task counts
+  const formulaCount = paint.formulas?.length || 0;
+  const taskCount = (paint._count?.logoTasks || 0) + (paint._count?.generalPaintings || 0);
 
   // Handle edit action
   const handleEdit = (e?: React.MouseEvent) => {
@@ -198,22 +219,18 @@ export function PaintCard({ paint, onFilterChange, currentFilters, showEffects =
         }}
         onContextMenu={handleContextMenu}
       >
-        {/* Color preview - either with effects or plain */}
-        <div className="h-32 relative flex-shrink-0 overflow-hidden">
-          {showEffects ? (
-            /* Show canvas renderer with ALL effects only if showEffects is true */
-            <div className="w-full h-full">
-              <CanvasNormalMapRenderer
-                baseColor={paint.hex}
-                finish={paint.finish as PAINT_FINISH}
-                width={400}
-                height={128}
-                quality="medium"
-                className="w-full h-full object-cover"
-              />
-            </div>
+        {/* Color preview - use colorPreview image if available, otherwise hex fallback */}
+        <div className="h-28 relative flex-shrink-0 overflow-hidden">
+          {paint.colorPreview ? (
+            /* Show stored preview image if available */
+            <img
+              src={paint.colorPreview}
+              alt={paint.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
           ) : (
-            /* Plain color without any effects when showEffects is false */
+            /* Fallback to hex color when no preview image */
             <div className="w-full h-full" style={{ backgroundColor }} />
           )}
 
@@ -227,91 +244,92 @@ export function PaintCard({ paint, onFilterChange, currentFilters, showEffects =
             </div>
           )}
 
-          {/* Hex code overlay */}
-          <div
-            className="absolute bottom-2 right-2 text-xs font-mono px-2 py-1 rounded"
-            style={{
-              backgroundColor: textColor === "#FFFFFF" ? "rgba(0,0,0,0.7)" : "rgba(255,255,255,0.9)",
-              color: textColor,
-            }}
-          >
-            {paint.hex}
-          </div>
+          {/* Paint code overlay - only shown if code exists */}
+          {paint.code && (
+            <div
+              className="absolute bottom-2 right-2 text-xs font-mono px-2 py-1 rounded"
+              style={codeOverlayStyle}
+            >
+              {paint.code}
+            </div>
+          )}
         </div>
 
         {/* Card content */}
-        <div className="p-4 space-y-3 flex-1 flex flex-col">
-          {/* Name - Always shown */}
-          <div className="flex-1">
-            <h3 className="font-semibold text-base line-clamp-2 mb-1">{paint.name}</h3>
-          </div>
+        <div className="p-3 flex-1 flex flex-col">
+          {/* Name */}
+          <h3 className="font-semibold text-base line-clamp-2">{paint.name}</h3>
 
-          {/* Badges - Always shown */}
-          <div className="flex flex-wrap gap-1">
+          {/* Badges - unified neutral style, no wrap for consistent card height */}
+          <div className="flex flex-nowrap gap-1 overflow-hidden mt-2">
             {paintTypeLabel && (
-              <Badge variant="secondary" className="text-xs">
-                <IconDroplet className="h-3 w-3 mr-1" />
+              <Badge className={cn("text-xs border-0 flex-shrink-0", BADGE_STYLE)}>
                 {paintTypeLabel}
               </Badge>
             )}
 
-            <Badge variant="secondary" className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors" onClick={handleFinishFilter}>
-              <IconSparkles className="h-3 w-3 mr-1" />
+            <Badge
+              className={cn("text-xs border-0 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity", BADGE_STYLE)}
+              onClick={handleFinishFilter}
+            >
               {finishLabel}
             </Badge>
 
             {brandLabel && (
-              <Badge variant="outline" className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors" onClick={handlePaintBrandFilter}>
+              <Badge
+                className={cn("text-xs border-0 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity", BADGE_STYLE)}
+                onClick={handlePaintBrandFilter}
+              >
                 {brandLabel}
               </Badge>
             )}
 
             {manufacturerLabel && (
-              <Badge variant="outline" className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors" onClick={handleManufacturerFilter}>
-                <IconTruckLoading className="h-3 w-3 mr-1" />
+              <Badge
+                className={cn("text-xs border-0 flex-shrink cursor-pointer hover:opacity-80 transition-opacity max-w-[100px] truncate", BADGE_STYLE)}
+                onClick={handleManufacturerFilter}
+                title={manufacturerLabel}
+              >
                 {manufacturerLabel}
               </Badge>
             )}
           </div>
 
-          {/* Tags - Always shown when available */}
-          {paint.tags && paint.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {paint.tags.slice(0, 3).map((tag, index) => (
-                <Badge key={index} variant="secondary" className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors" onClick={handleTagSearch(tag)}>
-                  <IconTag className="h-3 w-3 mr-1" />
-                  {tag}
-                </Badge>
-              ))}
-              {paint.tags.length > 3 && (
-                <Badge
-                  variant="secondary"
-                  className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(routes.painting.catalog.details(paint.id));
-                  }}
-                >
-                  +{paint.tags.length - 3}
-                </Badge>
-              )}
-            </div>
-          )}
-
-          {/* Formula quantity with color indicator - Always shown */}
-          <div className="flex items-center gap-2 text-sm">
-            <IconFlask className={`h-4 w-4 ${paint.formulas && paint.formulas.length > 0 ? "text-green-600" : "text-red-600"}`} />
-            <span className={paint.formulas && paint.formulas.length > 0 ? "text-foreground" : "text-muted-foreground"}>
-              {paint.formulas?.length || 0} fórmula{(paint.formulas?.length || 0) !== 1 ? "s" : ""}
-            </span>
+          {/* Tags section - always takes remaining space, pushes formula/tasks to bottom */}
+          <div className="flex-1 flex flex-col justify-end mt-2">
+            {/* Tags - horizontal scroller (only if tags exist) */}
+            {paint.tags && paint.tags.length > 0 && (
+              <div className="w-full overflow-x-auto mb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <div className="flex gap-1 whitespace-nowrap">
+                  {paint.tags.map((tag, index) => (
+                    <Badge
+                      key={index}
+                      className={cn("text-xs cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0", TAG_BADGE_STYLE)}
+                      onClick={handleTagSearch(tag)}
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Task count - Always shown */}
-          <div className="flex items-center gap-2 text-sm">
-            <IconClipboardList className={`h-4 w-4 ${(paint._count?.logoTasks || 0) + (paint._count?.generalPaintings || 0) > 0 ? "text-blue-600" : "text-muted-foreground"}`} />
-            <span className={(paint._count?.logoTasks || 0) + (paint._count?.generalPaintings || 0) > 0 ? "text-foreground" : "text-muted-foreground"}>
-              {(paint._count?.logoTasks || 0) + (paint._count?.generalPaintings || 0)} tarefa{((paint._count?.logoTasks || 0) + (paint._count?.generalPaintings || 0)) !== 1 ? "s" : ""}
-            </span>
+          {/* Formula and Task counts in a row - justify between */}
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-1.5">
+              <IconFlask className={cn("h-3.5 w-3.5", formulaCount > 0 ? "text-green-600" : "text-red-500")} />
+              <span className={cn("text-xs font-medium", formulaCount > 0 ? "text-foreground" : "text-muted-foreground")}>
+                {formulaCount} fórmula{formulaCount !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <IconClipboardList className={cn("h-3.5 w-3.5", taskCount > 0 ? "text-blue-600" : "text-muted-foreground")} />
+              <span className={cn("text-xs font-medium", taskCount > 0 ? "text-foreground" : "text-muted-foreground")}>
+                {taskCount} tarefa{taskCount !== 1 ? "s" : ""}
+              </span>
+            </div>
           </div>
         </div>
       </Card>

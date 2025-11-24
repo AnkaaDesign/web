@@ -91,6 +91,9 @@ import {
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
+
+// Paint badge style - unified neutral, more subtle (no icons)
+const PAINT_BADGE_STYLE = "bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0";
 import { FileItem, FilePreviewModal, useFileViewer, type FileViewMode } from "@/components/common/file";
 
 // Component to display truck layout SVG preview
@@ -855,24 +858,24 @@ export const TaskDetailsPage = () => {
                         )}
 
                         {/* Plate */}
-                        {task.plate && (
+                        {task.truck?.plate && (
                           <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                             <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                               <IconCar className="h-4 w-4" />
                               Placa
                             </span>
-                            <span className="text-sm font-semibold text-foreground font-mono uppercase">{task.plate}</span>
+                            <span className="text-sm font-semibold text-foreground font-mono uppercase">{task.truck.plate}</span>
                           </div>
                         )}
 
                         {/* Chassis Number */}
-                        {task.chassisNumber && (
+                        {task.truck?.chassisNumber && (
                           <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                             <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                               <IconBarcode className="h-4 w-4" />
                               Nº Chassi
                             </span>
-                            <span className="text-sm font-semibold text-foreground">{formatChassis(task.chassisNumber)}</span>
+                            <span className="text-sm font-semibold text-foreground">{formatChassis(task.truck.chassisNumber)}</span>
                           </div>
                         )}
 
@@ -1439,17 +1442,21 @@ export const TaskDetailsPage = () => {
                           >
                             {/* Paint info with small preview */}
                             <div className="flex items-start gap-4">
-                              {/* Small color preview - 80px */}
+                              {/* Small color preview - 80px - prefer colorPreview image */}
                               <div className="relative flex-shrink-0">
-                                <div className="w-20 h-20 rounded-lg overflow-hidden shadow-inner border border-muted">
-                                  <CanvasNormalMapRenderer
-                                    baseColor={task.generalPainting?.hex || "#888888"}
-                                    finish={(task.generalPainting?.finish as PAINT_FINISH) || PAINT_FINISH.SOLID}
-                                    width={80}
-                                    height={80}
-                                    quality="medium"
-                                    className="w-full h-full object-cover"
-                                  />
+                                <div className="w-20 h-20 rounded-md ring-1 ring-border shadow-sm overflow-hidden">
+                                  {task.generalPainting?.colorPreview ? (
+                                    <img src={task.generalPainting.colorPreview} alt={task.generalPainting.name} className="w-full h-full object-cover" loading="lazy" />
+                                  ) : (
+                                    <CanvasNormalMapRenderer
+                                      baseColor={task.generalPainting?.hex || "#888888"}
+                                      finish={(task.generalPainting?.finish as PAINT_FINISH) || PAINT_FINISH.SOLID}
+                                      width={80}
+                                      height={80}
+                                      quality="medium"
+                                      className="w-full h-full object-cover"
+                                    />
+                                  )}
                                 </div>
                               </div>
 
@@ -1460,28 +1467,25 @@ export const TaskDetailsPage = () => {
                                   <span className="text-xs font-mono text-muted-foreground">{task.generalPainting?.hex}</span>
                                 </div>
 
-                                {/* Badges */}
+                                {/* Badges - unified neutral style, no icons */}
                                 <div className="flex flex-wrap gap-1">
                                   {task.generalPainting?.paintType?.name && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      <IconDroplet className="h-3 w-3 mr-1" />
+                                    <Badge className={cn("text-xs", PAINT_BADGE_STYLE)}>
                                       {task.generalPainting?.paintType.name}
                                     </Badge>
                                   )}
                                   {task.generalPainting?.finish && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      <IconSparkles className="h-3 w-3 mr-1" />
+                                    <Badge className={cn("text-xs", PAINT_BADGE_STYLE)}>
                                       {PAINT_FINISH_LABELS[task.generalPainting?.finish]}
                                     </Badge>
                                   )}
                                   {task.generalPainting?.paintBrand?.name && (
-                                    <Badge variant="outline" className="text-xs">
+                                    <Badge className={cn("text-xs", PAINT_BADGE_STYLE)}>
                                       {task.generalPainting?.paintBrand?.name}
                                     </Badge>
                                   )}
                                   {task.generalPainting?.manufacturer && (
-                                    <Badge variant="outline" className="text-xs">
-                                      <IconTruckLoading className="h-3 w-3 mr-1" />
+                                    <Badge className={cn("text-xs max-w-[100px] truncate", PAINT_BADGE_STYLE)} title={TRUCK_MANUFACTURER_LABELS[task.generalPainting?.manufacturer]}>
                                       {TRUCK_MANUFACTURER_LABELS[task.generalPainting?.manufacturer]}
                                     </Badge>
                                   )}
@@ -1511,8 +1515,14 @@ export const TaskDetailsPage = () => {
                                       onClick={() => navigate(routes.painting.catalog.details(groundPaint.id))}
                                     >
                                       <div className="flex items-start gap-3">
-                                        {/* Small color preview */}
-                                        <div className="w-12 h-12 rounded-md flex-shrink-0 border border-muted shadow-sm" style={{ backgroundColor: groundPaint.hex }} />
+                                        {/* Small color preview - prefer colorPreview image */}
+                                        <div className="w-12 h-12 rounded-md ring-1 ring-border shadow-sm flex-shrink-0 overflow-hidden">
+                                          {groundPaint.colorPreview ? (
+                                            <img src={groundPaint.colorPreview} alt={groundPaint.name} className="w-full h-full object-cover" loading="lazy" />
+                                          ) : (
+                                            <div className="w-full h-full" style={{ backgroundColor: groundPaint.hex }} />
+                                          )}
+                                        </div>
 
                                         {/* Paint info */}
                                         <div className="flex-1 min-w-0 space-y-1">
@@ -1520,19 +1530,17 @@ export const TaskDetailsPage = () => {
                                           <code className="text-xs font-mono text-muted-foreground">{groundPaint.hex}</code>
                                           <div className="flex flex-wrap gap-1">
                                             {groundPaint.paintType?.name && (
-                                              <Badge variant="secondary" className="text-xs">
-                                                <IconDroplet className="h-3 w-3 mr-1" />
+                                              <Badge className={cn("text-xs", PAINT_BADGE_STYLE)}>
                                                 {groundPaint.paintType.name}
                                               </Badge>
                                             )}
                                             {groundPaint.finish && (
-                                              <Badge variant="secondary" className="text-xs">
-                                                <IconSparkles className="h-3 w-3 mr-1" />
+                                              <Badge className={cn("text-xs", PAINT_BADGE_STYLE)}>
                                                 {PAINT_FINISH_LABELS[groundPaint.finish]}
                                               </Badge>
                                             )}
                                             {groundPaint.paintBrand?.name && (
-                                              <Badge variant="outline" className="text-xs">
+                                              <Badge className={cn("text-xs", PAINT_BADGE_STYLE)}>
                                                 {groundPaint.paintBrand.name}
                                               </Badge>
                                             )}
@@ -1567,17 +1575,21 @@ export const TaskDetailsPage = () => {
                                 onClick={() => navigate(routes.painting.catalog.details(paint.id))}
                               >
                                 <div className="flex items-start gap-4">
-                                  {/* Small color preview - 40px for logo paints */}
+                                  {/* Small color preview - 40px for logo paints - prefer colorPreview image */}
                                   <div className="relative flex-shrink-0">
-                                    <div className="w-10 h-10 rounded-md overflow-hidden shadow-inner border border-muted">
-                                      <CanvasNormalMapRenderer
-                                        baseColor={paint.hex || "#888888"}
-                                        finish={(paint.finish as PAINT_FINISH) || PAINT_FINISH.SOLID}
-                                        width={40}
-                                        height={40}
-                                        quality="medium"
-                                        className="w-full h-full object-cover"
-                                      />
+                                    <div className="w-10 h-10 rounded-md ring-1 ring-border shadow-sm overflow-hidden">
+                                      {paint.colorPreview ? (
+                                        <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover rounded-md" loading="lazy" />
+                                      ) : (
+                                        <CanvasNormalMapRenderer
+                                          baseColor={paint.hex || "#888888"}
+                                          finish={(paint.finish as PAINT_FINISH) || PAINT_FINISH.SOLID}
+                                          width={40}
+                                          height={40}
+                                          quality="medium"
+                                          className="w-full h-full object-cover rounded-md"
+                                        />
+                                      )}
                                     </div>
                                   </div>
 
@@ -1588,28 +1600,25 @@ export const TaskDetailsPage = () => {
                                       <span className="text-xs font-mono text-muted-foreground">{paint.hex}</span>
                                     </div>
 
-                                    {/* Badges */}
+                                    {/* Badges - unified neutral style, no icons */}
                                     <div className="flex flex-wrap gap-1">
                                       {paint.paintType?.name && (
-                                        <Badge variant="secondary" className="text-xs">
-                                          <IconDroplet className="h-3 w-3 mr-1" />
+                                        <Badge className={cn("text-xs", PAINT_BADGE_STYLE)}>
                                           {paint.paintType.name}
                                         </Badge>
                                       )}
                                       {paint.finish && (
-                                        <Badge variant="secondary" className="text-xs">
-                                          <IconSparkles className="h-3 w-3 mr-1" />
+                                        <Badge className={cn("text-xs", PAINT_BADGE_STYLE)}>
                                           {PAINT_FINISH_LABELS[paint.finish]}
                                         </Badge>
                                       )}
                                       {paint.paintBrand?.name && (
-                                        <Badge variant="outline" className="text-xs">
+                                        <Badge className={cn("text-xs", PAINT_BADGE_STYLE)}>
                                           {paint.paintBrand?.name}
                                         </Badge>
                                       )}
                                       {paint.manufacturer && (
-                                        <Badge variant="outline" className="text-xs">
-                                          <IconTruckLoading className="h-3 w-3 mr-1" />
+                                        <Badge className={cn("text-xs max-w-[100px] truncate", PAINT_BADGE_STYLE)} title={TRUCK_MANUFACTURER_LABELS[paint.manufacturer]}>
                                           {TRUCK_MANUFACTURER_LABELS[paint.manufacturer]}
                                         </Badge>
                                       )}

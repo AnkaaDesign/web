@@ -7,7 +7,7 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { useFieldArray, useWatch } from "react-hook-form";
+import { useFieldArray, useWatch, useFormContext } from "react-hook-form";
 import {
   FormControl,
   FormField,
@@ -35,6 +35,7 @@ interface BudgetSelectorProps {
 
 export interface BudgetSelectorRef {
   addBudget: () => void;
+  clearAll: () => void;
 }
 
 export const BudgetSelector = forwardRef<
@@ -43,6 +44,7 @@ export const BudgetSelector = forwardRef<
 >(({ control, disabled, onBudgetCountChange }, ref) => {
   const [initialized, setInitialized] = useState(false);
   const lastRowRef = useRef<HTMLDivElement>(null);
+  const { setValue, clearErrors } = useFormContext();
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -95,9 +97,12 @@ export const BudgetSelector = forwardRef<
   }, [budgetItems, onBudgetCountChange]);
 
   const handleAddBudgetItem = useCallback(() => {
+    // Clear any existing budget errors before adding
+    clearErrors("budget");
+
     append({
       description: "",
-      amount: null,
+      amount: undefined,
     });
 
     // Focus on the new input after adding
@@ -107,15 +112,27 @@ export const BudgetSelector = forwardRef<
       ) as HTMLInputElement;
       descriptionInput?.focus();
     }, 100);
-  }, [append]);
+  }, [append, clearErrors]);
+
+  // Clear all budget items
+  const clearAll = useCallback(() => {
+    // Remove all items from the end to the beginning
+    for (let i = fields.length - 1; i >= 0; i--) {
+      remove(i);
+    }
+    // Also clear the expiresIn field and any validation errors
+    setValue("budget.expiresIn", null);
+    clearErrors("budget");
+  }, [fields.length, remove, setValue, clearErrors]);
 
   // Expose methods via ref
   useImperativeHandle(
     ref,
     () => ({
       addBudget: handleAddBudgetItem,
+      clearAll,
     }),
-    [handleAddBudgetItem],
+    [handleAddBudgetItem, clearAll],
   );
 
   const canRemove = fields.length > 0;
@@ -238,6 +255,20 @@ export const BudgetSelector = forwardRef<
             </div>
           ))}
         </div>
+      )}
+
+      {fields.length > 0 && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleAddBudgetItem}
+          disabled={disabled}
+          className="w-full"
+        >
+          <IconPlus className="h-4 w-4 mr-2" />
+          Adicionar
+        </Button>
       )}
 
       {/* Validation Alert - Only for incomplete items */}

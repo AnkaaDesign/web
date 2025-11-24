@@ -80,29 +80,44 @@ export function isUserBlocked(user: User): boolean {
 
 /**
  * Check if user has specific privilege
+ * Uses EXACT privilege matching (not hierarchical) - ADMIN is special case with access to everything
+ * FINANCIAL can edit tasks but not inventory, WAREHOUSE can edit inventory but not tasks
  */
 export function hasPrivilege(user: User, requiredPrivilege: SECTOR_PRIVILEGES): boolean {
   if (!user.sector?.privileges) return false;
 
-  const userPrivilegeLevel = getSectorPrivilegeLevel(user.sector.privileges);
-  const requiredPrivilegeLevel = getSectorPrivilegeLevel(requiredPrivilege);
+  const userPrivilege = user.sector.privileges;
 
-  return userPrivilegeLevel >= requiredPrivilegeLevel;
+  // ADMIN has access to everything (special case)
+  if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) return true;
+
+  // For all other privileges, require EXACT match (no hierarchy)
+  return userPrivilege === requiredPrivilege;
 }
 
 /**
  * Check if user has ANY of the specified privileges (OR logic)
- * Matches backend @Roles decorator behavior - user needs only one of the privileges
+ * Matches backend @Roles decorator behavior - checks if user's privilege is IN the array
+ * ADMIN can access everything, others need exact match
  */
 export function hasAnyPrivilege(user: User, requiredPrivileges: SECTOR_PRIVILEGES[]): boolean {
   if (!user.sector?.privileges || !requiredPrivileges.length) return false;
 
-  return requiredPrivileges.some((privilege) => hasPrivilege(user, privilege));
+  const userPrivilege = user.sector.privileges;
+
+  // ADMIN has access to everything (special case)
+  if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) return true;
+
+  // Check if user's privilege is in the allowed array (exact match)
+  return requiredPrivileges.includes(userPrivilege);
 }
 
 /**
  * Check if user has ALL of the specified privileges (AND logic)
- * User must have privilege level equal to or higher than ALL specified privileges
+ * User must have EXACT match for all privileges or be ADMIN
+ * Note: Since users can only have ONE privilege, this will only return true if:
+ * 1. User is ADMIN (has access to all), OR
+ * 2. Only one privilege is required and user has that exact privilege
  */
 export function hasAllPrivileges(user: User, requiredPrivileges: SECTOR_PRIVILEGES[]): boolean {
   if (!user.sector?.privileges || !requiredPrivileges.length) return false;

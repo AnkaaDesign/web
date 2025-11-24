@@ -43,10 +43,10 @@ export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeac
   const navigate = useNavigate();
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditPpeDeliveries(user);
-  const canDelete = canDeletePpeDeliveries(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'ppe');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditPpeDeliveries(user) : false;
+  const canDelete = user ? canDeletePpeDeliveries(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'ppe') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();

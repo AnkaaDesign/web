@@ -6,9 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { IconFilter, IconX } from "@tabler/icons-react";
-import { CUT_STATUS, CUT_TYPE, CUT_ORIGIN } from "../../../../constants";
+import { CUT_STATUS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES } from "../../../../constants";
 import { CUT_STATUS_LABELS, CUT_TYPE_LABELS, CUT_ORIGIN_LABELS } from "../../../../constants";
 import type { CutGetManyFormData } from "../../../../schemas";
+import type { Sector } from "../../../../types";
+import { useSectors } from "../../../../hooks";
 
 interface CutItemFiltersProps {
   open: boolean;
@@ -21,15 +23,26 @@ interface FilterState {
   statuses: CUT_STATUS[];
   types: CUT_TYPE[];
   origin: string;
+  sectorIds: string[];
   createdAfter?: Date;
   createdBefore?: Date;
 }
 
+// Special value for tasks without a sector
+const UNDEFINED_SECTOR_VALUE = "__UNDEFINED__";
+
 export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: CutItemFiltersProps) {
+  // Fetch production sectors
+  const { data: sectorsData } = useSectors({ limit: 100, orderBy: { name: "asc" } });
+  const sectors = (sectorsData?.data || []).filter(
+    (sector: Sector) => sector.privileges === SECTOR_PRIVILEGES.PRODUCTION
+  );
+
   const [localState, setLocalState] = useState<FilterState>({
     statuses: [],
     types: [],
     origin: "all",
+    sectorIds: [],
     createdAfter: undefined,
     createdBefore: undefined,
   });
@@ -39,10 +52,22 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
     if (!open) return;
 
     const where = filters.where as any;
+
+    // Parse sector filter - handle both regular IDs and the special "undefined" value
+    let sectorIds: string[] = [];
+    if (where?.task?.sectorId?.in) {
+      sectorIds = where.task.sectorId.in;
+    }
+    // Check if filtering for tasks without sector
+    if (where?.task?.sectorId === null) {
+      sectorIds = [UNDEFINED_SECTOR_VALUE];
+    }
+
     setLocalState({
       statuses: where?.status?.in || [],
       types: where?.type?.in || [],
       origin: where?.origin || "all",
+      sectorIds,
       createdAfter: filters.createdAt?.gte,
       createdBefore: filters.createdAt?.lte,
     });
@@ -67,6 +92,26 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
     // Origin
     if (localState.origin !== "all") {
       (newFilters.where as any).origin = localState.origin;
+    }
+
+    // Sector filter - filter cuts by task's sector
+    if (localState.sectorIds.length > 0) {
+      const hasUndefined = localState.sectorIds.includes(UNDEFINED_SECTOR_VALUE);
+      const realSectorIds = localState.sectorIds.filter((id) => id !== UNDEFINED_SECTOR_VALUE);
+
+      if (hasUndefined && realSectorIds.length === 0) {
+        // Only filtering for tasks without sector
+        (newFilters.where as any).task = { sectorId: null };
+      } else if (hasUndefined && realSectorIds.length > 0) {
+        // Filtering for both undefined and specific sectors - use OR
+        (newFilters.where as any).OR = [
+          { task: { sectorId: null } },
+          { task: { sectorId: { in: realSectorIds } } },
+        ];
+      } else {
+        // Only filtering for specific sectors
+        (newFilters.where as any).task = { sectorId: { in: realSectorIds } };
+      }
     }
 
     // Date range
@@ -96,6 +141,7 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
       statuses: [],
       types: [],
       origin: "all",
+      sectorIds: [],
       createdAfter: undefined,
       createdBefore: undefined,
     });
@@ -106,6 +152,7 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
     if (localState.statuses.length > 0) count++;
     if (localState.types.length > 0) count++;
     if (localState.origin !== "all") count++;
+    if (localState.sectorIds.length > 0) count++;
     if (localState.createdAfter || localState.createdBefore) count++;
     return count;
   };
@@ -194,6 +241,36 @@ export function CutItemFilters({ open, onOpenChange, filters, onFilterChange }: 
               placeholder="Selecionar origem..."
               emptyText="Nenhuma origem encontrada"
               searchable={false}
+              clearable={true}
+            />
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-base font-medium">
+              Setor da Tarefa
+              {localState.sectorIds.length > 0 && (
+                <Badge variant="secondary" className="ml-2">
+                  {localState.sectorIds.length}
+                </Badge>
+              )}
+            </Label>
+            <Combobox
+              mode="multiple"
+              options={[
+                { value: UNDEFINED_SECTOR_VALUE, label: "Indefinido (sem setor)" },
+                ...sectors.map((sector: Sector) => ({
+                  value: sector.id,
+                  label: sector.name,
+                })),
+              ]}
+              value={localState.sectorIds}
+              onValueChange={(sectorIds: string[]) => {
+                setLocalState((prev) => ({ ...prev, sectorIds }));
+              }}
+              placeholder="Selecionar setores..."
+              searchPlaceholder="Buscar setores..."
+              emptyText="Nenhum setor encontrado"
+              searchable={true}
               clearable={true}
             />
           </div>

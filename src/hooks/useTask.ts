@@ -420,7 +420,7 @@ export function useTaskBatchMutations() {
 
   // BATCH UPDATE
   const batchUpdateMutation = useMutation({
-    mutationFn: (data: TaskBatchUpdateFormData) => batchUpdateTasks(data),
+    mutationFn: (data: TaskBatchUpdateFormData | FormData) => batchUpdateTasks(data),
     onSuccess: (response) => {
       invalidateTasks();
 

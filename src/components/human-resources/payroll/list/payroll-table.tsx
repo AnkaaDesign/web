@@ -39,10 +39,10 @@ export function PayrollTable({
   const navigate = useNavigate();
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditHrEntities(user);
-  const canDelete = canDeleteHrEntities(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'hr-entities');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditHrEntities(user) : false;
+  const canDelete = user ? canDeleteHrEntities(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'hr') : false;
 
   // Handle row click to navigate to payroll details
   const handleRowClick = (row: PayrollUserRow) => {

@@ -42,14 +42,14 @@ interface OrderTableProps {
 
 export function OrderTable({ visibleColumns, className, onEdit, filters = {}, onDataChange }: OrderTableProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { delete: deleteOrder, updateAsync: updateOrder } = useOrderMutations();
   const { batchDelete } = useOrderBatchMutations();
 
   // Permission checks
-  const canEdit = canEditOrders(user);
-  const canDelete = canDeleteOrders(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'orders');
+  const canEdit = user ? canEditOrders(user) : false;
+  const canDelete = user ? canDeleteOrders(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'order') : false;
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{

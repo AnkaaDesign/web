@@ -53,10 +53,10 @@ export function ObservationTable({ visibleColumns, className, filters = {}, onDa
   const { delete: deleteObservation } = useObservationMutations();
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditObservations(user);
-  const canDelete = canDeleteObservations(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'observations');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditObservations(user) : false;
+  const canDelete = user ? canDeleteObservations(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'observation') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();

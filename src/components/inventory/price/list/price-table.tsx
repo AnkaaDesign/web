@@ -4,6 +4,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { canEditItems, canDeleteItems } from "@/utils/permissions/entity-permissions";
+import { useAuth } from "@/hooks/useAuth";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +39,11 @@ export function PriceTable({ itemId, filters = {}, onEditPrice, onDeletePrice, s
   } | null>(null);
 
   const { delete: deletePrice } = usePriceMutations();
+
+  // Permission checks
+  const { user } = useAuth();
+  const canEdit = user ? canEditItems(user) : false;
+  const canDelete = user ? canDeleteItems(user) : false;
 
   const queryFilters: Partial<PriceGetManyFormData> = {
     ...filters,
@@ -103,12 +110,16 @@ export function PriceTable({ itemId, filters = {}, onEditPrice, onDeletePrice, s
         header: "Ações",
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => onEditPrice?.(row.original)} disabled={!onEditPrice}>
-              <IconEdit className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => handleDeletePrice(row.original)} disabled={deletingId === row.original.id || !onDeletePrice}>
-              {deletingId === row.original.id ? <IconLoader className="h-4 w-4 animate-spin" /> : <IconTrash className="h-4 w-4" />}
-            </Button>
+            {canEdit && (
+              <Button size="sm" variant="outline" onClick={() => onEditPrice?.(row.original)} disabled={!onEditPrice}>
+                <IconEdit className="h-4 w-4" />
+              </Button>
+            )}
+            {canDelete && (
+              <Button size="sm" variant="outline" onClick={() => handleDeletePrice(row.original)} disabled={deletingId === row.original.id || !onDeletePrice}>
+                {deletingId === row.original.id ? <IconLoader className="h-4 w-4 animate-spin" /> : <IconTrash className="h-4 w-4" />}
+              </Button>
+            )}
           </div>
         ),
       },

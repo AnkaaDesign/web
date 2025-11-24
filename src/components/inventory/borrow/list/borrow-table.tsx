@@ -11,7 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { IconChevronUp, IconChevronDown, IconEdit, IconPackageImport, IconTrash, IconSelector, IconEye, IconAlertTriangle, IconPackageExport, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,14 +72,14 @@ const formatDateWithRelative = (date: Date | string) => {
 
 export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDelete, filters = {}, onDataChange }: BorrowTableProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { deleteMutation, markAsLostMutation } = useBorrowMutations();
   const { batchDelete, batchUpdate } = useBorrowBatchMutations();
 
   // Permission checks
-  const canEdit = canEditBorrows(user);
-  const canDelete = canDeleteBorrows(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'borrows');
+  const canEdit = user ? canEditBorrows(user) : false;
+  const canDelete = user ? canDeleteBorrows(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'borrow') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -686,64 +687,56 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
       </div>
 
       {/* Context Menu */}
-      {contextMenu && (
-        <DropdownMenu open={true} onOpenChange={(open) => !open && setContextMenu(null)}>
-          <DropdownMenuTrigger asChild>
-            <div
-              style={{
-                position: "fixed",
-                left: contextMenu.x,
-                top: contextMenu.y,
-                width: 1,
-                height: 1,
-              }}
-            />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="start" sideOffset={0} onCloseAutoFocus={(e) => e.preventDefault()}>
-            {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.items.length} itens selecionados</div>}
+      <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
+        <PositionedDropdownMenuContent
+          position={contextMenu}
+          isOpen={!!contextMenu}
+          className="w-56"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          {contextMenu?.isBulk && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{contextMenu.items.length} itens selecionados</div>}
 
-            {!contextMenu?.isBulk && (
-              <DropdownMenuItem onClick={handleView}>
-                <IconEye className="mr-2 h-4 w-4" />
-                Visualizar
+          {!contextMenu?.isBulk && (
+            <DropdownMenuItem onClick={handleView}>
+              <IconEye className="mr-2 h-4 w-4" />
+              Visualizar
+            </DropdownMenuItem>
+          )}
+
+          {canEdit && (
+            <DropdownMenuItem onClick={handleEdit}>
+              <IconEdit className="mr-2 h-4 w-4" />
+              {contextMenu?.items.length === 1 ? "Editar" : "Editar em lote"}
+            </DropdownMenuItem>
+          )}
+
+          {/* Show return option only for active items */}
+          {canEdit && contextMenu &&
+            (contextMenu.isBulk ? contextMenu.items.some((item) => item.status === BORROW_STATUS.ACTIVE) : contextMenu.items[0].status === BORROW_STATUS.ACTIVE) && (
+              <DropdownMenuItem onClick={handleReturn} className="text-green-700 focus:text-white focus:bg-green-700 hover:text-white hover:bg-green-700">
+                <IconPackageImport className="mr-2 h-4 w-4" />
+                Devolver
               </DropdownMenuItem>
             )}
 
-            {canEdit && (
-              <DropdownMenuItem onClick={handleEdit}>
-                <IconEdit className="mr-2 h-4 w-4" />
-                {contextMenu?.items.length === 1 ? "Editar" : "Editar em lote"}
-              </DropdownMenuItem>
-            )}
+          {/* Show mark as lost option only for active items */}
+          {canEdit && contextMenu && (contextMenu.isBulk ? contextMenu.items.some((item) => item.status === BORROW_STATUS.ACTIVE) : contextMenu.items[0].status === BORROW_STATUS.ACTIVE) && (
+            <DropdownMenuItem onClick={handleMarkAsLost} className="text-destructive">
+              <IconX className="mr-2 h-4 w-4" />
+              Marcar como perdidos
+            </DropdownMenuItem>
+          )}
 
-            {/* Show return option only for active items */}
-            {canEdit && contextMenu &&
-              (contextMenu.isBulk ? contextMenu.items.some((item) => item.status === BORROW_STATUS.ACTIVE) : contextMenu.items[0].status === BORROW_STATUS.ACTIVE) && (
-                <DropdownMenuItem onClick={handleReturn} className="text-green-700 focus:text-white focus:bg-green-700 hover:text-white hover:bg-green-700">
-                  <IconPackageImport className="mr-2 h-4 w-4" />
-                  Devolver
-                </DropdownMenuItem>
-              )}
+          {(canEdit || canDelete) && <DropdownMenuSeparator />}
 
-            {/* Show mark as lost option only for active items */}
-            {canEdit && contextMenu && (contextMenu.isBulk ? contextMenu.items.some((item) => item.status === BORROW_STATUS.ACTIVE) : contextMenu.items[0].status === BORROW_STATUS.ACTIVE) && (
-              <DropdownMenuItem onClick={handleMarkAsLost} className="text-destructive">
-                <IconX className="mr-2 h-4 w-4" />
-                Marcar como perdidos
-              </DropdownMenuItem>
-            )}
-
-            {(canEdit || canDelete) && <DropdownMenuSeparator />}
-
-            {canDelete && (
-              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-                <IconTrash className="mr-2 h-4 w-4" />
-                {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Deletar selecionados" : "Deletar"}
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+          {canDelete && (
+            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              {contextMenu?.isBulk && contextMenu.items.length > 1 ? "Deletar selecionados" : "Deletar"}
+            </DropdownMenuItem>
+          )}
+        </PositionedDropdownMenuContent>
+      </DropdownMenu>
 
       {/* Mark as Lost Confirmation Dialog */}
       <AlertDialog open={!!markAsLostDialog} onOpenChange={(open) => !open && setMarkAsLostDialog(null)}>

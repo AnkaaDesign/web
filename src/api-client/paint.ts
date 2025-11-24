@@ -200,8 +200,25 @@ export class PaintService {
   // Paint CRUD Operations
   // =====================
 
-  async createPaint(data: PaintCreateFormData, query?: PaintQueryFormData, skipNotification = false): Promise<PaintCreateResponse> {
-    const headers = skipNotification ? { "X-Skip-Success-Notification": "true" } : undefined;
+  async createPaint(
+    data: PaintCreateFormData,
+    query?: PaintQueryFormData,
+    skipNotification = false,
+    colorPreviewFile?: File
+  ): Promise<PaintCreateResponse> {
+    const headers: Record<string, string> = skipNotification ? { "X-Skip-Success-Notification": "true" } : {};
+
+    // If there's a file, use FormData
+    if (colorPreviewFile) {
+      const formData = this.createFormDataWithFile(data, colorPreviewFile);
+      const response = await apiClient.post<PaintCreateResponse>(this.basePath, formData, {
+        params: query,
+        headers,
+      });
+      return response.data;
+    }
+
+    // Otherwise, use JSON
     const response = await apiClient.post<PaintCreateResponse>(this.basePath, data, {
       params: query,
       headers,
@@ -209,9 +226,50 @@ export class PaintService {
     return response.data;
   }
 
-  async updatePaint(id: string, data: PaintUpdateFormData, query?: PaintQueryFormData): Promise<PaintUpdateResponse> {
+  async updatePaint(
+    id: string,
+    data: PaintUpdateFormData,
+    query?: PaintQueryFormData,
+    colorPreviewFile?: File
+  ): Promise<PaintUpdateResponse> {
+    // If there's a file, use FormData
+    if (colorPreviewFile) {
+      const formData = this.createFormDataWithFile(data, colorPreviewFile);
+      const response = await apiClient.put<PaintUpdateResponse>(`${this.basePath}/${id}`, formData, { params: query });
+      return response.data;
+    }
+
+    // Otherwise, use JSON
     const response = await apiClient.put<PaintUpdateResponse>(`${this.basePath}/${id}`, data, { params: query });
     return response.data;
+  }
+
+  /**
+   * Helper to create FormData with paint data and colorPreview file
+   */
+  private createFormDataWithFile(data: PaintCreateFormData | PaintUpdateFormData, file: File): FormData {
+    const formData = new FormData();
+
+    // Add the file
+    formData.append("colorPreview", file);
+
+    // Add other form data fields
+    Object.entries(data).forEach(([key, value]) => {
+      if (value === null || value === undefined || key === "colorPreview") {
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        // For arrays like tags and groundIds, use JSON string
+        formData.append(key, JSON.stringify(value));
+      } else if (typeof value === "object") {
+        formData.append(key, JSON.stringify(value));
+      } else {
+        formData.append(key, String(value));
+      }
+    });
+
+    return formData;
   }
 
   async deletePaint(id: string): Promise<PaintDeleteResponse> {
@@ -785,8 +843,8 @@ export const paintBrandService = new PaintBrandService();
 // Paint exports
 export const getPaints = (params: PaintGetManyFormData = {}) => paintService.getPaints(params);
 export const getPaintById = (id: string, params?: Omit<PaintGetByIdFormData, "id">) => paintService.getPaintById(id, params);
-export const createPaint = (data: PaintCreateFormData, query?: PaintQueryFormData, skipNotification = false) => paintService.createPaint(data, query, skipNotification);
-export const updatePaint = (id: string, data: PaintUpdateFormData, query?: PaintQueryFormData) => paintService.updatePaint(id, data, query);
+export const createPaint = (data: PaintCreateFormData, query?: PaintQueryFormData, skipNotification = false, colorPreviewFile?: File) => paintService.createPaint(data, query, skipNotification, colorPreviewFile);
+export const updatePaint = (id: string, data: PaintUpdateFormData, query?: PaintQueryFormData, colorPreviewFile?: File) => paintService.updatePaint(id, data, query, colorPreviewFile);
 export const deletePaint = (id: string) => paintService.deletePaint(id);
 export const batchCreatePaints = (data: PaintBatchCreateFormData, query?: PaintQueryFormData) => paintService.batchCreatePaints(data, query);
 export const batchUpdatePaints = (data: PaintBatchUpdateFormData, query?: PaintQueryFormData) => paintService.batchUpdatePaints(data, query);

@@ -92,10 +92,10 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditHrEntities(user);
-  const canDelete = canDeleteHrEntities(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'hr-entities');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditHrEntities(user) : false;
+  const canDelete = user ? canDeleteHrEntities(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'hr') : false;
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{

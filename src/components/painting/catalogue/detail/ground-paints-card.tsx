@@ -49,11 +49,14 @@ export function GroundPaintsCard({ paint, className }: GroundPaintsCardProps) {
               onClick={() => handlePaintClick(groundPaint.id)}
             >
               <div className="flex items-start gap-3">
-                {/* Small color preview */}
-                <div
-                  className="w-12 h-12 rounded-md flex-shrink-0 border border-muted shadow-sm"
-                  style={{ backgroundColor: groundPaint.hex }}
-                />
+                {/* Small color preview - prefer colorPreview image */}
+                <div className="w-12 h-12 rounded-md flex-shrink-0 ring-1 ring-muted shadow-sm overflow-hidden">
+                  {groundPaint.colorPreview ? (
+                    <img src={groundPaint.colorPreview} alt={groundPaint.name} className="w-full h-full object-cover" loading="lazy" />
+                  ) : (
+                    <div className="w-full h-full" style={{ backgroundColor: groundPaint.hex }} />
+                  )}
+                </div>
 
                 {/* Paint info */}
                 <div className="flex-1 min-w-0 space-y-1">

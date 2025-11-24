@@ -45,6 +45,7 @@ interface MultiCutSelectorProps {
 
 export interface MultiCutSelectorRef {
   addCut: () => void;
+  clearAll: () => void;
 }
 
 export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelectorProps>(({ control, disabled, onCutsCountChange }, ref) => {
@@ -100,13 +101,23 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
     // Expansion is handled by the useEffect above
   }, [prepend]);
 
+  // Clear all cuts
+  const clearAll = useCallback(() => {
+    // Remove all items from the end to the beginning
+    for (let i = fields.length - 1; i >= 0; i--) {
+      remove(i);
+    }
+    setExpandedItems([]);
+  }, [fields.length, remove]);
+
   // Expose methods to parent component using imperative handle
   useImperativeHandle(
     ref,
     () => ({
       addCut,
+      clearAll,
     }),
-    [addCut],
+    [addCut, clearAll],
   );
 
   // Pass cuts count to parent
@@ -201,7 +212,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
                     <IconScissors className="h-4 w-4" />
                     <span className="font-medium">Corte #{index + 1}</span>
                     <Badge variant="secondary">{CUT_TYPE_LABELS[currentCut.type as keyof typeof CUT_TYPE_LABELS] || currentCut.type}</Badge>
-                    <Badge variant="outline">Qtd: {currentCut.quantity}</Badge>
+                    <Badge variant="outline">Quantidade: {currentCut.quantity}</Badge>
                     {currentCut.file && <Badge variant="success">Arquivo anexado</Badge>}
                   </div>
                   <Button
@@ -293,6 +304,20 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
             );
           })}
         </Accordion>
+      )}
+
+      {fields.length > 0 && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addCut}
+          disabled={disabled || fields.length >= 10}
+          className="w-full"
+        >
+          <IconPlus className="h-4 w-4 mr-2" />
+          Adicionar
+        </Button>
       )}
 
       {hasCutsWithoutFiles && (

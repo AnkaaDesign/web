@@ -55,10 +55,10 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
   const { delete: deleteAirbrushing, update: updateAirbrushing } = useAirbrushingMutations();
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditAirbrushings(user);
-  const canDelete = canDeleteAirbrushings(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'airbrushings');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditAirbrushings(user) : false;
+  const canDelete = user ? canDeleteAirbrushings(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'airbrushing') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();

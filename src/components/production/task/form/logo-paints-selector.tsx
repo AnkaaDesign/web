@@ -115,13 +115,17 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
 
     return (
       <div className="flex items-center gap-3 w-full">
-        {/* Square color preview with finish effect */}
-        {paint.finish ? (
-          <div className="w-6 h-6 rounded border border-border shadow-sm flex-shrink-0 overflow-hidden">
+        {/* Square color preview - prefer colorPreview image */}
+        {paint.colorPreview ? (
+          <div className="w-6 h-6 rounded ring-1 ring-border shadow-sm flex-shrink-0 overflow-hidden">
+            <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" loading="lazy" />
+          </div>
+        ) : paint.finish ? (
+          <div className="w-6 h-6 rounded ring-1 ring-border shadow-sm flex-shrink-0 overflow-hidden">
             <CanvasNormalMapRenderer baseColor={color} finish={paint.finish as PAINT_FINISH} width={24} height={24} quality="low" className="w-full h-full" />
           </div>
         ) : (
-          <div className="w-6 h-6 rounded border border-border shadow-sm flex-shrink-0" style={{ backgroundColor: color }} />
+          <div className="w-6 h-6 rounded ring-1 ring-border shadow-sm flex-shrink-0" style={{ backgroundColor: color }} />
         )}
 
         <div className="flex-1 min-w-0">
@@ -221,12 +225,16 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
                             field.onChange(currentValue.filter((id: string) => id !== paint.id));
                           }}
                         >
-                          {paint.finish ? (
-                            <div className="w-4 h-4 rounded border border-border shadow-sm overflow-hidden">
+                          {paint.colorPreview ? (
+                            <div className="w-4 h-4 rounded ring-1 ring-border shadow-sm overflow-hidden">
+                              <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" />
+                            </div>
+                          ) : paint.finish ? (
+                            <div className="w-4 h-4 rounded ring-1 ring-border shadow-sm overflow-hidden">
                               <CanvasNormalMapRenderer baseColor={color} finish={paint.finish as PAINT_FINISH} width={16} height={16} quality="low" className="w-full h-full" />
                             </div>
                           ) : (
-                            <div className="w-4 h-4 rounded border border-border shadow-sm" style={{ backgroundColor: color }} />
+                            <div className="w-4 h-4 rounded ring-1 ring-border shadow-sm" style={{ backgroundColor: color }} />
                           )}
                           <span className="text-xs font-medium">{paint.name}</span>
                           {paint.paintType?.name && <span className="text-xs opacity-70">({paint.paintType.name})</span>}

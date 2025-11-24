@@ -210,10 +210,10 @@ export function ExternalWithdrawalTable({ visibleColumns, className, onEdit: _on
   const { markAsFullyReturned, markAsCharged, markAsLiquidated, markAsDelivered } = useExternalWithdrawalStatusMutations();
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditExternalWithdrawals(user);
-  const canDelete = canDeleteExternalWithdrawals(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'external-withdrawals');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditExternalWithdrawals(user) : false;
+  const canDelete = user ? canDeleteExternalWithdrawals(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'externalWithdrawal') : false;
 
   // Context menu state
   const [contextMenu, setContextMenu] = React.useState<{

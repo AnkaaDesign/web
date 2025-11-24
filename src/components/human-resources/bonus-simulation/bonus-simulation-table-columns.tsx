@@ -86,7 +86,22 @@ function calculatePosition11Base(averageTasksPerUser: number): number {
 }
 
 /**
- * Calculate cascade values for all positions (exactly as in seed database)
+ * EXACT position factors from Position 9 (as percentages)
+ * These are the exact values from the Excel spreadsheet
+ */
+const positionFactorsFromPosition9: Record<number, number> = {
+  1: 0.0972,  // Position 1: 9.72% of Position 9
+  2: 0.1932,  // Position 2: 19.32% of Position 9
+  3: 0.3220,  // Position 3: 32.20% of Position 9
+  4: 0.4609,  // Position 4: 46.09% of Position 9
+  5: 0.5985,  // Position 5: 59.85% of Position 9
+  6: 0.7210,  // Position 6: 72.10% of Position 9
+  7: 0.8283,  // Position 7: 82.83% of Position 9
+  8: 0.9205,  // Position 8: 92.05% of Position 9
+};
+
+/**
+ * Calculate cascade values for all positions based on EXACT Excel formulas
  */
 function calculateCascadeValues(position11Base: number): Map<number, number> {
   const values = new Map<number, number>();
@@ -99,16 +114,10 @@ function calculateCascadeValues(position11Base: number): Map<number, number> {
   const position9 = position10 * (1 - 0.055); // Position 9: Position 10 - 5.5%
   values.set(9, position9);
 
-  // Continue cascade from position 9 down
-  const position9Value = values.get(9)!;
-  values.set(8, position9Value * (1 - 0.036)); // Position 8: Position 9 - 3.6%
-  values.set(7, values.get(8)! * (1 - 0.101)); // Position 7: Position 8 - 10.1%
-  values.set(6, values.get(7)! * (1 - 0.1307)); // Position 6: Position 7 - 13.07%
-  values.set(5, values.get(6)! * (1 - 0.1702)); // Position 5: Position 6 - 17.02%
-  values.set(4, values.get(5)! * (1 - 0.2296)); // Position 4: Position 5 - 22.96%
-  values.set(3, values.get(4)! * (1 - 0.3006)); // Position 3: Position 4 - 30.06%
-  values.set(2, values.get(3)! * (1 - 0.4003)); // Position 2: Position 3 - 40.03%
-  values.set(1, values.get(2)! * (1 - 0.5)); // Position 1: Position 2 - 50%
+  // Positions 1-8 are calculated as EXACT percentages of Position 9
+  for (let excelPos = 1; excelPos <= 8; excelPos++) {
+    values.set(excelPos, position9 * positionFactorsFromPosition9[excelPos]);
+  }
 
   return values;
 }

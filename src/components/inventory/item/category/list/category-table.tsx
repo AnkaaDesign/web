@@ -35,10 +35,10 @@ export function CategoryTable({ visibleColumns, className, onEdit, onDelete, fil
   const { batchDelete } = useItemCategoryBatchMutations();
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditItems(user);
-  const canDelete = canDeleteItems(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'items');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditItems(user) : false;
+  const canDelete = user ? canDeleteItems(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'item') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();

@@ -1,6 +1,6 @@
 import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD } from "../../constants";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, TASK_STATUS_LABELS } from "../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { useAdministrationDashboard, usePositions } from "../../hooks";
 import { useNavigate } from "react-router-dom";
@@ -89,36 +89,36 @@ export const AdministrationRootPage = () => {
   const getUserStatus = () => {
     if (!dashboard?.data?.userMetrics) return [];
 
-    const { totalUsers, activeUsers, inactiveUsers, pendingUsers } = dashboard.data.userMetrics;
+    const { totalUsers, experiencePeriod1Users, experiencePeriod2Users, effectedUsers, dismissedUsers } = dashboard.data.userMetrics;
 
     return [
       {
-        status: "Ativo",
-        quantity: activeUsers?.value || 0,
-        total: totalUsers?.value || 0,
-        icon: IconUserCheck,
-        color: "green" as const,
-      },
-      {
-        status: "Inativo",
-        quantity: inactiveUsers?.value || 0,
-        total: totalUsers?.value || 0,
-        icon: IconUserX,
-        color: "red" as const,
-      },
-      {
-        status: "Pendente",
-        quantity: pendingUsers?.value || 0,
+        status: "Experiência 1/2",
+        quantity: experiencePeriod1Users?.value || 0,
         total: totalUsers?.value || 0,
         icon: IconClock,
         color: "orange" as const,
       },
       {
-        status: "Total",
-        quantity: totalUsers?.value || 0,
+        status: "Experiência 2/2",
+        quantity: experiencePeriod2Users?.value || 0,
         total: totalUsers?.value || 0,
-        icon: IconUsers,
+        icon: IconClock,
         color: "blue" as const,
+      },
+      {
+        status: "Efetivado",
+        quantity: effectedUsers?.value || 0,
+        total: totalUsers?.value || 0,
+        icon: IconUserCheck,
+        color: "green" as const,
+      },
+      {
+        status: "Desligado",
+        quantity: dismissedUsers?.value || 0,
+        total: totalUsers?.value || 0,
+        icon: IconUserX,
+        color: "red" as const,
       },
     ];
   };
@@ -452,7 +452,7 @@ export const AdministrationRootPage = () => {
                   title="Status das Tarefas"
                   data={
                     data?.taskOverview?.tasksByStatus?.labels?.map((label, index) => ({
-                      label: label,
+                      label: TASK_STATUS_LABELS[label as keyof typeof TASK_STATUS_LABELS] || label,
                       value: data.taskOverview.tasksByStatus.datasets[0]?.data[index] || 0,
                     })) || []
                   }

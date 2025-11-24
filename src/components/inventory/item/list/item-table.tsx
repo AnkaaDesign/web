@@ -37,14 +37,14 @@ interface ItemTableProps {
 
 export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDeactivate, onDelete, onMerge, onStockBalance, filters = {}, onDataChange }: ItemTableProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { delete: deleteItem } = useItemMutations();
   const { batchDelete } = useItemBatchMutations();
 
   // Permission checks
-  const canEdit = canEditItems(user);
-  const canDelete = canDeleteItems(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'items');
+  const canEdit = user ? canEditItems(user) : false;
+  const canDelete = user ? canDeleteItems(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'item') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();

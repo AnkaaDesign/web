@@ -18,26 +18,26 @@ interface TaskWithDeadlineInfo extends Task {
 export function getRowColorClass(task: TaskWithDeadlineInfo): string {
   // Non-production tasks (PENDING, COMPLETED, CANCELLED, ON_HOLD) use neutral gray
   if (task.status !== TASK_STATUS.IN_PRODUCTION) {
-    return "bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700";
+    return "bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-700 dark:hover:bg-neutral-600";
   }
 
   // Tasks with no deadline use neutral gray
   if (!task.term) {
-    return "bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700";
+    return "bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-700 dark:hover:bg-neutral-600";
   }
 
   // Check if task is overdue
   const isOverdue = task.isOverdue ?? isDateInPast(task.term);
   if (isOverdue) {
-    return "bg-red-200 hover:bg-red-300 dark:bg-red-900/50 dark:hover:bg-red-900/60";
+    return "bg-red-200 hover:bg-red-300 dark:bg-red-800 dark:hover:bg-red-700";
   }
 
   // Calculate hours remaining for active production tasks
   const hoursRemaining = task.hoursRemaining ?? getHoursBetween(new Date(), task.term);
 
   if (hoursRemaining > 4) {
-    return "bg-green-200 hover:bg-green-300 dark:bg-green-900/50 dark:hover:bg-green-900/60";
+    return "bg-green-200 hover:bg-green-300 dark:bg-green-800 dark:hover:bg-green-700";
   } else {
-    return "bg-orange-200 hover:bg-orange-300 dark:bg-orange-900/50 dark:hover:bg-orange-900/60";
+    return "bg-amber-200 hover:bg-amber-300 dark:bg-amber-700 dark:hover:bg-amber-600";
   }
 }

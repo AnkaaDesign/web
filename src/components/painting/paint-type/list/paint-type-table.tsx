@@ -46,10 +46,10 @@ export function PaintTypeTable({ visibleColumns, className, onEdit, onDelete, fi
   const { batchDelete } = usePaintTypeBatchMutations();
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditPaints(user);
-  const canDelete = canDeletePaints(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'paints');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditPaints(user) : false;
+  const canDelete = user ? canDeletePaints(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'paintType') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();

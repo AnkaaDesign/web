@@ -12,9 +12,10 @@ interface HexColorInputProps {
   control: any;
   disabled?: boolean;
   required?: boolean;
+  hidePreview?: boolean;
 }
 
-export function HexColorInput({ control, disabled, required }: HexColorInputProps) {
+export function HexColorInput({ control, disabled, required, hidePreview }: HexColorInputProps) {
   // Watch the finish field to apply appropriate effects
   const finish = useWatch({
     control,
@@ -37,21 +38,23 @@ export function HexColorInput({ control, disabled, required }: HexColorInputProp
           </FormControl>
           <FormMessage />
 
-          {/* Color Preview Card with finish effects */}
-          <Card className="flex-1 mt-4 overflow-hidden min-h-[200px]">
-            {finish ? (
-              <CanvasNormalMapRenderer
-                baseColor={field.value || "#000000"}
-                finish={finish as PAINT_FINISH}
-                width={400}
-                height={300}
-                quality="high"
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full transition-colors duration-300" style={{ backgroundColor: field.value || "#000000" }} />
-            )}
-          </Card>
+          {/* Color Preview Card with finish effects - hidden when hidePreview is true */}
+          {!hidePreview && (
+            <Card className="flex-1 mt-4 overflow-hidden min-h-[200px]">
+              {finish ? (
+                <CanvasNormalMapRenderer
+                  baseColor={field.value || "#000000"}
+                  finish={finish as PAINT_FINISH}
+                  width={400}
+                  height={300}
+                  quality="high"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full transition-colors duration-300" style={{ backgroundColor: field.value || "#000000" }} />
+              )}
+            </Card>
+          )}
         </FormItem>
       )}
     />

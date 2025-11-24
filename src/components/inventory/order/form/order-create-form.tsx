@@ -1162,33 +1162,29 @@ export const OrderCreateForm = () => {
                               >
                                 <label
                                   htmlFor="mode-inventory"
-                                  className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
+                                  className="flex flex-col space-y-1 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
                                 >
-                                  <RadioGroupItem value="inventory" id="mode-inventory" className="mt-0.5" />
-                                  <div className="flex-1 space-y-1">
-                                    <div className="flex items-center gap-2 font-medium group-hover:text-white">
-                                      <IconShoppingCart className="h-4 w-4" />
-                                      Itens do Estoque
-                                    </div>
-                                    <p className="text-sm text-muted-foreground group-hover:text-white/90">
-                                      Selecione itens do inventário
-                                    </p>
+                                  <div className="flex items-center gap-2 font-medium group-hover:text-white">
+                                    <RadioGroupItem value="inventory" id="mode-inventory" />
+                                    <IconShoppingCart className="h-4 w-4" />
+                                    Itens do Estoque
                                   </div>
+                                  <p className="text-sm text-muted-foreground group-hover:text-white/90 pl-6">
+                                    Selecione itens do inventário
+                                  </p>
                                 </label>
                                 <label
                                   htmlFor="mode-temporary"
-                                  className="flex items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
+                                  className="flex flex-col space-y-1 rounded-md border p-4 hover:bg-accent cursor-pointer transition-colors group"
                                 >
-                                  <RadioGroupItem value="temporary" id="mode-temporary" className="mt-0.5" />
-                                  <div className="flex-1 space-y-1">
-                                    <div className="flex items-center gap-2 font-medium group-hover:text-white">
-                                      <IconFileInvoice className="h-4 w-4" />
-                                      Itens Temporários
-                                    </div>
-                                    <p className="text-sm text-muted-foreground group-hover:text-white/90">
-                                      Compras únicas sem inventário
-                                    </p>
+                                  <div className="flex items-center gap-2 font-medium group-hover:text-white">
+                                    <RadioGroupItem value="temporary" id="mode-temporary" />
+                                    <IconFileInvoice className="h-4 w-4" />
+                                    Itens Temporários
                                   </div>
+                                  <p className="text-sm text-muted-foreground group-hover:text-white/90 pl-6">
+                                    Compras únicas sem inventário
+                                  </p>
                                 </label>
                               </RadioGroup>
                             </div>

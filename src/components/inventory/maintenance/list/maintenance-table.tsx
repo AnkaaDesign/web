@@ -49,10 +49,10 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
   const batchStartMutation = useBatchStartMaintenances();
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditMaintenance(user);
-  const canDelete = canDeleteMaintenance(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'maintenance');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditMaintenance(user) : false;
+  const canDelete = user ? canDeleteMaintenance(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'maintenance') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();

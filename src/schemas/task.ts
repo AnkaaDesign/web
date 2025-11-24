@@ -1082,6 +1082,19 @@ const taskServiceOrderCreateSchema = z.object({
 
 // Truck schema
 const taskTruckCreateSchema = z.object({
+  plate: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => (val === "" ? null : val?.toUpperCase()))
+    .refine((val) => !val || /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$|^[A-Z]{3}-?[0-9]{4}$/i.test(val), {
+      message: "Formato de placa inválido (ex: ABC1234 ou ABC-1234)",
+    }),
+  chassisNumber: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((val) => (val === "" ? null : val?.toUpperCase())),
   xPosition: z.number().nullable().optional(),
   yPosition: z.number().nullable().optional(),
 });

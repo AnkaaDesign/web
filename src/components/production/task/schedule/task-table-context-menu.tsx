@@ -1,9 +1,10 @@
-import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconPlayerPlay, IconPlayerPause, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconEye, IconTrash, IconEditCircle, IconFileInvoice } from "@tabler/icons-react";
+import { IconPlayerPlay, IconPlayerPause, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconTrash, IconEditCircle, IconFileInvoice, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut } from "@tabler/icons-react";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
 import { useAuth } from "@/contexts/auth-context";
+import { canEditTasks, canDeleteTasks, canLeaderManageTask } from "@/utils/permissions/entity-permissions";
 
 interface TaskTableContextMenuProps {
   contextMenu: {
@@ -15,17 +16,12 @@ interface TaskTableContextMenuProps {
   onAction: (action: TaskAction, tasks: Task[]) => void;
 }
 
-export type TaskAction = "start" | "finish" | "pause" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete";
+export type TaskAction = "start" | "finish" | "pause" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkDocuments" | "bulkPaints" | "bulkCuttingPlans";
 
 export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTableContextMenuProps) {
   const { user } = useAuth();
 
   if (!contextMenu) return null;
-
-  // WAREHOUSE users should not see any context menu
-  if (user?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE) {
-    return null;
-  }
 
   const { tasks } = contextMenu;
   const isMultiSelection = tasks.length > 1;
@@ -34,8 +30,20 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
   const hasOnHoldTasks = tasks.some((t) => t.status === TASK_STATUS.ON_HOLD);
   const hasCompletedTasks = tasks.some((t) => t.status === TASK_STATUS.COMPLETED);
 
-  // FINANCIAL users should only see View and Edit options
-  const isFinancialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
+  // Permission checks
+  const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+  const isLeader = user?.sector?.privileges === SECTOR_PRIVILEGES.LEADER;
+  const canEdit = canEditTasks(user); // ADMIN, DESIGNER, FINANCIAL, LOGISTIC
+  const canDelete = canDeleteTasks(user); // ADMIN only
+
+  // LEADER can only manage tasks in their sector or tasks without sector
+  const canLeaderManageTheseTasks = isLeader && tasks.every((t) => canLeaderManageTask(user, t.sectorId));
+  const canManageStatus = isAdmin || canLeaderManageTheseTasks;
+
+  // No context menu if user has no permissions at all
+  if (!canEdit && !canManageStatus) {
+    return null;
+  }
 
   const handleAction = (action: TaskAction) => {
     onAction(action, tasks);
@@ -52,71 +60,95 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
       >
         {isMultiSelection && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{tasks.length} tarefas selecionadas</div>}
 
-        {/* View action (single selection only) */}
-        {!isMultiSelection && (
-          <DropdownMenuItem onClick={() => handleAction("view")}>
-            <IconEye className="mr-2 h-4 w-4" />
-            Visualizar
-          </DropdownMenuItem>
-        )}
-
-        {/* Status actions - not available for FINANCIAL users */}
-        {!isFinancialUser && (hasPendingTasks || hasOnHoldTasks) && (
+        {/* Status actions - LEADER (sector match) and ADMIN only */}
+        {canManageStatus && (hasPendingTasks || hasOnHoldTasks) && (
           <DropdownMenuItem onClick={() => handleAction("start")} className="text-green-700 hover:text-white">
             <IconPlayerPlay className="mr-2 h-4 w-4" />
             Iniciar
           </DropdownMenuItem>
         )}
 
-        {!isFinancialUser && (hasInProgressTasks || hasOnHoldTasks || hasPendingTasks) && (
+        {canManageStatus && (hasInProgressTasks || hasOnHoldTasks || hasPendingTasks) && (
           <DropdownMenuItem onClick={() => handleAction("pause")} className="text-blue-600 hover:text-white">
             <IconPlayerPause className="mr-2 h-4 w-4" />
             {hasPendingTasks && !hasInProgressTasks ? "Colocar em Espera" : "Pausar"}
           </DropdownMenuItem>
         )}
 
-        {!isFinancialUser && hasInProgressTasks && (
+        {canManageStatus && hasInProgressTasks && (
           <DropdownMenuItem onClick={() => handleAction("finish")} className="text-green-700 hover:text-white">
             <IconCheck className="mr-2 h-4 w-4" />
             Finalizar
           </DropdownMenuItem>
         )}
 
-        {/* Separator if we have status actions - not for FINANCIAL users */}
-        {!isFinancialUser && (hasPendingTasks || hasOnHoldTasks || hasInProgressTasks) && <DropdownMenuSeparator />}
+        {/* Separator if we have status actions */}
+        {canManageStatus && (hasPendingTasks || hasOnHoldTasks || hasInProgressTasks) && <DropdownMenuSeparator />}
 
-        {/* Edit actions */}
-        <DropdownMenuItem onClick={() => handleAction("edit")}>
-          <IconEdit className="mr-2 h-4 w-4" />
-          {isMultiSelection ? "Editar em lote" : "Editar"}
-        </DropdownMenuItem>
+        {/* Edit action - ADMIN, DESIGNER, FINANCIAL, LOGISTIC */}
+        {canEdit && (
+          <DropdownMenuItem onClick={() => handleAction("edit")}>
+            <IconEdit className="mr-2 h-4 w-4" />
+            {isMultiSelection ? "Editar em lote" : "Editar"}
+          </DropdownMenuItem>
+        )}
 
-        {/* Additional actions - not available for FINANCIAL users */}
-        {!isFinancialUser && !isMultiSelection && (
+        {/* Admin-only actions: duplicate, setSector, setStatus, bulk operations */}
+        {isAdmin && !isMultiSelection && (
           <DropdownMenuItem onClick={() => handleAction("duplicate")}>
             <IconCopy className="mr-2 h-4 w-4" />
             Duplicar
           </DropdownMenuItem>
         )}
 
-        {!isFinancialUser && (
+        {isAdmin && (
           <DropdownMenuItem onClick={() => handleAction("setSector")}>
             <IconBuildingFactory2 className="mr-2 h-4 w-4" />
             {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}
           </DropdownMenuItem>
         )}
 
-        {!isFinancialUser && hasCompletedTasks && (
+        {isAdmin && hasCompletedTasks && (
           <DropdownMenuItem onClick={() => handleAction("setStatus")}>
             <IconFileInvoice className="mr-2 h-4 w-4" />
             Alterar Status
           </DropdownMenuItem>
         )}
 
-        {!isFinancialUser && <DropdownMenuSeparator />}
+        {/* Advanced bulk operations - ADMIN only */}
+        {isAdmin && <DropdownMenuSeparator />}
 
-        {/* Delete action - not available for FINANCIAL users */}
-        {!isFinancialUser && (
+        {isAdmin && (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="data-[state=open]:bg-accent data-[state=open]:text-accent-foreground">
+              <IconSettings2 className="mr-2 h-4 w-4" />
+              <span className="data-[state=open]:text-accent-foreground">Avançados</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem onClick={() => handleAction("bulkArts")}>
+                <IconPhoto className="mr-2 h-4 w-4" />
+                Adicionar Artes
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleAction("bulkDocuments")}>
+                <IconFileText className="mr-2 h-4 w-4" />
+                Adicionar Documentos
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleAction("bulkPaints")}>
+                <IconPalette className="mr-2 h-4 w-4" />
+                Adicionar Tintas
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleAction("bulkCuttingPlans")}>
+                <IconCut className="mr-2 h-4 w-4" />
+                Adicionar Plano de Corte
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
+
+        {/* Delete action - ADMIN only */}
+        {canDelete && <DropdownMenuSeparator />}
+
+        {canDelete && (
           <DropdownMenuItem onClick={() => handleAction("delete")} className="text-destructive">
             <IconTrash className="mr-2 h-4 w-4" />
             {isMultiSelection ? "Excluir selecionadas" : "Excluir"}

@@ -41,6 +41,7 @@ interface AirbrushingItem {
 
 export interface MultiAirbrushingSelectorRef {
   addAirbrushing: () => void;
+  clearAll: () => void;
 }
 
 export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, MultiAirbrushingSelectorProps>(
@@ -236,6 +237,12 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       setExpandedItems((prev) => prev.filter((itemId) => itemId !== id));
     }, []);
 
+    // Clear all airbrushings
+    const clearAll = useCallback(() => {
+      setAirbrushings([]);
+      setExpandedItems([]);
+    }, []);
+
     const updateAirbrushing = useCallback((id: string, updates: Partial<AirbrushingItem>) => {
       console.log('[updateAirbrushing] Called with id:', id, 'updates:', updates);
       setAirbrushings((prev) => {
@@ -290,8 +297,9 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       ref,
       () => ({
         addAirbrushing,
+        clearAll,
       }),
-      [addAirbrushing],
+      [addAirbrushing, clearAll],
     );
 
     const getStatusBadgeVariant = (status: string) => {
@@ -470,6 +478,20 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
               </AccordionItem>
             ))}
           </Accordion>
+        )}
+
+        {airbrushings.length > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addAirbrushing}
+            disabled={disabled || airbrushings.length >= 10}
+            className="w-full"
+          >
+            <IconPlus className="h-4 w-4 mr-2" />
+            Adicionar
+          </Button>
         )}
       </div>
     );

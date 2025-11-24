@@ -18,6 +18,7 @@ import { TaskTableContextMenu, type TaskAction } from "./task-table-context-menu
 import { DuplicateTaskModal } from "./duplicate-task-modal";
 import { SetSectorModal } from "./set-sector-modal";
 import { SetStatusModal } from "./set-status-modal";
+import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,6 +29,10 @@ import { TableSortUtils, createColumnConfigMap, type SortableColumnConfig, type 
 interface TaskScheduleTableProps {
   tasks: Task[];
   visibleColumns?: Set<string>;
+  selectedTaskIds?: Set<string>;
+  onSelectedTaskIdsChange?: (ids: Set<string>) => void;
+  advancedActionsRef?: React.RefObject<{ openModal: (type: string, taskIds: string[]) => void } | null>;
+  allSelectedTasks?: Task[]; // All selected tasks from all tables
 }
 
 interface TaskRow extends Task {
@@ -35,17 +40,25 @@ interface TaskRow extends Task {
   hoursRemaining: number | null;
 }
 
-export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTableProps) {
+export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: externalSelectedTaskIds, onSelectedTaskIdsChange, advancedActionsRef: externalAdvancedActionsRef, allSelectedTasks }: TaskScheduleTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canEdit = canEditTasks(user);
   const [sortConfigs, setSortConfigs] = useState<SortConfig[]>([]);
-  const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+
+  // Use external selection state if provided, otherwise use internal state
+  const [internalSelectedTaskIds, setInternalSelectedTaskIds] = useState<Set<string>>(new Set());
+  const selectedTaskIds = externalSelectedTaskIds ?? internalSelectedTaskIds;
+  const setSelectedTaskIds = onSelectedTaskIdsChange ?? setInternalSelectedTaskIds;
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [taskToDuplicate, setTaskToDuplicate] = useState<Task | null>(null);
   const [tasksToUpdate, setTasksToUpdate] = useState<Task[]>([]);
+
+  // Use external advanced actions ref if provided, otherwise use internal ref
+  const internalAdvancedActionsRef = React.useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
+  const advancedActionsRef = externalAdvancedActionsRef ?? internalAdvancedActionsRef;
   const [contextMenu, setContextMenu] = useState<{
     x: number;
     y: number;
@@ -61,8 +74,8 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
 
   // Custom sort function for serialNumberOrPlate (multi-field)
   const sortSerialNumberOrPlate = useCallback((a: TaskRow, b: TaskRow, direction: SortDirection): number => {
-    const aValue = a.truck?.serialNumber || a.truck?.plate || "";
-    const bValue = b.truck?.serialNumber || b.truck?.plate || "";
+    const aValue = a.serialNumber || a.truck?.plate || "";
+    const bValue = b.serialNumber || b.truck?.plate || "";
     return TableSortUtils.compareValues(aValue, bValue, direction);
   }, []);
 
@@ -94,7 +107,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
         key: "serialNumberOrPlate",
         header: "Nº SÉRIE",
         sortable: true,
-        accessor: (task: TaskRow) => task.truck?.serialNumber || task.truck?.plate || "",
+        accessor: (task: TaskRow) => task.serialNumber || task.truck?.plate || "",
         customSortFunction: sortSerialNumberOrPlate,
         dataType: "custom",
       },
@@ -147,6 +160,18 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
         accessor: (task: TaskRow) => calculateTaskMeasures(task) || 0,
         dataType: "number",
       },
+      {
+        key: "remainingTime",
+        header: "TEMPO RESTANTE",
+        sortable: true,
+        accessor: (task: TaskRow) => {
+          if (!task.term) return Infinity;
+          const now = new Date();
+          const deadline = new Date(task.term);
+          return deadline.getTime() - now.getTime();
+        },
+        dataType: "number",
+      },
     ],
     [sortSerialNumberOrPlate],
   );
@@ -169,7 +194,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
       { id: "startedAt", header: "INICIADO EM", width: "w-[110px]", sortable: true },
       { id: "finishedAt", header: "FINALIZADO EM", width: "w-[110px]", sortable: true },
       { id: "term", header: "PRAZO", width: "w-[110px]", sortable: true },
-      { id: "remainingTime", header: "TEMPO RESTANTE", width: "w-[130px]", sortable: false },
+      { id: "remainingTime", header: "TEMPO RESTANTE", width: "w-[130px]", sortable: true },
     ],
     [],
   );
@@ -209,13 +234,21 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
 
   const handleSelectAll = useCallback(
     (checked: boolean) => {
+      const currentTableTaskIds = preparedTasks.map((t) => t.id);
+
       if (checked) {
-        setSelectedTaskIds(new Set(preparedTasks.map((t) => t.id)));
+        // Add all tasks from this table to selection
+        const newSelected = new Set(selectedTaskIds);
+        currentTableTaskIds.forEach(id => newSelected.add(id));
+        setSelectedTaskIds(newSelected);
       } else {
-        setSelectedTaskIds(new Set());
+        // Remove all tasks from this table from selection
+        const newSelected = new Set(selectedTaskIds);
+        currentTableTaskIds.forEach(id => newSelected.delete(id));
+        setSelectedTaskIds(newSelected);
       }
     },
-    [preparedTasks],
+    [preparedTasks, selectedTaskIds, setSelectedTaskIds],
   );
 
   const handleSelectTask = useCallback(
@@ -271,8 +304,10 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
       const hasSelection = selectedTaskIds.size > 0;
 
       if (hasSelection && isTaskSelected) {
-        // Show context menu for all selected tasks
-        const selectedTasksList = preparedTasks.filter((t) => selectedTaskIds.has(t.id));
+        // Show context menu for all selected tasks (from all tables if provided)
+        const selectedTasksList = allSelectedTasks && allSelectedTasks.length > 0
+          ? allSelectedTasks
+          : preparedTasks.filter((t) => selectedTaskIds.has(t.id));
         setContextMenu({
           x: e.clientX,
           y: e.clientY,
@@ -287,7 +322,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
         });
       }
     },
-    [selectedTaskIds, preparedTasks],
+    [selectedTaskIds, preparedTasks, allSelectedTasks],
   );
 
   const handleSort = useCallback(
@@ -379,6 +414,34 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
             tasks,
             isBulk: tasks.length > 1,
           });
+          break;
+
+        case "bulkArts":
+          if (advancedActionsRef.current) {
+            const taskIds = tasks.map(t => t.id);
+            advancedActionsRef.current.openModal("arts", taskIds);
+          }
+          break;
+
+        case "bulkDocuments":
+          if (advancedActionsRef.current) {
+            const taskIds = tasks.map(t => t.id);
+            advancedActionsRef.current.openModal("documents", taskIds);
+          }
+          break;
+
+        case "bulkPaints":
+          if (advancedActionsRef.current) {
+            const taskIds = tasks.map(t => t.id);
+            advancedActionsRef.current.openModal("paints", taskIds);
+          }
+          break;
+
+        case "bulkCuttingPlans":
+          if (advancedActionsRef.current) {
+            const taskIds = tasks.map(t => t.id);
+            advancedActionsRef.current.openModal("cuttingPlans", taskIds);
+          }
           break;
       }
     },
@@ -532,8 +595,17 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
                     {column.id === "select" ? (
                       <div className="flex items-center justify-center h-full w-full px-2 min-h-[2.5rem]">
                         <Checkbox
-                          checked={selectedTaskIds.size === preparedTasks.length && preparedTasks.length > 0}
-                          indeterminate={selectedTaskIds.size > 0 && selectedTaskIds.size < preparedTasks.length}
+                          checked={(() => {
+                            // Check if ALL tasks from THIS table are selected
+                            const currentTableTaskIds = preparedTasks.map(t => t.id);
+                            return currentTableTaskIds.length > 0 && currentTableTaskIds.every(id => selectedTaskIds.has(id));
+                          })()}
+                          indeterminate={(() => {
+                            // Check if SOME (but not all) tasks from THIS table are selected
+                            const currentTableTaskIds = preparedTasks.map(t => t.id);
+                            const selectedFromThisTable = currentTableTaskIds.filter(id => selectedTaskIds.has(id)).length;
+                            return selectedFromThisTable > 0 && selectedFromThisTable < currentTableTaskIds.length;
+                          })()}
                           onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
                           data-checkbox
                         />
@@ -600,15 +672,19 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
                                 <TooltipProvider>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <div className="w-16 h-8">
-                                        <CanvasNormalMapRenderer
-                                          baseColor={task.generalPainting.hex || "#888888"}
-                                          finish={paintFinish || PAINT_FINISH.SOLID}
-                                          width={64}
-                                          height={32}
-                                          quality="medium"
-                                          className="w-full h-full rounded-md"
-                                        />
+                                      <div className="w-16 h-8 rounded-md ring-1 ring-border shadow-sm overflow-hidden">
+                                        {task.generalPainting.colorPreview ? (
+                                          <img src={task.generalPainting.colorPreview} alt={task.generalPainting.name} className="w-full h-full object-cover" loading="lazy" />
+                                        ) : (
+                                          <CanvasNormalMapRenderer
+                                            baseColor={task.generalPainting.hex || "#888888"}
+                                            finish={paintFinish || PAINT_FINISH.SOLID}
+                                            width={64}
+                                            height={32}
+                                            quality="medium"
+                                            className="w-full h-full"
+                                          />
+                                        )}
                                       </div>
                                     </TooltipTrigger>
                                     <TooltipContent side="top" className="max-w-xs">
@@ -628,7 +704,7 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
                             );
                           })()
                         : "-")}
-                    {column.id === "serialNumberOrPlate" && <span className="truncate block font-mono">{task.truck?.serialNumber || task.truck?.plate || "-"}</span>}
+                    {column.id === "serialNumberOrPlate" && <span className="truncate block font-mono">{task.serialNumber || task.truck?.plate || "-"}</span>}
                     {column.id === "chassisNumber" && <span className="truncate block font-mono">{task.truck?.chassisNumber || "-"}</span>}
                     {column.id === "sector.name" && <span className="truncate block">{task.sector?.name || "-"}</span>}
                     {column.id === "entryDate" && <span className="truncate block">{task.entryDate ? formatDate(task.entryDate) : "-"}</span>}
@@ -655,6 +731,15 @@ export function TaskScheduleTable({ tasks, visibleColumns }: TaskScheduleTablePr
       <SetSectorModal open={setSectorModalOpen} onOpenChange={setSetSectorModalOpen} tasks={tasksToUpdate} onConfirm={handleSetSectorConfirm} />
 
       <SetStatusModal open={setStatusModalOpen} onOpenChange={setSetStatusModalOpen} tasks={tasksToUpdate} onConfirm={handleSetStatusConfirm} />
+
+      {/* Only render AdvancedBulkActionsHandler if using internal ref (not shared) */}
+      {!externalAdvancedActionsRef && (
+        <AdvancedBulkActionsHandler
+          ref={advancedActionsRef}
+          selectedTaskIds={selectedTaskIds}
+          onClearSelection={() => setSelectedTaskIds(new Set())}
+        />
+      )}
 
       <TaskTableContextMenu contextMenu={contextMenu} onClose={() => setContextMenu(null)} onAction={handleAction} />
 

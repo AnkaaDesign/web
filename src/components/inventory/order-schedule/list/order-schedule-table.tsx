@@ -59,10 +59,10 @@ export function OrderScheduleTable({ data, isLoading = false, onEdit, onView, on
   );
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditOrders(user);
-  const canDelete = canDeleteOrders(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'orders');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditOrders(user) : false;
+  const canDelete = user ? canDeleteOrders(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'order') : false;
 
   const allColumns = React.useMemo(
     () => [

@@ -4,21 +4,19 @@ import { formatHexColor } from "./color-utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { PAINT_FINISH_LABELS, PAINT_FINISH, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
-import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface PaintGridProps {
   paints: Paint[];
   isLoading: boolean;
   onPaintClick: (paint: Paint) => void;
-  showEffects?: boolean;
   onOrderChange?: (paints: Paint[]) => void;
 }
 
 const SQUARE_SIZE = 64; // Fixed size in pixels
 const GAP = 8; // Gap between squares
 
-export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true, onOrderChange }: PaintGridProps) {
+export function PaintGrid({ paints, isLoading, onPaintClick, onOrderChange }: PaintGridProps) {
   // Local state for drag-and-drop reordering
   const [orderedPaints, setOrderedPaints] = useState<Paint[]>(paints);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -64,7 +62,7 @@ export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true,
     return (
       <div className="h-full w-full overflow-auto p-4">
         <div
-          className="grid"
+          className="grid justify-center"
           style={{
             gridTemplateColumns: `repeat(auto-fill, ${SQUARE_SIZE}px)`,
             gap: `${GAP}px`,
@@ -91,7 +89,7 @@ export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true,
       <div
         className="grid"
         style={{
-          gridTemplateColumns: `repeat(auto-fill, ${SQUARE_SIZE}px)`,
+          gridTemplateColumns: `repeat(auto-fill, minmax(${SQUARE_SIZE}px, 1fr))`,
           gap: `${GAP}px`,
         }}
       >
@@ -101,7 +99,6 @@ export function PaintGrid({ paints, isLoading, onPaintClick, showEffects = true,
             paint={paint}
             index={index}
             onClick={() => onPaintClick(paint)}
-            showEffects={showEffects}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
@@ -117,16 +114,14 @@ interface PaintSquareProps {
   paint: Paint;
   index: number;
   onClick: () => void;
-  showEffects?: boolean;
   onDragStart: (index: number) => void;
   onDragOver: (e: React.DragEvent, index: number) => void;
   onDragEnd: () => void;
   isDragging: boolean;
 }
 
-function PaintSquare({ paint, index, onClick, showEffects = true, onDragStart, onDragOver, onDragEnd, isDragging }: PaintSquareProps) {
+function PaintSquare({ paint, index, onClick, onDragStart, onDragOver, onDragEnd, isDragging }: PaintSquareProps) {
   const backgroundColor = formatHexColor(paint.hex);
-
   const paintFinish = paint.finish as PAINT_FINISH;
 
   const button = (
@@ -146,15 +141,18 @@ function PaintSquare({ paint, index, onClick, showEffects = true, onDragStart, o
       style={{
         width: SQUARE_SIZE,
         height: SQUARE_SIZE,
-        backgroundColor: showEffects && (paint.finish === PAINT_FINISH.METALLIC || paint.finish === PAINT_FINISH.PEARL) ? "transparent" : backgroundColor || "#cccccc",
+        backgroundColor: paint.colorPreview ? "transparent" : backgroundColor || "#cccccc",
         border: "1px solid rgba(0,0,0,0.1)",
       }}
     >
-      {/* Canvas renderer for realistic finish - only when effects are enabled */}
-      {showEffects && (paint.finish === PAINT_FINISH.METALLIC || paint.finish === PAINT_FINISH.PEARL) && (
-        <div className="absolute inset-0">
-          <CanvasNormalMapRenderer baseColor={paint.hex} finish={paint.finish as PAINT_FINISH} width={SQUARE_SIZE} height={SQUARE_SIZE} className="w-full h-full" />
-        </div>
+      {/* Use colorPreview image if available */}
+      {paint.colorPreview && (
+        <img
+          src={paint.colorPreview}
+          alt={paint.name}
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+        />
       )}
     </button>
   );

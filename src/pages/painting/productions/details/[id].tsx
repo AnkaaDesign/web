@@ -13,6 +13,8 @@ import { IconFlask, IconDroplet, IconCalendar, IconPaint, IconComponents, IconWe
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
+import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
+import { PAINT_FINISH } from "@/constants";
 
 export function ProductionDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -151,7 +153,22 @@ export function ProductionDetailsPage() {
               <CardContent className="space-y-4">
                 {paint && (
                   <div className="flex items-center gap-3">
-                    <div className="h-16 w-16 rounded-lg border-2 border-border shadow-sm flex-shrink-0" style={{ backgroundColor: paint.hex }} />
+                    <div className="h-16 w-16 rounded-md ring-1 ring-border shadow-sm flex-shrink-0 overflow-hidden">
+                      {paint.colorPreview ? (
+                        <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" loading="lazy" />
+                      ) : paint.finish ? (
+                        <CanvasNormalMapRenderer
+                          baseColor={paint.hex || "#888888"}
+                          finish={(paint.finish as PAINT_FINISH) || PAINT_FINISH.SOLID}
+                          width={64}
+                          height={64}
+                          quality="medium"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full" style={{ backgroundColor: paint.hex }} />
+                      )}
+                    </div>
                     <div className="flex-1 space-y-2">
                       <p className="font-semibold text-lg">{paint.name}</p>
                       <div className="flex items-center gap-2">

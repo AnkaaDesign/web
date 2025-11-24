@@ -110,13 +110,17 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
 
     return (
       <div className="flex items-center gap-3 w-full">
-        {/* Square color preview with finish effect */}
-        {paint.finish ? (
-          <div className="w-6 h-6 rounded border border-border shadow-sm flex-shrink-0 overflow-hidden">
+        {/* Square color preview - prefer colorPreview image */}
+        {paint.colorPreview ? (
+          <div className="w-6 h-6 rounded ring-1 ring-border shadow-sm flex-shrink-0 overflow-hidden">
+            <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" loading="lazy" />
+          </div>
+        ) : paint.finish ? (
+          <div className="w-6 h-6 rounded ring-1 ring-border shadow-sm flex-shrink-0 overflow-hidden">
             <CanvasNormalMapRenderer baseColor={color} finish={paint.finish as PAINT_FINISH} width={24} height={24} quality="low" className="w-full h-full" />
           </div>
         ) : (
-          <div className="w-6 h-6 rounded border border-border shadow-sm flex-shrink-0" style={{ backgroundColor: color }} />
+          <div className="w-6 h-6 rounded ring-1 ring-border shadow-sm flex-shrink-0" style={{ backgroundColor: color }} />
         )}
 
         <div className="flex-1 min-w-0">
@@ -200,8 +204,12 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
                       className="pl-2.5 pr-2.5 py-1.5 flex items-center gap-2 border cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
                       onClick={() => field.onChange(null)}
                     >
-                      {selectedPaint.finish ? (
-                        <div className="w-4 h-4 rounded border border-border shadow-sm overflow-hidden">
+                      {selectedPaint.colorPreview ? (
+                        <div className="w-4 h-4 rounded ring-1 ring-border shadow-sm overflow-hidden">
+                          <img src={selectedPaint.colorPreview} alt={selectedPaint.name} className="w-full h-full object-cover" />
+                        </div>
+                      ) : selectedPaint.finish ? (
+                        <div className="w-4 h-4 rounded ring-1 ring-border shadow-sm overflow-hidden">
                           <CanvasNormalMapRenderer
                             baseColor={selectedPaint.hex || paletteColors[selectedPaint.palette || ""] || "#888888"}
                             finish={selectedPaint.finish as PAINT_FINISH}
@@ -213,7 +221,7 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
                         </div>
                       ) : (
                         <div
-                          className="w-4 h-4 rounded border border-border shadow-sm"
+                          className="w-4 h-4 rounded ring-1 ring-border shadow-sm"
                           style={{ backgroundColor: selectedPaint.hex || paletteColors[selectedPaint.palette || ""] || "#888888" }}
                         />
                       )}

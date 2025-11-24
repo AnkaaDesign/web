@@ -47,7 +47,7 @@ export function DeadlineCountdown({ deadline, isOverdue }: DeadlineCountdownProp
   }, [deadline, isOverdue]);
 
   return (
-    <span className={isOverdue ? "font-semibold text-red-600" : ""} title={isOverdue ? "Tempo excedido" : "Tempo restante"}>
+    <span className="font-semibold" title={isOverdue ? "Tempo excedido" : "Tempo restante"}>
       {timeDisplay}
     </span>
   );

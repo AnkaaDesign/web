@@ -28,9 +28,6 @@ import {
   IconAlertCircle,
   IconCalendar,
   IconArrowBackUpDouble,
-  IconSparkles,
-  IconTruckLoading,
-  IconDroplet,
 } from "@tabler/icons-react";
 import type { ChangeLog } from "../../types";
 import { CHANGE_LOG_ENTITY_TYPE, CHANGE_LOG_ACTION, CHANGE_TRIGGERED_BY, CHANGE_LOG_ENTITY_TYPE_LABELS } from "../../constants";
@@ -51,7 +48,7 @@ interface ChangelogHistoryProps {
 }
 
 // Logo component for changelog display
-const LogoDisplay = ({ logoId, size = "w-12 h-12", className = "" }: { logoId?: string; size?: string; className?: string }) => {
+const LogoDisplay = ({ logoId, size = "w-12 h-12", className = "", useThumbnail = false }: { logoId?: string; size?: string; className?: string; useThumbnail?: boolean }) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   if (!logoId) {
@@ -72,7 +69,10 @@ const LogoDisplay = ({ logoId, size = "w-12 h-12", className = "" }: { logoId?: 
 
   // Use the same API URL configuration as the API client
   const apiUrl = import.meta.env.VITE_API_URL || "http://192.168.0.13:3030";
-  const imageUrl = `${apiUrl}/files/serve/${logoId}`;
+  // Use thumbnail endpoint for file previews, serve endpoint for logos
+  const imageUrl = useThumbnail
+    ? `${apiUrl}/files/thumbnail/${logoId}`
+    : `${apiUrl}/files/serve/${logoId}`;
   return (
     <div className={cn("relative", size, className)}>
       {imageLoading && (
@@ -83,7 +83,7 @@ const LogoDisplay = ({ logoId, size = "w-12 h-12", className = "" }: { logoId?: 
       <img
         src={imageUrl}
         alt="Logo"
-        className={cn("object-contain border border-border rounded-md bg-muted", size, imageLoading ? "opacity-0" : "opacity-100")}
+        className={cn("object-cover border border-border rounded-md bg-muted", size, imageLoading ? "opacity-0" : "opacity-100")}
         onError={(e) => {
           setImageError(true);
           setImageLoading(false);
@@ -329,17 +329,21 @@ const renderPaintsCards = (paints: any[]) => {
       {paints.map((paint: any, index: number) => (
         <div key={paint.id || index} className="border rounded-lg px-2.5 py-1.5 bg-card">
           <div className="flex items-start gap-3">
-            {/* Paint preview */}
+            {/* Paint preview - prefer colorPreview image */}
             <div className="relative flex-shrink-0">
-              <div className="w-10 h-10 rounded-md overflow-hidden shadow-inner border border-muted">
-                <CanvasNormalMapRenderer
-                  baseColor={paint.hex || "#888888"}
-                  finish={(paint.finish as PAINT_FINISH) || PAINT_FINISH.SOLID}
-                  width={40}
-                  height={40}
-                  quality="medium"
-                  className="w-full h-full object-cover"
-                />
+              <div className="w-10 h-10 rounded-md ring-1 ring-border shadow-sm overflow-hidden">
+                {paint.colorPreview ? (
+                  <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover rounded-md" loading="lazy" />
+                ) : (
+                  <CanvasNormalMapRenderer
+                    baseColor={paint.hex || "#888888"}
+                    finish={(paint.finish as PAINT_FINISH) || PAINT_FINISH.SOLID}
+                    width={40}
+                    height={40}
+                    quality="medium"
+                    className="w-full h-full object-cover rounded-md"
+                  />
+                )}
               </div>
             </div>
 
@@ -347,31 +351,30 @@ const renderPaintsCards = (paints: any[]) => {
             <div className="flex-1 min-w-0 space-y-1.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <h4 className="text-xs font-semibold truncate">{paint.name}</h4>
-                <span className="text-[10px] font-mono text-muted-foreground">{paint.hex}</span>
+                {paint.code && (
+                  <span className="text-[10px] font-mono text-muted-foreground">{paint.code}</span>
+                )}
               </div>
 
-              {/* Badges */}
+              {/* Badges - unified neutral style, more subtle, no icons */}
               <div className="flex flex-wrap gap-1">
                 {paint.paintType?.name && (
-                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-                    <IconDroplet className="h-2.5 w-2.5 mr-0.5" />
+                  <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
                     {paint.paintType.name}
                   </Badge>
                 )}
                 {paint.finish && (
-                  <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-                    <IconSparkles className="h-2.5 w-2.5 mr-0.5" />
+                  <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
                     {PAINT_FINISH_LABELS[paint.finish]}
                   </Badge>
                 )}
                 {paint.paintBrand?.name && (
-                  <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                  <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
                     {paint.paintBrand.name}
                   </Badge>
                 )}
                 {paint.manufacturer && (
-                  <Badge variant="outline" className="text-[10px] h-4 px-1.5">
-                    <IconTruckLoading className="h-2.5 w-2.5 mr-0.5" />
+                  <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
                     {TRUCK_MANUFACTURER_LABELS[paint.manufacturer]}
                   </Badge>
                 )}
@@ -875,8 +878,8 @@ const ChangelogTimelineItem = ({
                               )}
                             </div>
                           </>
-                        ) : changelog.field === "artworks" ? (
-                          // Special handling for artworks field - show thumbnail previews
+                        ) : changelog.field === "artworks" || changelog.field === "budgets" || changelog.field === "invoices" || changelog.field === "receipts" ? (
+                          // Special handling for file fields - show thumbnail previews
                           <>
                             <div className="text-sm">
                               <span className="text-muted-foreground">Antes: </span>
@@ -894,16 +897,18 @@ const ChangelogTimelineItem = ({
                                   }
                                   return null;
                                 };
-                                const artworks = parseValue(changelog.oldValue);
-                                if (!artworks || artworks.length === 0) {
-                                  return <span className="text-red-600 dark:text-red-400 font-medium">Nenhuma arte</span>;
+                                const files = parseValue(changelog.oldValue);
+                                if (!files || files.length === 0) {
+                                  return <span className="text-red-600 dark:text-red-400 font-medium">Nenhum arquivo</span>;
                                 }
                                 return (
                                   <div className="flex flex-wrap gap-2 mt-1">
-                                    {artworks.map((artwork: any, idx: number) => (
-                                      <LogoDisplay key={idx} logoId={artwork.id} size="w-12 h-12" />
-                                    ))}
-                                    <span className="text-sm text-muted-foreground self-center">({artworks.length} arte{artworks.length > 1 ? 's' : ''})</span>
+                                    {files.map((file: any, idx: number) => {
+                                      // Handle both object format {id: "..."} and string format "id"
+                                      const fileId = typeof file === 'string' ? file : file.id;
+                                      return <LogoDisplay key={idx} logoId={fileId} size="w-12 h-12" useThumbnail />;
+                                    })}
+                                    <span className="text-sm text-muted-foreground self-center">({files.length} arquivo{files.length > 1 ? 's' : ''})</span>
                                   </div>
                                 );
                               })()}
@@ -924,16 +929,18 @@ const ChangelogTimelineItem = ({
                                   }
                                   return null;
                                 };
-                                const artworks = parseValue(changelog.newValue);
-                                if (!artworks || artworks.length === 0) {
-                                  return <span className="text-green-600 dark:text-green-400 font-medium">Nenhuma arte</span>;
+                                const files = parseValue(changelog.newValue);
+                                if (!files || files.length === 0) {
+                                  return <span className="text-green-600 dark:text-green-400 font-medium">Nenhum arquivo</span>;
                                 }
                                 return (
                                   <div className="flex flex-wrap gap-2 mt-1">
-                                    {artworks.map((artwork: any, idx: number) => (
-                                      <LogoDisplay key={idx} logoId={artwork.id} size="w-12 h-12" />
-                                    ))}
-                                    <span className="text-sm text-muted-foreground self-center">({artworks.length} arte{artworks.length > 1 ? 's' : ''})</span>
+                                    {files.map((file: any, idx: number) => {
+                                      // Handle both object format {id: "..."} and string format "id"
+                                      const fileId = typeof file === 'string' ? file : file.id;
+                                      return <LogoDisplay key={idx} logoId={fileId} size="w-12 h-12" useThumbnail />;
+                                    })}
+                                    <span className="text-sm text-muted-foreground self-center">({files.length} arquivo{files.length > 1 ? 's' : ''})</span>
                                   </div>
                                 );
                               })()}

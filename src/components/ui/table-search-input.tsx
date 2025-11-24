@@ -16,6 +16,8 @@ interface TableSearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInput
   isLoading?: boolean;
   /** Debounce indicator */
   isPending?: boolean;
+  /** Content to display on the right side of the input */
+  suffix?: React.ReactNode;
 }
 
 /**
@@ -23,7 +25,7 @@ interface TableSearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInput
  * Handles search icon, clear button, and loading states
  */
 export const TableSearchInput = forwardRef<HTMLInputElement, TableSearchInputProps>(
-  ({ value, onChange, showClear = true, icon, isLoading = false, isPending = false, placeholder = "Buscar...", className, disabled, ...props }, ref) => {
+  ({ value, onChange, showClear = true, icon, isLoading = false, isPending = false, placeholder = "Buscar...", className, disabled, suffix, ...props }, ref) => {
     const handleClear = () => {
       onChange("");
       // Focus the input after clearing
@@ -55,8 +57,20 @@ export const TableSearchInput = forwardRef<HTMLInputElement, TableSearchInputPro
           placeholder={placeholder}
           disabled={disabled}
           transparent={true}
-          className={cn("pl-9 pr-9", isPending && "ring-1 ring-primary/20", className)}
+          className={cn(
+            "pl-9",
+            suffix ? "pr-32" : "pr-9",
+            isPending && "ring-1 ring-primary/20",
+            className
+          )}
         />
+
+        {/* Suffix content */}
+        {suffix && (
+          <div className="absolute right-9 top-1/2 transform -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+            {suffix}
+          </div>
+        )}
 
         {/* Clear button or pending indicator */}
         {showClear && value && !disabled && (

@@ -1050,7 +1050,7 @@ export enum PPE_TYPE {
   MASK = "MASK",
   GLOVES = "GLOVES",
   RAIN_BOOTS = "RAIN_BOOTS",
-  OUTROS = "OUTROS",
+  OTHERS = "OTHERS",
 }
 
 export enum PPE_SIZE_TYPE {
@@ -1897,13 +1897,11 @@ export enum FAVORITE_PAGES {
   RECURSOS_HUMANOS_SETORES_CADASTRAR = "/recursos-humanos/setores/cadastrar",
 
   // Personal - List Pages
-  PESSOAL_MINHAS_COMISSOES_LISTAR = "/pessoal/minhas-comissoes",
-  PESSOAL_MINHAS_FERIAS_LISTAR = "/pessoal/minhas-ferias",
-  PESSOAL_MEUS_FERIADOS_LISTAR = "/pessoal/meus-feriados",
-  PESSOAL_MEUS_EMPRESTIMOS_LISTAR = "/pessoal/meus-emprestimos",
+  PESSOAL_FERIADOS_LISTAR = "/pessoal/feriados",
+  PESSOAL_FERIAS_LISTAR = "/pessoal/ferias",
   PESSOAL_MEUS_EPIS_LISTAR = "/pessoal/meus-epis",
-  PESSOAL_MEUS_AVISOS_LISTAR = "/pessoal/meus-avisos",
-  PESSOAL_MINHAS_NOTIFICACOES_LISTAR = "/pessoal/minhas-notificacoes",
+  PESSOAL_MEUS_EMPRESTIMOS_LISTAR = "/pessoal/meus-emprestimos",
+  PESSOAL_MINHAS_ATIVIDADES_LISTAR = "/pessoal/minhas-atividades",
 
   // Catalog Basic - List Pages
   CATALOGO_BASICO_LISTAR = "/pintura/catalogo-basico",

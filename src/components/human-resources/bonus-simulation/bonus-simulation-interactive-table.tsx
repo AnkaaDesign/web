@@ -203,7 +203,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
 
   const taskQuery = {
     where: {
-      status: TASK_STATUS.COMPLETED, // Only count completed tasks
+      status: { in: [TASK_STATUS.COMPLETED, TASK_STATUS.INVOICED, TASK_STATUS.SETTLED] }, // Only count completed, invoiced, or settled tasks
       finishedAt: {
         gte: startDate,
         lte: endDate

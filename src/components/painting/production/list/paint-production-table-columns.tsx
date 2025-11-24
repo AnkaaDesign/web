@@ -37,10 +37,13 @@ export function createPaintProductionColumns(): PaintProductionColumn[] {
       header: "TINTA",
       accessor: (production) => {
         const paintInfo = getPaintInfo(production.formula);
+        const colorPreview = production.formula?.paint?.colorPreview;
         return (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-md ring-1 ring-border/50 shadow-sm flex-shrink-0 overflow-hidden">
-              {paintInfo.finish ? (
+            <div className="w-8 h-8 rounded-md ring-1 ring-border shadow-sm flex-shrink-0 overflow-hidden">
+              {colorPreview ? (
+                <img src={colorPreview} alt={paintInfo.name} className="w-full h-full object-cover" loading="lazy" />
+              ) : paintInfo.finish ? (
                 <CanvasNormalMapRenderer baseColor={paintInfo.hex} finish={paintInfo.finish as PAINT_FINISH} width={32} height={32} quality="low" className="w-full h-full" />
               ) : (
                 <div className="w-full h-full" style={{ backgroundColor: paintInfo.hex }} />

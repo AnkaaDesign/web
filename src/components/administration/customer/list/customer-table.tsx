@@ -36,14 +36,14 @@ interface CustomerTableProps {
 
 export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onMerge, filters = {}, onDataChange }: CustomerTableProps) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { delete: deleteCustomer } = useCustomerMutations();
   const { batchDelete } = useCustomerBatchMutations();
 
-  // Permission checks
-  const canEdit = canEditCustomers(user);
-  const canDelete = canDeleteCustomers(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'customers');
+  // Permission checks - wait for auth to load
+  const canEdit = user ? canEditCustomers(user) : false;
+  const canDelete = user ? canDeleteCustomers(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'customer') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();
@@ -110,7 +110,7 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
   }, [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds]);
 
   // Use the customers hook with memoized parameters
-  const { data: response, isLoading, error } = useCustomers(queryParams);
+  const { data: response, isLoading: isLoadingCustomers, error } = useCustomers(queryParams);
 
   const customers = response?.data || [];
   const totalRecords = response?.meta?.totalRecords || 0;
@@ -283,7 +283,7 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
     return () => document.removeEventListener("click", handleClick);
   }, []);
 
-  if (isLoading) {
+  if (isLoadingCustomers) {
     return <CustomerListSkeleton />;
   }
 
@@ -303,7 +303,7 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
                       indeterminate={partiallySelected}
                       onCheckedChange={handleSelectAll}
                       aria-label="Select all customers"
-                      disabled={isLoading || customers.length === 0}
+                      disabled={isLoadingCustomers || customers.length === 0}
                       data-checkbox
                     />
                   </div>

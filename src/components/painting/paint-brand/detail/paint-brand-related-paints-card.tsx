@@ -168,9 +168,15 @@ export function PaintBrandRelatedPaintsCard({ paintBrand }: PaintBrandRelatedPai
                   onClick={() => navigate(routes.painting.catalog.details(paint.id))}
                 >
                   <div className="p-4 space-y-3">
-                    {/* Color Preview and Name */}
+                    {/* Color Preview and Name - prefer colorPreview image */}
                     <div className="flex items-center gap-3">
-                      <div className="h-12 w-12 rounded-lg border border-border/60 dark:border-border/50 shadow-sm" style={{ backgroundColor: paint.hex }} />
+                      <div className="h-12 w-12 rounded-lg ring-1 ring-border/60 dark:ring-border/50 shadow-sm overflow-hidden">
+                        {paint.colorPreview ? (
+                          <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" loading="lazy" />
+                        ) : (
+                          <div className="w-full h-full" style={{ backgroundColor: paint.hex }} />
+                        )}
+                      </div>
                       <div className="flex-1">
                         <h4 className="font-medium line-clamp-1">{paint.name}</h4>
                         <p className="text-xs text-muted-foreground font-mono">{paint.hex}</p>

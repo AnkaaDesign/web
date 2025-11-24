@@ -171,7 +171,7 @@ export function getDaysUntilDeadline(task: Task): number | null {
  */
 export function formatTaskIdentifier(task: Task): string {
   if (task.serialNumber) return task.serialNumber;
-  if (task.plate) return task.plate;
+  if (task.truck?.plate) return task.truck.plate;
   return `#${task.id.slice(-6).toUpperCase()}`;
 }
 
@@ -335,4 +335,54 @@ export function calculateTaskStats(tasks: Task[]) {
 
 export function getTaskObservationTypeLabel(type: TASK_OBSERVATION_TYPE): string {
   return TASK_OBSERVATION_TYPE_LABELS[type] || type;
+}
+
+/**
+ * Validation result for service order checks
+ */
+export interface ServiceOrderValidationResult {
+  isValid: boolean;
+  errorMessage?: string;
+  incompleteOrders?: Array<{ id: string; name: string; status: string }>;
+}
+
+/**
+ * Validate that all service orders for a task are finished
+ * Used before allowing a LEADER to mark a task as COMPLETED
+ *
+ * @param task - The task to validate
+ * @returns Validation result with error details if any service orders are incomplete
+ */
+export function validateAllServiceOrdersCompleted(task: Task): ServiceOrderValidationResult {
+  // Check if task has service orders
+  if (!task.serviceOrders || task.serviceOrders.length === 0) {
+    // No service orders to validate - task can be finished
+    return { isValid: true };
+  }
+
+  // Find incomplete service orders
+  const incompleteOrders = task.serviceOrders.filter((order: any) => {
+    // Service order statuses: PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+    // Only COMPLETED orders are considered finished
+    return order.status !== 'COMPLETED';
+  });
+
+  if (incompleteOrders.length > 0) {
+    const orderNames = incompleteOrders
+      .map((order: any) => order.name || `OS #${order.id}`)
+      .join(', ');
+
+    return {
+      isValid: false,
+      errorMessage: `Não é possível finalizar a tarefa. As seguintes ordens de serviço ainda não foram concluídas: ${orderNames}`,
+      incompleteOrders: incompleteOrders.map((order: any) => ({
+        id: order.id,
+        name: order.name || `OS #${order.id}`,
+        status: order.status,
+      })),
+    };
+  }
+
+  // All service orders are completed
+  return { isValid: true };
 }

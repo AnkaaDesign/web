@@ -47,8 +47,14 @@ export function RelatedPaintsCard({ paint }: RelatedPaintsCardProps) {
                 onClick={() => handlePaintClick(relatedPaint.id)}
               >
                 <div className="space-y-3">
-                  {/* Color Strip */}
-                  <div className="h-16 rounded-md border" style={{ backgroundColor: relatedPaint.hex }} />
+                  {/* Color Strip - prefer colorPreview image */}
+                  <div className="h-16 rounded-md ring-1 ring-border overflow-hidden">
+                    {relatedPaint.colorPreview ? (
+                      <img src={relatedPaint.colorPreview} alt={relatedPaint.name} className="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <div className="w-full h-full" style={{ backgroundColor: relatedPaint.hex }} />
+                    )}
+                  </div>
 
                   {/* Paint Info */}
                   <div className="space-y-2">

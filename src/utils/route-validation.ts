@@ -182,19 +182,16 @@ const VALID_ROUTES = [
 
   // Personal routes
   routes.personal.root,
-  routes.personal.myProfile.root,
   routes.personal.myHolidays.root,
   routes.personal.myVacations.root,
   routes.personal.myVacations.details(":id"),
+  routes.personal.myPpes.root,
+  routes.personal.myPpes.details(":id"),
+  routes.personal.myPpes.request,
   routes.personal.myLoans.root,
   routes.personal.myLoans.details(":id"),
-  routes.personal.myPpes.root,
-  routes.personal.myPpes.request,
-  routes.personal.myWarnings.root,
-  routes.personal.myWarnings.details(":id"),
-  routes.personal.myNotifications.root,
-  routes.personal.myNotifications.details(":id"),
-  routes.personal.preferences.root,
+  routes.personal.myActivities.root,
+  routes.personal.myActivities.details(":id"),
 
   // My Team routes
   routes.myTeam.root,
@@ -209,6 +206,9 @@ const VALID_ROUTES = [
   // Maintenance routes
   routes.maintenance.root,
   routes.maintenance.details(":id"),
+
+  // Profile route
+  routes.profile,
 ];
 
 /**
@@ -268,12 +268,13 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/recursos-humanos/epi/agendamentos/listar": "/recursos-humanos/epi/agendamentos",
 
   // Personal (Pessoal) route mappings
-  "/pessoal/minhas-ferias/listar": "/pessoal/minhas-ferias",
-  "/pessoal/meus-feriados/listar": "/pessoal/meus-feriados",
-  "/pessoal/meus-emprestimos/listar": "/pessoal/meus-emprestimos",
+  "/pessoal/meus-feriados": "/pessoal/feriados",
+  "/pessoal/meus-feriados/listar": "/pessoal/feriados",
+  "/pessoal/minhas-ferias": "/pessoal/ferias",
+  "/pessoal/minhas-ferias/listar": "/pessoal/ferias",
   "/pessoal/meus-epis/listar": "/pessoal/meus-epis",
-  "/pessoal/meus-avisos/listar": "/pessoal/meus-avisos",
-  "/pessoal/minhas-notificacoes/listar": "/pessoal/minhas-notificacoes",
+  "/pessoal/meus-emprestimos/listar": "/pessoal/meus-emprestimos",
+  "/pessoal/minhas-atividades/listar": "/pessoal/minhas-atividades",
 
   // My Team (Meu Pessoal) route mappings
   "/meu-pessoal/ferias/listar": "/meu-pessoal/ferias",

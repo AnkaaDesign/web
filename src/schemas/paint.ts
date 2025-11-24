@@ -1327,6 +1327,7 @@ export const paintCreateSchema = z.object({
   paletteOrder: z.number().int().min(1).max(14).optional(),
   colorOrder: z.number().int().nullable().optional(),
   groundIds: z.array(z.string().uuid()).optional(),
+  colorPreview: z.string().nullable().optional(), // URL or data URL for paint preview image
 });
 
 export const paintUpdateSchema = z.object({
@@ -1355,6 +1356,7 @@ export const paintUpdateSchema = z.object({
   paletteOrder: z.number().int().min(1).max(14).optional(),
   colorOrder: z.number().int().nullable().optional(),
   groundIds: z.array(z.string().uuid()).optional(),
+  colorPreview: z.string().nullable().optional(), // URL or data URL for paint preview image
 });
 
 // Schema for batch updating color orders

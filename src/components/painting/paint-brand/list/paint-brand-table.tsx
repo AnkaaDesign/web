@@ -46,10 +46,10 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
   const { batchDelete } = usePaintBrandBatchMutations();
 
   // Permission checks
-  const { user } = useAuth();
-  const canEdit = canEditPaints(user);
-  const canDelete = canDeletePaints(user);
-  const showInteractive = shouldShowInteractiveElements(user, 'paints');
+  const { user, isLoading: isAuthLoading } = useAuth();
+  const canEdit = user ? canEditPaints(user) : false;
+  const canDelete = user ? canDeletePaints(user) : false;
+  const showInteractive = user ? shouldShowInteractiveElements(user, 'paintBrand') : false;
 
   // Get scrollbar width info
   const { width: scrollbarWidth, isOverlay } = useScrollbarWidth();

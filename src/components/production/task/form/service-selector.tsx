@@ -187,44 +187,47 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
               )}
             />
 
-            {/* Action Buttons */}
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {/* Remove Button */}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  if (canRemove) {
-                    remove(index);
-                  } else {
-                    // Clear the only row instead of removing it
-                    const fieldElement = document.querySelector(`[name="services.${index}.description"]`) as HTMLInputElement;
-                    if (fieldElement) {
-                      fieldElement.value = "";
-                      // Trigger change event
-                      const event = new Event("change", { bubbles: true });
-                      fieldElement.dispatchEvent(event);
-                    }
+            {/* Remove Button */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                if (canRemove) {
+                  remove(index);
+                } else {
+                  // Clear the only row instead of removing it
+                  const fieldElement = document.querySelector(`[name="services.${index}.description"]`) as HTMLInputElement;
+                  if (fieldElement) {
+                    fieldElement.value = "";
+                    // Trigger change event
+                    const event = new Event("change", { bubbles: true });
+                    fieldElement.dispatchEvent(event);
                   }
-                }}
-                disabled={disabled}
-                className="text-destructive"
-                title="Remover serviço"
-              >
-                <IconTrash className="h-4 w-4" />
-              </Button>
-
-              {/* Add Service Button - only shown on the last row */}
-              {index === fields.length - 1 && (
-                <Button type="button" variant="ghost" size="icon" onClick={handleAddService} disabled={disabled} className="text-primary" title="Adicionar serviço">
-                  <IconPlus className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
+                }
+              }}
+              disabled={disabled}
+              className="text-destructive flex-shrink-0"
+              title="Remover serviço"
+            >
+              <IconTrash className="h-4 w-4" />
+            </Button>
           </div>
         ))}
       </div>
+
+      {/* Add Service Button - full width at bottom */}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={handleAddService}
+        disabled={disabled}
+        className="w-full"
+      >
+        <IconPlus className="h-4 w-4 mr-2" />
+        Adicionar
+      </Button>
     </div>
   );
 }

@@ -70,9 +70,11 @@ export function PaintProductionCard({ production }: PaintProductionCardProps) {
     <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer h-full flex flex-col" onClick={handleClick}>
       {/* Header with paint color preview */}
       <div className="flex items-center gap-3 p-4 border-b border-neutral-200 dark:border-neutral-700">
-        {/* Color preview with finish effect */}
-        <div className="w-12 h-12 rounded-md ring-1 ring-border/50 shadow-sm flex-shrink-0 overflow-hidden">
-          {paint?.finish ? (
+        {/* Color preview - prefer colorPreview image */}
+        <div className="w-12 h-12 rounded-md ring-1 ring-border shadow-sm flex-shrink-0 overflow-hidden">
+          {paint?.colorPreview ? (
+            <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" loading="lazy" />
+          ) : paint?.finish ? (
             <CanvasNormalMapRenderer baseColor={paintColor} finish={paint.finish as PAINT_FINISH} width={48} height={48} quality="medium" className="w-full h-full" />
           ) : (
             <div className="w-full h-full" style={{ backgroundColor: paintColor }} />
