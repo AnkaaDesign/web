@@ -1,6 +1,7 @@
 // packages/api/src/index.ts
 
 export * from "./activity";
+export * from "./consumption-analytics";
 export * from "./airbrushing";
 export * from "./auth";
 export {

@@ -475,7 +475,13 @@ export const routes = {
     // Entity-specific statistics
     administration: "/estatisticas/administracao",
     humanResources: "/estatisticas/recursos-humanos",
-    inventory: "/estatisticas/estoque",
+    inventory: {
+      root: "/estatisticas/estoque",
+      consumption: "/estatisticas/estoque/consumo",
+      stockMovement: "/estatisticas/estoque/movimentacao",
+      topItems: "/estatisticas/estoque/principais-itens",
+      trends: "/estatisticas/estoque/tendencias",
+    },
     production: "/estatisticas/producao",
     orders: "/estatisticas/pedidos",
     financial: "/estatisticas/financeiro",

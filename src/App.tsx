@@ -157,6 +157,13 @@ const InventoryProductsBrandsEdit = lazy(() => import("@/pages/inventory/product
 const InventoryProductsBrandsDetails = lazy(() => import("@/pages/inventory/products/brands/details/[id]").then((module) => ({ default: module.default })));
 const InventoryProductsBrandsBatchEdit = lazy(() => import("@/pages/inventory/products/brands/batch-edit").then((module) => ({ default: module.default })));
 
+// Inventory Statistics
+const InventoryStatistics = lazy(() => import("@/pages/inventory/statistics/index").then((module) => ({ default: module.InventoryStatisticsPage })));
+const InventoryStatisticsConsumption = lazy(() => import("@/pages/inventory/statistics/consumption").then((module) => ({ default: module.InventoryConsumptionStatisticsPage })));
+const InventoryStatisticsStockMovement = lazy(() => import("@/pages/inventory/statistics/stock-movement").then((module) => ({ default: module.default })));
+const InventoryStatisticsTopItems = lazy(() => import("@/pages/inventory/statistics/top-items").then((module) => ({ default: module.default })));
+const InventoryStatisticsTrends = lazy(() => import("@/pages/inventory/statistics/trends").then((module) => ({ default: module.default })));
+
 // Personal
 const Personal = lazy(() => import("@/pages/personal/root").then((module) => ({ default: module.Personal })));
 const PersonalMyHolidays = lazy(() => import("@/pages/personal/my-holidays").then((module) => ({ default: module.MyHolidaysPage })));
@@ -753,12 +760,44 @@ function App() {
                   }
                 />
 
-                {/* Redirect from old inventory statistics route */}
+                {/* Inventory Statistics routes */}
                 <Route
-                  path="/estoque/estatisticas"
+                  path={routes.statistics.inventory.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <UnderConstruction />
+                      <InventoryStatistics />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.statistics.inventory.consumption}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <InventoryStatisticsConsumption />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.statistics.inventory.stockMovement}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <InventoryStatisticsStockMovement />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.statistics.inventory.topItems}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <InventoryStatisticsTopItems />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.statistics.inventory.trends}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <InventoryStatisticsTrends />
                     </Suspense>
                   }
                 />

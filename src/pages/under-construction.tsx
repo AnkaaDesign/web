@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { IconConstruction, IconArrowLeft, IconHome } from "@tabler/icons-react";
+import { IconHammer, IconArrowLeft, IconHome } from "@tabler/icons-react";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { routes } from "../constants";
 
@@ -23,7 +23,7 @@ export default function UnderConstruction() {
             {/* Icon */}
             <div className="relative">
               <div className="absolute inset-0 bg-orange-500/10 rounded-full blur-2xl" />
-              <IconConstruction className="h-20 w-20 text-orange-500 relative" />
+              <IconHammer className="h-20 w-20 text-orange-500 relative" />
             </div>
 
             {/* Message */}
