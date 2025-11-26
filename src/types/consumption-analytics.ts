@@ -6,7 +6,7 @@ import type { BaseResponse } from './common';
 // Consumption Analytics Types
 // =====================
 
-export type ConsumptionComparisonMode = 'items' | 'sectors' | 'users';
+export type ConsumptionComparisonMode = 'items' | 'sectors' | 'users' | 'periods';
 
 export interface ConsumptionEntityComparison {
   entityId: string;
@@ -69,6 +69,13 @@ export interface ConsumptionAnalyticsResponse extends BaseResponse {
   data: ConsumptionAnalyticsData;
 }
 
+export interface ConsumptionPeriod {
+  id: string; // e.g., "2024-01"
+  label: string; // e.g., "Janeiro 2024"
+  startDate: Date;
+  endDate: Date;
+}
+
 export interface ConsumptionAnalyticsFilters {
   startDate: Date;
   endDate: Date;
@@ -77,6 +84,7 @@ export interface ConsumptionAnalyticsFilters {
   itemIds?: string[];
   brandIds?: string[];
   categoryIds?: string[];
+  periods?: ConsumptionPeriod[];
   offset?: number;
   limit?: number;
   sortBy?: 'quantity' | 'value' | 'name';

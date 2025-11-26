@@ -478,12 +478,11 @@ export const routes = {
     inventory: {
       root: "/estatisticas/estoque",
       consumption: "/estatisticas/estoque/consumo",
-      stockMovement: "/estatisticas/estoque/movimentacao",
+      orders: "/estatisticas/estoque/pedidos",
       topItems: "/estatisticas/estoque/principais-itens",
       trends: "/estatisticas/estoque/tendencias",
     },
     production: "/estatisticas/producao",
-    orders: "/estatisticas/pedidos",
     financial: "/estatisticas/financeiro",
     // Advanced Analytics
     analytics: {

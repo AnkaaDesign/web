@@ -550,8 +550,8 @@ export const NAVIGATION_MENU: MenuItem[] = [
         icon: "box",
         path: "/estatisticas/estoque",
         children: [
-          { id: "stats-estoque-consumo", title: "Análise de Consumo", icon: "trendingDown", path: "/estatisticas/estoque/consumo" },
-          { id: "stats-estoque-movimentacao", title: "Movimentação", icon: "movement", path: "/estatisticas/estoque/movimentacao" },
+          { id: "stats-estoque-consumo", title: "Análise de Consumo", icon: "chartBar", path: "/estatisticas/estoque/consumo" },
+          { id: "stats-estoque-pedidos", title: "Análise de Pedidos", icon: "clipboardList", path: "/estatisticas/estoque/pedidos" },
           { id: "stats-estoque-tendencias", title: "Tendências", icon: "trendingUp", path: "/estatisticas/estoque/tendencias" },
           { id: "stats-estoque-top-itens", title: "Top Itens", icon: "trophy", path: "/estatisticas/estoque/top-itens" },
         ],

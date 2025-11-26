@@ -160,9 +160,11 @@ const InventoryProductsBrandsBatchEdit = lazy(() => import("@/pages/inventory/pr
 // Inventory Statistics
 const InventoryStatistics = lazy(() => import("@/pages/inventory/statistics/index").then((module) => ({ default: module.InventoryStatisticsPage })));
 const InventoryStatisticsConsumption = lazy(() => import("@/pages/inventory/statistics/consumption").then((module) => ({ default: module.InventoryConsumptionStatisticsPage })));
-const InventoryStatisticsStockMovement = lazy(() => import("@/pages/inventory/statistics/stock-movement").then((module) => ({ default: module.default })));
 const InventoryStatisticsTopItems = lazy(() => import("@/pages/inventory/statistics/top-items").then((module) => ({ default: module.default })));
 const InventoryStatisticsTrends = lazy(() => import("@/pages/inventory/statistics/trends").then((module) => ({ default: module.default })));
+
+// Order Statistics
+const OrderStatistics = lazy(() => import("@/pages/order/statistics/orders").then((module) => ({ default: module.OrderStatisticsPage })));
 
 // Personal
 const Personal = lazy(() => import("@/pages/personal/root").then((module) => ({ default: module.Personal })));
@@ -778,14 +780,6 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.statistics.inventory.stockMovement}
-                  element={
-                    <Suspense fallback={<PageLoader />}>
-                      <InventoryStatisticsStockMovement />
-                    </Suspense>
-                  }
-                />
-                <Route
                   path={routes.statistics.inventory.topItems}
                   element={
                     <Suspense fallback={<PageLoader />}>
@@ -798,6 +792,15 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <InventoryStatisticsTrends />
+                    </Suspense>
+                  }
+                />
+                {/* Order Statistics (Inventory) */}
+                <Route
+                  path={routes.statistics.inventory.orders}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <OrderStatistics />
                     </Suspense>
                   }
                 />

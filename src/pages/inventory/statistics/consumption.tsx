@@ -26,7 +26,11 @@ import {
   IconChartArea,
   IconChartDots,
   IconStack2,
+  IconRuler,
 } from '@tabler/icons-react';
+
+// Y-axis display mode type
+type YAxisMode = 'quantity' | 'value';
 import { format, startOfDay, endOfDay, subMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import ReactECharts from 'echarts-for-react';
@@ -47,6 +51,14 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
+
+// Format currency helper
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(value);
+};
 
 // Color palette for charts
 const CHART_COLORS = [
@@ -126,6 +138,9 @@ const ConsumptionPage = () => {
   // Chart type state
   const [selectedChartType, setSelectedChartType] = useState<ConsumptionChartType>('bar');
 
+  // Y-axis mode state (quantity or value)
+  const [yAxisMode, setYAxisMode] = useState<YAxisMode>('quantity');
+
   // Determine comparison mode
   const comparisonType = useMemo(() => getComparisonType(filters), [filters]);
   const isComparisonMode = comparisonType !== 'simple';
@@ -154,6 +169,7 @@ const ConsumptionPage = () => {
     if (filters.itemIds && filters.itemIds.length > 0) count++;
     if (filters.brandIds && filters.brandIds.length > 0) count++;
     if (filters.categoryIds && filters.categoryIds.length > 0) count++;
+    if (filters.periods && filters.periods.length >= 2) count++;
     return count;
   }, [filters]);
 
@@ -257,10 +273,10 @@ const ConsumptionPage = () => {
   const renderChart = () => {
     if (isLoading) {
       return (
-        <div className="h-[400px] flex items-center justify-center">
+        <div className="h-[600px] flex items-center justify-center">
           <div className="space-y-3">
             <Skeleton className="h-4 w-[250px]" />
-            <Skeleton className="h-[300px] w-[600px]" />
+            <Skeleton className="h-[400px] w-[600px]" />
           </div>
         </div>
       );
@@ -268,7 +284,7 @@ const ConsumptionPage = () => {
 
     if (isError) {
       return (
-        <div className="h-[400px] flex flex-col items-center justify-center gap-4">
+        <div className="h-[600px] flex flex-col items-center justify-center gap-4">
           <IconAlertCircle className="h-12 w-12 text-destructive" />
           <div className="text-center">
             <p className="font-semibold">Erro ao carregar dados</p>
@@ -286,7 +302,7 @@ const ConsumptionPage = () => {
 
     if (!items || items.length === 0) {
       return (
-        <div className="h-[400px] flex flex-col items-center justify-center gap-4">
+        <div className="h-[600px] flex flex-col items-center justify-center gap-4">
           <IconPackage className="h-12 w-12 text-muted-foreground" />
           <div className="text-center">
             <p className="font-semibold">Nenhum dado encontrado</p>
@@ -306,17 +322,44 @@ const ConsumptionPage = () => {
     const needsScroll = chartData.length > 8;
     const zoomEnd = needsScroll ? (8 / chartData.length) * 100 : 100;
 
+    // Helper to get display value based on Y-axis mode
+    const getItemValue = (item: typeof chartData[0]) => {
+      if (yAxisMode === 'quantity') {
+        return 'totalQuantity' in item ? item.totalQuantity : 0;
+      }
+      return 'totalValue' in item ? item.totalValue : 0;
+    };
+
+    const getComparisonValue = (comp: { quantity: number; value: number }) => {
+      return yAxisMode === 'quantity' ? comp.quantity : comp.value;
+    };
+
+    const yAxisLabel = yAxisMode === 'quantity' ? 'Quantidade' : 'Preço (R$)';
+
+    const yAxisConfig = yAxisMode === 'value' ? {
+      type: 'value' as const,
+      axisLabel: {
+        formatter: (value: number) => formatCurrency(value).replace('R$', '').trim(),
+      },
+    } : { type: 'value' as const };
+
     // PIE CHART
     if (selectedChartType === 'pie' && !isComparisonMode) {
       const pieData = chartData.map((item) => ({
         name: item.itemName,
-        value: 'totalQuantity' in item ? item.totalQuantity : 0,
+        value: getItemValue(item),
+        totalQuantity: 'totalQuantity' in item ? item.totalQuantity : 0,
+        totalValue: 'totalValue' in item ? item.totalValue : 0,
       }));
 
       const option: EChartsOption = {
         tooltip: {
           trigger: 'item',
-          formatter: '{b}: {c} ({d}%)',
+          formatter: (params: { name: string; value: number; percent: number; data: { totalQuantity: number; totalValue: number } }) => {
+            const qty = Math.round(params.data.totalQuantity);
+            const val = formatCurrency(params.data.totalValue);
+            return `<strong>${params.name}</strong><br/>Quantidade: ${qty} un<br/>Valor: ${val}<br/>${params.percent}%`;
+          },
         },
         legend: {
           bottom: 0,
@@ -336,13 +379,18 @@ const ConsumptionPage = () => {
               },
             },
             label: {
-              formatter: '{b}: {c}',
+              formatter: (params: { name: string; value: number }) => {
+                const formattedValue = yAxisMode === 'quantity'
+                  ? Math.round(params.value).toString()
+                  : formatCurrency(params.value);
+                return `${params.name}: ${formattedValue}`;
+              },
             },
           },
         ],
       };
 
-      return <ReactECharts option={option} style={{ height: '400px', width: '100%' }} />;
+      return <ReactECharts option={option} style={{ height: '600px', width: '100%' }} />;
     }
 
     // Prepare data for line/area/bar charts
@@ -358,7 +406,7 @@ const ConsumptionPage = () => {
           data: chartData.map((item) => {
             if ('comparisons' in item) {
               const comp = item.comparisons.find((c) => c.entityName === entity);
-              return comp ? comp.quantity : 0;
+              return comp ? getComparisonValue(comp) : 0;
             }
             return 0;
           }),
@@ -368,30 +416,30 @@ const ConsumptionPage = () => {
 
         const option: EChartsOption = {
           tooltip: { trigger: 'axis' },
-          legend: { data: entities, bottom: 0 },
-          grid: { left: '3%', right: '4%', bottom: needsScroll ? '15%' : '10%', containLabel: true },
+          legend: { data: entities, bottom: 45 },
+          grid: { left: '3%', right: '4%', bottom: needsScroll ? '25%' : '12%', containLabel: true },
           xAxis: { type: 'category', data: xAxisData, axisLabel: { rotate: 45, interval: 0 } },
-          yAxis: { type: 'value' },
+          yAxis: yAxisConfig,
           color: CHART_COLORS,
-          dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 0 }] : [],
+          dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 10, height: 25 }] : [],
           series,
         };
 
-        return <ReactECharts option={option} style={{ height: '400px', width: '100%' }} />;
+        return <ReactECharts option={option} style={{ height: '600px', width: '100%' }} />;
       } else {
-        const seriesData = chartData.map((item) => ('totalQuantity' in item ? item.totalQuantity : 0));
+        const seriesData = chartData.map((item) => getItemValue(item));
 
         const option: EChartsOption = {
           tooltip: { trigger: 'axis' },
-          grid: { left: '3%', right: '4%', bottom: needsScroll ? '15%' : '10%', containLabel: true },
+          grid: { left: '3%', right: '4%', bottom: needsScroll ? '25%' : '12%', containLabel: true },
           xAxis: { type: 'category', data: xAxisData, axisLabel: { rotate: 45, interval: 0 } },
-          yAxis: { type: 'value' },
+          yAxis: yAxisConfig,
           color: CHART_COLORS,
-          dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 0 }] : [],
-          series: [{ name: 'Quantidade', type: 'line', data: seriesData, smooth: true, itemStyle: { color: CHART_COLORS[0] } }],
+          dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 10, height: 25 }] : [],
+          series: [{ name: yAxisLabel, type: 'line', data: seriesData, smooth: true, itemStyle: { color: CHART_COLORS[0] } }],
         };
 
-        return <ReactECharts option={option} style={{ height: '400px', width: '100%' }} />;
+        return <ReactECharts option={option} style={{ height: '600px', width: '100%' }} />;
       }
     }
 
@@ -405,7 +453,7 @@ const ConsumptionPage = () => {
           data: chartData.map((item) => {
             if ('comparisons' in item) {
               const comp = item.comparisons.find((c) => c.entityName === entity);
-              return comp ? comp.quantity : 0;
+              return comp ? getComparisonValue(comp) : 0;
             }
             return 0;
           }),
@@ -416,30 +464,30 @@ const ConsumptionPage = () => {
 
         const option: EChartsOption = {
           tooltip: { trigger: 'axis' },
-          legend: { data: entities, bottom: 0 },
-          grid: { left: '3%', right: '4%', bottom: needsScroll ? '15%' : '10%', containLabel: true },
+          legend: { data: entities, bottom: 45 },
+          grid: { left: '3%', right: '4%', bottom: needsScroll ? '25%' : '12%', containLabel: true },
           xAxis: { type: 'category', data: xAxisData, axisLabel: { rotate: 45, interval: 0 } },
-          yAxis: { type: 'value' },
+          yAxis: yAxisConfig,
           color: CHART_COLORS,
-          dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 0 }] : [],
+          dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 10, height: 25 }] : [],
           series,
         };
 
-        return <ReactECharts option={option} style={{ height: '400px', width: '100%' }} />;
+        return <ReactECharts option={option} style={{ height: '600px', width: '100%' }} />;
       } else {
-        const seriesData = chartData.map((item) => ('totalQuantity' in item ? item.totalQuantity : 0));
+        const seriesData = chartData.map((item) => getItemValue(item));
 
         const option: EChartsOption = {
           tooltip: { trigger: 'axis' },
-          grid: { left: '3%', right: '4%', bottom: needsScroll ? '15%' : '10%', containLabel: true },
+          grid: { left: '3%', right: '4%', bottom: needsScroll ? '25%' : '12%', containLabel: true },
           xAxis: { type: 'category', data: xAxisData, axisLabel: { rotate: 45, interval: 0 } },
-          yAxis: { type: 'value' },
+          yAxis: yAxisConfig,
           color: CHART_COLORS,
-          dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 0 }] : [],
-          series: [{ name: 'Quantidade', type: 'line', data: seriesData, smooth: true, areaStyle: { opacity: 0.6 }, itemStyle: { color: CHART_COLORS[0] } }],
+          dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 10, height: 25 }] : [],
+          series: [{ name: yAxisLabel, type: 'line', data: seriesData, smooth: true, areaStyle: { opacity: 0.6 }, itemStyle: { color: CHART_COLORS[0] } }],
         };
 
-        return <ReactECharts option={option} style={{ height: '400px', width: '100%' }} />;
+        return <ReactECharts option={option} style={{ height: '600px', width: '100%' }} />;
       }
     }
 
@@ -453,7 +501,7 @@ const ConsumptionPage = () => {
         data: chartData.map((item) => {
           if ('comparisons' in item) {
             const comp = item.comparisons.find((c) => c.entityName === entity);
-            return comp ? comp.quantity : 0;
+            return comp ? getComparisonValue(comp) : 0;
           }
           return 0;
         }),
@@ -462,16 +510,16 @@ const ConsumptionPage = () => {
 
       const option: EChartsOption = {
         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-        legend: { data: entities, bottom: 0 },
-        grid: { left: '3%', right: '4%', bottom: needsScroll ? '15%' : '10%', containLabel: true },
+        legend: { data: entities, bottom: 45 },
+        grid: { left: '3%', right: '4%', bottom: needsScroll ? '25%' : '12%', containLabel: true },
         xAxis: { type: 'category', data: xAxisData, axisLabel: { rotate: 45, interval: 0 } },
-        yAxis: { type: 'value' },
+        yAxis: yAxisConfig,
         color: CHART_COLORS,
-        dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 0 }] : [],
+        dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 10, height: 25 }] : [],
         series,
       };
 
-      return <ReactECharts option={option} style={{ height: '400px', width: '100%' }} />;
+      return <ReactECharts option={option} style={{ height: '600px', width: '100%' }} />;
     }
 
     // BAR CHART (default - grouped or simple)
@@ -483,39 +531,105 @@ const ConsumptionPage = () => {
         data: chartData.map((item) => {
           if ('comparisons' in item) {
             const comp = item.comparisons.find((c) => c.entityName === entity);
-            return comp ? comp.quantity : 0;
+            return {
+              value: comp ? getComparisonValue(comp) : 0,
+              quantity: comp ? comp.quantity : 0,
+              totalValue: comp ? comp.value : 0,
+            };
           }
-          return 0;
+          return { value: 0, quantity: 0, totalValue: 0 };
         }),
         itemStyle: { color: CHART_COLORS[index % CHART_COLORS.length] },
+        label: {
+          show: true,
+          position: 'top',
+          fontSize: 9,
+          formatter: (params: { data: { value: number } }) => {
+            if (params.data.value > 0) {
+              return yAxisMode === 'quantity'
+                ? Math.round(params.data.value).toString()
+                : formatCurrency(params.data.value).replace('R$', '').trim();
+            }
+            return '';
+          },
+        },
       }));
 
       const option: EChartsOption = {
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-        legend: { data: entities, bottom: 0 },
-        grid: { left: '3%', right: '4%', bottom: needsScroll ? '15%' : '10%', containLabel: true },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          formatter: (params: Array<{ seriesName: string; marker: string; data: { quantity: number; totalValue: number } }>) => {
+            if (!Array.isArray(params) || params.length === 0) return '';
+            const itemName = xAxisData[params[0].dataIndex as unknown as number] || '';
+            let content = `<strong>${itemName}</strong>`;
+            params.forEach((p, idx) => {
+              const qty = Math.round(p.data.quantity);
+              const price = formatCurrency(p.data.totalValue);
+              if (idx > 0) content += '<hr style="margin: 8px 0; border: 0; border-top: 1px solid #e5e5e5;"/>';
+              content += `<br/>${p.marker} <strong>${p.seriesName}</strong>`;
+              content += `<br/>Quantidade: ${qty} un`;
+              content += `<br/>Valor: ${price}`;
+            });
+            return content;
+          },
+        },
+        legend: { data: entities, bottom: 45 },
+        grid: { left: '3%', right: '4%', bottom: needsScroll ? '25%' : '12%', containLabel: true },
         xAxis: { type: 'category', data: xAxisData, axisLabel: { rotate: 45, interval: 0 } },
-        yAxis: { type: 'value' },
+        yAxis: yAxisConfig,
         color: CHART_COLORS,
-        dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 0 }] : [],
+        dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 10, height: 25 }] : [],
         series,
       };
 
-      return <ReactECharts option={option} style={{ height: '400px', width: '100%' }} />;
+      return <ReactECharts option={option} style={{ height: '600px', width: '100%' }} />;
     } else {
-      const seriesData = chartData.map((item) => ('totalQuantity' in item ? item.totalQuantity : 0));
+      const seriesData = chartData.map((item) => ({
+        value: getItemValue(item),
+        quantity: 'totalQuantity' in item ? item.totalQuantity : 0,
+        totalValue: 'totalValue' in item ? item.totalValue : 0,
+      }));
 
       const option: EChartsOption = {
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-        grid: { left: '3%', right: '4%', bottom: needsScroll ? '15%' : '10%', containLabel: true },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          formatter: (params: Array<{ marker: string; data: { quantity: number; totalValue: number }; name: string }>) => {
+            if (!Array.isArray(params) || params.length === 0) return '';
+            const p = params[0];
+            const qty = Math.round(p.data.quantity);
+            const price = formatCurrency(p.data.totalValue);
+            return `<strong>${p.name}</strong><br/>Quantidade: ${qty} un<br/>Valor: ${price}`;
+          },
+        },
+        grid: { left: '3%', right: '4%', bottom: needsScroll ? '25%' : '12%', containLabel: true },
         xAxis: { type: 'category', data: xAxisData, axisLabel: { rotate: 45, interval: 0 } },
-        yAxis: { type: 'value' },
+        yAxis: yAxisConfig,
         color: CHART_COLORS,
-        dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 0 }] : [],
-        series: [{ name: 'Quantidade', type: 'bar', data: seriesData, itemStyle: { color: CHART_COLORS[0] } }],
+        dataZoom: needsScroll ? [{ type: 'slider', start: 0, end: zoomEnd, bottom: 10, height: 25 }] : [],
+        series: [{
+          name: yAxisLabel,
+          type: 'bar',
+          data: seriesData,
+          itemStyle: { color: CHART_COLORS[0] },
+          label: {
+            show: true,
+            position: 'top',
+            fontSize: 9,
+            formatter: (params: { data: { value: number } }) => {
+              if (params.data.value > 0) {
+                return yAxisMode === 'quantity'
+                  ? Math.round(params.data.value).toString()
+                  : formatCurrency(params.data.value).replace('R$', '').trim();
+              }
+              return '';
+            },
+          },
+        }],
       };
 
-      return <ReactECharts option={option} style={{ height: '400px', width: '100%' }} />;
+      return <ReactECharts option={option} style={{ height: '600px', width: '100%' }} />;
     }
   };
 
@@ -534,7 +648,7 @@ const ConsumptionPage = () => {
       />
 
       <Card className="flex-1 flex flex-col">
-        <CardHeader className="border-b">
+        <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Análise de Consumo de Itens</CardTitle>
@@ -542,7 +656,7 @@ const ConsumptionPage = () => {
                 Visualize e compare o consumo de itens por período, setor e usuário
                 {isComparisonMode && (
                   <Badge variant="secondary" className="ml-2">
-                    Modo Comparação: {comparisonType === 'sectors' ? 'Setores' : 'Usuários'}
+                    Modo Comparação: {comparisonType === 'sectors' ? 'Setores' : comparisonType === 'users' ? 'Usuários' : 'Períodos'}
                   </Badge>
                 )}
               </CardDescription>
@@ -639,11 +753,6 @@ const ConsumptionPage = () => {
                 )}
               </Button>
 
-              {/* Refresh Button */}
-              <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
-                <IconRefresh className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-              </Button>
-
               {/* Export Button */}
               <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={isLoading || !items.length}>
                 <IconDownload className="h-4 w-4 mr-2" />
@@ -656,52 +765,48 @@ const ConsumptionPage = () => {
         <CardContent className="flex-1 flex flex-col p-6 space-y-6">
           {/* Summary Cards */}
           {summary && (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total de Itens</CardTitle>
-                  <IconPackage className="h-4 w-4 text-muted-foreground" />
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <Card className="py-2">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                  <CardTitle className="text-xs font-medium">Total de Itens</CardTitle>
+                  <IconPackage className="h-3.5 w-3.5 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{summary.itemCount}</div>
-                  <p className="text-xs text-muted-foreground">Itens únicos no período</p>
+                <CardContent className="pb-0 px-4">
+                  <div className="text-xl font-bold">{summary.itemCount}</div>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Quantidade Total</CardTitle>
-                  <IconBox className="h-4 w-4 text-muted-foreground" />
+              <Card className="py-2">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                  <CardTitle className="text-xs font-medium">Quantidade Total</CardTitle>
+                  <IconBox className="h-3.5 w-3.5 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{summary.totalQuantity.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">Unidades consumidas</p>
+                <CardContent className="pb-0 px-4">
+                  <div className="text-xl font-bold">{summary.totalQuantity.toFixed(2)}</div>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
-                  <IconCash className="h-4 w-4 text-muted-foreground" />
+              <Card className="py-2">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                  <CardTitle className="text-xs font-medium">Valor Total</CardTitle>
+                  <IconCash className="h-3.5 w-3.5 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
+                <CardContent className="pb-0 px-4">
+                  <div className="text-xl font-bold">
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.totalValue)}
                   </div>
-                  <p className="text-xs text-muted-foreground">Valor estimado</p>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Valor Médio por Item</CardTitle>
-                  <IconCash className="h-4 w-4 text-muted-foreground" />
+              <Card className="py-2">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 pt-0 px-4">
+                  <CardTitle className="text-xs font-medium">Valor Médio por Item</CardTitle>
+                  <IconCash className="h-3.5 w-3.5 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
+                <CardContent className="pb-0 px-4">
+                  <div className="text-xl font-bold">
                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(summary.averageValuePerItem)}
                   </div>
-                  <p className="text-xs text-muted-foreground">Média por item</p>
                 </CardContent>
               </Card>
             </div>
@@ -709,9 +814,6 @@ const ConsumptionPage = () => {
 
           {/* Chart Section */}
           <Card>
-            <CardHeader>
-              <CardTitle>Visualização Gráfica</CardTitle>
-            </CardHeader>
             <CardContent className="p-4">
               {renderChart()}
             </CardContent>
@@ -822,6 +924,8 @@ const ConsumptionPage = () => {
         filters={filters}
         onApply={handleFilterApply}
         onReset={handleFilterReset}
+        yAxisMode={yAxisMode}
+        onYAxisModeChange={setYAxisMode}
       />
     </div>
   );

@@ -32,12 +32,14 @@ export function useConsumptionAnalytics(
 export function isComparisonMode(filters: ConsumptionAnalyticsFilters): boolean {
   const hasSectorComparison = filters.sectorIds && filters.sectorIds.length >= 2;
   const hasUserComparison = filters.userIds && filters.userIds.length >= 2;
-  return !!(hasSectorComparison || hasUserComparison);
+  const hasPeriodComparison = filters.periods && filters.periods.length >= 2;
+  return !!(hasSectorComparison || hasUserComparison || hasPeriodComparison);
 }
 
 export function getComparisonType(
   filters: ConsumptionAnalyticsFilters,
-): 'simple' | 'sectors' | 'users' {
+): 'simple' | 'sectors' | 'users' | 'periods' {
+  if (filters.periods && filters.periods.length >= 2) return 'periods';
   if (filters.sectorIds && filters.sectorIds.length >= 2) return 'sectors';
   if (filters.userIds && filters.userIds.length >= 2) return 'users';
   return 'simple';
@@ -49,11 +51,15 @@ export function validateConsumptionFilters(filters: ConsumptionAnalyticsFilters)
 } {
   const hasSectorComparison = filters.sectorIds && filters.sectorIds.length >= 2;
   const hasUserComparison = filters.userIds && filters.userIds.length >= 2;
+  const hasPeriodComparison = filters.periods && filters.periods.length >= 2;
 
-  if (hasSectorComparison && hasUserComparison) {
+  // Count active comparison modes
+  const activeComparisons = [hasSectorComparison, hasUserComparison, hasPeriodComparison].filter(Boolean).length;
+
+  if (activeComparisons > 1) {
     return {
       valid: false,
-      error: 'Não é possível comparar setores e usuários simultaneamente',
+      error: 'Não é possível usar múltiplos modos de comparação simultaneamente',
     };
   }
 

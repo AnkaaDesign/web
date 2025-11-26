@@ -1,4 +1,4 @@
-// web/src/components/inventory/statistics/consumption-filters.tsx
+// web/src/components/inventory/statistics/order-filters.tsx
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -8,7 +8,6 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { DateTimeInput } from '@/components/ui/date-time-input';
 import { Combobox } from '@/components/ui/combobox';
 import {
@@ -16,23 +15,19 @@ import {
   IconX,
   IconCalendar,
   IconUsers,
-  IconBuilding,
   IconPackage,
   IconTag,
   IconCategory,
-  IconInfoCircle,
   IconNumbers,
   IconRuler,
 } from '@tabler/icons-react';
 import { startOfDay, endOfDay, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import type { ConsumptionAnalyticsFilters, ConsumptionPeriod } from '@/types/consumption-analytics';
-import { getSectors } from '@/api-client/sector';
-import { getUsers } from '@/api-client/user';
+import type { OrderAnalyticsFilters, OrderPeriod } from '@/types/order-analytics';
+import { getSuppliers } from '@/api-client/supplier';
 import { getItems } from '@/api-client/item';
 import { getItemBrands } from '@/api-client/item-brand';
 import { getItemCategories } from '@/api-client/item-category';
-import { sectorKeys, userKeys, itemKeys, itemBrandKeys, itemCategoryKeys } from '@/hooks/queryKeys';
-import { ACTIVITY_OPERATION } from '@/constants';
+import { supplierKeys, itemKeys, itemBrandKeys, itemCategoryKeys } from '@/hooks/queryKeys';
 import { formatDate } from '@/utils';
 
 // Page size for async combobox
@@ -40,11 +35,11 @@ const COMBOBOX_PAGE_SIZE = 20;
 
 type YAxisMode = 'quantity' | 'value';
 
-interface ConsumptionFiltersProps {
+interface OrderFiltersProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  filters: ConsumptionAnalyticsFilters;
-  onApply: (filters: ConsumptionAnalyticsFilters) => void;
+  filters: OrderAnalyticsFilters;
+  onApply: (filters: OrderAnalyticsFilters) => void;
   onReset: () => void;
   yAxisMode?: YAxisMode;
   onYAxisModeChange?: (mode: YAxisMode) => void;
@@ -88,7 +83,7 @@ const Y_AXIS_OPTIONS = [
   { value: 'value', label: 'Preço (R$)' },
 ];
 
-export function ConsumptionFilters({
+export function OrderFilters({
   open,
   onOpenChange,
   filters,
@@ -96,8 +91,8 @@ export function ConsumptionFilters({
   onReset,
   yAxisMode = 'quantity',
   onYAxisModeChange,
-}: ConsumptionFiltersProps) {
-  const [localFilters, setLocalFilters] = useState<ConsumptionAnalyticsFilters>(filters);
+}: OrderFiltersProps) {
+  const [localFilters, setLocalFilters] = useState<OrderAnalyticsFilters>(filters);
   const [localYAxisMode, setLocalYAxisMode] = useState<YAxisMode>(yAxisMode);
 
   // Year and month state for period selector
@@ -125,38 +120,16 @@ export function ConsumptionFilters({
   }, []);
 
   // Async query functions for comboboxes
-  const fetchSectors = useCallback(async (search: string, page: number = 1) => {
-    const response = await getSectors({
+  const fetchSuppliers = useCallback(async (search: string, page: number = 1) => {
+    const response = await getSuppliers({
       search: search || undefined,
       page,
       limit: COMBOBOX_PAGE_SIZE,
     });
     return {
-      data: (response.data || []).map((sector) => ({
-        value: sector.id,
-        label: sector.name,
-      })),
-      hasMore: response.meta?.hasNextPage || false,
-    };
-  }, []);
-
-  const fetchUsers = useCallback(async (search: string, page: number = 1) => {
-    const response = await getUsers({
-      search: search || undefined,
-      page,
-      limit: COMBOBOX_PAGE_SIZE,
-    });
-    // Deduplicate users
-    const seen = new Set<string>();
-    const uniqueUsers = (response.data || []).filter(user => {
-      if (seen.has(user.id)) return false;
-      seen.add(user.id);
-      return true;
-    });
-    return {
-      data: uniqueUsers.map((user) => ({
-        value: user.id,
-        label: user.name,
+      data: (response.data || []).map((supplier) => ({
+        value: supplier.id,
+        label: supplier.fantasyName,
       })),
       hasMore: response.meta?.hasNextPage || false,
     };
@@ -208,28 +181,16 @@ export function ConsumptionFilters({
     };
   }, []);
 
-  // Calculate active filter count (excluding operation since it's always OUTBOUND for consumption)
+  // Calculate active filter count
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (localFilters.sectorIds && localFilters.sectorIds.length > 0) count++;
-    if (localFilters.userIds && localFilters.userIds.length > 0) count++;
+    if (localFilters.supplierIds && localFilters.supplierIds.length > 0) count++;
     if (localFilters.itemIds && localFilters.itemIds.length > 0) count++;
     if (localFilters.brandIds && localFilters.brandIds.length > 0) count++;
     if (localFilters.categoryIds && localFilters.categoryIds.length > 0) count++;
     if (selectedMonths.length > 0) count++;
     return count;
   }, [localFilters, selectedMonths]);
-
-  // Check comparison mode warnings
-  const sectorFilterDisabled = useMemo(
-    () => (localFilters.userIds?.length ?? 0) >= 2,
-    [localFilters.userIds]
-  );
-
-  const userFilterDisabled = useMemo(
-    () => (localFilters.sectorIds?.length ?? 0) >= 2,
-    [localFilters.sectorIds]
-  );
 
   // Calculate period date range when year/months are selected
   const periodDateRange = useMemo(() => {
@@ -246,7 +207,7 @@ export function ConsumptionFilters({
   }, [selectedYear, selectedMonths]);
 
   // Build periods for comparison when multiple months selected
-  const buildPeriods = useCallback((): ConsumptionPeriod[] | undefined => {
+  const buildPeriods = useCallback((): OrderPeriod[] | undefined => {
     if (!selectedYear || selectedMonths.length < 2) return undefined;
 
     return selectedMonths
@@ -296,13 +257,15 @@ export function ConsumptionFilters({
   }, [localFilters, selectedYear, selectedMonths, buildPeriods, periodDateRange, onApply, onOpenChange, localYAxisMode, onYAxisModeChange]);
 
   const handleClear = useCallback(() => {
-    const defaultFilters: ConsumptionAnalyticsFilters = {
+    const defaultFilters: OrderAnalyticsFilters = {
       startDate: startOfDay(subMonths(new Date(), 1)),
       endDate: endOfDay(new Date()),
-      operation: ACTIVITY_OPERATION.OUTBOUND,
       sortBy: 'quantity',
       sortOrder: 'desc',
       limit: 50,
+      topSuppliersLimit: 10,
+      topItemsLimit: 10,
+      trendGroupBy: 'month',
     };
     setLocalFilters(defaultFilters);
     setSelectedYear(undefined);
@@ -315,7 +278,7 @@ export function ConsumptionFilters({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <IconFilter className="h-5 w-5" />
-            Análise de Consumo - Filtros
+            Análise de Pedidos - Filtros
             {activeFilterCount > 0 && (
               <Badge variant="secondary" className="ml-2">
                 {activeFilterCount}
@@ -323,7 +286,7 @@ export function ConsumptionFilters({
             )}
           </SheetTitle>
           <SheetDescription>
-            Configure os filtros para refinar a análise de consumo
+            Configure os filtros para refinar a análise de pedidos
           </SheetDescription>
         </SheetHeader>
 
@@ -461,71 +424,27 @@ export function ConsumptionFilters({
               </div>
             </div>
 
-            {/* Sectors Filter */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <IconBuilding className="h-4 w-4" />
-                Setores
-              </Label>
-              {sectorFilterDisabled && (
-                <Alert variant="default" className="py-2">
-                  <IconInfoCircle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    Selecione 2+ setores para comparação. Desativa filtro de usuários.
-                  </AlertDescription>
-                </Alert>
-              )}
-              <Combobox
-                mode="multiple"
-                async
-                value={localFilters.sectorIds || []}
-                onValueChange={(value) => setLocalFilters({
-                  ...localFilters,
-                  sectorIds: Array.isArray(value) && value.length > 0 ? value : undefined,
-                })}
-                queryKey={sectorKeys.lists()}
-                queryFn={fetchSectors}
-                minSearchLength={0}
-                placeholder="Selecione setores..."
-                searchPlaceholder="Buscar setor..."
-                emptyText="Nenhum setor encontrado"
-                loadingText="Carregando setores..."
-                disabled={sectorFilterDisabled}
-                searchable={true}
-                clearable={true}
-              />
-            </div>
-
-            {/* Users Filter */}
+            {/* Suppliers Filter */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <IconUsers className="h-4 w-4" />
-                Usuários
+                Fornecedores
               </Label>
-              {userFilterDisabled && (
-                <Alert variant="default" className="py-2">
-                  <IconInfoCircle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    Selecione 2+ usuários para comparação. Desativa filtro de setores.
-                  </AlertDescription>
-                </Alert>
-              )}
               <Combobox
                 mode="multiple"
                 async
-                value={localFilters.userIds || []}
+                value={localFilters.supplierIds || []}
                 onValueChange={(value) => setLocalFilters({
                   ...localFilters,
-                  userIds: Array.isArray(value) && value.length > 0 ? value : undefined,
+                  supplierIds: Array.isArray(value) && value.length > 0 ? value : undefined,
                 })}
-                queryKey={userKeys.lists()}
-                queryFn={fetchUsers}
+                queryKey={supplierKeys.lists()}
+                queryFn={fetchSuppliers}
                 minSearchLength={0}
-                placeholder="Selecione usuários..."
-                searchPlaceholder="Buscar usuário..."
-                emptyText="Nenhum usuário encontrado"
-                loadingText="Carregando usuários..."
-                disabled={userFilterDisabled}
+                placeholder="Todos os fornecedores"
+                searchPlaceholder="Buscar fornecedor..."
+                emptyText="Nenhum fornecedor encontrado"
+                loadingText="Carregando fornecedores..."
                 searchable={true}
                 clearable={true}
               />

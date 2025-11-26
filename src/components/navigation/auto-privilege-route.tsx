@@ -146,17 +146,20 @@ export const AutoPrivilegeRoute: React.FC<AutoPrivilegeRouteProps> = ({ children
     return <Navigate to={routes.authentication.login} state={{ from: location }} replace />;
   }
 
-  // Check if user has basic privileges and redirect to welcome (only for main routes, not welcome page)
+  // Get required privilege for current route
+  const requiredPrivilege = getRequiredPrivilegeForRoute(location.pathname);
+
+  // Check if user has basic privileges and redirect to welcome if trying to access routes that require higher privileges
   const hasBasicPrivileges = !user.sector || user.sector.privileges === SECTOR_PRIVILEGES.BASIC;
   const isOnWelcomePage = location.pathname === "/";
 
-  // Only redirect basic users to welcome if they're trying to access a route that requires higher privileges
-  if (hasBasicPrivileges && !isOnWelcomePage) {
+  // Only redirect basic users if the route requires MORE than basic privileges
+  const routeRequiresMoreThanBasic = requiredPrivilege && requiredPrivilege !== "BASIC" &&
+    !(Array.isArray(requiredPrivilege) && requiredPrivilege.includes("BASIC"));
+
+  if (hasBasicPrivileges && !isOnWelcomePage && routeRequiresMoreThanBasic) {
     return <Navigate to="/" replace />;
   }
-
-  // Get required privilege for current route
-  const requiredPrivilege = getRequiredPrivilegeForRoute(location.pathname);
 
   // Only check privilege if it's defined (route requires specific privilege)
   if (requiredPrivilege) {
