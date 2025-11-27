@@ -106,7 +106,7 @@ export function MeasureForm({ onSubmit, defaultValues, className, showConverter 
   return (
     <div className={className}>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
           {/* Weight Section */}
           <Card>
             <CardHeader>

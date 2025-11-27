@@ -1,16 +1,45 @@
+import { PaintCatalogueList } from "@/components/painting/catalogue/list/paint-catalogue-list";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES } from "../../constants";
+import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../constants";
+import { usePageTracker } from "@/hooks/use-page-tracker";
+import { IconPaint } from "@tabler/icons-react";
 
+/**
+ * View-only Catalog List Page for Leaders and Designers
+ *
+ * This page provides read-only access to the paint catalog.
+ * Features:
+ * - No create button (Nova Tinta)
+ * - No reordering capabilities
+ * - View-only access to paint details
+ */
 export default function CatalogListPage() {
-  return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.LEADER}>
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">Catálogo Básico</h1>
+  // Track page access
+  usePageTracker({
+    title: "Catálogo de Tintas",
+    icon: "paint",
+  });
 
-        <div className="bg-white rounded-lg shadow-sm border p-6">
-          <p className="text-gray-600">Esta é a página de listagem do catálogo básico para líderes.</p>
-          <p className="text-sm text-gray-500 mt-2">Aqui você pode visualizar os itens do catálogo sem precisar de acesso ao módulo completo de pintura.</p>
+  // No actions - view only
+  const actions: never[] = [];
+
+  return (
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.DESIGNER]}>
+      <div className="flex flex-col h-full space-y-4">
+        <div className="flex-shrink-0">
+          <PageHeaderWithFavorite
+            title="Catálogo de Tintas"
+            icon={IconPaint}
+            favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
+            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Catálogo" }]}
+            actions={actions}
+          />
         </div>
+        <PaintCatalogueList
+          className="flex-1 min-h-0"
+          viewOnly={true}
+        />
       </div>
     </PrivilegeRoute>
   );

@@ -15,6 +15,8 @@ interface FilterUtilsOptions {
   sectors?: Array<{ id: string; name: string }>;
   customers?: Array<{ id: string; fantasyName: string }>;
   users?: Array<{ id: string; name: string }>;
+  /** When true, status filter tags will not be displayed */
+  hideStatusTags?: boolean;
 }
 
 export function extractActiveFilters(
@@ -23,7 +25,7 @@ export function extractActiveFilters(
   options: FilterUtilsOptions = {},
 ): FilterIndicator[] {
   const activeFilters: FilterIndicator[] = [];
-  const { sectors = [], customers = [], users = [] } = options;
+  const { sectors = [], customers = [], users = [], hideStatusTags = false } = options;
 
   // Search filter - handle both search and searchingFor for backward compatibility
   const searchValue = (filters as any).search || filters.searchingFor;
@@ -37,8 +39,8 @@ export function extractActiveFilters(
     });
   }
 
-  // Status filter - show individual badges for each status
-  if (filters.status && filters.status.length > 0) {
+  // Status filter - show individual badges for each status (only if not hidden)
+  if (!hideStatusTags && filters.status && filters.status.length > 0) {
     filters.status.forEach((status: TASK_STATUS) => {
       activeFilters.push({
         key: `status-${status}`,

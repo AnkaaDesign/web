@@ -319,7 +319,7 @@ export default function PayrollDetailPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           title={title}
@@ -335,10 +335,8 @@ export default function PayrollDetailPage() {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            {/* User Payroll Summary and Discounts Grid */}
-            <div className="grid gap-6 md:grid-cols-2 items-start">
+        {/* User Payroll Summary and Discounts Grid */}
+        <div className="grid gap-6 md:grid-cols-2 items-start">
               {/* Merged Card: User Payroll Summary + Period Statistics */}
               <Card className="h-full">
                 <CardHeader>
@@ -527,17 +525,15 @@ export default function PayrollDetailPage() {
               </Card>
             </div>
 
-            {/* Tasks Table - Only show for eligible users */}
-            {user?.position?.bonifiable && (
-              <div className="w-full">
-                <PayrollTasksTable
-                  tasks={payrollData?.bonus?.tasks || []}
-                  userName={user?.name}
-                />
-              </div>
-            )}
+        {/* Tasks Table - Only show for eligible users */}
+        {user?.position?.bonifiable && (
+          <div className="w-full">
+            <PayrollTasksTable
+              tasks={payrollData?.bonus?.tasks || []}
+              userName={user?.name}
+            />
           </div>
-        </div>
+        )}
       </div>
     </PrivilegeRoute>
   );

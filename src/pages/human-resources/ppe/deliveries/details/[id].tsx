@@ -248,7 +248,7 @@ const EPIDeliveryDetails = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         {/* Header */}
         <div className="animate-in fade-in-50 duration-500">
           <PageHeader
@@ -279,22 +279,18 @@ const EPIDeliveryDetails = () => {
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            {/* Content Grid */}
-            <div className="animate-in fade-in-50 duration-700 space-y-6">
-              {/* First Row: Basic Info and Item (1/2 each) */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <PpeDeliveryInfoCard ppeDelivery={ppeDelivery} className="h-full" />
-                <PpeDeliveryItemCard ppeDelivery={ppeDelivery} className="h-full" />
-              </div>
+        {/* Content Grid */}
+        <div className="animate-in fade-in-50 duration-700 space-y-6">
+          {/* First Row: Basic Info and Item (1/2 each) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <PpeDeliveryInfoCard ppeDelivery={ppeDelivery} className="h-full" />
+            <PpeDeliveryItemCard ppeDelivery={ppeDelivery} className="h-full" />
+          </div>
 
-              {/* Second Row: Schedule (if available) and Changelog (1/2 each) */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {ppeDelivery.ppeSchedule && <PpeDeliveryScheduleCard schedule={ppeDelivery.ppeSchedule} className="h-full" />}
-                <PpeDeliveryChangelogCard delivery={ppeDelivery} className={ppeDelivery.ppeSchedule ? "h-full" : "lg:col-span-2 h-full"} />
-              </div>
-            </div>
+          {/* Second Row: Schedule (if available) and Changelog (1/2 each) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {ppeDelivery.ppeSchedule && <PpeDeliveryScheduleCard schedule={ppeDelivery.ppeSchedule} className="h-full" />}
+            <PpeDeliveryChangelogCard delivery={ppeDelivery} className={ppeDelivery.ppeSchedule ? "h-full" : "lg:col-span-2 h-full"} />
           </div>
         </div>
 

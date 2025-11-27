@@ -293,7 +293,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
     <Card className="h-full flex flex-col shadow-sm border border-border overflow-hidden">
       <div className="flex-1 overflow-y-auto p-6">
         <Form {...form}>
-          <form id="ppe-schedule-form" onSubmit={form.handleSubmit(handleSubmit, handleError)} className="space-y-6">
+          <form id="ppe-schedule-form" onSubmit={form.handleSubmit(handleSubmit, handleError)} className="space-y-8">
             {/* Hidden submit button for programmatic form submission */}
             <button type="submit" id="ppe-schedule-form-submit" className="hidden" aria-hidden="true" />
               {/* PPE Items Configuration */}

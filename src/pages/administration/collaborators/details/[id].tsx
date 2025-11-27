@@ -85,7 +85,7 @@ const CollaboratorDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           title={user.name}
@@ -118,32 +118,26 @@ const CollaboratorDetailsPage = () => {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            {/* Core Information Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <BasicInfoCard user={user} />
-              <AddressCard user={user} />
-            </div>
-
-            {/* Professional and Login Info Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <ProfessionalInfoCard user={user} />
-              <LoginInfoCard user={user} />
-            </div>
-
-            {/* PPE Sizes and Changelog History - Side by Side */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <PpeSizesCard user={user} className="h-[700px]" />
-              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.USER} entityId={id} maxHeight="700px" className="h-[700px]" />
-            </div>
-
-            {/* Related Activities */}
-            <div className="grid grid-cols-1 gap-6">
-              <RelatedActivitiesCard user={user} />
-            </div>
-          </div>
+        {/* Core Information Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <BasicInfoCard user={user} />
+          <AddressCard user={user} />
         </div>
+
+        {/* Professional and Login Info Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ProfessionalInfoCard user={user} />
+          <LoginInfoCard user={user} />
+        </div>
+
+        {/* PPE Sizes and Changelog History - Side by Side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <PpeSizesCard user={user} className="h-[700px]" />
+          <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.USER} entityId={id} maxHeight="700px" className="h-[700px]" />
+        </div>
+
+        {/* Related Activities */}
+        <RelatedActivitiesCard user={user} />
 
         {/* Delete Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

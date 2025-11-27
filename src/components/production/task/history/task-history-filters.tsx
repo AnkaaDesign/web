@@ -25,9 +25,12 @@ interface TaskHistoryFiltersProps {
   onOpenChange: (open: boolean) => void;
   filters: Partial<TaskGetManyFormData>;
   onFilterChange: (filters: Partial<TaskGetManyFormData>) => void;
+  canViewPrice?: boolean;
+  /** When true, hides the status filter (for non-admin/financial users) */
+  canViewStatusFilter?: boolean;
 }
 
-export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange }: TaskHistoryFiltersProps) {
+export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange, canViewPrice = false, canViewStatusFilter = true }: TaskHistoryFiltersProps) {
   // Load data for selectors
   const { data: sectorsData } = useSectors({
     orderBy: { name: "asc" },
@@ -137,22 +140,24 @@ export function TaskHistoryFilters({ open, onOpenChange, filters, onFilterChange
         </SheetHeader>
 
         <div className="mt-6 space-y-6">
-          {/* Status Filter */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <IconChecklist className="h-4 w-4" />
-              Status das Tarefas
-            </Label>
-            <Combobox
-              mode="multiple"
-              options={statusOptions}
-              value={localFilters.status || []}
-              onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, status: value.length > 0 ? value : undefined })}
-              placeholder="Selecione os status"
-              searchable={true}
-              minSearchLength={0}
-            />
-          </div>
+          {/* Status Filter - only visible to admin/financial users */}
+          {canViewStatusFilter && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <IconChecklist className="h-4 w-4" />
+                Status das Tarefas
+              </Label>
+              <Combobox
+                mode="multiple"
+                options={statusOptions}
+                value={localFilters.status || []}
+                onValueChange={(value: string[]) => setLocalFilters({ ...localFilters, status: value.length > 0 ? value : undefined })}
+                placeholder="Selecione os status"
+                searchable={true}
+                minSearchLength={0}
+              />
+            </div>
+          )}
 
           {/* Sector Filter */}
           <div className="space-y-2">

@@ -108,15 +108,13 @@ export const createUserColumns = (): UserColumn[] => [
     key: "tasksCount",
     header: "TAREFAS",
     accessor: (user: User) => (
-      <div className="text-sm text-center">
-        <span className="inline-flex items-center justify-center min-w-[2rem] h-6 px-2 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium">
-          {user._count?.createdTasks || 0}
-        </span>
-      </div>
+      <Badge variant="default" className="w-10">
+        {user._count?.createdTasks || 0}
+      </Badge>
     ),
     sortable: false,
     className: "w-24",
-    align: "center",
+    align: "left",
   },
 
   // Total de Férias (Vacation Count)
@@ -124,15 +122,13 @@ export const createUserColumns = (): UserColumn[] => [
     key: "vacationsCount",
     header: "FÉRIAS",
     accessor: (user: User) => (
-      <div className="text-sm text-center">
-        <span className="inline-flex items-center justify-center min-w-[2rem] h-6 px-2 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-medium">
-          {user._count?.vacations || 0}
-        </span>
-      </div>
+      <Badge variant="default" className="w-10">
+        {user._count?.vacations || 0}
+      </Badge>
     ),
     sortable: false,
     className: "w-24",
-    align: "center",
+    align: "left",
   },
 
   // Data de Nascimento (Birth Date)
@@ -178,15 +174,13 @@ export const createUserColumns = (): UserColumn[] => [
     key: "performanceLevel",
     header: "NÍVEL DE PERFORMANCE",
     accessor: (user: User) => (
-      <div className="text-sm text-center">
-        <span className="inline-flex items-center justify-center min-w-[2rem] h-6 px-2 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-medium">
-          {user.performanceLevel || 0}
-        </span>
-      </div>
+      <Badge variant="default" className="w-10">
+        {user.performanceLevel || 0}
+      </Badge>
     ),
     sortable: true,
     className: "min-w-[180px]",
-    align: "center",
+    align: "left",
   },
 
   // Verificado (Verified)
@@ -194,7 +188,7 @@ export const createUserColumns = (): UserColumn[] => [
     key: "verified",
     header: "VERIFICADO",
     accessor: (user: User) => (
-      <div className="text-sm text-center">
+      <div className="text-sm">
         {user.verified ? (
           <Badge variant="default" className="text-xs">
             Sim
@@ -208,7 +202,7 @@ export const createUserColumns = (): UserColumn[] => [
     ),
     sortable: true,
     className: "min-w-[120px]",
-    align: "center",
+    align: "left",
   },
 
   // Último Login (Last Login)
@@ -298,7 +292,7 @@ export const createUserColumns = (): UserColumn[] => [
     key: "requirePasswordChange",
     header: "REQUER ALTERAÇÃO DE SENHA",
     accessor: (user: User) => (
-      <div className="text-sm text-center">
+      <div className="text-sm">
         {user.requirePasswordChange ? (
           <Badge variant="destructive" className="text-xs">
             Sim
@@ -312,7 +306,7 @@ export const createUserColumns = (): UserColumn[] => [
     ),
     sortable: true,
     className: "min-w-[220px]",
-    align: "center",
+    align: "left",
   },
 
   // Data de Criação (Created At)

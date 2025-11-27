@@ -44,10 +44,16 @@ export function TaskHistoryList({
   const { data: usersData } = useUsers({ orderBy: { name: "asc" } });
   const { data: currentUser } = useCurrentUser();
 
-  // Check if user can view price (Admin or Leader only)
+  // Check if user can view price (Admin or Financial only)
   const canViewPrice = currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
-    hasPrivilege(currentUser, SECTOR_PRIVILEGES.LEADER)
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)
+  );
+
+  // Check if user can view/change status filter (Admin or Financial only)
+  const canViewStatusFilter = currentUser && (
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)
   );
 
   // Get table state for selected tasks functionality
@@ -292,8 +298,9 @@ export function TaskHistoryList({
       sectors: sectorsData?.data || [],
       customers: customersData?.data || [],
       users: usersData?.data || [],
+      hideStatusTags: !canViewStatusFilter, // Hide status tags for non-admin/financial users
     });
-  }, [filters, searchingFor, sectorsData?.data, customersData?.data, usersData?.data, onRemoveFilter]);
+  }, [filters, searchingFor, sectorsData?.data, customersData?.data, usersData?.data, onRemoveFilter, canViewStatusFilter]);
 
   // Handle table data changes
   const handleTableDataChange = React.useCallback((data: { items: Task[]; totalRecords: number }) => {
@@ -349,6 +356,7 @@ export function TaskHistoryList({
           filters={filters}
           onFilterChange={handleFilterChange}
           canViewPrice={canViewPrice}
+          canViewStatusFilter={canViewStatusFilter}
         />
       </CardContent>
     </Card>

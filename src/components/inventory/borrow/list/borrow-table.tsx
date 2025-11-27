@@ -230,7 +230,7 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
     },
     {
       key: "quantity",
-      header: "QUANTIDADE",
+      header: "QNT",
       accessor: (borrow: Borrow) => <div className="font-mono text-sm text-center">{borrow.quantity}</div>,
       sortable: true,
       className: "w-40",

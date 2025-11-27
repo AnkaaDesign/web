@@ -1,8 +1,8 @@
 import React from "react";
 import type { PaintBrand } from "../../../../types";
 import { IconBrush, IconComponents } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
+import { Badge } from "@/components/ui/badge";
 import { formatDate } from "../../../../utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 
@@ -32,7 +32,9 @@ export function createPaintBrandColumns(): PaintBrandColumn[] {
         return (
           <div className="flex items-center gap-2">
             <IconBrush className="h-4 w-4 text-muted-foreground" />
-            <span className={cn(count === 0 && "text-muted-foreground")}>{count}</span>
+            <Badge variant="default" className="w-10 justify-center">
+              {count}
+            </Badge>
           </div>
         );
       },
@@ -48,7 +50,9 @@ export function createPaintBrandColumns(): PaintBrandColumn[] {
         return (
           <div className="flex items-center gap-2">
             <IconComponents className="h-4 w-4 text-muted-foreground" />
-            <span className={cn(count === 0 && "text-muted-foreground")}>{count}</span>
+            <Badge variant="default" className="w-10 justify-center">
+              {count}
+            </Badge>
           </div>
         );
       },

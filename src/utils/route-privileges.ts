@@ -105,19 +105,20 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/pintura/formulas/editar/:id": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can edit
   "/pintura/formulas/cadastrar": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can create
 
-  // Produção - Production with full WAREHOUSE access, read-only DESIGNER, FINANCIAL, and LOGISTIC access
+  // Produção - Production with full WAREHOUSE access, read-only DESIGNER, FINANCIAL, LOGISTIC, and LEADER access
   // WAREHOUSE has full access to all production routes including create, edit, and delete operations
   // DESIGNER has read-only access to schedule, on-hold, history, and cuts
   // FINANCIAL has read-only access to production schedule, on-hold, history, and airbrushings routes
   // LOGISTIC has read-only access to schedule, on-hold, history, and garages (can edit layout only)
-  [routes.production.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC"], // DESIGNER, FINANCIAL, and LOGISTIC can view
-  [routes.production.schedule.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC"], // DESIGNER, FINANCIAL, and LOGISTIC can view schedule
-  [routes.production.schedule.create]: ["PRODUCTION", "WAREHOUSE"], // DESIGNER and FINANCIAL excluded (cannot create)
+  // LEADER has access to schedule, history (manages their sector's tasks)
+  [routes.production.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER"], // LEADER can view production
+  [routes.production.schedule.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER"], // LEADER can view schedule
+  [routes.production.schedule.create]: ["PRODUCTION", "WAREHOUSE"], // DESIGNER, FINANCIAL, and LEADER excluded (cannot create)
   [routes.production.schedule.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER", "ADMIN"], // Task detail page
-  [routes.production.schedule.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "LEADER", "ADMIN"], // FINANCIAL and LOGISTIC can edit with restrictions
-  [routes.production.scheduleOnHold.root]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC"], // WAREHOUSE excluded from on-hold
+  [routes.production.schedule.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "LEADER", "ADMIN"], // FINANCIAL, LOGISTIC, and LEADER can edit with restrictions
+  [routes.production.scheduleOnHold.root]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC"], // WAREHOUSE and LEADER excluded from on-hold
   [routes.production.scheduleOnHold.details(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER", "ADMIN"], // On-hold task detail - WAREHOUSE excluded
-  [routes.production.history.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC"], // DESIGNER, FINANCIAL, and LOGISTIC can view history
+  [routes.production.history.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER"], // LEADER can view history
   [routes.production.history.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER", "ADMIN"], // History detail page
   [routes.production.airbrushings.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL"], // DESIGNER excluded from airbrushings
   [routes.production.airbrushings.list]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL"],
@@ -128,10 +129,10 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   [routes.production.cutting.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"],
   [routes.production.cutting.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // Cutting detail
 
-  // Other production routes
-  [routes.production.observations.root]: ["PRODUCTION", "WAREHOUSE"], // WAREHOUSE has full access
-  [routes.production.observations.create]: ["PRODUCTION", "WAREHOUSE"], // WAREHOUSE can create
-  [routes.production.observations.edit(":id")]: ["PRODUCTION", "WAREHOUSE"], // WAREHOUSE can edit
+  // Observations - accessible to all production-related sectors (read-only for most, edit for admin)
+  [routes.production.observations.root]: ["PRODUCTION", "WAREHOUSE", "LEADER", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN"],
+  [routes.production.observations.create]: ["PRODUCTION", "WAREHOUSE", "ADMIN"], // Only production/warehouse/admin can create
+  [routes.production.observations.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "ADMIN"], // Only production/warehouse/admin can edit
 
   // Registro de Ponto - Basic access
   "/registro-de-ponto": "BASIC",
@@ -157,9 +158,9 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/human-resources/employees/create": "ADMIN", // Employee creation requires admin
   "/human-resources/vacations": "HUMAN_RESOURCES",
 
-  // Catalog routes (basic catalog page for leaders - NOTE: uses same details path as painting.catalog, so privileges defined on line 87)
-  [routes.catalog.root]: "LEADER",
-  // [routes.catalog.details(":id")]: "LEADER", // REMOVED: Conflicts with painting.catalog.details (same path), using hardcoded entry on line 87 instead
+  // Catalog routes (view-only for leaders and designers - NOTE: uses same details path as painting.catalog, so privileges defined on line 87)
+  [routes.catalog.root]: ["LEADER", "DESIGNER"],
+  // [routes.catalog.details(":id")]: ["LEADER", "DESIGNER"], // REMOVED: Conflicts with painting.catalog.details (same path), using hardcoded entry on line 87 instead
 
   // Maintenance routes (maintenance access for technicians)
   [routes.maintenance.root]: "MAINTENANCE",
@@ -176,7 +177,7 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/administracao/*": "ADMIN",
   [`${routes.inventory.root}/*`]: "WAREHOUSE",
   "/pintura/*": ["WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // PRODUCTION excluded from paint routes
-  [`${routes.production.root}/*`]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC"], // DESIGNER, FINANCIAL, and LOGISTIC have read access to production routes
+  [`${routes.production.root}/*`]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER"], // DESIGNER, FINANCIAL, LOGISTIC, and LEADER have read access to production routes
   "/recursos-humanos/*": "HUMAN_RESOURCES",
   "/human-resources/*": "HUMAN_RESOURCES",
   "/meu-pessoal/*": "LEADER",

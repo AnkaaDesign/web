@@ -43,7 +43,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
     ),
     sortable: true,
     className: "w-24",
-    align: "center",
+    align: "left",
   },
   // User Name
   {
@@ -101,14 +101,14 @@ export const createPayrollColumns = (): PayrollColumn[] => [
       };
 
       return (
-        <Badge variant={getVariant(level)} className="min-w-[3rem] text-center justify-center">
+        <Badge variant={getVariant(level)} className="min-w-[3rem]">
           {level}
         </Badge>
       );
     },
     sortable: true,
     className: "w-32",
-    align: "center",
+    align: "left",
   },
   // Total Weighted Tasks for the Period (SAME for all eligible users)
   {
@@ -118,7 +118,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
       // If user is not eligible for bonus, show dash
       if (!user.position?.bonifiable) {
         return (
-          <div className="text-sm text-muted-foreground text-center">
+          <div className="text-sm text-muted-foreground">
             -
           </div>
         );
@@ -154,14 +154,14 @@ export const createPayrollColumns = (): PayrollColumn[] => [
       }
 
       return (
-        <div className="text-sm font-medium text-center tabular-nums">
+        <div className="text-sm font-medium tabular-nums">
           {totalWeightedTasks.toFixed(1)}
         </div>
       );
     },
     sortable: true,
     className: "w-32",
-    align: "center",
+    align: "left",
   },
   // Average Tasks Per Employee for this specific month/row
   {
@@ -171,7 +171,7 @@ export const createPayrollColumns = (): PayrollColumn[] => [
       // If user is not eligible for bonus, show dash
       if (!user.position?.bonifiable) {
         return (
-          <div className="text-sm text-muted-foreground text-center">
+          <div className="text-sm text-muted-foreground">
             -
           </div>
         );
@@ -200,14 +200,14 @@ export const createPayrollColumns = (): PayrollColumn[] => [
       }
 
       return (
-        <div className="text-sm font-medium text-center tabular-nums">
+        <div className="text-sm font-medium tabular-nums">
           {monthAverage.toFixed(1)}
         </div>
       );
     },
     sortable: true,
     className: "w-32",
-    align: "center",
+    align: "left",
   },
   // Bonus with status indicators
   {

@@ -237,7 +237,7 @@ const ExternalWithdrawalDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         {/* Hero Section - Enhanced Header with Actions */}
         <PageHeader
           variant="detail"
@@ -273,42 +273,34 @@ const ExternalWithdrawalDetailsPage = () => {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            {/* Core Information Grid */}
-            <div className="animate-in fade-in-50 duration-700 space-y-6">
-              {/* Top Section: Info and Changelog */}
-              {/* Mobile: Single column stacked */}
-              <div className="block lg:hidden space-y-4">
-                <ExternalWithdrawalInfoCard withdrawal={withdrawal} className="h-full" />
-                <ChangelogHistory
-                  entityType={CHANGE_LOG_ENTITY_TYPE.EXTERNAL_WITHDRAWAL}
-                  entityId={withdrawal.id}
-                  entityName={withdrawal.withdrawerName}
-                  entityCreatedAt={withdrawal.createdAt}
-                  className="h-full"
-                />
-              </div>
-
-              {/* Desktop/Tablet: 2 columns grid with 1/2 and 1/2 split */}
-              <div className="hidden lg:block">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <ExternalWithdrawalInfoCard withdrawal={withdrawal} className="h-full" />
-                  <ChangelogHistory
-                    entityType={CHANGE_LOG_ENTITY_TYPE.EXTERNAL_WITHDRAWAL}
-                    entityId={withdrawal.id}
-                    entityName={withdrawal.withdrawerName}
-                    entityCreatedAt={withdrawal.createdAt}
-                    className="h-full"
-                  />
-                </div>
-              </div>
-
-              {/* Bottom Section: Items Full Width */}
-              <ExternalWithdrawalItemsCard withdrawal={withdrawal} className="w-full" onWithdrawalUpdate={refetch} />
-            </div>
-          </div>
+        {/* Core Information Grid */}
+        {/* Top Section: Info and Changelog */}
+        {/* Mobile: Single column stacked */}
+        <div className="block lg:hidden space-y-4 animate-in fade-in-50 duration-700">
+          <ExternalWithdrawalInfoCard withdrawal={withdrawal} className="h-full" />
+          <ChangelogHistory
+            entityType={CHANGE_LOG_ENTITY_TYPE.EXTERNAL_WITHDRAWAL}
+            entityId={withdrawal.id}
+            entityName={withdrawal.withdrawerName}
+            entityCreatedAt={withdrawal.createdAt}
+            className="h-full"
+          />
         </div>
+
+        {/* Desktop/Tablet: 2 columns grid with 1/2 and 1/2 split */}
+        <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in-50 duration-700">
+          <ExternalWithdrawalInfoCard withdrawal={withdrawal} className="h-full" />
+          <ChangelogHistory
+            entityType={CHANGE_LOG_ENTITY_TYPE.EXTERNAL_WITHDRAWAL}
+            entityId={withdrawal.id}
+            entityName={withdrawal.withdrawerName}
+            entityCreatedAt={withdrawal.createdAt}
+            className="h-full"
+          />
+        </div>
+
+        {/* Bottom Section: Items Full Width */}
+        <ExternalWithdrawalItemsCard withdrawal={withdrawal} className="w-full" onWithdrawalUpdate={refetch} />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

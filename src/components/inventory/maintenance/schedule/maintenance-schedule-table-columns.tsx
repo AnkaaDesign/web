@@ -91,7 +91,7 @@ export const createMaintenanceScheduleColumns = (): MaintenanceScheduleColumn[] 
     ),
     sortable: true,
     className: "w-24",
-    align: "center",
+    align: "left",
   },
   // Secondary columns
   {
@@ -113,7 +113,7 @@ export const createMaintenanceScheduleColumns = (): MaintenanceScheduleColumn[] 
     key: "frequencyCount",
     header: "INTERVALO",
     accessor: (schedule: MaintenanceSchedule) => (
-      <div className="truncate text-sm text-center tabular-nums">
+      <div className="truncate text-sm tabular-nums">
         {schedule.frequencyCount ? (
           <span className="text-sky-600 font-medium">{schedule.frequencyCount}</span>
         ) : (
@@ -123,7 +123,7 @@ export const createMaintenanceScheduleColumns = (): MaintenanceScheduleColumn[] 
     ),
     sortable: true,
     className: "w-24",
-    align: "center",
+    align: "left",
   },
   {
     key: "lastRun",
@@ -154,7 +154,7 @@ export const createMaintenanceScheduleColumns = (): MaintenanceScheduleColumn[] 
     },
     sortable: false,
     className: "w-40",
-    align: "center",
+    align: "left",
   },
   {
     key: "createdAt",

@@ -328,9 +328,9 @@ export function CustomerForm(props: CustomerFormProps) {
   return (
     <div className="h-full overflow-y-auto p-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           {/* Basic Information */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle>Informações Básicas</CardTitle>
               <CardDescription>Dados fundamentais do cliente</CardDescription>
@@ -364,7 +364,7 @@ export function CustomerForm(props: CustomerFormProps) {
           </Card>
 
           {/* Logo */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle>Logo</CardTitle>
               <CardDescription>Imagem do logo do cliente</CardDescription>
@@ -375,7 +375,7 @@ export function CustomerForm(props: CustomerFormProps) {
           </Card>
 
           {/* Contact Information */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle>Informações de Contato</CardTitle>
               <CardDescription>Telefones e outras formas de contato</CardDescription>
@@ -386,7 +386,7 @@ export function CustomerForm(props: CustomerFormProps) {
           </Card>
 
           {/* Address Information */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle>Endereço</CardTitle>
               <CardDescription>Localização do cliente</CardDescription>
@@ -431,7 +431,7 @@ export function CustomerForm(props: CustomerFormProps) {
           </Card>
 
           {/* Tags */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle>Tags</CardTitle>
               <CardDescription>Etiquetas para categorizar o cliente</CardDescription>

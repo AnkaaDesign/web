@@ -92,7 +92,7 @@ export const WarningDetailPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           title="Detalhes da Advertência"
@@ -125,23 +125,19 @@ export const WarningDetailPage = () => {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="container max-w-7xl mx-auto pb-6 space-y-6">
-            {/* Main Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-6">
-                <SpecificationsCard warning={warning.data!} />
-                <AttachmentsCard warning={warning.data!} />
-              </div>
-              <div className="space-y-6">
-                <DescriptionCard warning={warning.data!} />
-              </div>
-            </div>
-
-            {/* Changelog */}
-            <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.WARNING} entityId={id} maxHeight="500px" />
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
+            <SpecificationsCard warning={warning.data!} />
+            <AttachmentsCard warning={warning.data!} />
+          </div>
+          <div className="space-y-6">
+            <DescriptionCard warning={warning.data!} />
           </div>
         </div>
+
+        {/* Changelog */}
+        <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.WARNING} entityId={id} maxHeight="500px" />
 
         {/* Delete Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

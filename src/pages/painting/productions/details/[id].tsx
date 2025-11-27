@@ -76,7 +76,7 @@ export function ProductionDetailsPage() {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <PageHeader
         variant="detail"
@@ -98,10 +98,8 @@ export function ProductionDetailsPage() {
         ]}
       />
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="space-y-6">
-          {/* Production Information Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Production Information Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left column - Production Details */}
             <Card>
               <CardHeader>
@@ -282,24 +280,22 @@ export function ProductionDetailsPage() {
             </Card>
           )}
 
-          {/* Changelog Section */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Histórico de Alterações</CardTitle>
-              <CardDescription>Acompanhe todas as modificações realizadas nesta produção</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChangelogHistory
-                entityType={CHANGE_LOG_ENTITY_TYPE.PAINT_PRODUCTION}
-                entityId={production.id}
-                entityName={productionEntity.name}
-                entityCreatedAt={production.createdAt}
-                className="h-[400px]"
-              />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      {/* Changelog Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Histórico de Alterações</CardTitle>
+          <CardDescription>Acompanhe todas as modificações realizadas nesta produção</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ChangelogHistory
+            entityType={CHANGE_LOG_ENTITY_TYPE.PAINT_PRODUCTION}
+            entityId={production.id}
+            entityName={productionEntity.name}
+            entityCreatedAt={production.createdAt}
+            className="h-[400px]"
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -245,13 +245,13 @@ const OrderDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="flex flex-col h-full">
+      <div className="space-y-6">
         {/* Hero Section - Enhanced Header with Actions */}
         <PageHeader
           variant="detail"
           title={order.description}
           icon={IconShoppingCart}
-          className="shadow-lg mb-6"
+          className="shadow-lg"
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Estoque", href: routes.inventory.root },
@@ -280,45 +280,37 @@ const OrderDetailsPage = () => {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            {/* Core Information Grid */}
-            <div className="animate-in fade-in-50 duration-700 space-y-6">
-              {/* Top Section: Info and Changelog */}
-              {/* Mobile: Single column stacked */}
-              <div className="block lg:hidden space-y-4">
-                <OrderInfoCard order={order} className="h-full" />
-                <ChangelogHistory
-                  entityType={CHANGE_LOG_ENTITY_TYPE.ORDER}
-                  entityId={order.id}
-                  entityName={order.description}
-                  entityCreatedAt={order.createdAt}
-                  className="h-full"
-                />
-              </div>
-
-              {/* Desktop/Tablet: 2 columns grid with 1/2 and 1/2 split */}
-              <div className="hidden lg:block">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <OrderInfoCard order={order} className="h-full" />
-                  <ChangelogHistory
-                    entityType={CHANGE_LOG_ENTITY_TYPE.ORDER}
-                    entityId={order.id}
-                    entityName={order.description}
-                    entityCreatedAt={order.createdAt}
-                    className="h-full"
-                  />
-                </div>
-              </div>
-
-              {/* Bottom Section: Items and Documents */}
-              <OrderItemsCard order={order} className="w-full" onOrderUpdate={handleOrderUpdate} />
-
-              {/* Documents Section */}
-              <OrderDocumentsCard order={order} className="w-full" />
-            </div>
-          </div>
+        {/* Core Information Grid */}
+        {/* Top Section: Info and Changelog */}
+        {/* Mobile: Single column stacked */}
+        <div className="block lg:hidden space-y-4 animate-in fade-in-50 duration-700">
+          <OrderInfoCard order={order} className="h-full" />
+          <ChangelogHistory
+            entityType={CHANGE_LOG_ENTITY_TYPE.ORDER}
+            entityId={order.id}
+            entityName={order.description}
+            entityCreatedAt={order.createdAt}
+            className="h-full"
+          />
         </div>
+
+        {/* Desktop/Tablet: 2 columns grid with 1/2 and 1/2 split */}
+        <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in-50 duration-700">
+          <OrderInfoCard order={order} className="h-full" />
+          <ChangelogHistory
+            entityType={CHANGE_LOG_ENTITY_TYPE.ORDER}
+            entityId={order.id}
+            entityName={order.description}
+            entityCreatedAt={order.createdAt}
+            className="h-full"
+          />
+        </div>
+
+        {/* Bottom Section: Items and Documents */}
+        <OrderItemsCard order={order} className="w-full" onOrderUpdate={handleOrderUpdate} />
+
+        {/* Documents Section */}
+        <OrderDocumentsCard order={order} className="w-full" />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

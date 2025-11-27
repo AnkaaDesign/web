@@ -29,6 +29,8 @@ interface PaintCatalogueListProps {
   onOrderStateChange?: (hasChanges: boolean, orderedPaints: Paint[]) => void;
   onSaveOrderRequest?: () => void;
   onResetOrderRequest?: () => void;
+  /** When true, disables reordering and selection features (for read-only access) */
+  viewOnly?: boolean;
 }
 
 const DEFAULT_PAGE_SIZE = 60; // More items for color grid
@@ -88,7 +90,7 @@ function SelectionInfo({ selectedPaints }: SelectionInfoProps) {
   );
 }
 
-function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderRequest, onResetOrderRequest }: PaintCatalogueListProps) {
+function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderRequest, onResetOrderRequest, viewOnly = false }: PaintCatalogueListProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { selectedPaintIds, clearSelection } = usePaintSelection();
 
@@ -577,8 +579,8 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
           {/* Active Filter Indicators */}
           {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} />}
 
-          {/* Selection Info */}
-          <SelectionInfo selectedPaints={selectedPaints} />
+          {/* Selection Info - only show when not in viewOnly mode */}
+          {!viewOnly && <SelectionInfo selectedPaints={selectedPaints} />}
 
 
           {/* Paint display with smooth transitions */}
@@ -594,19 +596,21 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
           {/* Filter Modal */}
           <PaintFilters open={showFilterModal} onOpenChange={setShowFilterModal} filters={filters} onFilterChange={handleFilterChange} />
 
-          {/* Merge Dialog */}
-          <PaintMergeDialog
-            open={showMergeDialog}
-            onOpenChange={setShowMergeDialog}
-            paints={selectedPaints}
-            onMerge={handleMergeConfirm}
-          />
+          {/* Merge Dialog - only show when not in viewOnly mode */}
+          {!viewOnly && (
+            <PaintMergeDialog
+              open={showMergeDialog}
+              onOpenChange={setShowMergeDialog}
+              paints={selectedPaints}
+              onMerge={handleMergeConfirm}
+            />
+          )}
       </Card>
     </ContextMenuProvider>
   );
 }
 
-export function PaintCatalogueList({ className, onOrderStateChange, onSaveOrderRequest, onResetOrderRequest }: PaintCatalogueListProps) {
+export function PaintCatalogueList({ className, onOrderStateChange, onSaveOrderRequest, onResetOrderRequest, viewOnly = false }: PaintCatalogueListProps) {
   return (
     <PaintSelectionProvider>
       <PaintCatalogueListContent
@@ -614,6 +618,7 @@ export function PaintCatalogueList({ className, onOrderStateChange, onSaveOrderR
         onOrderStateChange={onOrderStateChange}
         onSaveOrderRequest={onSaveOrderRequest}
         onResetOrderRequest={onResetOrderRequest}
+        viewOnly={viewOnly}
       />
     </PaintSelectionProvider>
   );

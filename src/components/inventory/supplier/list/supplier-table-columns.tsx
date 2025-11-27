@@ -122,7 +122,7 @@ export const createSupplierColumns = (): SupplierColumn[] => [
     accessor: (supplier: Supplier) => {
       const count = (supplier as any)._count?.items || 0;
       return (
-        <Badge variant={count > 0 ? "default" : "secondary"} className="min-w-[2rem] justify-center">
+        <Badge variant="default" className="w-10 justify-center">
           {count}
         </Badge>
       );
@@ -137,7 +137,7 @@ export const createSupplierColumns = (): SupplierColumn[] => [
     accessor: (supplier: Supplier) => {
       const count = (supplier as any)._count?.orders || 0;
       return (
-        <Badge variant={count > 0 ? "default" : "secondary"} className="min-w-[2rem] justify-center">
+        <Badge variant="default" className="w-10 justify-center">
           {count}
         </Badge>
       );
@@ -152,7 +152,7 @@ export const createSupplierColumns = (): SupplierColumn[] => [
     accessor: (supplier: Supplier) => {
       const count = (supplier as any)._count?.orderRules || 0;
       return (
-        <Badge variant={count > 0 ? "default" : "secondary"} className="min-w-[2rem] justify-center">
+        <Badge variant="default" className="w-10 justify-center">
           {count}
         </Badge>
       );

@@ -41,6 +41,7 @@ export function FormEmailInput({
               type="email"
               placeholder={placeholder}
               disabled={disabled}
+              transparent={true}
               className="transition-all duration-200 focus:ring-2 focus:ring-ring/20"
             />
           </FormControl>

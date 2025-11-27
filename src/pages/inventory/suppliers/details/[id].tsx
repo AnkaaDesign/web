@@ -92,7 +92,7 @@ const SupplierDetailsPage = () => {
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
       <FileViewerProvider>
-        <div className="flex flex-col h-full space-y-6">
+        <div className="space-y-6">
           <PageHeader
             variant="detail"
             title={supplier.fantasyName}
@@ -121,32 +121,28 @@ const SupplierDetailsPage = () => {
             ]}
           />
 
-          <div className="flex-1 overflow-y-auto">
-            <div className="space-y-6">
-              {/* Core Information Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <BasicInfoCard supplier={supplier} />
-                <ContactDetailsCard supplier={supplier} />
-              </div>
-
-              {/* Address and Changelog Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <AddressInfoCard supplier={supplier} />
-                <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.SUPPLIER} entityId={id} maxHeight="500px" />
-              </div>
-
-              {/* Documents and Empty Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <DocumentsCard supplier={supplier} />
-              </div>
-
-              {/* Related Orders */}
-              <RelatedOrdersCard supplier={supplier} />
-
-              {/* Related Items - Full Width, Last Section */}
-              <RelatedItemsCard items={supplier.items} supplierId={supplier.id} />
-            </div>
+          {/* Core Information Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <BasicInfoCard supplier={supplier} />
+            <ContactDetailsCard supplier={supplier} />
           </div>
+
+          {/* Address and Changelog Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <AddressInfoCard supplier={supplier} />
+            <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.SUPPLIER} entityId={id} maxHeight="500px" />
+          </div>
+
+          {/* Documents and Empty Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <DocumentsCard supplier={supplier} />
+          </div>
+
+          {/* Related Orders */}
+          <RelatedOrdersCard supplier={supplier} />
+
+          {/* Related Items - Full Width, Last Section */}
+          <RelatedItemsCard items={supplier.items} supplierId={supplier.id} />
 
           {/* Delete Dialog */}
           <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

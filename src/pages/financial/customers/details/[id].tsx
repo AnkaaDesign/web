@@ -108,7 +108,7 @@ export const FinancialCustomersDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           title={customer.fantasyName}
@@ -142,38 +142,34 @@ export const FinancialCustomersDetailsPage = () => {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            {/* Core Information Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <BasicInfoCard customer={customer} />
-              <ContactDetailsCard customer={customer} />
-            </div>
-
-            {/* Address and Changelog Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-              <AddressInfoCard customer={customer} className="h-full" />
-              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.CUSTOMER} entityId={id} className="h-full" />
-            </div>
-
-            {/* Documents (ADMIN and FINANCIAL only) */}
-            {canViewDocuments && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <DocumentsCard customer={customer} />
-              </div>
-            )}
-
-            {/* Related Invoices (ADMIN and FINANCIAL only) */}
-            {canViewDocuments && <RelatedInvoicesCard customer={customer} />}
-
-            {/* Customer Tasks - Full Width at Bottom */}
-            <CustomerTasksList
-              customerId={customer.id}
-              customerName={customer.fantasyName}
-              navigationRoute="history"
-            />
-          </div>
+        {/* Core Information Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <BasicInfoCard customer={customer} />
+          <ContactDetailsCard customer={customer} />
         </div>
+
+        {/* Address and Changelog Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <AddressInfoCard customer={customer} className="h-full" />
+          <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.CUSTOMER} entityId={id} className="h-full" />
+        </div>
+
+        {/* Documents (ADMIN and FINANCIAL only) */}
+        {canViewDocuments && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <DocumentsCard customer={customer} />
+          </div>
+        )}
+
+        {/* Related Invoices (ADMIN and FINANCIAL only) */}
+        {canViewDocuments && <RelatedInvoicesCard customer={customer} />}
+
+        {/* Customer Tasks - Full Width at Bottom */}
+        <CustomerTasksList
+          customerId={customer.id}
+          customerName={customer.fantasyName}
+          navigationRoute="history"
+        />
 
         {/* Delete Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

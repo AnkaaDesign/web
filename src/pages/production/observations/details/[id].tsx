@@ -95,7 +95,7 @@ export const ObservationDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.PRODUCTION}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           title={observation.task ? `Observação - ${observation.task.name}` : "Observação"}
@@ -129,24 +129,20 @@ export const ObservationDetailsPage = () => {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            <ObservationInfoCard
-              observation={{
-                ...observation,
-                files: observation.files?.map((file) => {
-                  const urls = generateFileUrls(file);
-                  return {
-                    ...file,
-                    fileUrl: urls.serve,
-                    thumbnailUrl: file.thumbnailUrl || urls.thumbnail || undefined,
-                    mimeType: file.mimetype, // Map mimetype to mimeType
-                  };
-                }),
-              }}
-            />
-          </div>
-        </div>
+        <ObservationInfoCard
+          observation={{
+            ...observation,
+            files: observation.files?.map((file) => {
+              const urls = generateFileUrls(file);
+              return {
+                ...file,
+                fileUrl: urls.serve,
+                thumbnailUrl: file.thumbnailUrl || urls.thumbnail || undefined,
+                mimeType: file.mimetype, // Map mimetype to mimeType
+              };
+            }),
+          }}
+        />
 
         {/* Delete Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

@@ -142,7 +142,7 @@ export default function PaintDetailsPage() {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-6">
+    <div className="space-y-6">
       {/* Hero Section */}
       <div className="animate-in fade-in-50 duration-500">
         <PageHeader
@@ -180,10 +180,8 @@ export default function PaintDetailsPage() {
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="space-y-6">
-          {/* Row 1: Specifications + (Formulas + Fundos Recomendados) */}
-          <div className="animate-in fade-in-50 duration-500 transition-all">
+      {/* Row 1: Specifications + (Formulas + Fundos Recomendados) */}
+      <div className="animate-in fade-in-50 duration-500 transition-all">
             {/* Mobile: Single column */}
             <div className="block lg:hidden space-y-4">
               <PaintSpecificationsCard paint={paint} className="h-auto" />
@@ -227,11 +225,9 @@ export default function PaintDetailsPage() {
             <PaintProductionHistoryCard paint={paint} className="h-auto lg:h-[550px]" />
           </div>
 
-          {/* Row 5: Changelog - Full Width */}
-          <div className="animate-in fade-in-50 duration-1000 transition-all">
-            <PaintWithFormulasChangelogHistory paint={paint} className="h-auto lg:h-[600px]" />
-          </div>
-        </div>
+      {/* Row 5: Changelog - Full Width */}
+      <div className="animate-in fade-in-50 duration-1000 transition-all">
+        <PaintWithFormulasChangelogHistory paint={paint} className="h-auto lg:h-[600px]" />
       </div>
 
       {/* Delete Confirmation Dialog */}

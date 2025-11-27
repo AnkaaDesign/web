@@ -197,68 +197,56 @@ export const LoanDetailsPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-6">
+    <div className="space-y-6">
       {/* Hero Section - Enhanced Header with Actions */}
-      <div className="animate-in fade-in-50 duration-500">
-        <PageHeader
-          variant="detail"
-          title={`Empréstimo #${borrow.id.slice(-8)}`}
-          icon={IconPackage}
-          className="shadow-lg"
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Estoque", href: routes.inventory.root },
-            { label: "Empréstimos", href: routes.inventory.loans.root },
-            { label: `#${borrow.id.slice(-8)}` },
-          ]}
-          actions={[
-            {
-              key: "refresh",
-              label: "Atualizar",
-              icon: IconRefresh,
-              onClick: handleRefresh,
-            },
-            ...(canManageWarehouse
-              ? [
-                  {
-                    key: "edit",
-                    label: "Editar",
-                    icon: IconEdit,
-                    onClick: handleEdit,
-                    variant: "default" as const,
-                  },
-                ]
-              : []),
-            ...customActions,
-          ]}
-        />
+      <PageHeader
+        variant="detail"
+        title={`Empréstimo #${borrow.id.slice(-8)}`}
+        icon={IconPackage}
+        className="shadow-lg"
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Empréstimos", href: routes.inventory.loans.root },
+          { label: `#${borrow.id.slice(-8)}` },
+        ]}
+        actions={[
+          {
+            key: "refresh",
+            label: "Atualizar",
+            icon: IconRefresh,
+            onClick: handleRefresh,
+          },
+          ...(canManageWarehouse
+            ? [
+                {
+                  key: "edit",
+                  label: "Editar",
+                  icon: IconEdit,
+                  onClick: handleEdit,
+                  variant: "default" as const,
+                },
+              ]
+            : []),
+          ...customActions,
+        ]}
+      />
+
+      {/* Core Information Grid - Specifications and Item */}
+      {/* Mobile: Single column stacked */}
+      <div className="block lg:hidden space-y-4 animate-in fade-in-50 duration-700">
+        <BorrowSpecificationsCard borrow={borrow} className="h-full" />
+        <BorrowItemCard borrow={borrow} className="h-full" />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="space-y-6">
-          {/* Core Information Grid - Specifications and Item */}
-          <div className="animate-in fade-in-50 duration-700">
-            {/* Mobile: Single column stacked */}
-            <div className="block lg:hidden space-y-4">
-              <BorrowSpecificationsCard borrow={borrow} className="h-full" />
-              <BorrowItemCard borrow={borrow} className="h-full" />
-            </div>
-
-            {/* Desktop/Tablet: 2 columns grid */}
-            <div className="hidden lg:block">
-              <div className="grid grid-cols-2 gap-6">
-                <BorrowSpecificationsCard borrow={borrow} className="h-full" />
-                <BorrowItemCard borrow={borrow} className="h-full" />
-              </div>
-            </div>
-          </div>
-
-          {/* History Section - Full width */}
-          <div className="animate-in fade-in-50 duration-900">
-            <BorrowHistoryCard borrow={borrow} className="h-full" />
-          </div>
-        </div>
+      {/* Desktop/Tablet: 2 columns grid */}
+      <div className="hidden lg:grid grid-cols-2 gap-6 animate-in fade-in-50 duration-700">
+        <BorrowSpecificationsCard borrow={borrow} className="h-full" />
+        <BorrowItemCard borrow={borrow} className="h-full" />
       </div>
+
+      {/* History Section - Full width */}
+      <BorrowHistoryCard borrow={borrow} className="h-full animate-in fade-in-50 duration-900" />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

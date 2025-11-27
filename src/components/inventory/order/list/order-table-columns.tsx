@@ -48,14 +48,14 @@ export const createOrderColumns = (): OrderColumn[] => [
     accessor: (order) => {
       const itemCount = order._count?.items ?? 0;
       return (
-        <Badge variant="secondary" className="font-tabular-nums">
-          {itemCount} {itemCount === 1 ? "item" : "itens"}
+        <Badge variant="default" className="w-10 justify-center">
+          {itemCount}
         </Badge>
       );
     },
     sortable: false,
-    align: "left",
-    className: "w-24",
+    align: "center",
+    className: "min-w-[80px]",
   },
   {
     key: "total",

@@ -505,20 +505,6 @@ export const routes = {
     },
   },
 
-  // Integrations - Integrações - System integrations
-  integrations: {
-    root: "/integracoes",
-    secullum: {
-      root: "/integracoes/secullum",
-      timeEntries: {
-        root: "/integracoes/secullum/registros-ponto",
-        details: (id: string) => `/integracoes/secullum/registros-ponto/detalhes/${id}`,
-      },
-      calculations: "/integracoes/secullum/calculos",
-      syncStatus: "/integracoes/secullum/status-sincronizacao",
-    },
-  },
-
   // Users - Alias for administration users (collaborators) for backward compatibility
   users: {
     batchEdit: "/administracao/colaboradores/editar-em-lote",

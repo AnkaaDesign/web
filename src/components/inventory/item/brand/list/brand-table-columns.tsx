@@ -1,5 +1,6 @@
 import React from "react";
 import type { ItemBrand } from "../../../../../types";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IconPackage } from "@tabler/icons-react";
 import { routes } from "../../../../../constants";
@@ -27,10 +28,14 @@ export const createBrandColumns = (): BrandColumn[] => {
     {
       key: "_count.items",
       header: "QTD. PRODUTOS",
-      accessor: (brand: ItemBrand) => <div className="truncate">{(brand as any)._count?.items || 0}</div>,
+      accessor: (brand: ItemBrand) => (
+        <Badge variant="default" className="w-10 justify-center">
+          {(brand as any)._count?.items || 0}
+        </Badge>
+      ),
       sortable: true,
       className: "flex-1",
-      align: "left",
+      align: "center",
     },
     {
       key: "actions",

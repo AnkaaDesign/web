@@ -2,7 +2,6 @@ import React from "react";
 import type { PaintType } from "../../../../types";
 import { Badge } from "@/components/ui/badge";
 import { IconBrush, IconComponents } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { formatDate } from "../../../../utils";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
@@ -26,7 +25,9 @@ const paintsCountAccessor = (paintType: PaintType) => {
   return (
     <div className="flex items-center gap-2">
       <IconBrush className="h-4 w-4 text-muted-foreground" />
-      <span className={cn(count === 0 && "text-muted-foreground")}>{count}</span>
+      <Badge variant="default" className="w-10 justify-center">
+        {count}
+      </Badge>
     </div>
   );
 };
@@ -36,7 +37,9 @@ const componentItemsCountAccessor = (paintType: PaintType) => {
   return (
     <div className="flex items-center gap-2">
       <IconComponents className="h-4 w-4 text-muted-foreground" />
-      <span className={cn(count === 0 && "text-muted-foreground")}>{count}</span>
+      <Badge variant="default" className="w-10 justify-center">
+        {count}
+      </Badge>
     </div>
   );
 };

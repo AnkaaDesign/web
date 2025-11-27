@@ -14,6 +14,7 @@ import {
   IconSparkles,
   IconScissors,
   IconPlus,
+  IconX,
   IconCurrencyReal,
   IconReceipt,
   IconFileInvoice,
@@ -159,6 +160,9 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   const [hasLayoutChanges, setHasLayoutChanges] = useState(false);
   const [hasFileChanges, setHasFileChanges] = useState(false);
   const [isObservationOpen, setIsObservationOpen] = useState(!!task.observation?.description);
+  const [isFinancialInfoOpen, setIsFinancialInfoOpen] = useState(
+    () => budgetFile.length > 0 || nfeFile.length > 0 || receiptFile.length > 0
+  );
   const [layoutWidthError, setLayoutWidthError] = useState<string | null>(null);
   const [observationFiles, setObservationFiles] = useState<FileWithPreview[]>(
     convertToFileWithPreview(task.observation?.files)
@@ -216,7 +220,8 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       rightSections: layoutsData?.rightSideLayout?.layoutSections,
     });
   }, [layoutsData, truckId]);
-  const { createOrUpdateTruckLayout } = useLayoutMutations();
+  const { createOrUpdateTruckLayout, delete: deleteLayout } = useLayoutMutations();
+  const [shouldDeleteLayouts, setShouldDeleteLayouts] = useState(false);
 
   // Check if any layout exists and open the section automatically
   useEffect(() => {
@@ -590,7 +595,41 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
         console.log('[TaskEditForm SUBMIT] modifiedLayoutSides.size:', modifiedLayoutSides.size);
         console.log('[TaskEditForm SUBMIT] Is Set?:', modifiedLayoutSides instanceof Set);
 
-        if (hasLayoutChanges) {
+        // Handle layout deletion if user clicked the remove button
+        if (shouldDeleteLayouts && layoutsData) {
+          console.log('[TaskEditForm SUBMIT] ========== LAYOUT DELETION ==========');
+          console.log('[TaskEditForm SUBMIT] shouldDeleteLayouts is TRUE - deleting all layouts');
+
+          const deletePromises: Promise<any>[] = [];
+
+          if (layoutsData.leftSideLayout?.id) {
+            console.log('[TaskEditForm SUBMIT] Queuing deletion of left layout:', layoutsData.leftSideLayout.id);
+            deletePromises.push(deleteLayout(layoutsData.leftSideLayout.id));
+          }
+          if (layoutsData.rightSideLayout?.id) {
+            console.log('[TaskEditForm SUBMIT] Queuing deletion of right layout:', layoutsData.rightSideLayout.id);
+            deletePromises.push(deleteLayout(layoutsData.rightSideLayout.id));
+          }
+          if (layoutsData.backSideLayout?.id) {
+            console.log('[TaskEditForm SUBMIT] Queuing deletion of back layout:', layoutsData.backSideLayout.id);
+            deletePromises.push(deleteLayout(layoutsData.backSideLayout.id));
+          }
+
+          if (deletePromises.length > 0) {
+            try {
+              await Promise.all(deletePromises);
+              console.log('[TaskEditForm SUBMIT] ✅ Successfully deleted', deletePromises.length, 'layout(s)');
+            } catch (error) {
+              console.error('[TaskEditForm SUBMIT] ❌ Error deleting layouts:', error);
+              toast.error('Erro ao remover layouts');
+            }
+          }
+
+          // Reset the flag after deletion
+          setShouldDeleteLayouts(false);
+        }
+
+        if (hasLayoutChanges && !shouldDeleteLayouts) {
           console.log('');
           console.log('═══════════════════════════════════════════════════════════════');
           console.log('[TaskEditForm SUBMIT] Layout changes detected - building payload');
@@ -1345,7 +1384,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
         <div className="h-full bg-card rounded-lg shadow-md border-muted overflow-hidden">
           <div className="h-full overflow-y-auto p-6">
             <Form {...form}>
-              <form className="space-y-6">
+              <form className="space-y-8">
                 {/* Basic Information Card */}
                 <Card className="bg-transparent">
                   <CardHeader>
@@ -1682,7 +1721,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                 {/* Layout Section - Hidden for Warehouse and Financial users, Read-only for Designer users, EDITABLE for Logistic users */}
                 {!isWarehouseUser && !isFinancialUser && (
                 <Card className="bg-transparent">
-                  <CardHeader>
+                  <CardHeader className={`transition-all duration-200 ${!isLayoutOpen ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <IconRuler className="h-5 w-5" />
@@ -1696,28 +1735,44 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                       {!isLayoutOpen ? (
                         <Button
                           type="button"
-                          onClick={() => setIsLayoutOpen(true)}
+                          onClick={() => {
+                            setIsLayoutOpen(true);
+                            setShouldDeleteLayouts(false);
+                          }}
                           disabled={isSubmitting}
                           size="sm"
                           className="gap-2"
                         >
                           <IconPlus className="h-4 w-4" />
-                          Adicionar Layout
+                          Adicionar
                         </Button>
                       ) : (
                         <Button
                           type="button"
                           variant="ghost"
-                          size="sm"
-                          onClick={() => setIsLayoutOpen(false)}
+                          size="icon"
+                          onClick={() => {
+                            setIsLayoutOpen(false);
+                            setShouldDeleteLayouts(true);
+                            setHasLayoutChanges(true);
+                            // Reset layout states to defaults
+                            setCurrentLayoutStates({
+                              left: { height: 2.4, sections: [{ width: 8, isDoor: false, doorOffset: null, position: 0 }], photoId: null },
+                              right: { height: 2.4, sections: [{ width: 8, isDoor: false, doorOffset: null, position: 0 }], photoId: null },
+                              back: { height: 2.42, sections: [{ width: 2.42, isDoor: false, doorOffset: null, position: 0 }], photoId: null },
+                            });
+                            setModifiedLayoutSides(new Set());
+                          }}
                           disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover layout"
                         >
-                          Remover
+                          <IconX className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className={`transition-all duration-200 ${!isLayoutOpen ? "p-2" : ""}`}>
                     {isLayoutOpen ? (
                       <div className="space-y-4">
                         {/* Layout Side Selector with Total Length */}
@@ -1879,102 +1934,253 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                 </Card>
                 )}
 
-                {/* Financial Information Card - Only visible to ADMIN and FINANCIAL users */}
-                {canViewFinancialSections && (
-                <Card className="bg-transparent">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <IconCurrencyReal className="h-5 w-5" />
-                      Informações Financeiras
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Budget File */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                          Orçamento
-                        </label>
-                        <FileUploadField
-                          onFilesChange={handleBudgetFileChange}
-                          maxFiles={5}
-                          disabled={isSubmitting}
-                          showPreview={true}
-                          existingFiles={budgetFile}
-                          variant="compact"
-                          placeholder="Adicionar orçamentos"
-                          label=""
-                        />
-                      </div>
-
-                      {/* NFe File */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <IconFile className="h-4 w-4 text-muted-foreground" />
-                          Nota Fiscal
-                        </label>
-                        <FileUploadField
-                          onFilesChange={handleNfeFileChange}
-                          maxFiles={5}
-                          disabled={isSubmitting}
-                          showPreview={true}
-                          existingFiles={nfeFile}
-                          variant="compact"
-                          placeholder="Adicionar NFes"
-                          label=""
-                        />
-                      </div>
-
-                      {/* Receipt File */}
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center gap-2">
-                          <IconReceipt className="h-4 w-4 text-muted-foreground" />
-                          Recibo
-                        </label>
-                        <FileUploadField
-                          onFilesChange={handleReceiptFileChange}
-                          maxFiles={5}
-                          disabled={isSubmitting}
-                          showPreview={true}
-                          existingFiles={receiptFile}
-                          variant="compact"
-                          placeholder="Adicionar recibos"
-                          label=""
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                )}
-
                 {/* Budget Card - Only visible to ADMIN and FINANCIAL users */}
                 {canViewFinancialSections && (
                 <Card className="bg-transparent">
-                  <CardHeader>
+                  <CardHeader className={`transition-all duration-200 ${budgetCount === 0 ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <IconFileInvoice className="h-5 w-5" />
                         Orçamento Detalhado
                       </CardTitle>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          if (budgetSelectorRef.current) {
-                            budgetSelectorRef.current.addBudget();
-                          }
-                        }}
-                        disabled={isSubmitting}
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <IconPlus className="h-4 w-4" />
-                        Adicionar Orçamento ({budgetCount})
-                      </Button>
+                      {budgetCount === 0 ? (
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (budgetSelectorRef.current) {
+                              budgetSelectorRef.current.addBudget();
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Adicionar
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (budgetSelectorRef.current) {
+                              budgetSelectorRef.current.clearAll();
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover orçamento"
+                        >
+                          <IconX className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className={`transition-all duration-200 ${budgetCount === 0 ? "p-2" : ""}`}>
                     <BudgetSelector ref={budgetSelectorRef} control={form.control} disabled={isSubmitting} onBudgetCountChange={setBudgetCount} />
+                  </CardContent>
+                </Card>
+                )}
+
+                {/* Cut Plans Section - Multiple Cuts Support - EDITABLE for Designer, Hidden for Financial and Logistic users */}
+                {!isFinancialUser && !isLogisticUser && (
+                <Card className="bg-transparent">
+                  <CardHeader className={`transition-all duration-200 ${cutsCount === 0 ? "pt-3 pb-0" : ""}`}>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconScissors className="h-5 w-5" />
+                        Plano de Corte
+                      </CardTitle>
+                      {cutsCount === 0 ? (
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (multiCutSelectorRef.current) {
+                              multiCutSelectorRef.current.addCut();
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Adicionar
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (multiCutSelectorRef.current) {
+                              multiCutSelectorRef.current.clearAll();
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover todos os recortes"
+                        >
+                          <IconX className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className={`transition-all duration-200 ${cutsCount === 0 ? "p-2" : ""}`}>
+                    <MultiCutSelector ref={multiCutSelectorRef} control={form.control} disabled={isSubmitting} onCutsCountChange={setCutsCount} />
+                  </CardContent>
+                </Card>
+                )}
+
+                {/* Airbrushing Section - Multiple Airbrushings Support - Hidden for Warehouse, Financial, Designer, and Logistic users */}
+                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && (
+                <Card className="bg-transparent">
+                  <CardHeader className={`transition-all duration-200 ${airbrushingsCount === 0 ? "pt-3 pb-0" : ""}`}>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconSparkles className="h-5 w-5" />
+                        Aerografias
+                      </CardTitle>
+                      {airbrushingsCount === 0 ? (
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            if (multiAirbrushingSelectorRef.current) {
+                              multiAirbrushingSelectorRef.current.addAirbrushing();
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Adicionar
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (multiAirbrushingSelectorRef.current) {
+                              multiAirbrushingSelectorRef.current.clearAll();
+                            }
+                          }}
+                          disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover todas as aerografias"
+                        >
+                          <IconX className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className={`transition-all duration-200 ${airbrushingsCount === 0 ? "p-2" : ""}`}>
+                    <MultiAirbrushingSelector ref={multiAirbrushingSelectorRef} control={form.control} disabled={isSubmitting} onAirbrushingsCountChange={setAirbrushingsCount} />
+                  </CardContent>
+                </Card>
+                )}
+
+                {/* Financial Information Card - Only visible to ADMIN and FINANCIAL users */}
+                {canViewFinancialSections && (
+                <Card className="bg-transparent">
+                  <CardHeader className={`transition-all duration-200 ${!isFinancialInfoOpen ? "pt-3 pb-0" : ""}`}>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconCurrencyReal className="h-5 w-5" />
+                        Informações Financeiras
+                      </CardTitle>
+                      {!isFinancialInfoOpen ? (
+                        <Button
+                          type="button"
+                          onClick={() => setIsFinancialInfoOpen(true)}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Adicionar
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setIsFinancialInfoOpen(false);
+                            setBudgetFile([]);
+                            setNfeFile([]);
+                            setReceiptFile([]);
+                          }}
+                          disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover arquivos financeiros"
+                        >
+                          <IconX className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className={`transition-all duration-200 ${!isFinancialInfoOpen ? "p-2" : ""}`}>
+                    {isFinancialInfoOpen ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Budget File */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                              <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
+                              Orçamento
+                            </label>
+                            <FileUploadField
+                              onFilesChange={handleBudgetFileChange}
+                              maxFiles={5}
+                              disabled={isSubmitting}
+                              showPreview={true}
+                              existingFiles={budgetFile}
+                              variant="compact"
+                              placeholder="Adicionar orçamentos"
+                              label=""
+                            />
+                          </div>
+
+                          {/* NFe File */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                              <IconFile className="h-4 w-4 text-muted-foreground" />
+                              Nota Fiscal
+                            </label>
+                            <FileUploadField
+                              onFilesChange={handleNfeFileChange}
+                              maxFiles={5}
+                              disabled={isSubmitting}
+                              showPreview={true}
+                              existingFiles={nfeFile}
+                              variant="compact"
+                              placeholder="Adicionar NFes"
+                              label=""
+                            />
+                          </div>
+
+                          {/* Receipt File */}
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                              <IconReceipt className="h-4 w-4 text-muted-foreground" />
+                              Recibo
+                            </label>
+                            <FileUploadField
+                              onFilesChange={handleReceiptFileChange}
+                              maxFiles={5}
+                              disabled={isSubmitting}
+                              showPreview={true}
+                              existingFiles={receiptFile}
+                              variant="compact"
+                              placeholder="Adicionar recibos"
+                              label=""
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
                   </CardContent>
                 </Card>
                 )}
@@ -1982,7 +2188,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                 {/* Observation Section - Hidden for Warehouse, Financial, Designer, and Logistic users */}
                 {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && (
                 <Card className="bg-transparent">
-                  <CardHeader>
+                  <CardHeader className={`transition-all duration-200 ${!isObservationOpen ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <IconFile className="h-5 w-5" />
@@ -1997,26 +2203,28 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                           className="gap-2"
                         >
                           <IconPlus className="h-4 w-4" />
-                          Adicionar Observação
+                          Adicionar
                         </Button>
                       ) : (
                         <Button
                           type="button"
                           variant="ghost"
-                          size="sm"
+                          size="icon"
                           onClick={() => {
                             setIsObservationOpen(false);
                             form.setValue("observation", null, { shouldValidate: true, shouldDirty: true });
                             setObservationFiles([]);
                           }}
                           disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover observação"
                         >
-                          Remover
+                          <IconX className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className={`transition-all duration-200 ${!isObservationOpen ? "p-2" : ""}`}>
                     {isObservationOpen ? (
                       <div className="space-y-4">
                         <FormField
@@ -2075,68 +2283,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                         )}
                       </div>
                     ) : null}
-                  </CardContent>
-                </Card>
-                )}
-
-                {/* Cut Plans Section - Multiple Cuts Support - EDITABLE for Designer, Hidden for Financial and Logistic users */}
-                {!isFinancialUser && !isLogisticUser && (
-                <Card className="bg-transparent">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconScissors className="h-5 w-5" />
-                        Plano de Corte
-                      </CardTitle>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          if (multiCutSelectorRef.current) {
-                            multiCutSelectorRef.current.addCut();
-                          }
-                        }}
-                        disabled={isSubmitting || cutsCount >= 10}
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <IconPlus className="h-4 w-4" />
-                        Adicionar Recorte ({cutsCount}/10)
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <MultiCutSelector ref={multiCutSelectorRef} control={form.control} disabled={isSubmitting} onCutsCountChange={setCutsCount} />
-                  </CardContent>
-                </Card>
-                )}
-
-                {/* Airbrushing Section - Multiple Airbrushings Support - Hidden for Warehouse, Financial, Designer, and Logistic users */}
-                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && (
-                <Card className="bg-transparent">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
-                        <IconSparkles className="h-5 w-5" />
-                        Aerografias
-                      </CardTitle>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          if (multiAirbrushingSelectorRef.current) {
-                            multiAirbrushingSelectorRef.current.addAirbrushing();
-                          }
-                        }}
-                        disabled={isSubmitting || airbrushingsCount >= 10}
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <IconPlus className="h-4 w-4" />
-                        Adicionar Aerografia ({airbrushingsCount}/10)
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <MultiAirbrushingSelector ref={multiAirbrushingSelectorRef} control={form.control} disabled={isSubmitting} onAirbrushingsCountChange={setAirbrushingsCount} />
                   </CardContent>
                 </Card>
                 )}

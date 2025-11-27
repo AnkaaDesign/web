@@ -1135,8 +1135,9 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
         if (changelog.oldValue && typeof changelog.oldValue === "string") customerIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string") customerIds.add(changelog.newValue);
       } else if (changelog.field === "sectorId") {
-        if (changelog.oldValue && typeof changelog.oldValue === "string") sectorIds.add(changelog.oldValue);
-        if (changelog.newValue && typeof changelog.newValue === "string") sectorIds.add(changelog.newValue);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (changelog.oldValue && typeof changelog.oldValue === "string" && uuidRegex.test(changelog.oldValue)) sectorIds.add(changelog.oldValue);
+        if (changelog.newValue && typeof changelog.newValue === "string" && uuidRegex.test(changelog.newValue)) sectorIds.add(changelog.newValue);
       } else if (changelog.field === "paintId") {
         if (changelog.oldValue && typeof changelog.oldValue === "string") paintIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string") paintIds.add(changelog.newValue);

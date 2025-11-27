@@ -99,7 +99,7 @@ export function BonusForm({
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
             {/* Period Section */}
             <div className="space-y-4">
               <div>

@@ -239,7 +239,7 @@ export const CuttingDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <div className="animate-in fade-in-50 duration-500">
           <PageHeader
             variant="detail"
@@ -283,292 +283,287 @@ export const CuttingDetailsPage = () => {
             ]}
           />
         </div>
-
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            {/* Main Information Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Basic Info Card */}
-              <Card className="border-2 shadow-lg animate-in fade-in-50 duration-700">
-                <CardHeader className="pb-6">
-                  <div className="flex items-start justify-between">
+        {/* Main Information Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Basic Info Card */}
+          <Card className="border-2 shadow-lg animate-in fade-in-50 duration-700">
+            <CardHeader className="pb-6">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                    <IconScissors className="h-6 w-6 text-primary" />
+                    Informações Básicas
+                  </CardTitle>
+                  <CardDescription>Detalhes do processo de corte</CardDescription>
+                </div>
+                <Badge variant={getStatusBadgeVariant(cut.status as CUT_STATUS)} className="text-sm px-3 py-1">
+                  {CUT_STATUS_LABELS[cut.status as CUT_STATUS]}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column: Information */}
+                <div className="space-y-4">
+                  {/* Basic Information */}
+                  <div className="space-y-4">
+                    {/* Origin */}
                     <div className="space-y-1">
-                      <CardTitle className="text-2xl font-bold flex items-center gap-2">
-                        <IconScissors className="h-6 w-6 text-primary" />
-                        Informações Básicas
-                      </CardTitle>
-                      <CardDescription>Detalhes do processo de corte</CardDescription>
-                    </div>
-                    <Badge variant={getStatusBadgeVariant(cut.status as CUT_STATUS)} className="text-sm px-3 py-1">
-                      {CUT_STATUS_LABELS[cut.status as CUT_STATUS]}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Left Column: Information */}
-                    <div className="space-y-4">
-                      {/* Basic Information */}
-                      <div className="space-y-4">
-                        {/* Origin */}
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <IconArrowBack className="h-4 w-4" />
-                            <span>Origem</span>
-                          </div>
-                          <p className="font-semibold">{CUT_ORIGIN_LABELS[cut.origin as CUT_ORIGIN]}</p>
-                        </div>
-
-                        {/* Type */}
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <IconHash className="h-4 w-4" />
-                            <span>Tipo</span>
-                          </div>
-                          <p className="font-semibold">{CUT_TYPE_LABELS[cut.type as CUT_TYPE]}</p>
-                        </div>
-
-                        {/* Duration */}
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <IconClock className="h-4 w-4" />
-                            <span>Tempo de Execução</span>
-                          </div>
-                          <p className="font-semibold">{getDuration() || "Não iniciado"}</p>
-                        </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <IconArrowBack className="h-4 w-4" />
+                        <span>Origem</span>
                       </div>
-
-                      {/* Recut Reason */}
-                      {cut.reason && (
-                        <>
-                          <Separator />
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <IconAlertCircle className="h-4 w-4 text-orange-500" />
-                              <span>Motivo do Retrabalho</span>
-                            </div>
-                            <p className="font-semibold text-orange-600">{CUT_REQUEST_REASON_LABELS[cut.reason as CUT_REQUEST_REASON]}</p>
-                          </div>
-                        </>
-                      )}
-
-                      {/* Parent Cut (if recut) */}
-                      {cut.parentCut && (
-                        <>
-                          <Separator />
-                          <div className="rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 space-y-3">
-                            <div className="flex items-center gap-2 text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                              <IconReload className="h-4 w-4" />
-                              <span>Este é um Retrabalho</span>
-                            </div>
-                            <div className="flex items-start justify-between">
-                              <div className="space-y-1">
-                                <p className="font-semibold">{cut.parentCut.file?.filename || "Recorte Original"}</p>
-                                <p className="text-sm text-muted-foreground">Criado em {formatDate(cut.parentCut.createdAt)}</p>
-                              </div>
-                              <Button variant="outline" size="sm" onClick={() => navigate(routes.production.cutting.details(cut.parentCut!.id))}>
-                                Ver Original
-                                <IconExternalLink className="h-4 w-4 ml-2" />
-                              </Button>
-                            </div>
-                          </div>
-                        </>
-                      )}
+                      <p className="font-semibold">{CUT_ORIGIN_LABELS[cut.origin as CUT_ORIGIN]}</p>
                     </div>
 
-                    {/* Right Column: File Preview */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                        <IconFile className="h-4 w-4" />
-                        <span>Arquivo de Corte</span>
+                    {/* Type */}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <IconHash className="h-4 w-4" />
+                        <span>Tipo</span>
                       </div>
-                      {cut.file ? (
-                        <div className="flex justify-center lg:justify-start">
-                          <FileItem
-                            file={cut.file}
-                            viewMode="grid"
-                          />
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-lg">
-                          <IconFile className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                          <p>Nenhum arquivo associado</p>
-                        </div>
-                      )}
+                      <p className="font-semibold">{CUT_TYPE_LABELS[cut.type as CUT_TYPE]}</p>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
 
-              {/* Task Information Card */}
-              <Card className="border-2 shadow-lg animate-in fade-in-50 duration-800">
-                <CardHeader className="pb-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-2xl font-bold flex items-center gap-2">
-                        <IconClipboardList className="h-6 w-6 text-primary" />
-                        Informações da Tarefa
-                      </CardTitle>
-                      <CardDescription>Detalhes da tarefa relacionada</CardDescription>
+                    {/* Duration */}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <IconClock className="h-4 w-4" />
+                        <span>Tempo de Execução</span>
+                      </div>
+                      <p className="font-semibold">{getDuration() || "Não iniciado"}</p>
                     </div>
-                    {cut.task && (
-                      <Button variant="ghost" size="sm" onClick={() => navigate(routes.production.schedule.details(cut.task!.id))} className="text-xs">
-                        <IconExternalLink className="h-3 w-3 mr-1" />
-                        Ver detalhes
-                      </Button>
-                    )}
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {cut.task ? (
+
+                  {/* Recut Reason */}
+                  {cut.reason && (
                     <>
-                      {/* Task Details */}
-                      <div className="space-y-3">
-                        <div className="space-y-1">
-                          <p className="text-sm text-muted-foreground">Nome da Tarefa</p>
-                          <p className="font-semibold text-lg">{cut.task.name}</p>
+                      <Separator />
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <IconAlertCircle className="h-4 w-4 text-orange-500" />
+                          <span>Motivo do Retrabalho</span>
                         </div>
-
-                        {cut.task.customer && (
-                          <div className="space-y-1">
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
-                              <IconUser className="h-3 w-3" />
-                              Cliente
-                            </p>
-                            <p className="font-semibold">{cut.task.customer.fantasyName}</p>
-                          </div>
-                        )}
-
-                        {cut.task.sector && (
-                          <div className="space-y-1">
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
-                              <IconBuildingFactory className="h-3 w-3" />
-                              Setor
-                            </p>
-                            <p className="font-semibold">{cut.task.sector.name}</p>
-                          </div>
-                        )}
+                        <p className="font-semibold text-orange-600">{CUT_REQUEST_REASON_LABELS[cut.reason as CUT_REQUEST_REASON]}</p>
                       </div>
-
-                      {/* Other Cuts from Same Task */}
-                      {otherTaskCuts.length > 0 && (
-                        <>
-                          <Separator />
-                          <div className="space-y-3">
-                            <h4 className="font-semibold text-sm flex items-center gap-2">
-                              <IconScissors className="h-4 w-4" />
-                              Outros Recortes da Mesma Tarefa
-                              <Badge variant="secondary" className="ml-1">
-                                {otherTaskCuts.length}
-                              </Badge>
-                            </h4>
-                            <div className="space-y-2 max-h-48 overflow-y-auto">
-                              {otherTaskCuts.map((otherCut) => (
-                                <div
-                                  key={otherCut.id}
-                                  className="flex items-center justify-between p-2 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
-                                  onClick={() => navigate(routes.production.cutting.details(otherCut.id))}
-                                >
-                                  <div className="flex items-center gap-2 flex-1">
-                                    <IconFile className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm font-medium truncate">{otherCut.file?.filename || "Sem nome"}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant={getStatusBadgeVariant(otherCut.status as CUT_STATUS)} className="text-xs">
-                                      {CUT_STATUS_LABELS[otherCut.status as CUT_STATUS]}
-                                    </Badge>
-                                    <IconChevronRight className="h-4 w-4 text-muted-foreground" />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </>
-                      )}
                     </>
+                  )}
+
+                  {/* Parent Cut (if recut) */}
+                  {cut.parentCut && (
+                    <>
+                      <Separator />
+                      <div className="rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 space-y-3">
+                        <div className="flex items-center gap-2 text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                          <IconReload className="h-4 w-4" />
+                          <span>Este é um Retrabalho</span>
+                        </div>
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <p className="font-semibold">{cut.parentCut.file?.filename || "Recorte Original"}</p>
+                            <p className="text-sm text-muted-foreground">Criado em {formatDate(cut.parentCut.createdAt)}</p>
+                          </div>
+                          <Button variant="outline" size="sm" onClick={() => navigate(routes.production.cutting.details(cut.parentCut!.id))}>
+                            Ver Original
+                            <IconExternalLink className="h-4 w-4 ml-2" />
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Right Column: File Preview */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                    <IconFile className="h-4 w-4" />
+                    <span>Arquivo de Corte</span>
+                  </div>
+                  {cut.file ? (
+                    <div className="flex justify-center lg:justify-start">
+                      <FileItem
+                        file={cut.file}
+                        viewMode="grid"
+                      />
+                    </div>
                   ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <IconClipboardList className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>Nenhuma tarefa associada</p>
+                    <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-lg">
+                      <IconFile className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                      <p>Nenhum arquivo associado</p>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Child Cuts and Changelog Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Child Cuts (Recuts) Section */}
-              {cut.childCuts && cut.childCuts.length > 0 && (
-                <Card className="border shadow-md animate-in fade-in-50 duration-900">
-                  <CardHeader>
-                    <CardTitle className="text-lg font-bold flex items-center gap-2">
-                      <IconReload className="h-5 w-5 text-primary" />
-                      Retrabalhos Realizados
-                      <Badge variant="secondary" className="ml-2">
-                        {cut.childCuts.length}
-                      </Badge>
-                    </CardTitle>
-                    <CardDescription>Histórico de retrabalhos baseados neste corte</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {cut.childCuts.map((childCut) => (
-                        <div
-                          key={childCut.id}
-                          className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
-                          onClick={() => navigate(routes.production.cutting.details(childCut.id))}
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <IconScissors className="h-4 w-4 text-muted-foreground" />
-                              <h4 className="font-semibold text-sm">{childCut.file?.filename || "Recorte"}</h4>
-                            </div>
-                            <Badge variant={getStatusBadgeVariant(childCut.status as CUT_STATUS)} className="text-xs">
-                              {CUT_STATUS_LABELS[childCut.status as CUT_STATUS]}
-                            </Badge>
-                          </div>
-
-                          {childCut.reason && (
-                            <div className="flex items-center gap-1 mb-2">
-                              <IconAlertCircle className="h-3 w-3 text-orange-500" />
-                              <span className="text-xs text-orange-600">{CUT_REQUEST_REASON_LABELS[childCut.reason as CUT_REQUEST_REASON]}</span>
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>Criado {formatRelativeTime(childCut.createdAt)}</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(routes.production.cutting.details(childCut.id));
-                              }}
-                            >
-                              Ver Detalhes
-                              <IconChevronRight className="h-3 w-3 ml-1" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Changelog Section */}
-              <div className={cn("animate-in fade-in-50 duration-1000", !cut.childCuts || cut.childCuts.length === 0 ? "lg:col-span-2" : "")}>
-                <ChangelogHistory
-                  entityType={CHANGE_LOG_ENTITY_TYPE.CUT}
-                  entityId={cut.id}
-                  entityName={cut.file?.filename || "Recorte"}
-                  entityCreatedAt={cut.createdAt}
-                  maxHeight="400px"
-                />
+                </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
+
+          {/* Task Information Card */}
+          <Card className="border-2 shadow-lg animate-in fade-in-50 duration-800">
+            <CardHeader className="pb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                    <IconClipboardList className="h-6 w-6 text-primary" />
+                    Informações da Tarefa
+                  </CardTitle>
+                  <CardDescription>Detalhes da tarefa relacionada</CardDescription>
+                </div>
+                {cut.task && (
+                  <Button variant="ghost" size="sm" onClick={() => navigate(routes.production.schedule.details(cut.task!.id))} className="text-xs">
+                    <IconExternalLink className="h-3 w-3 mr-1" />
+                    Ver detalhes
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {cut.task ? (
+                <>
+                  {/* Task Details */}
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <p className="text-sm text-muted-foreground">Nome da Tarefa</p>
+                      <p className="font-semibold text-lg">{cut.task.name}</p>
+                    </div>
+
+                    {cut.task.customer && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <IconUser className="h-3 w-3" />
+                          Cliente
+                        </p>
+                        <p className="font-semibold">{cut.task.customer.fantasyName}</p>
+                      </div>
+                    )}
+
+                    {cut.task.sector && (
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <IconBuildingFactory className="h-3 w-3" />
+                          Setor
+                        </p>
+                        <p className="font-semibold">{cut.task.sector.name}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Other Cuts from Same Task */}
+                  {otherTaskCuts.length > 0 && (
+                    <>
+                      <Separator />
+                      <div className="space-y-3">
+                        <h4 className="font-semibold text-sm flex items-center gap-2">
+                          <IconScissors className="h-4 w-4" />
+                          Outros Recortes da Mesma Tarefa
+                          <Badge variant="secondary" className="ml-1">
+                            {otherTaskCuts.length}
+                          </Badge>
+                        </h4>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {otherTaskCuts.map((otherCut) => (
+                            <div
+                              key={otherCut.id}
+                              className="flex items-center justify-between p-2 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer"
+                              onClick={() => navigate(routes.production.cutting.details(otherCut.id))}
+                            >
+                              <div className="flex items-center gap-2 flex-1">
+                                <IconFile className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-sm font-medium truncate">{otherCut.file?.filename || "Sem nome"}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={getStatusBadgeVariant(otherCut.status as CUT_STATUS)} className="text-xs">
+                                  {CUT_STATUS_LABELS[otherCut.status as CUT_STATUS]}
+                                </Badge>
+                                <IconChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <IconClipboardList className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Nenhuma tarefa associada</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Child Cuts and Changelog Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Child Cuts (Recuts) Section */}
+          {cut.childCuts && cut.childCuts.length > 0 && (
+            <Card className="border shadow-md animate-in fade-in-50 duration-900">
+              <CardHeader>
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <IconReload className="h-5 w-5 text-primary" />
+                  Retrabalhos Realizados
+                  <Badge variant="secondary" className="ml-2">
+                    {cut.childCuts.length}
+                  </Badge>
+                </CardTitle>
+                <CardDescription>Histórico de retrabalhos baseados neste corte</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {cut.childCuts.map((childCut) => (
+                    <div
+                      key={childCut.id}
+                      className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => navigate(routes.production.cutting.details(childCut.id))}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <IconScissors className="h-4 w-4 text-muted-foreground" />
+                          <h4 className="font-semibold text-sm">{childCut.file?.filename || "Recorte"}</h4>
+                        </div>
+                        <Badge variant={getStatusBadgeVariant(childCut.status as CUT_STATUS)} className="text-xs">
+                          {CUT_STATUS_LABELS[childCut.status as CUT_STATUS]}
+                        </Badge>
+                      </div>
+
+                      {childCut.reason && (
+                        <div className="flex items-center gap-1 mb-2">
+                          <IconAlertCircle className="h-3 w-3 text-orange-500" />
+                          <span className="text-xs text-orange-600">{CUT_REQUEST_REASON_LABELS[childCut.reason as CUT_REQUEST_REASON]}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Criado {formatRelativeTime(childCut.createdAt)}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(routes.production.cutting.details(childCut.id));
+                          }}
+                        >
+                          Ver Detalhes
+                          <IconChevronRight className="h-3 w-3 ml-1" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Changelog Section */}
+          <div className={cn("animate-in fade-in-50 duration-1000", !cut.childCuts || cut.childCuts.length === 0 ? "lg:col-span-2" : "")}>
+            <ChangelogHistory
+              entityType={CHANGE_LOG_ENTITY_TYPE.CUT}
+              entityId={cut.id}
+              entityName={cut.file?.filename || "Recorte"}
+              entityCreatedAt={cut.createdAt}
+              maxHeight="400px"
+            />
           </div>
         </div>
 

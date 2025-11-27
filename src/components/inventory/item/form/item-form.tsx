@@ -276,7 +276,7 @@ export function ItemForm(props: ItemFormProps) {
   return (
     <div className="h-full overflow-y-auto p-6">
       <FormProvider {...form}>
-        <form id="item-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <form id="item-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
           {/* Hidden submit button for programmatic form submission */}
           <button id="item-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
             Submit

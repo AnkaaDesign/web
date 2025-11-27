@@ -192,7 +192,7 @@ export function DiscountForm({
   return (
     <div className={`space-y-6 ${className}`}>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
           {/* Preset Selection */}
           {!isEditing && (
             <Card>

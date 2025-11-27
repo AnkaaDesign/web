@@ -30,7 +30,7 @@ export function NameInput({ disabled }: NameInputProps) {
               typewriterPlaceholder={false}
               naturalTyping={false}
               typingSpeed={40}
-              transparent
+              transparent={true}
             />
           </FormControl>
           <FormMessage />

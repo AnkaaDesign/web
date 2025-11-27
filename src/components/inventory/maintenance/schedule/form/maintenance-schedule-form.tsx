@@ -250,7 +250,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
     <Card className="h-full flex flex-col shadow-sm border border-border overflow-hidden">
       <div className="flex-1 overflow-y-auto p-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
             {/* Hidden submit button for programmatic form submission */}
             <button type="submit" id="maintenance-schedule-form-submit" className="hidden" aria-hidden="true" />
 

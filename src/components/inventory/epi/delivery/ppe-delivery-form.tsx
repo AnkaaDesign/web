@@ -132,7 +132,7 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
     <Card className="shadow-sm border border-border">
       <CardContent className="p-6">
         <Form {...form}>
-          <form id="ppe-delivery-form" onSubmit={form.handleSubmit(handleSubmit, handleError)} className="space-y-6">
+          <form id="ppe-delivery-form" onSubmit={form.handleSubmit(handleSubmit, handleError)} className="space-y-8">
             {/* Hidden submit button for programmatic form submission */}
             <button type="submit" id="ppe-delivery-form-submit" className="hidden" aria-hidden="true" />
               {/* Multi Delivery Input (only for create mode) */}

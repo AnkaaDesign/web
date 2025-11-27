@@ -209,15 +209,32 @@ export function UserForm(props: UserFormProps) {
     }
   }, [form, mode]);
 
-  // Debug validation errors in development
+  // Debug validation errors in development - only log on user interaction
   useEffect(() => {
-    if (process.env.NODE_ENV === "development" && Object.keys(errors).length > 0) {
-      console.log("User form validation errors:", {
-        errors,
-        currentValues: form.getValues(),
+    if (process.env.NODE_ENV === "development") {
+      console.log("[UserForm] Form state:", {
+        isValid,
+        isDirty,
+        hasErrors: Object.keys(errors).length > 0,
+        errors: Object.keys(errors).length > 0 ? errors : undefined,
+        errorFields: Object.keys(errors),
+        dirtyFields: Object.keys(form.formState.dirtyFields),
+        touchedFields: Object.keys(form.formState.touchedFields),
       });
     }
-  }, [errors, form]);
+  }, [errors, isValid, isDirty, form.formState.dirtyFields, form.formState.touchedFields]);
+
+  // One-time validation check on mount
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development" && mode === "update") {
+      const timer = setTimeout(() => {
+        form.trigger().then((result) => {
+          console.log("[UserForm] Initial validation result:", result, "errors:", form.formState.errors);
+        });
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // Track dirty state without triggering validation
   useEffect(() => {
@@ -299,7 +316,7 @@ export function UserForm(props: UserFormProps) {
   return (
     <div className="h-full overflow-y-auto p-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           {/* Avatar Upload */}
           <Card className="bg-transparent">
             <CardHeader>

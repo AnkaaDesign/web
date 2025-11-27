@@ -108,7 +108,7 @@ export function PriceEditForm({ priceId, onSuccess, onCancel }: PriceEditFormPro
         </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             {/* Price Value */}
             <FormInput type="currency" name="value" label="Novo Valor do Preço" placeholder="R$ 0,00" required />
 

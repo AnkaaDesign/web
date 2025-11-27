@@ -72,7 +72,7 @@ export const AirbrushingDetails = () => {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="flex flex-col h-full space-y-6">
+        <div className="space-y-6">
           <PageHeader
             variant="detail"
             title="Carregando..."
@@ -84,20 +84,16 @@ export const AirbrushingDetails = () => {
               { label: "Detalhes" },
             ]}
           />
-          <div className="flex-1 overflow-y-auto">
-            <div className="space-y-6">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <Skeleton className="h-8 w-1/3" />
-                    <Skeleton className="h-4 w-1/2" />
-                    <Skeleton className="h-4 w-2/3" />
-                    <Skeleton className="h-32 w-full" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <Skeleton className="h-8 w-1/3" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-32 w-full" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </PrivilegeRoute>
     );
@@ -107,7 +103,7 @@ export const AirbrushingDetails = () => {
   if (isError || !airbrushing) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="flex flex-col h-full space-y-6">
+        <div className="space-y-6">
           <PageHeader
             variant="detail"
             title="Aerografia não encontrada"
@@ -119,20 +115,16 @@ export const AirbrushingDetails = () => {
               { label: "Detalhes" },
             ]}
           />
-          <div className="flex-1 overflow-y-auto">
-            <div className="space-y-6">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="text-center">
-                    <div className="p-4 rounded-lg bg-red-50 border border-red-200">
-                      <p className="text-red-800 font-medium">Aerografia não encontrada</p>
-                      <p className="text-red-600 text-sm mt-1">A aerografia solicitada não existe ou você não tem permissão para acessá-la.</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center">
+                <div className="p-4 rounded-lg bg-red-50 border border-red-200">
+                  <p className="text-red-800 font-medium">Aerografia não encontrada</p>
+                  <p className="text-red-600 text-sm mt-1">A aerografia solicitada não existe ou você não tem permissão para acessá-la.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </PrivilegeRoute>
     );
@@ -140,7 +132,7 @@ export const AirbrushingDetails = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           title="Aerografia"
@@ -168,11 +160,7 @@ export const AirbrushingDetails = () => {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            <AirbrushingInfoCard airbrushing={airbrushing as any} />
-          </div>
-        </div>
+        <AirbrushingInfoCard airbrushing={airbrushing as any} />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

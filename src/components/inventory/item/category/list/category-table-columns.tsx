@@ -52,10 +52,14 @@ export function useCategoryTableColumns(): CategoryColumn[] {
       {
         key: "_count.items",
         header: "QTD. PRODUTOS",
-        accessor: (category: ItemCategory) => <div className="truncate">{(category as any)._count?.items || 0}</div>,
+        accessor: (category: ItemCategory) => (
+          <Badge variant="default" className="w-10 justify-center">
+            {(category as any)._count?.items || 0}
+          </Badge>
+        ),
         sortable: true,
         className: "flex-1",
-        align: "left",
+        align: "center",
       },
       {
         key: "actions",

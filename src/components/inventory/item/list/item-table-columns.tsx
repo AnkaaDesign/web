@@ -89,7 +89,7 @@ export const createItemColumns = (): ItemColumn[] => [
   },
   {
     key: "quantity",
-    header: "QUANTIDADE",
+    header: "QNT",
     accessor: (item: Item) => (
       <div className="flex">
         <StockStatusIndicator item={item} showQuantity={true} />
@@ -262,11 +262,9 @@ export const createItemColumns = (): ItemColumn[] => [
     key: "activitiesCount",
     header: "ATIVIDADES",
     accessor: (item: Item) => (
-      <div className="text-center">
-        <Badge variant="outline" className="font-mono">
-          {(item as any)._count?.activities || 0}
-        </Badge>
-      </div>
+      <Badge variant="default" className="w-10 justify-center">
+        {(item as any)._count?.activities || 0}
+      </Badge>
     ),
     sortable: false,
     className: "w-24",

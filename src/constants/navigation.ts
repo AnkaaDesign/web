@@ -525,14 +525,14 @@ export const NAVIGATION_MENU: MenuItem[] = [
     ],
   },
 
-  // CATÁLOGO
+  // CATÁLOGO - View-only for Leaders and Designers (separate from Pintura module)
   {
     id: "catalogo",
     title: "Catálogo",
     icon: "palette",
     path: "/pintura/catalogo-basico",
-    requiredPrivilege: [SECTOR_PRIVILEGES.LEADER],
-    children: [{ id: "catalogo-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/catalogo-basico/detalhes/:id", isDynamic: true }],
+    requiredPrivilege: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.DESIGNER],
+    children: [{ id: "catalogo-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/catalogo/detalhes/:id", isDynamic: true }],
   },
 
   // ESTATÍSTICAS
@@ -768,36 +768,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
     ],
   },
 
-  // INTEGRAÇÕES
-  {
-    id: "integracoes",
-    title: "Integrações",
-    icon: "api",
-    path: "/integracoes",
-    requiredPrivilege: SECTOR_PRIVILEGES.LEADER,
-    children: [
-      {
-        id: "integracoes-secullum",
-        title: "Secullum",
-        icon: "database",
-        path: "/integracoes/secullum",
-        children: [
-          { id: "integracoes-secullum-calculos", title: "Cálculos de Ponto", icon: "calculator", path: "/integracoes/secullum/calculos" },
-          {
-            id: "integracoes-secullum-registros-ponto",
-            title: "Registros de Ponto",
-            icon: "clock",
-            path: "/integracoes/secullum/registros-ponto",
-            children: [
-              { id: "integracoes-secullum-registros-ponto-detalhes", title: "Detalhes", icon: "eye", path: "/integracoes/secullum/registros-ponto/detalhes/:id", isDynamic: true },
-            ],
-          },
-          { id: "integracoes-secullum-status-sincronizacao", title: "Status de Sincronização", icon: "refresh", path: "/integracoes/secullum/status-sincronizacao" },
-        ],
-      },
-    ],
-  },
-
   // MANUTENÇÃO
   {
     id: "manutencao",
@@ -882,7 +852,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Catálogo",
         icon: "palette",
         path: "/pintura/catalogo",
-        requiredPrivilege: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
+        requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
         children: [
           { id: "catalogo-cadastrar", title: "Cadastrar", icon: "plus", path: "/pintura/catalogo/cadastrar", requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN] },
           {
@@ -945,6 +915,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Aerografia",
         icon: "paintBrush",
         path: "/producao/aerografia",
+        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN], // LEADER excluded from airbrushing
         children: [
           { id: "aerografia-cadastrar", title: "Cadastrar", icon: "plus", path: "/producao/aerografia/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
           { id: "aerografia-detalhes", title: "Detalhes", icon: "eye", path: "/producao/aerografia/detalhes/:id", isDynamic: true },

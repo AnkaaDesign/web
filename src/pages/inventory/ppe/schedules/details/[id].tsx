@@ -245,7 +245,7 @@ const EPIScheduleDetails = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         {/* Header */}
         <div className="animate-in fade-in-50 duration-500">
           <PageHeader
@@ -282,20 +282,15 @@ const EPIScheduleDetails = () => {
           />
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="animate-in fade-in-50 duration-700 space-y-6">
-            {/* First Row: Info and Items (1/2 each) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <PpeScheduleInfoCard schedule={ppeSchedule} className="h-full" />
-              <PpeScheduleItemsCard schedule={ppeSchedule} className="h-full" />
-            </div>
+        {/* First Row: Info and Items (1/2 each) */}
+        <div className="animate-in fade-in-50 duration-700 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <PpeScheduleInfoCard schedule={ppeSchedule} className="h-full" />
+          <PpeScheduleItemsCard schedule={ppeSchedule} className="h-full" />
+        </div>
 
-            {/* Second Row: Deliveries (full width) */}
-            <div className="grid grid-cols-1 gap-6">
-              <PpeScheduleDeliveriesCard scheduleId={ppeSchedule.id} className="h-full" />
-            </div>
-          </div>
+        {/* Second Row: Deliveries (full width) */}
+        <div className="grid grid-cols-1 gap-6">
+          <PpeScheduleDeliveriesCard scheduleId={ppeSchedule.id} className="h-full" />
         </div>
 
         {/* Activate Dialog */}

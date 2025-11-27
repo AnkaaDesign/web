@@ -137,7 +137,7 @@ export function PayrollForm({
   return (
     <div className={`space-y-6 ${className}`}>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
           {/* Header */}
           <div className="flex items-center justify-between">
             <div>

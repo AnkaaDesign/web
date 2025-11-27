@@ -226,7 +226,7 @@ export function CutForm({ cutId, fileId, taskId, parentCutId, mode, onSuccess, o
   return (
     <div className={className}>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
           {/* Header with cut info */}
           {mode === "edit" && existingCut && (
             <div className="space-y-4">

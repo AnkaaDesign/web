@@ -172,7 +172,7 @@ export function CutPlanForm({ fileId, fileName, taskId, taskName, onSuccess, onC
 
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
             {/* File selection - only if not provided */}
             {!fileId && (
               <FormField

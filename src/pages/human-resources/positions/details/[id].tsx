@@ -111,7 +111,7 @@ export const PositionDetailPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           entity={position}
@@ -146,24 +146,20 @@ export const PositionDetailPage = () => {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            {/* Info Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <SpecificationsCard position={position} />
-              <RemunerationHistoryCard position={position} />
-            </div>
+        {/* Info Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SpecificationsCard position={position} />
+          <RemunerationHistoryCard position={position} />
+        </div>
 
-            {/* Changelog - Single column */}
-            <div className="grid grid-cols-1 gap-6">
-              <ChangelogHistory entityType={"POSITION" as any} entityId={id} entityName={position.name} entityCreatedAt={position.createdAt} maxHeight="500px" />
-            </div>
+        {/* Changelog - Single column */}
+        <div className="grid grid-cols-1 gap-6">
+          <ChangelogHistory entityType={"POSITION" as any} entityId={id} entityName={position.name} entityCreatedAt={position.createdAt} maxHeight="500px" />
+        </div>
 
-            {/* Related Users - Full width, last section */}
-            <div className="grid grid-cols-1 gap-6">
-              <RelatedUsersCard position={position} />
-            </div>
-          </div>
+        {/* Related Users - Full width, last section */}
+        <div className="grid grid-cols-1 gap-6">
+          <RelatedUsersCard position={position} />
         </div>
 
         {/* Delete Confirmation Dialog */}

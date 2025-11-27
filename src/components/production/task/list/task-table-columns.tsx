@@ -192,8 +192,6 @@ export const createTaskColumns = (): TaskColumn[] => [
     filterable: false,
     defaultVisible: true,
     width: "100px",
-    className: "text-center",
-    headerClassName: "text-center",
     formatter: (_: any, row: Task) => renderServiceCount(row),
   },
   {
@@ -336,8 +334,6 @@ export const createTaskColumns = (): TaskColumn[] => [
     filterable: true,
     defaultVisible: false,
     width: "80px",
-    className: "text-center",
-    headerClassName: "text-center",
     formatter: (_value: boolean, row: Task) => {
       const count = row.artworks?.length || 0;
       if (count === 0) return <span className="text-muted-foreground">-</span>;
@@ -356,8 +352,6 @@ export const createTaskColumns = (): TaskColumn[] => [
     filterable: true,
     defaultVisible: false,
     width: "60px",
-    className: "text-center",
-    headerClassName: "text-center",
     formatter: (value: boolean) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
       return <IconAlertCircle className="h-4 w-4 text-yellow-500" />;

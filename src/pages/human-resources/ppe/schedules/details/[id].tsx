@@ -160,7 +160,7 @@ export function PPEScheduleDetailsPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         {/* Header */}
         <div className="animate-in fade-in-50 duration-500">
           <PageHeader
@@ -205,128 +205,124 @@ export function PPEScheduleDetailsPage() {
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            {/* Content Grid */}
-            <div className="animate-in fade-in-50 duration-700 space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Basic Information Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Informações Gerais</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Status</span>
-                      <Badge variant={ppeSchedule.data.isActive ? "success" : "secondary"}>{ppeSchedule.data.isActive ? "Ativo" : "Inativo"}</Badge>
+        {/* Content Grid */}
+        <div className="animate-in fade-in-50 duration-700 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Basic Information Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Informações Gerais</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Status</span>
+                  <Badge variant={ppeSchedule.data.isActive ? "success" : "secondary"}>{ppeSchedule.data.isActive ? "Ativo" : "Inativo"}</Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Frequência</span>
+                  <span className="text-sm font-medium">{SCHEDULE_FREQUENCY_LABELS[ppeSchedule.data.frequency] || ppeSchedule.data.frequency}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Frequência de Repetição</span>
+                  <span className="text-sm font-medium">{ppeSchedule.data.frequencyCount}x</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Tipo de Atribuição</span>
+                  <span className="text-sm font-medium">{ASSIGNMENT_TYPE_LABELS[ppeSchedule.data.assignmentType] || ppeSchedule.data.assignmentType}</span>
+                </div>
+                {ppeSchedule.data.ppeItems && ppeSchedule.data.ppeItems.length > 0 && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">EPIs</span>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {ppeSchedule.data.ppeItems.map((ppe: PpeScheduleItem, index: number) => (
+                        <Badge key={`${ppe.ppeType}-${index}`} variant="outline">
+                          {ppe.ppeType} (Qtd: {ppe.quantity})
+                        </Badge>
+                      ))}
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Frequência</span>
-                      <span className="text-sm font-medium">{SCHEDULE_FREQUENCY_LABELS[ppeSchedule.data.frequency] || ppeSchedule.data.frequency}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Frequência de Repetição</span>
-                      <span className="text-sm font-medium">{ppeSchedule.data.frequencyCount}x</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Tipo de Atribuição</span>
-                      <span className="text-sm font-medium">{ASSIGNMENT_TYPE_LABELS[ppeSchedule.data.assignmentType] || ppeSchedule.data.assignmentType}</span>
-                    </div>
-                    {ppeSchedule.data.ppeItems && ppeSchedule.data.ppeItems.length > 0 && (
-                      <div>
-                        <span className="text-sm text-muted-foreground">EPIs</span>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {ppeSchedule.data.ppeItems.map((ppe: PpeScheduleItem, index: number) => (
-                            <Badge key={`${ppe.ppeType}-${index}`} variant="outline">
-                              {ppe.ppeType} (Qtd: {ppe.quantity})
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Schedule Configuration Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Configuração do Agendamento</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {ppeSchedule.data.specificDate && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Data Específica</span>
-                        <span className="text-sm font-medium">{new Date(ppeSchedule.data.specificDate).toLocaleDateString("pt-BR")}</span>
-                      </div>
-                    )}
-                    {ppeSchedule.data.dayOfWeek !== null && ppeSchedule.data.dayOfWeek !== undefined && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Dia da Semana</span>
-                        <span className="text-sm font-medium">{["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][Number(ppeSchedule.data.dayOfWeek)]}</span>
-                      </div>
-                    )}
-                    {ppeSchedule.data.dayOfMonth !== null && ppeSchedule.data.dayOfMonth !== undefined && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Dia do Mês</span>
-                        <span className="text-sm font-medium">{ppeSchedule.data.dayOfMonth}</span>
-                      </div>
-                    )}
-                    {ppeSchedule.data.month !== null && ppeSchedule.data.month !== undefined && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">Mês</span>
-                        <span className="text-sm font-medium">
-                          {["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"][Number(ppeSchedule.data.month)]}
-                        </span>
-                      </div>
-                    )}
-                    {ppeSchedule.data.customMonths && ppeSchedule.data.customMonths.length > 0 && (
-                      <div>
-                        <span className="text-sm text-muted-foreground">Meses Personalizados</span>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {ppeSchedule.data.customMonths.map((month: MONTH) => (
-                            <Badge key={month} variant="outline">
-                              {["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"][Number(month)]}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Deliveries Summary Card */}
-                {ppeSchedule.data.deliveries && ppeSchedule.data.deliveries.length > 0 && (
-                  <Card className="lg:col-span-2">
-                    <CardHeader>
-                      <CardTitle>Últimas Entregas</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {ppeSchedule.data.deliveries.slice(0, 5).map((delivery: PpeDelivery) => (
-                          <div key={delivery.id} className="flex items-center justify-between p-4 border rounded-lg">
-                            <div className="space-y-1">
-                              <p className="text-sm font-medium">{delivery.item?.name || "Item não especificado"}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {delivery.user?.name || "Usuário não especificado"} - Qtd: {delivery.quantity}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm text-muted-foreground">
-                                {delivery.scheduledDate ? new Date(delivery.scheduledDate).toLocaleDateString("pt-BR") : "Não agendado"}
-                              </p>
-                              <Badge variant="outline">{PPE_DELIVERY_STATUS_LABELS[delivery.status] || delivery.status}</Badge>
-                            </div>
-                          </div>
-                        ))}
-                        {ppeSchedule.data.deliveries.length > 5 && (
-                          <p className="text-sm text-muted-foreground text-center">E mais {ppeSchedule.data.deliveries.length - 5} entregas...</p>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+                  </div>
                 )}
-              </div>
-            </div>
+              </CardContent>
+            </Card>
+
+            {/* Schedule Configuration Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Configuração do Agendamento</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {ppeSchedule.data.specificDate && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Data Específica</span>
+                    <span className="text-sm font-medium">{new Date(ppeSchedule.data.specificDate).toLocaleDateString("pt-BR")}</span>
+                  </div>
+                )}
+                {ppeSchedule.data.dayOfWeek !== null && ppeSchedule.data.dayOfWeek !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Dia da Semana</span>
+                    <span className="text-sm font-medium">{["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][Number(ppeSchedule.data.dayOfWeek)]}</span>
+                  </div>
+                )}
+                {ppeSchedule.data.dayOfMonth !== null && ppeSchedule.data.dayOfMonth !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Dia do Mês</span>
+                    <span className="text-sm font-medium">{ppeSchedule.data.dayOfMonth}</span>
+                  </div>
+                )}
+                {ppeSchedule.data.month !== null && ppeSchedule.data.month !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Mês</span>
+                    <span className="text-sm font-medium">
+                      {["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"][Number(ppeSchedule.data.month)]}
+                    </span>
+                  </div>
+                )}
+                {ppeSchedule.data.customMonths && ppeSchedule.data.customMonths.length > 0 && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Meses Personalizados</span>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {ppeSchedule.data.customMonths.map((month: MONTH) => (
+                        <Badge key={month} variant="outline">
+                          {["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"][Number(month)]}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Deliveries Summary Card */}
+            {ppeSchedule.data.deliveries && ppeSchedule.data.deliveries.length > 0 && (
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>Últimas Entregas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {ppeSchedule.data.deliveries.slice(0, 5).map((delivery: PpeDelivery) => (
+                      <div key={delivery.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">{delivery.item?.name || "Item não especificado"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {delivery.user?.name || "Usuário não especificado"} - Qtd: {delivery.quantity}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">
+                            {delivery.scheduledDate ? new Date(delivery.scheduledDate).toLocaleDateString("pt-BR") : "Não agendado"}
+                          </p>
+                          <Badge variant="outline">{PPE_DELIVERY_STATUS_LABELS[delivery.status] || delivery.status}</Badge>
+                        </div>
+                      </div>
+                    ))}
+                    {ppeSchedule.data.deliveries.length > 5 && (
+                      <p className="text-sm text-muted-foreground text-center">E mais {ppeSchedule.data.deliveries.length - 5} entregas...</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 

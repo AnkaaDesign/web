@@ -121,7 +121,7 @@ export function ComponentForm({ component, availableItems = [], onSubmit, onCanc
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
             {/* Item Selection */}
             <FormField
               control={form.control}

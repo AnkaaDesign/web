@@ -104,7 +104,7 @@ export function VerificationCodeForm({
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-8">
           {/* Code Input */}
           <div className="flex justify-center">
             <InputOTP

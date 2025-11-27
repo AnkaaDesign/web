@@ -99,7 +99,7 @@ export const CustomerDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.BASIC}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           title={customer.fantasyName}
@@ -133,31 +133,27 @@ export const CustomerDetailsPage = () => {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            {/* Core Information Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <BasicInfoCard customer={customer} />
-              <ContactDetailsCard customer={customer} />
-            </div>
-
-            {/* Address and Changelog Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-              <AddressInfoCard customer={customer} />
-              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.CUSTOMER} entityId={id} maxHeight="650px" />
-            </div>
-
-            {/* Documents (ADMIN and FINANCIAL only) */}
-            {canViewDocuments && <DocumentsCard customer={customer} />}
-
-            {/* Customer Tasks - Full Width at Bottom */}
-            <CustomerTasksList
-              customerId={customer.id}
-              customerName={customer.fantasyName}
-              navigationRoute="history"
-            />
-          </div>
+        {/* Core Information Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <BasicInfoCard customer={customer} />
+          <ContactDetailsCard customer={customer} />
         </div>
+
+        {/* Address and Changelog Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <AddressInfoCard customer={customer} />
+          <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.CUSTOMER} entityId={id} maxHeight="650px" />
+        </div>
+
+        {/* Documents (ADMIN and FINANCIAL only) */}
+        {canViewDocuments && <DocumentsCard customer={customer} />}
+
+        {/* Customer Tasks - Full Width at Bottom */}
+        <CustomerTasksList
+          customerId={customer.id}
+          customerName={customer.fantasyName}
+          navigationRoute="history"
+        />
 
         {/* Delete Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

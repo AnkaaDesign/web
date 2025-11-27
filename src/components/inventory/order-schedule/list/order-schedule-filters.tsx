@@ -109,7 +109,7 @@ export function OrderScheduleFilters({ open, onOpenChange, onFiltersChange, init
 
         <div className="mt-6 space-y-6">
           <Form {...form}>
-            <form className="space-y-6">
+            <form className="space-y-8">
               {/* Search */}
               <div className="space-y-2">
                 <Label htmlFor="searchingFor">Buscar</Label>

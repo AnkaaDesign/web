@@ -162,7 +162,7 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
             {/* Header Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Title */}

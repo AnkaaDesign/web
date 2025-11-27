@@ -236,7 +236,7 @@ const MaintenanceDetailsPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-6">
+    <div className="space-y-6">
       {/* Hero Section */}
       <div className="animate-in fade-in-50 duration-500">
         <PageHeader
@@ -254,46 +254,42 @@ const MaintenanceDetailsPage = () => {
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="space-y-6">
-          {/* Core Information Grid - Basic Info and Target Item */}
-          <div className="animate-in fade-in-50 duration-700">
-            {/* Mobile: Single column stacked */}
-            <div className="block lg:hidden space-y-4">
-              <MaintenanceInfoCard maintenance={maintenance} onMaintenanceUpdate={handleMaintenanceUpdate} className="h-full" />
-              <TargetItemCard item={maintenance.item} className="h-full" />
-            </div>
+      {/* Core Information Grid - Basic Info and Target Item */}
+      <div className="animate-in fade-in-50 duration-700">
+        {/* Mobile: Single column stacked */}
+        <div className="block lg:hidden space-y-4">
+          <MaintenanceInfoCard maintenance={maintenance} onMaintenanceUpdate={handleMaintenanceUpdate} className="h-full" />
+          <TargetItemCard item={maintenance.item} className="h-full" />
+        </div>
 
-            {/* Desktop/Tablet: 2 columns grid */}
-            <div className="hidden lg:block">
-              <div className="grid grid-cols-2 gap-6">
-                <MaintenanceInfoCard maintenance={maintenance as any} onMaintenanceUpdate={handleMaintenanceUpdate} className="h-full" />
-                <TargetItemCard item={maintenance.item} className="h-full" />
-              </div>
-            </div>
-          </div>
-
-          {/* Items Needed - Full Width */}
-          {maintenance.itemsNeeded && maintenance.itemsNeeded.length > 0 && (
-            <div className="animate-in fade-in-50 duration-800">
-              <ItemsNeededList itemsConfig={maintenance.itemsNeeded.map((mi: any) => ({
-                itemId: mi.item?.id || mi.itemId,
-                quantity: mi.quantity,
-              }))} />
-            </div>
-          )}
-
-          {/* Changelog History - Full Width */}
-          <div className="animate-in fade-in-50 duration-900">
-            <ChangelogHistory
-              entityType={CHANGE_LOG_ENTITY_TYPE.MAINTENANCE}
-              entityId={maintenance.id}
-              entityName={maintenance.name}
-              entityCreatedAt={maintenance.createdAt}
-              maxHeight="500px"
-            />
+        {/* Desktop/Tablet: 2 columns grid */}
+        <div className="hidden lg:block">
+          <div className="grid grid-cols-2 gap-6">
+            <MaintenanceInfoCard maintenance={maintenance as any} onMaintenanceUpdate={handleMaintenanceUpdate} className="h-full" />
+            <TargetItemCard item={maintenance.item} className="h-full" />
           </div>
         </div>
+      </div>
+
+      {/* Items Needed - Full Width */}
+      {maintenance.itemsNeeded && maintenance.itemsNeeded.length > 0 && (
+        <div className="animate-in fade-in-50 duration-800">
+          <ItemsNeededList itemsConfig={maintenance.itemsNeeded.map((mi: any) => ({
+            itemId: mi.item?.id || mi.itemId,
+            quantity: mi.quantity,
+          }))} />
+        </div>
+      )}
+
+      {/* Changelog History - Full Width */}
+      <div className="animate-in fade-in-50 duration-900">
+        <ChangelogHistory
+          entityType={CHANGE_LOG_ENTITY_TYPE.MAINTENANCE}
+          entityId={maintenance.id}
+          entityName={maintenance.name}
+          entityCreatedAt={maintenance.createdAt}
+          maxHeight="500px"
+        />
       </div>
 
       {/* Delete Confirmation Dialog */}

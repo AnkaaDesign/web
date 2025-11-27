@@ -133,7 +133,7 @@ export function VacationBatchForm({ vacations }: VacationBatchFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
         <Alert>
           <IconAlertTriangle className="h-4 w-4" />
           <AlertDescription>As alterações serão aplicadas a todas as {vacations.length} férias selecionadas. Campos não preenchidos não serão alterados.</AlertDescription>

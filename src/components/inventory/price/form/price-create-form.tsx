@@ -81,7 +81,7 @@ export function PriceCreateForm({ itemId, onSuccess, onCancel }: PriceCreateForm
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             {/* Item Selection - only show if itemId not provided */}
             {!itemId && (
               <FormField

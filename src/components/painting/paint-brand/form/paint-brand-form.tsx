@@ -146,7 +146,7 @@ export function PaintBrandForm(props: PaintBrandFormProps) {
   return (
     <div className="h-full overflow-y-auto p-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
           {/* Basic Information */}
           <Card className="bg-transparent">
             <CardHeader>

@@ -110,7 +110,7 @@ export const SectorDetailPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           entity={sector}
@@ -141,21 +141,17 @@ export const SectorDetailPage = () => {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            {/* Info Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <SpecificationsCard sector={sector} />
-              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.SECTOR} entityId={id} entityName={sector.name} entityCreatedAt={sector.createdAt} maxHeight="500px" />
-            </div>
-
-            {/* Related Tasks */}
-            <SectorTasksTable sector={sector} />
-
-            {/* Related Users - Last Section */}
-            <SectorUsersTable sector={sector} />
-          </div>
+        {/* Info Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SpecificationsCard sector={sector} />
+          <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.SECTOR} entityId={id} entityName={sector.name} entityCreatedAt={sector.createdAt} maxHeight="500px" />
         </div>
+
+        {/* Related Tasks */}
+        <SectorTasksTable sector={sector} />
+
+        {/* Related Users - Last Section */}
+        <SectorUsersTable sector={sector} />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

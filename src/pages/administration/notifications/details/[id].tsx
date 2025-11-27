@@ -36,7 +36,7 @@ export const NotificationDetailsPage = () => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           title="Carregando..."
@@ -48,27 +48,23 @@ export const NotificationDetailsPage = () => {
             { label: "Detalhes" },
           ]}
         />
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <Card>
-                  <CardHeader>
-                    <Skeleton className="h-7 w-40" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-4 w-1/2" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-              <div>
-                <Skeleton className="h-64 w-full" />
-              </div>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-7 w-40" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <div>
+            <Skeleton className="h-64 w-full" />
           </div>
         </div>
       </div>
@@ -77,7 +73,7 @@ export const NotificationDetailsPage = () => {
 
   if (!notification) {
     return (
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           title="Notificação não encontrada"
@@ -129,7 +125,7 @@ export const NotificationDetailsPage = () => {
   ];
 
   return (
-    <div className="flex flex-col h-full space-y-6">
+    <div className="space-y-6">
       <PageHeader
         variant="detail"
         title={notification.title}
@@ -143,9 +139,7 @@ export const NotificationDetailsPage = () => {
         actions={actions}
       />
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Notification Content */}
             <div className="lg:col-span-2 space-y-6">
               <Card>
@@ -268,8 +262,6 @@ export const NotificationDetailsPage = () => {
               )}
             </div>
           </div>
-        </div>
-      </div>
     </div>
   );
 };

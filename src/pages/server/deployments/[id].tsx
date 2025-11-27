@@ -174,7 +174,7 @@ export const DeploymentDetailPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           title={deployment.app?.displayName || "Implantação"}
@@ -195,10 +195,8 @@ export const DeploymentDetailPage = () => {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6">
-            {/* Status and Environment Overview */}
-            <div className="grid gap-6 md:grid-cols-2">
+        {/* Status and Environment Overview */}
+        <div className="grid gap-6 md:grid-cols-2">
               {/* Status Card */}
               <Card>
                 <CardHeader>
@@ -570,8 +568,6 @@ export const DeploymentDetailPage = () => {
                 </div>
               </CardContent>
             </Card>
-          </div>
-        </div>
       </div>
     </PrivilegeRoute>
   );

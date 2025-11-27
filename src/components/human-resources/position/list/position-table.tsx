@@ -321,7 +321,7 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
         accessor: (position: Position) => {
           const count = position._count?.users || 0;
           return (
-            <Badge variant={count > 0 ? "default" : "secondary"} className="min-w-[2rem] justify-center">
+            <Badge variant="default" className="w-10 justify-center">
               {count}
             </Badge>
           );

@@ -134,7 +134,7 @@ export function PaintBrandDetailsPage() {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <PageHeader
         variant="detail"
@@ -158,27 +158,22 @@ export function PaintBrandDetailsPage() {
         }
       />
 
-      {/* Content wrapper with proper height management */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="space-y-6">
-          {/* Top section - Specifications and Related Paints */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left column - Specifications */}
-            <div className="lg:col-span-1">
-              <PaintBrandSpecificationsCard paintBrand={paintBrand} />
-            </div>
-
-            {/* Right column - Related paints */}
-            <div className="lg:col-span-2">
-              <PaintBrandRelatedPaintsCard paintBrand={paintBrand} />
-            </div>
-          </div>
-
-          {/* Bottom section - Components (Full Width) */}
-          <div>
-            <PaintBrandComponentsCard paintBrand={paintBrand} />
-          </div>
+      {/* Top section - Specifications and Related Paints */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column - Specifications */}
+        <div className="lg:col-span-1">
+          <PaintBrandSpecificationsCard paintBrand={paintBrand} />
         </div>
+
+        {/* Right column - Related paints */}
+        <div className="lg:col-span-2">
+          <PaintBrandRelatedPaintsCard paintBrand={paintBrand} />
+        </div>
+      </div>
+
+      {/* Bottom section - Components (Full Width) */}
+      <div>
+        <PaintBrandComponentsCard paintBrand={paintBrand} />
       </div>
     </div>
   );

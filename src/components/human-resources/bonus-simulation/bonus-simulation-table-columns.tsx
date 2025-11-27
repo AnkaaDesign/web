@@ -348,7 +348,7 @@ export const createBonusSimulationColumns = (): BonusSimulationColumn[] => [
   // Performance Level column (editable input with validation 1-12)
   {
     key: "performanceLevel",
-    header: "NÍVEL PERFORMANCE",
+    header: "PERFORMANCE",
     accessor: (
       user: BonusSimulationRow,
       averageTasksPerUser: number,

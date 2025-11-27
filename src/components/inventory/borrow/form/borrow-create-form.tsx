@@ -210,7 +210,7 @@ export function BorrowCreateForm() {
         </CardHeader>
         <CardContent className="space-y-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               {/* Item Selection */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Seleção do Item</h3>

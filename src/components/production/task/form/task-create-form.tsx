@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -74,6 +74,7 @@ export const TaskCreateForm = () => {
   const [isLayoutOpen, setIsLayoutOpen] = useState(false);
   const [isObservationOpen, setIsObservationOpen] = useState(false);
   const [isFinancialInfoOpen, setIsFinancialInfoOpen] = useState(false);
+  const [layoutWidthError, setLayoutWidthError] = useState<string | null>(null);
   const [layouts, setLayouts] = useState<{
     left?: any;
     right?: any;
@@ -83,6 +84,38 @@ export const TaskCreateForm = () => {
     right: { height: 2.4, sections: [{ width: 8, hasDoor: false }], photoId: null },
     back: { height: 2.42, sections: [{ width: 2.42, hasDoor: false }], photoId: null },  // Back defaults to 2.42m x 2.42m
   });
+
+  // Real-time validation of layout width balance (same as edit form)
+  useEffect(() => {
+    if (!isLayoutOpen) {
+      setLayoutWidthError(null);
+      return;
+    }
+
+    // Get sections from current layout state
+    const leftLayout = layouts.left;
+    const rightLayout = layouts.right;
+    const leftSections = leftLayout?.sections;
+    const rightSections = rightLayout?.sections;
+
+    // Only validate if both sides exist and have sections
+    if (leftSections && leftSections.length > 0 && rightSections && rightSections.length > 0) {
+      const leftTotalWidth = leftSections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
+      const rightTotalWidth = rightSections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
+      const widthDifference = Math.abs(leftTotalWidth - rightTotalWidth);
+      const maxAllowedDifference = 0.04; // 4cm in meters
+
+      if (widthDifference > maxAllowedDifference) {
+        const errorMessage = `O layout possui diferença de largura maior que 4cm entre os lados. Lado Motorista: ${leftTotalWidth.toFixed(2)}m, Lado Sapo: ${rightTotalWidth.toFixed(2)}m (diferença de ${(widthDifference * 100).toFixed(1)}cm). Ajuste as medidas antes de enviar o formulário.`;
+        setLayoutWidthError(errorMessage);
+      } else {
+        setLayoutWidthError(null);
+      }
+    } else {
+      // Clear error if one side doesn't have sections
+      setLayoutWidthError(null);
+    }
+  }, [layouts, isLayoutOpen]);
 
   // Debug logging for cuts count changes
   const handleSetCutsCount = useCallback((count: number) => {
@@ -543,7 +576,7 @@ export const TaskCreateForm = () => {
       icon: isSubmitting ? IconLoader2 : IconCheck,
       onClick: form.handleSubmit(handleSubmit),
       variant: "default" as const,
-      disabled: isSubmitting || hasErrors || !hasRequiredFields,
+      disabled: isSubmitting || hasErrors || !hasRequiredFields || !!layoutWidthError,
       loading: isSubmitting,
     },
   ];
@@ -568,7 +601,7 @@ export const TaskCreateForm = () => {
         <div className="h-full bg-card rounded-lg shadow-md border-muted overflow-hidden">
           <div className="h-full overflow-y-auto p-6">
             <Form {...form}>
-              <form className="space-y-6">
+              <form className="space-y-8">
                 {/* Basic Information Card */}
                 <Card className="bg-transparent">
                   <CardHeader>
@@ -910,6 +943,7 @@ export const TaskCreateForm = () => {
                           }}
                           disabled={isSubmitting}
                           taskName={form.watch('name')}
+                          validationError={layoutWidthError}
                         />
                       </div>
                     ) : null}

@@ -77,7 +77,7 @@ export const VacationDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="space-y-6">
         <PageHeader
           variant="detail"
           title={`Férias de ${vacation.data?.user?.name || "Colaborador"}`}
@@ -110,14 +110,10 @@ export const VacationDetailsPage = () => {
           ]}
         />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="container max-w-7xl mx-auto pb-6 space-y-6">
-            {/* Info Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {vacation.data && <SpecificationsCard vacation={vacation.data} />}
-              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.VACATION} entityId={id} maxHeight="500px" />
-            </div>
-          </div>
+        {/* Info Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {vacation.data && <SpecificationsCard vacation={vacation.data} />}
+          <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.VACATION} entityId={id} maxHeight="500px" />
         </div>
 
         {/* Delete Dialog */}
