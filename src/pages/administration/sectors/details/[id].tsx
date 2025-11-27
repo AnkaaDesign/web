@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { IconBuildingSkyscraper, IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
+import { toast } from "sonner";
 
 import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { useSector, useSectorMutations } from "../../../../hooks";
@@ -101,7 +102,8 @@ export const SectorDetailPage = () => {
       await deleteAsync(id);
       navigate(routes.administration.sectors.root);
     } catch (error) {
-      // Error is already handled by the API client
+      toast.error("Erro ao excluir setor");
+      console.error(error);
     }
     setIsDeleteDialogOpen(false);
   };

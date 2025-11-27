@@ -4,6 +4,7 @@ import { useMaintenance, useMaintenanceMutations, useFinishMaintenance } from ".
 import { routes, MAINTENANCE_STATUS, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { Button } from "@/components/ui/button";
 import { IconAlertTriangle, IconSettings, IconCheck, IconTrash, IconPlayerPlay, IconRefresh, IconEdit } from "@tabler/icons-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/page-header";
 import { MaintenanceInfoCard } from "@/components/inventory/maintenance/detail/maintenance-info-card";
 import { TargetItemCard } from "@/components/inventory/maintenance/detail/target-item-card";
@@ -138,6 +139,7 @@ const MaintenanceDetailsPage = () => {
         refetch();
       }
     } catch (error) {
+      toast.error("Erro ao iniciar manutenção");
       console.error("Error starting maintenance:", error);
     }
   };
@@ -156,6 +158,7 @@ const MaintenanceDetailsPage = () => {
         refetch();
       }
     } catch (error) {
+      toast.error("Erro ao concluir manutenção");
       console.error("Error finishing maintenance:", error);
     }
   };
@@ -169,6 +172,7 @@ const MaintenanceDetailsPage = () => {
         navigate(routes.inventory.maintenance.root);
       }
     } catch (error) {
+      toast.error("Erro ao excluir manutenção");
       console.error("Error deleting maintenance:", error);
     } finally {
       setIsDeleting(false);

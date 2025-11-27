@@ -595,6 +595,7 @@ export const TaskDetailsPage = () => {
       await update(updateData);
       setStatusChangeDialogOpen(false);
     } catch (error) {
+      toast.error("Erro ao atualizar status da tarefa");
       console.error("Error updating task status:", error);
     } finally {
       setIsUpdating(false);
@@ -632,6 +633,7 @@ export const TaskDetailsPage = () => {
         }
       }
     } catch (error) {
+      toast.error("Erro ao atualizar status da ordem de serviço");
       console.error("Error updating service order status:", error);
     }
   };
@@ -653,6 +655,7 @@ export const TaskDetailsPage = () => {
       setPendingServiceOrder(null);
       setNextServiceOrderToStart(null);
     } catch (error) {
+      toast.error("Erro ao iniciar próxima ordem de serviço");
       console.error("Error starting next service order:", error);
     }
   };

@@ -1097,6 +1097,7 @@ const taskTruckCreateSchema = z.object({
     .transform((val) => (val === "" ? null : val?.toUpperCase())),
   xPosition: z.number().nullable().optional(),
   yPosition: z.number().nullable().optional(),
+  garageId: z.string().uuid("Garagem inválida").nullable().optional(),
 });
 
 // =====================

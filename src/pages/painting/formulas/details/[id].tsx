@@ -11,6 +11,7 @@ import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { formatCurrency } from "../../../../utils";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditPaints } from "@/utils/permissions/entity-permissions";
+import { toast } from "sonner";
 
 export default function FormulaDetails() {
   const { id } = useParams<{ id: string }>();
@@ -82,7 +83,7 @@ export default function FormulaDetails() {
       });
       navigate(routes.painting.productions.root);
     } catch (error) {
-      // Error is handled by the API client error handler
+      toast.error("Erro ao criar produção");
       console.error("Erro ao criar produção:", error);
     }
   };

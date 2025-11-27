@@ -127,7 +127,8 @@ const OrderDetailsPage = () => {
       await deleteMutation.mutateAsync(order.id);
       navigate(routes.inventory.orders.list);
     } catch (error) {
-      // Error toast is handled by API client
+      toast.error("Erro ao excluir pedido");
+      console.error(error);
     }
   };
 
@@ -146,7 +147,8 @@ const OrderDetailsPage = () => {
       setShowCompleteDialog(false);
       refetch();
     } catch (error) {
-      // Error toast is handled by API client
+      toast.error("Erro ao marcar pedido como recebido");
+      console.error(error);
     }
   };
 
@@ -224,7 +226,8 @@ const OrderDetailsPage = () => {
           }
           refetch();
         } catch (error) {
-          // Error toast is handled by API client
+          toast.error("Erro ao marcar pedido como feito");
+          console.error(error);
         }
       },
     });

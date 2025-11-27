@@ -35,6 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
+import { toast } from "sonner";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -232,6 +233,7 @@ export function MaintenanceScheduleDetailPage() {
       // TODO: Implement delete
       navigate(routes.inventory.maintenance.schedules.root);
     } catch (error) {
+      toast.error("Erro ao excluir agendamento");
       console.error("Error deleting schedule:", error);
     } finally {
       setIsDeleting(false);
