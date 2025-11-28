@@ -1,46 +1,59 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
 import { IconColumns, IconSearch, IconRefresh } from "@tabler/icons-react";
-import { getDefaultVisibleColumns } from "./payroll-table-columns";
 
-interface PayrollColumn {
+interface BonusColumn {
   key: string;
   header: string;
   defaultVisible: boolean;
 }
 
-const PAYROLL_COLUMNS: PayrollColumn[] = [
+const BONUS_COLUMNS: BonusColumn[] = [
   { key: "month", header: "Período", defaultVisible: false },
-  { key: "payrollNumber", header: "Nº Folha", defaultVisible: true },
-  { key: "user.name", header: "Nome", defaultVisible: true },
+  { key: "payrollNumber", header: "Nº Folha", defaultVisible: false },
+  { key: "user.name", header: "Colaborador", defaultVisible: true },
   { key: "user.cpf", header: "CPF", defaultVisible: false },
   { key: "position.name", header: "Cargo", defaultVisible: true },
-  { key: "sector.name", header: "Setor", defaultVisible: true },
+  { key: "sector.name", header: "Setor", defaultVisible: false },
+  { key: "performanceLevel", header: "Desempenho", defaultVisible: true },
+  { key: "tasksCompleted", header: "Tarefas", defaultVisible: true },
+  { key: "totalWeightedTasks", header: "Ponderadas", defaultVisible: false },
+  { key: "totalCollaborators", header: "Colaboradores", defaultVisible: true },
+  { key: "averageTasks", header: "Média", defaultVisible: true },
   { key: "bonus", header: "Bônus Bruto", defaultVisible: true },
+  { key: "totalDiscounts", header: "Descontos", defaultVisible: false },
   { key: "netBonus", header: "Bônus Líquido", defaultVisible: true },
-  { key: "remuneration", header: "Remuneração", defaultVisible: true },
-  { key: "totalEarnings", header: "Total Bruto", defaultVisible: false },
-  { key: "totalNet", header: "Total Líquido", defaultVisible: true },
 ];
 
-interface PayrollColumnVisibilityManagerProps {
+export function getDefaultVisibleColumns(): Set<string> {
+  return new Set(BONUS_COLUMNS.filter((col) => col.defaultVisible).map((col) => col.key));
+}
+
+interface BonusColumnVisibilityManagerProps {
   visibleColumns: Set<string>;
   onVisibilityChange: (columns: Set<string>) => void;
 }
 
-export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityChange }: PayrollColumnVisibilityManagerProps) {
+export function BonusColumnVisibilityManager({ visibleColumns, onVisibilityChange }: BonusColumnVisibilityManagerProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [localVisible, setLocalVisible] = useState(visibleColumns);
 
+  // Sync localVisible when visibleColumns prop changes or when popover opens
+  useEffect(() => {
+    if (open) {
+      setLocalVisible(visibleColumns);
+      setSearchQuery("");
+    }
+  }, [open, visibleColumns]);
+
   const filteredColumns = useMemo(() => {
-    if (!searchQuery) return PAYROLL_COLUMNS;
-    return PAYROLL_COLUMNS.filter((col) => col.header.toLowerCase().includes(searchQuery.toLowerCase()));
+    if (!searchQuery) return BONUS_COLUMNS;
+    return BONUS_COLUMNS.filter((col) => col.header.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [searchQuery]);
 
   const handleToggle = (columnKey: string, checked: boolean | undefined) => {
@@ -55,7 +68,7 @@ export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityCha
   };
 
   const handleSelectAll = () => {
-    setLocalVisible(new Set(PAYROLL_COLUMNS.map((col) => col.key)));
+    setLocalVisible(new Set(BONUS_COLUMNS.map((col) => col.key)));
   };
 
   const handleDeselectAll = () => {
@@ -68,18 +81,22 @@ export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityCha
 
   const handleApply = () => {
     onVisibilityChange(localVisible);
-    // Save to localStorage
-    localStorage.setItem("payroll-visible-columns", JSON.stringify(Array.from(localVisible)));
+    localStorage.setItem("bonus-visible-columns", JSON.stringify(Array.from(localVisible)));
     setOpen(false);
   };
 
   const handleClose = () => {
-    setLocalVisible(visibleColumns); // Reset to original state
+    setLocalVisible(visibleColumns);
     setOpen(false);
   };
 
+  // Handle search input - Input component passes value directly, not event
+  const handleSearchChange = (value: string | number | null) => {
+    setSearchQuery(typeof value === 'string' ? value : '');
+  };
+
   const visibleCount = localVisible.size;
-  const totalCount = PAYROLL_COLUMNS.length;
+  const totalCount = BONUS_COLUMNS.length;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -89,7 +106,7 @@ export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityCha
           Colunas ({visibleCount}/{totalCount})
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
+      <PopoverContent className="w-80 p-0 bg-popover" align="end">
         <div className="p-4 border-b">
           <div className="flex items-center justify-between mb-2">
             <h4 className="font-medium text-sm">Gerenciar Colunas</h4>
@@ -100,13 +117,13 @@ export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityCha
           </div>
 
           <div className="relative">
-            <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
+            <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground z-10" />
+            <input
               type="text"
               placeholder="Buscar coluna..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e?.target?.value || "")}
-              className="pl-9 h-9"
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-border bg-transparent px-9 py-2 text-sm placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
 
@@ -126,11 +143,11 @@ export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityCha
               <Label
                 key={column.key}
                 className="flex items-center justify-between space-x-3 p-2 hover:bg-accent hover:text-accent-foreground rounded-md cursor-pointer"
-                htmlFor={`column-${column.key}`}
+                htmlFor={`bonus-column-${column.key}`}
               >
                 <span className="text-sm">{column.header}</span>
                 <Switch
-                  id={`column-${column.key}`}
+                  id={`bonus-column-${column.key}`}
                   checked={localVisible.has(column.key)}
                   onCheckedChange={(checked) => handleToggle(column.key, checked)}
                 />

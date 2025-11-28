@@ -192,7 +192,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
               stroke="#000" stroke-width="1"/>`;
       });
     } else if (layout.layoutSections) {
-      // Handle both new LayoutSection entity format and old sections format
+      // Handle LayoutSection entity format with doorHeight
       const sections = layout.layoutSections;
       let currentPos = 0;
       sections.forEach((section: any, index: number) => {
@@ -200,23 +200,24 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
         const sectionX = margin + currentPos;
 
         // Check if this section is a door
-        if (section.isDoor && section.doorOffset !== null && section.doorOffset !== undefined) {
-          const doorOffsetTop = section.doorOffset * 100;
-          const doorY = margin + doorOffsetTop;
+        // doorHeight is measured from bottom of layout to top of door opening
+        if (section.isDoor && section.doorHeight !== null && section.doorHeight !== undefined) {
+          const doorHeightCm = section.doorHeight * 100;
+          const doorTopY = margin + (height - doorHeightCm);
 
           // Left vertical line of door
           svg += `
-          <line x1="${sectionX}" y1="${doorY}" x2="${sectionX}" y2="${margin + height}"
+          <line x1="${sectionX}" y1="${doorTopY}" x2="${sectionX}" y2="${margin + height}"
                 stroke="#000" stroke-width="1"/>`;
 
           // Right vertical line of door
           svg += `
-          <line x1="${sectionX + sectionWidth}" y1="${doorY}" x2="${sectionX + sectionWidth}" y2="${margin + height}"
+          <line x1="${sectionX + sectionWidth}" y1="${doorTopY}" x2="${sectionX + sectionWidth}" y2="${margin + height}"
                 stroke="#000" stroke-width="1"/>`;
 
           // Top horizontal line of door
           svg += `
-          <line x1="${sectionX}" y1="${doorY}" x2="${sectionX + sectionWidth}" y2="${doorY}"
+          <line x1="${sectionX}" y1="${doorTopY}" x2="${sectionX + sectionWidth}" y2="${doorTopY}"
                 stroke="#000" stroke-width="1"/>`;
         }
 
@@ -285,60 +286,35 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
 
   return (
     <div className="space-y-4">
-      {/* Side selector and download */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant={selectedSide === 'left' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSelectedSide('left')}
-            disabled={!layouts.leftSideLayout}
-          >
-            Motorista
-          </Button>
-          <Button
-            type="button"
-            variant={selectedSide === 'right' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSelectedSide('right')}
-            disabled={!layouts.rightSideLayout}
-          >
-            Sapo
-          </Button>
-          <Button
-            type="button"
-            variant={selectedSide === 'back' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSelectedSide('back')}
-            disabled={!layouts.backSideLayout}
-          >
-            Traseira
-          </Button>
-        </div>
-
-        <div className="flex gap-2">
-          <Button onClick={downloadSVG} size="sm" variant="default">
-            <IconDownload className="h-4 w-4 mr-1" />
-            Baixar Layout
-          </Button>
-
-          {/* Layout photo download button */}
-          {currentLayout?.photo && (
-            <Button
-              onClick={() => {
-                const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
-                const photoUrl = `${apiUrl}/files/${currentLayout.photo.id}/download`;
-                window.open(photoUrl, '_blank');
-              }}
-              size="sm"
-              variant="outline"
-            >
-              <IconDownload className="h-4 w-4 mr-1" />
-              Baixar Foto do Layout
-            </Button>
-          )}
-        </div>
+      {/* Side selector */}
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          variant={selectedSide === 'left' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setSelectedSide('left')}
+          disabled={!layouts.leftSideLayout}
+        >
+          Motorista
+        </Button>
+        <Button
+          type="button"
+          variant={selectedSide === 'right' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setSelectedSide('right')}
+          disabled={!layouts.rightSideLayout}
+        >
+          Sapo
+        </Button>
+        <Button
+          type="button"
+          variant={selectedSide === 'back' ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setSelectedSide('back')}
+          disabled={!layouts.backSideLayout}
+        >
+          Traseira
+        </Button>
       </div>
 
       {/* SVG Preview */}
@@ -354,6 +330,106 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
           </div>
         </div>
       )}
+
+      {/* Download buttons */}
+      <div className="flex gap-2 justify-end">
+        {/* Download all layouts as zip */}
+        <Button
+          onClick={async () => {
+            const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
+            const taskPrefix = taskName ? `${taskName}-` : '';
+            const zipFileName = `${taskPrefix}layouts.zip`;
+
+            const JSZip = (await import('jszip')).default;
+            const zip = new JSZip();
+
+            const getSideLabel = (s: string) => {
+              switch (s) {
+                case 'left': return 'motorista';
+                case 'right': return 'sapo';
+                case 'back': return 'traseira';
+                default: return s;
+              }
+            };
+
+            // Add left side layout SVG if exists
+            if (layouts.leftSideLayout) {
+              const svgContent = generatePreviewSVG(layouts.leftSideLayout, 'left', true);
+              const sections = layouts.leftSideLayout.layoutSections;
+              const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
+              zip.file(`${taskPrefix}layout-${getSideLabel('left')}-${Math.round(totalWidth)}mm.svg`, svgContent);
+            }
+
+            // Add right side layout SVG if exists
+            if (layouts.rightSideLayout) {
+              const svgContent = generatePreviewSVG(layouts.rightSideLayout, 'right', true);
+              const sections = layouts.rightSideLayout.layoutSections;
+              const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
+              zip.file(`${taskPrefix}layout-${getSideLabel('right')}-${Math.round(totalWidth)}mm.svg`, svgContent);
+            }
+
+            // Add back side layout SVG if exists
+            if (layouts.backSideLayout) {
+              const svgContent = generatePreviewSVG(layouts.backSideLayout, 'back', true);
+              const sections = layouts.backSideLayout.layoutSections;
+              const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
+              zip.file(`${taskPrefix}layout-${getSideLabel('back')}-${Math.round(totalWidth)}mm.svg`, svgContent);
+
+              // Add backside photo if exists
+              if (layouts.backSideLayout.photo) {
+                try {
+                  const photoUrl = `${apiUrl}/files/${layouts.backSideLayout.photo.id}/download`;
+                  const response = await fetch(photoUrl);
+                  if (response.ok) {
+                    const blob = await response.blob();
+                    const extension = layouts.backSideLayout.photo.mimeType?.split('/')[1] || 'jpg';
+                    zip.file(`${taskPrefix}layout-traseira-foto.${extension}`, blob);
+                  }
+                } catch (error) {
+                  console.error('Error downloading backside photo:', error);
+                }
+              }
+            }
+
+            // Generate zip and download
+            const content = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(content);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = zipFileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+          }}
+          size="sm"
+          variant="default"
+        >
+          <IconDownload className="h-4 w-4 mr-1" />
+          Baixar Tudo
+        </Button>
+
+        <Button onClick={downloadSVG} size="sm" variant="outline">
+          <IconDownload className="h-4 w-4 mr-1" />
+          Baixar Layout
+        </Button>
+
+        {/* Layout photo download button */}
+        {currentLayout?.photo && (
+          <Button
+            onClick={() => {
+              const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
+              const photoUrl = `${apiUrl}/files/${currentLayout.photo.id}/download`;
+              window.open(photoUrl, '_blank');
+            }}
+            size="sm"
+            variant="outline"
+          >
+            <IconDownload className="h-4 w-4 mr-1" />
+            Baixar Foto
+          </Button>
+        )}
+      </div>
     </div>
   );
 };

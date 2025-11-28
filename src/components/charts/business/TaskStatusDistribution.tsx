@@ -44,7 +44,7 @@ export const TaskStatusDistribution = React.memo<TaskStatusDistributionProps>(({
   // Convert data to pie chart format
   const chartData: PieChartDataPoint[] = useMemo(() => {
     const statusLabels = {
-      pending: 'Pendente',
+      pending: 'Aguardando',
       in_progress: 'Em Andamento',
       completed: 'Concluído',
       cancelled: 'Cancelado',

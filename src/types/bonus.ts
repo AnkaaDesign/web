@@ -1,4 +1,7 @@
 // packages/types/src/bonus.ts
+// Simplified Bonus entity - redundant fields removed
+// Period dates are computed from year/month (26th of prev month to 25th of current month)
+// ponderedTasks is computed from tasks array (FULL_COMMISSION=1.0, PARTIAL_COMMISSION=0.5)
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
 import type { ORDER_BY_DIRECTION } from "../constants";
@@ -17,10 +20,6 @@ export interface Bonus extends BaseEntity {
   month: number;
   performanceLevel: number;
   baseBonus: number | { toNumber: () => number }; // Decimal from Prisma
-  ponderedTaskCount: number | { toNumber: () => number }; // Decimal from Prisma
-  averageTasksPerUser: number | { toNumber: () => number }; // Decimal from Prisma
-  calculationPeriodStart: Date;
-  calculationPeriodEnd: Date;
 
   // Relations (optional, populated based on query)
   user?: User;
@@ -28,6 +27,13 @@ export interface Bonus extends BaseEntity {
   tasks?: Task[];
   bonusDiscounts?: BonusDiscount[];
   payroll?: any; // Payroll type would need to be imported if available
+
+  // Computed fields (added by service layer or frontend)
+  _computed?: {
+    ponderedTaskCount?: number; // Computed from tasks array
+    periodStart?: Date; // Computed from year/month
+    periodEnd?: Date; // Computed from year/month
+  };
 }
 
 
@@ -71,15 +77,11 @@ export interface BonusIncludes {
 export interface BonusWhere {
   id?: string | { in?: string[]; notIn?: string[] };
   year?: number | { in?: number[]; gte?: number; lte?: number; gt?: number; lt?: number };
-  month?: number | { in?: number[]; gte?: number; lte?: number; gt?: number; lt?: number };
+  month?: number | { in?: number[]; notIn?: number[]; gte?: number; lte?: number; gt?: number; lt?: number };
   userId?: string | { in?: string[]; notIn?: string[] };
   payrollId?: string | { in?: string[]; notIn?: string[] };
-  performanceLevel?: number | { gte?: number; lte?: number; gt?: number; lt?: number };
+  performanceLevel?: number | { in?: number[]; notIn?: number[]; gte?: number; lte?: number; gt?: number; lt?: number };
   baseBonus?: number | { gte?: number; lte?: number; gt?: number; lt?: number };
-  ponderedTaskCount?: number | { gte?: number; lte?: number; gt?: number; lt?: number };
-  averageTasksPerUser?: number | { gte?: number; lte?: number; gt?: number; lt?: number };
-  calculationPeriodStart?: Date | { gte?: Date; lte?: Date; gt?: Date; lt?: Date };
-  calculationPeriodEnd?: Date | { gte?: Date; lte?: Date; gt?: Date; lt?: Date };
   createdAt?: Date | { gte?: Date; lte?: Date; gt?: Date; lt?: Date };
   updatedAt?: Date | { gte?: Date; lte?: Date; gt?: Date; lt?: Date };
 
@@ -109,22 +111,19 @@ export interface BonusOrderBy {
   month?: ORDER_BY_DIRECTION;
   performanceLevel?: ORDER_BY_DIRECTION;
   baseBonus?: ORDER_BY_DIRECTION;
-  ponderedTaskCount?: ORDER_BY_DIRECTION;
-  averageTasksPerUser?: ORDER_BY_DIRECTION;
-  calculationPeriodStart?: ORDER_BY_DIRECTION;
-  calculationPeriodEnd?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
 
-  // Relations
+  // Relations - for sorting by task count, use tasks._count
   user?: {
     name?: ORDER_BY_DIRECTION;
     createdAt?: ORDER_BY_DIRECTION;
   };
+  tasks?: {
+    _count?: ORDER_BY_DIRECTION;
+  };
 }
 
-
-// =====================
 
 // =====================
 // API Response Types
@@ -146,7 +145,8 @@ export interface BonusGetManyParams {
   skip?: number;
   page?: number;
   take?: number;
-  orderBy?: BonusOrderBy;
+  limit?: number;
+  orderBy?: BonusOrderBy | BonusOrderBy[];
   where?: BonusWhere;
   include?: BonusIncludes;
   searchingFor?: string; // Multi-field search parameter
@@ -172,24 +172,13 @@ export interface BonusCreateFormData {
   userId: string;
   performanceLevel: number;
   baseBonus: number;
-  ponderedTaskCount?: number;
-  averageTasksPerUser?: number;
-  calculationPeriodStart?: Date;
-  calculationPeriodEnd?: Date;
   payrollId?: string;
 }
 
 export interface BonusUpdateFormData {
-  year?: number;
-  month?: number;
-  userId?: string;
   performanceLevel?: number;
   baseBonus?: number;
-  ponderedTaskCount?: number;
-  averageTasksPerUser?: number;
-  calculationPeriodStart?: Date;
-  calculationPeriodEnd?: Date;
-  payrollId?: string;
+  payrollId?: string | null;
 }
 
 // =====================
@@ -203,18 +192,18 @@ export interface LiveBonus {
   month: number;
   performanceLevel: number;
   baseBonus: number;
-  ponderedTaskCount: number;
-  averageTasksPerUser: number;
-  calculationPeriodStart: Date;
-  calculationPeriodEnd: Date;
   isLive: true;
-  totalTasks?: number;
-  weightedTaskCount?: number;
   tasks?: Task[];
   users?: User[];
   payrollId?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  // Computed fields for live calculations
+  _computed?: {
+    ponderedTaskCount?: number;
+    periodStart?: Date;
+    periodEnd?: Date;
+  };
 }
 
 // =====================
@@ -229,9 +218,62 @@ export interface LiveBonusGetManyResponse {
     totalRecords: number;
     page: number;
     hasNextPage: boolean;
-    calculationPeriod: {
-      start: Date;
-      end: Date;
-    };
+    // Period is computed from year/month, not stored
+    year: number;
+    month: number;
   };
+}
+
+// =====================
+// Filter Types for UI
+// =====================
+
+/**
+ * Filters interface for bonus list pages
+ * Similar to PayrollFiltersData, used for filtering bonus lists in the UI
+ */
+export interface BonusFiltersData {
+  year?: number;
+  months?: string[];
+  performanceLevels?: number[];
+  sectorIds?: string[];
+  positionIds?: string[];
+  userIds?: string[];
+  excludeUserIds?: string[];
+}
+
+/**
+ * Parameters for bonus list hook
+ * Combines filter data with standard query parameters
+ */
+export interface BonusListParams extends BonusGetManyParams {
+  // Direct filter fields (alternative to using where clause)
+  year?: number;
+  months?: number[];
+  performanceLevels?: number[];
+  sectorIds?: string[];
+  positionIds?: string[];
+  userIds?: string[];
+  excludeUserIds?: string[];
+}
+
+// =====================
+// Utility Types for Computed Values
+// =====================
+
+/**
+ * Computed bonus data that can be calculated from the base entity
+ * These values are NOT stored in the database but computed on-demand
+ */
+export interface BonusComputedFields {
+  /** Weighted task count: FULL_COMMISSION = 1.0, PARTIAL_COMMISSION = 0.5 */
+  ponderedTaskCount: number;
+  /** Period start date (26th of previous month) */
+  periodStart: Date;
+  /** Period end date (25th of current month) */
+  periodEnd: Date;
+  /** Total eligible users for bonus calculation in this period */
+  totalEligibleUsers?: number;
+  /** Average tasks per user (ponderedTaskCount / totalEligibleUsers) */
+  averageTasksPerUser?: number;
 }

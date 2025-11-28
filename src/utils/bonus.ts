@@ -1,8 +1,126 @@
 // packages/utils/src/bonus.ts
+// Simplified bonus utilities - all calculations happen on the backend
+// Frontend only needs to display data and compute derived values from tasks array
 
-// REMOVED: Incorrect hardcoded bonus matrix
-// The correct bonus calculation is implemented in the API using polynomial-based algorithm
-// from db:seed script and ExactBonusCalculationService
+// =====================
+// Commission Status Constants
+// =====================
+export const COMMISSION_STATUS = {
+  FULL_COMMISSION: 'FULL_COMMISSION',
+  PARTIAL_COMMISSION: 'PARTIAL_COMMISSION',
+  NO_COMMISSION: 'NO_COMMISSION',
+} as const;
+
+export type CommissionStatus = typeof COMMISSION_STATUS[keyof typeof COMMISSION_STATUS];
+
+// =====================
+// Task Computation Utilities (used for display/sorting)
+// =====================
+
+interface TaskWithCommission {
+  commission?: string;
+  [key: string]: any;
+}
+
+/**
+ * Calculate weighted task count (ponderedTasks) from tasks array
+ * FULL_COMMISSION = 1.0, PARTIAL_COMMISSION = 0.5, NO_COMMISSION = 0
+ *
+ * @param tasks Array of tasks with commission status
+ * @returns Weighted task count
+ */
+export function calculatePonderedTasks(tasks?: TaskWithCommission[]): number {
+  if (!tasks || tasks.length === 0) return 0;
+
+  return tasks.reduce((sum, task) => {
+    if (task.commission === COMMISSION_STATUS.FULL_COMMISSION) {
+      return sum + 1.0;
+    } else if (task.commission === COMMISSION_STATUS.PARTIAL_COMMISSION) {
+      return sum + 0.5;
+    }
+    return sum;
+  }, 0);
+}
+
+/**
+ * Get task count by commission type
+ * @param tasks Array of tasks with commission status
+ * @returns Object with counts for each commission type
+ */
+export function getTaskCountByCommission(tasks?: TaskWithCommission[]): {
+  full: number;
+  partial: number;
+  none: number;
+  total: number;
+  pondered: number;
+} {
+  if (!tasks || tasks.length === 0) {
+    return { full: 0, partial: 0, none: 0, total: 0, pondered: 0 };
+  }
+
+  let full = 0;
+  let partial = 0;
+  let none = 0;
+
+  for (const task of tasks) {
+    if (task.commission === COMMISSION_STATUS.FULL_COMMISSION) {
+      full++;
+    } else if (task.commission === COMMISSION_STATUS.PARTIAL_COMMISSION) {
+      partial++;
+    } else {
+      none++;
+    }
+  }
+
+  return {
+    full,
+    partial,
+    none,
+    total: tasks.length,
+    pondered: full + (partial * 0.5),
+  };
+}
+
+/**
+ * Compute bonus display data from raw bonus entity
+ * Adds computed fields like ponderedTasks and period dates
+ *
+ * @param bonus Raw bonus entity from API
+ * @returns Bonus with computed fields added
+ */
+export function enrichBonusWithComputed<T extends { year: number; month: number; tasks?: TaskWithCommission[] }>(
+  bonus: T
+): T & { _computed: { ponderedTaskCount: number; periodStart: Date; periodEnd: Date } } {
+  return {
+    ...bonus,
+    _computed: {
+      ponderedTaskCount: calculatePonderedTasks(bonus.tasks),
+      periodStart: getBonusPeriodStart(bonus.year, bonus.month),
+      periodEnd: getBonusPeriodEnd(bonus.year, bonus.month),
+    },
+  };
+}
+
+/**
+ * Sort bonuses by pondered task count (computed from tasks array)
+ * @param bonuses Array of bonuses
+ * @param direction 'asc' or 'desc'
+ * @returns Sorted array
+ */
+export function sortBonusesByPonderedTasks<T extends { tasks?: TaskWithCommission[] }>(
+  bonuses: T[],
+  direction: 'asc' | 'desc' = 'desc'
+): T[] {
+  return [...bonuses].sort((a, b) => {
+    const aCount = calculatePonderedTasks(a.tasks);
+    const bCount = calculatePonderedTasks(b.tasks);
+    return direction === 'asc' ? aCount - bCount : bCount - aCount;
+  });
+}
+
+// =====================
+// Position Utilities
+// =====================
 
 /**
  * Get position level from position name (1=junior, 2=pleno, 3=senior)
@@ -332,8 +450,6 @@ export interface BonusDiscount {
   order: number;
 }
 
-export type { BonusDiscount };
-
 /**
  * Apply percentage discount to a bonus value
  * @param value The original bonus value
@@ -571,8 +687,6 @@ export interface PayrollDiscount {
   fixedValue?: number;
   calculationOrder: number;
 }
-
-export type { PayrollDiscount };
 
 /**
  * Calculate payroll discounts applied to base remuneration

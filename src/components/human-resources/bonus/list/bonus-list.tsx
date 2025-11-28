@@ -12,8 +12,10 @@ import { BONUS_STATUS, BONUS_STATUS_LABELS, routes } from "../../../../constants
 import { getBadgeVariant } from "../../../../constants";
 import type { Bonus } from "../../../../types";
 import type { BonusGetManyFormData } from "../../../../schemas";
-import { IconPlus, IconEye, IconEdit } from "@tabler/icons-react";
+import { IconPlus, IconEye, IconEdit, IconCalculator } from "@tabler/icons-react";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
+import { BonusSimulationInteractiveTable } from "../../bonus-simulation/bonus-simulation-interactive-table";
+import { cn } from "@/lib/utils";
 
 interface BonusListProps {
   bonuses?: Bonus[];
@@ -37,6 +39,7 @@ const getDefaultVisibleColumns = () =>
 
 export function BonusList({ bonuses = [], isLoading = false, onFilter, className }: BonusListProps) {
   const navigate = useNavigate();
+  const [showSimulation, setShowSimulation] = useState(false);
 
   const {
     searchTerm,
@@ -195,38 +198,55 @@ export function BonusList({ bonuses = [], isLoading = false, onFilter, className
         <div className="flex items-center justify-between">
           <CardTitle>Bonificações</CardTitle>
           <div className="flex gap-2">
-            <ColumnVisibilityManager
-              columns={allColumns}
-              visibleColumns={visibleColumns}
-              onVisibilityChange={setVisibleColumns}
-              defaultVisibleColumns={getDefaultVisibleColumns()}
-            />
-            <Button onClick={() => navigate(routes.humanResources.bonus.create)}>
-              <IconPlus className="h-4 w-4 mr-2" />
-              Criar Bonificação
+            {!showSimulation && (
+              <ColumnVisibilityManager
+                columns={allColumns}
+                visibleColumns={visibleColumns}
+                onVisibilityChange={setVisibleColumns}
+                defaultVisibleColumns={getDefaultVisibleColumns()}
+              />
+            )}
+            <Button
+              variant={showSimulation ? "default" : "outline"}
+              onClick={() => setShowSimulation(!showSimulation)}
+            >
+              <IconCalculator className="h-4 w-4 mr-2" />
+              Simulação de Bônus
             </Button>
+            {!showSimulation && (
+              <Button onClick={() => navigate(routes.humanResources.bonus.create)}>
+                <IconPlus className="h-4 w-4 mr-2" />
+                Criar Bonificação
+              </Button>
+            )}
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <StandardizedTable
-          data={bonuses}
-          columns={columns}
-          searchTerm={searchTerm}
-          onSearchChange={handleSearch}
-          searchPlaceholder="Buscar por funcionário, ano ou mês..."
-          page={page}
-          pageSize={pageSize}
-          totalCount={bonuses.length}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          sortConfigs={sortConfigs}
-          onSort={handleSort}
-          selectedRows={selectedRows}
-          onRowSelection={handleRowSelection}
-          onSelectAll={handleSelectAll}
-          emptyMessage="Nenhuma bonificação encontrada"
-        />
+        {showSimulation ? (
+          <div className="h-[calc(100vh-300px)]">
+            <BonusSimulationInteractiveTable embedded={true} />
+          </div>
+        ) : (
+          <StandardizedTable
+            data={bonuses}
+            columns={columns}
+            searchTerm={searchTerm}
+            onSearchChange={handleSearch}
+            searchPlaceholder="Buscar por funcionário, ano ou mês..."
+            page={page}
+            pageSize={pageSize}
+            totalCount={bonuses.length}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
+            sortConfigs={sortConfigs}
+            onSort={handleSort}
+            selectedRows={selectedRows}
+            onRowSelection={handleRowSelection}
+            onSelectAll={handleSelectAll}
+            emptyMessage="Nenhuma bonificação encontrada"
+          />
+        )}
       </CardContent>
     </Card>
   );

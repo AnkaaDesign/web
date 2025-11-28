@@ -47,15 +47,17 @@ export const getSectorPrivilegeDescription = (privilege: SECTOR_PRIVILEGES): str
 
 export const getSectorPrivilegeColor = (privilege: SECTOR_PRIVILEGES): string => {
   const colors = {
-    [SECTOR_PRIVILEGES.BASIC]: "gray",
-    [SECTOR_PRIVILEGES.MAINTENANCE]: "blue",
-    [SECTOR_PRIVILEGES.WAREHOUSE]: "purple",
-    [SECTOR_PRIVILEGES.PRODUCTION]: "green",
-    [SECTOR_PRIVILEGES.LEADER]: "yellow",
-    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: "pink",
-    [SECTOR_PRIVILEGES.FINANCIAL]: "orange",
     [SECTOR_PRIVILEGES.ADMIN]: "red",
+    [SECTOR_PRIVILEGES.LEADER]: "blue",
+    [SECTOR_PRIVILEGES.PRODUCTION]: "blue",
+    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: "purple",
+    [SECTOR_PRIVILEGES.FINANCIAL]: "purple",
+    [SECTOR_PRIVILEGES.DESIGNER]: "purple",
+    [SECTOR_PRIVILEGES.LOGISTIC]: "purple",
+    [SECTOR_PRIVILEGES.MAINTENANCE]: "orange",
+    [SECTOR_PRIVILEGES.BASIC]: "gray",
     [SECTOR_PRIVILEGES.EXTERNAL]: "gray",
+    [SECTOR_PRIVILEGES.WAREHOUSE]: "green",
   };
   return colors[privilege] || "gray";
 };

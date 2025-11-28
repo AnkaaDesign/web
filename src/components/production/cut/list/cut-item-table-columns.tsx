@@ -2,7 +2,7 @@ import React from "react";
 import { format, isToday, isYesterday } from "date-fns";
 import { IconFileOff, IconScissors } from "@tabler/icons-react";
 import type { Cut } from "../../../../types";
-import { CUT_STATUS_LABELS, CUT_REQUEST_REASON_LABELS, CUT_ORIGIN_LABELS, CUT_TYPE_LABELS } from "../../../../constants";
+import { CUT_STATUS_LABELS, CUT_REQUEST_REASON_LABELS, CUT_ORIGIN_LABELS, CUT_TYPE_LABELS, getBadgeVariant } from "../../../../constants";
 import { CUT_STATUS, CUT_ORIGIN } from "../../../../constants";
 import { Badge } from "@/components/ui/badge";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
@@ -96,7 +96,7 @@ export const createCutColumns = (): CutColumn[] => [
     header: "STATUS",
     accessor: (item: Cut) => (
       <div className="px-4 py-2">
-        <Badge variant={item.status === CUT_STATUS.PENDING ? "secondary" : item.status === CUT_STATUS.CUTTING ? "default" : "success"}>
+        <Badge variant={getBadgeVariant(item.status, "CUT")}>
           {CUT_STATUS_LABELS[item.status]}
         </Badge>
       </div>

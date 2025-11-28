@@ -16,7 +16,7 @@ export function OrderStatusBadge({ status, className, size = "default" }: OrderS
   const displayText = ORDER_STATUS_LABELS[status] || status;
 
   return (
-    <Badge variant={variant} size={size} className={cn("font-medium", className)}>
+    <Badge variant={variant} size={size} className={cn("font-medium whitespace-nowrap", className)}>
       {displayText}
     </Badge>
   );

@@ -3,8 +3,8 @@ import { toast } from "sonner";
 import { formatCurrency, formatDate } from "../../../../utils";
 import { formatCPF } from "../../../../utils/formatters";
 
-// Payroll row interface matching the list page
-interface PayrollRow {
+// Bonus row interface matching the list page
+interface BonusRow {
   id: string;
   userId: string;
   userName: string;
@@ -15,102 +15,91 @@ interface PayrollRow {
   sector?: { id: string; name: string };
   performanceLevel: number;
   status: string;
-  payrollId?: string;
-  baseRemuneration: number;
-  totalDiscounts: number;
-  netSalary: number;
+  bonusId?: string;
   bonusAmount: number;
   tasksCompleted: number;
   averageTasks: number;
   totalWeightedTasks: number;
   bonusStatus: 'live' | 'saved';
+  totalDiscounts: number;
+  netBonus: number;
   monthLabel?: string;
   month: number;
   year: number;
 }
 
-// Extended filters with payroll-specific fields
-interface PayrollFiltersData {
+// Filters interface
+interface BonusFiltersData {
   year?: number;
   months?: string[];
-  userIds?: string[];
-  excludeUserIds?: string[];
+  performanceLevels?: number[];
   sectorIds?: string[];
   positionIds?: string[];
-  performanceLevels?: number[];
+  userIds?: string[];
+  excludeUserIds?: string[];
 }
 
-interface PayrollExportProps {
+interface BonusExportProps {
   className?: string;
-  filters?: PayrollFiltersData;
-  currentPageData?: PayrollRow[];
+  filters?: BonusFiltersData;
+  currentPageData?: BonusRow[];
   totalRecords?: number;
   selectedItems?: Set<string>;
   visibleColumns?: Set<string>;
 }
 
-// Export columns configuration
-const EXPORT_COLUMNS: ExportColumn<PayrollRow>[] = [
+// Column configuration for export
+const EXPORT_COLUMNS: ExportColumn<BonusRow>[] = [
   {
     id: "payrollNumber",
     label: "Nº Folha",
-    getValue: (row: PayrollRow) => row.payrollNumber || "-"
+    getValue: (row: BonusRow) => row.payrollNumber || "-"
   },
   {
     id: "user.name",
     label: "Nome",
-    getValue: (row: PayrollRow) => row.userName || ""
+    getValue: (row: BonusRow) => row.userName || ""
   },
   {
     id: "user.cpf",
     label: "CPF",
-    getValue: (row: PayrollRow) => row.userCpf ? formatCPF(row.userCpf) : "-"
+    getValue: (row: BonusRow) => row.userCpf ? formatCPF(row.userCpf) : "-"
   },
   {
     id: "position.name",
     label: "Cargo",
-    getValue: (row: PayrollRow) => row.position?.name || "-"
+    getValue: (row: BonusRow) => row.position?.name || "-"
   },
   {
     id: "sector.name",
     label: "Setor",
-    getValue: (row: PayrollRow) => row.sector?.name || "-"
+    getValue: (row: BonusRow) => row.sector?.name || "-"
   },
   {
     id: "performanceLevel",
     label: "Performance",
-    getValue: (row: PayrollRow) => row.performanceLevel?.toString() || "0"
+    getValue: (row: BonusRow) => row.performanceLevel?.toString() || "0"
   },
   {
     id: "averageTasks",
     label: "Média",
-    getValue: (row: PayrollRow) => {
+    getValue: (row: BonusRow) => {
       const isEligible = row.position?.bonifiable && row.performanceLevel > 0;
       return isEligible ? row.averageTasks.toFixed(1) : "-";
     }
   },
   {
-    id: "remuneration",
-    label: "Salário Base",
-    getValue: (row: PayrollRow) => formatCurrency(row.baseRemuneration || 0)
-  },
-  {
     id: "bonus",
     label: "Bônus",
-    getValue: (row: PayrollRow) => {
+    getValue: (row: BonusRow) => {
       const isEligible = row.position?.bonifiable && row.performanceLevel > 0;
-      return isEligible ? formatCurrency(row.bonusAmount || 0) : "Não elegível";
+      return isEligible ? formatCurrency(row.bonusAmount) : "Não elegível";
     }
   },
   {
-    id: "totalEarnings",
-    label: "Total Bruto",
-    getValue: (row: PayrollRow) => formatCurrency((row.baseRemuneration || 0) + (row.bonusAmount || 0))
-  },
-  {
-    id: "netSalary",
+    id: "netBonus",
     label: "Líquido",
-    getValue: (row: PayrollRow) => formatCurrency(row.netSalary || 0)
+    getValue: (row: BonusRow) => formatCurrency(row.netBonus)
   },
 ];
 
@@ -121,37 +110,34 @@ const DEFAULT_VISIBLE_COLUMNS = new Set([
   "position.name",
   "performanceLevel",
   "averageTasks",
-  "remuneration",
   "bonus",
-  "totalEarnings",
+  "netBonus",
 ]);
 
-export function PayrollExport({
+export function BonusExport({
   className,
   filters = {},
   currentPageData = [],
   totalRecords = 0,
   selectedItems,
   visibleColumns
-}: PayrollExportProps) {
+}: BonusExportProps) {
 
   // Calculate totals from current data
-  const calculateTotals = (data: PayrollRow[]) => {
-    const totalRemuneration = data.reduce((sum, row) => sum + (row.baseRemuneration || 0), 0);
+  const calculateTotals = (data: BonusRow[]) => {
     const totalBonus = data.reduce((sum, row) => sum + (row.bonusAmount || 0), 0);
-    const totalGross = data.reduce((sum, row) => sum + (row.baseRemuneration || 0) + (row.bonusAmount || 0), 0);
-    const totalNet = data.reduce((sum, row) => sum + (row.netSalary || 0), 0);
+    const totalNet = data.reduce((sum, row) => sum + (row.netBonus || 0), 0);
     const eligibleUsers = data.filter(row => row.position?.bonifiable && row.performanceLevel > 0);
+
+    // Get weighted tasks from first eligible user (they share the same pool)
+    const totalWeightedTasks = eligibleUsers.length > 0 ? eligibleUsers[0]?.totalWeightedTasks || 0 : 0;
     const avgTasks = eligibleUsers.length > 0 ? eligibleUsers[0]?.averageTasks || 0 : 0;
-    const totalTasks = eligibleUsers.length > 0 ? eligibleUsers[0]?.totalWeightedTasks || 0 : 0;
 
     return {
-      totalRemuneration,
       totalBonus,
-      totalGross,
       totalNet,
+      totalWeightedTasks,
       avgTasks,
-      totalTasks,
       eligibleCount: eligibleUsers.length,
       totalCount: data.length
     };
@@ -173,7 +159,7 @@ export function PayrollExport({
   };
 
   // Export handlers
-  const handleExport = async (format: ExportFormat, items: PayrollRow[], columns: ExportColumn<PayrollRow>[]) => {
+  const handleExport = async (format: ExportFormat, items: BonusRow[], columns: ExportColumn<BonusRow>[]) => {
     const totals = calculateTotals(items);
 
     switch (format) {
@@ -192,39 +178,32 @@ export function PayrollExport({
   };
 
   const exportToCSV = async (
-    items: PayrollRow[],
-    columns: ExportColumn<PayrollRow>[],
+    items: BonusRow[],
+    columns: ExportColumn<BonusRow>[],
     totals: ReturnType<typeof calculateTotals>
   ) => {
-    // CSV headers from columns
     const headers = columns.map((col) => col.label);
-
-    // Convert items to CSV rows
     const rows = items.map((item) => columns.map((col) => col.getValue(item)));
 
     // Add total row
     const totalRow = columns.map((col) => {
       if (col.id === "user.name") return "TOTAL";
-      if (col.id === "remuneration") return formatCurrency(totals.totalRemuneration);
       if (col.id === "bonus") return formatCurrency(totals.totalBonus);
-      if (col.id === "totalEarnings") return formatCurrency(totals.totalGross);
-      if (col.id === "netSalary") return formatCurrency(totals.totalNet);
+      if (col.id === "netBonus") return formatCurrency(totals.totalNet);
       return "";
     });
     rows.push(totalRow);
 
-    // Create CSV content
     const csvContent = [
       headers.join(","),
       ...rows.map((row) => row.map((cell) => `"${cell}"`).join(","))
     ].join("\n");
 
-    // Download CSV
     const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `folha-pagamento-${formatDate(new Date()).replace(/\//g, "-")}.csv`);
+    link.setAttribute("download", `bonus-${formatDate(new Date()).replace(/\//g, "-")}.csv`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -232,36 +211,29 @@ export function PayrollExport({
   };
 
   const exportToExcel = async (
-    items: PayrollRow[],
-    columns: ExportColumn<PayrollRow>[],
+    items: BonusRow[],
+    columns: ExportColumn<BonusRow>[],
     totals: ReturnType<typeof calculateTotals>
   ) => {
-    // Headers from columns
     const headers = columns.map((col) => col.label);
-
-    // Convert items to rows
     const rows = items.map((item) => columns.map((col) => col.getValue(item)));
 
     // Add total row
     const totalRow = columns.map((col) => {
       if (col.id === "user.name") return "TOTAL";
-      if (col.id === "remuneration") return formatCurrency(totals.totalRemuneration);
       if (col.id === "bonus") return formatCurrency(totals.totalBonus);
-      if (col.id === "totalEarnings") return formatCurrency(totals.totalGross);
-      if (col.id === "netSalary") return formatCurrency(totals.totalNet);
+      if (col.id === "netBonus") return formatCurrency(totals.totalNet);
       return "";
     });
     rows.push(totalRow);
 
-    // Create tab-separated values for Excel
     const excelContent = [headers.join("\t"), ...rows.map((row) => row.join("\t"))].join("\n");
 
-    // Download as .xls file
     const blob = new Blob(["\ufeff" + excelContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `folha-pagamento-${formatDate(new Date()).replace(/\//g, "-")}.xls`);
+    link.setAttribute("download", `bonus-${formatDate(new Date()).replace(/\//g, "-")}.xls`);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -269,13 +241,11 @@ export function PayrollExport({
   };
 
   const exportToPDF = async (
-    items: PayrollRow[],
-    columns: ExportColumn<PayrollRow>[],
+    items: BonusRow[],
+    columns: ExportColumn<BonusRow>[],
     totals: ReturnType<typeof calculateTotals>
   ) => {
     const periodLabel = getPeriodLabel();
-
-    // Calculate responsive font sizes
     const fontSize = "12px";
     const headerFontSize = "11px";
     const cellPadding = "8px 6px";
@@ -287,7 +257,7 @@ export function PayrollExport({
       <html>
       <head>
         <meta charset="UTF-8">
-        <title>Folha de Pagamento - ${formatDate(new Date())}</title>
+        <title>Bônus - ${formatDate(new Date())}</title>
         <style>
           @page {
             size: A4;
@@ -427,9 +397,12 @@ export function PayrollExport({
         <div class="header">
           <img src="/logo.png" alt="Logo" class="logo" />
           <div class="header-info">
-            <h1 style="font-size: 20px; margin-bottom: 8px;">Folha de Pagamento</h1>
+            <h1 style="font-size: 20px; margin-bottom: 8px;">Relatório de Bonificação</h1>
             <div class="info">
               <p><strong>Período:</strong> ${periodLabel}</p>
+              <p><strong>Tarefas Ponderadas:</strong> ${totals.totalWeightedTasks.toFixed(1)}</p>
+              <p><strong>Total de colaboradores:</strong> ${totals.totalCount}</p>
+              <p><strong>Média por colaborador:</strong> ${totals.avgTasks.toFixed(1)}</p>
             </div>
           </div>
         </div>
@@ -450,10 +423,8 @@ export function PayrollExport({
               <tr>
                 ${columns.map((col) => {
                   if (col.id === "user.name") return `<td class="text-left">TOTAL</td>`;
-                  if (col.id === "remuneration") return `<td class="text-left">${formatCurrency(totals.totalRemuneration)}</td>`;
                   if (col.id === "bonus") return `<td class="text-left">${formatCurrency(totals.totalBonus)}</td>`;
-                  if (col.id === "totalEarnings") return `<td class="text-left">${formatCurrency(totals.totalGross)}</td>`;
-                  if (col.id === "netSalary") return `<td class="text-left">${formatCurrency(totals.totalNet)}</td>`;
+                  if (col.id === "netBonus") return `<td class="text-left">${formatCurrency(totals.totalNet)}</td>`;
                   return `<td></td>`;
                 }).join("")}
               </tr>
@@ -493,7 +464,7 @@ export function PayrollExport({
   const filteredColumns = EXPORT_COLUMNS.filter((col) => effectiveVisibleColumns.has(col.id));
 
   return (
-    <BaseExportPopover<PayrollRow>
+    <BaseExportPopover<BonusRow>
       className={className}
       currentItems={currentPageData}
       totalRecords={totalRecords}
@@ -502,8 +473,8 @@ export function PayrollExport({
       exportColumns={filteredColumns}
       defaultVisibleColumns={DEFAULT_VISIBLE_COLUMNS}
       onExport={handleExport}
-      entityName="colaborador"
-      entityNamePlural="colaboradores"
+      entityName="bônus"
+      entityNamePlural="bônus"
     />
   );
 }

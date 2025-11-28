@@ -98,6 +98,8 @@ export type BadgeVariant =
   | "blue"
   | "orange"
   | "green"
+  | "gray"
+  | "cyan"
   // Deprecated (keep for backward compatibility)
   | "success"
   | "destructive"
@@ -314,6 +316,16 @@ export const BADGE_COLORS: Record<
     text: "text-white",
     hover: "hover:bg-green-800",
   },
+  gray: {
+    bg: "bg-neutral-500",
+    text: "text-white",
+    hover: "hover:bg-neutral-600",
+  },
+  cyan: {
+    bg: "bg-cyan-500",
+    text: "text-white",
+    hover: "hover:bg-cyan-600",
+  },
 
   // ===== DEPRECATED - Keep for backward compatibility =====
   success: {
@@ -355,22 +367,24 @@ export const BADGE_COLORS: Record<
 export const ENTITY_BADGE_CONFIG = {
   // Order Status
   ORDER: {
-    [ORDER_STATUS.CREATED]: "created" as BadgeVariant,
-    [ORDER_STATUS.PARTIALLY_FULFILLED]: "yellow" as BadgeVariant,  // Entity-specific: use yellow
-    [ORDER_STATUS.FULFILLED]: "amber" as BadgeVariant,             // Entity-specific: use amber
-    [ORDER_STATUS.OVERDUE]: "purple" as BadgeVariant,              // Entity-specific: use purple
-    [ORDER_STATUS.PARTIALLY_RECEIVED]: "teal" as BadgeVariant,     // Entity-specific: use teal
-    [ORDER_STATUS.RECEIVED]: "received" as BadgeVariant,
-    [ORDER_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
+    [ORDER_STATUS.CREATED]: "gray" as BadgeVariant,                // Gray - initial state
+    [ORDER_STATUS.PARTIALLY_FULFILLED]: "cyan" as BadgeVariant,    // Cyan - partially done
+    [ORDER_STATUS.FULFILLED]: "blue" as BadgeVariant,              // Blue - done/fulfilled
+    [ORDER_STATUS.OVERDUE]: "purple" as BadgeVariant,              // Purple - overdue
+    [ORDER_STATUS.PARTIALLY_RECEIVED]: "teal" as BadgeVariant,     // Teal - partially received
+    [ORDER_STATUS.RECEIVED]: "received" as BadgeVariant,           // Green - received
+    [ORDER_STATUS.CANCELLED]: "cancelled" as BadgeVariant,         // Red - cancelled
   },
 
   // Task Status
   TASK: {
-    [TASK_STATUS.PENDING]: "pending" as BadgeVariant,
-    [TASK_STATUS.IN_PRODUCTION]: "blue" as BadgeVariant,
-    [TASK_STATUS.ON_HOLD]: "onHold" as BadgeVariant,
-    [TASK_STATUS.COMPLETED]: "completed" as BadgeVariant,
-    [TASK_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
+    [TASK_STATUS.PENDING]: "gray" as BadgeVariant,           // Gray - not started yet
+    [TASK_STATUS.IN_PRODUCTION]: "blue" as BadgeVariant,     // Blue - in progress
+    [TASK_STATUS.ON_HOLD]: "orange" as BadgeVariant,         // Orange - paused
+    [TASK_STATUS.COMPLETED]: "green" as BadgeVariant,        // Green - finished
+    [TASK_STATUS.CANCELLED]: "red" as BadgeVariant,          // Red - cancelled
+    [TASK_STATUS.INVOICED]: "purple" as BadgeVariant,        // Purple - invoiced (financial)
+    [TASK_STATUS.SETTLED]: "teal" as BadgeVariant,           // Teal - settled/finalized
   },
 
   // Maintenance Status
@@ -414,10 +428,10 @@ export const ENTITY_BADGE_CONFIG = {
 
   // Service Order Status
   SERVICE_ORDER: {
-    [SERVICE_ORDER_STATUS.PENDING]: "pending" as BadgeVariant,
-    [SERVICE_ORDER_STATUS.IN_PROGRESS]: "inProgress" as BadgeVariant,
-    [SERVICE_ORDER_STATUS.COMPLETED]: "completed" as BadgeVariant,
-    [SERVICE_ORDER_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
+    [SERVICE_ORDER_STATUS.PENDING]: "gray" as BadgeVariant,      // Gray - not started
+    [SERVICE_ORDER_STATUS.IN_PROGRESS]: "blue" as BadgeVariant,  // Blue - in progress
+    [SERVICE_ORDER_STATUS.COMPLETED]: "green" as BadgeVariant,   // Green - completed
+    [SERVICE_ORDER_STATUS.CANCELLED]: "red" as BadgeVariant,     // Red - cancelled
   },
 
   // Airbrushing Status
@@ -430,16 +444,16 @@ export const ENTITY_BADGE_CONFIG = {
 
   // Cut Status
   CUT: {
-    [CUT_STATUS.PENDING]: "pending" as BadgeVariant,
+    [CUT_STATUS.PENDING]: "gray" as BadgeVariant,
     [CUT_STATUS.CUTTING]: "blue" as BadgeVariant,
-    [CUT_STATUS.COMPLETED]: "completed" as BadgeVariant,
+    [CUT_STATUS.COMPLETED]: "green" as BadgeVariant,
   },
 
   // Borrow Status
   BORROW: {
-    [BORROW_STATUS.ACTIVE]: "active" as BadgeVariant, // Green for active borrows
-    [BORROW_STATUS.RETURNED]: "returned" as BadgeVariant, // Green for returned
-    [BORROW_STATUS.LOST]: "lost" as BadgeVariant, // Red for lost
+    [BORROW_STATUS.ACTIVE]: "blue" as BadgeVariant,    // Blue for active borrows
+    [BORROW_STATUS.RETURNED]: "green" as BadgeVariant, // Green for returned
+    [BORROW_STATUS.LOST]: "red" as BadgeVariant,       // Red for lost
   },
 
   // PPE Request Status
@@ -645,23 +659,26 @@ export const ENTITY_BADGE_CONFIG = {
 
   // Sector Privileges
   SECTOR_PRIVILEGES: {
-    [SECTOR_PRIVILEGES.BASIC]: "muted" as BadgeVariant,
-    [SECTOR_PRIVILEGES.MAINTENANCE]: "secondary" as BadgeVariant,
-    [SECTOR_PRIVILEGES.WAREHOUSE]: "default" as BadgeVariant,
-    [SECTOR_PRIVILEGES.ADMIN]: "red" as BadgeVariant,           // Red - admin privileges
-    [SECTOR_PRIVILEGES.PRODUCTION]: "blue" as BadgeVariant,
-    [SECTOR_PRIVILEGES.LEADER]: "blue" as BadgeVariant,
-    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: "orange" as BadgeVariant,
-    [SECTOR_PRIVILEGES.FINANCIAL]: "green" as BadgeVariant,
-    [SECTOR_PRIVILEGES.EXTERNAL]: "outline" as BadgeVariant,
+    [SECTOR_PRIVILEGES.ADMIN]: "red" as BadgeVariant,              // Red - admin privileges
+    [SECTOR_PRIVILEGES.LEADER]: "blue" as BadgeVariant,            // Blue - leadership role (same as production)
+    [SECTOR_PRIVILEGES.PRODUCTION]: "blue" as BadgeVariant,        // Blue - production role
+    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: "purple" as BadgeVariant, // Purple - HR specific
+    [SECTOR_PRIVILEGES.FINANCIAL]: "purple" as BadgeVariant,       // Purple - financial role (same as HR)
+    [SECTOR_PRIVILEGES.DESIGNER]: "purple" as BadgeVariant,        // Purple - designer role (same as HR)
+    [SECTOR_PRIVILEGES.LOGISTIC]: "purple" as BadgeVariant,        // Purple - logistics role (same as HR)
+    [SECTOR_PRIVILEGES.MAINTENANCE]: "orange" as BadgeVariant,     // Orange - maintenance role
+    [SECTOR_PRIVILEGES.BASIC]: "gray" as BadgeVariant,             // Gray - basic access
+    [SECTOR_PRIVILEGES.EXTERNAL]: "gray" as BadgeVariant,          // Gray - external access
+    [SECTOR_PRIVILEGES.WAREHOUSE]: "green" as BadgeVariant,        // Green - warehouse role
   },
 
   // Commission Status
+  // green = integral, blue = parcial, orange = sem comissão, red = suspensa
   COMMISSION_STATUS: {
-    [COMMISSION_STATUS.FULL_COMMISSION]: "green" as BadgeVariant,    // Entity-specific: use green
-    [COMMISSION_STATUS.PARTIAL_COMMISSION]: "orange" as BadgeVariant, // Entity-specific: use orange
-    [COMMISSION_STATUS.NO_COMMISSION]: "cancelled" as BadgeVariant,   // Core semantic
-    [COMMISSION_STATUS.SUSPENDED_COMMISSION]: "suspended" as BadgeVariant, // Core semantic
+    [COMMISSION_STATUS.FULL_COMMISSION]: "green" as BadgeVariant,      // Green - full commission
+    [COMMISSION_STATUS.PARTIAL_COMMISSION]: "blue" as BadgeVariant,    // Blue - partial commission
+    [COMMISSION_STATUS.NO_COMMISSION]: "orange" as BadgeVariant,       // Orange - no commission
+    [COMMISSION_STATUS.SUSPENDED_COMMISSION]: "suspended" as BadgeVariant, // Red - suspended
   },
 };
 
@@ -759,8 +776,8 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
 
   // Commission Status fallback
   FULL_COMMISSION: "green",
-  PARTIAL_COMMISSION: "orange",
-  NO_COMMISSION: "cancelled",
+  PARTIAL_COMMISSION: "blue",
+  NO_COMMISSION: "orange",
   SUSPENDED_COMMISSION: "suspended",
 };
 
@@ -865,12 +882,15 @@ export const BOOLEAN_BADGE_CONFIG = {
  * Helper function to get badge variant from any enum value
  * First checks entity-specific mappings, then falls back to generic mappings
  */
-export function getBadgeVariant(value: string, entity?: keyof typeof ENTITY_BADGE_CONFIG): BadgeVariant {
-  // If entity is specified, check entity-specific config first
-  if (entity && ENTITY_BADGE_CONFIG[entity]) {
-    const entityConfig = ENTITY_BADGE_CONFIG[entity] as Record<string, BadgeVariant>;
-    if (entityConfig[value]) {
-      return entityConfig[value];
+export function getBadgeVariant(value: string, entity?: keyof typeof ENTITY_BADGE_CONFIG | string): BadgeVariant {
+  // If entity is specified, check entity-specific config first (case-insensitive)
+  if (entity) {
+    const entityKey = entity.toUpperCase() as keyof typeof ENTITY_BADGE_CONFIG;
+    if (ENTITY_BADGE_CONFIG[entityKey]) {
+      const entityConfig = ENTITY_BADGE_CONFIG[entityKey] as Record<string, BadgeVariant>;
+      if (entityConfig[value]) {
+        return entityConfig[value];
+      }
     }
   }
 

@@ -264,9 +264,11 @@ export function getPageIconName(path: string): string {
     "/recursos-humanos/setores": "building",
     "/recursos-humanos/setores/cadastrar": "building",
     "/recursos-humanos/folha-de-pagamento": "payroll",
+    "/recursos-humanos/bonus": "coins",
+    "/recursos-humanos/bonus/:id": "coins",
     "/recursos-humanos/calculos": "device-ipad-dollar",
     "/recursos-humanos/controle-ponto": "fingerprint",
-    "/recursos-humanos/niveis-desempenho": "trending-up",
+    "/recursos-humanos/bonus/nivel-de-performance": "trending-up",
     "/recursos-humanos/requisicoes": "clipboard-list",
     "/recursos-humanos/simulacao-bonus": "calculator",
 

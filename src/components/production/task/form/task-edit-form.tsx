@@ -174,17 +174,17 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     const defaults = {
       left: {
         height: 2.4,
-        sections: [{ width: 8.0, isDoor: false, doorOffset: null, position: 0 }],
+        layoutSections: [{ width: 8.0, isDoor: false, doorHeight: null, position: 0 }],
         photoId: null,
       },
       right: {
         height: 2.4,
-        sections: [{ width: 8.0, isDoor: false, doorOffset: null, position: 0 }],
+        layoutSections: [{ width: 8.0, isDoor: false, doorHeight: null, position: 0 }],
         photoId: null,
       },
       back: {
         height: 2.42,
-        sections: [{ width: 2.42, isDoor: false, doorOffset: null, position: 0 }],
+        layoutSections: [{ width: 2.42, isDoor: false, doorHeight: null, position: 0 }],
         photoId: null,
       },
     };
@@ -250,16 +250,16 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       if (layoutsData.leftSideLayout?.layoutSections) {
         newStates.left = {
           height: layoutsData.leftSideLayout.height,
-          sections: layoutsData.leftSideLayout.layoutSections.map((s: any) => ({
+          layoutSections: layoutsData.leftSideLayout.layoutSections.map((s: any) => ({
             width: s.width,
             isDoor: s.isDoor,
-            doorOffset: s.doorOffset,
+            doorHeight: s.doorHeight,
             position: s.position,
           })),
           photoId: layoutsData.leftSideLayout.photoId,
         };
         console.log('[TaskEditForm] Synced left side from backend:', {
-          sectionsCount: newStates.left.sections.length,
+          layoutSectionsCount: newStates.left.layoutSections.length,
           height: newStates.left.height,
         });
       }
@@ -268,16 +268,16 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       if (layoutsData.rightSideLayout?.layoutSections) {
         newStates.right = {
           height: layoutsData.rightSideLayout.height,
-          sections: layoutsData.rightSideLayout.layoutSections.map((s: any) => ({
+          layoutSections: layoutsData.rightSideLayout.layoutSections.map((s: any) => ({
             width: s.width,
             isDoor: s.isDoor,
-            doorOffset: s.doorOffset,
+            doorHeight: s.doorHeight,
             position: s.position,
           })),
           photoId: layoutsData.rightSideLayout.photoId,
         };
         console.log('[TaskEditForm] Synced right side from backend:', {
-          sectionsCount: newStates.right.sections.length,
+          layoutSectionsCount: newStates.right.layoutSections.length,
           height: newStates.right.height,
         });
       }
@@ -286,16 +286,16 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       if (layoutsData.backSideLayout?.layoutSections) {
         newStates.back = {
           height: layoutsData.backSideLayout.height,
-          sections: layoutsData.backSideLayout.layoutSections.map((s: any) => ({
+          layoutSections: layoutsData.backSideLayout.layoutSections.map((s: any) => ({
             width: s.width,
             isDoor: s.isDoor,
-            doorOffset: s.doorOffset,
+            doorHeight: s.doorHeight,
             position: s.position,
           })),
           photoId: layoutsData.backSideLayout.photoId,
         };
         console.log('[TaskEditForm] Synced back side from backend:', {
-          sectionsCount: newStates.back.sections.length,
+          layoutSectionsCount: newStates.back.layoutSections.length,
           height: newStates.back.height,
           photoId: newStates.back.photoId,
         });
@@ -310,6 +310,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   }, [layoutsData, modifiedLayoutSides.size]);
 
   // When layout section opens, mark as having changes (because defaults are considered edits)
+  // Also mark all sides as modified if no existing layouts exist (to create all 3 sides with defaults)
   useEffect(() => {
     if (isLayoutOpen && !hasLayoutChanges) {
       console.log('');
@@ -317,11 +318,21 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       console.log('[TaskEditForm] Layout section opened!');
       console.log('[TaskEditForm] Setting hasLayoutChanges = TRUE');
       console.log('[TaskEditForm] Reason: Opening layout means user wants to configure it');
+
+      // Check if this is a NEW layout (no existing layouts from backend)
+      const hasExistingLayouts = !!(layoutsData?.leftSideLayout || layoutsData?.rightSideLayout || layoutsData?.backSideLayout);
+
+      if (!hasExistingLayouts) {
+        // Mark ALL sides as modified so they all get created with default values
+        console.log('[TaskEditForm] No existing layouts - marking ALL sides as modified for creation');
+        setModifiedLayoutSides(new Set(['left', 'right', 'back']));
+      }
+
       console.log('🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢');
       console.log('');
       setHasLayoutChanges(true);
     }
-  }, [isLayoutOpen, hasLayoutChanges]);
+  }, [isLayoutOpen, hasLayoutChanges, layoutsData]);
 
   // Real-time validation of layout width balance
   useEffect(() => {
@@ -637,24 +648,24 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           console.log('[TaskEditForm SUBMIT] Current layout states (FULL DETAILS):', {
             left: currentLayoutStates.left ? {
               height: currentLayoutStates.left.height,
-              sectionsCount: currentLayoutStates.left.sections?.length,
-              sections: currentLayoutStates.left.sections,
+              layoutSectionsCount: currentLayoutStates.left.layoutSections?.length,
+              layoutSections: currentLayoutStates.left.layoutSections,
               photoId: currentLayoutStates.left.photoId,
               hasPhotoFile: !!currentLayoutStates.left.photoFile,
               photoFileName: currentLayoutStates.left.photoFile?.name,
             } : null,
             right: currentLayoutStates.right ? {
               height: currentLayoutStates.right.height,
-              sectionsCount: currentLayoutStates.right.sections?.length,
-              sections: currentLayoutStates.right.sections,
+              layoutSectionsCount: currentLayoutStates.right.layoutSections?.length,
+              layoutSections: currentLayoutStates.right.layoutSections,
               photoId: currentLayoutStates.right.photoId,
               hasPhotoFile: !!currentLayoutStates.right.photoFile,
               photoFileName: currentLayoutStates.right.photoFile?.name,
             } : null,
             back: currentLayoutStates.back ? {
               height: currentLayoutStates.back.height,
-              sectionsCount: currentLayoutStates.back.sections?.length,
-              sections: currentLayoutStates.back.sections,
+              layoutSectionsCount: currentLayoutStates.back.layoutSections?.length,
+              layoutSections: currentLayoutStates.back.layoutSections,
               photoId: currentLayoutStates.back.photoId,
               hasPhotoFile: !!currentLayoutStates.back.photoFile,
               photoFileName: currentLayoutStates.back.photoFile?.name,
@@ -668,7 +679,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
             const sideData = currentLayoutStates[side];
             console.log(`[TaskEditForm SUBMIT] sideData for ${side}:`, sideData);
 
-            if (sideData && sideData.sections && sideData.sections.length > 0) {
+            if (sideData && sideData.layoutSections && sideData.layoutSections.length > 0) {
               const sideName = side === 'left' ? 'leftSide' : side === 'right' ? 'rightSide' : 'backSide';
 
               // Extract photo file if present
@@ -679,23 +690,23 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
               truckLayoutData[sideName] = {
                 height: sideData.height,
-                sections: sideData.sections,
+                layoutSections: sideData.layoutSections,
                 photoId: sideData.photoId || null,
                 // Don't include file in JSON - it will be in FormData
               };
               console.log(`[TaskEditForm SUBMIT] ✅ Added modified ${sideName} to payload:`, {
                 height: truckLayoutData[sideName].height,
-                sectionsCount: truckLayoutData[sideName].sections.length,
-                sections: truckLayoutData[sideName].sections,
+                layoutSectionsCount: truckLayoutData[sideName].layoutSections.length,
+                layoutSections: truckLayoutData[sideName].layoutSections,
                 photoId: truckLayoutData[sideName].photoId,
                 hasPhotoFile: !!sideData.photoFile,
               });
             } else {
-              console.log(`[TaskEditForm SUBMIT] ⚠️ Side ${side} has no sections or invalid data!`);
+              console.log(`[TaskEditForm SUBMIT] ⚠️ Side ${side} has no layoutSections or invalid data!`);
               console.log(`[TaskEditForm SUBMIT] Debug info:`, {
                 hasSideData: !!sideData,
-                hasSections: !!sideData?.sections,
-                sectionsLength: sideData?.sections?.length,
+                hasLayoutSections: !!sideData?.layoutSections,
+                layoutSectionsLength: sideData?.layoutSections?.length,
                 sideDataKeys: sideData ? Object.keys(sideData) : [],
               });
             }
@@ -1757,9 +1768,9 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                             setHasLayoutChanges(true);
                             // Reset layout states to defaults
                             setCurrentLayoutStates({
-                              left: { height: 2.4, sections: [{ width: 8, isDoor: false, doorOffset: null, position: 0 }], photoId: null },
-                              right: { height: 2.4, sections: [{ width: 8, isDoor: false, doorOffset: null, position: 0 }], photoId: null },
-                              back: { height: 2.42, sections: [{ width: 2.42, isDoor: false, doorOffset: null, position: 0 }], photoId: null },
+                              left: { height: 2.4, layoutSections: [{ width: 8, isDoor: false, doorHeight: null, position: 0 }], photoId: null },
+                              right: { height: 2.4, layoutSections: [{ width: 8, isDoor: false, doorHeight: null, position: 0 }], photoId: null },
+                              back: { height: 2.42, layoutSections: [{ width: 2.42, isDoor: false, doorHeight: null, position: 0 }], photoId: null },
                             });
                             setModifiedLayoutSides(new Set());
                           }}
@@ -1848,28 +1859,28 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                               side,
                               layoutData: {
                                 height: layoutData.height,
-                                sectionsCount: layoutData.sections?.length,
-                                sections: layoutData.sections?.map((s: any) => ({
+                                layoutSectionsCount: layoutData.layoutSections?.length,
+                                layoutSections: layoutData.layoutSections?.map((s: any) => ({
                                   width: s.width,
                                   isDoor: s.isDoor,
-                                  doorOffset: s.doorOffset,
+                                  doorHeight: s.doorHeight,
                                 })),
-                                totalWidth: layoutData.sections?.reduce((sum: number, s: any) => sum + s.width, 0),
+                                totalWidth: layoutData.layoutSections?.reduce((sum: number, s: any) => sum + s.width, 0),
                               },
                             });
 
                             console.log('[TaskEditForm] Current state BEFORE update:', {
                               left: currentLayoutStates.left ? {
-                                totalWidth: currentLayoutStates.left.sections?.reduce((sum: number, s: any) => sum + s.width, 0),
-                                sectionsCount: currentLayoutStates.left.sections?.length,
+                                totalWidth: currentLayoutStates.left.layoutSections?.reduce((sum: number, s: any) => sum + s.width, 0),
+                                layoutSectionsCount: currentLayoutStates.left.layoutSections?.length,
                               } : 'default/null',
                               right: currentLayoutStates.right ? {
-                                totalWidth: currentLayoutStates.right.sections?.reduce((sum: number, s: any) => sum + s.width, 0),
-                                sectionsCount: currentLayoutStates.right.sections?.length,
+                                totalWidth: currentLayoutStates.right.layoutSections?.reduce((sum: number, s: any) => sum + s.width, 0),
+                                layoutSectionsCount: currentLayoutStates.right.layoutSections?.length,
                               } : 'default/null',
                               back: currentLayoutStates.back ? {
-                                totalWidth: currentLayoutStates.back.sections?.reduce((sum: number, s: any) => sum + s.width, 0),
-                                sectionsCount: currentLayoutStates.back.sections?.length,
+                                totalWidth: currentLayoutStates.back.layoutSections?.reduce((sum: number, s: any) => sum + s.width, 0),
+                                layoutSectionsCount: currentLayoutStates.back.layoutSections?.length,
                               } : 'default/null',
                             });
 
@@ -1899,8 +1910,8 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
                               console.log('[TaskEditForm] State AFTER update:', {
                                 [side]: {
-                                  totalWidth: layoutData.sections?.reduce((sum: number, s: any) => sum + s.width, 0),
-                                  sectionsCount: layoutData.sections?.length,
+                                  totalWidth: layoutData.layoutSections?.reduce((sum: number, s: any) => sum + s.width, 0),
+                                  layoutSectionsCount: layoutData.layoutSections?.length,
                                   hasPhotoFile: !!layoutData.photoFile,
                                   photoFileName: layoutData.photoFile?.name,
                                 },
@@ -1917,7 +1928,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                               console.log('[TaskEditForm] LayoutForm onSave called - layouts will be saved with task submission', {
                                 side: selectedLayoutSide,
                                 layoutData,
-                                sectionsCount: layoutData.sections?.length,
+                                layoutSectionsCount: layoutData.layoutSections?.length,
                               });
 
                               // Mark layout changes to enable submit button

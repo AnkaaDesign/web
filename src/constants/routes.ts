@@ -122,10 +122,6 @@ export const routes = {
       remunerations: (positionId: string) => `/recursos-humanos/cargos/${positionId}/remuneracoes`,
       root: "/recursos-humanos/cargos",
     },
-    performanceLevels: {
-      list: "/recursos-humanos/niveis-desempenho",
-      root: "/recursos-humanos/niveis-desempenho",
-    },
     ppe: {
       create: "/recursos-humanos/epi/cadastrar",
       deliveries: {
@@ -182,7 +178,14 @@ export const routes = {
       edit: (payrollId: string) => `/recursos-humanos/folha-de-pagamento/editar/${payrollId}`,
     },
     bonus: {
-      simulation: "/recursos-humanos/simulacao-bonus",
+      root: "/recursos-humanos/bonus",
+      list: "/recursos-humanos/bonus",
+      details: (id: string) => `/recursos-humanos/bonus/${id}`,
+      simulation: "/recursos-humanos/bonus/simulacao-de-bonus",
+      performanceLevels: {
+        list: "/recursos-humanos/bonus/nivel-de-performance",
+        root: "/recursos-humanos/bonus/nivel-de-performance",
+      },
     },
   },
 

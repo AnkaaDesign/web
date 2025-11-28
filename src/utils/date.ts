@@ -722,13 +722,18 @@ export const getCurrentPayrollPeriod = (referenceDate?: Date): { year: number; m
   let year = date.getFullYear();
   let month = date.getMonth() + 1; // getMonth() is 0-based, we want 1-based
 
-  // If today is the 26th or later, the period is for the next month
-  if (day >= 26) {
-    month += 1;
-    // Handle year rollover
-    if (month > 12) {
-      month = 1;
-      year += 1;
+  // 5th day rule:
+  // - If today is <= 5th, we're still in the editing window for the PREVIOUS month's payroll
+  // - If today is > 5th, we show the CURRENT month's payroll
+  //
+  // Example: Today is Nov 3rd (day <= 5) -> show October payroll
+  // Example: Today is Nov 6th (day > 5) -> show November payroll
+  if (day <= 5) {
+    month -= 1;
+    // Handle year rollover (January -> December of previous year)
+    if (month < 1) {
+      month = 12;
+      year -= 1;
     }
   }
 

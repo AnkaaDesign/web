@@ -42,13 +42,13 @@ export function getTaskStatusLabel(status: TASK_STATUS): string {
  */
 export function getTaskStatusColor(status: TASK_STATUS): string {
   const colors: Record<TASK_STATUS, string> = {
-    [TASK_STATUS.PENDING]: "pending",
-    [TASK_STATUS.IN_PRODUCTION]: "inProgress",
-    [TASK_STATUS.COMPLETED]: "completed",
-    [TASK_STATUS.CANCELLED]: "cancelled",
-    [TASK_STATUS.ON_HOLD]: "onHold",
-    [TASK_STATUS.INVOICED]: "invoiced",
-    [TASK_STATUS.SETTLED]: "settled",
+    [TASK_STATUS.PENDING]: "gray",           // Gray - not started yet
+    [TASK_STATUS.IN_PRODUCTION]: "blue",     // Blue - in progress
+    [TASK_STATUS.COMPLETED]: "green",        // Green - finished
+    [TASK_STATUS.CANCELLED]: "red",          // Red - cancelled
+    [TASK_STATUS.ON_HOLD]: "orange",         // Orange - paused
+    [TASK_STATUS.INVOICED]: "purple",        // Purple - invoiced (financial)
+    [TASK_STATUS.SETTLED]: "teal",           // Teal - settled/finalized
   };
   return colors[status] || "default";
 }

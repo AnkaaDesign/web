@@ -13,6 +13,8 @@ import type {
   BonusGetManyParams,
   BonusGetManyResponse,
   BonusGetByIdParams,
+  BonusFiltersData,
+  BonusListParams,
 } from "../types";
 
 import type {
@@ -38,6 +40,8 @@ export type {
   PayrollData,
   BonusDiscountCreateFormData,
   BonusCalculationResult,
+  BonusFiltersData,
+  BonusListParams,
 };
 
 // =====================================================
@@ -96,43 +100,6 @@ export const useBonusDetail = baseHooks.useDetail;
 export const useBonusMutations = baseHooks.useMutations;
 export const useBonusBatchMutations = baseHooks.useBatchMutations;
 
-// =====================================================
-// Live Calculation Hooks
-// =====================================================
-
-/**
- * Hook to get live bonus calculations for a specific period
- * Shows real-time calculated bonuses before they are saved to database
- * Refreshes frequently to show current calculations
- *
- * @param year - Year for calculation (e.g., 2024)
- * @param month - Month for calculation (1-12)
- * @param options - Query options
- */
-export const useLiveBonusCalculation = (
-  year: number,
-  month: number,
-  options?: {
-    enabled?: boolean;
-    refetchInterval?: number;
-  }
-) => {
-  return useQuery({
-    queryKey: [...bonusKeys.all, 'live', year, month],
-    queryFn: async () => {
-      const response = await bonusService.getLiveBonuses(year, month);
-      // The API returns PayrollData with bonuses array
-      return response.data || { bonuses: [], meta: {}, summary: {} };
-    },
-    staleTime: 1000 * 30, // 30 seconds - fresh calculation data
-    refetchInterval: options?.refetchInterval ?? 1000 * 60, // Refresh every minute by default
-    enabled: (options?.enabled ?? true) && !!year && !!month,
-  });
-};
-
-// Alias for backward compatibility
-export const useLiveBonuses = useLiveBonusCalculation;
-
 /**
  * Hook to manually trigger bonus calculation
  * Used by admins to save calculated bonuses to database
@@ -145,7 +112,6 @@ export const useCalculateBonuses = () => {
 
   return useMutation({
     mutationFn: (params: { year: number; month: number }) => {
-      console.log('Triggering bonus calculation for:', params);
       return bonusService.calculateBonuses({
         year: params.year.toString(),
         month: params.month.toString()
@@ -253,6 +219,95 @@ export const useBonusByPeriod = (
   });
 };
 
+/**
+ * Hook to get bonus list with comprehensive filters
+ * Similar to payroll list hook, supports all common filter types
+ *
+ * @param params - Filter parameters including year, months, performance levels, sectors, positions, users
+ * @param options - Query options (enabled, refetch interval, etc.)
+ *
+ * @example
+ * ```ts
+ * const { data: bonuses, isLoading } = useBonusList({
+ *   year: 2024,
+ *   months: [1, 2, 3],
+ *   performanceLevels: [4, 5],
+ *   sectorIds: ['sector-1'],
+ *   include: { user: true, tasks: true, bonusDiscounts: true }
+ * });
+ * ```
+ */
+export const useBonusList = (
+  params: BonusListParams = {},
+  options?: { enabled?: boolean }
+) => {
+  // Build the where clause from filter parameters
+  const whereClause: BonusGetManyParams['where'] = {
+    ...params.where,
+  };
+
+  // Add year filter
+  if (params.year !== undefined) {
+    whereClause.year = params.year;
+  }
+
+  // Add month filters - support both single month and multiple months
+  if (params.months && params.months.length > 0) {
+    whereClause.month = { in: params.months };
+  } else if (params.month !== undefined) {
+    whereClause.month = params.month;
+  }
+
+  // Add performance level filters
+  if (params.performanceLevels && params.performanceLevels.length > 0) {
+    whereClause.performanceLevel = { in: params.performanceLevels };
+  }
+
+  // Add user filters
+  if (params.userIds && params.userIds.length > 0) {
+    whereClause.userId = { in: params.userIds };
+  }
+
+  // Add exclude user filters
+  if (params.excludeUserIds && params.excludeUserIds.length > 0) {
+    whereClause.userId = {
+      ...whereClause.userId as any,
+      notIn: params.excludeUserIds,
+    };
+  }
+
+  // Add sector and position filters through user relation
+  if (params.sectorIds || params.positionIds) {
+    whereClause.user = {
+      ...whereClause.user,
+      ...(params.sectorIds && params.sectorIds.length > 0 && { sectorId: { in: params.sectorIds } }),
+      ...(params.positionIds && params.positionIds.length > 0 && { positionId: { in: params.positionIds } }),
+    };
+  }
+
+  // Build final query params
+  const queryParams: BonusGetManyParams = {
+    ...params,
+    where: whereClause,
+    include: params.include || {
+      user: {
+        include: {
+          sector: true,
+          position: true,
+        },
+      },
+      tasks: true,
+      bonusDiscounts: true,
+    },
+    orderBy: params.orderBy || [
+      { year: 'desc' },
+      { month: 'desc' },
+    ],
+  };
+
+  return useBonuses(queryParams, options);
+};
+
 // =====================================================
 // Payroll Hooks
 // =====================================================
@@ -303,6 +358,122 @@ export const useExportPayroll = () => {
   });
 };
 
+/**
+ * Hook to export bonuses as Excel file with comprehensive filters
+ * Similar to useExportPayroll but supports all filter options from useBonusList
+ *
+ * @example
+ * ```ts
+ * const exportBonuses = useExportBonuses();
+ *
+ * // Export with filters
+ * exportBonuses.mutate({
+ *   year: 2024,
+ *   months: [1, 2, 3],
+ *   performanceLevels: [4, 5],
+ *   sectorIds: ['sector-1'],
+ *   include: { user: true, tasks: true, bonusDiscounts: true }
+ * });
+ * ```
+ */
+export const useExportBonuses = () => {
+  return useMutation({
+    mutationFn: (params?: BonusListParams) => {
+      // Build the same where clause as useBonusList
+      const whereClause: BonusGetManyParams['where'] = {
+        ...params?.where,
+      };
+
+      if (params?.year !== undefined) {
+        whereClause.year = params.year;
+      }
+
+      if (params?.months && params.months.length > 0) {
+        whereClause.month = { in: params.months };
+      } else if (params?.month !== undefined) {
+        whereClause.month = params.month;
+      }
+
+      if (params?.performanceLevels && params.performanceLevels.length > 0) {
+        whereClause.performanceLevel = { in: params.performanceLevels };
+      }
+
+      if (params?.userIds && params.userIds.length > 0) {
+        whereClause.userId = { in: params.userIds };
+      }
+
+      if (params?.excludeUserIds && params.excludeUserIds.length > 0) {
+        whereClause.userId = {
+          ...whereClause.userId as any,
+          notIn: params.excludeUserIds,
+        };
+      }
+
+      if (params?.sectorIds || params?.positionIds) {
+        whereClause.user = {
+          ...whereClause.user,
+          ...(params.sectorIds && params.sectorIds.length > 0 && { sectorId: { in: params.sectorIds } }),
+          ...(params.positionIds && params.positionIds.length > 0 && { positionId: { in: params.positionIds } }),
+        };
+      }
+
+      const queryParams: BonusGetManyParams = {
+        ...params,
+        where: whereClause,
+        include: params?.include || {
+          user: {
+            include: {
+              sector: true,
+              position: true,
+            },
+          },
+          tasks: true,
+          bonusDiscounts: true,
+        },
+        orderBy: params?.orderBy || [
+          { year: 'desc' },
+          { month: 'desc' },
+        ],
+      };
+
+      return bonusService.exportBonuses(queryParams);
+    },
+    onSuccess: (response: any, variables: BonusListParams = {}) => {
+      // Handle file download
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+
+      // Build filename based on filters
+      let filename = 'bonus';
+      if (variables.year) {
+        filename += `-${variables.year}`;
+      }
+      if (variables.months && variables.months.length === 1) {
+        filename += `-${String(variables.months[0]).padStart(2, '0')}`;
+      } else if (variables.month) {
+        filename += `-${String(variables.month).padStart(2, '0')}`;
+      }
+      filename += `.xlsx`;
+
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Bônus exportados com sucesso!');
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message ?? 'Erro ao exportar bônus';
+      toast.error(message);
+    }
+  });
+};
+
 
 // =====================================================
 // Bonus Discount Hooks
@@ -346,43 +517,6 @@ export const useBonusDiscountMutations = () => {
 };
 
 // =====================================================
-// Specialized Query Hooks
-// =====================================================
-
-/**
- * Hook to save monthly bonuses (typically used by cron jobs)
- * This is different from calculateBonuses - it's for the automated saving process
- */
-export const useSaveMonthlyBonuses = () => {
-  const queryClient = useQueryClient();
-
-  // TODO: Uncomment when bonusService.saveMonthlyBonuses is available (after API client rebuild)
-  return useMutation({
-    mutationFn: (_params: { year: number; month: number }) => {
-      console.warn('saveMonthlyBonuses not yet available - API client needs rebuild');
-      return Promise.resolve({
-        success: true,
-        message: 'Funcionalidade em desenvolvimento',
-        data: { totalProcessed: 0, totalSuccess: 0, totalFailed: 0, details: [] }
-      });
-    },
-    onSuccess: (result: BonusCalculationResult, variables) => {
-      queryClient.invalidateQueries({ queryKey: bonusKeys.all });
-
-      const monthName = new Date(variables.year, variables.month - 1).toLocaleDateString('pt-BR', { month: 'long' });
-      const successCount = result.data?.totalSuccess ?? 0;
-      const failedCount = result.data?.totalFailed ?? 0;
-
-      toast.success(`Bônus mensais de ${monthName} salvos: ${successCount} sucessos, ${failedCount} falhas`);
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message ?? 'Erro ao salvar bônus mensais';
-      toast.error(message);
-    }
-  });
-};
-
-// =====================================================
 // Standard Factory Hook Interface
 // =====================================================
 
@@ -393,14 +527,3 @@ export const bonusHooks = {
   useMutations: useBonusMutations,
   useBatchMutations: useBonusBatchMutations,
 };
-
-// =====================================================
-// Legacy Aliases for Backward Compatibility
-// =====================================================
-
-export { useBonuses as useBonusList };
-export { useBonusDetail as useBonus };
-export { useBonusMutations as useBonusCrud };
-
-// Alias exports for backward compatibility
-export type { BonusPayrollParams as BonusPayrollGetParams } from "../api-client";

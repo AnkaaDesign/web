@@ -11,24 +11,28 @@ import { Badge } from "@/components/ui/badge";
 const getPrivilegeColor = (privilege: string) => {
   switch (privilege) {
     case SECTOR_PRIVILEGES.ADMIN:
-      return "destructive"; // Red - highest privilege
+      return "red"; // Red - admin privileges
     case SECTOR_PRIVILEGES.LEADER:
-      return "warning"; // Yellow/Orange - leadership role
-    case SECTOR_PRIVILEGES.HUMAN_RESOURCES:
-      return "purple"; // Purple - HR specific
+      return "blue"; // Blue - leadership role (same as production)
     case SECTOR_PRIVILEGES.PRODUCTION:
       return "blue"; // Blue - production role
+    case SECTOR_PRIVILEGES.HUMAN_RESOURCES:
+      return "purple"; // Purple - HR specific
+    case SECTOR_PRIVILEGES.FINANCIAL:
+      return "purple"; // Purple - financial role (same as HR)
+    case SECTOR_PRIVILEGES.DESIGNER:
+      return "purple"; // Purple - designer role (same as HR)
+    case SECTOR_PRIVILEGES.LOGISTIC:
+      return "purple"; // Purple - logistics role (same as HR)
     case SECTOR_PRIVILEGES.MAINTENANCE:
       return "orange"; // Orange - maintenance role
     case SECTOR_PRIVILEGES.WAREHOUSE:
       return "green"; // Green - warehouse role
-    case SECTOR_PRIVILEGES.FINANCIAL:
-      return "green"; // Green - financial role
     case SECTOR_PRIVILEGES.EXTERNAL:
-      return "secondary"; // Gray - external access
+      return "gray"; // Gray - external access
     case SECTOR_PRIVILEGES.BASIC:
     default:
-      return "default"; // Default gray - basic access
+      return "gray"; // Gray - basic access
   }
 };
 

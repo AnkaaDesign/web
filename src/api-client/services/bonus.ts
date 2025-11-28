@@ -112,54 +112,117 @@ export const bonusService = {
   batchDelete: (ids: string[]) =>
     apiClient.delete<BatchOperationResult<Bonus>>('/bonus/batch', { data: { ids } }),
 
-  // Live bonus calculation and payroll data
-  /**
-   * Get live bonus calculations for a specific period (calculated on-demand)
-   * This provides real-time bonus calculations without saving to database
-   */
-  getLivePayrollData: (filters?: BonusPayrollFilters) =>
-    apiClient.get<PayrollData>('/bonus/payroll-data', { params: filters }),
+  // =====================================================
+  // Live Bonus Calculation Endpoints (NEW - Clean Implementation)
+  // =====================================================
 
   /**
-   * Alias for getLivePayrollData - Get live bonuses by year/month
-   * @param year - Year for calculation
-   * @param month - Month for calculation
+   * Get live bonus calculations for a specific period
+   * Uses new clean endpoint: GET /bonus/live/:year/:month
    */
   getLiveBonuses: (year: number, month: number) =>
-    apiClient.get<PayrollData>('/bonus/payroll-data', { params: { year: year.toString(), month: month.toString() } }),
+    apiClient.get<PayrollData>(`/bonus/live/${year}/${month}`),
 
   /**
-   * Calculate and save bonuses for a specific period
-   * This saves the calculated bonuses to the database
+   * Get live bonus calculation for a specific user
+   * Uses new clean endpoint: GET /bonus/live/:userId/:year/:month
+   */
+  getLiveBonusForUser: (userId: string, year: number, month: number) =>
+    apiClient.get<any>(`/bonus/live/${userId}/${year}/${month}`),
+
+  /**
+   * Calculate and save bonuses for a specific period (Admin only)
+   * Uses new clean endpoint: POST /bonus/calculate/:year/:month
    */
   calculateAndSaveBonuses: (params: BonusCalculationParams) =>
-    apiClient.post<BonusCalculationResult>('/bonus/calculate-and-save', params),
+    apiClient.post<BonusCalculationResult>(`/bonus/calculate/${params.year}/${params.month}`),
 
   /**
    * Alias for calculateAndSaveBonuses - for hooks compatibility
    */
   calculateBonuses: (params: BonusCalculationParams) =>
-    apiClient.post<BonusCalculationResult>('/bonus/calculate-and-save', params),
+    apiClient.post<BonusCalculationResult>(`/bonus/calculate/${params.year}/${params.month}`),
+
+  // =====================================================
+  // Filtering Endpoints
+  // =====================================================
 
   /**
-   * Legacy method - redirects to calculateAndSaveBonuses
+   * Get bonuses by user
+   * Uses new clean endpoint: GET /bonus/user/:userId
+   */
+  getByUser: (userId: string, params?: BonusGetManyParamsType) =>
+    apiClient.get<BonusGetManyResponseType>(`/bonus/user/${userId}`, { params }),
+
+  /**
+   * Get bonuses by month
+   * Uses new clean endpoint: GET /bonus/month/:year/:month
+   */
+  getByMonth: (year: number, month: number, params?: BonusGetManyParamsType) =>
+    apiClient.get<BonusGetManyResponseType>(`/bonus/month/${year}/${month}`, { params }),
+
+  /**
+   * Get bonus by user and month
+   * Uses new clean endpoint: GET /bonus/user/:userId/month/:year/:month
+   */
+  getByUserAndMonth: (userId: string, year: number, month: number) =>
+    apiClient.get<any>(`/bonus/user/${userId}/month/${year}/${month}`),
+
+  /**
+   * Get bonus calculation details for debugging/transparency
+   * Uses new clean endpoint: GET /bonus/calculation-details/:performanceLevel
+   */
+  getCalculationDetails: (performanceLevel: number, weightedTaskCount?: number) =>
+    apiClient.get<any>(`/bonus/calculation-details/${performanceLevel}`, {
+      params: weightedTaskCount ? { weightedTaskCount: weightedTaskCount.toString() } : undefined
+    }),
+
+  // =====================================================
+  // Legacy/Backward Compatibility Methods
+  // =====================================================
+
+  /**
+   * @deprecated Use getLiveBonuses instead
+   * Legacy method - Get live payroll data
+   */
+  getLivePayrollData: (filters?: BonusPayrollFilters) => {
+    const year = filters?.year || new Date().getFullYear().toString();
+    const monthVal = Array.isArray(filters?.month) ? filters.month[0] : filters?.month;
+    const month = monthVal || (new Date().getMonth() + 1).toString();
+    return apiClient.get<PayrollData>(`/bonus/live/${year}/${month}`);
+  },
+
+  /**
    * @deprecated Use calculateAndSaveBonuses instead
    */
   saveMonthlyBonuses: (params: BonusCalculationParams) =>
-    apiClient.post<BonusCalculationResult>('/bonus/save-monthly', params),
+    apiClient.post<BonusCalculationResult>(`/bonus/calculate/${params.year}/${params.month}`),
 
   /**
+   * @deprecated Use getLiveBonuses instead
    * Get payroll data for a specific period
-   * Similar to getLivePayrollData but formatted for payroll display
    */
-  getPayroll: (params: BonusPayrollParams) =>
-    apiClient.get<PayrollData>('/bonus/payroll-data', { params }),
+  getPayroll: (params: BonusPayrollParams) => {
+    const year = params.year || new Date().getFullYear().toString();
+    const month = params.month || (new Date().getMonth() + 1).toString();
+    return apiClient.get<PayrollData>(`/bonus/live/${year}/${month}`);
+  },
 
   /**
    * Export payroll data to Excel
    */
   exportPayroll: (params: BonusPayrollParams) =>
     apiClient.get('/bonus/export-payroll', {
+      params,
+      responseType: 'blob'
+    }),
+
+  /**
+   * Export bonuses data to Excel with filters
+   * Similar to exportPayroll but supports more filter options
+   */
+  exportBonuses: (params?: BonusGetManyParamsType) =>
+    apiClient.get('/bonus/export', {
       params,
       responseType: 'blob'
     }),

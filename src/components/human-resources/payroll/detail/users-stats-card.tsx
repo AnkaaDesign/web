@@ -182,7 +182,7 @@ export function UsersStatsCard({
       header: "BONIFICAÇÃO",
       accessor: (user: UserStatsRow) => {
         // Check if position is eligible for bonus
-        if (!user.position?.bonifiable || (user.performanceLevel || 0) <= 0) {
+        if (!user.position?.bonifiable) {
           return (
             <div className="text-sm text-muted-foreground text-right">
               Não elegível

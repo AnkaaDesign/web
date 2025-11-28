@@ -345,10 +345,6 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
                 </div>
                 <div className="mt-4 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span>Nível de Performance:</span>
-                    <span>{payroll.bonus.performanceLevel || 0}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
                     <span>Total de Tarefas:</span>
                     <span>{payroll.taskStats?.totalTasks || payroll.bonus.taskCount || 0}</span>
                   </div>

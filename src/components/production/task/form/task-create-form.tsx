@@ -92,13 +92,13 @@ export const TaskCreateForm = () => {
       return;
     }
 
-    // Get sections from current layout state
+    // Get layoutSections from current layout state
     const leftLayout = layouts.left;
     const rightLayout = layouts.right;
-    const leftSections = leftLayout?.sections;
-    const rightSections = rightLayout?.sections;
+    const leftSections = leftLayout?.layoutSections;
+    const rightSections = rightLayout?.layoutSections;
 
-    // Only validate if both sides exist and have sections
+    // Only validate if both sides exist and have layoutSections
     if (leftSections && leftSections.length > 0 && rightSections && rightSections.length > 0) {
       const leftTotalWidth = leftSections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
       const rightTotalWidth = rightSections.reduce((sum: number, s: any) => sum + (s.width || 0), 0);
@@ -367,24 +367,24 @@ export const TaskCreateForm = () => {
             const transformLayoutForAPI = (layoutData: any, side: string) => {
               console.log(`🔧 Transforming ${side} layout data:`, layoutData);
 
-              if (!layoutData || !layoutData.sections) {
-                console.log(`❌ No ${side} layout data or sections`);
+              if (!layoutData || !layoutData.layoutSections) {
+                console.log(`❌ No ${side} layout data or layoutSections`);
                 return null;
               }
 
-              // Ensure sections is an actual array, not an object
-              let sectionsArray = layoutData.sections;
+              // Ensure layoutSections is an actual array, not an object
+              let sectionsArray = layoutData.layoutSections;
               if (!Array.isArray(sectionsArray)) {
-                console.log(`⚠️ Converting sections object to array for ${side}`);
+                console.log(`⚠️ Converting layoutSections object to array for ${side}`);
                 sectionsArray = Object.values(sectionsArray);
               }
 
-              // Create a proper array (not object) for sections
+              // Create a proper array (not object) for layoutSections
               const sectionsAsArray = sectionsArray.map((section: any, index: number) => {
                 const transformedSection = {
                   width: typeof section.width === 'number' ? section.width : 1, // Width in meters
                   isDoor: typeof section.isDoor === 'boolean' ? section.isDoor : false,
-                  doorOffset: section.isDoor && typeof section.doorOffset === 'number' ? section.doorOffset : null,
+                  doorHeight: section.isDoor && typeof section.doorHeight === 'number' ? section.doorHeight : null,
                   position: typeof section.position === 'number' ? section.position : index,
                 };
                 console.log(`  Section ${index}:`, section, '=>', transformedSection);
@@ -393,14 +393,14 @@ export const TaskCreateForm = () => {
 
               const transformed = {
                 height: typeof layoutData.height === 'number' ? layoutData.height : 2.4, // Height in meters
-                sections: sectionsAsArray, // Ensure this is an actual array
+                layoutSections: sectionsAsArray, // Ensure this is an actual array
                 photoId: layoutData.photoId || null,
               };
 
               console.log(`✅ Transformed ${side} layout (array check):`, {
                 ...transformed,
-                sectionsIsArray: Array.isArray(transformed.sections),
-                sectionsLength: transformed.sections.length
+                layoutSectionsIsArray: Array.isArray(transformed.layoutSections),
+                layoutSectionsLength: transformed.layoutSections.length
               });
 
               // Force JSON serialization to verify structure
@@ -409,14 +409,14 @@ export const TaskCreateForm = () => {
 
               // CRITICAL FIX: Clone the object to ensure arrays don't get corrupted by Axios
               const finalData = JSON.parse(JSON.stringify(transformed));
-              console.log(`🛡️ Final data after JSON roundtrip:`, finalData, 'sections is array:', Array.isArray(finalData.sections));
+              console.log(`🛡️ Final data after JSON roundtrip:`, finalData, 'layoutSections is array:', Array.isArray(finalData.layoutSections));
 
               return finalData;
             };
 
             // Create layouts for each side that has data
-            console.log(`🔍 Checking left layout:`, layouts.left, 'Has sections:', layouts.left?.sections, 'Length:', layouts.left?.sections?.length);
-            if (layouts.left && layouts.left.sections && layouts.left.sections.length > 0) {
+            console.log(`🔍 Checking left layout:`, layouts.left, 'Has layoutSections:', layouts.left?.layoutSections, 'Length:', layouts.left?.layoutSections?.length);
+            if (layouts.left && layouts.left.layoutSections && layouts.left.layoutSections.length > 0) {
               console.log(`✅ Creating left layout`);
               const leftLayoutData = transformLayoutForAPI(layouts.left, 'left');
               if (leftLayoutData) {
@@ -426,8 +426,8 @@ export const TaskCreateForm = () => {
               console.log(`❌ Skipping left layout - no valid data`);
             }
 
-            console.log(`🔍 Checking right layout:`, layouts.right, 'Has sections:', layouts.right?.sections, 'Length:', layouts.right?.sections?.length);
-            if (layouts.right && layouts.right.sections && layouts.right.sections.length > 0) {
+            console.log(`🔍 Checking right layout:`, layouts.right, 'Has layoutSections:', layouts.right?.layoutSections, 'Length:', layouts.right?.layoutSections?.length);
+            if (layouts.right && layouts.right.layoutSections && layouts.right.layoutSections.length > 0) {
               console.log(`✅ Creating right layout`);
               const rightLayoutData = transformLayoutForAPI(layouts.right, 'right');
               if (rightLayoutData) {
@@ -437,8 +437,8 @@ export const TaskCreateForm = () => {
               console.log(`❌ Skipping right layout - no valid data`);
             }
 
-            console.log(`🔍 Checking back layout:`, layouts.back, 'Has sections:', layouts.back?.sections, 'Length:', layouts.back?.sections?.length);
-            if (layouts.back && layouts.back.sections && layouts.back.sections.length > 0) {
+            console.log(`🔍 Checking back layout:`, layouts.back, 'Has layoutSections:', layouts.back?.layoutSections, 'Length:', layouts.back?.layoutSections?.length);
+            if (layouts.back && layouts.back.layoutSections && layouts.back.layoutSections.length > 0) {
               console.log(`✅ Creating back layout`);
               const backLayoutData = transformLayoutForAPI(layouts.back, 'back');
               if (backLayoutData) {
@@ -923,8 +923,8 @@ export const TaskCreateForm = () => {
                             <span className="text-sm font-semibold text-foreground">
                               {(() => {
                                 const currentLayout = layouts[selectedLayoutSide];
-                                if (!currentLayout || !currentLayout.sections) return "0,00m";
-                                const totalWidth = currentLayout.sections.reduce((sum, s) => sum + (s.width || 0), 0);
+                                if (!currentLayout || !currentLayout.layoutSections) return "0,00m";
+                                const totalWidth = currentLayout.layoutSections.reduce((sum, s) => sum + (s.width || 0), 0);
                                 return totalWidth.toFixed(2).replace(".", ",") + "m";
                               })()}
                             </span>

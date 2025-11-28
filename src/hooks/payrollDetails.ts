@@ -244,32 +244,6 @@ export const useCalculatePayrollBonuses = () => {
   });
 };
 
-/**
- * Hook to save monthly bonuses
- * Saves calculated bonuses to the database
- */
-export const useSaveMonthlyBonuses = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ year, month }: { year: number; month: number }) =>
-      bonusService.saveMonthlyBonuses({ year: year.toString(), month: month.toString() }),
-    onSuccess: (result: any) => {
-      queryClient.invalidateQueries({ queryKey: payrollDetailsKeys.all });
-      queryClient.invalidateQueries({ queryKey: bonusKeys.all });
-
-      // Access the result from the axios response
-      const responseData = result?.data || result;
-      const totalSuccess = responseData?.data?.totalSuccess || 0;
-      toast.success(`${totalSuccess} bonificações salvas com sucesso`);
-    },
-    onError: (error: any) => {
-      const message = error?.response?.data?.message || 'Erro ao salvar bonificações';
-      toast.error(message);
-    },
-  });
-};
-
 // =====================================================
 // Utility Functions
 // =====================================================

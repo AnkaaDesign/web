@@ -149,9 +149,10 @@ interface SimulatedUser {
 
 interface BonusSimulationInteractiveTableProps {
   className?: string;
+  embedded?: boolean;
 }
 
-export function BonusSimulationInteractiveTable({ className }: BonusSimulationInteractiveTableProps) {
+export function BonusSimulationInteractiveTable({ className, embedded = false }: BonusSimulationInteractiveTableProps) {
   // State
   const [taskQuantity, setTaskQuantity] = useState<number>(0); // Will be set from current period
   const [originalTaskQuantity, setOriginalTaskQuantity] = useState<number>(0); // Store original for restore
@@ -883,8 +884,7 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
             display: flex;
             align-items: center;
             margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #e5e7eb;
+            padding-top: 10px;
           }
 
           .logo {
@@ -916,7 +916,6 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
           table {
             width: 100%;
             border-collapse: collapse;
-            border: 1px solid #e5e7eb;
             font-size: ${fontSize};
           }
 
@@ -925,11 +924,15 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
             font-weight: 600;
             color: #374151;
             padding: ${headerPadding};
-            border-bottom: 2px solid #e5e7eb;
+            border-bottom: 1px solid #e5e7eb;
             border-right: 1px solid #e5e7eb;
             font-size: ${headerFontSize};
             text-transform: uppercase;
             letter-spacing: 0.03em;
+          }
+
+          th:last-child {
+            border-right: none;
           }
 
           td {
@@ -937,6 +940,14 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
             border-bottom: 1px solid #f3f4f6;
             border-right: 1px solid #f3f4f6;
             vertical-align: top;
+          }
+
+          td:last-child {
+            border-right: none;
+          }
+
+          tbody tr:first-child td {
+            border-top: none;
           }
 
           tbody tr:nth-child(even) {
@@ -983,8 +994,8 @@ export function BonusSimulationInteractiveTable({ className }: BonusSimulationIn
             <h1 style="font-size: 20px; margin-bottom: 8px;">Simulação de Bônus</h1>
             <div class="info">
               <p><strong>Data:</strong> ${formatDate(new Date())}</p>
+              <p><strong>Total de tarefas:</strong> ${taskQuantity.toFixed(1)}</p>
               <p><strong>Total de colaboradores:</strong> ${users.length}</p>
-              <p><strong>Tarefas:</strong> ${taskQuantity.toFixed(1)}</p>
               <p><strong>Média por colaborador:</strong> ${averageTasksPerUser.toFixed(1)}</p>
             </div>
           </div>

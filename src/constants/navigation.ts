@@ -1036,9 +1036,17 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       { id: "folha-de-pagamento", title: "Folha de Pagamento", icon: "payroll", path: "/recursos-humanos/folha-de-pagamento" },
-      { id: "niveis-desempenho", title: "Níveis de Desempenho", icon: "trendingUp", path: "/recursos-humanos/niveis-desempenho" },
+      {
+        id: "bonus",
+        title: "Bônus",
+        icon: "coins",
+        path: "/recursos-humanos/bonus",
+        children: [
+          { id: "simulacao-bonus", title: "Simulação de Bônus", icon: "calculator", path: "/recursos-humanos/bonus/simulacao-de-bonus" },
+          { id: "nivel-de-performance", title: "Nível de Performance", icon: "trendingUp", path: "/recursos-humanos/bonus/nivel-de-performance" },
+        ],
+      },
       { id: "requisicoes", title: "Requisições", icon: "clipboardList", path: "/recursos-humanos/requisicoes" },
-      { id: "simulacao-bonus", title: "Simulação de Bônus", icon: "calculator", path: "/recursos-humanos/simulacao-bonus" },
     ],
   },
 

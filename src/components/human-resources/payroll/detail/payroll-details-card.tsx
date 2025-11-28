@@ -76,19 +76,12 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
       const remuneration = user.position?.remuneration || 0;
       totalRemuneration += remuneration;
 
-      // Count users with performance level > 0 (once per unique user)
-      if ((user.performanceLevel || 0) > 0) {
-        performanceUsersCount++;
-      }
-
       // Check if user is eligible for bonus:
       // 1. User must be EFFECTED (not experience period or dismissed)
       // 2. Position must be bonifiable
-      // 3. Performance level must be > 0
       const isEligible =
         user.status === USER_STATUS.EFFECTED &&
-        user.position?.bonifiable === true &&
-        (user.performanceLevel || 0) > 0;
+        user.position?.bonifiable === true;
 
       if (isEligible) {
         // Use actual bonus data from API

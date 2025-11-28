@@ -60,6 +60,8 @@ const AdministrationCollaboratorsBatchEdit = lazy(() => import("@/pages/administ
 
 const HumanResourcesPayrollList = lazy(() => import("@/pages/human-resources/payroll/list").then((module) => ({ default: module.default })));
 const HumanResourcesPayrollDetail = lazy(() => import("@/pages/human-resources/payroll/detail").then((module) => ({ default: module.default })));
+const HumanResourcesBonusList = lazy(() => import("@/pages/human-resources/bonus/list").then((module) => ({ default: module.default })));
+const HumanResourcesBonusDetail = lazy(() => import("@/pages/human-resources/bonus/detail").then((module) => ({ default: module.default })));
 const HumanResourcesBonusSimulation = lazy(() => import("@/pages/human-resources/simulacao-bonus").then((module) => ({ default: module.default })));
 
 const AdministrationSectorsList = lazy(() => import("@/pages/administration/sectors/list").then((module) => ({ default: module.SectorListPage })));
@@ -627,7 +629,24 @@ function App() {
                     </Suspense>
                   }
                 />
-                {/* Bonus simulation route */}
+                {/* Bonus routes */}
+                <Route
+                  path={routes.humanResources.bonus.list}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <HumanResourcesBonusList />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.humanResources.bonus.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <HumanResourcesBonusDetail />
+                    </Suspense>
+                  }
+                />
+                {/* Bonus simulation route - under bonus domain */}
                 <Route
                   path={routes.humanResources.bonus.simulation}
                   element={
@@ -635,6 +654,11 @@ function App() {
                       <HumanResourcesBonusSimulation />
                     </Suspense>
                   }
+                />
+                {/* Legacy redirect for old simulation URL */}
+                <Route
+                  path="/recursos-humanos/simulacao-bonus"
+                  element={<Navigate to={routes.humanResources.bonus.simulation} replace />}
                 />
                 <Route
                   path={routes.administration.sectors.root}
@@ -1848,7 +1872,7 @@ function App() {
                   }
                 />
                 <Route
-                  path={routes.humanResources.performanceLevels.list}
+                  path={routes.humanResources.bonus.performanceLevels.list}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <HumanResourcesPerformanceLevels />

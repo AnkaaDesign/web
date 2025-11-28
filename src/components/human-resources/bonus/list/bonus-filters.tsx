@@ -7,10 +7,9 @@ import { IconFilter, IconX, IconCheck, IconBuilding, IconBriefcase, IconUserChec
 import type { UserGetManyFormData } from "../../../../schemas";
 import { useUsers, useSectors, usePositions } from "../../../../hooks";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { getCurrentPayrollPeriod } from "../../../../utils";
 
-// Extended filters with UI-only fields for payroll
-interface PayrollFiltersData extends Partial<UserGetManyFormData> {
+// Extended filters with UI-only fields for bonus
+interface BonusFiltersData extends Partial<UserGetManyFormData> {
   year?: number;
   months?: string[];
   sectorIds?: string[];
@@ -18,25 +17,24 @@ interface PayrollFiltersData extends Partial<UserGetManyFormData> {
   userIds?: string[];
 }
 
-interface PayrollFiltersProps {
+interface BonusFiltersProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  filters: PayrollFiltersData;
-  onApplyFilters: (filters: PayrollFiltersData) => void;
+  filters: BonusFiltersData;
+  onApplyFilters: (filters: BonusFiltersData) => void;
 }
 
-export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: PayrollFiltersProps) {
+export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: BonusFiltersProps) {
   // Local state for filter values
-  const [localFilters, setLocalFilters] = useState<PayrollFiltersData>(filters);
+  const [localFilters, setLocalFilters] = useState<BonusFiltersData>(filters);
 
   // Load entities for selectors
   const { data: usersData } = useUsers({
     orderBy: { name: "asc" },
     include: { position: true, sector: true },
     where: {
-      // Users with payroll number and status NOT dismissed
-      payrollNumber: { not: null },
-      status: { not: "DISMISSED" }
+      isActive: true, // Only active users for bonus
+      payrollNumber: { not: null } // Only users with payroll numbers
     },
     limit: 100, // Max 100 due to API limit
   });
@@ -68,14 +66,27 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
   // Reset local filters when modal opens and set defaults if needed
   useEffect(() => {
     if (open) {
-      // If no year/month selected, default to current period using 5th day rule
+      // If no year/month selected, default to current year/month (with 5th cutoff)
       if (!filters.year && (!filters.months || filters.months.length === 0)) {
-        const { year, month } = getCurrentPayrollPeriod();
+        const now = new Date();
+        const currentDay = now.getDate();
+        let currentYear = now.getFullYear();
+        let currentMonth = now.getMonth() + 1; // 1-indexed
+
+        // If today is <= 5th, default to PREVIOUS month (bonus not paid yet)
+        // If today is > 5th, default to CURRENT month (bonus was paid on day 5)
+        if (currentDay <= 5) {
+          currentMonth -= 1;
+          if (currentMonth < 1) {
+            currentMonth = 12;
+            currentYear -= 1;
+          }
+        }
 
         setLocalFilters({
           ...filters,
-          year: year,
-          months: [String(month).padStart(2, '0')],
+          year: currentYear,
+          months: [String(currentMonth).padStart(2, '0')],
           // Set default sectors if not already set
           sectorIds: filters.sectorIds || defaultSectorIds
         });
@@ -124,12 +135,24 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
   };
 
   const handleClear = () => {
-    // Get current period using 5th day rule
-    const { year, month } = getCurrentPayrollPeriod();
+    // Get current year/month for default
+    const now = new Date();
+    const currentDay = now.getDate();
+    let currentYear = now.getFullYear();
+    let currentMonth = now.getMonth() + 1;
+
+    // If today is <= 5th, default to PREVIOUS month
+    if (currentDay <= 5) {
+      currentMonth -= 1;
+      if (currentMonth < 1) {
+        currentMonth = 12;
+        currentYear -= 1;
+      }
+    }
 
     setLocalFilters({
-      year: year,
-      months: [String(month).padStart(2, '0')],
+      year: currentYear,
+      months: [String(currentMonth).padStart(2, '0')],
       sectorIds: [],
       positionIds: [],
       userIds: [],
@@ -165,14 +188,14 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <IconFilter size={20} />
-            Filtros de Folha de Pagamento
+            Filtros de Bônus
             {totalActiveFilters > 0 && (
               <Badge variant="secondary" className="ml-2">
                 {totalActiveFilters} {totalActiveFilters === 1 ? "ativo" : "ativos"}
               </Badge>
             )}
           </SheetTitle>
-          <SheetDescription>Configure os filtros para refinar a visualização da folha de pagamento.</SheetDescription>
+          <SheetDescription>Configure os filtros para refinar a visualização de bônus.</SheetDescription>
         </SheetHeader>
 
         <div className="mt-6 space-y-6">

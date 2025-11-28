@@ -9,12 +9,10 @@ import {
   IconFilter,
   IconRefresh,
   IconReceipt,
-  IconCalculator,
   IconCheck,
   IconClock,
   IconAlertCircle,
   IconUsers,
-  IconDownload
 } from "@tabler/icons-react";
 import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -26,7 +24,7 @@ import { PayrollColumnVisibilityManager } from "@/components/human-resources/pay
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { usePayrollBonuses, useSectors } from "../../../hooks";
+import { usePayrolls, useSectors } from "../../../hooks";
 import { isUserEligibleForBonus, getCurrentPayrollPeriod } from "../../../utils";
 import { StandardizedTable } from "@/components/ui/standardized-table";
 import type { StandardizedColumn } from "@/components/ui/standardized-table";
@@ -363,7 +361,7 @@ function PayrollTableComponent({
     },
     {
       key: "totalWeightedTasks",
-      header: "Ponderadas",
+      header: "Tarefas Ponderadas",
       accessor: (row: PayrollRow) => {
         // Check if user is eligible for bonus
         const isEligible = row.position?.bonifiable && row.performanceLevel > 0;
@@ -696,19 +694,38 @@ export default function PayrollListPage() {
     return params;
   }, [filters.year, filters.months]);
 
+  // Helper function to create payroll query params
+  const createPayrollParams = (year: number, month: number) => ({
+    where: { year, month },
+    include: {
+      user: {
+        include: {
+          position: true,
+          sector: true,
+        },
+      },
+      bonus: {
+        include: {
+          tasks: true,
+        },
+      },
+      discounts: true,
+    },
+  });
+
   // Call hooks a fixed 12 times (max months), conditionally enable them
-  const query0 = usePayrollBonuses(monthParams[0].year, monthParams[0].month);
-  const query1 = usePayrollBonuses(monthParams[1].year, monthParams[1].month);
-  const query2 = usePayrollBonuses(monthParams[2].year, monthParams[2].month);
-  const query3 = usePayrollBonuses(monthParams[3].year, monthParams[3].month);
-  const query4 = usePayrollBonuses(monthParams[4].year, monthParams[4].month);
-  const query5 = usePayrollBonuses(monthParams[5].year, monthParams[5].month);
-  const query6 = usePayrollBonuses(monthParams[6].year, monthParams[6].month);
-  const query7 = usePayrollBonuses(monthParams[7].year, monthParams[7].month);
-  const query8 = usePayrollBonuses(monthParams[8].year, monthParams[8].month);
-  const query9 = usePayrollBonuses(monthParams[9].year, monthParams[9].month);
-  const query10 = usePayrollBonuses(monthParams[10].year, monthParams[10].month);
-  const query11 = usePayrollBonuses(monthParams[11].year, monthParams[11].month);
+  const query0 = usePayrolls(createPayrollParams(monthParams[0].year, monthParams[0].month), { enabled: monthParams[0].month > 0 });
+  const query1 = usePayrolls(createPayrollParams(monthParams[1].year, monthParams[1].month), { enabled: monthParams[1].month > 0 });
+  const query2 = usePayrolls(createPayrollParams(monthParams[2].year, monthParams[2].month), { enabled: monthParams[2].month > 0 });
+  const query3 = usePayrolls(createPayrollParams(monthParams[3].year, monthParams[3].month), { enabled: monthParams[3].month > 0 });
+  const query4 = usePayrolls(createPayrollParams(monthParams[4].year, monthParams[4].month), { enabled: monthParams[4].month > 0 });
+  const query5 = usePayrolls(createPayrollParams(monthParams[5].year, monthParams[5].month), { enabled: monthParams[5].month > 0 });
+  const query6 = usePayrolls(createPayrollParams(monthParams[6].year, monthParams[6].month), { enabled: monthParams[6].month > 0 });
+  const query7 = usePayrolls(createPayrollParams(monthParams[7].year, monthParams[7].month), { enabled: monthParams[7].month > 0 });
+  const query8 = usePayrolls(createPayrollParams(monthParams[8].year, monthParams[8].month), { enabled: monthParams[8].month > 0 });
+  const query9 = usePayrolls(createPayrollParams(monthParams[9].year, monthParams[9].month), { enabled: monthParams[9].month > 0 });
+  const query10 = usePayrolls(createPayrollParams(monthParams[10].year, monthParams[10].month), { enabled: monthParams[10].month > 0 });
+  const query11 = usePayrolls(createPayrollParams(monthParams[11].year, monthParams[11].month), { enabled: monthParams[11].month > 0 });
 
   // Collect only the active queries
   const payrollData = [query0, query1, query2, query3, query4, query5, query6, query7, query8, query9, query10, query11];
@@ -1020,12 +1037,6 @@ export default function PayrollListPage() {
     }, 300);
   };
 
-  // Handle navigation to bonus simulation
-  const handleNavigateToSimulation = () => {
-    navigate(routes.humanResources.bonus.simulation);
-  };
-
-
   // Handle row click
   const handleRowClick = (row: PayrollRow) => {
     // For live calculations, we need to pass the user/year/month to fetch details
@@ -1035,8 +1046,8 @@ export default function PayrollListPage() {
       navigate(routes.humanResources.payroll.detail(row.payrollId));
     } else {
       // Live calculation - navigate with user/year/month parameters
-      // We'll use a special format for live payrolls
-      const liveId = `${row.userId}_${row.year}_${row.month}`;
+      // Use 'live-' prefix format (matching bonus page pattern)
+      const liveId = `live-${row.userId}-${row.year}-${row.month}`;
       navigate(routes.humanResources.payroll.detail(liveId));
     }
   };
@@ -1146,13 +1157,8 @@ export default function PayrollListPage() {
                   />
                 </div>
 
-                {/* Right side - Simulate and Export */}
+                {/* Right side - Export */}
                 <div className="flex items-center gap-2">
-                  <Button onClick={handleNavigateToSimulation} variant="outline" size="default">
-                    <IconCalculator className="h-4 w-4 mr-2" />
-                    Simular
-                  </Button>
-
                   <PayrollExport
                     filters={filters}
                     currentPageData={processedPayrolls}

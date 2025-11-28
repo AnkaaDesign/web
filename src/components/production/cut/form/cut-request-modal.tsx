@@ -14,7 +14,7 @@ import { IconFileText, IconCut, IconAlertCircle, IconInfoCircle } from "@tabler/
 import { useState } from "react";
 import type { Cut } from "../../../../types";
 import { CUT_REQUEST_REASON, CUT_ORIGIN, CUT_STATUS } from "../../../../constants";
-import { CUT_REQUEST_REASON_LABELS, CUT_TYPE_LABELS, CUT_STATUS_LABELS } from "../../../../constants";
+import { CUT_REQUEST_REASON_LABELS, CUT_TYPE_LABELS, CUT_STATUS_LABELS, getBadgeVariant } from "../../../../constants";
 import { useCutMutations } from "../../../../hooks";
 import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "../../../../utils";
@@ -139,7 +139,7 @@ export function CutRequestModal({ open, onOpenChange, cutItem, onSuccess }: CutR
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="outline">{CUT_TYPE_LABELS[cutType!]}</Badge>
-                <Badge variant="secondary">{CUT_STATUS_LABELS[cutItem.status]}</Badge>
+                <Badge variant={getBadgeVariant(cutItem.status, "CUT")}>{CUT_STATUS_LABELS[cutItem.status]}</Badge>
               </div>
             </div>
 

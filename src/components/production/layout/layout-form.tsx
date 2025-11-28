@@ -36,7 +36,7 @@ interface Door {
   id: string;
   position: number; // Position from left edge in cm
   width: number; // Door width in cm
-  offsetTop: number; // Space from top in cm
+  doorHeight: number; // Height of the door from bottom of layout in cm
 }
 
 // Store state for each side
@@ -53,17 +53,17 @@ interface PhotoState {
   file?: File;
 }
 
-// Completely uncontrolled door offset input
-const DoorOffsetInput = React.forwardRef<
+// Completely uncontrolled door height input
+const DoorHeightInput = React.forwardRef<
   { getValue: () => number },
   {
     doorId: string;
     defaultValue: number;
-    height: number;
+    layoutHeight: number;
     disabled?: boolean;
     onBlur?: (value: number) => void;
   }
->(({ doorId, defaultValue, height, disabled, onBlur }, ref) => {
+>(({ doorId, defaultValue, layoutHeight, disabled, onBlur }, ref) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [localValue, setLocalValue] = useState<string>(() => {
     if (defaultValue === 0) return "";
@@ -78,7 +78,7 @@ const DoorOffsetInput = React.forwardRef<
     const parsed = parseFloat(normalized);
     if (isNaN(parsed)) return 0;
 
-    // If value looks like it was typed without decimal (e.g., 50 for 0.50m)
+    // If value looks like it was typed without decimal (e.g., 190 for 1.90m)
     if (!val.includes(",") && !val.includes(".") && parsed > 10) {
       return parsed;
     }
@@ -89,10 +89,11 @@ const DoorOffsetInput = React.forwardRef<
   React.useImperativeHandle(ref, () => ({
     getValue: () => {
       let cmValue = parseValue(localValue);
-      cmValue = Math.max(0, Math.min(height - 50, cmValue));
+      // Door height must be between 50cm and the layout height
+      cmValue = Math.max(50, Math.min(layoutHeight, cmValue));
       return Math.round(cmValue);
     }
-  }), [localValue, height]);
+  }), [localValue, layoutHeight]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
@@ -107,7 +108,8 @@ const DoorOffsetInput = React.forwardRef<
 
   const handleBlur = () => {
     const value = parseValue(localValue);
-    const clampedValue = Math.max(0, Math.min(height - 50, value));
+    // Door height must be between 50cm and the layout height
+    const clampedValue = Math.max(50, Math.min(layoutHeight, value));
     onBlur?.(Math.round(clampedValue));
 
     // Format for display
@@ -131,14 +133,14 @@ const DoorOffsetInput = React.forwardRef<
       onChange={handleChange}
       onBlur={handleBlur}
       onKeyDown={handleKeyDown}
-      placeholder="0,50"
+      placeholder="1,90"
       disabled={disabled}
       className="w-14 h-8 text-center text-xs rounded-md border border-border bg-transparent px-2 py-1 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 transition-all"
     />
   );
 });
 
-DoorOffsetInput.displayName = 'DoorOffsetInput';
+DoorHeightInput.displayName = 'DoorHeightInput';
 
 // Natural typing measurement input component
 const MeasurementInput = React.memo(({
@@ -336,21 +338,21 @@ export const LayoutForm = ({
       };
 
       if (layout.layoutSections && layout.layoutSections.length > 0) {
-        const sections = layout.layoutSections;
-        const total = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
+        const layoutSections = layout.layoutSections;
+        const total = layoutSections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
         state.totalWidth = total || 800;
 
         // Extract doors from sections
         const extractedDoors: Door[] = [];
         let currentPos = 0;
 
-        sections.forEach((section: any, idx: number) => {
+        layoutSections.forEach((section: any, idx: number) => {
           if (section.isDoor) {
             extractedDoors.push({
               id: `door-${selectedSide}-${idx}-${Date.now()}-${Math.random()}`,
               position: currentPos,
               width: section.width * 100,
-              offsetTop: (section.doorOffset || 0.5) * 100
+              doorHeight: (section.doorHeight || 1.9) * 100
             });
           }
           currentPos += section.width * 100;
@@ -373,21 +375,21 @@ export const LayoutForm = ({
           };
 
           if (layoutData.layoutSections && layoutData.layoutSections.length > 0) {
-            const sections = layoutData.layoutSections;
-            const total = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
+            const layoutSections = layoutData.layoutSections;
+            const total = layoutSections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
             state.totalWidth = total || 800;
 
             // Extract doors from sections
             const extractedDoors: Door[] = [];
             let currentPos = 0;
 
-            sections.forEach((section: any, idx: number) => {
+            layoutSections.forEach((section: any, idx: number) => {
               if (section.isDoor) {
                 extractedDoors.push({
                   id: `door-${side}-${idx}-${Date.now()}-${Math.random()}`,
                   position: currentPos,
                   width: section.width * 100,
-                  offsetTop: (section.doorOffset || 0.5) * 100
+                  doorHeight: (section.doorHeight || 1.9) * 100
                 });
               }
               currentPos += section.width * 100;
@@ -439,21 +441,21 @@ export const LayoutForm = ({
             doors: []
           };
 
-          const sections = layoutData.layoutSections;
-          const total = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
+          const layoutSections = layoutData.layoutSections;
+          const total = layoutSections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
           state.totalWidth = total || (side === 'back' ? 242 : 800);
 
           // Extract doors from sections
           const extractedDoors: Door[] = [];
           let currentPos = 0;
 
-          sections.forEach((section: any, idx: number) => {
+          layoutSections.forEach((section: any, idx: number) => {
             if (section.isDoor) {
               extractedDoors.push({
                 id: `door-${side}-${idx}-${Date.now()}-${Math.random()}`,
                 position: currentPos,
                 width: section.width * 100,
-                offsetTop: (section.doorOffset || 0.5) * 100
+                doorHeight: (section.doorHeight || 1.9) * 100
               });
             }
             currentPos += section.width * 100;
@@ -547,21 +549,21 @@ export const LayoutForm = ({
     };
 
     if (layout.layoutSections && layout.layoutSections.length > 0) {
-      const sections = layout.layoutSections;
-      const total = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
+      const layoutSections = layout.layoutSections;
+      const total = layoutSections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
       state.totalWidth = total || 800;
 
       // Extract doors from sections
       const extractedDoors: Door[] = [];
       let currentPos = 0;
 
-      sections.forEach((section: any, idx: number) => {
+      layoutSections.forEach((section: any, idx: number) => {
         if (section.isDoor) {
           extractedDoors.push({
             id: `door-${selectedSide}-${idx}-${Date.now()}-${Math.random()}`,
             position: currentPos,
             width: section.width * 100,
-            offsetTop: (section.doorOffset || 0.5) * 100
+            doorHeight: (section.doorHeight || 1.9) * 100
           });
         }
         currentPos += section.width * 100;
@@ -724,16 +726,16 @@ export const LayoutForm = ({
       }
     }
 
-    const sections = segments.map((segment, index) => ({
+    const layoutSections = segments.map((segment, index) => ({
       width: segment.width / 100,
       isDoor: segment.type === 'door',
-      doorOffset: segment.type === 'door' && segment.door ? segment.door.offsetTop / 100 : null,
+      doorHeight: segment.type === 'door' && segment.door ? segment.door.doorHeight / 100 : null,
       position: index
     }));
 
     const layoutData = {
       height: state.height / 100,
-      sections,
+      layoutSections,
       photoId: photoState?.photoId || null,
       photoFile: photoState?.file || null, // Include file for upload
     };
@@ -742,9 +744,9 @@ export const LayoutForm = ({
       selectedSide,
       layoutData: {
         height: layoutData.height,
-        sectionsCount: sections.length,
-        sections: sections.map(s => ({ width: s.width, isDoor: s.isDoor })),
-        totalWidth: sections.reduce((sum, s) => sum + s.width, 0),
+        layoutSectionsCount: layoutSections.length,
+        layoutSections: layoutSections.map(s => ({ width: s.width, isDoor: s.isDoor })),
+        totalWidth: layoutSections.reduce((sum, s) => sum + s.width, 0),
       },
     });
 
@@ -801,16 +803,16 @@ export const LayoutForm = ({
       // Emit changes for current side
       const segments = calculateSegments(state.doors, state.totalWidth);
 
-      const sections = segments.map((segment, index) => ({
+      const layoutSections = segments.map((segment, index) => ({
         width: segment.width / 100,
         isDoor: segment.type === 'door',
-        doorOffset: segment.type === 'door' && segment.door ? segment.door.offsetTop / 100 : null,
+        doorHeight: segment.type === 'door' && segment.door ? segment.door.doorHeight / 100 : null,
         position: index
       }));
 
       const layoutData = {
         height: state.height / 100,
-        sections,
+        layoutSections,
         photoId: photoState?.photoId || null,
         photoFile: photoState?.file || null, // Include file for upload
       };
@@ -819,9 +821,9 @@ export const LayoutForm = ({
         selectedSide,
         layoutData: {
           height: layoutData.height,
-          sectionsCount: sections.length,
-          sections: sections.map(s => ({ width: s.width, isDoor: s.isDoor, doorOffset: s.doorOffset })),
-          totalWidth: sections.reduce((sum, s) => sum + s.width, 0),
+          layoutSectionsCount: layoutSections.length,
+          layoutSections: layoutSections.map(s => ({ width: s.width, isDoor: s.isDoor, doorHeight: s.doorHeight })),
+          totalWidth: layoutSections.reduce((sum, s) => sum + s.width, 0),
         },
       });
 
@@ -938,7 +940,7 @@ export const LayoutForm = ({
     if (!currentState) return;
 
     const doorWidth = 100; // Default door width in cm
-    const doorOffset = 50; // Default offset from top
+    const defaultDoorHeight = 190; // Default door height from bottom in cm (1.90m)
 
     let position: number;
     const doors = currentState.doors;
@@ -962,7 +964,7 @@ export const LayoutForm = ({
           id: `door-${selectedSide}-${Date.now()}-${Math.random()}`,
           position: Math.round(Math.max(0, Math.min(position, currentState.totalWidth - doorWidth))),
           width: Math.round(doorWidth),
-          offsetTop: Math.round(doorOffset)
+          doorHeight: Math.round(defaultDoorHeight)
         }
       ];
 
@@ -1007,7 +1009,7 @@ export const LayoutForm = ({
       id: `door-${selectedSide}-${Date.now()}-${Math.random()}`,
       position: Math.round(Math.max(0, Math.min(position, currentState.totalWidth - doorWidth))),
       width: Math.round(doorWidth),
-      offsetTop: Math.round(doorOffset)
+      doorHeight: Math.round(defaultDoorHeight)
     };
 
     updateCurrentSide({ doors: [...doors, newDoor] });
@@ -1019,11 +1021,11 @@ export const LayoutForm = ({
     updateCurrentSide({ doors: currentState.doors.filter(d => d.id !== doorId) });
   }, [currentState, updateCurrentSide]);
 
-  // Update door offset
-  const updateDoorOffset = useCallback((doorId: string, offsetTop: number) => {
+  // Update door height
+  const updateDoorHeight = useCallback((doorId: string, doorHeight: number) => {
     if (!currentState) return;
     const updatedDoors = currentState.doors.map(d =>
-      d.id === doorId ? { ...d, offsetTop } : d
+      d.id === doorId ? { ...d, doorHeight } : d
     );
     updateCurrentSide({ doors: updatedDoors });
   }, [currentState, updateCurrentSide]);
@@ -1091,12 +1093,13 @@ export const LayoutForm = ({
   <!-- Main container -->
   <rect x="${margin}" y="${margin}" width="${currentState.totalWidth}" height="${currentState.height}" fill="none" stroke="#000" stroke-width="1"/>`;
 
-    // Add doors
+    // Add doors - doorHeight is measured from bottom of layout to top of door opening
     currentState.doors.forEach(door => {
+      const doorTopY = margin + (currentState.height - door.doorHeight);
       svg += `
-  <line x1="${margin + door.position}" y1="${margin + door.offsetTop}" x2="${margin + door.position}" y2="${margin + currentState.height}" stroke="#000" stroke-width="1"/>
-  <line x1="${margin + door.position + door.width}" y1="${margin + door.offsetTop}" x2="${margin + door.position + door.width}" y2="${margin + currentState.height}" stroke="#000" stroke-width="1"/>
-  <line x1="${margin + door.position}" y1="${margin + door.offsetTop}" x2="${margin + door.position + door.width}" y2="${margin + door.offsetTop}" stroke="#000" stroke-width="1"/>`;
+  <line x1="${margin + door.position}" y1="${doorTopY}" x2="${margin + door.position}" y2="${margin + currentState.height}" stroke="#000" stroke-width="1"/>
+  <line x1="${margin + door.position + door.width}" y1="${doorTopY}" x2="${margin + door.position + door.width}" y2="${margin + currentState.height}" stroke="#000" stroke-width="1"/>
+  <line x1="${margin + door.position}" y1="${doorTopY}" x2="${margin + door.position + door.width}" y2="${doorTopY}" stroke="#000" stroke-width="1"/>`;
     });
 
     // Add width dimensions with arrows
@@ -1240,16 +1243,16 @@ export const LayoutForm = ({
 
         // Calculate current segments to send with the photo
         const segments = calculateSegments(currentState.doors, currentState.totalWidth);
-        const sections = segments.map((segment, index) => ({
+        const layoutSections = segments.map((segment, index) => ({
           width: segment.width / 100,
           isDoor: segment.type === 'door',
-          doorOffset: segment.type === 'door' && segment.door ? segment.door.offsetTop / 100 : null,
+          doorHeight: segment.type === 'door' && segment.door ? segment.door.doorHeight / 100 : null,
           position: index
         }));
 
         const layoutData = {
           height: currentState.height / 100,
-          sections,
+          layoutSections,
           photoId: newPhotoState.photoId || null,
           photoFile: file, // Include the file
         };
@@ -1259,7 +1262,7 @@ export const LayoutForm = ({
           fileName: file.name,
           fileSize: file.size,
           fileType: file.type,
-          sectionsCount: sections.length,
+          layoutSectionsCount: layoutSections.length,
         });
 
         // Notify parent immediately with photo file
@@ -1330,7 +1333,7 @@ export const LayoutForm = ({
 
             {/* Layout and Width Inputs Container */}
             <div className="flex flex-col">
-              {/* Door offset inputs above the truck layout */}
+              {/* Door height inputs above the truck layout */}
               <div className="mb-2 relative" style={{ width: `${currentState.totalWidth * scale}px`, height: '30px' }}>
                 {currentState.doors.map(door => (
                   <div
@@ -1341,12 +1344,12 @@ export const LayoutForm = ({
                       width: `${door.width * scale}px`,
                     }}
                   >
-                    <DoorOffsetInput
+                    <DoorHeightInput
                       doorId={door.id}
-                      defaultValue={door.offsetTop}
-                      height={currentState.height}
+                      defaultValue={door.doorHeight}
+                      layoutHeight={currentState.height}
                       disabled={disabled}
-                      onBlur={(value) => updateDoorOffset(door.id, value)}
+                      onBlur={(value) => updateDoorHeight(door.id, value)}
                     />
                   </div>
                 ))}
@@ -1369,44 +1372,49 @@ export const LayoutForm = ({
                   />
                 )}
                 {/* Render doors and their controls (only for sides, not back) */}
-                {selectedSide !== 'back' && currentState.doors.map(door => (
-                  <div key={door.id}>
-                    {/* Door vertical lines - only below the door top line */}
-                    <div
-                      className="absolute border-l-2 border-r-2 border-foreground/50 pointer-events-none"
-                      style={{
-                        left: `${door.position * scale}px`,
-                        top: `${door.offsetTop * scale}px`,
-                        width: `${door.width * scale}px`,
-                        height: `${(currentState.height - door.offsetTop) * scale - 2}px`,
-                      }}
-                    />
+                {selectedSide !== 'back' && currentState.doors.map(door => {
+                  // doorHeight is measured from bottom to top of door opening
+                  // So the door top position = layout height - door height
+                  const doorTopPosition = currentState.height - door.doorHeight;
+                  return (
+                    <div key={door.id}>
+                      {/* Door vertical lines - only below the door top line */}
+                      <div
+                        className="absolute border-l-2 border-r-2 border-foreground/50 pointer-events-none"
+                        style={{
+                          left: `${door.position * scale}px`,
+                          top: `${doorTopPosition * scale}px`,
+                          width: `${door.width * scale}px`,
+                          height: `${door.doorHeight * scale - 2}px`,
+                        }}
+                      />
 
-                    {/* Door top line */}
-                    <div
-                      className="absolute border-t-2 border-foreground/50 pointer-events-none"
-                      style={{
-                        left: `${door.position * scale}px`,
-                        top: `${door.offsetTop * scale}px`,
-                        width: `${door.width * scale}px`,
-                      }}
-                    />
+                      {/* Door top line */}
+                      <div
+                        className="absolute border-t-2 border-foreground/50 pointer-events-none"
+                        style={{
+                          left: `${door.position * scale}px`,
+                          top: `${doorTopPosition * scale}px`,
+                          width: `${door.width * scale}px`,
+                        }}
+                      />
 
-                    {/* Remove door button */}
-                    <button
-                      type="button"
-                      onClick={() => removeDoor(door.id)}
-                      disabled={disabled}
-                      className="absolute w-5 h-5 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-full flex items-center justify-center transition-colors opacity-80 hover:opacity-100"
-                      style={{
-                        left: `${(door.position + door.width / 2) * scale - 10}px`,
-                        top: `${(door.offsetTop + (currentState.height - door.offsetTop) / 2) * scale - 10}px`,
-                      }}
-                    >
-                      <IconTrash size={12} />
-                    </button>
-                  </div>
-                ))}
+                      {/* Remove door button */}
+                      <button
+                        type="button"
+                        onClick={() => removeDoor(door.id)}
+                        disabled={disabled}
+                        className="absolute w-5 h-5 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-full flex items-center justify-center transition-colors opacity-80 hover:opacity-100"
+                        style={{
+                          left: `${(door.position + door.width / 2) * scale - 10}px`,
+                          top: `${(doorTopPosition + door.doorHeight / 2) * scale - 10}px`,
+                        }}
+                      >
+                        <IconTrash size={12} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Width inputs below layout */}
@@ -1545,15 +1553,15 @@ export const LayoutForm = ({
                 // Notify parent about photo removal
                 if (!currentState) return;
                 const segments = calculateSegments(currentState.doors, currentState.totalWidth);
-                const sections = segments.map((segment, index) => ({
+                const layoutSections = segments.map((segment, index) => ({
                   width: segment.width / 100,
                   isDoor: segment.type === 'door',
-                  doorOffset: segment.type === 'door' && segment.door ? segment.door.offsetTop / 100 : null,
+                  doorHeight: segment.type === 'door' && segment.door ? segment.door.doorHeight / 100 : null,
                   position: index
                 }));
                 const layoutData = {
                   height: currentState.height / 100,
-                  sections,
+                  layoutSections,
                   photoId: null,
                   photoFile: null,
                 };

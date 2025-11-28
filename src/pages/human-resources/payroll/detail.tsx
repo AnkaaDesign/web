@@ -1,58 +1,98 @@
-import { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useUser } from "../../../hooks";
-import { routes, SECTOR_PRIVILEGES, TASK_STATUS, USER_STATUS } from "../../../constants";
+import { useState, useMemo, useEffect } from "react";
+import { useParams } from "react-router-dom";
+import { payrollService } from "../../../api-client";
+import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { formatCurrency } from "../../../utils";
+import { formatCPF, formatPIS } from "../../../utils/formatters";
+import { cn } from "@/lib/utils";
 import {
   IconReceipt,
+  IconAlertCircle,
   IconRefresh,
+  IconFileDownload,
   IconUser,
   IconCurrencyReal,
-  IconClipboardList,
-  IconAlertCircle,
-  IconBuildingStore,
-  IconCalendar,
-  IconUsers,
-  IconTrendingUp,
-  IconCalendarStats,
 } from "@tabler/icons-react";
 
-// Import the detail components
-import { PayrollDetailsCard } from "@/components/human-resources/payroll/detail/payroll-details-card";
-import { TasksInBonusCard } from "@/components/human-resources/payroll/detail/tasks-in-bonus-card";
-import { UsersStatsCard } from "@/components/human-resources/payroll/detail/users-stats-card";
-import { PayrollTasksTable } from "@/components/human-resources/payroll/detail/payroll-tasks-table";
-
 interface PayrollDetailPageParams {
-  payrollId: string; // Only payrollId is needed now
+  payrollId: string;
 }
+
+// Month names in Portuguese
+const MONTH_NAMES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+];
 
 function getMonthName(month?: number): string {
   if (!month) return "";
-  const monthNames = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-  ];
   const monthIndex = month - 1;
-  return monthNames[monthIndex] || "";
+  return MONTH_NAMES[monthIndex] || "";
+}
+
+// Helper to format currency amount (handles Decimal type)
+const formatAmount = (amount: any): string => {
+  if (amount === null || amount === undefined) return formatCurrency(0);
+  if (typeof amount === 'number') return formatCurrency(amount);
+  if (typeof amount === 'string') return formatCurrency(parseFloat(amount) || 0);
+  if (amount?.toNumber) return formatCurrency(amount.toNumber());
+  return formatCurrency(0);
+};
+
+// Helper to get numeric value from any type
+const getNumericValue = (value: any): number => {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return parseFloat(value) || 0;
+  if (value?.toNumber) return value.toNumber();
+  return 0;
+};
+
+// Helper to check if ID is a live payroll ID
+function isLivePayrollId(id: string): boolean {
+  return id.startsWith('live-');
+}
+
+// Helper to parse live payroll ID (format: live-{userId}-{year}-{month})
+function parseLivePayrollId(id: string): { userId: string; year: number; month: number } | null {
+  if (!isLivePayrollId(id)) return null;
+
+  const parts = id.replace('live-', '').split('-');
+  if (parts.length < 7) return null; // UUID has 5 parts + year + month = 7
+
+  const month = parseInt(parts[parts.length - 1]);
+  const year = parseInt(parts[parts.length - 2]);
+  const userId = parts.slice(0, -2).join('-');
+
+  if (isNaN(year) || isNaN(month)) return null;
+
+  return { userId, year, month };
+}
+
+// Info row component for consistent styling
+function InfoRow({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn("flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3", className)}>
+      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      <span className="text-sm font-semibold text-foreground">{value}</span>
+    </div>
+  );
 }
 
 export default function PayrollDetailPage() {
   const { payrollId } = useParams<PayrollDetailPageParams>();
-  const navigate = useNavigate();
 
-  // Fetch payroll details including bonuses
-  const [payrollData, setPayrollData] = useState<any>(null);
-  const [payrollLoading, setPayrollLoading] = useState(true);
+  // State for payroll data
+  const [payroll, setPayroll] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Track page access
   usePageTracker({
@@ -60,32 +100,29 @@ export default function PayrollDetailPage() {
     icon: "receipt",
   });
 
+  // Determine if this is a live payroll ID (used for fetching)
+  const isLiveId = payrollId ? isLivePayrollId(payrollId) : false;
+  const liveParams = payrollId && isLiveId ? parseLivePayrollId(payrollId) : null;
+
+  // Fetch payroll data
   useEffect(() => {
-    const fetchPayrollDetails = async () => {
-      if (!payrollId) {
-        setPayrollData(null);
-        setPayrollLoading(false);
-        return;
-      }
+    if (!payrollId) {
+      setError('ID da folha de pagamento não fornecido');
+      setLoading(false);
+      return;
+    }
 
-      setPayrollLoading(true);
+    const fetchPayroll = async () => {
+      setLoading(true);
+      setError(null);
+
       try {
-        const { payrollService, userService } = await import('../../../api-client');
-
-        // Check if it's a composite ID for live calculation (userId_year_month)
-        const isCompositeId = payrollId.includes('_');
-
-        if (isCompositeId) {
-          // Parse composite ID for live calculation
-          const [userId, year, month] = payrollId.split('_');
-
-          // No need to fetch users separately - backend now returns correct participant count
-
-          // Fetch live calculation using the user/year/month endpoint
+        if (isLiveId && liveParams) {
+          // Live calculation - fetch by user/year/month
           const response = await payrollService.getByUserAndMonth(
-            userId,
-            parseInt(year),
-            parseInt(month),
+            liveParams.userId,
+            liveParams.year,
+            liveParams.month,
             {
               include: {
                 user: {
@@ -94,17 +131,11 @@ export default function PayrollDetailPage() {
                     sector: true,
                   },
                 },
+                position: true,
                 bonus: {
                   include: {
-                    tasks: {
-                      include: {
-                        customer: true,
-                        createdBy: true,
-                        sector: true,
-                        services: true,
-                      },
-                    },
-                    users: true,
+                    bonusDiscounts: true,
+                    position: true,
                   },
                 },
                 discounts: true,
@@ -112,11 +143,13 @@ export default function PayrollDetailPage() {
             }
           );
 
-          if (response?.data) {
-            setPayrollData(response.data);
+          if (response.data?.data) {
+            setPayroll(response.data.data);
+          } else {
+            setError('Folha de pagamento não encontrada para este período.');
           }
         } else {
-          // Standard fetch by ID for saved payrolls
+          // Saved payroll - fetch by ID
           const response = await payrollService.getById(payrollId, {
             include: {
               user: {
@@ -125,143 +158,96 @@ export default function PayrollDetailPage() {
                   sector: true,
                 },
               },
+              position: true,
               bonus: {
                 include: {
-                  tasks: {
-                    include: {
-                      customer: true,
-                      user: true,
-                      sector: true,
-                      services: true,
-                    },
-                  },
-                  users: true,
+                  bonusDiscounts: true,
+                  position: true,
                 },
               },
               discounts: true,
             },
           });
 
-          if (response?.data?.data) {
-            setPayrollData(response.data.data);
-          } else if (response?.data) {
-            setPayrollData(response.data);
+          if (response.data?.data) {
+            setPayroll(response.data.data);
+          } else if (response.data) {
+            setPayroll(response.data);
+          } else {
+            setError('Folha de pagamento não encontrada.');
           }
         }
-      } catch (error) {
-        setPayrollData(null);
+      } catch (err: any) {
+        setError(err?.response?.data?.message || 'Erro ao carregar folha de pagamento.');
+      } finally {
+        setLoading(false);
       }
-      setPayrollLoading(false);
     };
 
-    fetchPayrollDetails();
-  }, [payrollId]);
+    fetchPayroll();
+  }, [payrollId, isLiveId, liveParams?.userId, liveParams?.year, liveParams?.month]);
 
-  // Calculate bonus period dates (26th to 25th)
-  const getBonusPeriodDates = (year: number, month: number) => {
-    if (!year || !month) return { startDate: new Date(), endDate: new Date() };
-
-    const startDate = new Date(year, month - 2, 26, 0, 0, 0); // Previous month, day 26
-    const endDate = new Date(year, month - 1, 25, 23, 59, 59); // Current month, day 25
-
-    // If month is January (1), we need to handle year transition
-    if (month === 1) {
-      startDate.setFullYear(year - 1);
-      startDate.setMonth(11); // December
-    }
-
-    return { startDate, endDate };
-  };
-
-  const { startDate, endDate } = useMemo(() => {
-    if (payrollData) {
-      return getBonusPeriodDates(payrollData.year, payrollData.month);
-    }
-    return { startDate: new Date(), endDate: new Date() };
-  }, [payrollData]);
-
-  // Detect if month is closed (bonus has been saved/confirmed)
-  const isMonthClosed = useMemo(() => {
-    return payrollData?.bonus && !payrollData.bonus.isLive;
-  }, [payrollData]);
-
-  // Get the correct user data based on whether month is closed or not
-  const displayUser = useMemo(() => {
-    if (!payrollData?.user) return null;
-
-    // For unclosed months (live data), use current user data
-    if (!isMonthClosed) {
+  // Calculate values
+  const calculations = useMemo(() => {
+    if (!payroll) {
       return {
-        ...payrollData.user,
-        performanceLevel: payrollData.user.performanceLevel, // Use current performance level
-        position: payrollData.user.position, // Use current position
+        baseRemuneration: 0,
+        bonusAmount: 0,
+        totalGross: 0,
+        totalDiscounts: 0,
+        totalNet: 0,
       };
     }
 
-    // For closed months, use saved bonus/payroll data
-    return {
-      ...payrollData.user,
-      performanceLevel: payrollData.bonus?.performanceLevel ?? payrollData.user.performanceLevel,
-      position: payrollData.position || payrollData.user.position, // Prefer payroll.position if available
-    };
-  }, [payrollData, isMonthClosed]);
+    const baseRemuneration = getNumericValue(payroll.baseRemuneration) ||
+      getNumericValue(payroll.position?.baseRemuneration) ||
+      getNumericValue(payroll.user?.position?.baseRemuneration) ||
+      0;
 
-  // Extract statistics from payroll data
-  const statistics = useMemo(() => {
-    if (!payrollData) {
-      return {
-        totalParticipants: 0,
-        totalTasks: 0,
-        totalWeightedTasks: 0,
-        averageWeightedTasks: 0,
-        averageTasksPerUser: 0,
-      };
+    const bonusAmount = payroll.bonus ? getNumericValue(payroll.bonus.baseBonus) : 0;
+    const totalGross = baseRemuneration + bonusAmount;
+
+    // Calculate discounts
+    let totalDiscounts = 0;
+    if (payroll.discounts && payroll.discounts.length > 0) {
+      payroll.discounts.forEach((discount: any) => {
+        const fixedValue = getNumericValue(discount.value) || getNumericValue(discount.fixedValue);
+        if (fixedValue > 0) {
+          totalDiscounts += fixedValue;
+        } else if (discount.percentage) {
+          totalDiscounts += totalGross * (getNumericValue(discount.percentage) / 100);
+        }
+      });
     }
 
-    const tasks = payrollData.bonus?.tasks || [];
-    const users = payrollData.bonus?.users || [];
-
-    // If we have the direct statistics from backend, use them
-    if (payrollData.bonus?.totalTasks !== undefined) {
-      // Backend now sends correct data with proper filtering (EFFECTED + bonifiable + performance > 0)
-      const averagePerUser = payrollData.bonus.weightedTaskCount || 0;
-      const totalTasks = payrollData.bonus.totalTasks;
-      const totalParticipants = payrollData.bonus.totalUsers || users.length || 0;
-
-      // Calculate total weighted tasks from average and participant count
-      const totalWeightedTasks = averagePerUser * totalParticipants;
-
-
-      return {
-        totalParticipants,
-        totalTasks: payrollData.bonus.totalTasks,
-        totalWeightedTasks, // Total weighted tasks for the period
-        averageWeightedTasks: averagePerUser, // Average per user (from backend)
-        averageTasksPerUser: averagePerUser, // Same as averageWeightedTasks
-        isLive: !isMonthClosed, // Use the computed isMonthClosed flag
-      };
+    // Calculate bonus discounts
+    let bonusDiscounts = 0;
+    if (payroll.bonus?.bonusDiscounts && payroll.bonus.bonusDiscounts.length > 0) {
+      let currentBonusAmount = bonusAmount;
+      payroll.bonus.bonusDiscounts
+        .sort((a: any, b: any) => (a.calculationOrder || 0) - (b.calculationOrder || 0))
+        .forEach((discount: any) => {
+          if (discount.percentage) {
+            const discountValue = currentBonusAmount * (getNumericValue(discount.percentage) / 100);
+            bonusDiscounts += discountValue;
+            currentBonusAmount -= discountValue;
+          } else if (discount.value) {
+            bonusDiscounts += getNumericValue(discount.value);
+            currentBonusAmount -= getNumericValue(discount.value);
+          }
+        });
     }
 
-    // Otherwise calculate from tasks (fallback if backend doesn't provide statistics)
-    const fullCommissionTasks = tasks.filter((t: any) => t.commission === 'FULL_COMMISSION').length;
-    const partialCommissionTasks = tasks.filter((t: any) => t.commission === 'PARTIAL_COMMISSION').length;
-    const totalWeightedTasks = fullCommissionTasks + (partialCommissionTasks * 0.5);
-
-    // Use bonus users count or fallback
-    const participantCount = payrollData.bonus?.totalUsers || users.length || 0;
-
-    const averageWeightedTasks = participantCount > 0 ? totalWeightedTasks / participantCount : 0;
-    const averageTasksPerUser = participantCount > 0 ? tasks.length / participantCount : 0;
+    const totalNet = totalGross - totalDiscounts - bonusDiscounts;
 
     return {
-      totalParticipants: participantCount,
-      totalTasks: tasks.length,
-      totalWeightedTasks,
-      averageWeightedTasks, // Average weighted tasks per user
-      averageTasksPerUser, // Average total tasks per user
-      isLive: !isMonthClosed, // Use the computed isMonthClosed flag
+      baseRemuneration,
+      bonusAmount,
+      totalGross,
+      totalDiscounts: totalDiscounts + bonusDiscounts,
+      totalNet,
     };
-  }, [payrollData, isMonthClosed]);
+  }, [payroll]);
 
   // Validation - check if payrollId is provided
   if (!payrollId) {
@@ -275,8 +261,7 @@ export default function PayrollDetailPage() {
     );
   }
 
-  // Show loading state while fetching payroll
-  if (payrollLoading) {
+  if (loading) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="flex items-center justify-center p-8">
@@ -286,8 +271,18 @@ export default function PayrollDetailPage() {
     );
   }
 
-  // Show error if payroll not found
-  if (!payrollData) {
+  if (error) {
+    return (
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
+        <Alert variant="destructive">
+          <IconAlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      </PrivilegeRoute>
+    );
+  }
+
+  if (!payroll) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
         <Alert variant="destructive">
@@ -298,12 +293,17 @@ export default function PayrollDetailPage() {
     );
   }
 
-  // Extract user and period info from payroll data
-  const user = displayUser;
-  const userName = user?.name || payrollData?.user?.name || 'Funcionário';
-  const monthName = getMonthName(payrollData?.month);
-  const year = payrollData?.year || new Date().getFullYear();
-  const title = payrollData ? `${userName} - ${monthName} ${year}` : 'Folha de Pagamento';
+  // Extract data
+  const user = payroll.user;
+  const userName = user?.name || 'Funcionário';
+  const monthName = getMonthName(payroll.month);
+  const year = payroll.year || new Date().getFullYear();
+  const title = `${userName} - ${monthName} ${year}`;
+
+  // Use position saved at payroll creation, fallback to user's current
+  const position = payroll.position || payroll.bonus?.position || user?.position;
+  const sector = user?.sector;
+  const isBonifiable = position?.bonifiable ?? false;
 
   const breadcrumbs = [
     { label: "Início", href: routes.home },
@@ -313,9 +313,15 @@ export default function PayrollDetailPage() {
   ];
 
   const handleRefresh = () => {
-    // Re-fetch payroll data
     window.location.reload();
   };
+
+  const handleExport = () => {
+    window.print();
+  };
+
+  const hasPayrollDiscounts = payroll.discounts && payroll.discounts.length > 0;
+  const hasBonusDiscounts = payroll.bonus?.bonusDiscounts && payroll.bonus.bonusDiscounts.length > 0;
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
@@ -332,208 +338,108 @@ export default function PayrollDetailPage() {
               icon: IconRefresh,
               onClick: handleRefresh,
             },
+            {
+              key: "export",
+              label: "Exportar",
+              icon: IconFileDownload,
+              onClick: handleExport,
+            },
           ]}
         />
 
-        {/* User Payroll Summary and Discounts Grid */}
-        <div className="grid gap-6 md:grid-cols-2 items-start">
-              {/* Merged Card: User Payroll Summary + Period Statistics */}
-              <Card className="h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <IconCurrencyReal className="h-5 w-5 text-muted-foreground" />
-                    Detalhes da Remuneração
-                  </CardTitle>
-                  <CardDescription>
-                    Informações de cargo e remuneração para {monthName} de {year}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Cargo</p>
-                      <p className="font-medium">
-                        {user?.position?.name || "-"}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Setor</p>
-                      <p className="font-medium">
-                        {user?.sector?.name || "-"}
-                      </p>
-                    </div>
-                    {user?.position?.bonifiable && (
-                      <div className="space-y-1">
-                        <p className="text-sm text-muted-foreground">Nível Performance</p>
-                        <Badge variant={(user?.performanceLevel || 0) > 0 ? "default" : "secondary"}>
-                          {user?.performanceLevel || "0"}
-                        </Badge>
-                        {statistics.isLive && (
-                          <p className="text-xs text-yellow-600 mt-1">
-                            (dados em tempo real)
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Bonificável</p>
-                      <Badge variant={user?.position?.bonifiable ? "success" : "secondary"}>
-                        {user?.position?.bonifiable ? "Sim" : "Não"}
-                      </Badge>
-                    </div>
+        {/* Info Cards - 2 columns */}
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* General Info Card */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <IconUser className="h-4 w-4" />
+                Informações Gerais
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <InfoRow label="Nº Folha" value={user?.payrollNumber || "-"} />
+              <InfoRow label="Colaborador" value={userName} />
+              <InfoRow label="CPF" value={user?.cpf ? formatCPF(user.cpf) : "-"} />
+              <InfoRow label="PIS" value={user?.pis ? formatPIS(user.pis) : "-"} />
+              <InfoRow label="Cargo" value={position?.name || "-"} />
+              <InfoRow label="Setor" value={sector?.name || "-"} />
+              <InfoRow label="Bonificável" value={isBonifiable ? "Sim" : "Não"} />
+              {isBonifiable && (
+                <InfoRow
+                  label="Nível de Performance"
+                  value={payroll.bonus?.performanceLevel || user?.performanceLevel || 0}
+                />
+              )}
+              <InfoRow label="Período" value={`${monthName}/${year}`} />
+            </CardContent>
+          </Card>
+
+          {/* Financial Card */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <IconCurrencyReal className="h-4 w-4" />
+                Valores
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between py-1">
+                <span className="text-sm text-muted-foreground">Remuneração Base</span>
+                <span className="text-sm font-medium">{formatAmount(calculations.baseRemuneration)}</span>
+              </div>
+
+              {isBonifiable && calculations.bonusAmount > 0 && (
+                <>
+                  <Separator className="my-2" />
+                  <div className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Bônus</span>
+                    <span className="text-sm font-medium">{formatAmount(calculations.bonusAmount)}</span>
                   </div>
-
-                  <Separator className="my-4" />
-
-                  <div className="grid gap-4 grid-cols-1">
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Remuneração Base</p>
-                      <p className="text-2xl font-bold text-primary">
-                        {formatCurrency(
-                          Number(payrollData.baseRemuneration) ||
-                          Number(payrollData.user?.position?.baseRemuneration) ||
-                          0
-                        )}
-                      </p>
+                  {hasBonusDiscounts && payroll.bonus.bonusDiscounts.map((discount: any) => (
+                    <div key={discount.id} className="flex justify-between py-1">
+                      <span className="text-sm text-muted-foreground">Desconto: {discount.reference}</span>
+                      <span className="text-sm font-medium text-destructive">-{discount.percentage}%</span>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Bonificação</p>
-                      <p className="text-2xl font-bold text-green-600">
-                        {formatCurrency(
-                          payrollData.bonus ? Number(payrollData.bonus.baseBonus) : 0
-                        )}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Total Bruto</p>
-                      <p className="text-2xl font-bold">
-                        {formatCurrency(
-                          (Number(payrollData.baseRemuneration) ||
-                           Number(payrollData.user?.position?.baseRemuneration) ||
-                           0) + (payrollData.bonus ? Number(payrollData.bonus.baseBonus) : 0)
-                        )}
-                      </p>
-                    </div>
-                  </div>
+                  ))}
+                </>
+              )}
 
-                  {/* Period Statistics - Only show if user is eligible */}
-                  {user?.position?.bonifiable && (
-                    <>
-                      <Separator className="my-4" />
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 mb-3">
-                          <IconCalendarStats className="h-5 w-5" />
-                          <h3 className="text-lg font-semibold">Estatísticas do Período</h3>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          Dados de performance para {monthName} de {year}
-                          <span className="block text-xs mt-1">
-                            Período: {startDate.toLocaleDateString('pt-BR')} a {endDate.toLocaleDateString('pt-BR')}
-                          </span>
-                          {statistics.isLive && (
-                            <span className="block text-xs text-yellow-600 mt-1">
-                              ⚠️ Dados calculados em tempo real (bônus ainda não criado)
-                            </span>
-                          )}
-                        </p>
-                        <div className="grid gap-4 grid-cols-2 mt-4">
-                          <div className="text-center p-4 rounded-lg bg-muted/50">
-                            <IconUsers className="h-8 w-8 text-primary mx-auto mb-2" />
-                            <p className="text-2xl font-bold">{statistics.totalParticipants}</p>
-                            <p className="text-xs text-muted-foreground">Funcionários com Bônus</p>
-                          </div>
-                          <div className="text-center p-4 rounded-lg bg-muted/50">
-                            <IconClipboardList className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                            <p className="text-2xl font-bold">{statistics.totalTasks}</p>
-                            <p className="text-xs text-muted-foreground">Total de Tarefas</p>
-                          </div>
-                          <div className="text-center p-4 rounded-lg bg-muted/50">
-                            <IconTrendingUp className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                            <p className="text-2xl font-bold">{statistics.totalWeightedTasks.toFixed(1)}</p>
-                            <p className="text-xs text-muted-foreground">Tarefas Ponderadas</p>
-                          </div>
-                          <div className="text-center p-4 rounded-lg bg-muted/50">
-                            <IconCalendarStats className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-                            <p className="text-2xl font-bold">{statistics.averageWeightedTasks.toFixed(1)}</p>
-                            <p className="text-xs text-muted-foreground">Média por Funcionário</p>
-                          </div>
-                        </div>
+              {hasPayrollDiscounts && (
+                <>
+                  <Separator className="my-2" />
+                  {payroll.discounts.map((discount: any) => {
+                    const discountValue = getNumericValue(discount.value) ||
+                      getNumericValue(discount.fixedValue) ||
+                      (calculations.totalGross * (getNumericValue(discount.percentage) / 100));
+                    return (
+                      <div key={discount.id} className="flex justify-between py-1">
+                        <span className="text-sm text-muted-foreground">{discount.reference || "Desconto"}</span>
+                        <span className="text-sm font-medium text-destructive">-{formatAmount(discountValue)}</span>
                       </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
+                    );
+                  })}
+                </>
+              )}
 
-              {/* Discounts Card */}
-              <Card className="h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <IconCurrencyReal className="h-5 w-5 text-muted-foreground" />
-                    Descontos e Cálculos
-                  </CardTitle>
-                  <CardDescription>
-                    Detalhes da bonificação e descontos aplicados
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {payrollData.bonus ? (
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm text-muted-foreground">Bonificação Base</span>
-                          <span className="font-medium">{formatCurrency(Number(payrollData.bonus.baseBonus) || 0)}</span>
-                        </div>
-                        {payrollData.discounts?.length > 0 && (
-                          <>
-                            <Separator />
-                            {payrollData.discounts.map((discount: any) => (
-                              <div key={discount.id} className="flex justify-between">
-                                <span className="text-sm text-muted-foreground">{discount.reference}</span>
-                                <span className="text-sm text-red-600">
-                                  -{formatCurrency(
-                                    Number(discount.value) ||
-                                    Number(discount.fixedValue) ||
-                                    ((Number(payrollData.baseRemuneration) || Number(payrollData.user?.position?.baseRemuneration) || 0) * (Number(discount.percentage) || 0) / 100)
-                                  )}
-                                </span>
-                              </div>
-                            ))}
-                          </>
-                        )}
-                        <Separator />
-                        <div className="flex justify-between">
-                          <span className="text-sm font-medium">Total Líquido</span>
-                          <span className="font-bold text-lg">
-                            {formatCurrency(
-                              (Number(payrollData.baseRemuneration) || Number(payrollData.user?.position?.baseRemuneration) || 0) +
-                              (payrollData.bonus ? Number(payrollData.bonus.baseBonus) : 0) -
-                              (payrollData.discounts?.reduce((sum: number, d: any) =>
-                                sum + (Number(d.value) || Number(d.fixedValue) || ((Number(payrollData.baseRemuneration) || Number(payrollData.user?.position?.baseRemuneration) || 0) * (Number(d.percentage) || 0) / 100)), 0
-                              ) || 0)
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <IconCurrencyReal className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                        <p className="text-muted-foreground">Nenhuma bonificação registrada para este período</p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-        {/* Tasks Table - Only show for eligible users */}
-        {user?.position?.bonifiable && (
-          <div className="w-full">
-            <PayrollTasksTable
-              tasks={payrollData?.bonus?.tasks || []}
-              userName={user?.name}
-            />
-          </div>
-        )}
+              <Separator className="my-2" />
+              <div className="flex justify-between py-1">
+                <span className="text-sm text-muted-foreground">Total Bruto</span>
+                <span className="text-sm font-medium">{formatAmount(calculations.totalGross)}</span>
+              </div>
+              {calculations.totalDiscounts > 0 && (
+                <div className="flex justify-between py-1">
+                  <span className="text-sm text-muted-foreground">Total Descontos</span>
+                  <span className="text-sm font-medium text-destructive">-{formatAmount(calculations.totalDiscounts)}</span>
+                </div>
+              )}
+              <div className="flex justify-between py-2 bg-green-50 dark:bg-green-950/20 rounded-lg px-3 mt-2">
+                <span className="text-sm font-medium text-muted-foreground">Total Líquido</span>
+                <span className="text-lg font-bold text-green-600">{formatAmount(calculations.totalNet)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </PrivilegeRoute>
   );

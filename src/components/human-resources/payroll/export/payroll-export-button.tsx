@@ -17,45 +17,11 @@ export function PayrollExportButton({ users, isLoading, className }: PayrollExpo
 
   const calculatePayrollData = (user: User) => {
     const baseRemuneration = user.position?.remuneration || 0;
-    let bonusMultiplier = 0;
-
-    // Calculate bonus based on performance level
-    switch (user.performanceLevel) {
-      case 4: // Excellent
-        bonusMultiplier = 0.15;
-        break;
-      case 3: // Good
-        bonusMultiplier = 0.10;
-        break;
-      case 2: // Fair
-        bonusMultiplier = 0.05;
-        break;
-      case 1: // Poor
-        bonusMultiplier = 0;
-        break;
-      default:
-        bonusMultiplier = 0.05;
-    }
-
-    const bonus = baseRemuneration * bonusMultiplier;
+    // Bonus calculation is handled by the bonus domain
+    const bonus = 0;
     const total = baseRemuneration + bonus;
 
     return { baseRemuneration, bonus, total };
-  };
-
-  const getPerformanceLevelText = (level: number): string => {
-    switch (level) {
-      case 1:
-        return "Ruim";
-      case 2:
-        return "Regular";
-      case 3:
-        return "Bom";
-      case 4:
-        return "Excelente";
-      default:
-        return "Regular";
-    }
   };
 
   const exportToCsv = async () => {
@@ -68,23 +34,19 @@ export function PayrollExportButton({ users, isLoading, className }: PayrollExpo
         "Nome",
         "Cargo",
         "Setor",
-        "Nível de Performance",
-        "Bonificação",
         "Remuneração",
         "Total"
       ];
 
       // Prepare CSV data
       const csvData = users.map(user => {
-        const { baseRemuneration, bonus, total } = calculatePayrollData(user);
+        const { baseRemuneration, total } = calculatePayrollData(user);
 
         return [
           user.payrollNumber ? user.payrollNumber.toString().padStart(4, "0") : "-",
           user.name,
           user.position?.name || "-",
           user.sector?.name || "-",
-          getPerformanceLevelText(user.performanceLevel),
-          formatCurrency(bonus),
           formatCurrency(baseRemuneration),
           formatCurrency(total)
         ];
@@ -127,22 +89,18 @@ export function PayrollExportButton({ users, isLoading, className }: PayrollExpo
         "Nome",
         "Cargo",
         "Setor",
-        "Nível de Performance",
-        "Bonificação",
         "Remuneração",
         "Total"
       ];
 
       const csvData = users.map(user => {
-        const { baseRemuneration, bonus, total } = calculatePayrollData(user);
+        const { baseRemuneration, total } = calculatePayrollData(user);
 
         return [
           user.payrollNumber ? user.payrollNumber.toString().padStart(4, "0") : "-",
           user.name,
           user.position?.name || "-",
           user.sector?.name || "-",
-          getPerformanceLevelText(user.performanceLevel),
-          formatCurrency(bonus),
           formatCurrency(baseRemuneration),
           formatCurrency(total)
         ];

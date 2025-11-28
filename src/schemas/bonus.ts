@@ -117,6 +117,8 @@ export const bonusWhereSchema: z.ZodType<any> = z.lazy(() =>
             lte: z.number().optional(),
             gt: z.number().optional(),
             gte: z.number().optional(),
+            in: z.array(z.number()).optional(),
+            notIn: z.array(z.number()).optional(),
           }),
         ])
         .optional(),
@@ -141,6 +143,8 @@ export const bonusWhereSchema: z.ZodType<any> = z.lazy(() =>
             lte: z.number().optional(),
             gt: z.number().optional(),
             gte: z.number().optional(),
+            in: z.array(z.number()).optional(),
+            notIn: z.array(z.number()).optional(),
           }),
         ])
         .optional(),
@@ -221,6 +225,30 @@ export const bonusWhereSchema: z.ZodType<any> = z.lazy(() =>
               contains: z.string().optional(),
               mode: z.enum(["default", "insensitive"]).optional(),
             })
+            .optional(),
+          status: z
+            .union([
+              z.string(),
+              z.object({
+                in: z.array(z.string()).optional(),
+              }),
+            ])
+            .optional(),
+          positionId: z
+            .union([
+              z.string(),
+              z.object({
+                in: z.array(z.string()).optional(),
+              }),
+            ])
+            .optional(),
+          sectorId: z
+            .union([
+              z.string(),
+              z.object({
+                in: z.array(z.string()).optional(),
+              }),
+            ])
             .optional(),
         })
         .optional(),

@@ -16,14 +16,14 @@ interface TaskWithDeadlineInfo extends Task {
  * - Red: Overdue tasks (past deadline)
  */
 export function getRowColorClass(task: TaskWithDeadlineInfo): string {
-  // Non-production tasks (PENDING, COMPLETED, CANCELLED, ON_HOLD) use neutral gray
+  // Non-production tasks (PENDING, COMPLETED, CANCELLED, ON_HOLD) - lighter in light mode, darker in dark mode
   if (task.status !== TASK_STATUS.IN_PRODUCTION) {
-    return "bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-700 dark:hover:bg-neutral-600";
+    return "bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-700";
   }
 
-  // Tasks with no deadline use neutral gray
+  // Tasks with no deadline - lighter in light mode, darker in dark mode
   if (!task.term) {
-    return "bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-700 dark:hover:bg-neutral-600";
+    return "bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-700";
   }
 
   // Check if task is overdue

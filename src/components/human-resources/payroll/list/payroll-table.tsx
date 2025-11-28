@@ -4,7 +4,7 @@ import { StandardizedTable, type StandardizedColumn } from "@/components/ui/stan
 import { IconUsers } from "@tabler/icons-react";
 import { useAuth } from "../../../../hooks/useAuth";
 import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
-import { usePayrollBonuses } from "../../../../hooks";
+import { usePayrolls } from "../../../../hooks";
 import { createPayrollColumns } from "./payroll-table-columns";
 import type { PayrollColumn, PayrollUserRow } from "./payroll-table-columns";
 import { useTableState } from "@/hooks/use-table-state";
@@ -15,7 +15,6 @@ import { routes } from "../../../../constants";
 interface PayrollFiltersData {
   year?: number;
   months?: string[];
-  performanceLevels?: number[];
   sectorIds?: string[];
   positionIds?: string[];
   userIds?: string[];
@@ -45,10 +44,15 @@ export function PayrollTable({
   const showInteractive = user ? shouldShowInteractiveElements(user, 'hr') : false;
 
   // Handle row click to navigate to payroll details
-  const handleRowClick = (row: PayrollUserRow) => {
-    // Don't navigate for temp payroll IDs (live calculations)
+  const handleRowClick = (row: PayrollUserRow & { month?: number; year?: number }) => {
+    // For saved payrolls with valid ID, navigate directly
     if (row.payrollId && !row.payrollId.startsWith('temp-')) {
       navigate(routes.humanResources.payroll.detail(row.payrollId));
+    } else if (row.id && row.month && (row.year || filters?.year)) {
+      // For live calculations, create live ID with user info
+      const year = row.year || filters?.year;
+      const liveId = `live-${row.id}-${year}-${row.month}`;
+      navigate(routes.humanResources.payroll.detail(liveId));
     }
   };
 
@@ -87,19 +91,27 @@ export function PayrollTable({
   const secondMonth = filters?.months?.[1] ? parseInt(filters.months[1]) : 0;
   const thirdMonth = filters?.months?.[2] ? parseInt(filters.months[2]) : 0;
 
-  const { data: firstMonthData, isLoading: firstMonthLoading, error: firstMonthError } = usePayrollBonuses(
-    filters?.year || 0,
-    firstMonth
+  const payrollParams = {
+    include: {
+      user: { include: { position: true, sector: true } },
+      bonus: { include: { tasks: true } },
+      discounts: true,
+    },
+  };
+
+  const { data: firstMonthData, isLoading: firstMonthLoading, error: firstMonthError } = usePayrolls(
+    { ...payrollParams, where: { year: filters?.year || 0, month: firstMonth } },
+    { enabled: !!filters?.year && firstMonth > 0 }
   );
 
-  const { data: secondMonthData, isLoading: secondMonthLoading } = usePayrollBonuses(
-    filters?.year || 0,
-    secondMonth
+  const { data: secondMonthData, isLoading: secondMonthLoading } = usePayrolls(
+    { ...payrollParams, where: { year: filters?.year || 0, month: secondMonth } },
+    { enabled: !!filters?.year && secondMonth > 0 }
   );
 
-  const { data: thirdMonthData, isLoading: thirdMonthLoading } = usePayrollBonuses(
-    filters?.year || 0,
-    thirdMonth
+  const { data: thirdMonthData, isLoading: thirdMonthLoading } = usePayrolls(
+    { ...payrollParams, where: { year: filters?.year || 0, month: thirdMonth } },
+    { enabled: !!filters?.year && thirdMonth > 0 }
   );
 
   // Combine all payroll data with proper month labels
@@ -170,12 +182,6 @@ export function PayrollTable({
       );
     }
 
-    if (filters?.performanceLevels && filters.performanceLevels.length > 0) {
-      filteredData = filteredData.filter((p: any) =>
-        filters.performanceLevels!.includes(p.user?.performanceLevel || 0)
-      );
-    }
-
     // Map payroll entities to table rows
     const rows: PayrollUserRow[] = filteredData.map((payroll: any) => {
       const user = payroll.user;
@@ -192,7 +198,6 @@ export function PayrollTable({
         payrollNumber: user.payrollNumber,
         position: user.position,
         sector: user.sector,
-        performanceLevel: user.performanceLevel || 0,
         status: user.status,
 
         // Payroll fields
@@ -245,10 +250,6 @@ export function PayrollTable({
           case 'sector.name':
             aValue = a.sector?.name || '';
             bValue = b.sector?.name || '';
-            break;
-          case 'performanceLevel':
-            aValue = a.performanceLevel || 0;
-            bValue = b.performanceLevel || 0;
             break;
           case 'tasksCompleted':
             // Calculate weighted tasks

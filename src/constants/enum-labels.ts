@@ -147,7 +147,7 @@ export const USER_STATUS_LABELS: Record<USER_STATUS, string> = {
 };
 
 export const TASK_STATUS_LABELS: Record<TASK_STATUS, string> = {
-  [TASK_STATUS.PENDING]: "Pendente",
+  [TASK_STATUS.PENDING]: "Aguardando",
   [TASK_STATUS.IN_PRODUCTION]: "Em Produção",
   [TASK_STATUS.COMPLETED]: "Concluído",
   [TASK_STATUS.CANCELLED]: "Cancelado",
