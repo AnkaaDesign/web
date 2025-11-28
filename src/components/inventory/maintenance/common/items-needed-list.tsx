@@ -51,10 +51,8 @@ export function ItemsNeededList({ itemsConfig, className }: ItemsNeededListProps
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border w-full", className)}>
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconPackage className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconPackage className="h-5 w-5 text-muted-foreground" />
           Itens Necessários
         </CardTitle>
       </CardHeader>

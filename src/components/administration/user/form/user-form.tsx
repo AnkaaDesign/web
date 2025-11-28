@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useRef } from "react";
+import { IconUser, IconInfoCircle, IconFileText, IconMapPin, IconBriefcase, IconShieldCheck, IconShirt } from "@tabler/icons-react";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { userCreateSchema, userUpdateSchema, type UserCreateFormData, type UserUpdateFormData } from "../../../../schemas";
@@ -320,7 +321,10 @@ export function UserForm(props: UserFormProps) {
           {/* Avatar Upload */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Foto de Perfil</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconUser className="h-5 w-5 text-muted-foreground" />
+                Foto de Perfil
+              </CardTitle>
               <CardDescription>Foto do colaborador</CardDescription>
             </CardHeader>
             <CardContent>
@@ -334,7 +338,10 @@ export function UserForm(props: UserFormProps) {
           {/* Basic Information */}
           <Card className="bg-transparent">
               <CardHeader>
-                <CardTitle>Informações Básicas</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
+                  Informações Básicas
+                </CardTitle>
                 <CardDescription>Dados fundamentais do colaborador</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -368,7 +375,10 @@ export function UserForm(props: UserFormProps) {
           {/* Documents */}
           <Card className="bg-transparent">
               <CardHeader>
-                <CardTitle>Documentos</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <IconFileText className="h-5 w-5 text-muted-foreground" />
+                  Documentos
+                </CardTitle>
                 <CardDescription>Documentação do colaborador</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -382,7 +392,10 @@ export function UserForm(props: UserFormProps) {
           {/* Address Information */}
           <Card className="bg-transparent">
               <CardHeader>
-                <CardTitle>Endereço</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <IconMapPin className="h-5 w-5 text-muted-foreground" />
+                  Endereço
+                </CardTitle>
                 <CardDescription>Informações de endereço do colaborador</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -414,7 +427,10 @@ export function UserForm(props: UserFormProps) {
           {/* Professional Information */}
           <Card className="bg-transparent">
               <CardHeader>
-                <CardTitle>Informações Profissionais</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <IconBriefcase className="h-5 w-5 text-muted-foreground" />
+                  Informações Profissionais
+                </CardTitle>
                 <CardDescription>Dados relacionados ao trabalho</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -430,7 +446,10 @@ export function UserForm(props: UserFormProps) {
           {/* Employment Status */}
           <Card className="bg-transparent">
               <CardHeader>
-                <CardTitle>Status do Colaborador</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
+                  Status do Colaborador
+                </CardTitle>
                 <CardDescription>Defina o status atual do colaborador e as datas relacionadas</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -444,7 +463,10 @@ export function UserForm(props: UserFormProps) {
           {/* Access Control */}
           <Card className="bg-transparent">
               <CardHeader>
-                <CardTitle>Controle de Acesso</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <IconShieldCheck className="h-5 w-5 text-muted-foreground" />
+                  Controle de Acesso
+                </CardTitle>
                 <CardDescription>Configurações de acesso e verificação do usuário</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

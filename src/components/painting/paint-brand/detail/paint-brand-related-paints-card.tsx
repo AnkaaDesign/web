@@ -57,12 +57,10 @@ export function PaintBrandRelatedPaintsCard({ paintBrand }: PaintBrandRelatedPai
       <Card className="shadow-sm border border-border">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <IconBrush className="h-5 w-5 text-primary" />
-              </div>
-              Tintas Relacionadas
-            </CardTitle>
+            <CardTitle className="flex items-center gap-2">
+          <IconBrush className="h-5 w-5 text-muted-foreground" />
+          Tintas Relacionadas
+        </CardTitle>
             {paintBrand.id && (
               <Button
                 variant="outline"
@@ -94,12 +92,10 @@ export function PaintBrandRelatedPaintsCard({ paintBrand }: PaintBrandRelatedPai
     <Card className="shadow-sm border border-border" level={1}>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconBrush className="h-5 w-5 text-primary" />
-            </div>
-            Tintas Relacionadas ({totalPaints})
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconBrush className="h-5 w-5 text-muted-foreground" />
+          Tintas Relacionadas ({totalPaints})
+        </CardTitle>
           {paintBrand.id && (
             <Button
               variant="outline"

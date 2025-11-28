@@ -27,10 +27,8 @@ export function PpeScheduleInfoCard({ schedule, className }: PpeScheduleInfoCard
   return (
     <Card className={cn("shadow-sm border border-border", className)} level={1}>
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconCalendar className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconCalendar className="h-5 w-5 text-muted-foreground" />
           Informações do Agendamento
         </CardTitle>
       </CardHeader>

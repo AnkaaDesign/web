@@ -111,12 +111,10 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
       <Card className={cn("shadow-sm border border-border", className)} level={1}>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <IconChecklist className="h-5 w-5 text-primary" />
-              </div>
-              Tarefas Relacionadas
-            </CardTitle>
+            <CardTitle className="flex items-center gap-2">
+          <IconChecklist className="h-5 w-5 text-muted-foreground" />
+          Tarefas Relacionadas
+        </CardTitle>
             {customer.id && (
               <Button variant="outline" size="sm" onClick={() => navigate(`${routes.production.schedule.list}?customerId=${customer.id}`)}>
                 Ver todas as tarefas
@@ -138,12 +136,10 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
     <Card className={cn("shadow-sm border border-border", className)} level={1}>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconChecklist className="h-5 w-5 text-primary" />
-            </div>
-            Tarefas Relacionadas
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconChecklist className="h-5 w-5 text-muted-foreground" />
+          Tarefas Relacionadas
+        </CardTitle>
           {customer.id && (
             <Button
               variant="outline"

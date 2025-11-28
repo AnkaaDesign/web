@@ -240,12 +240,10 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
     return (
       <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
         <CardHeader className="pb-6">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconPackage className="h-5 w-5 text-primary" />
-            </div>
-            Itens da Retirada
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconPackage className="h-5 w-5 text-muted-foreground" />
+          Itens da Retirada
+        </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2 text-muted-foreground bg-muted/30 rounded-lg p-4">
@@ -261,12 +259,10 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconPackage className="h-5 w-5 text-primary" />
-            </div>
-            Itens da Retirada
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconPackage className="h-5 w-5 text-muted-foreground" />
+          Itens da Retirada
+        </CardTitle>
           <Badge variant="secondary" className="text-sm">
             {summary.itemCount} {summary.itemCount === 1 ? "item" : "itens"}
           </Badge>

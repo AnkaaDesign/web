@@ -14,10 +14,8 @@ export function SpecificationsCard({ brand, itemCount = 0, className }: Specific
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconInfoCircle className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
           Informações da Marca
         </CardTitle>
       </CardHeader>

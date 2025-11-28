@@ -341,7 +341,7 @@ export default function PayrollDetailPage() {
               <Card className="h-full">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <IconCurrencyReal className="h-5 w-5" />
+                    <IconCurrencyReal className="h-5 w-5 text-muted-foreground" />
                     Detalhes da Remuneração
                   </CardTitle>
                   <CardDescription>
@@ -468,7 +468,7 @@ export default function PayrollDetailPage() {
               <Card className="h-full">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <IconCurrencyReal className="h-5 w-5" />
+                    <IconCurrencyReal className="h-5 w-5 text-muted-foreground" />
                     Descontos e Cálculos
                   </CardTitle>
                   <CardDescription>

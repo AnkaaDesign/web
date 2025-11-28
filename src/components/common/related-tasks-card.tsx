@@ -328,10 +328,8 @@ export function RelatedTasksCard({
       <Card className={cn("shadow-sm border border-border", className)} level={1}>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Icon className="h-5 w-5 text-primary" />
-              </div>
+            <CardTitle className="flex items-center gap-2">
+              <Icon className="h-5 w-5 text-muted-foreground" />
               {title}
             </CardTitle>
             {viewAllUrl && (
@@ -355,10 +353,8 @@ export function RelatedTasksCard({
     <Card className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)} level={1}>
       <CardHeader className="pb-4 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Icon className="h-5 w-5 text-primary" />
-            </div>
+          <CardTitle className="flex items-center gap-2">
+            <Icon className="h-5 w-5 text-muted-foreground" />
             {title}
           </CardTitle>
           <div className="flex items-center gap-2">

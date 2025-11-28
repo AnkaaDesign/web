@@ -91,10 +91,8 @@ export function RelatedActivitiesCard({ user, className, maxHeight = "500px" }: 
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-4 flex-shrink-0">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconClock className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconClock className="h-5 w-5 text-muted-foreground" />
           Histórico de Atividades - {format(startOfMonth(new Date()), "MMMM 'de' yyyy", { locale: ptBR })}
         </CardTitle>
       </CardHeader>

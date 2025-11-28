@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { IconCheck, IconLoader2, IconX } from "@tabler/icons-react";
+import { IconCheck, IconLoader2, IconX, IconBriefcase } from "@tabler/icons-react";
 
 import type { Position } from "../../../../types";
 import type { PositionCreateFormData, PositionUpdateFormData } from "../../../../schemas";
@@ -144,7 +144,10 @@ export function PositionForm(props: PositionFormProps) {
           <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-y-auto space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Informações do Cargo</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <IconBriefcase className="h-5 w-5 text-muted-foreground" />
+                  Informações do Cargo
+                </CardTitle>
                 <CardDescription>Preencha as informações básicas do cargo</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

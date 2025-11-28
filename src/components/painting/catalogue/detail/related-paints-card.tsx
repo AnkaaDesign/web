@@ -29,10 +29,8 @@ export function RelatedPaintsCard({ paint }: RelatedPaintsCardProps) {
   return (
     <Card className="shadow-sm border border-border" level={1}>
       <CardHeader className="pb-6">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconLink className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconLink className="h-5 w-5 text-muted-foreground" />
           Tintas Relacionadas ({allRelated.length})
         </CardTitle>
       </CardHeader>

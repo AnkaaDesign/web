@@ -12,10 +12,8 @@ export function PaintTypeSpecificationsCard({ paintType }: PaintTypeSpecificatio
   return (
     <Card className="h-full flex flex-col shadow-sm border border-border">
       <CardHeader className="pb-6">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconSettings className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconSettings className="h-5 w-5 text-muted-foreground" />
           Especificações
         </CardTitle>
       </CardHeader>

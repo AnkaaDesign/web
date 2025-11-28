@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { IconInfoCircle, IconPackage } from "@tabler/icons-react";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { paintBrandCreateSchema, paintBrandUpdateSchema, type PaintBrandCreateFormData, type PaintBrandUpdateFormData } from "../../../../schemas";
@@ -150,7 +151,10 @@ export function PaintBrandForm(props: PaintBrandFormProps) {
           {/* Basic Information */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Informações Básicas</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
+                Informações Básicas
+              </CardTitle>
               <CardDescription>Nome e identificação da marca de tinta</CardDescription>
             </CardHeader>
             <CardContent>
@@ -163,7 +167,10 @@ export function PaintBrandForm(props: PaintBrandFormProps) {
           {/* Component Items Section */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Componentes</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconPackage className="h-5 w-5 text-muted-foreground" />
+                Componentes
+              </CardTitle>
               <CardDescription>
                 Selecione os itens que podem ser usados como componentes desta marca de tinta
               </CardDescription>

@@ -788,12 +788,10 @@ export const TaskDetailsPage = () => {
           <Card className="border flex flex-col animate-in fade-in-50 duration-700" level={1}>
             <CardHeader className="pb-6">
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-3 text-xl">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <IconClipboardList className="h-5 w-5 text-primary" />
-                  </div>
-                  Informações Gerais
-                </CardTitle>
+                <CardTitle className="flex items-center gap-2">
+          <IconClipboardList className="h-5 w-5 text-muted-foreground" />
+          Informações Gerais
+        </CardTitle>
                 <Badge variant={getBadgeVariantFromStatus(task.status, "task")}>{TASK_STATUS_LABELS[task.status] || task.status}</Badge>
               </div>
             </CardHeader>
@@ -906,12 +904,10 @@ export const TaskDetailsPage = () => {
               {/* Dates Card */}
               <Card className="border flex flex-col animate-in fade-in-50 duration-800" level={1}>
                 <CardHeader className="pb-6">
-                  <CardTitle className="flex items-center gap-3 text-xl">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <IconCalendarWeek className="h-5 w-5 text-primary" />
-                    </div>
-                    Datas
-                  </CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+          <IconCalendarWeek className="h-5 w-5 text-muted-foreground" />
+          Datas
+        </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0 flex-1">
               <div className="space-y-4">
@@ -982,12 +978,10 @@ export const TaskDetailsPage = () => {
                 <Card className="border flex flex-col animate-in fade-in-50 duration-825" level={1}>
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-3 text-xl">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <IconFileInvoice className="h-5 w-5 text-primary" />
-                        </div>
-                        Orçamento Detalhado
-                      </CardTitle>
+                      <CardTitle className="flex items-center gap-2">
+          <IconFileInvoice className="h-5 w-5 text-muted-foreground" />
+          Orçamento Detalhado
+        </CardTitle>
                       <Button
                         variant="outline"
                         size="sm"
@@ -1055,12 +1049,10 @@ export const TaskDetailsPage = () => {
               {task.truck && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-850" level={1}>
                   <CardHeader className="pb-6">
-                    <CardTitle className="flex items-center gap-3 text-xl">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <IconLayoutGrid className="h-5 w-5 text-primary" />
-                      </div>
-                      Layout do Caminhão
-                    </CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+          <IconLayoutGrid className="h-5 w-5 text-muted-foreground" />
+          Layout do Caminhão
+        </CardTitle>
                     {/* Display truck dimensions from layout */}
                     {(() => {
                       const layouts = [task.truck.leftSideLayout, task.truck.rightSideLayout, task.truck.backSideLayout].filter(Boolean);
@@ -1089,10 +1081,8 @@ export const TaskDetailsPage = () => {
               {!shouldHideServiceOrdersAndArtworks && filteredServiceOrders.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-900" level={1}>
                   <CardHeader className="pb-6">
-                    <CardTitle className="flex items-center gap-3 text-xl">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <IconClipboardList className="h-5 w-5 text-primary" />
-                      </div>
+                    <CardTitle className="flex items-center gap-2">
+                      <IconClipboardList className="h-5 w-5 text-muted-foreground" />
                       Ordens de Serviço
                       <Badge variant="secondary" className="ml-auto">
                         {filteredServiceOrders.length}
@@ -1162,10 +1152,8 @@ export const TaskDetailsPage = () => {
                 <Card className="border flex flex-col animate-in fade-in-50 duration-950 lg:col-span-1" level={1}>
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-3 text-xl">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <IconCut className="h-5 w-5 text-primary" />
-                        </div>
+                      <CardTitle className="flex items-center gap-2">
+                        <IconCut className="h-5 w-5 text-muted-foreground" />
                         Recortes
                         <Badge variant="secondary" className="ml-2">
                           {cuts.length}
@@ -1239,10 +1227,8 @@ export const TaskDetailsPage = () => {
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1" level={1}>
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-3 text-xl">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <IconFiles className="h-5 w-5 text-primary" />
-                        </div>
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFiles className="h-5 w-5 text-muted-foreground" />
                         Artes
                         <Badge variant="secondary" className="ml-2">
                           {task.artworks?.length ?? 0}
@@ -1315,10 +1301,8 @@ export const TaskDetailsPage = () => {
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1050" level={1}>
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-3 text-xl">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <IconFileText className="h-5 w-5 text-primary" />
-                        </div>
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFileText className="h-5 w-5 text-muted-foreground" />
                         Documentos
                         <Badge variant="secondary" className="ml-2">
                           {[...(task.budgets || []), ...(task.invoices || []), ...(task.receipts || [])].length}
@@ -1418,12 +1402,10 @@ export const TaskDetailsPage = () => {
               {(task.generalPainting || (task.logoPaints && task.logoPaints.length > 0)) && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1150" level={1}>
                   <CardHeader className="pb-6">
-                    <CardTitle className="flex items-center gap-3 text-xl">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <IconPaint className="h-5 w-5 text-primary" />
-                      </div>
-                      Tintas
-                    </CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+          <IconPaint className="h-5 w-5 text-muted-foreground" />
+          Tintas
+        </CardTitle>
                   </CardHeader>
               <CardContent className="pt-0 flex-1">
                 <div className="space-y-6">
@@ -1636,7 +1618,7 @@ export const TaskDetailsPage = () => {
               {task.observation && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1200" level={1}>
                   <CardHeader className="pb-6">
-                    <CardTitle className="flex items-center gap-3 text-xl">
+                    <CardTitle className="flex items-center gap-2">
                       <div className="p-2 rounded-lg bg-yellow-500/10">
                         <IconAlertCircle className="h-5 w-5 text-yellow-500" />
                       </div>
@@ -1690,10 +1672,8 @@ export const TaskDetailsPage = () => {
               {airbrushings.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1250 lg:col-span-1" level={1}>
                   <CardHeader className="pb-6">
-                    <CardTitle className="flex items-center gap-3 text-xl">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <IconSpray className="h-5 w-5 text-primary" />
-                      </div>
+                    <CardTitle className="flex items-center gap-2">
+                      <IconSpray className="h-5 w-5 text-muted-foreground" />
                       Aerografias
                       <Badge variant="secondary" className="ml-2">
                         {airbrushings.length}

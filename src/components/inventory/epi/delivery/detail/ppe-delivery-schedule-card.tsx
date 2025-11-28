@@ -16,12 +16,10 @@ export function PpeDeliveryScheduleCard({ schedule, className }: PpeDeliverySche
     return (
       <Card className={cn("shadow-sm border border-border", className)} level={1}>
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconCalendar className="h-5 w-5 text-primary" />
-            </div>
-            Agendamento
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconCalendar className="h-5 w-5 text-muted-foreground" />
+          Agendamento
+        </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
@@ -36,10 +34,8 @@ export function PpeDeliveryScheduleCard({ schedule, className }: PpeDeliverySche
   return (
     <Card className={cn("shadow-sm border border-border", className)} level={1}>
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconCalendar className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconCalendar className="h-5 w-5 text-muted-foreground" />
           Agendamento
         </CardTitle>
       </CardHeader>

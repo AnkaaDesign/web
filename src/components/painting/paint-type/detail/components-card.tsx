@@ -159,12 +159,10 @@ export function PaintTypeComponentsCard({ paintType }: PaintTypeComponentsCardPr
       <Card className="h-full flex flex-col shadow-sm border border-border">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <IconComponents className="h-5 w-5 text-primary" />
-              </div>
-              Componentes
-            </CardTitle>
+            <CardTitle className="flex items-center gap-2">
+          <IconComponents className="h-5 w-5 text-muted-foreground" />
+          Componentes
+        </CardTitle>
             <Button variant="outline" size="sm" onClick={() => navigate(`${routes.inventory.products.list}?paintTypes=${paintType.id}`)}>
               Ver todos os itens
             </Button>
@@ -185,12 +183,10 @@ export function PaintTypeComponentsCard({ paintType }: PaintTypeComponentsCardPr
     <Card className="h-full flex flex-col shadow-sm border border-border">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconComponents className="h-5 w-5 text-primary" />
-            </div>
-            Componentes
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconComponents className="h-5 w-5 text-muted-foreground" />
+          Componentes
+        </CardTitle>
           <Button variant="outline" size="sm" onClick={() => navigate(`${routes.inventory.products.list}?paintTypes=${paintType.id}`)}>
             Ver todos os itens
           </Button>

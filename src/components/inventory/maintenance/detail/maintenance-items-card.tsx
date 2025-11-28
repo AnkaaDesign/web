@@ -50,12 +50,10 @@ export function MaintenanceItemsCard({ maintenanceItems, className }: Maintenanc
     return (
       <Card className={cn("shadow-sm border border-border", className)} level={1}>
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconPackage className="h-5 w-5 text-primary" />
-            </div>
-            Itens Necessários
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconPackage className="h-5 w-5 text-muted-foreground" />
+          Itens Necessários
+        </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
           <div className="text-center py-12">
@@ -70,10 +68,8 @@ export function MaintenanceItemsCard({ maintenanceItems, className }: Maintenanc
   return (
     <Card className={cn("shadow-sm border border-border", className)} level={1}>
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconPackage className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconPackage className="h-5 w-5 text-muted-foreground" />
           Itens Necessários
         </CardTitle>
       </CardHeader>

@@ -124,12 +124,10 @@ export function RelatedOrdersCard({ supplier, className }: RelatedOrdersCardProp
       <Card className={cn("shadow-sm border border-border", className)} level={1}>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <IconShoppingCart className="h-5 w-5 text-primary" />
-              </div>
-              Pedidos Relacionados
-            </CardTitle>
+            <CardTitle className="flex items-center gap-2">
+          <IconShoppingCart className="h-5 w-5 text-muted-foreground" />
+          Pedidos Relacionados
+        </CardTitle>
             {supplier.id && (
               <Button variant="outline" size="sm" onClick={() => navigate(`${routes.inventory.orders.list}?suppliers=${supplier.id}`)}>
                 Ver todos os pedidos
@@ -151,12 +149,10 @@ export function RelatedOrdersCard({ supplier, className }: RelatedOrdersCardProp
     <Card className={cn("shadow-sm border border-border", className)} level={1}>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconShoppingCart className="h-5 w-5 text-primary" />
-            </div>
-            Pedidos Relacionados
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconShoppingCart className="h-5 w-5 text-muted-foreground" />
+          Pedidos Relacionados
+        </CardTitle>
           {supplier.id && (
             <Button
               variant="outline"

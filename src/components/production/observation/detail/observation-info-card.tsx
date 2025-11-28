@@ -93,7 +93,7 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
         {/* Basic Information Card - Full Width */}
         <Card className="shadow-sm border border-border">
           <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-3 text-xl">
+            <CardTitle className="flex items-center gap-2">
               <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/20">
                 <IconAlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
@@ -219,7 +219,7 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
       {/* Basic Information Card */}
       <Card className="shadow-sm border border-border">
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-xl">
+          <CardTitle className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/20">
               <IconAlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
@@ -339,7 +339,7 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
       {/* Files Card */}
       <Card className="shadow-sm border border-border">
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-xl">
+          <CardTitle className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
               <IconFileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>

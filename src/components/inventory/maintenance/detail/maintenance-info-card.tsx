@@ -99,11 +99,9 @@ function MaintenanceInfoCard({ maintenance, className }: MaintenanceInfoCardProp
   return (
     <Card className={cn("shadow-sm border border-border", className)}>
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center justify-between text-xl">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconSettings className="h-5 w-5 text-primary" />
-            </div>
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <IconSettings className="h-5 w-5 text-muted-foreground" />
             Informações da Manutenção
           </div>
           <MaintenanceStatusBadge status={maintenance.status} showIcon={false} />

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useForm, useFieldArray, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router-dom";
+import { IconInfoCircle, IconClipboardList, IconCurrencyDollar, IconRuler, IconBarcode, IconSettings } from "@tabler/icons-react";
 import { FormInput } from "@/components/ui/form-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { itemCreateSchema, itemUpdateSchema, type ItemCreateFormData, type ItemUpdateFormData } from "../../../../schemas";
@@ -284,7 +285,10 @@ export function ItemForm(props: ItemFormProps) {
           {/* Basic Information & Classification */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Informações Básicas</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
+                Informações Básicas
+              </CardTitle>
               <CardDescription>Identificação e classificação do item</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -305,7 +309,10 @@ export function ItemForm(props: ItemFormProps) {
           {/* Inventory */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Controle de Estoque</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconClipboardList className="h-5 w-5 text-muted-foreground" />
+                Controle de Estoque
+              </CardTitle>
               <CardDescription>Quantidades e níveis de estoque</CardDescription>
             </CardHeader>
             <CardContent>
@@ -321,7 +328,10 @@ export function ItemForm(props: ItemFormProps) {
           {/* Pricing */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Preço e Taxas</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconCurrencyDollar className="h-5 w-5 text-muted-foreground" />
+                Preço e Taxas
+              </CardTitle>
               <CardDescription>Informações de preço e impostos</CardDescription>
             </CardHeader>
             <CardContent>
@@ -354,7 +364,10 @@ export function ItemForm(props: ItemFormProps) {
           {/* Tracking */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Rastreamento</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconBarcode className="h-5 w-5 text-muted-foreground" />
+                Rastreamento
+              </CardTitle>
               <CardDescription>Códigos de barras para identificação do item</CardDescription>
             </CardHeader>
             <CardContent>
@@ -365,7 +378,10 @@ export function ItemForm(props: ItemFormProps) {
           {/* Extra Configurations */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Configurações Extras</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconSettings className="h-5 w-5 text-muted-foreground" />
+                Configurações Extras
+              </CardTitle>
               <CardDescription>Configurações adicionais do item</CardDescription>
             </CardHeader>
             <CardContent>

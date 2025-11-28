@@ -1279,10 +1279,8 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)} level={1} style={maxHeight ? { maxHeight, height: maxHeight } : undefined}>
       <CardHeader className="pb-4 flex-shrink-0">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconHistory className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconHistory className="h-5 w-5 text-muted-foreground" />
           Histórico de Alterações
           {entityName && <span className="text-base font-normal text-muted-foreground">- {entityName}</span>}
         </CardTitle>

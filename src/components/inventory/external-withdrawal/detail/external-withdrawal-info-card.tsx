@@ -26,12 +26,10 @@ export function ExternalWithdrawalInfoCard({ withdrawal, className }: ExternalWi
     <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconPackage className="h-5 w-5 text-primary" />
-            </div>
-            Informações da Retirada Externa
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconPackage className="h-5 w-5 text-muted-foreground" />
+          Informações da Retirada Externa
+        </CardTitle>
           <ExternalWithdrawalStatusBadge status={withdrawal.status} />
         </div>
       </CardHeader>

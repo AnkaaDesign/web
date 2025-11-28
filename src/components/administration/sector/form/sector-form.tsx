@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { IconBuildingSkyscraper } from "@tabler/icons-react";
 
 import type { SectorCreateFormData, SectorUpdateFormData, Sector } from "../../../../types";
 import { sectorCreateSchema, sectorUpdateSchema } from "../../../../schemas";
@@ -139,7 +140,10 @@ export function SectorForm(props: SectorFormProps) {
           <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-y-auto space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Informações do Setor</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <IconBuildingSkyscraper className="h-5 w-5 text-muted-foreground" />
+                  Informações do Setor
+                </CardTitle>
                 <CardDescription>Preencha as informações básicas do setor</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

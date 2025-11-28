@@ -71,12 +71,10 @@ export function PaintFormulasCard({ item, className }: PaintFormulasCardProps) {
     return (
       <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
         <CardHeader className="pb-6 flex-shrink-0">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconFlask className="h-5 w-5 text-primary" />
-            </div>
-            Fórmulas de Tinta
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconFlask className="h-5 w-5 text-muted-foreground" />
+          Fórmulas de Tinta
+        </CardTitle>
         </CardHeader>
         <CardContent className="pt-0 flex-1">
           <div className="space-y-3">
@@ -94,12 +92,10 @@ export function PaintFormulasCard({ item, className }: PaintFormulasCardProps) {
     return (
       <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
         <CardHeader className="pb-6 flex-shrink-0">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconFlask className="h-5 w-5 text-primary" />
-            </div>
-            Fórmulas de Tinta
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconFlask className="h-5 w-5 text-muted-foreground" />
+          Fórmulas de Tinta
+        </CardTitle>
         </CardHeader>
         <CardContent className="pt-0 flex-1 flex items-center justify-center">
           <div className="text-center py-8 space-y-4">
@@ -118,12 +114,10 @@ export function PaintFormulasCard({ item, className }: PaintFormulasCardProps) {
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconFlask className="h-5 w-5 text-primary" />
-            </div>
-            Fórmulas de Tinta ({formulas.length})
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconFlask className="h-5 w-5 text-muted-foreground" />
+          Fórmulas de Tinta ({formulas.length})
+        </CardTitle>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleDisplayAll}>
               <IconList className="h-4 w-4 mr-2" />

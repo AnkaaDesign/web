@@ -11,7 +11,7 @@ import { formatCurrency } from "../../../../utils";
 import { bonusCreateSchema, bonusUpdateSchema } from "../../../../schemas";
 import type { BonusCreateFormData, BonusUpdateFormData } from "../../../../schemas";
 import type { Bonus, User } from "../../../../types";
-import { IconDeviceFloppy, IconX } from "@tabler/icons-react";
+import { IconDeviceFloppy, IconX, IconCurrencyDollar } from "@tabler/icons-react";
 
 interface BonusFormProps {
   bonus?: Bonus;
@@ -93,7 +93,8 @@ export function BonusForm({
   return (
     <Card className={className}>
       <CardHeader>
-        <CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <IconCurrencyDollar className="h-5 w-5 text-muted-foreground" />
           {isEdit ? "Editar Bonificação" : "Criar Bonificação"}
         </CardTitle>
       </CardHeader>

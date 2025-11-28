@@ -102,12 +102,10 @@ export function RelatedItemsCard({ items, brandId, className, maxHeight }: Relat
       <Card className={cn("shadow-sm border border-border", className)} level={1}>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <IconPackage className="h-5 w-5 text-primary" />
-              </div>
-              Produtos da Marca
-            </CardTitle>
+            <CardTitle className="flex items-center gap-2">
+          <IconPackage className="h-5 w-5 text-muted-foreground" />
+          Produtos da Marca
+        </CardTitle>
             {brandId && (
               <Button variant="outline" size="sm" onClick={() => navigate(`${routes.inventory.products.list}?brands=${brandId}`)}>
                 Ver no estoque
@@ -129,12 +127,10 @@ export function RelatedItemsCard({ items, brandId, className, maxHeight }: Relat
     <Card className={cn("shadow-sm border border-border", className)} level={1}>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconPackage className="h-5 w-5 text-primary" />
-            </div>
-            Produtos da Marca
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconPackage className="h-5 w-5 text-muted-foreground" />
+          Produtos da Marca
+        </CardTitle>
           {brandId && (
             <Button variant="outline" size="sm" onClick={() => navigate(`${routes.inventory.products.list}?brands=${brandId}`)}>
               Ver no estoque

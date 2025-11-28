@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { IconInfoCircle, IconPhoto, IconPhone, IconMapPin, IconTag } from "@tabler/icons-react";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { customerCreateSchema, customerUpdateSchema, type CustomerCreateFormData, type CustomerUpdateFormData } from "../../../../schemas";
@@ -332,7 +333,10 @@ export function CustomerForm(props: CustomerFormProps) {
           {/* Basic Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Informações Básicas</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
+                Informações Básicas
+              </CardTitle>
               <CardDescription>Dados fundamentais do cliente</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -366,7 +370,10 @@ export function CustomerForm(props: CustomerFormProps) {
           {/* Logo */}
           <Card>
             <CardHeader>
-              <CardTitle>Logo</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconPhoto className="h-5 w-5 text-muted-foreground" />
+                Logo
+              </CardTitle>
               <CardDescription>Imagem do logo do cliente</CardDescription>
             </CardHeader>
             <CardContent>
@@ -377,7 +384,10 @@ export function CustomerForm(props: CustomerFormProps) {
           {/* Contact Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Informações de Contato</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconPhone className="h-5 w-5 text-muted-foreground" />
+                Informações de Contato
+              </CardTitle>
               <CardDescription>Telefones e outras formas de contato</CardDescription>
             </CardHeader>
             <CardContent>
@@ -388,7 +398,10 @@ export function CustomerForm(props: CustomerFormProps) {
           {/* Address Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Endereço</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconMapPin className="h-5 w-5 text-muted-foreground" />
+                Endereço
+              </CardTitle>
               <CardDescription>Localização do cliente</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -433,7 +446,10 @@ export function CustomerForm(props: CustomerFormProps) {
           {/* Tags */}
           <Card>
             <CardHeader>
-              <CardTitle>Tags</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconTag className="h-5 w-5 text-muted-foreground" />
+                Tags
+              </CardTitle>
               <CardDescription>Etiquetas para categorizar o cliente</CardDescription>
             </CardHeader>
             <CardContent>

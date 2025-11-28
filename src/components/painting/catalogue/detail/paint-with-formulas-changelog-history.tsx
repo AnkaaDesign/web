@@ -181,10 +181,8 @@ export function PaintWithFormulasChangelogHistory({ paint, className }: PaintWit
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} style={{ maxHeight: className?.includes("h-") ? undefined : "600px" }}>
       <CardHeader className="pb-4 flex-shrink-0">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconHistory className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconHistory className="h-5 w-5 text-muted-foreground" />
           Histórico de Alterações
           <span className="text-base font-normal text-muted-foreground">- {paint.name}</span>
         </CardTitle>

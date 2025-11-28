@@ -56,30 +56,55 @@ import {
 
 /**
  * Badge Variant Types
- * These are the available badge variants in the UI components
+ * Semantic variants that clearly express status meaning
  */
 export type BadgeVariant =
+  // Neutral variants
   | "default"
-  | "primary"
   | "secondary"
-  | "destructive"
-  | "outline"
-  | "success"
-  | "warning"
-  | "error"
-  | "info"
   | "muted"
-  | "pending"
-  | "active"
+  | "outline"
   | "inactive"
+  // Core semantic variants (common across entities)
   | "completed"
   | "cancelled"
-  | "onHold"
+  | "pending"
+  | "created"
+  | "active"
   | "inProgress"
+  | "processing"
+  | "approved"
+  | "rejected"
+  | "received"
+  | "delivered"
+  | "sent"
+  | "verified"
+  | "expired"
+  | "failed"
+  | "onHold"
+  | "blocked"
+  | "suspended"
+  | "returned"
+  | "lost"
+  | "bounced"
+  // Color utilities (for entity-specific or non-status use)
+  | "red"
+  | "purple"
   | "teal"
+  | "indigo"
+  | "pink"
   | "yellow"
   | "amber"
-  | "purple";
+  | "blue"
+  | "orange"
+  | "green"
+  // Deprecated (keep for backward compatibility)
+  | "success"
+  | "destructive"
+  | "primary"
+  | "error"
+  | "info"
+  | "warning";
 
 /**
  * Badge Color Definitions
@@ -94,7 +119,7 @@ export const BADGE_COLORS: Record<
     border?: string;
   }
 > = {
-  // Neutral variants
+  // ===== NEUTRAL VARIANTS =====
   default: {
     bg: "bg-neutral-500",
     text: "text-white",
@@ -116,108 +141,210 @@ export const BADGE_COLORS: Record<
     hover: "hover:bg-neutral-100 dark:hover:bg-neutral-800",
     border: "border border-neutral-300 dark:border-neutral-600",
   },
-
-  // Primary/Info variants (Blue tones)
-  primary: {
-    bg: "bg-blue-600",
-    text: "text-white",
-    hover: "hover:bg-blue-700",
-  },
-  info: {
-    bg: "bg-sky-500",
-    text: "text-white",
-    hover: "hover:bg-sky-600",
-  },
-  inProgress: {
-    bg: "bg-blue-500",
-    text: "text-white",
-    hover: "hover:bg-blue-600",
-  },
-
-  // Success variants (Green tones - positive actions)
-  success: {
-    bg: "bg-green-600",
-    text: "text-white",
-    hover: "hover:bg-green-700",
-  },
-  completed: {
-    bg: "bg-green-600",
-    text: "text-white",
-    hover: "hover:bg-green-700",
-  },
-  active: {
-    bg: "bg-green-600",
-    text: "text-white",
-    hover: "hover:bg-green-700",
-  },
-
-  // Warning variants (Orange/Amber tones - attention needed)
-  warning: {
-    bg: "bg-orange-500",
-    text: "text-white",
-    hover: "hover:bg-orange-600",
-  },
-  pending: {
-    bg: "bg-amber-500",
-    text: "text-white",
-    hover: "hover:bg-amber-600",
-  },
-  onHold: {
-    bg: "bg-orange-500",
-    text: "text-white",
-    hover: "hover:bg-orange-600",
-  },
-
-  // Error/Destructive variants (Red tones - negative actions)
-  error: {
-    bg: "bg-red-600",
-    text: "text-white",
-    hover: "hover:bg-red-700",
-  },
-  destructive: {
-    bg: "bg-red-600",
-    text: "text-white",
-    hover: "hover:bg-red-700",
-  },
-  cancelled: {
-    bg: "bg-red-600",
-    text: "text-white",
-    hover: "hover:bg-red-700",
-  },
-
-  // Inactive variant (Gray - disabled/inactive states)
   inactive: {
     bg: "bg-gray-500",
     text: "text-white",
     hover: "hover:bg-gray-600",
   },
 
-  // Teal variant (Teal tones - partially received orders)
+  // ===== CORE SEMANTIC VARIANTS =====
+  // Green status variants (use green-700)
+  completed: {
+    bg: "bg-green-700",
+    text: "text-white",
+    hover: "hover:bg-green-800",
+  },
+  received: {
+    bg: "bg-green-700",
+    text: "text-white",
+    hover: "hover:bg-green-800",
+  },
+  approved: {
+    bg: "bg-green-700",
+    text: "text-white",
+    hover: "hover:bg-green-800",
+  },
+  returned: {
+    bg: "bg-green-700",
+    text: "text-white",
+    hover: "hover:bg-green-800",
+  },
+  delivered: {
+    bg: "bg-green-700",
+    text: "text-white",
+    hover: "hover:bg-green-800",
+  },
+  active: {
+    bg: "bg-green-700",
+    text: "text-white",
+    hover: "hover:bg-green-800",
+  },
+  verified: {
+    bg: "bg-green-700",
+    text: "text-white",
+    hover: "hover:bg-green-800",
+  },
+  sent: {
+    bg: "bg-green-700",
+    text: "text-white",
+    hover: "hover:bg-green-800",
+  },
+
+  // Red status variants (use red-700)
+  cancelled: {
+    bg: "bg-red-700",
+    text: "text-white",
+    hover: "hover:bg-red-800",
+  },
+  rejected: {
+    bg: "bg-red-700",
+    text: "text-white",
+    hover: "hover:bg-red-800",
+  },
+  lost: {
+    bg: "bg-red-700",
+    text: "text-white",
+    hover: "hover:bg-red-800",
+  },
+  failed: {
+    bg: "bg-red-700",
+    text: "text-white",
+    hover: "hover:bg-red-800",
+  },
+  bounced: {
+    bg: "bg-red-700",
+    text: "text-white",
+    hover: "hover:bg-red-800",
+  },
+  blocked: {
+    bg: "bg-red-700",
+    text: "text-white",
+    hover: "hover:bg-red-800",
+  },
+  suspended: {
+    bg: "bg-red-700",
+    text: "text-white",
+    hover: "hover:bg-red-800",
+  },
+
+  // Blue status variants (use blue-700)
+  created: {
+    bg: "bg-blue-700",
+    text: "text-white",
+    hover: "hover:bg-blue-800",
+  },
+  inProgress: {
+    bg: "bg-blue-700",
+    text: "text-white",
+    hover: "hover:bg-blue-800",
+  },
+  processing: {
+    bg: "bg-blue-700",
+    text: "text-white",
+    hover: "hover:bg-blue-800",
+  },
+
+  // Amber status variants (use amber-600)
+  pending: {
+    bg: "bg-amber-600",
+    text: "text-white",
+    hover: "hover:bg-amber-700",
+  },
+  expired: {
+    bg: "bg-amber-600",
+    text: "text-white",
+    hover: "hover:bg-amber-700",
+  },
+
+  // Orange status variants (use orange-600)
+  onHold: {
+    bg: "bg-orange-600",
+    text: "text-white",
+    hover: "hover:bg-orange-700",
+  },
+
+  // ===== COLOR UTILITIES =====
+  red: {
+    bg: "bg-red-700",
+    text: "text-white",
+    hover: "hover:bg-red-800",
+  },
+  purple: {
+    bg: "bg-purple-600",
+    text: "text-white",
+    hover: "hover:bg-purple-700",
+  },
   teal: {
     bg: "bg-teal-500",
     text: "text-white",
     hover: "hover:bg-teal-600",
   },
-
-  // Yellow variant (Yellow tones - partially fulfilled orders)
+  indigo: {
+    bg: "bg-indigo-600",
+    text: "text-white",
+    hover: "hover:bg-indigo-700",
+  },
+  pink: {
+    bg: "bg-pink-600",
+    text: "text-white",
+    hover: "hover:bg-pink-700",
+  },
   yellow: {
     bg: "bg-yellow-500",
     text: "text-white",
     hover: "hover:bg-yellow-600",
   },
-
-  // Amber variant (Amber tones - fulfilled orders)
   amber: {
     bg: "bg-amber-500",
     text: "text-white",
     hover: "hover:bg-amber-600",
   },
-
-  // Purple variant (Purple tones - overdue orders)
-  purple: {
-    bg: "bg-purple-600",
+  blue: {
+    bg: "bg-blue-600",
     text: "text-white",
-    hover: "hover:bg-purple-700",
+    hover: "hover:bg-blue-700",
+  },
+  orange: {
+    bg: "bg-orange-500",
+    text: "text-white",
+    hover: "hover:bg-orange-600",
+  },
+  green: {
+    bg: "bg-green-700",
+    text: "text-white",
+    hover: "hover:bg-green-800",
+  },
+
+  // ===== DEPRECATED - Keep for backward compatibility =====
+  success: {
+    bg: "bg-green-700", // Standardized to green-700
+    text: "text-white",
+    hover: "hover:bg-green-800",
+  },
+  destructive: {
+    bg: "bg-red-700", // Standardized to red-700
+    text: "text-white",
+    hover: "hover:bg-red-800",
+  },
+  primary: {
+    bg: "bg-blue-700", // Standardized to blue-700
+    text: "text-white",
+    hover: "hover:bg-blue-800",
+  },
+  error: {
+    bg: "bg-red-700", // Standardized to red-700
+    text: "text-white",
+    hover: "hover:bg-red-800",
+  },
+  info: {
+    bg: "bg-blue-700", // Standardized to blue-700
+    text: "text-white",
+    hover: "hover:bg-blue-800",
+  },
+  warning: {
+    bg: "bg-orange-600", // Standardized to orange-600
+    text: "text-white",
+    hover: "hover:bg-orange-700",
   },
 };
 
@@ -228,19 +355,19 @@ export const BADGE_COLORS: Record<
 export const ENTITY_BADGE_CONFIG = {
   // Order Status
   ORDER: {
-    [ORDER_STATUS.CREATED]: "primary" as BadgeVariant,
-    [ORDER_STATUS.PARTIALLY_FULFILLED]: "yellow" as BadgeVariant, // Yellow-500 for partially fulfilled
-    [ORDER_STATUS.FULFILLED]: "amber" as BadgeVariant, // Amber-500 for fulfilled orders
-    [ORDER_STATUS.OVERDUE]: "purple" as BadgeVariant, // Purple-600 for overdue orders
-    [ORDER_STATUS.PARTIALLY_RECEIVED]: "teal" as BadgeVariant, // Teal-500 for partial receipt
-    [ORDER_STATUS.RECEIVED]: "success" as BadgeVariant,
+    [ORDER_STATUS.CREATED]: "created" as BadgeVariant,
+    [ORDER_STATUS.PARTIALLY_FULFILLED]: "yellow" as BadgeVariant,  // Entity-specific: use yellow
+    [ORDER_STATUS.FULFILLED]: "amber" as BadgeVariant,             // Entity-specific: use amber
+    [ORDER_STATUS.OVERDUE]: "purple" as BadgeVariant,              // Entity-specific: use purple
+    [ORDER_STATUS.PARTIALLY_RECEIVED]: "teal" as BadgeVariant,     // Entity-specific: use teal
+    [ORDER_STATUS.RECEIVED]: "received" as BadgeVariant,
     [ORDER_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
 
   // Task Status
   TASK: {
     [TASK_STATUS.PENDING]: "pending" as BadgeVariant,
-    [TASK_STATUS.IN_PRODUCTION]: "inProgress" as BadgeVariant,
+    [TASK_STATUS.IN_PRODUCTION]: "blue" as BadgeVariant,
     [TASK_STATUS.ON_HOLD]: "onHold" as BadgeVariant,
     [TASK_STATUS.COMPLETED]: "completed" as BadgeVariant,
     [TASK_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
@@ -252,33 +379,33 @@ export const ENTITY_BADGE_CONFIG = {
     [MAINTENANCE_STATUS.IN_PROGRESS]: "inProgress" as BadgeVariant,
     [MAINTENANCE_STATUS.COMPLETED]: "completed" as BadgeVariant,
     [MAINTENANCE_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
-    [MAINTENANCE_STATUS.OVERDUE]: "warning" as BadgeVariant, // Changed from error to warning (orange)
+    [MAINTENANCE_STATUS.OVERDUE]: "purple" as BadgeVariant,
   },
 
   // User Status
   USER: {
-    [USER_STATUS.EXPERIENCE_PERIOD_1]: "pending" as BadgeVariant,  // Yellow - first trial period
-    [USER_STATUS.EXPERIENCE_PERIOD_2]: "primary" as BadgeVariant,  // Blue - second trial period
-    [USER_STATUS.EFFECTED]: "success" as BadgeVariant,             // Green - fully hired/effected
-    [USER_STATUS.DISMISSED]: "destructive" as BadgeVariant,        // Red - dismissed
+    [USER_STATUS.EXPERIENCE_PERIOD_1]: "pending" as BadgeVariant,  // Amber - first trial period
+    [USER_STATUS.EXPERIENCE_PERIOD_2]: "created" as BadgeVariant,  // Blue - second trial period
+    [USER_STATUS.EFFECTED]: "green" as BadgeVariant,               // Entity-specific: use green
+    [USER_STATUS.DISMISSED]: "red" as BadgeVariant,                // Entity-specific: use red
   },
 
   // External Withdrawal Status
   EXTERNAL_WITHDRAWAL: {
-    [EXTERNAL_WITHDRAWAL_STATUS.PENDING]: "pending" as BadgeVariant, // Yellow - pending
-    [EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED]: "warning" as BadgeVariant, // Orange - partial
-    [EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED]: "success" as BadgeVariant, // Green - completed
-    [EXTERNAL_WITHDRAWAL_STATUS.CHARGED]: "primary" as BadgeVariant, // Blue - charged
-    [EXTERNAL_WITHDRAWAL_STATUS.LIQUIDATED]: "success" as BadgeVariant, // Green - paid
-    [EXTERNAL_WITHDRAWAL_STATUS.DELIVERED]: "completed" as BadgeVariant, // Purple - delivered
-    [EXTERNAL_WITHDRAWAL_STATUS.CANCELLED]: "cancelled" as BadgeVariant, // Red - cancelled
+    [EXTERNAL_WITHDRAWAL_STATUS.PENDING]: "pending" as BadgeVariant,
+    [EXTERNAL_WITHDRAWAL_STATUS.PARTIALLY_RETURNED]: "orange" as BadgeVariant,  // Entity-specific: use orange
+    [EXTERNAL_WITHDRAWAL_STATUS.FULLY_RETURNED]: "green" as BadgeVariant,       // Entity-specific: use green
+    [EXTERNAL_WITHDRAWAL_STATUS.CHARGED]: "blue" as BadgeVariant,               // Entity-specific: use blue
+    [EXTERNAL_WITHDRAWAL_STATUS.LIQUIDATED]: "green" as BadgeVariant,           // Entity-specific: use green
+    [EXTERNAL_WITHDRAWAL_STATUS.DELIVERED]: "delivered" as BadgeVariant,
+    [EXTERNAL_WITHDRAWAL_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
 
   // Vacation Status
   VACATION: {
     [VACATION_STATUS.PENDING]: "pending" as BadgeVariant,
-    [VACATION_STATUS.APPROVED]: "success" as BadgeVariant,
-    [VACATION_STATUS.REJECTED]: "destructive" as BadgeVariant,
+    [VACATION_STATUS.APPROVED]: "approved" as BadgeVariant,
+    [VACATION_STATUS.REJECTED]: "rejected" as BadgeVariant,
     [VACATION_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
     [VACATION_STATUS.IN_PROGRESS]: "inProgress" as BadgeVariant,
     [VACATION_STATUS.COMPLETED]: "completed" as BadgeVariant,
@@ -296,7 +423,7 @@ export const ENTITY_BADGE_CONFIG = {
   // Airbrushing Status
   AIRBRUSHING: {
     [AIRBRUSHING_STATUS.PENDING]: "pending" as BadgeVariant,
-    [AIRBRUSHING_STATUS.IN_PRODUCTION]: "inProgress" as BadgeVariant,
+    [AIRBRUSHING_STATUS.IN_PRODUCTION]: "blue" as BadgeVariant,
     [AIRBRUSHING_STATUS.COMPLETED]: "completed" as BadgeVariant,
     [AIRBRUSHING_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
@@ -304,46 +431,46 @@ export const ENTITY_BADGE_CONFIG = {
   // Cut Status
   CUT: {
     [CUT_STATUS.PENDING]: "pending" as BadgeVariant,
-    [CUT_STATUS.CUTTING]: "inProgress" as BadgeVariant,
+    [CUT_STATUS.CUTTING]: "blue" as BadgeVariant,
     [CUT_STATUS.COMPLETED]: "completed" as BadgeVariant,
   },
 
   // Borrow Status
   BORROW: {
-    [BORROW_STATUS.ACTIVE]: "inProgress" as BadgeVariant, // Blue for active borrows
-    [BORROW_STATUS.RETURNED]: "completed" as BadgeVariant, // Green for returned
-    [BORROW_STATUS.LOST]: "destructive" as BadgeVariant, // Red for lost
+    [BORROW_STATUS.ACTIVE]: "active" as BadgeVariant, // Green for active borrows
+    [BORROW_STATUS.RETURNED]: "returned" as BadgeVariant, // Green for returned
+    [BORROW_STATUS.LOST]: "lost" as BadgeVariant, // Red for lost
   },
 
   // PPE Request Status
   PPE_REQUEST: {
     [PPE_REQUEST_STATUS.PENDING]: "pending" as BadgeVariant,
-    [PPE_REQUEST_STATUS.APPROVED]: "success" as BadgeVariant,
-    [PPE_REQUEST_STATUS.REJECTED]: "destructive" as BadgeVariant,
-    [PPE_REQUEST_STATUS.DELIVERED]: "completed" as BadgeVariant,
+    [PPE_REQUEST_STATUS.APPROVED]: "approved" as BadgeVariant,
+    [PPE_REQUEST_STATUS.REJECTED]: "rejected" as BadgeVariant,
+    [PPE_REQUEST_STATUS.DELIVERED]: "delivered" as BadgeVariant,
     [PPE_REQUEST_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
 
   // PPE Delivery Status
   PPE_DELIVERY: {
     [PPE_DELIVERY_STATUS.PENDING]: "pending" as BadgeVariant,
-    [PPE_DELIVERY_STATUS.APPROVED]: "success" as BadgeVariant,
-    [PPE_DELIVERY_STATUS.DELIVERED]: "completed" as BadgeVariant,
-    [PPE_DELIVERY_STATUS.REPROVED]: "cancelled" as BadgeVariant,
+    [PPE_DELIVERY_STATUS.APPROVED]: "approved" as BadgeVariant,
+    [PPE_DELIVERY_STATUS.DELIVERED]: "delivered" as BadgeVariant,
+    [PPE_DELIVERY_STATUS.REPROVED]: "red" as BadgeVariant,
     [PPE_DELIVERY_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
 
   // Maintenance Schedule Status
   MAINTENANCE_SCHEDULE: {
     [MAINTENANCE_SCHEDULE_STATUS.PENDING]: "pending" as BadgeVariant,
-    [MAINTENANCE_SCHEDULE_STATUS.FINISHED]: "completed" as BadgeVariant,
+    [MAINTENANCE_SCHEDULE_STATUS.FINISHED]: "green" as BadgeVariant,
     [MAINTENANCE_SCHEDULE_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
 
   // Activity Operation (Entrada/Saída)
   ACTIVITY: {
-    [ACTIVITY_OPERATION.INBOUND]: "success" as BadgeVariant, // Green for entry
-    [ACTIVITY_OPERATION.OUTBOUND]: "error" as BadgeVariant, // Red for exit
+    [ACTIVITY_OPERATION.INBOUND]: "received" as BadgeVariant, // Green for entry
+    [ACTIVITY_OPERATION.OUTBOUND]: "cancelled" as BadgeVariant, // Red for exit
   },
 
   // Priority Type
@@ -416,42 +543,42 @@ export const ENTITY_BADGE_CONFIG = {
   // SMS Verification Status
   SMS_VERIFICATION: {
     [SMS_VERIFICATION_STATUS.PENDING]: "pending" as BadgeVariant,
-    [SMS_VERIFICATION_STATUS.SENT]: "info" as BadgeVariant,
-    [SMS_VERIFICATION_STATUS.VERIFIED]: "success" as BadgeVariant,
-    [SMS_VERIFICATION_STATUS.EXPIRED]: "muted" as BadgeVariant,
-    [SMS_VERIFICATION_STATUS.FAILED]: "error" as BadgeVariant,
+    [SMS_VERIFICATION_STATUS.SENT]: "sent" as BadgeVariant,
+    [SMS_VERIFICATION_STATUS.VERIFIED]: "verified" as BadgeVariant,
+    [SMS_VERIFICATION_STATUS.EXPIRED]: "expired" as BadgeVariant,
+    [SMS_VERIFICATION_STATUS.FAILED]: "failed" as BadgeVariant,
     [SMS_VERIFICATION_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
-    [SMS_VERIFICATION_STATUS.RATE_LIMITED]: "warning" as BadgeVariant,
-    [SMS_VERIFICATION_STATUS.BLOCKED]: "destructive" as BadgeVariant,
+    [SMS_VERIFICATION_STATUS.RATE_LIMITED]: "onHold" as BadgeVariant,
+    [SMS_VERIFICATION_STATUS.BLOCKED]: "blocked" as BadgeVariant,
   },
 
   // Email Status
   EMAIL: {
     [EMAIL_STATUS.PENDING]: "pending" as BadgeVariant,
-    [EMAIL_STATUS.SENT]: "info" as BadgeVariant,
-    [EMAIL_STATUS.DELIVERED]: "success" as BadgeVariant,
-    [EMAIL_STATUS.FAILED]: "error" as BadgeVariant,
-    [EMAIL_STATUS.BOUNCED]: "destructive" as BadgeVariant,
+    [EMAIL_STATUS.SENT]: "sent" as BadgeVariant,
+    [EMAIL_STATUS.DELIVERED]: "delivered" as BadgeVariant,
+    [EMAIL_STATUS.FAILED]: "failed" as BadgeVariant,
+    [EMAIL_STATUS.BOUNCED]: "bounced" as BadgeVariant,
     [EMAIL_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
 
   // Verification Status
   VERIFICATION: {
     [VERIFICATION_STATUS.PENDING]: "pending" as BadgeVariant,
-    [VERIFICATION_STATUS.SENT]: "info" as BadgeVariant,
-    [VERIFICATION_STATUS.VERIFIED]: "success" as BadgeVariant,
-    [VERIFICATION_STATUS.EXPIRED]: "muted" as BadgeVariant,
-    [VERIFICATION_STATUS.FAILED]: "error" as BadgeVariant,
+    [VERIFICATION_STATUS.SENT]: "sent" as BadgeVariant,
+    [VERIFICATION_STATUS.VERIFIED]: "verified" as BadgeVariant,
+    [VERIFICATION_STATUS.EXPIRED]: "expired" as BadgeVariant,
+    [VERIFICATION_STATUS.FAILED]: "failed" as BadgeVariant,
     [VERIFICATION_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
   },
 
   // Batch Operation Status
   BATCH_OPERATION: {
     [BATCH_OPERATION_STATUS.PENDING]: "pending" as BadgeVariant,
-    [BATCH_OPERATION_STATUS.PROCESSING]: "inProgress" as BadgeVariant,
+    [BATCH_OPERATION_STATUS.PROCESSING]: "processing" as BadgeVariant,
     [BATCH_OPERATION_STATUS.COMPLETED]: "completed" as BadgeVariant,
-    [BATCH_OPERATION_STATUS.FAILED]: "error" as BadgeVariant,
-    [BATCH_OPERATION_STATUS.PARTIAL]: "warning" as BadgeVariant,
+    [BATCH_OPERATION_STATUS.FAILED]: "failed" as BadgeVariant,
+    [BATCH_OPERATION_STATUS.PARTIAL]: "orange" as BadgeVariant,
   },
 
   // Workload Level
@@ -478,11 +605,11 @@ export const ENTITY_BADGE_CONFIG = {
 
   // Activity Level
   ACTIVITY_LEVEL: {
-    [ACTIVITY_LEVEL.VERY_ACTIVE]: "success" as BadgeVariant,
+    [ACTIVITY_LEVEL.VERY_ACTIVE]: "active" as BadgeVariant,
     [ACTIVITY_LEVEL.ACTIVE]: "active" as BadgeVariant,
     [ACTIVITY_LEVEL.OCCASIONAL]: "pending" as BadgeVariant,
-    [ACTIVITY_LEVEL.DORMANT]: "muted" as BadgeVariant,
-    [ACTIVITY_LEVEL.LOST]: "destructive" as BadgeVariant,
+    [ACTIVITY_LEVEL.DORMANT]: "inactive" as BadgeVariant,
+    [ACTIVITY_LEVEL.LOST]: "lost" as BadgeVariant,
   },
 
   // Trend Direction
@@ -521,20 +648,20 @@ export const ENTITY_BADGE_CONFIG = {
     [SECTOR_PRIVILEGES.BASIC]: "muted" as BadgeVariant,
     [SECTOR_PRIVILEGES.MAINTENANCE]: "secondary" as BadgeVariant,
     [SECTOR_PRIVILEGES.WAREHOUSE]: "default" as BadgeVariant,
-    [SECTOR_PRIVILEGES.ADMIN]: "primary" as BadgeVariant,
-    [SECTOR_PRIVILEGES.PRODUCTION]: "info" as BadgeVariant,
-    [SECTOR_PRIVILEGES.LEADER]: "inProgress" as BadgeVariant,
-    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: "warning" as BadgeVariant,
-    [SECTOR_PRIVILEGES.FINANCIAL]: "success" as BadgeVariant,
+    [SECTOR_PRIVILEGES.ADMIN]: "red" as BadgeVariant,           // Red - admin privileges
+    [SECTOR_PRIVILEGES.PRODUCTION]: "blue" as BadgeVariant,
+    [SECTOR_PRIVILEGES.LEADER]: "blue" as BadgeVariant,
+    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: "orange" as BadgeVariant,
+    [SECTOR_PRIVILEGES.FINANCIAL]: "green" as BadgeVariant,
     [SECTOR_PRIVILEGES.EXTERNAL]: "outline" as BadgeVariant,
   },
 
   // Commission Status
   COMMISSION_STATUS: {
-    [COMMISSION_STATUS.FULL_COMMISSION]: "success" as BadgeVariant,     // Green
-    [COMMISSION_STATUS.PARTIAL_COMMISSION]: "primary" as BadgeVariant,  // Blue
-    [COMMISSION_STATUS.NO_COMMISSION]: "warning" as BadgeVariant,       // Orange
-    [COMMISSION_STATUS.SUSPENDED_COMMISSION]: "destructive" as BadgeVariant, // Red
+    [COMMISSION_STATUS.FULL_COMMISSION]: "green" as BadgeVariant,    // Entity-specific: use green
+    [COMMISSION_STATUS.PARTIAL_COMMISSION]: "orange" as BadgeVariant, // Entity-specific: use orange
+    [COMMISSION_STATUS.NO_COMMISSION]: "cancelled" as BadgeVariant,   // Core semantic
+    [COMMISSION_STATUS.SUSPENDED_COMMISSION]: "suspended" as BadgeVariant, // Core semantic
   },
 };
 
@@ -546,92 +673,95 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
   // Common status values
   PENDING: "pending",
   IN_PROGRESS: "inProgress",
-  IN_PRODUCTION: "inProgress",
+  IN_PRODUCTION: "inProduction",
   COMPLETED: "completed",
   CANCELLED: "cancelled",
   ACTIVE: "active",
   INACTIVE: "inactive",
-  APPROVED: "success",
-  REJECTED: "destructive",
-  DELIVERED: "completed",
-  FAILED: "error",
-  EXPIRED: "muted",
-  VERIFIED: "success",
-  RETURNED: "completed",
-  LOST: "destructive",
-  OVERDUE: "purple", // Purple-600 for overdue
-  CREATED: "primary",
-  FULFILLED: "amber", // Amber-500 for fulfilled orders
-  RECEIVED: "success",
-  SENT: "info",
+  APPROVED: "approved",
+  REJECTED: "rejected",
+  DELIVERED: "delivered",
+  FAILED: "failed",
+  EXPIRED: "expired",
+  VERIFIED: "verified",
+  RETURNED: "returned",
+  LOST: "lost",
+  OVERDUE: "purple",
+  CREATED: "created",
+  FULFILLED: "amber",
+  RECEIVED: "received",
+  SENT: "sent",
   ON_HOLD: "onHold",
-  SUSPENDED: "warning",
-  BLOCKED: "destructive",
-  PROCESSING: "inProgress",
-  PARTIAL: "warning",
-  CUTTING: "inProgress",
-  FINISHED: "completed",
-  CHARGED: "info",
-  RATE_LIMITED: "warning",
-  BOUNCED: "destructive",
+  SUSPENDED: "suspended",
+  BLOCKED: "blocked",
+  PROCESSING: "processing",
+  PARTIAL: "partial",
+  CUTTING: "cutting",
+  FINISHED: "finished",
+  CHARGED: "charged",
+  RATE_LIMITED: "onHold",
+  BOUNCED: "bounced",
+  DISMISSED: "dismissed",
+  EFFECTED: "effected",
+  REPROVED: "reproved",
 
   // Operations
-  INBOUND: "success", // Green for entry
-  OUTBOUND: "error", // Red for exit
-  "1": "success", // Numeric inbound
-  "-1": "error", // Numeric outbound
+  INBOUND: "active", // Green for entry
+  OUTBOUND: "cancelled", // Red for exit
+  "1": "active", // Numeric inbound
+  "-1": "cancelled", // Numeric outbound
 
   // Performance/Health levels
-  EXCELLENT: "success",
+  EXCELLENT: "green",
   GOOD: "active",
   FAIR: "pending",
-  POOR: "warning",
-  CRITICAL: "destructive",
+  POOR: "onHold",
+  CRITICAL: "failed",
 
   // Priority/Urgency levels
   LOW: "muted",
   MEDIUM: "pending",
-  HIGH: "warning",
+  HIGH: "onHold",
   NORMAL: "default",
-  URGENT: "destructive",
+  URGENT: "failed",
 
   // Trends
-  UP: "success",
-  DOWN: "error",
+  UP: "active",
+  DOWN: "failed",
   STABLE: "default",
-  POSITIVE: "success",
-  NEGATIVE: "error",
+  POSITIVE: "active",
+  NEGATIVE: "failed",
   NEUTRAL: "default",
-  VOLATILE: "warning",
-  SEASONAL: "info",
+  VOLATILE: "onHold",
+  SEASONAL: "created",
 
   // Activity levels
-  VERY_ACTIVE: "success",
+  VERY_ACTIVE: "active",
   OCCASIONAL: "pending",
-  DORMANT: "muted",
+  DORMANT: "inactive",
 
   // Validation
-  ERROR: "error",
-  WARNING: "warning",
-  INFO: "info",
+  ERROR: "failed",
+  WARNING: "onHold",
+  INFO: "created",
 
   // Special
-  VERBAL: "info",
+  VERBAL: "created",
   WRITTEN: "pending",
-  SUSPENSION: "warning",
-  FINAL_WARNING: "destructive",
+  SUSPENSION: "onHold",
+  FINAL_WARNING: "failed",
   PENDING_JUSTIFICATION: "pending",
-  JUSTIFICATION_SUBMITTED: "info",
-  PARTIALLY_FULFILLED: "yellow", // Yellow-500 for partially fulfilled orders
-  PARTIALLY_RECEIVED: "teal", // Teal-500 for partially received orders
-  PARTIALLY_RETURNED: "warning",
-  FULLY_RETURNED: "success",
+  JUSTIFICATION_SUBMITTED: "sent",
+  PARTIALLY_FULFILLED: "yellow",
+  PARTIALLY_RECEIVED: "teal",
+  PARTIALLY_RETURNED: "orange",
+  FULLY_RETURNED: "green",
 
   // Commission Status fallback
-  FULL_COMMISSION: "success",     // Green
-  PARTIAL_COMMISSION: "primary",  // Blue
-  NO_COMMISSION: "warning",       // Orange
-  SUSPENDED_COMMISSION: "destructive", // Red
+  FULL_COMMISSION: "green",
+  PARTIAL_COMMISSION: "orange",
+  NO_COMMISSION: "cancelled",
+  SUSPENDED_COMMISSION: "suspended",
 };
 
 /**
@@ -698,15 +828,15 @@ export const XYZ_BADGE_COLORS: Record<
  */
 export const BOOLEAN_BADGE_CONFIG = {
   willReturn: {
-    true: "success" as BadgeVariant, // Green - will return items (positive)
-    false: "destructive" as BadgeVariant, // Red - won't return items (negative)
+    true: "green" as BadgeVariant,     // Green - will return items (positive)
+    false: "cancelled" as BadgeVariant, // Red - won't return items (negative)
   },
   isActive: {
     true: "active" as BadgeVariant,
     false: "inactive" as BadgeVariant,
   },
   isUrgent: {
-    true: "destructive" as BadgeVariant,
+    true: "failed" as BadgeVariant,
     false: "default" as BadgeVariant,
   },
   isCompleted: {
@@ -714,19 +844,19 @@ export const BOOLEAN_BADGE_CONFIG = {
     false: "pending" as BadgeVariant,
   },
   isApproved: {
-    true: "success" as BadgeVariant,
+    true: "approved" as BadgeVariant,
     false: "pending" as BadgeVariant,
   },
   isVerified: {
-    true: "success" as BadgeVariant,
-    false: "warning" as BadgeVariant,
+    true: "verified" as BadgeVariant,
+    false: "pending" as BadgeVariant,
   },
   isDelivered: {
-    true: "completed" as BadgeVariant,
+    true: "delivered" as BadgeVariant,
     false: "pending" as BadgeVariant,
   },
   isOverdue: {
-    true: "purple" as BadgeVariant, // Purple-600 for overdue
+    true: "overdue" as BadgeVariant,
     false: "default" as BadgeVariant,
   },
 };

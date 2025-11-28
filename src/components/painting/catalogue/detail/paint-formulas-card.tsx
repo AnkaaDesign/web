@@ -45,12 +45,10 @@ export function PaintFormulasCard({ paint, className, isLoading = false, error =
     return (
       <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
         <CardHeader className="pb-6 flex-shrink-0">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconFlask className="h-5 w-5 text-primary" />
-            </div>
-            Fórmulas
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconFlask className="h-5 w-5 text-muted-foreground" />
+          Fórmulas
+        </CardTitle>
         </CardHeader>
         <CardContent className="pt-0 flex-1 flex items-center justify-center">
           <div className="text-center py-8 space-y-4">
@@ -73,10 +71,8 @@ export function PaintFormulasCard({ paint, className, isLoading = false, error =
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6 flex-shrink-0">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconFlask className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconFlask className="h-5 w-5 text-muted-foreground" />
           Fórmulas ({paint.formulas?.length || 0})
         </CardTitle>
       </CardHeader>

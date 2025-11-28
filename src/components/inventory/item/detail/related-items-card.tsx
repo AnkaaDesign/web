@@ -24,11 +24,9 @@ export function RelatedItemsCard({ item, className }: RelatedItemsCardProps) {
     <Card className={cn("shadow-sm border border-border", className)} level={1}>
       <CardContent className="p-6">
         {/* Section Header */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconLink className="h-5 w-5 text-primary" />
-          </div>
-          <h3 className="text-xl font-semibold">Produtos Relacionados</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <IconLink className="h-5 w-5 text-muted-foreground" />
+          <h3 className="text-base font-medium">Produtos Relacionados</h3>
           <Badge variant="secondary" className="ml-auto">
             {allRelated.length}
           </Badge>

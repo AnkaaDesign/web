@@ -20,12 +20,10 @@ export const BorrowItemCard = ({ borrow, className }: BorrowItemCardProps) => {
     return (
       <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
         <CardHeader className="pb-6">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconPackage className="h-5 w-5 text-primary" />
-            </div>
-            Informações do Item
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconPackage className="h-5 w-5 text-muted-foreground" />
+          Informações do Item
+        </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2 text-muted-foreground bg-muted/30 rounded-lg p-4">
@@ -83,12 +81,10 @@ export const BorrowItemCard = ({ borrow, className }: BorrowItemCardProps) => {
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconPackage className="h-5 w-5 text-primary" />
-            </div>
-            Informações do Item
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconPackage className="h-5 w-5 text-muted-foreground" />
+          Informações do Item
+        </CardTitle>
           <Button variant="ghost" size="sm" onClick={handleViewItem} className="text-xs">
             <IconExternalLink className="h-3 w-3 mr-1" />
             Ver detalhes

@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { IconInfoCircle, IconPackage, IconPaintFilled } from "@tabler/icons-react";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { paintTypeCreateSchema, paintTypeUpdateSchema, type PaintTypeCreateFormData, type PaintTypeUpdateFormData } from "../../../../schemas";
@@ -155,7 +156,10 @@ export function PaintTypeForm(props: PaintTypeFormProps) {
           {/* Basic Information */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Informações Básicas</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
+                Informações Básicas
+              </CardTitle>
               <CardDescription>Nome e identificação do tipo de tinta</CardDescription>
             </CardHeader>
             <CardContent>
@@ -168,7 +172,10 @@ export function PaintTypeForm(props: PaintTypeFormProps) {
           {/* Component Items Section */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Componentes</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconPackage className="h-5 w-5 text-muted-foreground" />
+                Componentes
+              </CardTitle>
               <CardDescription>
                 Selecione os itens que podem ser usados como componentes em fórmulas deste tipo de tinta
               </CardDescription>
@@ -181,7 +188,10 @@ export function PaintTypeForm(props: PaintTypeFormProps) {
           {/* Ground Paint Configuration */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Configuração de Fundo</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconPaintFilled className="h-5 w-5 text-muted-foreground" />
+                Configuração de Fundo
+              </CardTitle>
               <CardDescription>Define se este tipo de tinta requer aplicação de fundo</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

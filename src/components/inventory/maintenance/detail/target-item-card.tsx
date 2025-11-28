@@ -21,12 +21,10 @@ export function TargetItemCard({ item, className }: TargetItemCardProps) {
     return (
       <Card className={cn("shadow-sm border border-border", className)} level={1}>
         <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconBox className="h-5 w-5 text-primary" />
-            </div>
-            Equipamento da Manutenção
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconBox className="h-5 w-5 text-muted-foreground" />
+          Equipamento da Manutenção
+        </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
           <div className="text-center py-12">
@@ -83,12 +81,10 @@ export function TargetItemCard({ item, className }: TargetItemCardProps) {
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconBox className="h-5 w-5 text-primary" />
-            </div>
-            Equipamento da Manutenção
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconBox className="h-5 w-5 text-muted-foreground" />
+          Equipamento da Manutenção
+        </CardTitle>
           <Button variant="ghost" size="sm" onClick={handleViewItem} className="text-xs">
             <IconExternalLink className="h-3 w-3 mr-1" />
             Ver detalhes

@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { IconInfoCircle, IconPhoto, IconPhone, IconMapPin, IconTag } from "@tabler/icons-react";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supplierCreateSchema, supplierUpdateSchema, type SupplierCreateFormData, type SupplierUpdateFormData } from "../../../../schemas";
@@ -327,7 +328,10 @@ export function SupplierForm(props: SupplierFormProps) {
           {/* Basic Information */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Informações Básicas</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
+                Informações Básicas
+              </CardTitle>
               <CardDescription>Dados fundamentais do fornecedor</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -348,7 +352,10 @@ export function SupplierForm(props: SupplierFormProps) {
           {/* Logo */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Logo</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconPhoto className="h-5 w-5 text-muted-foreground" />
+                Logo
+              </CardTitle>
               <CardDescription>Imagem do logo do fornecedor</CardDescription>
             </CardHeader>
             <CardContent>
@@ -359,7 +366,10 @@ export function SupplierForm(props: SupplierFormProps) {
           {/* Contact Information */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Informações de Contato</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconPhone className="h-5 w-5 text-muted-foreground" />
+                Informações de Contato
+              </CardTitle>
               <CardDescription>Telefones e outras formas de contato</CardDescription>
             </CardHeader>
             <CardContent>
@@ -370,7 +380,10 @@ export function SupplierForm(props: SupplierFormProps) {
           {/* Address Information */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Endereço</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconMapPin className="h-5 w-5 text-muted-foreground" />
+                Endereço
+              </CardTitle>
               <CardDescription>Localização do fornecedor</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -412,7 +425,10 @@ export function SupplierForm(props: SupplierFormProps) {
           {/* Tags */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Tags</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconTag className="h-5 w-5 text-muted-foreground" />
+                Tags
+              </CardTitle>
               <CardDescription>Etiquetas para categorizar o fornecedor</CardDescription>
             </CardHeader>
             <CardContent>

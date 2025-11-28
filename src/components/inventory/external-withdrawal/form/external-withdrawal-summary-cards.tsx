@@ -55,10 +55,8 @@ export const BasicInfoSummaryCard: React.FC<BasicInfoSummaryCardProps> = ({ with
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconUser className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconUser className="h-5 w-5 text-muted-foreground" />
           Informações da Retirada
         </CardTitle>
       </CardHeader>
@@ -116,12 +114,10 @@ export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItem
     return (
       <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
         <CardHeader className="pb-6">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconPackage className="h-5 w-5 text-primary" />
-            </div>
-            Itens da Retirada
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconPackage className="h-5 w-5 text-muted-foreground" />
+          Itens da Retirada
+        </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2 text-muted-foreground bg-muted/30 rounded-lg p-4">
@@ -137,12 +133,10 @@ export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItem
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconPackage className="h-5 w-5 text-primary" />
-            </div>
-            Itens da Retirada
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconPackage className="h-5 w-5 text-muted-foreground" />
+          Itens da Retirada
+        </CardTitle>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="px-3 py-1">
               {totalItems} {totalItems === 1 ? "item" : "itens"}
@@ -274,10 +268,8 @@ export const TotalCalculationCard: React.FC<TotalCalculationCardProps> = ({ sele
   return (
     <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
       <CardHeader className="pb-6">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconCurrencyReal className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconCurrencyReal className="h-5 w-5 text-muted-foreground" />
           Cálculo do Total
         </CardTitle>
       </CardHeader>

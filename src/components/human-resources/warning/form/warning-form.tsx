@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useRef }
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { IconAlertTriangle, IconUsers, IconCalendar } from "@tabler/icons-react";
 import { debounce } from "../../../../utils";
 import { createWarningFormData } from "@/utils/form-data-helper";
 
@@ -316,7 +317,10 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
               {/* Basic Information Card */}
               <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Informações da Advertência</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconAlertTriangle className="h-5 w-5 text-muted-foreground" />
+                Informações da Advertência
+              </CardTitle>
               <CardDescription>Preencha os detalhes da advertência ao colaborador</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -338,7 +342,10 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
           {/* People Involved Card */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Pessoas Envolvidas</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconUsers className="h-5 w-5 text-muted-foreground" />
+                Pessoas Envolvidas
+              </CardTitle>
               <CardDescription>Selecione o colaborador, supervisor e testemunhas</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -372,7 +379,10 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
           {/* Follow-up and Notes Card */}
           <Card className="bg-transparent">
             <CardHeader>
-              <CardTitle>Acompanhamento</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <IconCalendar className="h-5 w-5 text-muted-foreground" />
+                Acompanhamento
+              </CardTitle>
               <CardDescription>Defina a data de acompanhamento e adicione observações</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

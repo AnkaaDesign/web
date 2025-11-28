@@ -110,12 +110,10 @@ export function RelatedServiceOrdersCard({ customer, className }: RelatedService
       <Card className={cn("shadow-sm border border-border", className)} level={1}>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-3 text-xl">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <IconClipboardList className="h-5 w-5 text-primary" />
-              </div>
-              Ordens de Serviço Relacionadas
-            </CardTitle>
+            <CardTitle className="flex items-center gap-2">
+          <IconClipboardList className="h-5 w-5 text-muted-foreground" />
+          Ordens de Serviço Relacionadas
+        </CardTitle>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
@@ -132,12 +130,10 @@ export function RelatedServiceOrdersCard({ customer, className }: RelatedService
     <Card className={cn("shadow-sm border border-border", className)} level={1}>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-xl">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <IconClipboardList className="h-5 w-5 text-primary" />
-            </div>
-            Ordens de Serviço Relacionadas
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2">
+          <IconClipboardList className="h-5 w-5 text-muted-foreground" />
+          Ordens de Serviço Relacionadas
+        </CardTitle>
         </div>
       </CardHeader>
 

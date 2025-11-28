@@ -29,10 +29,8 @@ export function RelatedInvoicesCard({ customer }: RelatedInvoicesCardProps) {
   return (
     <Card className="shadow-sm border border-border" level={1}>
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-3 text-xl">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <IconFileInvoice className="h-5 w-5 text-primary" />
-          </div>
+        <CardTitle className="flex items-center gap-2">
+          <IconFileInvoice className="h-5 w-5 text-muted-foreground" />
           Notas Fiscais Relacionadas
         </CardTitle>
       </CardHeader>
