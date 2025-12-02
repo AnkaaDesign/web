@@ -156,7 +156,7 @@ export class PaintService {
 
   async getPaints(params: PaintGetManyFormData = {}): Promise<PaintGetManyResponse> {
     // Clean up params to remove empty strings, undefined, and null values
-    const cleanedParams = Object.entries(params).reduce((acc, [key, value]) => {
+    const cleanedParams = Object.entries(params).reduce((acc, [key, value]: [string, any]) => {
       // Skip empty strings, null, undefined
       if (value === "" || value === null || value === undefined) {
         return acc;

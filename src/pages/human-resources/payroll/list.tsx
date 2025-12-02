@@ -33,7 +33,6 @@ import type { StandardizedColumn } from "@/components/ui/standardized-table";
 interface PayrollFiltersData {
   year?: number;
   months?: string[];
-  performanceLevels?: number[];
   sectorIds?: string[];
   positionIds?: string[];
   userIds?: string[];
@@ -60,15 +59,6 @@ function parseFiltersFromUrl(searchParams: URLSearchParams): PayrollFiltersData 
     }
   }
 
-  const performanceLevelsParam = searchParams.get('performanceLevels');
-  if (performanceLevelsParam) {
-    try {
-      const levels = JSON.parse(performanceLevelsParam);
-      if (Array.isArray(levels)) filters.performanceLevels = levels;
-    } catch {
-      // Ignore parsing errors
-    }
-  }
 
   const sectorIdsParam = searchParams.get('sectorIds');
   if (sectorIdsParam) {
@@ -139,12 +129,6 @@ function updateFiltersInUrl(
     searchParams.delete('months');
   }
 
-  // Performance levels
-  if (filters.performanceLevels && filters.performanceLevels.length > 0) {
-    searchParams.set('performanceLevels', JSON.stringify(filters.performanceLevels));
-  } else {
-    searchParams.delete('performanceLevels');
-  }
 
   // Sector IDs
   if (filters.sectorIds && filters.sectorIds.length > 0) {
@@ -188,11 +172,33 @@ interface PayrollRow {
   performanceLevel: number;
   status: string;
 
-  // Payroll data
+  // Payroll data - Base
   payrollId?: string;
   baseRemuneration: number;
   totalDiscounts: number;
   netSalary: number;
+
+  // Payroll data - Earnings
+  overtime50Hours?: number;
+  overtime50Amount?: number;
+  overtime100Hours?: number;
+  overtime100Amount?: number;
+  nightHours?: number;
+  nightDifferentialAmount?: number;
+  dsrAmount?: number;
+  grossSalary?: number;
+
+  // Payroll data - Tax deductions
+  inssBase?: number;
+  inssAmount?: number;
+  irrfBase?: number;
+  irrfAmount?: number;
+  fgtsAmount?: number;
+
+  // Payroll data - Working days
+  workingDaysInMonth?: number;
+  workedDaysInMonth?: number;
+  absenceHours?: number;
 
   // Bonus data
   bonusAmount: number;
@@ -335,52 +341,6 @@ function PayrollTableComponent({
       accessor: (row: PayrollRow) => row.sector?.name || "-",
       sortable: true,
       className: "text-sm w-24 truncate",
-      align: "left" as const,
-    },
-    {
-      key: "performanceLevel",
-      header: "Desempenho",
-      accessor: (row: PayrollRow) => row.performanceLevel || 0,
-      sortable: true,
-      className: "text-sm w-24 truncate",
-      align: "left" as const,
-    },
-
-    // Task statistics columns (improved layout)
-    {
-      key: "tasksCompleted",
-      header: "Tarefas",
-      accessor: (row: PayrollRow) => {
-        // Check if user is eligible for bonus
-        const isEligible = row.position?.bonifiable && row.performanceLevel > 0;
-        return isEligible ? row.tasksCompleted.toFixed(1) : "-";
-      },
-      sortable: true,
-      className: "text-sm w-24 font-medium truncate",
-      align: "left" as const,
-    },
-    {
-      key: "totalWeightedTasks",
-      header: "Tarefas Ponderadas",
-      accessor: (row: PayrollRow) => {
-        // Check if user is eligible for bonus
-        const isEligible = row.position?.bonifiable && row.performanceLevel > 0;
-        return isEligible ? row.totalWeightedTasks.toFixed(1) : "-";
-      },
-      sortable: true,
-      className: "text-sm w-24 font-medium truncate",
-      align: "left" as const,
-    },
-    {
-      key: "averageTasks",
-      header: "Média",
-      accessor: (row: PayrollRow) => {
-        // Check if user is eligible for bonus
-        const isEligible = row.position?.bonifiable && row.performanceLevel > 0;
-        return isEligible ? row.averageTasks.toFixed(1) : "-";
-      },
-      sortable: true,
-      className: "text-sm w-24 font-medium truncate",
       align: "left" as const,
     },
 
@@ -582,18 +542,11 @@ export default function PayrollListPage() {
     limit: 100,
   });
 
-  // Get default sector IDs (production, warehouse, leader privileges)
+  // Get default sector IDs - show all sectors by default
+  // Previously filtered to only PRODUCTION/WAREHOUSE/LEADER which was hiding users in other sectors
   const defaultSectorIds = useMemo(() => {
-    if (!sectorsData?.data) return [];
-
-    return sectorsData.data
-      .filter(sector =>
-        sector.privilege === 'PRODUCTION' ||
-        sector.privilege === 'WAREHOUSE' ||
-        sector.privilege === 'LEADER'
-      )
-      .map(sector => sector.id);
-  }, [sectorsData?.data]);
+    return []; // Empty array = show all sectors
+  }, []);
 
   // Apply default sector filters to initial filters if not already set
   const filtersWithDefaults = useMemo(() => {
@@ -637,8 +590,6 @@ export default function PayrollListPage() {
     new Set([
       'user.name',
       'position.name',
-      'performanceLevel',
-      'averageTasks',
       'bonus',
       'remuneration',
       'totalEarnings',
@@ -844,9 +795,6 @@ export default function PayrollListPage() {
           return;
         }
 
-        if (filters.performanceLevels && filters.performanceLevels.length > 0 && !filters.performanceLevels.includes(user?.performanceLevel || 0)) {
-          return;
-        }
 
         // Determine bonus eligibility using proper business logic
         const isEligibleForBonus = isUserEligibleForBonus(user);
@@ -902,11 +850,33 @@ export default function PayrollListPage() {
           performanceLevel: payroll.performanceLevel || bonus?.performanceLevel || user.performanceLevel || 0,
           status: payroll.status || user.status || 'ACTIVE',
 
-          // Payroll data
+          // Payroll data - Base
           payrollId: payroll.id,
           baseRemuneration: baseRemuneration,
           totalDiscounts: totalDiscounts,
           netSalary: netSalary,
+
+          // Payroll data - Earnings
+          overtime50Hours: payroll.overtime50Hours,
+          overtime50Amount: payroll.overtime50Amount,
+          overtime100Hours: payroll.overtime100Hours,
+          overtime100Amount: payroll.overtime100Amount,
+          nightHours: payroll.nightHours,
+          nightDifferentialAmount: payroll.nightDifferentialAmount,
+          dsrAmount: payroll.dsrAmount,
+          grossSalary: payroll.grossSalary,
+
+          // Payroll data - Tax deductions
+          inssBase: payroll.inssBase,
+          inssAmount: payroll.inssAmount,
+          irrfBase: payroll.irrfBase,
+          irrfAmount: payroll.irrfAmount,
+          fgtsAmount: payroll.fgtsAmount,
+
+          // Payroll data - Working days
+          workingDaysInMonth: payroll.workingDaysInMonth,
+          workedDaysInMonth: payroll.workedDaysInMonth,
+          absenceHours: payroll.absenceHours,
 
           // Bonus data
           bonusAmount: bonusAmount,
@@ -1090,7 +1060,6 @@ export default function PayrollListPage() {
     if (filters.excludeUserIds && filters.excludeUserIds.length > 0) count++;
     if (filters.sectorIds && filters.sectorIds.length > 0) count++;
     if (filters.positionIds && filters.positionIds.length > 0) count++;
-    if (filters.performanceLevels && filters.performanceLevels.length > 0) count++;
 
     return count;
   }, [filters]);

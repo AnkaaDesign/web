@@ -17,8 +17,16 @@ interface PayrollRow {
   status: string;
   payrollId?: string;
   baseRemuneration: number;
+  overtime50Amount?: number;
+  overtime50Hours?: number;
+  overtime100Amount?: number;
+  overtime100Hours?: number;
+  nightDifferentialAmount?: number;
+  nightHours?: number;
+  dsrAmount?: number;
   totalDiscounts: number;
   netSalary: number;
+  grossSalary: number;
   bonusAmount: number;
   tasksCompleted: number;
   averageTasks: number;
@@ -48,6 +56,13 @@ interface PayrollExportProps {
   selectedItems?: Set<string>;
   visibleColumns?: Set<string>;
 }
+
+// Helper function to convert decimal hours to HH:MM format
+const formatHoursToHHMM = (decimalHours: number): string => {
+  const hours = Math.floor(decimalHours);
+  const minutes = Math.round((decimalHours - hours) * 60);
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+};
 
 // Export columns configuration
 const EXPORT_COLUMNS: ExportColumn<PayrollRow>[] = [
@@ -95,6 +110,41 @@ const EXPORT_COLUMNS: ExportColumn<PayrollRow>[] = [
     getValue: (row: PayrollRow) => formatCurrency(row.baseRemuneration || 0)
   },
   {
+    id: "overtime50",
+    label: "Horas Extras 50%",
+    getValue: (row: PayrollRow) => {
+      const amount = row.overtime50Amount || 0;
+      const hours = row.overtime50Hours || 0;
+      return amount > 0 ? `${formatHoursToHHMM(hours)} - ${formatCurrency(amount)}` : "-";
+    }
+  },
+  {
+    id: "overtime100",
+    label: "Horas Extras 100%",
+    getValue: (row: PayrollRow) => {
+      const amount = row.overtime100Amount || 0;
+      const hours = row.overtime100Hours || 0;
+      return amount > 0 ? `${formatHoursToHHMM(hours)} - ${formatCurrency(amount)}` : "-";
+    }
+  },
+  {
+    id: "nightDifferential",
+    label: "Adicional Noturno",
+    getValue: (row: PayrollRow) => {
+      const amount = row.nightDifferentialAmount || 0;
+      const hours = row.nightHours || 0;
+      return amount > 0 ? `${formatHoursToHHMM(hours)} - ${formatCurrency(amount)}` : "-";
+    }
+  },
+  {
+    id: "dsr",
+    label: "DSR Reflexo",
+    getValue: (row: PayrollRow) => {
+      const amount = row.dsrAmount || 0;
+      return amount > 0 ? formatCurrency(amount) : "-";
+    }
+  },
+  {
     id: "bonus",
     label: "Bônus",
     getValue: (row: PayrollRow) => {
@@ -105,7 +155,7 @@ const EXPORT_COLUMNS: ExportColumn<PayrollRow>[] = [
   {
     id: "totalEarnings",
     label: "Total Bruto",
-    getValue: (row: PayrollRow) => formatCurrency((row.baseRemuneration || 0) + (row.bonusAmount || 0))
+    getValue: (row: PayrollRow) => formatCurrency(row.grossSalary || 0)
   },
   {
     id: "netSalary",
@@ -138,8 +188,12 @@ export function PayrollExport({
   // Calculate totals from current data
   const calculateTotals = (data: PayrollRow[]) => {
     const totalRemuneration = data.reduce((sum, row) => sum + (row.baseRemuneration || 0), 0);
+    const totalOvertime50 = data.reduce((sum, row) => sum + (row.overtime50Amount || 0), 0);
+    const totalOvertime100 = data.reduce((sum, row) => sum + (row.overtime100Amount || 0), 0);
+    const totalNightDifferential = data.reduce((sum, row) => sum + (row.nightDifferentialAmount || 0), 0);
+    const totalDSR = data.reduce((sum, row) => sum + (row.dsrAmount || 0), 0);
     const totalBonus = data.reduce((sum, row) => sum + (row.bonusAmount || 0), 0);
-    const totalGross = data.reduce((sum, row) => sum + (row.baseRemuneration || 0) + (row.bonusAmount || 0), 0);
+    const totalGross = data.reduce((sum, row) => sum + (row.grossSalary || 0), 0);
     const totalNet = data.reduce((sum, row) => sum + (row.netSalary || 0), 0);
     const eligibleUsers = data.filter(row => row.position?.bonifiable && row.performanceLevel > 0);
     const avgTasks = eligibleUsers.length > 0 ? eligibleUsers[0]?.averageTasks || 0 : 0;
@@ -147,6 +201,10 @@ export function PayrollExport({
 
     return {
       totalRemuneration,
+      totalOvertime50,
+      totalOvertime100,
+      totalNightDifferential,
+      totalDSR,
       totalBonus,
       totalGross,
       totalNet,
@@ -206,6 +264,10 @@ export function PayrollExport({
     const totalRow = columns.map((col) => {
       if (col.id === "user.name") return "TOTAL";
       if (col.id === "remuneration") return formatCurrency(totals.totalRemuneration);
+      if (col.id === "overtime50") return formatCurrency(totals.totalOvertime50);
+      if (col.id === "overtime100") return formatCurrency(totals.totalOvertime100);
+      if (col.id === "nightDifferential") return formatCurrency(totals.totalNightDifferential);
+      if (col.id === "dsr") return formatCurrency(totals.totalDSR);
       if (col.id === "bonus") return formatCurrency(totals.totalBonus);
       if (col.id === "totalEarnings") return formatCurrency(totals.totalGross);
       if (col.id === "netSalary") return formatCurrency(totals.totalNet);
@@ -246,6 +308,10 @@ export function PayrollExport({
     const totalRow = columns.map((col) => {
       if (col.id === "user.name") return "TOTAL";
       if (col.id === "remuneration") return formatCurrency(totals.totalRemuneration);
+      if (col.id === "overtime50") return formatCurrency(totals.totalOvertime50);
+      if (col.id === "overtime100") return formatCurrency(totals.totalOvertime100);
+      if (col.id === "nightDifferential") return formatCurrency(totals.totalNightDifferential);
+      if (col.id === "dsr") return formatCurrency(totals.totalDSR);
       if (col.id === "bonus") return formatCurrency(totals.totalBonus);
       if (col.id === "totalEarnings") return formatCurrency(totals.totalGross);
       if (col.id === "netSalary") return formatCurrency(totals.totalNet);
@@ -451,6 +517,10 @@ export function PayrollExport({
                 ${columns.map((col) => {
                   if (col.id === "user.name") return `<td class="text-left">TOTAL</td>`;
                   if (col.id === "remuneration") return `<td class="text-left">${formatCurrency(totals.totalRemuneration)}</td>`;
+                  if (col.id === "overtime50") return `<td class="text-left">${formatCurrency(totals.totalOvertime50)}</td>`;
+                  if (col.id === "overtime100") return `<td class="text-left">${formatCurrency(totals.totalOvertime100)}</td>`;
+                  if (col.id === "nightDifferential") return `<td class="text-left">${formatCurrency(totals.totalNightDifferential)}</td>`;
+                  if (col.id === "dsr") return `<td class="text-left">${formatCurrency(totals.totalDSR)}</td>`;
                   if (col.id === "bonus") return `<td class="text-left">${formatCurrency(totals.totalBonus)}</td>`;
                   if (col.id === "totalEarnings") return `<td class="text-left">${formatCurrency(totals.totalGross)}</td>`;
                   if (col.id === "netSalary") return `<td class="text-left">${formatCurrency(totals.totalNet)}</td>`;

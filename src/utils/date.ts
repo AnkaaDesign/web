@@ -703,15 +703,23 @@ export const parseTime = (timeString: string): Date | null => {
 /**
  * Get the current payroll period based on today's date.
  *
- * Ankaa uses a 26th-to-25th monthly cycle for payroll:
- * - If today is the 26th or later, the current period is for NEXT month
- * - If today is before the 26th, the current period is for CURRENT month
+ * Ankaa uses a 26th-to-25th monthly cycle for payroll periods, but the "current period"
+ * only changes after the 5th of the month (payment date).
+ *
+ * THE 5TH DAY RULE:
+ * - Days 1-5: Current period = PREVIOUS month (payment hasn't occurred yet)
+ * - Days 6-31: Current period = CURRENT month (payment occurred on the 5th)
+ *
+ * Why: Because payment happens on the 5th, until payment is made, users are still
+ * in the "previous" period for display and editing purposes.
  *
  * Examples:
- * - September 25th → Period: September (Aug 26 - Sep 25)
- * - September 26th → Period: October (Sep 26 - Oct 25)
- * - September 30th → Period: October (Sep 26 - Oct 25)
- * - October 1st → Period: October (Sep 26 - Oct 25)
+ * - November 3rd → Period: October (payment not yet made)
+ * - November 6th → Period: November (payment made on 5th)
+ * - December 31st → Period: December
+ * - January 5th → Period: December of previous year (payment not yet made)
+ *
+ * Period Dates: 26th of previous month at 00:00:00 to 25th of current month at 23:59:59
  *
  * @param referenceDate - Optional date to check (defaults to today)
  * @returns Object with year and month for the current payroll period
@@ -722,12 +730,7 @@ export const getCurrentPayrollPeriod = (referenceDate?: Date): { year: number; m
   let year = date.getFullYear();
   let month = date.getMonth() + 1; // getMonth() is 0-based, we want 1-based
 
-  // 5th day rule:
-  // - If today is <= 5th, we're still in the editing window for the PREVIOUS month's payroll
-  // - If today is > 5th, we show the CURRENT month's payroll
-  //
-  // Example: Today is Nov 3rd (day <= 5) -> show October payroll
-  // Example: Today is Nov 6th (day > 5) -> show November payroll
+  // 5th day rule: If we're on or before the 5th, we're still in the previous month's period
   if (day <= 5) {
     month -= 1;
     // Handle year rollover (January -> December of previous year)

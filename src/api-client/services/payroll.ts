@@ -30,9 +30,24 @@ export const payrollService = {
 
   /**
    * Get payroll by ID - Standard entity retrieval
+   * Handles both regular UUIDs and live IDs (format: live-{userId}-{year}-{month})
    */
-  getById: (id: string, params?: PayrollGetByIdParams) =>
-    apiClient.get<Payroll>(`/payroll/${id}`, { params }),
+  getById: (id: string, params?: PayrollGetByIdParams) => {
+    // Check if this is a live ID (format: live-{userId}-{year}-{month})
+    if (id.startsWith('live-')) {
+      const parts = id.split('-');
+      // live-{uuid part1}-{uuid part2}-{uuid part3}-{uuid part4}-{uuid part5}-{year}-{month}
+      if (parts.length === 8) {
+        const userId = `${parts[1]}-${parts[2]}-${parts[3]}-${parts[4]}-${parts[5]}`;
+        const year = parseInt(parts[6], 10);
+        const month = parseInt(parts[7], 10);
+        // Call the proper live endpoint
+        return apiClient.get<Payroll>(`/payroll/live/${userId}/${year}/${month}`);
+      }
+    }
+    // Regular UUID - use normal endpoint
+    return apiClient.get<Payroll>(`/payroll/${id}`, { params });
+  },
 
   /**
    * Update payroll - Standard entity update
@@ -191,7 +206,7 @@ export const payrollService = {
   /**
    * @deprecated Not available in new controller
    */
-  finalizeMonth: (year: number, month: number) => {
+  finalizeMonth: (_year: number, _month: number) => {
     console.warn('finalizeMonth is deprecated - payrolls are finalized by cronjob');
     return Promise.resolve({ data: { success: false, message: 'Deprecated' } });
   },

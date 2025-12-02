@@ -61,9 +61,9 @@ export function formatPercentage(value: number, options?: {
   multiplier?: number;
 }): string {
   const {
-    minimumFractionDigits = 1,
-    maximumFractionDigits = 1,
-    multiplier = 1, // Use 100 if value is in decimal form (0.15 -> 15%)
+    minimumFractionDigits = 2,
+    maximumFractionDigits = 2,
+    multiplier = 100, // Use 100 if value is in decimal form (0.15 -> 15%)
   } = options || {};
 
   const displayValue = value * multiplier;
@@ -78,18 +78,35 @@ export function formatPercentage(value: number, options?: {
 /**
  * Format number values
  */
-export function formatNumber(value: number, options?: {
+export function formatNumber(value: number, optionsOrDecimals?: number | {
   minimumFractionDigits?: number;
   maximumFractionDigits?: number;
   compact?: boolean;
   unit?: string;
 }): string {
+  // Handle legacy signature: formatNumber(value, decimals)
+  let options: {
+    minimumFractionDigits?: number;
+    maximumFractionDigits?: number;
+    compact?: boolean;
+    unit?: string;
+  } = {};
+
+  if (typeof optionsOrDecimals === 'number') {
+    options = {
+      minimumFractionDigits: optionsOrDecimals,
+      maximumFractionDigits: optionsOrDecimals,
+    };
+  } else if (optionsOrDecimals) {
+    options = optionsOrDecimals;
+  }
+
   const {
     minimumFractionDigits = 0,
     maximumFractionDigits = 2,
     compact = false,
     unit = '',
-  } = options || {};
+  } = options;
 
   if (compact && Math.abs(value) >= 1000) {
     return formatCompactNumber(value) + (unit ? ` ${unit}` : '');
@@ -111,13 +128,16 @@ export function formatCompactNumber(value: number): string {
   const sign = value < 0 ? '-' : '';
 
   if (absValue >= 1_000_000_000) {
-    return `${sign}${(absValue / 1_000_000_000).toFixed(1)}B`;
+    const result = absValue / 1_000_000_000;
+    return `${sign}${result % 1 === 0 ? result.toFixed(0) : result.toFixed(1)}B`;
   }
   if (absValue >= 1_000_000) {
-    return `${sign}${(absValue / 1_000_000).toFixed(1)}M`;
+    const result = absValue / 1_000_000;
+    return `${sign}${result % 1 === 0 ? result.toFixed(0) : result.toFixed(1)}M`;
   }
   if (absValue >= 1_000) {
-    return `${sign}${(absValue / 1_000).toFixed(1)}K`;
+    const result = absValue / 1_000;
+    return `${sign}${result % 1 === 0 ? result.toFixed(0) : result.toFixed(1)}K`;
   }
 
   return value.toString();
@@ -165,11 +185,14 @@ export function formatRelativeDate(date: Date | string | number): string {
  * Format time duration in hours
  */
 export function formatDuration(hours: number): string {
+  if (hours === 0) {
+    return '0h';
+  }
   if (hours < 1) {
     return `${Math.round(hours * 60)} min`;
   }
   if (hours < 24) {
-    return `${hours.toFixed(1)}h`;
+    return `${hours % 1 === 0 ? hours.toFixed(0) : hours.toFixed(1)}h`;
   }
 
   const days = Math.floor(hours / 24);
@@ -179,7 +202,7 @@ export function formatDuration(hours: number): string {
     return `${days}d`;
   }
 
-  return `${days}d ${remainingHours.toFixed(0)}h`;
+  return `${days}d ${remainingHours.toFixed(1)}h`;
 }
 
 /**

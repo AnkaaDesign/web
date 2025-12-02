@@ -19,7 +19,7 @@ import type {
   DeploymentBatchUpdateFormData,
   DeploymentBatchDeleteFormData,
 } from '../../schemas';
-import { DEPLOYMENT_ENVIRONMENT, DEPLOYMENT_APPLICATION } from '../../constants';
+import { DEPLOYMENT_ENVIRONMENT } from '../../constants';
 
 export const deploymentService = {
   // Standard CRUD operations

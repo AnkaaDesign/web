@@ -121,9 +121,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should group by week', () => {
       const data = [
-        { date: '2024-01-01', value: 100 }, // Week 1
-        { date: '2024-01-03', value: 200 }, // Week 1
-        { date: '2024-01-08', value: 300 }, // Week 2
+        { date: new Date(2024, 0, 1, 12, 0), value: 100 }, // Week 1, noon to avoid timezone issues
+        { date: new Date(2024, 0, 3, 12, 0), value: 200 }, // Week 1
+        { date: new Date(2024, 0, 8, 12, 0), value: 300 }, // Week 2
       ];
 
       const result = TimeSeriesTransformer.transform(data, {
@@ -139,9 +139,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should group by month', () => {
       const data = [
-        { date: '2024-01-01', value: 100 },
-        { date: '2024-01-15', value: 200 },
-        { date: '2024-02-01', value: 300 },
+        { date: new Date(2024, 0, 1, 12, 0), value: 100 },  // January, noon to avoid timezone issues
+        { date: new Date(2024, 0, 15, 12, 0), value: 200 }, // January
+        { date: new Date(2024, 1, 1, 12, 0), value: 300 },  // February
       ];
 
       const result = TimeSeriesTransformer.transform(data, {
@@ -157,9 +157,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should group by quarter', () => {
       const data = [
-        { date: '2024-01-01', value: 100 }, // Q1
-        { date: '2024-02-01', value: 200 }, // Q1
-        { date: '2024-04-01', value: 300 }, // Q2
+        { date: new Date(2024, 0, 1, 12, 0), value: 100 },  // Q1 (Jan), noon to avoid timezone issues
+        { date: new Date(2024, 1, 1, 12, 0), value: 200 },  // Q1 (Feb)
+        { date: new Date(2024, 3, 1, 12, 0), value: 300 },  // Q2 (Apr)
       ];
 
       const result = TimeSeriesTransformer.transform(data, {
@@ -175,9 +175,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should group by year', () => {
       const data = [
-        { date: '2024-01-01', value: 100 },
-        { date: '2024-06-01', value: 200 },
-        { date: '2025-01-01', value: 300 },
+        { date: new Date(2024, 0, 1, 12, 0), value: 100 },  // 2024, noon to avoid timezone issues
+        { date: new Date(2024, 5, 1, 12, 0), value: 200 },  // 2024
+        { date: new Date(2025, 0, 1, 12, 0), value: 300 },  // 2025
       ];
 
       const result = TimeSeriesTransformer.transform(data, {
@@ -484,9 +484,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should resample to week with average aggregation', () => {
       const data = [
-        { value: 100, _parsedDate: new Date('2024-01-01') },
-        { value: 200, _parsedDate: new Date('2024-01-02') },
-        { value: 300, _parsedDate: new Date('2024-01-08') },
+        { value: 100, _parsedDate: new Date(2024, 0, 1, 12, 0) },  // Week 1, noon to avoid timezone issues
+        { value: 200, _parsedDate: new Date(2024, 0, 2, 12, 0) },  // Week 1
+        { value: 300, _parsedDate: new Date(2024, 0, 8, 12, 0) },  // Week 2
       ];
 
       const result = TimeSeriesTransformer.resample(data, 'week', 'avg', ['value']);
@@ -558,9 +558,9 @@ describe('TimeSeriesTransformer', () => {
 
     it('should resample to month', () => {
       const data = [
-        { value: 100, _parsedDate: new Date('2024-01-01') },
-        { value: 200, _parsedDate: new Date('2024-01-15') },
-        { value: 300, _parsedDate: new Date('2024-02-01') },
+        { value: 100, _parsedDate: new Date(2024, 0, 1, 12, 0) },   // January, noon to avoid timezone issues
+        { value: 200, _parsedDate: new Date(2024, 0, 15, 12, 0) },  // January
+        { value: 300, _parsedDate: new Date(2024, 1, 1, 12, 0) },   // February
       ];
 
       const result = TimeSeriesTransformer.resample(data, 'month', 'sum', ['value']);

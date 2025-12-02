@@ -45,7 +45,9 @@ export function securityPlugin(): Plugin {
     },
 
     generateBundle() {
-      // Log security configuration during build},
+      // Log security configuration during build
+      console.log("🔒 Security headers configured");
+    },
 
     // Removed transformIndexHtml to avoid duplicate CSP headers
     // CSP is now only set via server middleware using generateCSPHeader()
@@ -67,9 +69,13 @@ export function securityValidationPlugin(): Plugin {
           console.warn("⚠️  Security warnings detected:");
           warnings.forEach((warning) => console.warn(`   - ${warning}`));
 
-          if (recommendations.length > 0) {recommendations.forEach((rec) =>);
+          if (recommendations.length > 0) {
+            console.warn("📋 Recommendations:");
+            recommendations.forEach((rec) => console.warn(`   - ${rec}`));
           }
-        } else {}
+        } else {
+          console.log("✅ Security configuration validated");
+        }
       } catch (error) {
         console.warn("⚠️  Security validation failed:", error instanceof Error ? error.message : "Unknown error");
       }

@@ -722,7 +722,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         // Skip notifications for batch operations - they'll be handled by the dialog
         const isBatchOperation = config.url?.includes("/batch");
         // Only show success if the response indicates success
-        const isSuccess = response.data?.success !== false; // Show success unless explicitly false
+        const isSuccess = (response.data?.success as boolean | undefined) !== false; // Show success unless explicitly false
 
         if (!isBatchOperation && isSuccess) {
           const message = response.data?.message || getSuccessMessage(config.method);

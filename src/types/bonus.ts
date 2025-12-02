@@ -20,6 +20,9 @@ export interface Bonus extends BaseEntity {
   month: number;
   performanceLevel: number;
   baseBonus: number | { toNumber: () => number }; // Decimal from Prisma
+  netBonus: number | { toNumber: () => number }; // Decimal - baseBonus after deductions
+  weightedTasks: number | { toNumber: () => number }; // Decimal - weighted task count for this user
+  averageTaskPerUser: number | { toNumber: () => number }; // Decimal - average tasks per eligible user
 
   // Relations (optional, populated based on query)
   user?: User;
@@ -82,6 +85,9 @@ export interface BonusWhere {
   payrollId?: string | { in?: string[]; notIn?: string[] };
   performanceLevel?: number | { in?: number[]; notIn?: number[]; gte?: number; lte?: number; gt?: number; lt?: number };
   baseBonus?: number | { gte?: number; lte?: number; gt?: number; lt?: number };
+  netBonus?: number | { gte?: number; lte?: number; gt?: number; lt?: number };
+  weightedTasks?: number | { gte?: number; lte?: number; gt?: number; lt?: number };
+  averageTaskPerUser?: number | { gte?: number; lte?: number; gt?: number; lt?: number };
   createdAt?: Date | { gte?: Date; lte?: Date; gt?: Date; lt?: Date };
   updatedAt?: Date | { gte?: Date; lte?: Date; gt?: Date; lt?: Date };
 
@@ -111,6 +117,9 @@ export interface BonusOrderBy {
   month?: ORDER_BY_DIRECTION;
   performanceLevel?: ORDER_BY_DIRECTION;
   baseBonus?: ORDER_BY_DIRECTION;
+  netBonus?: ORDER_BY_DIRECTION;
+  weightedTasks?: ORDER_BY_DIRECTION;
+  averageTaskPerUser?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
 

@@ -1,4 +1,4 @@
-import { defineConfig, Plugin, loadEnv } from "vite";
+import { defineConfig, type Plugin, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -17,8 +17,6 @@ function htmlEnvReplace(apiUrl: string): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
-  const isDevelopment = mode === "development";
-
   // Load env file based on `mode` in the current working directory.
   // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
   const env = loadEnv(mode, process.cwd(), '');
@@ -68,6 +66,8 @@ export default defineConfig(({ mode }) => {
       sourcemap: mode === "production" ? "hidden" : true,
       // Minification settings
       minify: mode === "production" ? "esbuild" : false,
+      // Increase chunk size warning limit to reduce noise for intentionally large chunks
+      chunkSizeWarningLimit: 1000,
       commonjsOptions: {
         transformMixedEsModules: true,
         strictRequires: false,
@@ -76,38 +76,75 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         external: [],
         output: {
-          manualChunks: {
-            // React must be in its own chunk and load first
-            "vendor-react": ["react", "react-dom", "react/jsx-runtime"],
-            // React-related libraries in second chunk
-            "vendor-react-libs": [
-              "@tanstack/react-query",
-              "react-router-dom",
-              "react-hook-form",
-              "@hookform/resolvers",
-            ],
-            // UI libraries
-            "vendor-ui": [
-              "@radix-ui/react-accordion",
-              "@radix-ui/react-alert-dialog",
-              "@radix-ui/react-checkbox",
-              "@radix-ui/react-dialog",
-              "@radix-ui/react-dropdown-menu",
-              "@radix-ui/react-label",
-              "@radix-ui/react-popover",
-              "@radix-ui/react-select",
-              "@radix-ui/react-separator",
-              "@radix-ui/react-slot",
-              "@radix-ui/react-switch",
-              "@radix-ui/react-tabs",
-              "@radix-ui/react-toast",
-              "@radix-ui/react-tooltip",
-              "lucide-react",
-              "clsx",
-              "tailwind-merge",
-              "tailwindcss-animate",
-              "class-variance-authority",
-            ],
+          manualChunks: (id) => {
+            // React core - must load first
+            if (id.includes("node_modules/react/") ||
+                id.includes("node_modules/react-dom/") ||
+                id.includes("node_modules/react/jsx-runtime")) {
+              return "vendor-react";
+            }
+
+            // React ecosystem libraries
+            if (id.includes("@tanstack/react-query") ||
+                id.includes("react-router-dom") ||
+                id.includes("react-hook-form") ||
+                id.includes("@hookform/resolvers")) {
+              return "vendor-react-libs";
+            }
+
+            // Radix UI components
+            if (id.includes("@radix-ui")) {
+              return "vendor-radix-ui";
+            }
+
+            // Icon libraries
+            if (id.includes("lucide-react") || id.includes("@tabler/icons-react")) {
+              return "vendor-icons";
+            }
+
+            // Utility libraries
+            if (id.includes("clsx") ||
+                id.includes("tailwind-merge") ||
+                id.includes("class-variance-authority")) {
+              return "vendor-utils";
+            }
+
+            // Chart libraries
+            if (id.includes("echarts") ||
+                id.includes("recharts") ||
+                id.includes("@react-three")) {
+              return "vendor-charts";
+            }
+
+            // Data processing libraries
+            if (id.includes("lodash") ||
+                id.includes("papaparse") ||
+                id.includes("xlsx") ||
+                id.includes("jszip")) {
+              return "vendor-data";
+            }
+
+            // PDF and file handling
+            if (id.includes("jspdf") ||
+                id.includes("html2canvas") ||
+                id.includes("react-pdf")) {
+              return "vendor-pdf";
+            }
+
+            // Date utilities
+            if (id.includes("date-fns") || id.includes("react-day-picker")) {
+              return "vendor-date";
+            }
+
+            // DnD kit
+            if (id.includes("@dnd-kit")) {
+              return "vendor-dnd";
+            }
+
+            // All other node_modules
+            if (id.includes("node_modules")) {
+              return "vendor-other";
+            }
           },
           // Ensure correct import order
           format: "es",

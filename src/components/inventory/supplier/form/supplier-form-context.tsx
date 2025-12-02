@@ -238,7 +238,8 @@ export function SupplierFormProvider({ children, initialValues, onSubmit, mode, 
           clearErrors();
 
           try {
-            // Submit validated dataawait onSubmit(result.data);
+            // Submit validated data
+            await onSubmit(result.data);
           } catch (error) {
             console.error("Form submission error:", error);
           } finally {

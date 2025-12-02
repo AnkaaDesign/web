@@ -833,3 +833,60 @@ export function getPayrollCalculationBreakdown(
     discountDetails,
   };
 }
+
+// =====================
+// Composite ID Utilities (for live calculations)
+// =====================
+
+/**
+ * Parse a composite live ID into its components
+ * Format: live-{userId}-{year}-{month}
+ * @param id The composite ID to parse
+ * @returns Object with userId, year, and month, or null if invalid
+ */
+export function parseLiveId(id: string): { userId: string; year: number; month: number } | null {
+  if (!id || !id.startsWith('live-')) {
+    return null;
+  }
+
+  const parts = id.replace('live-', '').split('-');
+  if (parts.length < 7) {
+    return null;
+  }
+
+  const month = parseInt(parts[parts.length - 1], 10);
+  const year = parseInt(parts[parts.length - 2], 10);
+  const userId = parts.slice(0, -2).join('-');
+
+  if (isNaN(month) || isNaN(year) || month < 1 || month > 12 || year < 2000 || year > 2100) {
+    return null;
+  }
+
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(userId)) {
+    return null;
+  }
+
+  return { userId, year, month };
+}
+
+/**
+ * Create a composite live ID from components
+ * Format: live-{userId}-{year}-{month}
+ * @param userId The user UUID
+ * @param year The year
+ * @param month The month
+ * @returns The composite ID string
+ */
+export function createLiveId(userId: string, year: number, month: number): string {
+  return `live-${userId}-${year}-${month}`;
+}
+
+/**
+ * Check if an ID is a composite live ID
+ * @param id The ID to check
+ * @returns True if the ID is a live ID, false otherwise
+ */
+export function isLiveId(id: string): boolean {
+  return id?.startsWith('live-') ?? false;
+}

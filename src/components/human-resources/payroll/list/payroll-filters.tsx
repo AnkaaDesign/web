@@ -46,18 +46,11 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
     limit: 100, // Max 100 due to API limit
   });
 
-  // Get default sector IDs (production, warehouse, leader privileges)
+  // Get default sector IDs - show all sectors by default
+  // Previously filtered to only PRODUCTION/WAREHOUSE/LEADER which was hiding users in other sectors
   const defaultSectorIds = useMemo(() => {
-    if (!sectorsData?.data) return [];
-
-    return sectorsData.data
-      .filter(sector =>
-        sector.privilege === 'PRODUCTION' ||
-        sector.privilege === 'WAREHOUSE' ||
-        sector.privilege === 'LEADER'
-      )
-      .map(sector => sector.id);
-  }, [sectorsData?.data]);
+    return []; // Empty array = show all sectors
+  }, []);
 
   const { data: positionsData } = usePositions({
     orderBy: { name: "asc" },

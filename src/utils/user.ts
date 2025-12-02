@@ -1,6 +1,5 @@
 import type { User } from "../types";
 import { USER_STATUS, SECTOR_PRIVILEGES, VERIFICATION_TYPE } from "../constants";
-import { getSectorPrivilegeLevel } from "./privilege";
 import { dateUtils } from "./date";
 import type { UserStatus, VerificationType, ShirtSize, BootSize, PantsSize, SleevesSize, MaskSize } from "@prisma/client";
 

@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { type ReactNode } from "react";
 
 /**
  * Sort direction type
@@ -216,7 +216,7 @@ export class TableSortUtils {
    * Toggle sort for a column with advanced options
    */
   static toggleColumnSort(currentSortConfigs: SortConfig[], column: string, options: ToggleSortOptions = {}): SortConfig[] {
-    const { multiSort = false, replaceExisting = false, ctrlKey = false, shiftKey = false } = options;
+    const { multiSort = false, replaceExisting = false, ctrlKey = false } = options;
 
     // Multi-sort enabled by Ctrl/Cmd key or explicit option
     const enableMultiSort = multiSort || ctrlKey;

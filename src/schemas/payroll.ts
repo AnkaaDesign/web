@@ -287,19 +287,6 @@ export const payrollWhereSchema: z.ZodType<any> = z.lazy(() =>
           }),
         ])
         .optional(),
-      bonusAmount: z
-        .union([
-          z.number(),
-          z.object({
-            equals: z.number().optional(),
-            not: z.number().optional(),
-            lt: z.number().optional(),
-            lte: z.number().optional(),
-            gt: z.number().optional(),
-            gte: z.number().optional(),
-          }),
-        ])
-        .optional(),
       remunerationAmount: z
         .union([
           z.number(),
@@ -440,7 +427,6 @@ export const payrollOrderBySchema = z.union([
       month: orderByDirectionSchema.optional(),
       userId: orderByDirectionSchema.optional(),
       performanceLevel: orderByDirectionSchema.optional(),
-      bonusAmount: orderByDirectionSchema.optional(),
       remunerationAmount: orderByDirectionSchema.optional(),
       totalEarnings: orderByDirectionSchema.optional(),
       baseRemuneration: orderByDirectionSchema.optional(),
@@ -473,7 +459,6 @@ export const payrollOrderBySchema = z.union([
         month: orderByDirectionSchema.optional(),
         userId: orderByDirectionSchema.optional(),
         performanceLevel: orderByDirectionSchema.optional(),
-        bonusAmount: orderByDirectionSchema.optional(),
         remunerationAmount: orderByDirectionSchema.optional(),
         totalEarnings: orderByDirectionSchema.optional(),
         baseRemuneration: orderByDirectionSchema.optional(),

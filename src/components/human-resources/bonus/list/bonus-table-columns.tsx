@@ -156,16 +156,33 @@ export const createBonusColumns = (): BonusColumn[] => [
     className: "w-32",
     align: "left",
   },
-  // Pondered Task Count
+  // Task Count (array length)
   {
-    key: "ponderedTaskCount",
-    header: "TAREFAS PONDERADAS",
+    key: "taskCount",
+    header: "QTD TAREFAS",
     accessor: (bonus: BonusTableRow) => {
-      const taskCount = toNumber(bonus.ponderedTaskCount);
+      const count = bonus.tasks?.length || 0;
 
       return (
         <div className="text-sm font-medium tabular-nums">
-          {taskCount.toFixed(1)}
+          {count}
+        </div>
+      );
+    },
+    sortable: false,
+    className: "w-28",
+    align: "left",
+  },
+  // Weighted Tasks (stored in database)
+  {
+    key: "weightedTasks",
+    header: "TAREFAS PONDERADAS",
+    accessor: (bonus: BonusTableRow) => {
+      const taskCount = toNumber(bonus.weightedTasks);
+
+      return (
+        <div className="text-sm font-medium tabular-nums">
+          {taskCount.toFixed(2)}
         </div>
       );
     },
@@ -173,16 +190,16 @@ export const createBonusColumns = (): BonusColumn[] => [
     className: "w-32",
     align: "left",
   },
-  // Average Tasks Per User
+  // Average Tasks Per User (stored in database)
   {
-    key: "averageTasksPerUser",
+    key: "averageTaskPerUser",
     header: "MÉDIA TAREFAS",
     accessor: (bonus: BonusTableRow) => {
-      const average = toNumber(bonus.averageTasksPerUser);
+      const average = toNumber(bonus.averageTaskPerUser);
 
       return (
         <div className="text-sm font-medium tabular-nums">
-          {average.toFixed(1)}
+          {average.toFixed(2)}
         </div>
       );
     },
@@ -193,7 +210,7 @@ export const createBonusColumns = (): BonusColumn[] => [
   // Base Bonus (formatted as currency BRL)
   {
     key: "baseBonus",
-    header: "BONIFICAÇÃO",
+    header: "BÔNUS BRUTO",
     accessor: (bonus: BonusTableRow) => {
       const bonusAmount = toNumber(bonus.baseBonus);
 
@@ -209,6 +226,32 @@ export const createBonusColumns = (): BonusColumn[] => [
       return (
         <div className="text-sm font-medium tabular-nums text-right">
           {formatCurrency(bonusAmount)}
+        </div>
+      );
+    },
+    sortable: true,
+    className: "w-40",
+    align: "right",
+  },
+  // Net Bonus (after deductions)
+  {
+    key: "netBonus",
+    header: "BÔNUS LÍQUIDO",
+    accessor: (bonus: BonusTableRow) => {
+      const netAmount = toNumber(bonus.netBonus);
+
+      // If bonus amount is 0, show as "Sem bônus"
+      if (netAmount === 0) {
+        return (
+          <div className="text-sm font-medium text-right text-muted-foreground">
+            Sem bônus
+          </div>
+        );
+      }
+
+      return (
+        <div className="text-sm font-medium tabular-nums text-right">
+          {formatCurrency(netAmount)}
         </div>
       );
     },
@@ -267,8 +310,11 @@ export const getDefaultVisibleColumns = (): Set<string> => {
     "userName",
     "position.name",
     "performanceLevel",
-    "ponderedTaskCount",
+    "taskCount",
+    "weightedTasks",
+    "averageTaskPerUser",
     "baseBonus",
+    "netBonus",
     "status"
   ]);
 };

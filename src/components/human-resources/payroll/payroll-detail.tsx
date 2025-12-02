@@ -52,6 +52,7 @@ import { routes } from "../../../constants";
 import type { Discount } from "../../../types";
 import { DiscountForm } from "./discount-form";
 import { PayrollCalculation } from "./payroll-calculation";
+import { PayrollSummaryCard } from "./payroll-summary-card";
 
 interface PayrollDetailProps {
   className?: string;
@@ -305,137 +306,103 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
         </CardContent>
       </Card>
 
-      {/* Salary Overview */}
+      {/* Comprehensive Payroll Summary */}
+      <PayrollSummaryCard payroll={payroll} />
+
+      {/* Additional Info Cards */}
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Left Column - Salary Breakdown */}
-        <div className="space-y-6">
-          {/* Base Salary */}
+        {/* Bonus Details */}
+        {payroll.bonus && (
           <Card>
             <CardHeader>
-              <div className="flex items-center gap-2">
-                <IconCurrencyReal className="h-5 w-5" />
-                <CardTitle>Remuneração Base</CardTitle>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <IconCurrencyReal className="h-5 w-5 text-green-600" />
+                  <CardTitle>Detalhes do Bônus</CardTitle>
+                </div>
+                <Badge variant="secondary">Vinculado</Badge>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">
-                {formatCurrency(Number(baseRemuneration) || 0)}
-              </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                Período: {monthNum}/{yearNum}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Bonus */}
-          {payroll.bonus && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <IconCurrencyReal className="h-5 w-5 text-green-600" />
-                    <CardTitle>Bônus</CardTitle>
-                  </div>
-                  <Badge variant="secondary">Vinculado</Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-green-600">
-                  {formatCurrency(Number(payroll.bonus?.baseBonus) || Number(bonusValue) || 0)}
-                </div>
-                <div className="mt-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Total de Tarefas:</span>
-                    <span>{payroll.taskStats?.totalTasks || payroll.bonus.taskCount || 0}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Tarefas Completas:</span>
-                    <span>{payroll.taskStats?.fullCommissionTasks || 0}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Tarefas Parciais:</span>
-                    <span>{payroll.taskStats?.partialCommissionTasks || 0}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-semibold">
-                    <span>Total Ponderado:</span>
-                    <span>
-                      {payroll.taskStats?.totalPonderado?.toFixed(1) || '0.0'}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Right Column - Summary */}
-        <div className="space-y-6">
-          {/* Summary Card */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <IconCalculator className="h-5 w-5" />
-                <CardTitle>Resumo da Folha</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span>Salário Base:</span>
-                  <span>{formatCurrency(Number(baseRemuneration) || 0)}</span>
-                </div>
-                <div className="flex justify-between text-green-600">
-                  <span>+ Bônus:</span>
-                  <span>{formatCurrency(Number(bonusValue) || 0)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between font-medium">
-                  <span>Salário Bruto:</span>
-                  <span>{formatCurrency(Number(grossSalary) || 0)}</span>
-                </div>
-                <div className="flex justify-between text-red-600">
-                  <span>- Descontos:</span>
-                  <span>{formatCurrency(Number(totalDiscounts) || 0)}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Salário Líquido:</span>
-                  <span className="text-blue-600">{formatCurrency(Number(netSalary) || 0)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Period Info */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <IconCalendar className="h-5 w-5" />
-                <CardTitle>Período</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Ano:</span>
-                  <span>{yearNum}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Mês:</span>
-                  <span>
-                    {new Date(yearNum, monthNum - 1).toLocaleDateString("pt-BR", {
-                      month: "long"
-                    })}
+                  <span className="text-sm text-muted-foreground">Valor Base:</span>
+                  <span className="font-semibold text-green-600">
+                    {formatCurrency(Number(payroll.bonus?.baseBonus) || 0)}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Referência:</span>
-                  <span>26/{monthNum - 1 || 12} à 25/{monthNum}</span>
+                <Separator />
+                <div className="flex justify-between text-sm">
+                  <span>Total de Tarefas:</span>
+                  <span>{payroll.taskStats?.totalTasks || payroll.bonus.taskCount || 0}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Tarefas Completas:</span>
+                  <span>{payroll.taskStats?.fullCommissionTasks || 0}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Tarefas Parciais:</span>
+                  <span>{payroll.taskStats?.partialCommissionTasks || 0}</span>
+                </div>
+                <div className="flex justify-between text-sm font-semibold">
+                  <span>Total Ponderado:</span>
+                  <span>
+                    {payroll.taskStats?.totalPonderado?.toFixed(1) || '0.0'}
+                  </span>
                 </div>
               </div>
             </CardContent>
           </Card>
-        </div>
+        )}
+
+        {/* Period & Working Days Info */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <IconCalendar className="h-5 w-5" />
+              <CardTitle>Período e Dias Trabalhados</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span>Ano/Mês:</span>
+                <span className="font-medium">{monthNum}/{yearNum}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Mês:</span>
+                <span className="font-medium">
+                  {new Date(yearNum, monthNum - 1).toLocaleDateString("pt-BR", {
+                    month: "long"
+                  })}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Período de Apuração:</span>
+                <span className="font-medium">26/{(monthNum - 1) || 12} à 25/{monthNum}</span>
+              </div>
+              <Separator />
+              {payroll.workingDaysInMonth && (
+                <div className="flex justify-between text-sm">
+                  <span>Dias Úteis no Mês:</span>
+                  <span className="font-medium">{payroll.workingDaysInMonth} dias</span>
+                </div>
+              )}
+              {payroll.workedDaysInMonth && (
+                <div className="flex justify-between text-sm">
+                  <span>Dias Trabalhados:</span>
+                  <span className="font-medium">{payroll.workedDaysInMonth} dias</span>
+                </div>
+              )}
+              {(payroll.absenceDays && payroll.absenceDays > 0) && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-red-600">Dias de Falta:</span>
+                  <span className="font-medium text-red-600">{payroll.absenceDays} dias</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Discounts Section */}

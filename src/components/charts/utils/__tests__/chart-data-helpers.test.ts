@@ -18,19 +18,19 @@ describe('Chart Data Helpers', () => {
     ];
 
     it('should aggregate by month', () => {
-      const result = aggregateByPeriod(sampleData, 'month', 'value');
+      const result = aggregateByPeriod(sampleData, 'month', 'date', 'value');
       expect(result).toHaveLength(2);
       expect(result[0].value).toBe(250); // Jan: 100 + 150
       expect(result[1].value).toBe(450); // Feb: 200 + 250
     });
 
     it('should aggregate by day', () => {
-      const result = aggregateByPeriod(sampleData, 'day', 'value');
+      const result = aggregateByPeriod(sampleData, 'day', 'date', 'value');
       expect(result).toHaveLength(4);
     });
 
     it('should handle empty data', () => {
-      const result = aggregateByPeriod([], 'month', 'value');
+      const result = aggregateByPeriod([], 'month', 'date', 'value');
       expect(result).toEqual([]);
     });
   });
@@ -66,7 +66,7 @@ describe('Chart Data Helpers', () => {
         { date: new Date('2024-01-03'), value: 30 },
       ];
 
-      const result = fillMissingDates(data, new Date('2024-01-01'), new Date('2024-01-03'));
+      const result = fillMissingDates(data, 'date', 0);
       expect(result).toHaveLength(3);
       expect(result[1].value).toBe(0); // Missing date filled with 0
     });
@@ -77,7 +77,7 @@ describe('Chart Data Helpers', () => {
         { date: new Date('2024-01-02'), value: 20 },
       ];
 
-      const result = fillMissingDates(data, new Date('2024-01-01'), new Date('2024-01-02'));
+      const result = fillMissingDates(data, 'date', 0);
       expect(result[0].value).toBe(10);
       expect(result[1].value).toBe(20);
     });
@@ -92,9 +92,9 @@ describe('Chart Data Helpers', () => {
       ];
 
       const result = calculateCumulativeSum(data, 'value');
-      expect(result[0].cumulative).toBe(10);
-      expect(result[1].cumulative).toBe(30);
-      expect(result[2].cumulative).toBe(60);
+      expect(result[0].cumulativeSum).toBe(10);
+      expect(result[1].cumulativeSum).toBe(30);
+      expect(result[2].cumulativeSum).toBe(60);
     });
 
     it('should handle empty data', () => {
@@ -141,7 +141,7 @@ describe('Chart Data Helpers', () => {
     ];
 
     it('should return top N items', () => {
-      const result = getTopN(data, 3, 'value');
+      const result = getTopN(data, 3, 'value', false);
       expect(result).toHaveLength(3);
       expect(result[0].name).toBe('A');
       expect(result[1].name).toBe('B');
@@ -156,7 +156,7 @@ describe('Chart Data Helpers', () => {
     });
 
     it('should handle N larger than data length', () => {
-      const result = getTopN(data, 10, 'value');
+      const result = getTopN(data, 10, 'value', false);
       expect(result).toHaveLength(5);
     });
   });

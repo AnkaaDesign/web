@@ -734,7 +734,11 @@ export function debugFormData(formData: ExternalWithdrawalFormData, label?: stri
     return;
   }
 
-  console.group(`🔍 External Withdrawal Form Data${label ? ` - ${label}` : ""}`););const totals = calculateExternalWithdrawalTotals(formData.selectedItems, formData.quantities, formData.prices, formData.type);console.groupEnd();
+  console.group(`🔍 External Withdrawal Form Data${label ? ` - ${label}` : ""}`);
+  const totals = calculateExternalWithdrawalTotals(formData.selectedItems, formData.quantities, formData.prices, formData.type);
+  console.log("Form data:", formData);
+  console.log("Calculated totals:", totals);
+  console.groupEnd();
 }
 
 /**
@@ -744,7 +748,8 @@ export function debugValidation(formData: ExternalWithdrawalFormData): Validatio
   const result = validateExternalWithdrawalForm(formData);
 
   if (process.env.NODE_ENV === "development") {
-    console.group("🔍 Form Validation Results");if (result.errors.length > 0) {
+    console.group("🔍 Form Validation Results");
+    if (result.errors.length > 0) {
       console.error("Errors:", result.errors);
     }
     if (result.warnings.length > 0) {

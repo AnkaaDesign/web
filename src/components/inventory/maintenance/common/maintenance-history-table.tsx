@@ -187,7 +187,20 @@ export function MaintenanceHistoryTable({ maintenances, className }: Maintenance
               }
 
               return (
-                <TableRow key={maintenance.id} className={cn("cursor-pointer border-b border-border", index % 2 === 1 && "bg-muted/10", "hover:bg-muted/20")} onClick={() => navigate(routes.inventory.maintenance.details(maintenance.id))}>
+                <TableRow
+                  key={maintenance.id}
+                  className={cn("cursor-pointer border-b border-border", index % 2 === 1 && "bg-muted/10", "hover:bg-muted/20")}
+                  onClick={() => navigate(routes.inventory.maintenance.details(maintenance.id))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate(routes.inventory.maintenance.details(maintenance.id));
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Ver detalhes da manutenção ${maintenance.name || maintenance.id}`}
+                >
                   <TableCell className="w-80 min-w-80 max-w-80 p-0 !border-r-0">
                     <div className="px-4 py-2">
                       <div className="font-medium truncate">{maintenance.name}</div>

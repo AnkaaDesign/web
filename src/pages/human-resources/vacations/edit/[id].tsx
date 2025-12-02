@@ -88,7 +88,7 @@ export const EditVacationPage = () => {
       <div className="flex flex-col h-full">
         {/* Fixed Header */}
         <div className="flex-shrink-0">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-3xl mx-auto px-4">
             <PageHeader
               variant="form"
               title="Editar Férias"
@@ -125,7 +125,7 @@ export const EditVacationPage = () => {
 
         {/* Scrollable Form Container */}
         <div className="flex-1 overflow-y-auto mt-6">
-          <div className="max-w-3xl mx-auto px-4 pb-6 flex flex-col h-full">
+          <div className="max-w-3xl mx-auto px-4 pb-6">
             <VacationForm
               mode="update"
               vacation={vacation.data}

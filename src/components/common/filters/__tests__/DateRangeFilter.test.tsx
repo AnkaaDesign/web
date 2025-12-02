@@ -30,8 +30,8 @@ describe('DateRangeFilter', () => {
 
     it('should display formatted date range when value is set', () => {
       const value: DateRange = {
-        from: new Date('2024-01-01'),
-        to: new Date('2024-01-31'),
+        from: new Date(2024, 0, 1), // January 1, 2024 in local time
+        to: new Date(2024, 0, 31),  // January 31, 2024 in local time
       };
       render(<DateRangeFilter value={value} onChange={mockOnChange} />);
       expect(screen.getByText(/01\/01\/2024 - 31\/01\/2024/)).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe('DateRangeFilter', () => {
 
     it('should display single date when only from is set', () => {
       const value: DateRange = {
-        from: new Date('2024-01-01'),
+        from: new Date(2024, 0, 1), // January 1, 2024 in local time
       };
       render(<DateRangeFilter value={value} onChange={mockOnChange} />);
       expect(screen.getByText('01/01/2024')).toBeInTheDocument();
@@ -177,8 +177,8 @@ describe('DateRangeFilter', () => {
   describe('Date Validation', () => {
     it('should accept valid date range where end >= start', () => {
       const value: DateRange = {
-        from: new Date('2024-01-01'),
-        to: new Date('2024-01-31'),
+        from: new Date(2024, 0, 1), // January 1, 2024 in local time
+        to: new Date(2024, 0, 31),  // January 31, 2024 in local time
       };
 
       render(<DateRangeFilter value={value} onChange={mockOnChange} />);
@@ -188,8 +188,8 @@ describe('DateRangeFilter', () => {
 
     it('should handle range where from and to are the same', () => {
       const value: DateRange = {
-        from: new Date('2024-01-01'),
-        to: new Date('2024-01-01'),
+        from: new Date(2024, 0, 1), // January 1, 2024 in local time
+        to: new Date(2024, 0, 1),   // January 1, 2024 in local time
       };
 
       render(<DateRangeFilter value={value} onChange={mockOnChange} />);

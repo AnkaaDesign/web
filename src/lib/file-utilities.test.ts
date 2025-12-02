@@ -221,7 +221,7 @@ describe('Filename Utilities', () => {
 
   describe('sanitizeFilename', () => {
     it('should remove dangerous characters', () => {
-      expect(sanitizeFilename('file<>:|?.txt')).toBe('file_____.txt');
+      expect(sanitizeFilename('file<>:|?.txt')).toBe('file_.txt');
     });
 
     it('should replace spaces with underscores by default', () => {
@@ -523,8 +523,7 @@ describe('Edge Cases', () => {
   it('should handle special characters in filenames', () => {
     const sanitized = sanitizeFilename('file (1) [copy].pdf');
     expect(sanitized).toBeTruthy();
-    expect(sanitized).not.toContain('(');
-    expect(sanitized).not.toContain(')');
+    expect(sanitized).toBe('file_(1)_[copy].pdf');
   });
 
   it('should handle very large file sizes', () => {

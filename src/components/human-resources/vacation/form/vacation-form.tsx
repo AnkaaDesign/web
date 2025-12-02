@@ -8,7 +8,7 @@ import { debounce } from "../../../../utils";
 import type { Vacation } from "../../../../types";
 import type { VacationCreateFormData, VacationUpdateFormData } from "../../../../schemas";
 import { vacationCreateSchema, vacationUpdateSchema } from "../../../../schemas";
-import { routes } from "../../../../constants";
+import { routes, VACATION_TYPE, VACATION_STATUS } from "../../../../constants";
 import { useVacationMutations } from "../../../../hooks";
 
 import { Form } from "@/components/ui/form";
@@ -66,8 +66,8 @@ export function VacationForm(props: VacationFormProps) {
     userId: "",
     startAt: new Date(),
     endAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default to 1 week later
-    type: undefined,
-    status: undefined,
+    type: VACATION_TYPE.ANNUAL,
+    status: VACATION_STATUS.PENDING,
     isCollective: false,
     ...defaultValues,
   };
@@ -254,44 +254,40 @@ export function VacationForm(props: VacationFormProps) {
   const isCollective = form.watch("isCollective");
 
   return (
-    <Card className="flex-1 flex flex-col shadow-sm border border-border h-full">
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-y-auto">
+    <Card className="shadow-sm border border-border">
+      <CardHeader>
+        <CardTitle>Informações das Férias</CardTitle>
+        <CardDescription>Preencha as informações do período de férias</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
         <Form {...form}>
-          <form id="vacation-form" onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Informações das Férias</CardTitle>
-                <CardDescription>Preencha as informações do período de férias</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <FormErrorDisplay errors={errors} />
+          <form id="vacation-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormErrorDisplay errors={errors} />
 
-                <CollectiveSwitch control={form.control} disabled={finalIsSubmitting} />
+            <CollectiveSwitch control={form.control} disabled={finalIsSubmitting} />
 
-                {!isCollective && (
-                  <div className="pt-2">
-                    <CollaboratorSelect
-                      control={form.control}
-                      disabled={finalIsSubmitting || mode === "update"}
-                      required={mode === "create" && !isCollective}
-                      initialCollaborator={mode === "update" ? (props as UpdateModeProps).vacation.user : undefined}
-                    />
-                  </div>
-                )}
+            {!isCollective && (
+              <div className="pt-2">
+                <CollaboratorSelect
+                  control={form.control}
+                  disabled={finalIsSubmitting || mode === "update"}
+                  required={mode === "create" && !isCollective}
+                  initialCollaborator={mode === "update" ? (props as UpdateModeProps).vacation.user : undefined}
+                />
+              </div>
+            )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
-                  <StartDatePicker control={form.control} disabled={finalIsSubmitting} required={mode === "create"} endDate={form.watch("endAt")} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
+              <StartDatePicker control={form.control} disabled={finalIsSubmitting} required={mode === "create"} endDate={form.watch("endAt")} />
 
-                  <EndDatePicker control={form.control} disabled={finalIsSubmitting} required={mode === "create"} startDate={form.watch("startAt")} />
-                </div>
+              <EndDatePicker control={form.control} disabled={finalIsSubmitting} required={mode === "create"} startDate={form.watch("startAt")} />
+            </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <TypeSelect control={form.control} disabled={finalIsSubmitting} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <TypeSelect control={form.control} disabled={finalIsSubmitting} />
 
-                  <StatusSelect control={form.control} disabled={finalIsSubmitting} />
-                </div>
-              </CardContent>
-            </Card>
+              <StatusSelect control={form.control} disabled={finalIsSubmitting} />
+            </div>
           </form>
         </Form>
       </CardContent>

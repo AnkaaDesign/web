@@ -217,7 +217,8 @@ export function formatBorrowNotificationMessage(borrow: Borrow & { item?: Item; 
  */
 export function scheduleReturnReminder(borrow: BorrowNotificationData, daysBefore: number = 1): void {
   // This would integrate with a backend notification service
-  // For now, we just log the intention}
+  // For now, we just log the intention
+}
 
 /**
  * Cancel scheduled notifications for a borrow
@@ -225,7 +226,8 @@ export function scheduleReturnReminder(borrow: BorrowNotificationData, daysBefor
  */
 export function cancelBorrowNotifications(borrowId: string): void {
   // This would integrate with a backend notification service
-  // For now, we just log the intention}
+  // For now, we just log the intention
+}
 
 /**
  * Batch process overdue notifications

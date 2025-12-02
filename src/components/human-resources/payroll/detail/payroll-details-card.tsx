@@ -84,8 +84,8 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
         user.position?.bonifiable === true;
 
       if (isEligible) {
-        // Use actual bonus data from API
-        const bonusValue = user.bonusAmount || user.calculatedBonus || user.bonus?.baseBonus || 0;
+        // Use actual bonus data from API (bonus relation is the source of truth)
+        const bonusValue = user.bonus?.baseBonus || user.calculatedBonus || 0;
         totalBonus += bonusValue;
         bonusEligibleCount++;
       }

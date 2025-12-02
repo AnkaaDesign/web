@@ -12,6 +12,7 @@ import { usePageTracker } from "@/hooks/use-page-tracker";
 import { formatCurrency } from "../../../utils";
 import { formatCPF, formatPIS } from "../../../utils/formatters";
 import { cn } from "@/lib/utils";
+import { generatePayrollPDF } from "@/utils/payroll-pdf-generator";
 import {
   IconReceipt,
   IconAlertCircle,
@@ -193,6 +194,13 @@ export default function PayrollDetailPage() {
       return {
         baseRemuneration: 0,
         bonusAmount: 0,
+        overtime50Amount: 0,
+        overtime50Hours: 0,
+        overtime100Amount: 0,
+        overtime100Hours: 0,
+        nightDifferentialAmount: 0,
+        nightHours: 0,
+        dsrAmount: 0,
         totalGross: 0,
         totalDiscounts: 0,
         totalNet: 0,
@@ -205,7 +213,18 @@ export default function PayrollDetailPage() {
       0;
 
     const bonusAmount = payroll.bonus ? getNumericValue(payroll.bonus.baseBonus) : 0;
-    const totalGross = baseRemuneration + bonusAmount;
+
+    // Get Secullum data - overtime and DSR
+    const overtime50Amount = getNumericValue(payroll.overtime50Amount);
+    const overtime50Hours = getNumericValue(payroll.overtime50Hours);
+    const overtime100Amount = getNumericValue(payroll.overtime100Amount);
+    const overtime100Hours = getNumericValue(payroll.overtime100Hours);
+    const nightDifferentialAmount = getNumericValue(payroll.nightDifferentialAmount);
+    const nightHours = getNumericValue(payroll.nightHours);
+    const dsrAmount = getNumericValue(payroll.dsrAmount);
+
+    // Total gross includes ALL earnings
+    const totalGross = baseRemuneration + bonusAmount + overtime50Amount + overtime100Amount + nightDifferentialAmount + dsrAmount;
 
     // Calculate discounts
     let totalDiscounts = 0;
@@ -243,6 +262,13 @@ export default function PayrollDetailPage() {
     return {
       baseRemuneration,
       bonusAmount,
+      overtime50Amount,
+      overtime50Hours,
+      overtime100Amount,
+      overtime100Hours,
+      nightDifferentialAmount,
+      nightHours,
+      dsrAmount,
       totalGross,
       totalDiscounts: totalDiscounts + bonusDiscounts,
       totalNet,
@@ -317,7 +343,80 @@ export default function PayrollDetailPage() {
   };
 
   const handleExport = () => {
-    window.print();
+    if (!payroll) return;
+
+    // Collect other discounts
+    const otherDiscounts = payroll.discounts
+      ?.filter((d: any) =>
+        !['INSS', 'IRRF', 'FGTS'].some(type => d.description?.toUpperCase().includes(type))
+      )
+      .map((d: any) => ({
+        description: d.description || 'Desconto',
+        amount: getNumericValue(d.amount)
+      })) || [];
+
+    // Get INSS and IRRF discounts
+    const inssDiscount = payroll.discounts?.find((d: any) =>
+      d.description?.toUpperCase().includes('INSS')
+    );
+    const irrfDiscount = payroll.discounts?.find((d: any) =>
+      d.description?.toUpperCase().includes('IRRF')
+    );
+
+    // Generate PDF with proper data structure
+    generatePayrollPDF({
+      // Employee info
+      employeeName: payroll.user?.name || 'N/A',
+      employeeCPF: payroll.user?.cpf,
+      employeePIS: payroll.user?.pis,
+      employeePayrollNumber: payroll.user?.payrollNumber,
+      position: payroll.position?.name || payroll.user?.position?.name,
+      sector: payroll.user?.sector?.name,
+
+      // Period
+      month: payroll.month,
+      year: payroll.year,
+
+      // Earnings
+      baseRemuneration: calculations.baseRemuneration,
+      overtime50Hours: calculations.overtime50Hours,
+      overtime50Amount: calculations.overtime50Amount,
+      overtime100Hours: calculations.overtime100Hours,
+      overtime100Amount: calculations.overtime100Amount,
+      nightHours: calculations.nightHours,
+      nightDifferentialAmount: calculations.nightDifferentialAmount,
+      dsrAmount: calculations.dsrAmount,
+      bonusAmount: calculations.bonusAmount,
+
+      // Deductions
+      inssBase: getNumericValue(payroll.inssBase),
+      inssAmount: inssDiscount ? getNumericValue(inssDiscount.amount) : getNumericValue(payroll.inssAmount),
+      irrfBase: getNumericValue(payroll.irrfBase),
+      irrfAmount: irrfDiscount ? getNumericValue(irrfDiscount.amount) : getNumericValue(payroll.irrfAmount),
+      fgtsAmount: getNumericValue(payroll.fgtsAmount),
+      absenceHours: getNumericValue(payroll.absenceHours),
+      absenceAmount: getNumericValue(payroll.absenceAmount),
+      lateArrivalMinutes: getNumericValue(payroll.lateArrivalMinutes),
+      lateArrivalAmount: getNumericValue(payroll.lateArrivalAmount),
+      otherDiscounts: otherDiscounts,
+
+      // Totals
+      grossSalary: calculations.totalGross,
+      totalDiscounts: calculations.totalDiscounts,
+      netSalary: calculations.totalNet,
+
+      // Company info (you can customize these)
+      companyName: 'ANKAA SISTEMAS',
+      companyCNPJ: '00.000.000/0000-00', // Replace with actual CNPJ
+      companyAddress: 'Endereço da Empresa', // Replace with actual address
+    });
+  };
+
+  // Helper function to convert decimal hours to HH:MM format
+  const formatHoursToHHMM = (decimalHours: number): string => {
+    const hours = Math.floor(decimalHours);
+    const minutes = Math.round((decimalHours - hours) * 60);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
   const hasPayrollDiscounts = payroll.discounts && payroll.discounts.length > 0;
@@ -347,8 +446,8 @@ export default function PayrollDetailPage() {
           ]}
         />
 
-        {/* Info Cards - 2 columns */}
-        <div className="grid gap-6 md:grid-cols-2">
+        {/* Info Cards - 1/3 and 2/3 columns */}
+        <div className="grid gap-6 md:grid-cols-3">
           {/* General Info Card */}
           <Card>
             <CardHeader className="pb-4">
@@ -376,67 +475,146 @@ export default function PayrollDetailPage() {
           </Card>
 
           {/* Financial Card */}
-          <Card>
+          <Card className="md:col-span-2">
             <CardHeader className="pb-4">
               <CardTitle className="text-base flex items-center gap-2">
                 <IconCurrencyReal className="h-4 w-4" />
                 Valores
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between py-1">
-                <span className="text-sm text-muted-foreground">Remuneração Base</span>
-                <span className="text-sm font-medium">{formatAmount(calculations.baseRemuneration)}</span>
-              </div>
+            <CardContent className="overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 px-0 font-medium">Descrição</th>
+                    <th className="text-left py-2 px-0 font-medium w-24">Ref.</th>
+                    <th className="text-right py-2 px-0 font-medium w-32">Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Base Remuneration */}
+                  <tr className="border-b border-border/50">
+                    <td className="py-2 px-0">Salário Base</td>
+                    <td className="py-2 px-0 text-left text-muted-foreground text-xs">-</td>
+                    <td className="py-2 px-0 text-right font-semibold">{formatAmount(calculations.baseRemuneration)}</td>
+                  </tr>
 
-              {isBonifiable && calculations.bonusAmount > 0 && (
-                <>
-                  <Separator className="my-2" />
-                  <div className="flex justify-between py-1">
-                    <span className="text-sm text-muted-foreground">Bônus</span>
-                    <span className="text-sm font-medium">{formatAmount(calculations.bonusAmount)}</span>
-                  </div>
-                  {hasBonusDiscounts && payroll.bonus.bonusDiscounts.map((discount: any) => (
-                    <div key={discount.id} className="flex justify-between py-1">
-                      <span className="text-sm text-muted-foreground">Desconto: {discount.reference}</span>
-                      <span className="text-sm font-medium text-destructive">-{discount.percentage}%</span>
-                    </div>
-                  ))}
-                </>
-              )}
+                  {/* Overtime 50% */}
+                  {calculations.overtime50Amount > 0 && (
+                    <tr className="border-b border-border/50">
+                      <td className="py-2 px-0">Horas Extras 50%</td>
+                      <td className="py-2 px-0 text-left text-muted-foreground text-xs">{formatHoursToHHMM(calculations.overtime50Hours)}</td>
+                      <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.overtime50Amount)}</td>
+                    </tr>
+                  )}
 
-              {hasPayrollDiscounts && (
-                <>
-                  <Separator className="my-2" />
-                  {payroll.discounts.map((discount: any) => {
-                    const discountValue = getNumericValue(discount.value) ||
-                      getNumericValue(discount.fixedValue) ||
-                      (calculations.totalGross * (getNumericValue(discount.percentage) / 100));
-                    return (
-                      <div key={discount.id} className="flex justify-between py-1">
-                        <span className="text-sm text-muted-foreground">{discount.reference || "Desconto"}</span>
-                        <span className="text-sm font-medium text-destructive">-{formatAmount(discountValue)}</span>
-                      </div>
-                    );
-                  })}
-                </>
-              )}
+                  {/* Overtime 100% */}
+                  {calculations.overtime100Amount > 0 && (
+                    <tr className="border-b border-border/50">
+                      <td className="py-2 px-0">Horas Extras 100%</td>
+                      <td className="py-2 px-0 text-left text-muted-foreground text-xs">{formatHoursToHHMM(calculations.overtime100Hours)}</td>
+                      <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.overtime100Amount)}</td>
+                    </tr>
+                  )}
 
-              <Separator className="my-2" />
-              <div className="flex justify-between py-1">
-                <span className="text-sm text-muted-foreground">Total Bruto</span>
-                <span className="text-sm font-medium">{formatAmount(calculations.totalGross)}</span>
-              </div>
-              {calculations.totalDiscounts > 0 && (
-                <div className="flex justify-between py-1">
-                  <span className="text-sm text-muted-foreground">Total Descontos</span>
-                  <span className="text-sm font-medium text-destructive">-{formatAmount(calculations.totalDiscounts)}</span>
-                </div>
-              )}
-              <div className="flex justify-between py-2 bg-green-50 dark:bg-green-950/20 rounded-lg px-3 mt-2">
-                <span className="text-sm font-medium text-muted-foreground">Total Líquido</span>
-                <span className="text-lg font-bold text-green-600">{formatAmount(calculations.totalNet)}</span>
-              </div>
+                  {/* Night Differential */}
+                  {calculations.nightDifferentialAmount > 0 && (
+                    <tr className="border-b border-border/50">
+                      <td className="py-2 px-0">Adicional Noturno</td>
+                      <td className="py-2 px-0 text-left text-muted-foreground text-xs">{formatHoursToHHMM(calculations.nightHours)}</td>
+                      <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.nightDifferentialAmount)}</td>
+                    </tr>
+                  )}
+
+                  {/* DSR */}
+                  {calculations.dsrAmount > 0 && (
+                    <tr className="border-b border-border/50">
+                      <td className="py-2 px-0">DSR Reflexo</td>
+                      <td className="py-2 px-0 text-left text-muted-foreground text-xs">{payroll.dsrDays || '-'}</td>
+                      <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.dsrAmount)}</td>
+                    </tr>
+                  )}
+
+                  {/* Bonus */}
+                  {isBonifiable && calculations.bonusAmount > 0 && (
+                    <tr className="border-b border-border/50">
+                      <td className="py-2 px-0">Bônus</td>
+                      <td className="py-2 px-0 text-left text-muted-foreground text-xs">-</td>
+                      <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.bonusAmount)}</td>
+                    </tr>
+                  )}
+
+                  {/* Discounts */}
+                  {hasPayrollDiscounts && payroll.discounts
+                    .filter((discount: any) => {
+                      // Filter out FGTS since we show it separately
+                      const desc = discount.description?.toUpperCase() || "";
+                      return !desc.includes("FGTS");
+                    })
+                    .map((discount: any, index: number) => {
+                      const discountValue = getNumericValue(discount.amount) ||
+                        getNumericValue(discount.value) ||
+                        getNumericValue(discount.fixedValue) ||
+                        (calculations.totalGross * (getNumericValue(discount.percentage) / 100));
+
+                      // Use reference for display (clean names like "I.N.S.S.")
+                      const displayDescription = discount.reference || discount.description || "Desconto";
+
+                      // Calculate percentage for reference column
+                      let referenceText = "-";
+                      const desc = discount.description?.toUpperCase() || "";
+
+                      if (desc.includes("INSS") && payroll.inssBase) {
+                        const inssBase = getNumericValue(payroll.inssBase);
+                        if (inssBase > 0) {
+                          const percentage = (discountValue / inssBase) * 100;
+                          referenceText = `${percentage.toFixed(2)}%`;
+                        }
+                      } else if (desc.includes("IRRF") && payroll.irrfBase) {
+                        const irrfBase = getNumericValue(payroll.irrfBase);
+                        if (irrfBase > 0 && discountValue > 0) {
+                          const percentage = (discountValue / irrfBase) * 100;
+                          referenceText = `${percentage.toFixed(2)}%`;
+                        }
+                      } else if (discount.percentage) {
+                        referenceText = `${getNumericValue(discount.percentage).toFixed(2)}%`;
+                      }
+
+                      return (
+                        <tr key={discount.id || index} className="border-b border-border/50">
+                          <td className="py-2 px-0">{displayDescription}</td>
+                          <td className="py-2 px-0 text-left text-muted-foreground text-xs">{referenceText}</td>
+                          <td className="py-2 px-0 text-right font-semibold text-destructive">-{formatAmount(discountValue)}</td>
+                        </tr>
+                      );
+                    })}
+
+                  {/* FGTS Info */}
+                  {getNumericValue(payroll.fgtsAmount) > 0 && (
+                    <tr className="border-b border-border/50 bg-muted/20">
+                      <td className="py-2 px-0 italic">FGTS (Empregador)</td>
+                      <td className="py-2 px-0 text-left text-muted-foreground text-xs">8%</td>
+                      <td className="py-2 px-0 text-right font-semibold">{formatAmount(getNumericValue(payroll.fgtsAmount))}</td>
+                    </tr>
+                  )}
+
+                  {/* Totals */}
+                  <tr className="border-t-2 border-border">
+                    <td className="py-2 px-0 font-semibold" colSpan={2}>Total Bruto</td>
+                    <td className="py-2 px-0 text-right font-bold">{formatAmount(calculations.totalGross)}</td>
+                  </tr>
+                  {calculations.totalDiscounts > 0 && (
+                    <tr className="border-b">
+                      <td className="py-2 px-0 font-semibold" colSpan={2}>Total Descontos</td>
+                      <td className="py-2 px-0 text-right font-bold text-destructive">-{formatAmount(calculations.totalDiscounts)}</td>
+                    </tr>
+                  )}
+                  <tr className="bg-primary text-primary-foreground">
+                    <td className="py-3 -ml-6 pl-3 font-bold" colSpan={2}>Total Líquido</td>
+                    <td className="py-3 -mr-6 pr-3 text-right font-bold text-lg">{formatAmount(calculations.totalNet)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </CardContent>
           </Card>
         </div>

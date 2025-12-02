@@ -209,7 +209,8 @@ export function CustomerFormProvider({ children, initialValues, onSubmit, mode, 
           clearErrors();
 
           try {
-            // Validate and submitawait onSubmit(values);
+            // Validate and submit
+            await onSubmit(values);
           } catch (error) {
             console.error("Form submission error:", error);
           } finally {

@@ -209,6 +209,15 @@ export function ItemsNeededTable({ itemsConfig, visibleColumns, className, filte
                   key={item.id}
                   className={cn("cursor-pointer transition-colors border-b border-border", index % 2 === 1 && "bg-muted/10", "hover:bg-muted/20")}
                   onClick={() => navigate(routes.inventory.products.details(item.id))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate(routes.inventory.products.details(item.id));
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Ver detalhes do item ${item.name || item.id}`}
                 >
                   {columns.map((column) => (
                     <TableCell key={column.key} className={cn(column.className, "p-0 !border-r-0")}>

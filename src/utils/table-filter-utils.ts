@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { type ReactNode } from "react";
 
 /**
  * Filter data types
@@ -169,7 +169,7 @@ export function defaultGetLabel(key: string): string {
 /**
  * Default value formatter
  */
-export function defaultGetDisplayValue(key: string, value: any): string {
+export function defaultGetDisplayValue(_key: string, value: any): string {
   // Handle null/undefined
   if (value === null || value === undefined) {
     return "Vazio";
