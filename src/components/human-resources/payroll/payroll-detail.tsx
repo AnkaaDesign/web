@@ -43,7 +43,7 @@ import {
 } from "@tabler/icons-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import {
-  usePayrollDetailsWithBonus,
+  usePayrollByUserAndPeriod,
   usePayrollDiscountMutations,
   usePayrollMutations,
 } from "../../../hooks";
@@ -81,7 +81,7 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
     isLoading,
     error,
     refetch
-  } = usePayrollDetailsWithBonus(userId!, yearNum, monthNum);
+  } = usePayrollByUserAndPeriod(userId!, yearNum, monthNum);
 
   const payroll = payrollResponse;
 

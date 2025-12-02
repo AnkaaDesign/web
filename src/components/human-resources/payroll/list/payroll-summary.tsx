@@ -140,8 +140,8 @@ export function PayrollSummary({ users }: PayrollSummaryProps) {
   // Get month labels for display
   const monthLabels = [...new Set(users.map(u => u.monthLabel).filter(Boolean))];
 
-  // State for minimize/expand
-  const [isMinimized, setIsMinimized] = useState(false);
+  // State for minimize/expand - minimized by default
+  const [isMinimized, setIsMinimized] = useState(true);
 
   return (
     <div className="relative">

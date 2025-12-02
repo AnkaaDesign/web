@@ -257,14 +257,10 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
                   disabled={!localFilters.year}
                   searchable={true}
                   clearable={false}
+                  hideDefaultBadges={true}
                 />
               </div>
             </div>
-            {localFilters.months && localFilters.months.length > 0 && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {localFilters.months.length} mês{localFilters.months.length !== 1 ? "es" : ""} selecionado{localFilters.months.length !== 1 ? "s" : ""}
-              </p>
-            )}
           </div>
 
           {/* Sector Filter Section */}

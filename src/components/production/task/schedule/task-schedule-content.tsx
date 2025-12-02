@@ -218,25 +218,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
             <div className="text-center text-muted-foreground py-8">Nenhuma tarefa encontrada com os critérios de busca</div>
           ) : (
             <div className="space-y-6">
-              {/* Undefined sector first if it has tasks */}
-              {(() => {
-                const undefinedTasks = tasksBySector.get("undefined");
-                return undefinedTasks && undefinedTasks.length > 0 ? (
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3 text-muted-foreground">Setor Indefinido</h3>
-                    <TaskScheduleTable
-                      tasks={undefinedTasks}
-                      visibleColumns={visibleColumns}
-                      selectedTaskIds={selectedTaskIds}
-                      onSelectedTaskIdsChange={handleSelectedTaskIdsChange}
-                      advancedActionsRef={advancedActionsRef}
-                      allSelectedTasks={selectedTasks}
-                    />
-                  </div>
-                ) : null;
-              })()}
-
-              {/* Production sectors */}
+              {/* Production sectors first */}
               {productionSectors.map((sector) => {
                 const tasks = tasksBySector.get(sector.id) || [];
                 if (tasks.length === 0) return null;
@@ -255,6 +237,24 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                   </div>
                 );
               })}
+
+              {/* Undefined sector last if it has tasks */}
+              {(() => {
+                const undefinedTasks = tasksBySector.get("undefined");
+                return undefinedTasks && undefinedTasks.length > 0 ? (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3 text-muted-foreground">Setor Indefinido</h3>
+                    <TaskScheduleTable
+                      tasks={undefinedTasks}
+                      visibleColumns={visibleColumns}
+                      selectedTaskIds={selectedTaskIds}
+                      onSelectedTaskIdsChange={handleSelectedTaskIdsChange}
+                      advancedActionsRef={advancedActionsRef}
+                      allSelectedTasks={selectedTasks}
+                    />
+                  </div>
+                ) : null;
+              })()}
             </div>
           )}
         </div>

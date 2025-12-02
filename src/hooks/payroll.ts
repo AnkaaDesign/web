@@ -1,7 +1,10 @@
+// packages/hooks/src/payroll.ts
+
 import { createEntityHooks } from "./createEntityHooks";
 import { payrollService } from "../api-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { payrollKeys, bonusKeys } from "./queryKeys";
 import type {
   PayrollGetManyParams,
   PayrollGetManyResponse,
@@ -18,22 +21,10 @@ import type {
   DiscountUpdateFormData,
 } from "../schemas";
 
-// Query Keys
-export const payrollQueryKeys = {
-  all: ["payroll"] as const,
-  lists: () => [...payrollQueryKeys.all, "list"] as const,
-  list: (filters?: PayrollGetManyParams) => [...payrollQueryKeys.lists(), filters] as const,
-  details: () => [...payrollQueryKeys.all, "details"] as const,
-  detail: (id: string, include?: any) => [...payrollQueryKeys.all, "detail", id, include] as const,
-  byIds: (ids: string[]) => [...payrollQueryKeys.all, "byIds", ids] as const,
-  userPeriod: (userId: string, year: number, month: number) =>
-    [...payrollQueryKeys.all, "userPeriod", userId, year, month] as const,
-  current: () => [...payrollQueryKeys.all, "current"] as const,
-  live: (userId: string, year: number, month: number) =>
-    [...payrollQueryKeys.all, "live", userId, year, month] as const,
-} as const;
+// =====================================================
+// Payroll Service Adapter
+// =====================================================
 
-// Service Adapter for Entity Factory
 const payrollServiceAdapter = {
   getMany: (params?: PayrollGetManyParams) =>
     payrollService.getMany(params).then(response => response.data),
@@ -53,7 +44,10 @@ const payrollServiceAdapter = {
     payrollService.batchDelete(data).then(() => undefined),
 };
 
-// Base Payroll Hooks using Entity Factory
+// =====================================================
+// Base Payroll Hooks
+// =====================================================
+
 const baseHooks = createEntityHooks<
   PayrollGetManyParams,
   PayrollGetManyResponse,
@@ -70,118 +64,114 @@ const baseHooks = createEntityHooks<
   PayrollBatchDeleteFormData,
   void
 >({
-  queryKeys: payrollQueryKeys,
+  queryKeys: payrollKeys,
   service: payrollServiceAdapter,
-  staleTime: 1000 * 60 * 5,
-  relatedQueryKeys: [],
+  staleTime: 1000 * 60 * 5, // 5 minutes
+  relatedQueryKeys: [bonusKeys],
 });
 
-// Export base hooks
+// Export base hooks with standard names (matching useUser.ts pattern)
 export const usePayrollsInfinite = baseHooks.useInfiniteList;
 export const usePayrolls = baseHooks.useList;
-export const usePayrollEntity = baseHooks.useDetail;
+export const usePayroll = baseHooks.useDetail;
 export const usePayrollMutations = baseHooks.useMutations;
 export const usePayrollBatchMutations = baseHooks.useBatchMutations;
 
-/**
- * Hook to get payroll by user and period
- */
-export const usePayrollByUserPeriod = (userId: string, year: number, month: number, params?: PayrollGetByIdParams) => {
-  return useQuery({
-    queryKey: payrollQueryKeys.userPeriod(userId, year, month),
-    queryFn: () => payrollService.getByUserAndMonth(userId, year, month, params).then(response => response.data),
-    staleTime: 5 * 60 * 1000,
-    enabled: !!userId && !!year && !!month,
-  });
-};
+// =====================================================
+// Specialized Payroll Hooks
+// =====================================================
 
 /**
- * Hook to get current month payroll data
+ * Hook to get payroll for a specific user and period.
+ *
+ * The API automatically returns:
+ * - Saved payroll data if it exists in the database
+ * - Live-calculated payroll if it's the current period and no saved data exists
+ *
+ * @param userId - The user ID
+ * @param year - The year (e.g., 2025)
+ * @param month - The month (1-12)
+ * @param options - Optional configuration
  */
-export const useCurrentMonthPayroll = (params?: PayrollGetManyParams) => {
-  return useQuery({
-    queryKey: payrollQueryKeys.current(),
-    queryFn: () => payrollService.getCurrentMonth(params).then(response => response.data),
-    staleTime: 5 * 60 * 1000,
-  });
-};
-
-/**
- * Hook to get live payroll calculation for a user
- */
-export const usePayrollLiveCalculation = (
+export const usePayrollByUserAndPeriod = (
   userId: string,
   year: number,
   month: number,
   options?: {
     enabled?: boolean;
-    refetchInterval?: number;
+    include?: PayrollGetByIdParams['include'];
   }
 ) => {
+  const defaultInclude = {
+    user: {
+      include: {
+        position: true,
+        sector: true,
+      },
+    },
+    bonus: {
+      include: {
+        tasks: true,
+        bonusDiscounts: true,
+      },
+    },
+    discounts: true,
+    position: true,
+  };
+
   return useQuery({
-    queryKey: payrollQueryKeys.live(userId, year, month),
-    queryFn: () => payrollService.getLiveCalculation(userId, year, month).then(response => response.data),
-    staleTime: 30 * 1000,
-    refetchInterval: options?.refetchInterval ?? 60 * 1000,
+    queryKey: payrollKeys.byUserAndPeriod(userId, year, month, options?.include ?? defaultInclude),
+    queryFn: async () => {
+      const response = await payrollService.getByUserAndMonth(userId, year, month, {
+        include: options?.include ?? defaultInclude,
+      });
+      // The API returns { success, message, data } - extract the data
+      return response.data?.data ?? response.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
     enabled: (options?.enabled ?? true) && !!userId && !!year && !!month,
   });
 };
 
 /**
- * Hook to get payroll details with bonuses for a specific user
+ * Hook to get payrolls for a specific period (all users).
+ *
+ * @param year - The year (e.g., 2025)
+ * @param month - The month (1-12)
+ * @param options - Optional configuration
  */
-export const usePayrollDetailsWithBonus = (userId: string, year: number, month: number) => {
+export const usePayrollsByPeriod = (
+  year: number,
+  month: number,
+  options?: {
+    enabled?: boolean;
+    userId?: string;
+    sectorId?: string;
+  }
+) => {
   return useQuery({
-    queryKey: payrollQueryKeys.userPeriod(userId, year, month),
+    queryKey: payrollKeys.byPeriod(year, month, { userId: options?.userId }),
     queryFn: async () => {
-      try {
-        const response = await payrollService.getByUserAndMonth(userId, year, month, {
-          include: {
-            user: {
-              include: {
-                position: true,
-                sector: true,
-              },
-            },
-            bonus: {
-              include: {
-                tasks: true,
-                users: true,
-              },
-            },
-            discounts: true,
-          },
-        });
-
-        if (response.data) {
-          return response.data;
+      const response = await payrollService.getMany({
+        where: { year, month, userId: options?.userId },
+        include: {
+          user: { include: { position: true, sector: true } },
+          bonus: true,
+          discounts: { orderBy: { calculationOrder: "asc" } }
         }
-      } catch (error: any) {
-        if (error?.response?.status === 404) {
-          try {
-            const liveResponse = await payrollService.getLiveCalculation(userId, year, month);
-            if (liveResponse.data) {
-              return liveResponse.data.payroll || liveResponse.data;
-            }
-          } catch (liveError) {
-            throw liveError;
-          }
-        } else {
-          throw error;
-        }
-      }
-
-      throw new Error('No payroll data found for the specified period');
+      });
+      return response.data;
     },
-    staleTime: 5 * 60 * 1000,
-    enabled: !!userId && !!year && !!month,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: (options?.enabled ?? true) && !!year && !!month,
   });
 };
 
 /**
- * Hook to simulate bonus calculations with given parameters
+ * Hook to simulate bonus calculations with given parameters.
+ * Used for "what-if" scenarios before finalizing bonuses.
  */
-export const useBonusSimulation = (params: {
+export const usePayrollBonusSimulation = (params: {
   year: number;
   month: number;
   taskQuantity?: number;
@@ -189,15 +179,87 @@ export const useBonusSimulation = (params: {
   excludeUserIds?: string[];
 }) => {
   return useQuery({
-    queryKey: ['payroll', 'bonuses', 'simulate', params],
+    queryKey: payrollKeys.simulation(params),
     queryFn: async () => {
       const response = await payrollService.simulateBonuses(params);
       return response.data;
     },
-    staleTime: 30 * 1000,
+    staleTime: 30 * 1000, // 30 seconds - simulation data can change
     enabled: !!params.year && !!params.month && params.year > 0 && params.month > 0,
   });
 };
+
+/**
+ * Hook to get payroll comparison between two periods.
+ */
+export const usePayrollComparison = (
+  currentYear: number,
+  currentMonth: number,
+  options?: {
+    enabled?: boolean;
+    compareWithPrevious?: boolean;
+  }
+) => {
+  const compareWithPrevious = options?.compareWithPrevious ?? true;
+
+  const compareYear = compareWithPrevious
+    ? (currentMonth === 1 ? currentYear - 1 : currentYear)
+    : currentYear - 1;
+
+  const compareMonth = compareWithPrevious
+    ? (currentMonth === 1 ? 12 : currentMonth - 1)
+    : currentMonth;
+
+  const currentQuery = usePayrollsByPeriod(currentYear, currentMonth, { enabled: options?.enabled });
+  const compareQuery = usePayrollsByPeriod(compareYear, compareMonth, { enabled: options?.enabled });
+
+  return useQuery({
+    queryKey: payrollKeys.comparison(currentYear, currentMonth),
+    queryFn: async () => {
+      const currentData = currentQuery.data;
+      const compareData = compareQuery.data;
+
+      if (!currentData || !compareData) {
+        throw new Error('Dados de comparação não disponíveis');
+      }
+
+      const currentTotal = currentData.data?.reduce((sum: number, p: any) =>
+        sum + (p.baseRemuneration || 0) + (p.bonus?.baseBonus || 0), 0
+      ) || 0;
+
+      const compareTotal = compareData.data?.reduce((sum: number, p: any) =>
+        sum + (p.baseRemuneration || 0) + (p.bonus?.baseBonus || 0), 0
+      ) || 0;
+
+      const difference = currentTotal - compareTotal;
+      const percentageChange = compareTotal > 0
+        ? ((difference / compareTotal) * 100)
+        : 0;
+
+      return {
+        current: {
+          period: `${currentMonth}/${currentYear}`,
+          total: currentTotal,
+          count: currentData.data?.length || 0,
+        },
+        compare: {
+          period: `${compareMonth}/${compareYear}`,
+          total: compareTotal,
+          count: compareData.data?.length || 0,
+        },
+        difference,
+        percentageChange: Math.round(percentageChange * 100) / 100,
+        isIncrease: difference > 0,
+      };
+    },
+    staleTime: 1000 * 60 * 5,
+    enabled: (options?.enabled ?? true) && !!currentQuery.data && !!compareQuery.data,
+  });
+};
+
+// =====================================================
+// Payroll Mutations
+// =====================================================
 
 /**
  * Hook for finalizing payroll for a month
@@ -209,8 +271,8 @@ export const useFinalizePayrollMonth = () => {
     mutationFn: ({ year, month }: { year: number; month: number }) =>
       payrollService.finalizeMonth(year, month).then(response => response.data),
     onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: payrollQueryKeys.all });
-      const previousPayrolls = queryClient.getQueryData(payrollQueryKeys.list());
+      await queryClient.cancelQueries({ queryKey: payrollKeys.all });
+      const previousPayrolls = queryClient.getQueryData(payrollKeys.list());
       const monthName = new Date(variables.year, variables.month - 1).toLocaleDateString('pt-BR', { month: 'long' });
       toast.loading(`Finalizando folha de pagamento de ${monthName}...`, {
         id: `finalize-${variables.year}-${variables.month}`
@@ -218,14 +280,14 @@ export const useFinalizePayrollMonth = () => {
       return { previousPayrolls };
     },
     onSuccess: (_result, variables) => {
-      queryClient.invalidateQueries({ queryKey: payrollQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
       toast.dismiss(`finalize-${variables.year}-${variables.month}`);
       const monthName = new Date(variables.year, variables.month - 1).toLocaleDateString('pt-BR', { month: 'long' });
       toast.success(`Folha de pagamento de ${monthName} finalizada com sucesso!`);
     },
     onError: (error: any, variables, context) => {
       if (context?.previousPayrolls) {
-        queryClient.setQueryData(payrollQueryKeys.list(), context.previousPayrolls);
+        queryClient.setQueryData(payrollKeys.list(), context.previousPayrolls);
       }
       toast.dismiss(`finalize-${variables.year}-${variables.month}`);
       const message = error?.response?.data?.message ?? 'Erro ao finalizar folha de pagamento';
@@ -235,16 +297,16 @@ export const useFinalizePayrollMonth = () => {
 };
 
 /**
- * Hook for batch creating payrolls for a period
+ * Hook for generating monthly payrolls
  */
-export const useBatchCreatePayroll = () => {
+export const useGenerateMonthlyPayrolls = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ year, month }: { year: number; month: number }) =>
-      payrollService.batchCreateForPeriod(year, month).then(response => response.data),
+      payrollService.generateMonthlyPayrolls(year, month).then(response => response.data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: payrollQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
     },
   });
 };
@@ -261,7 +323,7 @@ export const usePayrollDiscountMutations = () => {
       discount: DiscountCreateFormData
     }) => payrollService.addDiscount(payrollId, discount).then(response => response.data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: payrollQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
     },
   });
 
@@ -269,7 +331,7 @@ export const usePayrollDiscountMutations = () => {
     mutationFn: ({ payrollId, discountId }: { payrollId: string; discountId: string }) =>
       payrollService.removeDiscount(payrollId, discountId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: payrollQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
     },
   });
 
@@ -280,7 +342,7 @@ export const usePayrollDiscountMutations = () => {
       discount: DiscountUpdateFormData
     }) => payrollService.updateDiscount(payrollId, discountId, discount).then(response => response.data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: payrollQueryKeys.all });
+      queryClient.invalidateQueries({ queryKey: payrollKeys.all });
     },
   });
 
@@ -296,10 +358,22 @@ export const usePayrollDiscountMutations = () => {
   };
 };
 
-export const payrollHooks = {
-  useInfiniteList: usePayrollsInfinite,
-  useList: usePayrolls,
-  useDetail: usePayrollEntity,
-  useMutations: usePayrollMutations,
-  useBatchMutations: usePayrollBatchMutations,
-};
+// =====================================================
+// Export Type for Comparison
+// =====================================================
+
+export interface PayrollComparison {
+  current: {
+    period: string;
+    total: number;
+    count: number;
+  };
+  compare: {
+    period: string;
+    total: number;
+    count: number;
+  };
+  difference: number;
+  percentageChange: number;
+  isIncrease: boolean;
+}

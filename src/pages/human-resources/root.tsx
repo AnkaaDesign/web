@@ -400,7 +400,7 @@ export const HumanResourcesRootPage = () => {
                 <QuickAccessCard
                   title="Setores"
                   icon={IconHome}
-                  onClick={() => navigate(routes.humanResources.sectors.root)}
+                  onClick={() => navigate(routes.administration.sectors.root)}
                   count={data?.sectorMetrics?.totalSectors}
                   color="teal"
                 />

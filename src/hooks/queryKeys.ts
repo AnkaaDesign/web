@@ -766,6 +766,39 @@ export const vacationKeys = {
 };
 
 // =====================================================
+// Payroll Query Keys
+// =====================================================
+
+export const payrollKeys = {
+  all: ["payrolls"] as const,
+  lists: () => ["payrolls", "list"] as const,
+  list: (filters?: any) => (filters ? (["payrolls", "list", filters] as const) : (["payrolls", "list"] as const)),
+  details: () => ["payrolls", "detail"] as const,
+  detail: (id: string, include?: any) => (include ? (["payrolls", "detail", id, include] as const) : (["payrolls", "detail", id] as const)),
+  byIds: (ids: string[]) => ["payrolls", "byIds", ids] as const,
+
+  // Specialized queries
+  byUser: (userId: string, filters?: any) =>
+    filters ? (["payrolls", "byUser", userId, filters] as const) : (["payrolls", "byUser", userId] as const),
+  byPeriod: (year: number, month: number, filters?: any) =>
+    filters ? (["payrolls", "byPeriod", year, month, filters] as const) : (["payrolls", "byPeriod", year, month] as const),
+  byUserAndPeriod: (userId: string, year: number, month: number, include?: any) =>
+    include ? (["payrolls", "byUserAndPeriod", userId, year, month, include] as const) : (["payrolls", "byUserAndPeriod", userId, year, month] as const),
+
+  // Live calculation queries
+  live: (year: number, month: number) => ["payrolls", "live", year, month] as const,
+  liveByUser: (userId: string, year: number, month: number) => ["payrolls", "live", userId, year, month] as const,
+
+  // Simulation queries
+  simulation: (params: any) => ["payrolls", "simulation", params] as const,
+
+  // Statistics
+  statistics: (year?: number, month?: number) =>
+    year && month ? (["payrolls", "statistics", year, month] as const) : (["payrolls", "statistics"] as const),
+  comparison: (year: number, month: number) => ["payrolls", "comparison", year, month] as const,
+};
+
+// =====================================================
 // Deployment Query Keys
 // =====================================================
 

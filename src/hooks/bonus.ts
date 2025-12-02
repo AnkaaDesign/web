@@ -93,12 +93,15 @@ const baseHooks = createEntityHooks<
   relatedQueryKeys: [userKeys],
 });
 
-// Export base hooks with standard names
+// Export base hooks with standard names (matching usePayroll pattern)
 export const useBonusesInfinite = baseHooks.useInfiniteList;
 export const useBonuses = baseHooks.useList;
-export const useBonusDetail = baseHooks.useDetail;
+export const useBonus = baseHooks.useDetail;
 export const useBonusMutations = baseHooks.useMutations;
 export const useBonusBatchMutations = baseHooks.useBatchMutations;
+
+// Backward compatibility alias
+export const useBonusDetail = useBonus;
 
 /**
  * Hook to manually trigger bonus calculation
@@ -523,7 +526,7 @@ export const useBonusDiscountMutations = () => {
 export const bonusHooks = {
   useInfiniteList: useBonusesInfinite,
   useList: useBonuses,
-  useDetail: useBonusDetail,
+  useDetail: useBonus,
   useMutations: useBonusMutations,
   useBatchMutations: useBonusBatchMutations,
 };

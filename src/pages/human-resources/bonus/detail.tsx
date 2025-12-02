@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { useBonusDetail } from "../../../hooks";
 import { bonusService } from "../../../api-client";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -11,7 +10,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { formatCurrency } from "../../../utils";
-import { calculatePonderedTasks } from "../../../utils/bonus";
 import { cn } from "@/lib/utils";
 import { BonusTasksList } from "@/components/human-resources/bonus/detail";
 import {
@@ -56,27 +54,6 @@ const formatBonusAmount = (amount: any): string => {
   return formatCurrency(0);
 };
 
-// Helper to check if ID is a live bonus ID
-function isLiveBonusId(id: string): boolean {
-  return id.startsWith('live-');
-}
-
-// Helper to parse live bonus ID
-function parseLiveBonusId(id: string): { userId: string; year: number; month: number } | null {
-  if (!isLiveBonusId(id)) return null;
-
-  const parts = id.replace('live-', '').split('-');
-  if (parts.length < 7) return null;
-
-  const month = parseInt(parts[parts.length - 1]);
-  const year = parseInt(parts[parts.length - 2]);
-  const userId = parts.slice(0, -2).join('-');
-
-  if (isNaN(year) || isNaN(month)) return null;
-
-  return { userId, year, month };
-}
-
 // Info row component for consistent styling
 function InfoRow({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
   return (
@@ -90,10 +67,10 @@ function InfoRow({ label, value, className }: { label: string; value: React.Reac
 export default function BonusDetailPage() {
   const { id } = useParams<BonusDetailPageParams>();
 
-  // State for live bonus data
-  const [liveBonus, setLiveBonus] = useState<any>(null);
-  const [liveLoading, setLiveLoading] = useState(false);
-  const [liveError, setLiveError] = useState<string | null>(null);
+  // State for bonus data
+  const [bonus, setBonus] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Track page access
   usePageTracker({
@@ -101,73 +78,63 @@ export default function BonusDetailPage() {
     icon: "currency-dollar",
   });
 
-  // Determine if this is a live bonus
-  const isLive = id ? isLiveBonusId(id) : false;
-  const liveParams = id && isLive ? parseLiveBonusId(id) : null;
-
-  // Fetch saved bonus details (only for non-live IDs)
-  const { data: bonusResponse, isLoading: savedBonusLoading } = useBonusDetail(id || '', {
-    include: {
-      user: {
-        include: {
-          position: true,
-          sector: true,
-        },
-      },
-      position: true, // Include position saved at the time of bonus creation
-      tasks: {
-        include: {
-          customer: true,
-          sector: true,
-        },
-      },
-      bonusDiscounts: true,
-      users: true,
-    },
-  }, {
-    enabled: !!id && !isLive,
-  });
-
-  // Fetch live bonus data
+  // Fetch bonus data - Backend handles both regular UUIDs and live IDs transparently
+  // The data structure is identical regardless of whether bonus is saved or calculated live
   useEffect(() => {
-    if (!liveParams) return;
+    if (!id) {
+      setError('ID do bônus não fornecido');
+      setLoading(false);
+      return;
+    }
 
-    const fetchLiveBonus = async () => {
-      setLiveLoading(true);
-      setLiveError(null);
+    const fetchBonus = async () => {
+      setLoading(true);
+      setError(null);
 
       try {
-        const response = await bonusService.getByUserAndMonth(
-          liveParams.userId,
-          liveParams.year,
-          liveParams.month
-        );
+        // Single endpoint handles both live IDs and regular UUIDs
+        // Backend's findByIdOrLive parses live IDs and returns consistent data format
+        const response = await bonusService.getById(id, {
+          include: {
+            user: {
+              include: {
+                position: true,
+                sector: true,
+              },
+            },
+            position: true,
+            tasks: {
+              include: {
+                customer: true,
+                sector: true,
+              },
+            },
+            bonusDiscounts: true,
+            users: true,
+          },
+        });
 
-        if (response.data?.data && response.data.data.length > 0) {
-          const userBonus = response.data.data.find(
-            (b: any) => b.userId === liveParams.userId
-          );
-          if (userBonus) {
-            setLiveBonus(userBonus);
-          } else {
-            setLiveError('Bônus não encontrado para este usuário no período.');
-          }
+        const responseData = response.data;
+
+        if (responseData?.data) {
+          setBonus(responseData.data);
+        } else if (responseData?.success === false) {
+          setError(responseData.message || 'Bônus não encontrado.');
+        } else if (responseData && !responseData.success) {
+          // Direct bonus object without wrapper
+          setBonus(responseData);
         } else {
-          setLiveError('Nenhum bônus encontrado para este período.');
+          setError('Bônus não encontrado.');
         }
-      } catch (error: any) {
-        setLiveError(error?.response?.data?.message || 'Erro ao carregar bônus ao vivo.');
+      } catch (err: any) {
+        setError(err?.response?.data?.message || 'Erro ao carregar bônus.');
       } finally {
-        setLiveLoading(false);
+        setLoading(false);
       }
     };
 
-    fetchLiveBonus();
-  }, [liveParams?.userId, liveParams?.year, liveParams?.month]);
-
-  // Get the bonus data (either saved or live)
-  const bonus = isLive ? liveBonus : bonusResponse?.data;
-  const bonusLoading = isLive ? liveLoading : savedBonusLoading;
+    fetchBonus();
+  }, [id]);
 
   // Calculate final bonus amount (after discounts)
   const calculateFinalAmount = useMemo(() => {
@@ -196,15 +163,31 @@ export default function BonusDetailPage() {
     return finalAmount;
   }, [bonus]);
 
-  // Calculate task statistics
+  // Get task statistics - use pre-calculated values from API
+  // API returns identical structure for live and saved bonuses
   const taskStats = useMemo(() => {
     const tasks = bonus?.tasks || [];
     const users = bonus?.users || [];
 
+    // Total raw tasks count
     const totalRawTasks = tasks.length;
-    const totalPonderedTasks = calculatePonderedTasks(tasks);
+
+    // Use weightedTasks from API (period total - same for all users)
+    const totalPonderedTasks = bonus?.weightedTasks
+      ? (typeof bonus.weightedTasks === 'object' && bonus.weightedTasks?.toNumber
+        ? bonus.weightedTasks.toNumber()
+        : Number(bonus.weightedTasks) || 0)
+      : 0;
+
+    // Total collaborators from users relation
     const totalCollaborators = users.length || 1;
-    const averageTasksPerUser = totalCollaborators > 0 ? totalPonderedTasks / totalCollaborators : 0;
+
+    // Use averageTaskPerUser from API (period average - same for all users)
+    const averageTasksPerUser = bonus?.averageTaskPerUser
+      ? (typeof bonus.averageTaskPerUser === 'object' && bonus.averageTaskPerUser?.toNumber
+        ? bonus.averageTaskPerUser.toNumber()
+        : Number(bonus.averageTaskPerUser) || 0)
+      : 0;
 
     return {
       totalRawTasks,
@@ -213,7 +196,7 @@ export default function BonusDetailPage() {
       averageTasksPerUser,
       tasks,
     };
-  }, [bonus?.tasks, bonus?.users]);
+  }, [bonus?.tasks, bonus?.users, bonus?.weightedTasks, bonus?.averageTaskPerUser]);
 
   // Validation
   if (!id) {
@@ -227,22 +210,80 @@ export default function BonusDetailPage() {
     );
   }
 
-  if (bonusLoading) {
+  if (loading) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="flex items-center justify-center p-8">
-          <Skeleton className="h-32 w-full max-w-lg" />
+        <div className="space-y-6">
+          {/* Header skeleton */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-9 w-24" />
+              <Skeleton className="h-9 w-24" />
+            </div>
+          </div>
+
+          {/* Cards skeleton */}
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* General Info Card skeleton */}
+            <Card>
+              <CardHeader className="pb-4">
+                <Skeleton className="h-5 w-40" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+              </CardContent>
+            </Card>
+
+            {/* Financial Card skeleton */}
+            <Card>
+              <CardHeader className="pb-4">
+                <Skeleton className="h-5 w-24" />
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Separator className="my-2" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-10 w-full rounded-lg mt-2" />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Tasks table skeleton */}
+          <Card>
+            <CardHeader className="pb-4">
+              <Skeleton className="h-5 w-40" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </PrivilegeRoute>
     );
   }
 
-  if (isLive && liveError) {
+  if (error) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
         <Alert variant="destructive">
           <IconAlertCircle className="h-4 w-4" />
-          <AlertDescription>{liveError}</AlertDescription>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       </PrivilegeRoute>
     );
@@ -311,16 +352,6 @@ export default function BonusDetailPage() {
             },
           ]}
         />
-
-        {/* Live calculation indicator */}
-        {isLive && (
-          <Alert>
-            <IconAlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Este é um cálculo em tempo real. O bônus ainda não foi salvo no sistema.
-            </AlertDescription>
-          </Alert>
-        )}
 
         {/* Info Cards - 2 columns */}
         <div className="grid gap-6 md:grid-cols-2">

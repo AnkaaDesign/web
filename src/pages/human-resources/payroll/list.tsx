@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { usePageTracker } from "@/hooks/use-page-tracker";
@@ -21,10 +21,12 @@ import { PayrollFilters } from "@/components/human-resources/payroll/list/payrol
 import { PayrollSummary } from "@/components/human-resources/payroll/list/payroll-summary";
 import { PayrollExport } from "@/components/human-resources/payroll/export/payroll-export";
 import { PayrollColumnVisibilityManager } from "@/components/human-resources/payroll/list/payroll-column-visibility-manager";
+import { FilterIndicators } from "@/components/human-resources/payroll/list/filter-indicator";
+import { extractActiveFilters, createFilterRemover } from "@/components/human-resources/payroll/list/filter-utils";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { usePayrolls, useSectors } from "../../../hooks";
+import { usePayrolls, useSectors, usePositions, useUsers } from "../../../hooks";
 import { isUserEligibleForBonus, getCurrentPayrollPeriod } from "../../../utils";
 import { StandardizedTable } from "@/components/ui/standardized-table";
 import type { StandardizedColumn } from "@/components/ui/standardized-table";
@@ -201,7 +203,8 @@ interface PayrollRow {
   absenceHours?: number;
 
   // Bonus data
-  bonusAmount: number;
+  bonusAmount: number; // Gross bonus (Bônus Bruto)
+  netBonus: number; // Net bonus after discounts (Bônus Líquido)
   tasksCompleted: number;
   averageTasks: number;
   totalWeightedTasks: number;
@@ -355,16 +358,39 @@ function PayrollTableComponent({
     },
     {
       key: "bonus",
-      header: "Bônus",
+      header: "Bônus Bruto",
       accessor: (row: PayrollRow) => {
-        // Check if user is eligible for bonus
-        const isEligible = row.position?.bonifiable && row.performanceLevel > 0;
-
-        if (!isEligible) {
+        // Check if user is eligible for bonus based on position
+        if (!row.position?.bonifiable) {
           return <span className="text-muted-foreground text-sm whitespace-nowrap">Não elegível</span>;
         }
 
+        // Show "Sem bônus" if amount is 0
+        if (row.bonusAmount === 0) {
+          return <span className="text-muted-foreground text-sm whitespace-nowrap">Sem bônus</span>;
+        }
+
         return <span className="whitespace-nowrap">{formatCurrency(row.bonusAmount)}</span>;
+      },
+      sortable: true,
+      className: "text-sm w-32 truncate",
+      align: "left" as const,
+    },
+    {
+      key: "netBonus",
+      header: "Bônus Líquido",
+      accessor: (row: PayrollRow) => {
+        // Check if user is eligible for bonus based on position
+        if (!row.position?.bonifiable) {
+          return <span className="text-muted-foreground text-sm whitespace-nowrap">Não elegível</span>;
+        }
+
+        // Show "Sem bônus" if gross bonus is 0
+        if (row.bonusAmount === 0) {
+          return <span className="text-muted-foreground text-sm whitespace-nowrap">Sem bônus</span>;
+        }
+
+        return <span className="whitespace-nowrap text-green-600">{formatCurrency(row.netBonus)}</span>;
       },
       sortable: true,
       className: "text-sm w-32 truncate",
@@ -379,8 +405,8 @@ function PayrollTableComponent({
       align: "left" as const,
     },
     {
-      key: "netSalary",
-      header: "Líquido",
+      key: "totalNet",
+      header: "Total Líquido",
       accessor: (row: PayrollRow) => formatCurrency(row.netSalary),
       sortable: true,
       className: "text-sm w-32 font-mono font-bold text-green-600 truncate",
@@ -542,6 +568,21 @@ export default function PayrollListPage() {
     limit: 100,
   });
 
+  const { data: positionsData } = usePositions({
+    orderBy: { name: "asc" },
+    limit: 100,
+  });
+
+  const { data: usersData } = useUsers({
+    orderBy: { name: "asc" },
+    include: { position: true, sector: true },
+    where: {
+      isActive: true,
+      payrollNumber: { not: null },
+    },
+    limit: 100,
+  });
+
   // Get default sector IDs - show all sectors by default
   // Previously filtered to only PRODUCTION/WAREHOUSE/LEADER which was hiding users in other sectors
   const defaultSectorIds = useMemo(() => {
@@ -591,8 +632,9 @@ export default function PayrollListPage() {
       'user.name',
       'position.name',
       'bonus',
+      'netBonus',
       'remuneration',
-      'totalEarnings',
+      'totalNet',
     ])
   );
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -658,6 +700,7 @@ export default function PayrollListPage() {
       bonus: {
         include: {
           tasks: true,
+          bonusDiscounts: true, // Include bonus discounts to calculate net bonus
         },
       },
       discounts: true,
@@ -811,6 +854,27 @@ export default function PayrollListPage() {
           averageTasks = averageTasksPerUser;
         }
 
+        // Calculate net salary components with proper null handling and bonus eligibility
+        const baseRemuneration = Number(payroll.baseRemuneration) || 0;
+
+        // Only include bonus for eligible users
+        const bonusAmount = isEligibleForBonus && bonus?.baseBonus
+          ? Number(bonus.baseBonus) || 0
+          : 0;
+
+        // Calculate net bonus (gross bonus minus bonus discounts)
+        let bonusDiscountsTotal = 0;
+        if (isEligibleForBonus && bonus?.bonusDiscounts && Array.isArray(bonus.bonusDiscounts)) {
+          bonus.bonusDiscounts.forEach((discount: any) => {
+            if (discount.percentage) {
+              bonusDiscountsTotal += bonusAmount * (discount.percentage / 100);
+            } else if (discount.value) {
+              bonusDiscountsTotal += Number(discount.value) || 0;
+            }
+          });
+        }
+        const netBonusAmount = bonusAmount - bonusDiscountsTotal;
+
         // Calculate the discounts total with proper number handling
         const totalDiscounts = payroll.discounts && Array.isArray(payroll.discounts)
           ? payroll.discounts.reduce((sum: number, discount: any) => {
@@ -820,15 +884,11 @@ export default function PayrollListPage() {
             }, 0)
           : 0;
 
-        // Calculate net salary components with proper null handling and bonus eligibility
-        const baseRemuneration = Number(payroll.baseRemuneration) || 0;
-
-        // Only include bonus for eligible users
-        const bonusAmount = isEligibleForBonus && bonus?.baseBonus
-          ? Number(bonus.baseBonus) || 0
-          : 0;
-
-        const netSalary = baseRemuneration + bonusAmount - totalDiscounts;
+        // Use netSalary from API if available (saved payrolls have complete calculation)
+        // For live payrolls, the API returns simplified data, so use that
+        const netSalary = payroll.netSalary !== undefined && payroll.netSalary !== null
+          ? Number(payroll.netSalary)
+          : baseRemuneration + netBonusAmount - totalDiscounts;
 
         // Use the user's payroll number (employee registration number)
         // This is NOT the payroll ID, but the employee's permanent registration number
@@ -879,7 +939,8 @@ export default function PayrollListPage() {
           absenceHours: payroll.absenceHours,
 
           // Bonus data
-          bonusAmount: bonusAmount,
+          bonusAmount: bonusAmount, // Gross bonus (Bônus Bruto)
+          netBonus: netBonusAmount, // Net bonus after discounts (Bônus Líquido)
           tasksCompleted,
           averageTasks,
           totalWeightedTasks: totalTasksForPeriod, // Same for all users - total weighted tasks
@@ -919,10 +980,13 @@ export default function PayrollListPage() {
         } else if (columnKey === 'bonus') {
           aValue = a.bonusAmount;
           bValue = b.bonusAmount;
+        } else if (columnKey === 'netBonus') {
+          aValue = a.netBonus;
+          bValue = b.netBonus;
         } else if (columnKey === 'totalEarnings') {
           aValue = a.baseRemuneration + a.bonusAmount;
           bValue = b.baseRemuneration + b.bonusAmount;
-        } else if (columnKey === 'netSalary') {
+        } else if (columnKey === 'totalNet' || columnKey === 'netSalary') {
           aValue = a.netSalary;
           bValue = b.netSalary;
         } else if (columnKey === 'user.cpf') {
@@ -1044,6 +1108,31 @@ export default function PayrollListPage() {
     };
   }, [filters.year, filters.months]);
 
+  // Create filter remover function
+  const onRemoveFilter = useCallback(
+    createFilterRemover(filters, defaultFilters, handleApplyFilters),
+    [filters, defaultFilters, handleApplyFilters]
+  );
+
+  // Extract active filters for badge display
+  const activeFilterBadges = useMemo(() => {
+    return extractActiveFilters(
+      filters,
+      defaultFilters,
+      onRemoveFilter,
+      {
+        sectors: sectorsData?.data || [],
+        positions: positionsData?.data || [],
+        users: usersData?.data || [],
+      }
+    );
+  }, [filters, defaultFilters, onRemoveFilter, sectorsData?.data, positionsData?.data, usersData?.data]);
+
+  // Clear all filters
+  const clearAllFilters = useCallback(() => {
+    handleApplyFilters(defaultFilters);
+  }, [defaultFilters, handleApplyFilters]);
+
   // Count active filters (excluding defaults)
   const activeFiltersCount = useMemo(() => {
     const defaultFilters = getDefaultFilters();
@@ -1136,6 +1225,15 @@ export default function PayrollListPage() {
                   />
                 </div>
               </div>
+
+              {/* Active Filter Badges */}
+              {activeFilterBadges.length > 0 && (
+                <FilterIndicators
+                  filters={activeFilterBadges}
+                  onClearAll={clearAllFilters}
+                  className="mt-4"
+                />
+              )}
             </CardContent>
 
             {/* Table Content */}
@@ -1168,9 +1266,9 @@ export default function PayrollListPage() {
               </div>
             </CardContent>
 
-            {/* Summary - At bottom */}
+            {/* Summary - At bottom, no spacing between table */}
             {processedPayrolls.length > 0 && (
-              <div className="px-6 pb-6 pt-0">
+              <div className="px-6 pb-6">
                 <PayrollSummary users={processedPayrolls} />
               </div>
             )}

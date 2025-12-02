@@ -105,8 +105,9 @@ export function PayrollColumnVisibilityManager({ visibleColumns, onVisibilityCha
               type="text"
               placeholder="Buscar coluna..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e?.target?.value || "")}
+              onChange={(value) => setSearchQuery(typeof value === 'string' ? value : "")}
               className="pl-9 h-9"
+              transparent
             />
           </div>
 

@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { CalculationTable } from "./calculation-table";
 import { CalculationExport } from "./calculation-export";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
-import { CalculationFilters } from "./calculation-filters";
 import { createCalculationColumns } from "./calculation-table-columns";
 import { cn } from "@/lib/utils";
 import { useTableState } from "@/hooks/use-table-state";
@@ -14,7 +13,7 @@ import { ShowSelectedToggle } from "@/components/ui/show-selected-toggle";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { USER_STATUS } from "../../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { IconChevronLeft, IconChevronRight, IconCalendar, IconFilter } from "@tabler/icons-react";
+import { IconChevronLeft, IconChevronRight, IconCalendar } from "@tabler/icons-react";
 import { addMonths, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -57,11 +56,11 @@ interface CalculationRow {
 
 const DEFAULT_PAGE_SIZE = 40;
 
-// Helper function to convert selected month to 25th-to-25th period
+// Helper function to convert selected month to 26th-to-25th period
 const getPayrollPeriod = (selectedMonth: Date) => {
-  // For selected month, get from 25th of previous month to 25th of selected month
+  // For selected month, get from 26th of previous month to 25th of selected month
   const previousMonth = addMonths(selectedMonth, -1);
-  const startDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), 25);
+  const startDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), 26);
   const endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 25);
 
   return {
@@ -91,8 +90,6 @@ export function CalculationList({ className }: CalculationListProps) {
     return searchParams.get("userId") || "";
   });
 
-  // Filters state
-  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Fetch users for filter
   const {
@@ -335,10 +332,10 @@ export function CalculationList({ className }: CalculationListProps) {
     handleMonthChange(nextMonth);
   };
 
-  // Format the period display (25th to 25th)
+  // Format the period display (26th to 25th)
   const getPayrollPeriodDisplay = (month: Date) => {
     const previousMonth = subMonths(month, 1);
-    const startDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), 25);
+    const startDate = new Date(previousMonth.getFullYear(), previousMonth.getMonth(), 26);
     const endDate = new Date(month.getFullYear(), month.getMonth(), 25);
 
     return {
@@ -365,22 +362,6 @@ export function CalculationList({ className }: CalculationListProps) {
     userId: selectedUserId,
   }), [selectedMonth, selectedUserId]);
 
-  // Check if there are active filters (for now, always false as we don't have advanced filters yet)
-  const hasActiveFilters = useMemo(() => {
-    // In the future, check if any advanced filters are applied
-    return false;
-  }, []);
-
-  const totalFilterCount = useMemo(() => {
-    // In the future, count the number of active filters
-    return 0;
-  }, []);
-
-  // Handle filter changes
-  const handleFilterChange = (filters: any) => {
-    // In the future, update filters state
-    // For now, just close the sheet
-  };
 
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
@@ -448,18 +429,6 @@ export function CalculationList({ className }: CalculationListProps) {
 
           <div className="flex gap-2 shrink-0">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />
-            <Button
-              variant={hasActiveFilters ? "default" : "outline"}
-              size="default"
-              onClick={() => setFiltersOpen(true)}
-              className="group"
-            >
-              <IconFilter className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              <span className="text-foreground">
-                Filtros
-                {hasActiveFilters ? ` (${totalFilterCount})` : ""}
-              </span>
-            </Button>
             <ColumnVisibilityManager columns={allColumns} visibleColumns={visibleColumns} onVisibilityChange={setVisibleColumns} />
             <CalculationExport
               filters={exportFilters}
@@ -482,16 +451,6 @@ export function CalculationList({ className }: CalculationListProps) {
         </div>
       </CardContent>
 
-      {/* Filters Sheet */}
-      <CalculationFilters
-        open={filtersOpen}
-        onOpenChange={setFiltersOpen}
-        filters={{
-          userId: selectedUserId,
-          selectedMonth: selectedMonth,
-        }}
-        onFilterChange={handleFilterChange}
-      />
     </Card>
   );
 }

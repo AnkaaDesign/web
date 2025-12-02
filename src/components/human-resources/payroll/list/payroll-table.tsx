@@ -94,9 +94,10 @@ export function PayrollTable({
   const payrollParams = {
     include: {
       user: { include: { position: true, sector: true } },
-      bonus: { include: { tasks: true } },
+      bonus: { include: { tasks: true, bonusDiscounts: true } },
       discounts: true,
     },
+    take: 200, // Ensure we get all payrolls for the month (max ~100 employees)
   };
 
   const { data: firstMonthData, isLoading: firstMonthLoading, error: firstMonthError } = usePayrolls(

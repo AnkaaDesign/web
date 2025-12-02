@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { usePageTracker } from "@/hooks/use-page-tracker";
@@ -22,8 +22,10 @@ import { BonusFilters } from "@/components/human-resources/bonus/list/bonus-filt
 import { BonusSummary } from "@/components/human-resources/bonus/list/bonus-summary";
 import { BonusExport } from "@/components/human-resources/bonus/export/bonus-export";
 import { BonusColumnVisibilityManager } from "@/components/human-resources/bonus/list/bonus-column-visibility-manager";
+import { FilterIndicators } from "@/components/human-resources/bonus/list/filter-indicator";
+import { extractActiveFilters, createFilterRemover } from "@/components/human-resources/bonus/list/filter-utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useBonusList, useSectors } from "../../../hooks";
+import { useBonusList, useSectors, usePositions, useUsers } from "../../../hooks";
 import { calculatePonderedTasks } from "../../../utils/bonus";
 import { StandardizedTable } from "@/components/ui/standardized-table";
 import type { StandardizedColumn } from "@/components/ui/standardized-table";
@@ -401,6 +403,21 @@ export default function BonusListPage() {
     limit: 100,
   });
 
+  const { data: positionsData } = usePositions({
+    orderBy: { name: "asc" },
+    limit: 100,
+  });
+
+  const { data: usersData } = useUsers({
+    orderBy: { name: "asc" },
+    include: { position: true, sector: true },
+    where: {
+      isActive: true,
+      payrollNumber: { not: null },
+    },
+    limit: 100,
+  });
+
   const defaultSectorIds = useMemo(() => {
     if (!sectorsData?.data) return [];
     return sectorsData.data
@@ -491,23 +508,6 @@ export default function BonusListPage() {
     const bonuses = bonusData.data;
     const combined: BonusRow[] = [];
 
-    // Total collaborators = number of bonuses (each bonus = one user)
-    const totalCollaborators = bonuses.length;
-
-    // Raw task count (total number of tasks, regardless of commission type)
-    const totalRawTasks = bonuses.length > 0
-      ? (bonuses[0].tasks?.length || 0)
-      : 0;
-
-    // Total pondered tasks = from first bonus's tasks (all bonuses share the same task pool)
-    // Since all users share the same tasks, we just calculate once from the first bonus
-    const totalPonderedTasks = bonuses.length > 0
-      ? calculatePonderedTasks(bonuses[0].tasks || [])
-      : 0;
-
-    // Average = total pondered tasks / total collaborators
-    const averageTasks = totalCollaborators > 0 ? totalPonderedTasks / totalCollaborators : 0;
-
     bonuses.forEach((bonus: any) => {
       if (!bonus) return;
 
@@ -532,6 +532,30 @@ export default function BonusListPage() {
         return sum + discountAmount;
       }, 0);
 
+      // Get period-level task count (total tasks in the period - same for all users)
+      // bonus.tasks contains ALL tasks for the period
+      const totalTasksInPeriod = bonus.tasks?.length || 0;
+
+      // Get period-level weighted tasks (total weighted tasks - same for all users)
+      // bonus.weightedTasks is the TOTAL weighted tasks for the period
+      const totalWeightedTasks = bonus.weightedTasks
+        ? (typeof bonus.weightedTasks === 'object' && bonus.weightedTasks?.toNumber
+          ? bonus.weightedTasks.toNumber()
+          : Number(bonus.weightedTasks) || 0)
+        : calculatePonderedTasks(bonus.tasks || []);
+
+      // Get total collaborators from the users array (all bonifiable users)
+      // bonus.users contains all eligible users for bonus calculation
+      const totalCollaborators = bonus.users?.length || 0;
+
+      // Get average tasks per user directly from API (pre-calculated correctly)
+      // This is: totalWeightedTasks / totalEligibleUsers
+      const averageTasks = bonus.averageTaskPerUser
+        ? (typeof bonus.averageTaskPerUser === 'object' && bonus.averageTaskPerUser?.toNumber
+          ? bonus.averageTaskPerUser.toNumber()
+          : Number(bonus.averageTaskPerUser) || 0)
+        : (totalCollaborators > 0 ? totalWeightedTasks / totalCollaborators : 0);
+
       const row: BonusRow = {
         id: bonus.id,
         oderId: user.id,
@@ -553,11 +577,11 @@ export default function BonusListPage() {
 
         bonusId: bonus.id,
         bonusAmount: bonusAmount,
-        tasksCompleted: totalRawTasks,         // Raw count of tasks (56)
-        averageTasks: averageTasks,            // totalPonderedTasks / totalCollaborators
-        totalWeightedTasks: totalPonderedTasks, // Pondered value (54.5)
+        tasksCompleted: totalTasksInPeriod,       // Total raw task count for the period
+        averageTasks: averageTasks,               // Pre-calculated average from API
+        totalWeightedTasks: totalWeightedTasks,   // Total weighted tasks for the period
 
-        totalCollaborators: totalCollaborators,
+        totalCollaborators: totalCollaborators,   // Total bonifiable users
 
         totalDiscounts: totalDiscounts,
         netBonus: bonusAmount - totalDiscounts,
@@ -648,6 +672,31 @@ export default function BonusListPage() {
     }
   };
 
+  // Create filter remover function
+  const onRemoveFilter = useCallback(
+    createFilterRemover(filters, defaultFilters, handleApplyFilters),
+    [filters, defaultFilters, handleApplyFilters]
+  );
+
+  // Extract active filters for badge display
+  const activeFilterBadges = useMemo(() => {
+    return extractActiveFilters(
+      filters,
+      defaultFilters,
+      onRemoveFilter,
+      {
+        sectors: sectorsData?.data || [],
+        positions: positionsData?.data || [],
+        users: usersData?.data || [],
+      }
+    );
+  }, [filters, defaultFilters, onRemoveFilter, sectorsData?.data, positionsData?.data, usersData?.data]);
+
+  // Clear all filters
+  const clearAllFilters = useCallback(() => {
+    handleApplyFilters(defaultFilters);
+  }, [defaultFilters, handleApplyFilters]);
+
   const activeFiltersCount = useMemo(() => {
     const defaultFilters = getDefaultFilters();
     let count = 0;
@@ -733,6 +782,15 @@ export default function BonusListPage() {
                   />
                 </div>
               </div>
+
+              {/* Active Filter Badges */}
+              {activeFilterBadges.length > 0 && (
+                <FilterIndicators
+                  filters={activeFilterBadges}
+                  onClearAll={clearAllFilters}
+                  className="mt-4"
+                />
+              )}
             </CardContent>
 
             <CardContent className="flex-1 overflow-hidden p-6 pt-0 relative">
@@ -763,8 +821,9 @@ export default function BonusListPage() {
               </div>
             </CardContent>
 
+            {/* Summary - At bottom, no spacing between table */}
             {processedBonuses.length > 0 && (
-              <div className="px-6 pb-6 pt-0">
+              <div className="px-6 pb-6">
                 <BonusSummary bonuses={processedBonuses} />
               </div>
             )}

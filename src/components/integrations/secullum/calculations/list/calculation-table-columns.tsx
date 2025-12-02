@@ -93,19 +93,10 @@ const renderDate = (value: string | undefined) => {
   if (!value) return <span className="text-muted-foreground">-</span>;
 
   // Parse the date and format as DD/MM/YYYY - Day
-  // Input format is expected to be MM/DD/YYYY from Secullum
+  // Input format from Secullum is already DD/MM/YYYY - keep it as is
   const parts = value.split(" - ");
-  let formattedDate = parts[0];
+  const formattedDate = parts[0];
   const dayOfWeek = parts[1];
-
-  // Convert MM/DD/YYYY to DD/MM/YYYY if needed
-  if (formattedDate && formattedDate.includes("/")) {
-    const dateParts = formattedDate.split("/");
-    if (dateParts.length === 3) {
-      // Assuming MM/DD/YYYY format from Secullum, convert to DD/MM/YYYY
-      formattedDate = `${dateParts[1].padStart(2, '0')}/${dateParts[0].padStart(2, '0')}/${dateParts[2]}`;
-    }
-  }
 
   // Convert day abbreviation to Portuguese proper case
   const dayMap: { [key: string]: string } = {

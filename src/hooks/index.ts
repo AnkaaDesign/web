@@ -68,16 +68,6 @@ export * from "./usePositionRemuneration";
 export * from "./useSector";
 export * from "./bonus";
 export * from "./payroll";
-export {
-  payrollDetailsKeys,
-  usePayrollDetails,
-  usePayrollLiveDetails,
-  usePayrollUserStats,
-  usePayrollTaskSummary,
-  useCalculatePayrollBonuses,
-  usePayrollComparison
-} from "./payrollDetails";
-export type { PayrollComparison } from "./payrollDetails";
 export * from "./useHoliday";
 export * from "./useVacation";
 export * from "./useWarning";

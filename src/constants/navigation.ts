@@ -969,7 +969,17 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "warnings-editar", title: "Editar", icon: "edit", path: "/recursos-humanos/avisos/editar/:id", isDynamic: true },
         ],
       },
-      { id: "calculos", title: "Cálculos", icon: "deviceIpadDollar", path: "/recursos-humanos/calculos" },
+      {
+        id: "bonus",
+        title: "Bônus",
+        icon: "coins",
+        path: "/recursos-humanos/bonus",
+        children: [
+          { id: "simulacao-bonus", title: "Simulação de Bônus", icon: "calculator", path: "/recursos-humanos/bonus/simulacao-de-bonus" },
+          { id: "nivel-de-performance", title: "Nível de Performance", icon: "trendingUp", path: "/recursos-humanos/bonus/nivel-de-performance" },
+        ],
+      },
+      { id: "calculos", title: "Cálculos de Ponto", icon: "deviceIpadDollar", path: "/recursos-humanos/calculos" },
       {
         id: "cargos",
         title: "Cargos",
@@ -1036,16 +1046,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       { id: "folha-de-pagamento", title: "Folha de Pagamento", icon: "payroll", path: "/recursos-humanos/folha-de-pagamento" },
-      {
-        id: "bonus",
-        title: "Bônus",
-        icon: "coins",
-        path: "/recursos-humanos/bonus",
-        children: [
-          { id: "simulacao-bonus", title: "Simulação de Bônus", icon: "calculator", path: "/recursos-humanos/bonus/simulacao-de-bonus" },
-          { id: "nivel-de-performance", title: "Nível de Performance", icon: "trendingUp", path: "/recursos-humanos/bonus/nivel-de-performance" },
-        ],
-      },
       { id: "requisicoes", title: "Requisições", icon: "clipboardList", path: "/recursos-humanos/requisicoes" },
     ],
   },

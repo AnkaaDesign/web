@@ -181,8 +181,8 @@ export function BonusSummary({ bonuses, isLoading = false }: BonusSummaryProps) 
     ? Math.round((bonifiableUsersCount / uniqueUsersCount) * 100)
     : 0;
 
-  // State for minimize/expand
-  const [isMinimized, setIsMinimized] = useState(false);
+  // State for minimize/expand - minimized by default
+  const [isMinimized, setIsMinimized] = useState(true);
 
   if (isLoading) {
     return (

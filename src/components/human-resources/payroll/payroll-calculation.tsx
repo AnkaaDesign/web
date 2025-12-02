@@ -14,18 +14,12 @@ import { Label } from "@/components/ui/label";
 import {
   IconCalculator,
   IconRefresh,
-  IconCurrencyReal,
-  IconTrendingUp,
-  IconTrendingDown,
   IconClock,
-  IconUser,
   IconCalendar,
-  IconTarget,
   IconClipboardList,
 } from "@tabler/icons-react";
 import {
-  usePayrollLiveCalculation,
-  usePayrollByUserPeriod,
+  usePayrollByUserAndPeriod,
   useUsers,
   useTasks
 } from "../../../hooks";
@@ -56,20 +50,12 @@ export function PayrollCalculation({
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [showDetails, setShowDetails] = useState(true);
 
-  // Fetch live calculation data
-  const {
-    data: liveCalculation,
-    isLoading: isCalculationLoading,
-    error: calculationError,
-    refetch: refetchCalculation
-  } = usePayrollLiveCalculation(userId, year, month);
-
-  // Fetch current payroll data for comparison
+  // Fetch payroll data (API transparently returns live calculation for current period)
   const {
     data: payrollResponse,
     isLoading: isPayrollLoading,
     refetch: refetchPayroll
-  } = usePayrollByUserPeriod(userId, year, month, {
+  } = usePayrollByUserAndPeriod(userId, year, month, {
     include: {
       user: {
         include: { position: true, sector: true }
@@ -108,9 +94,8 @@ export function PayrollCalculation({
   });
 
   const user = usersResponse?.data?.[0];
-  const payroll = payrollResponse?.data;
+  const payroll = payrollResponse;
   const tasks = tasksResponse?.data || [];
-  const calculation = liveCalculation?.data;
 
   // Calculate current task statistics
   const taskStats: TaskStats = useMemo(() => {
@@ -148,37 +133,30 @@ export function PayrollCalculation({
     return stats;
   }, [tasks]);
 
-  // Live calculation values
-  const liveBaseRemuneration = calculation?.baseRemuneration || payroll?.baseRemuneration || 0;
-  const liveBonusValue = calculation?.bonusValue || payroll?.bonus?.finalValue || 0;
-  const liveGrossSalary = liveBaseRemuneration + liveBonusValue;
+  // Current calculation values (API returns live data for current period)
+  const baseRemuneration = payroll?.baseRemuneration || 0;
+  const bonusValue = payroll?.bonus?.baseBonus || payroll?.bonus?.finalValue || 0;
+  const grossSalary = Number(baseRemuneration) + Number(bonusValue);
 
-  // Calculate live discounts
-  const liveDiscounts = calculation?.discounts || payroll?.discounts || [];
-  const liveTotalDiscounts = liveDiscounts.reduce((sum, discount) => {
+  // Calculate discounts
+  const discounts = payroll?.discounts || [];
+  const totalDiscounts = discounts.reduce((sum: number, discount: any) => {
     if (discount.fixedValue) {
-      return sum + discount.fixedValue;
+      return sum + Number(discount.fixedValue);
     }
     if (discount.percentage) {
-      return sum + (liveGrossSalary * discount.percentage / 100);
+      return sum + (grossSalary * Number(discount.percentage) / 100);
     }
     return sum;
   }, 0);
 
-  const liveNetSalary = Math.max(0, liveGrossSalary - liveTotalDiscounts);
-
-  // Compare with saved payroll
-  const hasChanges = payroll && (
-    payroll.baseRemuneration !== liveBaseRemuneration ||
-    (payroll.bonus?.finalValue || 0) !== liveBonusValue
-  );
+  const netSalary = Math.max(0, grossSalary - totalDiscounts);
 
   const handleRefresh = () => {
-    refetchCalculation();
     refetchPayroll();
   };
 
-  if (isCalculationLoading || isPayrollLoading) {
+  if (isPayrollLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
@@ -219,17 +197,16 @@ export function PayrollCalculation({
         </div>
       </div>
 
-      {/* Changes Alert */}
-      {hasChanges && (
-        <Card className="border-orange-200 bg-orange-50">
+      {/* Info about live calculation */}
+      {payroll?.isLive && (
+        <Card className="border-blue-200 bg-blue-50">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-orange-800">
+            <div className="flex items-center gap-2 text-blue-800">
               <IconClock className="h-5 w-5" />
-              <p className="font-medium">Alterações Detectadas</p>
+              <p className="font-medium">Cálculo em Tempo Real</p>
             </div>
-            <p className="text-sm text-orange-700 mt-1">
-              Os valores calculados são diferentes da folha salva.
-              Considere atualizar a folha de pagamento.
+            <p className="text-sm text-blue-700 mt-1">
+              Esta folha ainda não foi salva. Os valores são calculados em tempo real.
             </p>
           </CardContent>
         </Card>
@@ -340,20 +317,20 @@ export function PayrollCalculation({
               <div className="space-y-4">
                 <div className="flex justify-between">
                   <span>Salário Base:</span>
-                  <span className="font-medium">{formatCurrency(liveBaseRemuneration)}</span>
+                  <span className="font-medium">{formatCurrency(baseRemuneration)}</span>
                 </div>
 
                 <div className="flex justify-between">
                   <div className="flex items-center gap-2">
                     <span>Bônus:</span>
-                    {calculation?.bonusCalculation && (
+                    {payroll?.bonus && (
                       <Badge variant="secondary" className="text-xs">
-                        {calculation.bonusCalculation.weightedTasks} × {calculation.bonusCalculation.multiplier}
+                        {payroll.bonus.taskCount || 0} tarefas
                       </Badge>
                     )}
                   </div>
                   <span className="font-medium text-green-600">
-                    +{formatCurrency(liveBonusValue)}
+                    +{formatCurrency(bonusValue)}
                   </span>
                 </div>
 
@@ -361,17 +338,17 @@ export function PayrollCalculation({
 
                 <div className="flex justify-between font-medium">
                   <span>Salário Bruto:</span>
-                  <span>{formatCurrency(liveGrossSalary)}</span>
+                  <span>{formatCurrency(grossSalary)}</span>
                 </div>
 
-                {liveDiscounts.length > 0 && (
+                {discounts.length > 0 && (
                   <>
                     <Separator />
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Descontos:</p>
-                      {liveDiscounts.map((discount) => {
+                      {discounts.map((discount: any) => {
                         const discountValue = discount.fixedValue ||
-                          (discount.percentage ? (liveGrossSalary * discount.percentage / 100) : 0);
+                          (discount.percentage ? (grossSalary * discount.percentage / 100) : 0);
 
                         return (
                           <div key={discount.id} className="flex justify-between text-sm">
@@ -384,7 +361,7 @@ export function PayrollCalculation({
                       })}
                       <div className="flex justify-between text-sm font-medium">
                         <span>Total de descontos:</span>
-                        <span className="text-red-600">-{formatCurrency(liveTotalDiscounts)}</span>
+                        <span className="text-red-600">-{formatCurrency(totalDiscounts)}</span>
                       </div>
                     </div>
                   </>
@@ -394,80 +371,11 @@ export function PayrollCalculation({
 
                 <div className="flex justify-between text-lg font-bold">
                   <span>Salário Líquido:</span>
-                  <span className="text-blue-600">{formatCurrency(liveNetSalary)}</span>
+                  <span className="text-blue-600">{formatCurrency(netSalary)}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          {/* Comparison with Saved Payroll */}
-          {payroll && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <IconTrendingUp className="h-5 w-5" />
-                  <CardTitle>Comparação</CardTitle>
-                </div>
-                <CardDescription>
-                  Diferenças com a folha salva
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span>Salário Base:</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{formatCurrency(payroll.baseRemuneration)}</span>
-                      {payroll.baseRemuneration !== liveBaseRemuneration ? (
-                        <div className="flex items-center gap-1">
-                          <IconTrendingUp className="h-3 w-3 text-green-600" />
-                          <span className="text-xs text-green-600">
-                            {formatCurrency(liveBaseRemuneration - payroll.baseRemuneration)}
-                          </span>
-                        </div>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">Igual</Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span>Bônus:</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{formatCurrency(payroll.bonus?.finalValue || 0)}</span>
-                      {(payroll.bonus?.finalValue || 0) !== liveBonusValue ? (
-                        <div className="flex items-center gap-1">
-                          {liveBonusValue > (payroll.bonus?.finalValue || 0) ? (
-                            <IconTrendingUp className="h-3 w-3 text-green-600" />
-                          ) : (
-                            <IconTrendingDown className="h-3 w-3 text-red-600" />
-                          )}
-                          <span className={`text-xs ${
-                            liveBonusValue > (payroll.bonus?.finalValue || 0)
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }`}>
-                            {formatCurrency(Math.abs(liveBonusValue - (payroll.bonus?.finalValue || 0)))}
-                          </span>
-                        </div>
-                      ) : (
-                        <Badge variant="outline" className="text-xs">Igual</Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {hasChanges && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-700">
-                      <strong>Atualização recomendada:</strong> Os cálculos atuais diferem
-                      da folha salva. Considere atualizar a folha de pagamento.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
 
           {/* Last Update */}
           <Card>

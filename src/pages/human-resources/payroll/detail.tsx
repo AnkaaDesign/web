@@ -56,26 +56,6 @@ const getNumericValue = (value: any): number => {
   return 0;
 };
 
-// Helper to check if ID is a live payroll ID
-function isLivePayrollId(id: string): boolean {
-  return id.startsWith('live-');
-}
-
-// Helper to parse live payroll ID (format: live-{userId}-{year}-{month})
-function parseLivePayrollId(id: string): { userId: string; year: number; month: number } | null {
-  if (!isLivePayrollId(id)) return null;
-
-  const parts = id.replace('live-', '').split('-');
-  if (parts.length < 7) return null; // UUID has 5 parts + year + month = 7
-
-  const month = parseInt(parts[parts.length - 1]);
-  const year = parseInt(parts[parts.length - 2]);
-  const userId = parts.slice(0, -2).join('-');
-
-  if (isNaN(year) || isNaN(month)) return null;
-
-  return { userId, year, month };
-}
 
 // Info row component for consistent styling
 function InfoRow({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
@@ -101,11 +81,7 @@ export default function PayrollDetailPage() {
     icon: "receipt",
   });
 
-  // Determine if this is a live payroll ID (used for fetching)
-  const isLiveId = payrollId ? isLivePayrollId(payrollId) : false;
-  const liveParams = payrollId && isLiveId ? parseLivePayrollId(payrollId) : null;
-
-  // Fetch payroll data
+  // Fetch payroll data - Backend handles both regular UUIDs and live IDs (live-{userId}-{year}-{month})
   useEffect(() => {
     if (!payrollId) {
       setError('ID da folha de pagamento não fornecido');
@@ -118,65 +94,38 @@ export default function PayrollDetailPage() {
       setError(null);
 
       try {
-        if (isLiveId && liveParams) {
-          // Live calculation - fetch by user/year/month
-          const response = await payrollService.getByUserAndMonth(
-            liveParams.userId,
-            liveParams.year,
-            liveParams.month,
-            {
+        // Single endpoint handles both live IDs and regular UUIDs
+        // Backend's findByIdOrLive parses live IDs and returns consistent data format
+        const response = await payrollService.getById(payrollId, {
+          include: {
+            user: {
               include: {
-                user: {
-                  include: {
-                    position: true,
-                    sector: true,
-                  },
-                },
                 position: true,
-                bonus: {
-                  include: {
-                    bonusDiscounts: true,
-                    position: true,
-                  },
-                },
-                discounts: true,
+                sector: true,
               },
-            }
-          );
-
-          if (response.data?.data) {
-            setPayroll(response.data.data);
-          } else {
-            setError('Folha de pagamento não encontrada para este período.');
-          }
-        } else {
-          // Saved payroll - fetch by ID
-          const response = await payrollService.getById(payrollId, {
-            include: {
-              user: {
-                include: {
-                  position: true,
-                  sector: true,
-                },
-              },
-              position: true,
-              bonus: {
-                include: {
-                  bonusDiscounts: true,
-                  position: true,
-                },
-              },
-              discounts: true,
             },
-          });
+            position: true,
+            bonus: {
+              include: {
+                bonusDiscounts: true,
+                position: true,
+              },
+            },
+            discounts: true,
+          },
+        });
 
-          if (response.data?.data) {
-            setPayroll(response.data.data);
-          } else if (response.data) {
-            setPayroll(response.data);
-          } else {
-            setError('Folha de pagamento não encontrada.');
-          }
+        const responseData = response.data;
+
+        // Backend returns consistent format: { success, message, data: payroll }
+        // Both live and saved payrolls have the same structure
+        // Payroll object includes bonus as a relation (not separate)
+        if (responseData?.success && responseData?.data) {
+          setPayroll(responseData.data);
+        } else if (responseData?.success === false) {
+          setError(responseData.message || 'Folha de pagamento não encontrada.');
+        } else {
+          setError('Folha de pagamento não encontrada.');
         }
       } catch (err: any) {
         setError(err?.response?.data?.message || 'Erro ao carregar folha de pagamento.');
@@ -186,7 +135,7 @@ export default function PayrollDetailPage() {
     };
 
     fetchPayroll();
-  }, [payrollId, isLiveId, liveParams?.userId, liveParams?.year, liveParams?.month]);
+  }, [payrollId]);
 
   // Calculate values
   const calculations = useMemo(() => {
@@ -290,8 +239,85 @@ export default function PayrollDetailPage() {
   if (loading) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="flex items-center justify-center p-8">
-          <Skeleton className="h-32 w-full max-w-lg" />
+        <div className="space-y-6">
+          {/* Page Header Skeleton */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-64" />
+              <div className="flex gap-2">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-48" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="h-9 w-24" />
+              <Skeleton className="h-9 w-24" />
+            </div>
+          </div>
+
+          {/* Info Cards Skeleton - 1/3 and 2/3 columns */}
+          <div className="grid gap-6 md:grid-cols-3">
+            {/* General Info Card Skeleton */}
+            <Card>
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-4" />
+                  <Skeleton className="h-5 w-40" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {[...Array(9)].map((_, i) => (
+                  <div key={i} className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Financial Card Skeleton */}
+            <Card className="md:col-span-2">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-4 w-4" />
+                  <Skeleton className="h-5 w-24" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-0">
+                  {/* Table Header */}
+                  <div className="flex border-b py-2">
+                    <Skeleton className="h-4 w-32 flex-1" />
+                    <Skeleton className="h-4 w-16 mx-4" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                  {/* Table Rows */}
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="flex border-b border-border/50 py-3">
+                      <Skeleton className="h-4 w-40 flex-1" />
+                      <Skeleton className="h-4 w-12 mx-4" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  ))}
+                  {/* Totals */}
+                  <div className="flex border-t-2 py-3">
+                    <Skeleton className="h-5 w-28 flex-1" />
+                    <Skeleton className="h-5 w-24" />
+                  </div>
+                  <div className="flex py-3">
+                    <Skeleton className="h-5 w-32 flex-1" />
+                    <Skeleton className="h-5 w-24" />
+                  </div>
+                  <div className="flex bg-primary/10 rounded py-3 px-3 -mx-3">
+                    <Skeleton className="h-6 w-32 flex-1" />
+                    <Skeleton className="h-6 w-28" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </PrivilegeRoute>
     );
@@ -458,7 +484,7 @@ export default function PayrollDetailPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <InfoRow label="Nº Folha" value={user?.payrollNumber || "-"} />
-              <InfoRow label="Colaborador" value={userName} />
+              <InfoRow label="Colaborador" value={<span className="block truncate max-w-[160px]" title={userName}>{userName}</span>} />
               <InfoRow label="CPF" value={user?.cpf ? formatCPF(user.cpf) : "-"} />
               <InfoRow label="PIS" value={user?.pis ? formatPIS(user.pis) : "-"} />
               <InfoRow label="Cargo" value={position?.name || "-"} />
@@ -529,7 +555,7 @@ export default function PayrollDetailPage() {
                   {/* DSR */}
                   {calculations.dsrAmount > 0 && (
                     <tr className="border-b border-border/50">
-                      <td className="py-2 px-0">DSR Reflexo</td>
+                      <td className="py-2 px-0">Reflexo Extras DSR</td>
                       <td className="py-2 px-0 text-left text-muted-foreground text-xs">{payroll.dsrDays || '-'}</td>
                       <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.dsrAmount)}</td>
                     </tr>
@@ -539,7 +565,11 @@ export default function PayrollDetailPage() {
                   {isBonifiable && calculations.bonusAmount > 0 && (
                     <tr className="border-b border-border/50">
                       <td className="py-2 px-0">Bônus</td>
-                      <td className="py-2 px-0 text-left text-muted-foreground text-xs">-</td>
+                      <td className="py-2 px-0 text-left text-muted-foreground text-xs">
+                        {payroll.bonus?.weightedTasks !== undefined
+                          ? Number(payroll.bonus.weightedTasks).toFixed(1)
+                          : "-"}
+                      </td>
                       <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.bonusAmount)}</td>
                     </tr>
                   )}

@@ -478,6 +478,7 @@ export function getDaysRemainingInExperiencePeriod(user: User): number | null {
 /**
  * Calculate time since contracted or dismissed
  * Returns an object with years, months, and days
+ * Returns null if the status date is in the future (not yet reached)
  */
 export function getTimeSinceStatusChange(user: User): { years: number; months: number; days: number } | null {
   const now = new Date();
@@ -490,6 +491,11 @@ export function getTimeSinceStatusChange(user: User): { years: number; months: n
   }
 
   if (!startDate) {
+    return null;
+  }
+
+  // If the status date is in the future, return null (can't calculate time since a future date)
+  if (startDate > now) {
     return null;
   }
 
