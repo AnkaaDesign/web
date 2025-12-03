@@ -1,6 +1,6 @@
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconPlayerPlay, IconPlayerPause, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconTrash, IconEditCircle, IconFileInvoice, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut } from "@tabler/icons-react";
+import { IconPlayerPlay, IconPlayerPause, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconTrash, IconEditCircle, IconFileInvoice, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy } from "@tabler/icons-react";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
 import { useAuth } from "@/contexts/auth-context";
@@ -16,7 +16,7 @@ interface TaskTableContextMenuProps {
   onAction: (action: TaskAction, tasks: Task[]) => void;
 }
 
-export type TaskAction = "start" | "finish" | "pause" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkDocuments" | "bulkPaints" | "bulkCuttingPlans";
+export type TaskAction = "start" | "finish" | "pause" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkDocuments" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask";
 
 export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTableContextMenuProps) {
   const { user } = useAuth();
@@ -140,6 +140,11 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
               <DropdownMenuItem onClick={() => handleAction("bulkCuttingPlans")}>
                 <IconCut className="mr-2 h-4 w-4" />
                 Adicionar Plano de Corte
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleAction("copyFromTask")}>
+                <IconClipboardCopy className="mr-2 h-4 w-4" />
+                Copiar de Outra Tarefa
               </DropdownMenuItem>
             </DropdownMenuSubContent>
           </DropdownMenuSub>

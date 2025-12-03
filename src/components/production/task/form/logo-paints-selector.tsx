@@ -16,23 +16,6 @@ interface LogoPaintsSelectorProps {
   initialPaints?: Paint[];
 }
 
-const paletteColors: Record<string, string> = {
-  BLACK: "#000000",
-  GRAY: "#6B7280",
-  WHITE: "#FFFFFF",
-  SILVER: "#C0C0C0",
-  GOLDEN: "#FFD700",
-  YELLOW: "#FFEB3B",
-  ORANGE: "#FF9800",
-  BROWN: "#8B4513",
-  RED: "#EF4444",
-  PINK: "#EC4899",
-  PURPLE: "#9333EA",
-  BLUE: "#3B82F6",
-  GREEN: "#22C55E",
-  BEIGE: "#F5F5DC",
-};
-
 export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPaintsSelectorProps) {
   // Cache of selected paints to display in badges
   const [selectedPaints, setSelectedPaints] = useState<Map<string, Paint>>(
@@ -111,7 +94,7 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
 
   // Custom render function for paint items
   const renderPaintItem = (paint: Paint, isSelected: boolean) => {
-    const color = paint.hex || paletteColors[paint.palette || ""] || "#888888";
+    const color = paint.hex || "#888888";
 
     return (
       <div className="flex items-center gap-3 w-full">
@@ -212,7 +195,7 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
                 {selectedPaints.size > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3">
                     {Array.from(selectedPaints.values()).map((paint) => {
-                      const color = paint.hex || paletteColors[paint.palette || ""] || "#888888";
+                      const color = paint.hex || "#888888";
 
                       return (
                         <Badge

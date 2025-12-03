@@ -40,23 +40,18 @@ export function ZipCodeInput({
         if (response.ok) {
           const data = await response.json();
           if (!data.erro) {
-            // Get current form values to check if fields are already filled
-            const currentValues = form.getValues();
-
-            // Helper to check if a field should be filled (only fill if empty)
-            const shouldFillField = (fieldValue: any) => fieldValue === null || fieldValue === undefined || fieldValue === "";
-
-            // Auto-fill address fields only if they're empty
-            if (data.logradouro && shouldFillField(currentValues[addressFieldName])) {
+            // CEP data is more precise for address information, so always
+            // overwrite existing values (including those from CNPJ autofill)
+            if (data.logradouro) {
               form.setValue(addressFieldName, data.logradouro, { shouldDirty: true });
             }
-            if (data.bairro && shouldFillField(currentValues[neighborhoodFieldName])) {
+            if (data.bairro) {
               form.setValue(neighborhoodFieldName, data.bairro, { shouldDirty: true });
             }
-            if (data.localidade && shouldFillField(currentValues[cityFieldName])) {
+            if (data.localidade) {
               form.setValue(cityFieldName, data.localidade, { shouldDirty: true });
             }
-            if (data.uf && shouldFillField(currentValues[stateFieldName])) {
+            if (data.uf) {
               form.setValue(stateFieldName, data.uf, { shouldDirty: true });
             }
           }

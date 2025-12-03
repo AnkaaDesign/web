@@ -106,7 +106,7 @@ export function CustomerForm(props: CustomerFormProps) {
   // CNPJ lookup hook
   const { lookupCnpj } = useCnpjLookup({
     onSuccess: async (data) => {
-      // Autofill all fields with data from Brasil API, allowing updates to existing data
+      // Autofill company info fields from Brasil API
       form.setValue("fantasyName", data.fantasyName, { shouldDirty: true, shouldValidate: true });
 
       if (data.corporateName) {
@@ -115,30 +115,21 @@ export function CustomerForm(props: CustomerFormProps) {
       if (data.email) {
         form.setValue("email", data.email, { shouldDirty: true, shouldValidate: true });
       }
+
+      // Only set CEP from CNPJ - the CEP lookup will fill the rest of the address fields
+      // This ensures more accurate address data from the postal code API
       if (data.zipCode) {
         form.setValue("zipCode", data.zipCode, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.streetType) {
-        form.setValue("streetType", data.streetType, { shouldDirty: true, shouldValidate: true });
-      }
-      if (data.address) {
-        form.setValue("address", data.address, { shouldDirty: true, shouldValidate: true });
-      }
+
+      // Only set address number and complement from CNPJ (CEP API doesn't have these)
       if (data.addressNumber) {
         form.setValue("addressNumber", data.addressNumber, { shouldDirty: true, shouldValidate: true });
       }
       if (data.addressComplement) {
         form.setValue("addressComplement", data.addressComplement, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.neighborhood) {
-        form.setValue("neighborhood", data.neighborhood, { shouldDirty: true, shouldValidate: true });
-      }
-      if (data.city) {
-        form.setValue("city", data.city, { shouldDirty: true, shouldValidate: true });
-      }
-      if (data.state) {
-        form.setValue("state", data.state, { shouldDirty: true, shouldValidate: true });
-      }
+
       if (data.phones && data.phones.length > 0) {
         // Add all phones to the phones array, avoiding duplicates
         const currentPhones = form.getValues("phones") || [];
@@ -340,12 +331,12 @@ export function CustomerForm(props: CustomerFormProps) {
               <CardDescription>Dados fundamentais do cliente</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <FormDocumentInput<CustomerCreateFormData | CustomerUpdateFormData> cpfFieldName="cpf" cnpjFieldName="cnpj" defaultDocumentType="cnpj" disabled={isSubmitting} required />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FantasyNameInput disabled={isSubmitting} />
                 <CorporateNameInput disabled={isSubmitting} />
               </div>
-
-              <FormDocumentInput<CustomerCreateFormData | CustomerUpdateFormData> cpfFieldName="cpf" cnpjFieldName="cnpj" defaultDocumentType="cnpj" disabled={isSubmitting} required />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormInput<CustomerCreateFormData | CustomerUpdateFormData> name="email" type="email" label="E-mail" placeholder="cliente@exemplo.com" disabled={isSubmitting} />

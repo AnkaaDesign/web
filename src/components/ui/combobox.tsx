@@ -543,7 +543,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
             aria-haspopup="listbox"
             aria-label={name || "Select option"}
             className={cn(
-              "w-full justify-between text-foreground bg-transparent",
+              "group w-full justify-between text-foreground bg-transparent",
               heightClass,
               "hover:bg-accent hover:text-white",
               "data-[state=open]:bg-accent data-[state=open]:text-white",

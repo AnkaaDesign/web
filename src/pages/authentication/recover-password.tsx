@@ -49,7 +49,7 @@ export function RecoverPasswordPage() {
   const styles = getAuthStyles();
 
   return (
-    <div className={authLayoutVariants({ background: "gradient" })}>
+    <div className={cn(authLayoutVariants({ background: "gradient" }), "w-screen")}>
       <Card className={cn(authCardVariants({ elevation: "elevated" }))}>
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">

@@ -7,9 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Combobox } from "@/components/ui/combobox";
-import { IconFilter, IconPalette, IconPaint, IconTag, IconBrush, IconTruck, IconSparkles, IconX, IconColorPicker } from "@tabler/icons-react";
+import { IconFilter, IconPaint, IconTag, IconBrush, IconTruck, IconSparkles, IconX, IconColorPicker } from "@tabler/icons-react";
 import type { PaintGetManyFormData } from "../../../../schemas";
-import { PAINT_FINISH, COLOR_PALETTE, PAINT_FINISH_LABELS, COLOR_PALETTE_LABELS, TRUCK_MANUFACTURER, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
+import { PAINT_FINISH, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
 import { usePaintTypes, usePaintBrands } from "../../../../hooks";
 import { AdvancedColorPicker } from "../../form/advanced-color-picker";
 
@@ -35,7 +35,6 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
     if (localFilters.paintBrandIds?.length) count++;
     if (localFilters.finishes?.length) count++;
     if (localFilters.manufacturers?.length) count++;
-    if (localFilters.palettes?.length) count++;
     if (localFilters.hasFormulas !== undefined) count++;
     if (localFilters.similarColor && localFilters.similarColor !== "#000000") count++;
     return count;
@@ -115,7 +114,6 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
   // Get selected values
   const selectedFinishes = localFilters.finishes || [];
   const selectedPaintBrandIds = localFilters.paintBrandIds || [];
-  const selectedPalettes = localFilters.palettes || [];
   const selectedManufacturers = localFilters.manufacturers || [];
   const selectedPaintTypeIds = localFilters.paintTypeIds || [];
   const hasFormulas = localFilters.hasFormulas ?? undefined;
@@ -235,28 +233,6 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
                 clearable={true}
                 emptyText="Nenhuma montadora encontrada"
                 searchPlaceholder="Pesquisar montadoras..."
-              />
-            </div>
-
-            {/* Color Palettes */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <IconPalette className="h-4 w-4" />
-                Paletas de Cores
-              </Label>
-              <Combobox
-                options={Object.values(COLOR_PALETTE).map((palette) => ({
-                  value: palette,
-                  label: COLOR_PALETTE_LABELS[palette] || palette,
-                }))}
-                value={selectedPalettes}
-                onValueChange={(values) => handleChange("palettes", values)}
-                placeholder="Selecione as paletas"
-                mode="multiple"
-                searchable={true}
-                clearable={true}
-                emptyText="Nenhuma paleta encontrada"
-                searchPlaceholder="Pesquisar paletas..."
               />
             </div>
 

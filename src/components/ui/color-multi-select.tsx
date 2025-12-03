@@ -47,7 +47,7 @@ export function ColorMultiSelect({
   const renderValue = React.useCallback(
     (selectedOptions: ColorMultiSelectOption[]) => {
       if (!selectedOptions || selectedOptions.length === 0) {
-        return <span className="text-muted-foreground">{placeholder}</span>;
+        return <span className="text-muted-foreground group-hover:text-inherit group-data-[state=open]:text-inherit">{placeholder}</span>;
       }
 
       const count = selectedOptions.length;

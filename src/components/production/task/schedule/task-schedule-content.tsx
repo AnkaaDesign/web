@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useCallback, useRef } from "react";
-import { useSectors, useTasks, useCurrentUser } from "../../../../hooks";
+import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
+import { useSectors, useTasks, useCurrentUser, useTaskBatchMutations } from "../../../../hooks";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
@@ -11,25 +11,48 @@ import { TaskScheduleFilters } from "./task-schedule-filters";
 import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { TaskScheduleExport } from "./task-schedule-export";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
-import { IconSearch, IconFilter } from "@tabler/icons-react";
+import { CopyFromTaskModal, type CopyableField } from "./copy-from-task-modal";
+import { IconSearch, IconFilter, IconX, IconHandClick } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { hasPrivilege } from "@/utils";
+import { toast } from "sonner";
 
 interface TaskScheduleContentProps {
   className?: string;
 }
 
+// Copy from task state type
+interface CopyFromTaskState {
+  step: "idle" | "selecting_fields" | "selecting_source" | "confirming";
+  targetTasks: Task[];
+  selectedFields: CopyableField[];
+  sourceTask: Task | null;
+}
+
+const initialCopyFromTaskState: CopyFromTaskState = {
+  step: "idle",
+  targetTasks: [],
+  selectedFields: [],
+  sourceTask: null,
+};
+
 export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   // Shared selection state across all tables
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
+
+  // Copy from task state
+  const [copyFromTaskState, setCopyFromTaskState] = useState<CopyFromTaskState>(initialCopyFromTaskState);
 
   // Shared advanced actions ref
   const advancedActionsRef = useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
 
   // Get current user to check permissions
   const { data: currentUser } = useCurrentUser();
+
+  // Batch mutations for copy operation
+  const { batchUpdateAsync } = useTaskBatchMutations();
 
   // Check if user can export (Admin or Financial only)
   const canExport = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL));
@@ -123,6 +146,206 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
     setSelectedTaskIds(ids);
   }, []);
 
+  // Copy from task handlers
+  const handleStartCopyFromTask = useCallback((targetTasks: Task[]) => {
+    setCopyFromTaskState({
+      step: "selecting_fields",
+      targetTasks,
+      selectedFields: [],
+      sourceTask: null,
+    });
+  }, []);
+
+  const handleStartSourceSelection = useCallback((selectedFields: CopyableField[]) => {
+    setCopyFromTaskState((prev) => ({
+      ...prev,
+      step: "selecting_source",
+      selectedFields,
+    }));
+  }, []);
+
+  const handleSourceTaskSelected = useCallback((sourceTask: Task) => {
+    // Move to confirming step
+    setCopyFromTaskState((prev) => ({
+      ...prev,
+      step: "confirming",
+      sourceTask,
+    }));
+  }, []);
+
+  const handleCopyFromTaskConfirm = useCallback(
+    async (selectedFields: CopyableField[], sourceTask: Task) => {
+      const { targetTasks } = copyFromTaskState;
+
+      try {
+        // Build update data based on selected fields
+        const updates = targetTasks.map((targetTask) => {
+          const updateData: Record<string, unknown> = {};
+
+          selectedFields.forEach((field) => {
+            switch (field) {
+              case "details":
+                updateData.details = sourceTask.details;
+                break;
+              case "term":
+                updateData.term = sourceTask.term;
+                break;
+              case "artworkIds":
+                // Reference existing artwork files
+                updateData.artworkIds = sourceTask.artworks?.map((f) => f.id) || [];
+                break;
+              case "budgetId":
+                updateData.budgetId = sourceTask.budgetId;
+                break;
+              case "paintId":
+                updateData.paintId = sourceTask.paintId;
+                break;
+              case "paintIds":
+                // Reference existing paint IDs
+                updateData.paintIds = sourceTask.logoPaints?.map((p) => p.id) || [];
+                break;
+              case "services":
+                // Create NEW service orders (independent entities) with reset dates
+                if (sourceTask.services && sourceTask.services.length > 0) {
+                  updateData.services = sourceTask.services.map((service) => ({
+                    status: service.status,
+                    statusOrder: service.statusOrder,
+                    description: service.description,
+                    startedAt: null, // Reset dates for new entities
+                    finishedAt: null,
+                  }));
+                }
+                break;
+              case "cuts":
+                // Create NEW cut entities (independent) with reset dates
+                if (sourceTask.cuts && sourceTask.cuts.length > 0) {
+                  updateData.cuts = sourceTask.cuts.map((cut) => ({
+                    fileId: cut.fileId,
+                    type: cut.type,
+                    status: cut.status,
+                    statusOrder: cut.statusOrder,
+                    origin: cut.origin,
+                    reason: cut.reason,
+                    startedAt: null, // Reset dates for new entities
+                    completedAt: null,
+                  }));
+                }
+                break;
+              case "layout":
+                // Copy truck layout data
+                if (sourceTask.truck) {
+                  const truckData: Record<string, unknown> = {
+                    xPosition: sourceTask.truck.xPosition,
+                    yPosition: sourceTask.truck.yPosition,
+                  };
+
+                  // Copy layout sections if they exist
+                  if (sourceTask.truck.leftSideLayout) {
+                    truckData.leftSideLayout = {
+                      height: sourceTask.truck.leftSideLayout.height,
+                      photoId: sourceTask.truck.leftSideLayout.photoId,
+                      layoutSections: sourceTask.truck.leftSideLayout.layoutSections?.map((section) => ({
+                        width: section.width,
+                        isDoor: section.isDoor,
+                        doorHeight: section.doorHeight,
+                        position: section.position,
+                      })) || [],
+                    };
+                  }
+
+                  if (sourceTask.truck.rightSideLayout) {
+                    truckData.rightSideLayout = {
+                      height: sourceTask.truck.rightSideLayout.height,
+                      photoId: sourceTask.truck.rightSideLayout.photoId,
+                      layoutSections: sourceTask.truck.rightSideLayout.layoutSections?.map((section) => ({
+                        width: section.width,
+                        isDoor: section.isDoor,
+                        doorHeight: section.doorHeight,
+                        position: section.position,
+                      })) || [],
+                    };
+                  }
+
+                  if (sourceTask.truck.backSideLayout) {
+                    truckData.backSideLayout = {
+                      height: sourceTask.truck.backSideLayout.height,
+                      photoId: sourceTask.truck.backSideLayout.photoId,
+                      layoutSections: sourceTask.truck.backSideLayout.layoutSections?.map((section) => ({
+                        width: section.width,
+                        isDoor: section.isDoor,
+                        doorHeight: section.doorHeight,
+                        position: section.position,
+                      })) || [],
+                    };
+                  }
+
+                  updateData.truck = truckData;
+                }
+                break;
+            }
+          });
+
+          return {
+            id: targetTask.id,
+            data: updateData,
+          };
+        });
+
+        await batchUpdateAsync({
+          tasks: updates,
+          triggeredBy: "TASK_COPY_FROM_TASK",
+          metadata: {
+            sourceTaskName: sourceTask.name,
+            sourceTaskId: sourceTask.id,
+          },
+        });
+
+        toast.success(
+          `Copiado de outra tarefa`,
+          {
+            description: `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${targetTasks.length} tarefa(s)`,
+          }
+        );
+
+        // Reset state and clear selection
+        setCopyFromTaskState(initialCopyFromTaskState);
+        setSelectedTaskIds(new Set());
+      } catch (error) {
+        toast.error("Erro ao copiar campos", {
+          description: "Não foi possível copiar os campos. Tente novamente.",
+        });
+      }
+    },
+    [copyFromTaskState, batchUpdateAsync]
+  );
+
+  const handleCopyFromTaskCancel = useCallback(() => {
+    setCopyFromTaskState(initialCopyFromTaskState);
+  }, []);
+
+  const handleChangeSource = useCallback(() => {
+    // Go back to selecting source mode
+    setCopyFromTaskState((prev) => ({
+      ...prev,
+      step: "selecting_source",
+      sourceTask: null,
+    }));
+  }, []);
+
+  // Effect to handle escape key during source selection
+  useEffect(() => {
+    if (copyFromTaskState.step !== "selecting_source") return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleCopyFromTaskCancel();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [copyFromTaskState.step, handleCopyFromTaskCancel]);
+
   // Filter tasks based on search
   const filteredTasks = useMemo(() => {
     if (!searchText) return allTasks;
@@ -183,6 +406,32 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   return (
     <Card className={cn("h-full flex flex-col", className)}>
       <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+        {/* Source selection mode banner */}
+        {copyFromTaskState.step === "selecting_source" && (
+          <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10 border border-primary/20 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20">
+                <IconHandClick className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-primary">Selecione a tarefa de origem</p>
+                <p className="text-xs text-muted-foreground">
+                  Clique em qualquer tarefa para copiar os campos selecionados
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCopyFromTaskCancel}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <IconX className="h-4 w-4 mr-1" />
+              Cancelar
+            </Button>
+          </div>
+        )}
+
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex-1 relative">
@@ -233,6 +482,9 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                       onSelectedTaskIdsChange={handleSelectedTaskIdsChange}
                       advancedActionsRef={advancedActionsRef}
                       allSelectedTasks={selectedTasks}
+                      isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+                      onSourceTaskSelect={handleSourceTaskSelected}
+                      onStartCopyFromTask={handleStartCopyFromTask}
                     />
                   </div>
                 );
@@ -251,6 +503,9 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                       onSelectedTaskIdsChange={handleSelectedTaskIdsChange}
                       advancedActionsRef={advancedActionsRef}
                       allSelectedTasks={selectedTasks}
+                      isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+                      onSourceTaskSelect={handleSourceTaskSelected}
+                      onStartCopyFromTask={handleStartCopyFromTask}
                     />
                   </div>
                 ) : null;
@@ -273,6 +528,21 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
           ref={advancedActionsRef}
           selectedTaskIds={selectedTaskIds}
           onClearSelection={() => setSelectedTaskIds(new Set())}
+        />
+
+        {/* Copy From Task Modal */}
+        <CopyFromTaskModal
+          open={copyFromTaskState.step === "selecting_fields" || copyFromTaskState.step === "confirming"}
+          onOpenChange={(open) => {
+            if (!open) handleCopyFromTaskCancel();
+          }}
+          targetTasks={copyFromTaskState.targetTasks}
+          sourceTask={copyFromTaskState.sourceTask}
+          step={copyFromTaskState.step === "confirming" ? "confirming" : "selecting_fields"}
+          onStartSourceSelection={handleStartSourceSelection}
+          onConfirm={handleCopyFromTaskConfirm}
+          onCancel={handleCopyFromTaskCancel}
+          onChangeSource={handleChangeSource}
         />
       </CardContent>
     </Card>

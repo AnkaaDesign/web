@@ -1,7 +1,7 @@
 import type { PaintGetManyFormData } from "../../../../schemas";
 import type { PaintType, PaintBrand } from "../../../../types";
-import { PAINT_FINISH_LABELS, COLOR_PALETTE_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH, COLOR_PALETTE, TRUCK_MANUFACTURER } from "../../../../constants";
-import { IconSearch, IconPaint, IconBrush, IconTags, IconPalette, IconTruck, IconHash, IconFlask, IconCalendar } from "@tabler/icons-react";
+import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH, TRUCK_MANUFACTURER } from "../../../../constants";
+import { IconSearch, IconPaint, IconBrush, IconTags, IconTruck, IconHash, IconFlask, IconCalendar } from "@tabler/icons-react";
 import React from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -73,19 +73,6 @@ export function extractActiveFilters(filters: Partial<PaintGetManyFormData>, onR
           onRemove: () => onRemoveFilter("paintBrandIds", brandId),
         });
       }
-    });
-  }
-
-  // Palette filters
-  if (filters.palettes && filters.palettes.length > 0) {
-    filters.palettes.forEach((palette: COLOR_PALETTE) => {
-      activeFilters.push({
-        key: `palette-${palette}`,
-        label: "Paleta",
-        value: COLOR_PALETTE_LABELS[palette] || palette,
-        icon: <IconPalette className="h-3 w-3" />,
-        onRemove: () => onRemoveFilter("palettes", palette),
-      });
     });
   }
 
@@ -199,17 +186,6 @@ export function createFilterRemover(filters: Partial<PaintGetManyFormData>, hand
           }
         } else {
           delete newFilters.paintBrandIds;
-        }
-        break;
-
-      case "palettes":
-        if (value && newFilters.palettes) {
-          newFilters.palettes = newFilters.palettes.filter((p: COLOR_PALETTE) => p !== value);
-          if (newFilters.palettes.length === 0) {
-            delete newFilters.palettes;
-          }
-        } else {
-          delete newFilters.palettes;
         }
         break;
 

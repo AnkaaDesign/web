@@ -1,5 +1,5 @@
 import { FilterIndicators as StandardFilterIndicators, FilterIndicator as StandardFilterIndicator } from "@/components/ui/filter-indicator";
-import { IconSearch, IconTags, IconPaint, IconBrush, IconPalette, IconTruck, IconHash, IconFlask, IconCalendar } from "@tabler/icons-react";
+import { IconSearch, IconTags, IconPaint, IconBrush, IconTruck, IconHash, IconFlask, IconCalendar } from "@tabler/icons-react";
 
 function renderFilterIcon(iconType?: string) {
   if (!iconType) return null;
@@ -15,8 +15,6 @@ function renderFilterIcon(iconType?: string) {
       return <IconBrush {...iconProps} />;
     case "tags":
       return <IconTags {...iconProps} />;
-    case "palette":
-      return <IconPalette {...iconProps} />;
     case "truck":
       return <IconTruck {...iconProps} />;
     case "hash":

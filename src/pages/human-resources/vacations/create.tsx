@@ -6,7 +6,6 @@ import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorit
 import { VacationForm } from "@/components/human-resources/vacation";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { useNavigate } from "react-router-dom";
-import type { VacationCreateFormData } from "../../../schemas";
 
 export const CreateVacationPage = () => {
   const navigate = useNavigate();
@@ -38,15 +37,6 @@ export const CreateVacationPage = () => {
     }
   }, []);
 
-  const handleFormSubmit = useCallback(async (data: VacationCreateFormData) => {
-    setIsSubmitting(true);
-    try {
-      // Form will handle the actual submission
-      // This is just to track the state
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, []);
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
@@ -94,7 +84,6 @@ export const CreateVacationPage = () => {
               mode="create"
               onFormStateChange={handleFormStateChange}
               onCancel={handleCancel}
-              onFormSubmit={handleFormSubmit}
               isSubmitting={isSubmitting}
             />
           </div>

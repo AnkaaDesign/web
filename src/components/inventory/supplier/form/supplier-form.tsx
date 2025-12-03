@@ -116,7 +116,7 @@ export function SupplierForm(props: SupplierFormProps) {
   // CNPJ lookup hook
   const { lookupCnpj } = useCnpjLookup({
     onSuccess: (data) => {
-      // Autofill all fields with data from Brasil API, allowing updates to existing data
+      // Autofill company info fields from Brasil API
       form.setValue("fantasyName", data.fantasyName, { shouldDirty: true, shouldValidate: true });
 
       if (data.corporateName) {
@@ -125,30 +125,21 @@ export function SupplierForm(props: SupplierFormProps) {
       if (data.email) {
         form.setValue("email", data.email, { shouldDirty: true, shouldValidate: true });
       }
+
+      // Only set CEP from CNPJ - the CEP lookup will fill the rest of the address fields
+      // This ensures more accurate address data from the postal code API
       if (data.zipCode) {
         form.setValue("zipCode", data.zipCode, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.streetType) {
-        form.setValue("streetType", data.streetType, { shouldDirty: true, shouldValidate: true });
-      }
-      if (data.address) {
-        form.setValue("address", data.address, { shouldDirty: true, shouldValidate: true });
-      }
+
+      // Only set address number and complement from CNPJ (CEP API doesn't have these)
       if (data.addressNumber) {
         form.setValue("addressNumber", data.addressNumber, { shouldDirty: true, shouldValidate: true });
       }
       if (data.addressComplement) {
         form.setValue("addressComplement", data.addressComplement, { shouldDirty: true, shouldValidate: true });
       }
-      if (data.neighborhood) {
-        form.setValue("neighborhood", data.neighborhood, { shouldDirty: true, shouldValidate: true });
-      }
-      if (data.city) {
-        form.setValue("city", data.city, { shouldDirty: true, shouldValidate: true });
-      }
-      if (data.state) {
-        form.setValue("state", data.state, { shouldDirty: true, shouldValidate: true });
-      }
+
       if (data.phones && data.phones.length > 0) {
         // Add all phones to the phones array, avoiding duplicates
         const currentPhones = form.getValues("phones") || [];
@@ -326,7 +317,7 @@ export function SupplierForm(props: SupplierFormProps) {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           {/* Basic Information */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
@@ -335,12 +326,12 @@ export function SupplierForm(props: SupplierFormProps) {
               <CardDescription>Dados fundamentais do fornecedor</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <FormInput<SupplierCreateFormData | SupplierUpdateFormData> name="cnpj" type="cnpj" label="CNPJ" disabled={isSubmitting} />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FantasyNameInput disabled={isSubmitting} />
                 <CorporateNameInput disabled={isSubmitting} />
               </div>
-
-              <FormInput<SupplierCreateFormData | SupplierUpdateFormData> name="cnpj" type="cnpj" label="CNPJ" disabled={isSubmitting} />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormInput<SupplierCreateFormData | SupplierUpdateFormData> name="email" type="email" label="E-mail" placeholder="fornecedor@exemplo.com" disabled={isSubmitting} />
@@ -350,7 +341,7 @@ export function SupplierForm(props: SupplierFormProps) {
           </Card>
 
           {/* Logo */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconPhoto className="h-5 w-5 text-muted-foreground" />
@@ -364,7 +355,7 @@ export function SupplierForm(props: SupplierFormProps) {
           </Card>
 
           {/* Contact Information */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconPhone className="h-5 w-5 text-muted-foreground" />
@@ -378,7 +369,7 @@ export function SupplierForm(props: SupplierFormProps) {
           </Card>
 
           {/* Address Information */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconMapPin className="h-5 w-5 text-muted-foreground" />
@@ -423,7 +414,7 @@ export function SupplierForm(props: SupplierFormProps) {
           </Card>
 
           {/* Tags */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconTag className="h-5 w-5 text-muted-foreground" />

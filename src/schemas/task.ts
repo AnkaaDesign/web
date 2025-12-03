@@ -1312,6 +1312,13 @@ export const taskBatchUpdateSchema = z.object({
       }),
     )
     .min(1, "Pelo menos uma tarefa deve ser fornecida"),
+  triggeredBy: z.string().optional(), // Optional metadata to track what triggered the batch update
+  metadata: z
+    .object({
+      sourceTaskName: z.string().optional(), // Source task name for copy operations
+      sourceTaskId: z.string().uuid().optional(), // Source task ID for copy operations
+    })
+    .optional(),
 });
 
 export const taskBatchDeleteSchema = z.object({

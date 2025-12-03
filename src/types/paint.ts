@@ -1,7 +1,7 @@
 // packages/interfaces/src/paint.ts
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, BaseMergeResponse } from "./common";
-import type { PAINT_FINISH, ORDER_BY_DIRECTION, COLOR_PALETTE, TRUCK_MANUFACTURER, PAINT_TYPE_ENUM } from "../constants";
+import type { PAINT_FINISH, ORDER_BY_DIRECTION, TRUCK_MANUFACTURER, PAINT_TYPE_ENUM } from "../constants";
 import type { Item, ItemIncludes, ItemOrderBy } from "./item";
 import type { Task, TaskIncludes } from "./task";
 import type { PaintBrand, PaintBrandIncludes, PaintBrandOrderBy, PaintBrandWhere } from "./paint-brand";
@@ -33,8 +33,6 @@ export interface Paint extends BaseEntity {
   finish: PAINT_FINISH;
   manufacturer: TRUCK_MANUFACTURER | null;
   tags: string[];
-  palette: COLOR_PALETTE;
-  paletteOrder: number;
   colorOrder: number;
   paintTypeId: string;
   paintBrandId: string | null;
@@ -249,8 +247,6 @@ export interface PaintOrderBy {
   hex?: ORDER_BY_DIRECTION;
   finish?: ORDER_BY_DIRECTION;
   manufacturer?: ORDER_BY_DIRECTION;
-  palette?: ORDER_BY_DIRECTION;
-  paletteOrder?: ORDER_BY_DIRECTION;
   colorOrder?: ORDER_BY_DIRECTION;
   paintTypeId?: ORDER_BY_DIRECTION;
   paintBrandId?: ORDER_BY_DIRECTION;
@@ -346,10 +342,8 @@ export interface PaintWhere {
   // Enum fields
   finish?: PAINT_FINISH | { equals?: PAINT_FINISH; not?: PAINT_FINISH; in?: PAINT_FINISH[]; notIn?: PAINT_FINISH[] };
   manufacturer?: TRUCK_MANUFACTURER | { equals?: TRUCK_MANUFACTURER; not?: TRUCK_MANUFACTURER; in?: TRUCK_MANUFACTURER[]; notIn?: TRUCK_MANUFACTURER[] } | null;
-  palette?: COLOR_PALETTE | { equals?: COLOR_PALETTE; not?: COLOR_PALETTE; in?: COLOR_PALETTE[]; notIn?: COLOR_PALETTE[] };
 
   // Number fields
-  paletteOrder?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number; in?: number[]; notIn?: number[] };
   colorOrder?: number | { equals?: number; not?: number; lt?: number; lte?: number; gt?: number; gte?: number; in?: number[]; notIn?: number[] };
 
   // Array fields
@@ -501,7 +495,6 @@ export interface PaintComponentFilters {
     hex?: string;
     finish?: PAINT_FINISH | PAINT_FINISH[];
     manufacturer?: TRUCK_MANUFACTURER | TRUCK_MANUFACTURER[];
-    palette?: COLOR_PALETTE | COLOR_PALETTE[];
     tags?: string[];
   };
 }

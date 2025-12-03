@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { usePaints, usePaintTypes, usePaintBrands, usePaintMerge } from "../../../../hooks";
 import type { Paint, PaintOrderBy } from "../../../../types";
 import type { PaintGetManyFormData } from "../../../../schemas";
-import { PAINT_FINISH, COLOR_PALETTE, PAINT_BRAND, TRUCK_MANUFACTURER } from "../../../../constants";
+import { PAINT_FINISH, PAINT_BRAND, TRUCK_MANUFACTURER } from "../../../../constants";
 import { batchUpdatePaintColorOrder } from "../../../../api-client/paint";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -154,11 +154,6 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
       filters.paintBrandIds = paintBrandIds.split(",");
     }
 
-    const palettes = params.get("palettes");
-    if (palettes) {
-      filters.palettes = palettes.split(",") as COLOR_PALETTE[];
-    }
-
     const manufacturers = params.get("manufacturers");
     if (manufacturers) {
       filters.manufacturers = manufacturers.split(",") as TRUCK_MANUFACTURER[];
@@ -210,7 +205,6 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
     // Serialize array filters
     if (filters.finishes?.length) params.finishes = filters.finishes.join(",");
     if (filters.paintBrandIds?.length) params.paintBrandIds = filters.paintBrandIds.join(",");
-    if (filters.palettes?.length) params.palettes = filters.palettes.join(",");
     if (filters.manufacturers?.length) params.manufacturers = filters.manufacturers.join(",");
     if (filters.paintTypeIds?.length) params.paintTypeIds = filters.paintTypeIds.join(",");
     if (filters.tags?.length) params.tags = filters.tags.join(",");
@@ -301,7 +295,7 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
         orderBy = { name: "asc" };
         break;
       case "color":
-        orderBy = { palette: "asc", paletteOrder: "asc" };
+        orderBy = { colorOrder: "asc" };
         break;
       case "type":
         orderBy = { paintType: { name: "asc" } };
@@ -463,7 +457,6 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
     if (filters.paintBrandIds?.length) count++;
     if (filters.finishes?.length) count++;
     if (filters.manufacturers?.length) count++;
-    if (filters.palettes?.length) count++;
     if (filters.hasFormulas !== undefined) count++;
     if (filters.similarColor && filters.similarColor.trim() !== "" && filters.similarColor !== "#000000") count++;
     return count > 0;
@@ -475,7 +468,6 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
     if (filters.paintBrandIds?.length) count += filters.paintBrandIds.length;
     if (filters.finishes?.length) count += filters.finishes.length;
     if (filters.manufacturers?.length) count += filters.manufacturers.length;
-    if (filters.palettes?.length) count += filters.palettes.length;
     if (filters.hasFormulas !== undefined) count++;
     if (filters.similarColor && filters.similarColor.trim() !== "" && filters.similarColor !== "#000000") count++;
     return count;

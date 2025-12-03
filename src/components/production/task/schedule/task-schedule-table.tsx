@@ -33,6 +33,9 @@ interface TaskScheduleTableProps {
   onSelectedTaskIdsChange?: (ids: Set<string>) => void;
   advancedActionsRef?: React.RefObject<{ openModal: (type: string, taskIds: string[]) => void } | null>;
   allSelectedTasks?: Task[]; // All selected tasks from all tables
+  isSelectingSourceTask?: boolean; // True when in "copy from task" source selection mode
+  onSourceTaskSelect?: (task: Task) => void; // Callback when source task is selected
+  onStartCopyFromTask?: (targetTasks: Task[]) => void; // Callback to start copy from task flow
 }
 
 interface TaskRow extends Task {
@@ -40,7 +43,7 @@ interface TaskRow extends Task {
   hoursRemaining: number | null;
 }
 
-export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: externalSelectedTaskIds, onSelectedTaskIdsChange, advancedActionsRef: externalAdvancedActionsRef, allSelectedTasks }: TaskScheduleTableProps) {
+export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: externalSelectedTaskIds, onSelectedTaskIdsChange, advancedActionsRef: externalAdvancedActionsRef, allSelectedTasks, isSelectingSourceTask, onSourceTaskSelect, onStartCopyFromTask }: TaskScheduleTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canEdit = canEditTasks(user);
@@ -271,6 +274,15 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
         return;
       }
 
+      // Handle source task selection mode (copy from task)
+      if (isSelectingSourceTask && onSourceTaskSelect) {
+        const task = preparedTasks.find((t) => t.id === taskId);
+        if (task) {
+          onSourceTaskSelect(task);
+        }
+        return;
+      }
+
       // Handle selection with Ctrl/Cmd or Shift
       if (e.ctrlKey || e.metaKey) {
         handleSelectTask(taskId, !selectedTaskIds.has(taskId));
@@ -291,7 +303,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
         navigate(routes.production.schedule.details(taskId));
       }
     },
-    [navigate, selectedTaskIds, preparedTasks, handleSelectTask],
+    [navigate, selectedTaskIds, preparedTasks, handleSelectTask, isSelectingSourceTask, onSourceTaskSelect],
   );
 
   const handleContextMenu = useCallback(
@@ -443,9 +455,15 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
             advancedActionsRef.current.openModal("cuttingPlans", taskIds);
           }
           break;
+
+        case "copyFromTask":
+          if (onStartCopyFromTask) {
+            onStartCopyFromTask(tasks);
+          }
+          break;
       }
     },
-    [updateAsync, createAsync, deleteTaskAsync, navigate],
+    [updateAsync, createAsync, deleteTaskAsync, navigate, onStartCopyFromTask],
   );
 
   const confirmDelete = async () => {
@@ -570,7 +588,11 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
   }, []);
 
   const getRowClassName = (task: TaskRow) => {
-    return cn("cursor-pointer transition-colors", getRowColorClass(task));
+    return cn(
+      "cursor-pointer transition-colors",
+      getRowColorClass(task),
+      isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary"
+    );
   };
 
   if (tasks.length === 0) {

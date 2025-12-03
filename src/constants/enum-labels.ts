@@ -18,7 +18,6 @@ import {
   PAINT_FINISH,
   PAINT_TYPE_ENUM,
   TRUCK_MANUFACTURER,
-  COLOR_PALETTE,
   WARNING_SEVERITY,
   WARNING_CATEGORY,
   NOTIFICATION_TYPE,
@@ -291,22 +290,6 @@ export const PAINT_TYPE_ENUM_LABELS: Record<PAINT_TYPE_ENUM, string> = {
 };
 
 
-export const COLOR_PALETTE_LABELS: Record<COLOR_PALETTE, string> = {
-  [COLOR_PALETTE.BLACK]: "Preto",
-  [COLOR_PALETTE.GRAY]: "Cinza",
-  [COLOR_PALETTE.WHITE]: "Branco",
-  [COLOR_PALETTE.SILVER]: "Prata",
-  [COLOR_PALETTE.GOLDEN]: "Dourado",
-  [COLOR_PALETTE.YELLOW]: "Amarelo",
-  [COLOR_PALETTE.ORANGE]: "Laranja",
-  [COLOR_PALETTE.BROWN]: "Marrom",
-  [COLOR_PALETTE.RED]: "Vermelho",
-  [COLOR_PALETTE.PINK]: "Rosa",
-  [COLOR_PALETTE.PURPLE]: "Roxo",
-  [COLOR_PALETTE.BLUE]: "Azul",
-  [COLOR_PALETTE.GREEN]: "Verde",
-  [COLOR_PALETTE.BEIGE]: "Bege",
-};
 
 // =====================
 // Truck Labels
@@ -1086,6 +1069,7 @@ export const CHANGE_ACTION_LABELS: Record<CHANGE_ACTION, string> = {
 export const CHANGE_TRIGGERED_BY_LABELS: Record<CHANGE_TRIGGERED_BY, string> = {
   [CHANGE_TRIGGERED_BY.TASK_CREATE]: "Criação de Tarefa",
   [CHANGE_TRIGGERED_BY.TASK_UPDATE]: "Atualização de Tarefa",
+  [CHANGE_TRIGGERED_BY.TASK_COPY_FROM_TASK]: "Copiado de Outra Tarefa",
   [CHANGE_TRIGGERED_BY.ITEM_UPDATE]: "Atualização de Item",
   [CHANGE_TRIGGERED_BY.USER_ACTION]: "Ação do Usuário",
   [CHANGE_TRIGGERED_BY.BATCH_CREATE]: "Criação em Lote",

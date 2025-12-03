@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, hexColorSchema } from "./common";
 import type { Paint, PaintType, PaintFormula, PaintFormulaComponent, PaintProduction, PaintGround, PaintBrand } from "../types";
-import { PAINT_FINISH, COLOR_PALETTE, PAINT_BRAND, TRUCK_MANUFACTURER } from "../constants";
+import { PAINT_FINISH, PAINT_BRAND, TRUCK_MANUFACTURER } from "../constants";
 
 // =====================
 // Include Schemas (Second Level Only)
@@ -658,8 +658,6 @@ export const paintOrderBySchema = z
       hex: orderByDirectionSchema.optional(),
       finish: orderByDirectionSchema.optional(),
       manufacturer: orderByDirectionSchema.optional(),
-      palette: orderByDirectionSchema.optional(),
-      paletteOrder: orderByDirectionSchema.optional(),
       paintTypeId: orderByDirectionSchema.optional(),
       paintBrandId: orderByDirectionSchema.optional(),
       createdAt: orderByDirectionSchema.optional(),
@@ -674,8 +672,6 @@ export const paintOrderBySchema = z
         hex: orderByDirectionSchema.optional(),
         finish: orderByDirectionSchema.optional(),
         manufacturer: orderByDirectionSchema.optional(),
-        palette: orderByDirectionSchema.optional(),
-        paletteOrder: orderByDirectionSchema.optional(),
         paintTypeId: orderByDirectionSchema.optional(),
         paintBrandId: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
@@ -808,8 +804,6 @@ export const paintWhereSchema: z.ZodSchema<any> = z.lazy(() =>
       hex: z.union([z.string(), z.object({ contains: z.string().optional(), startsWith: z.string().optional(), endsWith: z.string().optional() })]).optional(),
       finish: z.union([z.nativeEnum(PAINT_FINISH), z.object({ in: z.array(z.nativeEnum(PAINT_FINISH)).optional() })]).optional(),
       manufacturer: z.union([z.nativeEnum(TRUCK_MANUFACTURER), z.object({ in: z.array(z.nativeEnum(TRUCK_MANUFACTURER)).optional() })]).optional(),
-      palette: z.union([z.nativeEnum(COLOR_PALETTE), z.object({ in: z.array(z.nativeEnum(COLOR_PALETTE)).optional() })]).optional(),
-      paletteOrder: z.union([z.number(), z.object({ gte: z.number().optional(), lte: z.number().optional() })]).optional(),
       tags: z.object({ has: z.string().optional(), hasEvery: z.array(z.string()).optional(), hasSome: z.array(z.string()).optional() }).optional(),
       paintTypeId: z.union([z.string(), z.object({ in: z.array(z.string()).optional(), notIn: z.array(z.string()).optional() })]).optional(),
       paintBrandId: z.union([z.string(), z.object({ in: z.array(z.string()).optional(), notIn: z.array(z.string()).optional() })]).optional(),
@@ -937,11 +931,8 @@ const paintFilters = {
   finishes: z.array(z.nativeEnum(PAINT_FINISH)).optional(),
   brands: z.array(z.nativeEnum(PAINT_BRAND)).optional(),
   manufacturers: z.array(z.nativeEnum(TRUCK_MANUFACTURER)).optional(),
-  palettes: z.array(z.nativeEnum(COLOR_PALETTE)).optional(),
   tags: z.array(z.string()).optional(),
   hasFormulas: z.boolean().optional(),
-  minpaletteOrder: z.number().optional(),
-  maxpaletteOrder: z.number().optional(),
   paintTypeIds: z.array(z.string()).optional(),
   paintBrandIds: z.array(z.string()).optional(),
   // Color similarity filtering
@@ -988,11 +979,6 @@ const paintTransform = (data: any) => {
     delete data.manufacturers;
   }
 
-  if (data.palettes) {
-    andConditions.push({ palette: { in: data.palettes } });
-    delete data.palettes;
-  }
-
   if (data.tags) {
     andConditions.push({ tags: { hasSome: data.tags } });
     delete data.tags;
@@ -1013,19 +999,6 @@ const paintTransform = (data: any) => {
       formulas: data.hasFormulas ? { some: {} } : { none: {} },
     });
     delete data.hasFormulas;
-  }
-
-  if (data.minpaletteOrder !== undefined || data.maxpaletteOrder !== undefined) {
-    const paletteCondition: any = {};
-    if (data.minpaletteOrder !== undefined) {
-      paletteCondition.gte = data.minpaletteOrder;
-      delete data.minpaletteOrder;
-    }
-    if (data.maxpaletteOrder !== undefined) {
-      paletteCondition.lte = data.maxpaletteOrder;
-      delete data.maxpaletteOrder;
-    }
-    andConditions.push({ paletteOrder: paletteCondition });
   }
 
   if (data.createdAt) {
@@ -1319,12 +1292,6 @@ export const paintCreateSchema = z.object({
     .nullable()
     .optional(),
   tags: z.array(z.string()).default([]),
-  palette: z
-    .enum(Object.values(COLOR_PALETTE) as [string, ...string[]], {
-      errorMap: () => ({ message: "paleta inválida" }),
-    })
-    .optional(),
-  paletteOrder: z.number().int().min(1).max(14).optional(),
   colorOrder: z.number().int().nullable().optional(),
   groundIds: z.array(z.string().uuid()).optional(),
   colorPreview: z.string().nullable().optional(), // URL or data URL for paint preview image
@@ -1348,12 +1315,6 @@ export const paintUpdateSchema = z.object({
     .nullable()
     .optional(),
   tags: z.array(z.string()).default([]).optional(),
-  palette: z
-    .enum(Object.values(COLOR_PALETTE) as [string, ...string[]], {
-      errorMap: () => ({ message: "paleta inválida" }),
-    })
-    .optional(),
-  paletteOrder: z.number().int().min(1).max(14).optional(),
   colorOrder: z.number().int().nullable().optional(),
   groundIds: z.array(z.string().uuid()).optional(),
   colorPreview: z.string().nullable().optional(), // URL or data URL for paint preview image
@@ -2441,8 +2402,6 @@ export const mapPaintToFormData = createMapToFormDataHelper<Paint, PaintUpdateFo
   paintBrandId: paint.paintBrandId,
   manufacturer: paint.manufacturer,
   tags: paint.tags,
-  palette: paint.palette,
-  paletteOrder: paint.paletteOrder,
   paintTypeId: paint.paintTypeId,
   groundIds: paint.paintGrounds?.map((pg) => pg.groundPaintId) || [],
 }));

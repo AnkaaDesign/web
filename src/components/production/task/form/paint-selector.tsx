@@ -4,31 +4,11 @@ import { Combobox } from "@/components/ui/combobox";
 import { getPaints } from "../../../../api-client";
 import type { Paint } from "../../../../types";
 import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
-import { Badge } from "@/components/ui/badge";
-import { COLOR_PALETTE_LABELS } from "../../../../constants";
-
 interface PaintSelectorProps {
   control: any;
   disabled?: boolean;
   initialPaints?: Paint[];
 }
-
-const paletteColors: Record<string, string> = {
-  BLACK: "#000000",
-  GRAY: "#6B7280",
-  WHITE: "#FFFFFF",
-  SILVER: "#C0C0C0",
-  GOLDEN: "#FFD700",
-  YELLOW: "#FFEB3B",
-  ORANGE: "#FF9800",
-  BROWN: "#8B4513",
-  RED: "#EF4444",
-  PINK: "#EC4899",
-  PURPLE: "#9333EA",
-  BLUE: "#3B82F6",
-  GREEN: "#22C55E",
-  BEIGE: "#F5F5DC",
-};
 
 export function PaintSelector({ control, disabled, initialPaints }: PaintSelectorProps) {
   // Create a stable cache for fetched paints
@@ -97,20 +77,13 @@ export function PaintSelector({ control, disabled, initialPaints }: PaintSelecto
     return (
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2">
-          {paint.palette && (
-            <div
-              className="w-4 h-4 rounded-full border border-border shrink-0"
-              style={{ backgroundColor: paletteColors[paint.palette] || "#ccc" }}
-              title={COLOR_PALETTE_LABELS[paint.palette]}
-            />
-          )}
+          <div
+            className="w-4 h-4 rounded-full border border-border shrink-0"
+            style={{ backgroundColor: paint.hex || "#ccc" }}
+            title={paint.hex}
+          />
           <span>{paint.name}</span>
         </div>
-        {paint.palette && (
-          <Badge variant="secondary" className="ml-2 shrink-0 text-xs">
-            {COLOR_PALETTE_LABELS[paint.palette]}
-          </Badge>
-        )}
       </div>
     );
   }, []);

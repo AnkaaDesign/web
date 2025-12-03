@@ -1,23 +1,4 @@
 import type { Paint } from "../../../../types";
-import { COLOR_PALETTE } from "../../../../constants";
-
-// Optimized palette order for visual color flow (like the images provided)
-const PALETTE_ORDER: Record<COLOR_PALETTE, number> = {
-  [COLOR_PALETTE.BLACK]: 1,
-  [COLOR_PALETTE.GRAY]: 2,
-  [COLOR_PALETTE.WHITE]: 3,
-  [COLOR_PALETTE.SILVER]: 4,
-  [COLOR_PALETTE.BEIGE]: 5,
-  [COLOR_PALETTE.BROWN]: 6,
-  [COLOR_PALETTE.YELLOW]: 7,
-  [COLOR_PALETTE.GOLDEN]: 8,
-  [COLOR_PALETTE.ORANGE]: 9,
-  [COLOR_PALETTE.RED]: 10,
-  [COLOR_PALETTE.PINK]: 11,
-  [COLOR_PALETTE.PURPLE]: 12,
-  [COLOR_PALETTE.BLUE]: 13,
-  [COLOR_PALETTE.GREEN]: 14,
-};
 
 // Convert hex to HSL for better color sorting
 export function hexToHsl(hex: string): { h: number; s: number; l: number } {
@@ -62,7 +43,6 @@ export function hexToHsl(hex: string): { h: number; s: number; l: number } {
 // Advanced color sorting algorithm that creates a smooth color flow
 export function getAdvancedColorSortValue(paint: Paint): number {
   const hsl = hexToHsl(paint.hex || "#000000");
-  const paletteBase = PALETTE_ORDER[paint.palette] || 12;
 
   // For grayscale colors (low saturation), sort by lightness
   if (hsl.s < 15) {
@@ -71,58 +51,14 @@ export function getAdvancedColorSortValue(paint: Paint): number {
     return lightnessOrder * 100000 + (100 - hsl.l) * 100;
   }
 
-  // For colored paints, create smooth transitions within palettes
-  // Primary sort by palette group
-  let primarySort = paletteBase * 1000000;
+  // For colored paints, sort by hue to create a smooth rainbow spectrum
+  // Primary sort by hue (creates color wheel ordering)
+  const primarySort = hsl.h * 1000000;
 
-  // Secondary sort by hue within similar colors
-  // Adjust hue to create better visual flow
-  let adjustedHue = hsl.h;
-
-  // Group similar hues together for smoother transitions
-  switch (paint.palette) {
-    case COLOR_PALETTE.RED:
-      // Reds: 0-30 and 330-360
-      if (adjustedHue > 330) adjustedHue = adjustedHue - 360;
-      break;
-    case COLOR_PALETTE.ORANGE:
-      // Oranges: 15-45
-      adjustedHue = Math.abs(adjustedHue - 30);
-      break;
-    case COLOR_PALETTE.YELLOW:
-      // Yellows: 45-70
-      adjustedHue = Math.abs(adjustedHue - 60);
-      break;
-    case COLOR_PALETTE.GREEN:
-      // Greens: 70-150
-      adjustedHue = Math.abs(adjustedHue - 120);
-      break;
-    case COLOR_PALETTE.BLUE:
-      // Blues: 180-270
-      adjustedHue = Math.abs(adjustedHue - 220);
-      break;
-    case COLOR_PALETTE.PURPLE:
-      // Purples: 270-330
-      adjustedHue = Math.abs(adjustedHue - 300);
-      break;
-    case COLOR_PALETTE.BROWN:
-      // Browns: typically 20-40
-      adjustedHue = Math.abs(adjustedHue - 30);
-      break;
-    case COLOR_PALETTE.BEIGE:
-      // Beige: typically 30-50
-      adjustedHue = Math.abs(adjustedHue - 40);
-      break;
-    case COLOR_PALETTE.SILVER:
-      // Silver: grayscale, will be handled by saturation check
-      adjustedHue = 0;
-      break;
-  }
-
-  // Tertiary sort by saturation (more saturated colors first within the hue)
+  // Secondary sort by saturation (more saturated colors first within the hue)
   const saturationSort = (100 - hsl.s) * 100;
 
-  // Quaternary sort by lightness (medium tones first, then dark, then light)
+  // Tertiary sort by lightness (medium tones first, then dark, then light)
   let lightnessSort;
   if (hsl.l >= 40 && hsl.l <= 60) {
     lightnessSort = 0; // Medium tones first
@@ -133,7 +69,7 @@ export function getAdvancedColorSortValue(paint: Paint): number {
   }
 
   // Combine all factors for final sort value
-  return primarySort + adjustedHue * 1000 + saturationSort + lightnessSort;
+  return primarySort + saturationSort + lightnessSort;
 }
 
 // Get a numeric value for sorting colors (legacy - kept for compatibility)

@@ -523,7 +523,11 @@ const ChangelogTimelineItem = ({
   };
 
   // Determine the action label
-  const actionLabel = getActionLabel(firstChange.action as any, firstChange.triggeredBy || CHANGE_TRIGGERED_BY.USER);
+  const actionLabel = getActionLabel(
+    firstChange.action as any,
+    firstChange.triggeredBy || CHANGE_TRIGGERED_BY.USER,
+    firstChange.metadata as { sourceTaskName?: string } | undefined
+  );
 
   // Check if this is a CREATE action
   if (firstChange.action === CHANGE_LOG_ACTION.CREATE) {

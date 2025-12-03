@@ -253,6 +253,27 @@ export function VacationForm(props: VacationFormProps) {
   // Watch isCollective field to conditionally show/hide user selector
   const isCollective = form.watch("isCollective");
 
+  // Handle isCollective changes (for create mode)
+  // When collective is enabled, clear userId so it doesn't fail UUID validation
+  // When collective is disabled, reset userId to empty string for user to select
+  useEffect(() => {
+    if (mode === "create") {
+      const currentUserId = form.getValues("userId");
+      if (isCollective) {
+        // Set userId to null when collective (null passes nullable().optional() validation)
+        if (currentUserId !== null) {
+          form.setValue("userId", null, { shouldValidate: true });
+        }
+      } else {
+        // Reset to empty string when not collective, so user must select a collaborator
+        if (currentUserId === null) {
+          form.setValue("userId", "", { shouldValidate: true });
+        }
+      }
+      form.trigger();
+    }
+  }, [isCollective, form, mode]);
+
   return (
     <Card className="shadow-sm border border-border">
       <CardHeader>

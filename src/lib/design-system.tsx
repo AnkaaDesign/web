@@ -76,7 +76,7 @@ export const cardVariants = cva("rounded-xl border bg-card text-card-foreground 
 });
 
 // Auth Layout Variants
-export const authLayoutVariants = cva("min-h-screen flex items-center justify-center p-4", {
+export const authLayoutVariants = cva("min-h-screen w-full flex items-center justify-center p-4", {
   variants: {
     background: {
       default: "bg-background",
@@ -89,7 +89,7 @@ export const authLayoutVariants = cva("min-h-screen flex items-center justify-ce
 });
 
 // Auth Card Variants
-export const authCardVariants = cva("w-full rounded-xl border bg-card shadow-sm", {
+export const authCardVariants = cva("w-full mx-auto rounded-xl border bg-card shadow-sm", {
   variants: {
     size: {
       default: "max-w-md",

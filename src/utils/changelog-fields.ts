@@ -1908,8 +1908,16 @@ export const actionConfig: Record<CHANGE_LOG_ACTION, { label: string }> = {
  * @param triggeredBy - The trigger type
  * @returns The action label
  */
-export function getActionLabel(action: CHANGE_LOG_ACTION, triggeredBy?: CHANGE_TRIGGERED_BY): string {
+export function getActionLabel(action: CHANGE_LOG_ACTION, triggeredBy?: CHANGE_TRIGGERED_BY, metadata?: { sourceTaskName?: string }): string {
   const baseLabel = actionConfig[action]?.label || action;
+
+  // Handle copy from task operation
+  if (triggeredBy === CHANGE_TRIGGERED_BY.TASK_COPY_FROM_TASK) {
+    if (metadata?.sourceTaskName) {
+      return `Copiado de "${metadata.sourceTaskName}"`;
+    }
+    return "Copiado de outra tarefa";
+  }
 
   // Handle batch operations
   if (triggeredBy === CHANGE_TRIGGERED_BY.BATCH_UPDATE) {

@@ -29,10 +29,6 @@ export function serializeFormToUrlParams(formData: Partial<PaintCreateFormData>,
   if (formData.paintBrandId) params.set("paintBrandId", formData.paintBrandId);
   if (formData.manufacturer) params.set("manufacturer", formData.manufacturer);
   if (formData.paintTypeId && formData.paintTypeId.trim()) params.set("paintTypeId", formData.paintTypeId);
-  if (formData.palette) params.set("palette", formData.palette);
-  if (formData.paletteOrder !== undefined && formData.paletteOrder !== null && formData.paletteOrder !== "") {
-    params.set("paletteOrder", formData.paletteOrder.toString());
-  }
 
   // Serialize arrays
   if (formData.tags && formData.tags.length > 0) {
@@ -90,15 +86,6 @@ export function deserializeUrlParamsToForm(searchParams: URLSearchParams): {
   const paintTypeId = searchParams.get("paintTypeId");
   if (paintTypeId) formData.paintTypeId = paintTypeId;
 
-  const palette = searchParams.get("palette");
-  if (palette) formData.palette = palette as any;
-
-  const paletteOrder = searchParams.get("paletteOrder");
-  if (paletteOrder) {
-    const parsedOrder = parseInt(paletteOrder, 10);
-    if (!isNaN(parsedOrder)) formData.paletteOrder = parsedOrder;
-  }
-
   // Parse arrays
   try {
     const tagsParam = searchParams.get("tags");
@@ -147,8 +134,6 @@ export function getDefaultFormValues(searchParams: URLSearchParams, baseDefaults
     paintBrandId: null,
     manufacturer: null,
     tags: [],
-    palette: undefined,
-    paletteOrder: undefined,
     paintTypeId: "",
     groundIds: [],
     ...baseDefaults,

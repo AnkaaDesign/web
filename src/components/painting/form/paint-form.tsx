@@ -18,7 +18,6 @@ import { FinishSelector } from "./finish-selector";
 import { PaintBrandSelector } from "./brand-selector";
 import { ManufacturerSelector } from "./manufacturer-selector";
 import { PaintTypeSelector } from "./paint-type-selector";
-import { PaletteSelector } from "./palette-selector";
 import { TagsInput } from "./tags-input";
 import { GroundSelector } from "./ground-selector";
 import { FormulaManager } from "./formula-manager";
@@ -117,8 +116,6 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     paintBrandId: null,
     manufacturer: null,
     tags: [],
-    palette: undefined,
-    paletteOrder: undefined,
     paintTypeId: "",
     groundIds: [],
     ...defaultValues,
@@ -452,7 +449,6 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
                   <PaintTypeSelector control={form.control} required />
                   <FinishSelector control={form.control} required />
                   <ManufacturerSelector control={form.control} />
-                  <PaletteSelector control={form.control} />
                 </div>
 
                 {/* Tags field spanning full width */}

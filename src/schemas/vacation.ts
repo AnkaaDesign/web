@@ -576,7 +576,11 @@ export const vacationGetManySchema = z
 
 export const vacationCreateSchema = z
   .object({
-    userId: z.string().uuid("Usuário inválido").nullable().optional(),
+    userId: z.union([
+      z.string().uuid("Usuário inválido"),
+      z.literal(""),
+      z.null(),
+    ]).optional(),
     startAt: z.coerce.date({
       required_error: "Data de início é obrigatória",
       invalid_type_error: "Data de início inválida",
@@ -602,8 +606,8 @@ export const vacationCreateSchema = z
     path: ["endAt"],
   })
   .refine((data) => {
-    // If not collective, userId is required
-    if (!data.isCollective && !data.userId) {
+    // If not collective, userId is required (and must not be empty string)
+    if (!data.isCollective && (!data.userId || data.userId === "")) {
       return false;
     }
     return true;

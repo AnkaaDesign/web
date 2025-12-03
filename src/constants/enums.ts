@@ -278,22 +278,6 @@ export enum CHART_TYPE {
   STACKED = "STACKED",
 }
 
-export enum COLOR_PALETTE {
-  BLACK = "BLACK",
-  GRAY = "GRAY",
-  WHITE = "WHITE",
-  SILVER = "SILVER",
-  GOLDEN = "GOLDEN",
-  YELLOW = "YELLOW",
-  ORANGE = "ORANGE",
-  BROWN = "BROWN",
-  RED = "RED",
-  PINK = "PINK",
-  PURPLE = "PURPLE",
-  BLUE = "BLUE",
-  GREEN = "GREEN",
-  BEIGE = "BEIGE",
-}
 
 // =====================
 // Statistics & Analytics Enums
@@ -885,6 +869,7 @@ export enum CHANGE_ACTION {
 export enum CHANGE_TRIGGERED_BY {
   TASK_CREATE = "TASK_CREATE",
   TASK_UPDATE = "TASK_UPDATE",
+  TASK_COPY_FROM_TASK = "TASK_COPY_FROM_TASK",
   ITEM_UPDATE = "ITEM_UPDATE",
   USER_ACTION = "USER_ACTION",
   BATCH_CREATE = "BATCH_CREATE",

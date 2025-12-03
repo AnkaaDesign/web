@@ -307,19 +307,6 @@ export function Painting() {
               <h3 className="text-lg font-semibold text-foreground mb-4">Atividades Recentes</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <RecentActivitiesCard title="Tintas Usadas em Tarefas" activities={getRecentPaintsUsedInTasks()} icon={IconActivity} color="blue" />
-                <RecentActivitiesCard
-                  title="Cores por Paleta"
-                  activities={
-                    data?.colorAnalysis?.colorsByPalette?.slice(0, 3).map((palette) => ({
-                      item: palette.palette,
-                      info: "Paleta",
-                      quantity: `${palette.count} cores`,
-                      time: `${palette.percentage.toFixed(2)}%`,
-                    })) || []
-                  }
-                  icon={IconColorPicker}
-                  color="green"
-                />
                 <RecentActivitiesCard title="Produções Recentes" activities={getRecentProductions()} icon={IconPaint} color="orange" />
                 <RecentActivitiesCard
                   title="Top Produções por Volume"

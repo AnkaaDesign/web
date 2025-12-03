@@ -9,23 +9,6 @@ import { IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 
-const paletteColors: Record<string, string> = {
-  BLACK: "#000000",
-  GRAY: "#6B7280",
-  WHITE: "#FFFFFF",
-  SILVER: "#C0C0C0",
-  GOLDEN: "#FFD700",
-  YELLOW: "#FFEB3B",
-  ORANGE: "#FF9800",
-  BROWN: "#8B4513",
-  RED: "#EF4444",
-  PINK: "#EC4899",
-  PURPLE: "#9333EA",
-  BLUE: "#3B82F6",
-  GREEN: "#22C55E",
-  BEIGE: "#F5F5DC",
-};
-
 interface GeneralPaintingSelectorProps {
   control: any;
   disabled?: boolean;
@@ -106,7 +89,7 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
 
   // Custom render function for paint items
   const renderPaintItem = (paint: Paint, isSelected: boolean) => {
-    const color = paint.hex || paletteColors[paint.palette || ""] || "#888888";
+    const color = paint.hex || "#888888";
 
     return (
       <div className="flex items-center gap-3 w-full">
@@ -211,7 +194,7 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
                       ) : selectedPaint.finish ? (
                         <div className="w-4 h-4 rounded ring-1 ring-border shadow-sm overflow-hidden">
                           <CanvasNormalMapRenderer
-                            baseColor={selectedPaint.hex || paletteColors[selectedPaint.palette || ""] || "#888888"}
+                            baseColor={selectedPaint.hex || "#888888"}
                             finish={selectedPaint.finish as PAINT_FINISH}
                             width={16}
                             height={16}
@@ -222,7 +205,7 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
                       ) : (
                         <div
                           className="w-4 h-4 rounded ring-1 ring-border shadow-sm"
-                          style={{ backgroundColor: selectedPaint.hex || paletteColors[selectedPaint.palette || ""] || "#888888" }}
+                          style={{ backgroundColor: selectedPaint.hex || "#888888" }}
                         />
                       )}
                       <span className="text-xs font-medium">{selectedPaint.name}</span>

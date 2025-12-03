@@ -75,6 +75,7 @@ export function TagsInput<TFieldValues extends FieldValues = FieldValues>({ cont
                   }}
                   placeholder="Digite uma tag e pressione Enter ou clique em +"
                   disabled={disabled}
+                  transparent={true}
                   className="flex-1"
                 />
                 <TooltipProvider>

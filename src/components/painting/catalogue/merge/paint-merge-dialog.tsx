@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { IconAlertTriangle, IconArrowRight, IconCheck, IconLoader2, IconPalette, IconInfoCircle } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import type { Paint } from "../../../../types";
-import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, COLOR_PALETTE_LABELS } from "../../../../constants";
+import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
 
 interface ConflictField {
   field: string;
@@ -52,7 +52,6 @@ export function PaintMergeDialog({ open, onOpenChange, paints, onMerge }: PaintM
       { field: "finish", label: "Acabamento", type: "single" as const },
       { field: "manufacturer", label: "Fabricante", type: "single" as const },
       { field: "tags", label: "Tags", type: "array" as const },
-      { field: "palette", label: "Paleta", type: "single" as const },
       { field: "paintTypeId", label: "Tipo de Tinta", type: "single" as const },
       { field: "paintBrandId", label: "Marca", type: "single" as const },
     ];
@@ -70,8 +69,6 @@ export function PaintMergeDialog({ open, onOpenChange, paints, onMerge }: PaintM
             formatted = PAINT_FINISH_LABELS[value];
           } else if (field === "manufacturer" && TRUCK_MANUFACTURER_LABELS[value]) {
             formatted = TRUCK_MANUFACTURER_LABELS[value];
-          } else if (field === "palette" && COLOR_PALETTE_LABELS[value]) {
-            formatted = COLOR_PALETTE_LABELS[value];
           } else if (field === "paintTypeId" && paint.paintType) {
             formatted = paint.paintType.name;
           } else if (field === "paintBrandId" && paint.paintBrand) {

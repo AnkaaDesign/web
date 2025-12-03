@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { IconInfoCircle, IconCopy, IconPalette } from "@tabler/icons-react";
 
 import type { Paint } from "../../../../types";
-import { PAINT_BRAND_LABELS, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, COLOR_PALETTE_LABELS, PAINT_FINISH } from "../../../../constants";
+import { PAINT_BRAND_LABELS, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH } from "../../../../constants";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -182,12 +182,6 @@ export function PaintSpecificationsCard({ paint, className }: PaintSpecification
               <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground">Fabricante</span>
                 <span className="text-sm font-medium">{TRUCK_MANUFACTURER_LABELS[paint.manufacturer]}</span>
-              </div>
-            )}
-            {paint.palette && (
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-muted-foreground">Paleta de Cor</span>
-                <span className="text-sm font-medium">{COLOR_PALETTE_LABELS[paint.palette]}</span>
               </div>
             )}
             {paint.paintType && (

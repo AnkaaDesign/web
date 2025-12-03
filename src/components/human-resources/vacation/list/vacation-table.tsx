@@ -260,8 +260,8 @@ export function VacationTable({ filters, onDataChange, className }: VacationTabl
         sortable: true,
         className: "min-w-[200px]",
         accessor: (vacation: Vacation) => (
-          <span className="font-medium truncate block" title={vacation.user?.name}>
-            {vacation.user?.name || "—"}
+          <span className="font-medium truncate block" title={vacation.isCollective ? "Férias Coletivas" : vacation.user?.name}>
+            {vacation.isCollective ? "Coletiva" : vacation.user?.name || "—"}
           </span>
         ),
       },
@@ -290,7 +290,6 @@ export function VacationTable({ filters, onDataChange, className }: VacationTabl
         header: "DIAS",
         sortable: true,
         className: "min-w-[80px]",
-        align: "center" as const,
         accessor: (vacation: Vacation) => {
           // Calculate working days excluding weekends using the utility function
           const workingDays = getWorkdaysBetween(vacation.startAt, vacation.endAt);
