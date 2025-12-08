@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Task, BatchOperationResult } from "../../../../types";
-import { TASK_STATUS, TASK_STATUS_LABELS, PRIORITY_TYPE, PRIORITY_TYPE_LABELS } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS } from "../../../../constants";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -16,14 +16,13 @@ import { SectorCell } from "./cells/sector-cell";
 import { CustomerCell } from "./cells/customer-cell";
 import { GeneralPaintingCell } from "./cells/general-painting-cell";
 import { DateTimeCell } from "./cells/date-time-cell";
-import { PriorityCell } from "./cells/priority-cell";
 import { DateCell } from "./cells/date-cell";
 import { cn } from "@/lib/utils";
 import { TaskBatchResultDialog } from "./task-batch-result-dialog";
 import { useBatchUpdateTasks } from "../../../../hooks";
 import { useNavigate } from "react-router-dom";
 import { routes } from "../../../../constants";
-import { moneySchema, createNameSchema, createDescriptionSchema, nullableDate } from "../../../../schemas";
+import { createNameSchema, createDescriptionSchema, nullableDate } from "../../../../schemas";
 
 // Task batch edit schema for UI form
 const taskBatchEditSchema = z.object({
@@ -47,6 +46,11 @@ const taskBatchEditSchema = z.object({
             .regex(/^[A-Z0-9-]*$/, "A placa deve conter apenas letras maiúsculas, números e hífens")
             .nullable()
             .optional(),
+          chassisNumber: z
+            .string()
+            .regex(/^[A-Z0-9-]*$/, "O chassi deve conter apenas letras maiúsculas, números e hífens")
+            .nullable()
+            .optional(),
           details: createDescriptionSchema(1, 1000, false).nullable().optional(),
           entryDate: nullableDate.optional(),
           term: nullableDate.optional(),
@@ -55,10 +59,6 @@ const taskBatchEditSchema = z.object({
           customerId: z.string().uuid().nullable().optional(),
           sectorId: z.string().uuid().nullable().optional(),
           paintId: z.string().uuid().nullable().optional(),
-          priority: z
-            .enum(Object.values(PRIORITY_TYPE) as [string, ...string[]])
-            .nullable()
-            .optional(),
           truckHeight: z.number().min(0).max(10).nullable().optional(),
           truckLength: z.number().min(0).max(30).nullable().optional(),
           truckWidth: z.number().min(0).max(5).nullable().optional(),
@@ -107,6 +107,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                 status: task.status,
                 serialNumber: task.serialNumber || "",
                 plate: task.truck?.plate || "",
+                chassisNumber: task.truck?.chassisNumber || "",
                 details: task.details || "",
                 entryDate: task.entryDate ? new Date(task.entryDate) : null,
                 term: task.term ? new Date(task.term) : null,
@@ -115,7 +116,6 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                 customerId: task.customerId || null,
                 sectorId: task.sectorId || null,
                 paintId: task.generalPainting?.id || null,
-                priority: task.priority || null,
                 truckHeight: task.truck?.height || null,
                 truckLength: task.truck?.length || null,
                 truckWidth: task.truck?.width || null,
@@ -141,6 +141,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
           status: task.status,
           serialNumber: task.serialNumber || "",
           plate: task.truck?.plate || "",
+          chassisNumber: task.truck?.chassisNumber || "",
           details: task.details || "",
           entryDate: task.entryDate ? new Date(task.entryDate) : null,
           term: task.term ? new Date(task.term) : null,
@@ -149,7 +150,6 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
           customerId: task.customerId || null,
           sectorId: task.sectorId || null,
           paintId: task.generalPainting?.id || null,
-          priority: task.priority || null,
           truckHeight: task.truck?.height || null,
           truckLength: task.truck?.length || null,
           truckWidth: task.truck?.width || null,
@@ -171,10 +171,10 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
           task.data.status !== originalTask.status ||
           task.data.serialNumber !== originalTask.serialNumber ||
           task.data.plate !== originalTask.truck?.plate ||
+          task.data.chassisNumber !== originalTask.truck?.chassisNumber ||
           task.data.customerId !== originalTask.customerId ||
           task.data.sectorId !== originalTask.sectorId ||
           task.data.paintId !== originalTask.generalPainting?.id ||
-          task.data.priority !== originalTask.priority ||
           task.data.entryDate?.toISOString() !== originalTask.entryDate ||
           task.data.term?.toISOString() !== originalTask.term ||
           task.data.startedAt?.toISOString() !== originalTask.startedAt ||
@@ -253,34 +253,34 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-44">
                     <div className="px-3 py-2">Status</div>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-44">
-                    <div className="px-3 py-2">Prioridade</div>
-                  </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-72">
                     <div className="px-3 py-2">Cliente</div>
                   </TableHead>
                   <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-48">
                     <div className="px-3 py-2">Setor</div>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-48">
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-24">
                     <div className="px-3 py-2">Nº Série</div>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-40">
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-24">
                     <div className="px-3 py-2">Placa</div>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-60">
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-48">
+                    <div className="px-3 py-2">Chassi</div>
+                  </TableHead>
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-72">
                     <div className="px-3 py-2">Pintura Geral</div>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-44">
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-32">
                     <div className="px-3 py-2">Data Entrada</div>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-56">
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-40">
                     <div className="px-3 py-2">Prazo</div>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-56">
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-40">
                     <div className="px-3 py-2">Iniciado em</div>
                   </TableHead>
-                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-56">
+                  <TableHead className="whitespace-nowrap text-foreground font-bold uppercase text-xs bg-muted !border-r-0 p-0 w-40">
                     <div className="px-3 py-2">Finalizado em</div>
                   </TableHead>
                 </TableRow>
@@ -292,6 +292,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                       console.error("Invalid field or index in task batch edit table:", { field, index });
                       return null;
                     }
+                    const originalTask = tasks[index];
                     return (
                       <TableRow
                         key={field.fieldId}
@@ -313,14 +314,9 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                             <StatusCell control={form.control} index={index} />
                           </div>
                         </TableCell>
-                        <TableCell className="w-44 p-0 !border-r-0">
-                          <div className="px-3 py-2">
-                            <PriorityCell control={form.control} index={index} />
-                          </div>
-                        </TableCell>
                         <TableCell className="w-72 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <CustomerCell control={form.control} index={index} />
+                            <CustomerCell control={form.control} index={index} initialCustomer={originalTask?.customer} />
                           </div>
                         </TableCell>
                         <TableCell className="w-48 p-0 !border-r-0">
@@ -328,39 +324,44 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                             <SectorCell control={form.control} index={index} />
                           </div>
                         </TableCell>
-                        <TableCell className="w-48 p-0 !border-r-0">
+                        <TableCell className="w-24 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <FormInput control={form.control} name={`tasks.${index}.data.serialNumber`} placeholder="Número de série" className="uppercase" />
+                            <FormInput control={form.control} name={`tasks.${index}.data.serialNumber`} placeholder="Nº Série" className="uppercase" />
                           </div>
                         </TableCell>
-                        <TableCell className="w-40 p-0 !border-r-0">
+                        <TableCell className="w-24 p-0 !border-r-0">
                           <div className="px-3 py-2">
                             <FormInput control={form.control} name={`tasks.${index}.data.plate`} placeholder="Placa" className="uppercase" />
                           </div>
                         </TableCell>
-                        <TableCell className="w-60 p-0 !border-r-0">
+                        <TableCell className="w-48 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <GeneralPaintingCell control={form.control} index={index} />
+                            <FormInput control={form.control} name={`tasks.${index}.data.chassisNumber`} placeholder="Chassi" className="uppercase" />
                           </div>
                         </TableCell>
-                        <TableCell className="w-44 p-0 !border-r-0">
+                        <TableCell className="w-72 p-0 !border-r-0">
+                          <div className="px-3 py-2">
+                            <GeneralPaintingCell control={form.control} index={index} initialPaint={originalTask?.generalPainting} />
+                          </div>
+                        </TableCell>
+                        <TableCell className="w-32 p-0 !border-r-0">
                           <div className="px-3 py-2">
                             <DateCell control={form.control} name={`tasks.${index}.data.entryDate`} placeholder="Data de entrada" />
                           </div>
                         </TableCell>
-                        <TableCell className="w-56 p-0 !border-r-0">
+                        <TableCell className="w-40 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <DateTimeCell control={form.control} name={`tasks.${index}.data.term`} placeholder="Prazo de entrega" />
+                            <DateTimeCell control={form.control} name={`tasks.${index}.data.term`} placeholder="Prazo de entrega" defaultTime="07:30" />
                           </div>
                         </TableCell>
-                        <TableCell className="w-56 p-0 !border-r-0">
+                        <TableCell className="w-40 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <DateTimeCell control={form.control} name={`tasks.${index}.data.startedAt`} placeholder="Data/hora de início" />
+                            <DateTimeCell control={form.control} name={`tasks.${index}.data.startedAt`} placeholder="Data/hora de início" defaultTime="07:30" />
                           </div>
                         </TableCell>
-                        <TableCell className="w-56 p-0 !border-r-0">
+                        <TableCell className="w-40 p-0 !border-r-0">
                           <div className="px-3 py-2">
-                            <DateTimeCell control={form.control} name={`tasks.${index}.data.finishedAt`} placeholder="Data/hora de conclusão" />
+                            <DateTimeCell control={form.control} name={`tasks.${index}.data.finishedAt`} placeholder="Data/hora de conclusão" defaultTime="07:30" />
                           </div>
                         </TableCell>
                       </TableRow>
@@ -368,7 +369,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                       Carregando tarefas...
                     </TableCell>
                   </TableRow>

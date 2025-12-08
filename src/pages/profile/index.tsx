@@ -279,7 +279,7 @@ export function ProfilePage() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto">
-        <div className="px-4 sm:px-6 h-full">
+        <div className="h-full">
           <div className="grid gap-6 md:grid-cols-[300px,1fr] h-full md:items-start">
             {/* First Column: Profile Photo (Full Height) */}
             <Card className="md:h-full">

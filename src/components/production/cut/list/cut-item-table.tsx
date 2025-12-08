@@ -114,7 +114,6 @@ export function CutItemTable({ filters = {}, className, onDataChange, visibleCol
     resetSelectionOnPageChange: false,
     defaultSort: [
       { column: "status", direction: "asc" },
-      { column: "createdAt", direction: "desc" },
     ],
   });
 
@@ -145,9 +144,10 @@ export function CutItemTable({ filters = {}, className, onDataChange, visibleCol
       limit: pageSize,
       include: includeConfig,
       // Convert sortConfigs to orderBy format for API
-      ...(sortConfigs.length > 0 && {
-        orderBy: convertSortConfigsToOrderBy(sortConfigs),
-      }),
+      // Always sort by statusOrder first for proper status ordering
+      orderBy: sortConfigs.length > 0
+        ? convertSortConfigsToOrderBy(sortConfigs)
+        : { statusOrder: 'asc' },
       // When showSelectedOnly is true, only show selected items
       ...(showSelectedOnly &&
         selectedIds.length > 0 && {

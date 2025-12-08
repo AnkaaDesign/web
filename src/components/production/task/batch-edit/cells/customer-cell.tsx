@@ -1,5 +1,6 @@
 // apps/web/src/components/production/task/batch-edit/cells/customer-cell.tsx
 
+import { useMemo, useCallback } from "react";
 import { FormField, FormItem, FormControl } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { getCustomers } from "../../../../../api-client";
@@ -10,13 +11,28 @@ import { formatCNPJ } from "../../../../../utils";
 interface CustomerCellProps {
   control: any;
   index: number;
+  initialCustomer?: Customer | null;
 }
 
-export function CustomerCell({ control, index }: CustomerCellProps) {
+export function CustomerCell({ control, index, initialCustomer }: CustomerCellProps) {
+  // Memoize initial options to prevent infinite loops
+  const initialOptions = useMemo(() =>
+    initialCustomer ? [initialCustomer] : [],
+    [initialCustomer?.id]
+  );
+
+  // Memoize callbacks
+  const getOptionLabel = useCallback((customer: Customer) => customer.fantasyName, []);
+  const getOptionValue = useCallback((customer: Customer) => customer.id, []);
+
   // Search function for Combobox
-  const searchCustomers = async (search: string): Promise<Customer[]> => {
+  const searchCustomers = useCallback(async (
+    search: string,
+    page: number = 1
+  ): Promise<{ data: Customer[]; hasMore: boolean }> => {
     const params: any = {
       orderBy: { fantasyName: "asc" },
+      page,
       take: 50,
       include: { logo: true },
     };
@@ -27,12 +43,15 @@ export function CustomerCell({ control, index }: CustomerCellProps) {
 
     try {
       const response = await getCustomers(params);
-      return response.data || [];
+      return {
+        data: response.data || [],
+        hasMore: response.meta?.hasNextPage || false,
+      };
     } catch (error) {
       console.error("Erro ao buscar clientes:", error);
-      return [];
+      return { data: [], hasMore: false };
     }
-  };
+  }, []);
 
   return (
     <FormField
@@ -41,15 +60,19 @@ export function CustomerCell({ control, index }: CustomerCellProps) {
       render={({ field }) => (
         <FormItem>
           <FormControl>
-            <Combobox
+            <Combobox<Customer>
               value={field.value || ""}
               onValueChange={(value) => field.onChange(value || null)}
-              searchFunction={searchCustomers}
               placeholder="Selecionar cliente"
-              emptyMessage="Nenhum cliente encontrado"
+              emptyText="Nenhum cliente encontrado"
               searchPlaceholder="Buscar cliente..."
-              getOptionLabel={(customer: Customer) => customer.fantasyName}
-              getOptionValue={(customer: Customer) => customer.id}
+              getOptionLabel={getOptionLabel}
+              getOptionValue={getOptionValue}
+              async={true}
+              queryKey={["customers", "batch-edit-cell", index]}
+              queryFn={searchCustomers}
+              minSearchLength={0}
+              initialOptions={initialOptions}
               renderOption={(customer: Customer) => (
                 <div className="flex items-center gap-2">
                   <CustomerLogoDisplay
@@ -66,7 +89,7 @@ export function CustomerCell({ control, index }: CustomerCellProps) {
                   </div>
                 </div>
               )}
-              allowClear
+              clearable
               searchable
             />
           </FormControl>

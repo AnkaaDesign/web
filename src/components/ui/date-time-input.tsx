@@ -3,6 +3,7 @@ import { IconCalendar, IconClock, IconX } from "@tabler/icons-react";
 import { format, isValid, parse, addDays, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
+import type { FieldValues, FieldPath } from "react-hook-form";
 import { FormControl, FormItem, FormLabel, FormMessage, useFormField } from "@/components/ui/form";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";

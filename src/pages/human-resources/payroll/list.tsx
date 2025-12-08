@@ -590,8 +590,15 @@ export default function PayrollListPage() {
   }, []);
 
   // Apply default sector filters to initial filters if not already set
+  // Don't apply default sector filter if user has selected specific users or positions
   const filtersWithDefaults = useMemo(() => {
     if (initialFilters.sectorIds && initialFilters.sectorIds.length > 0) {
+      return initialFilters;
+    }
+    if (initialFilters.userIds && initialFilters.userIds.length > 0) {
+      return initialFilters;
+    }
+    if (initialFilters.positionIds && initialFilters.positionIds.length > 0) {
       return initialFilters;
     }
     return {
@@ -611,12 +618,17 @@ export default function PayrollListPage() {
     // 1. We haven't initialized yet
     // 2. Default sectors are available
     // 3. No sector filters are currently set (including from URL)
-    // 4. No URL parameters exist for sectors
+    // 4. No user or position filters are set (user explicitly wants specific users/positions)
+    // 5. No URL parameters exist for sectors/users/positions
     if (
       !hasInitializedSectorsRef.current &&
       defaultSectorIds.length > 0 &&
       (!filters.sectorIds || filters.sectorIds.length === 0) &&
-      !searchParams.has('sectorIds')
+      (!filters.userIds || filters.userIds.length === 0) &&
+      (!filters.positionIds || filters.positionIds.length === 0) &&
+      !searchParams.has('sectorIds') &&
+      !searchParams.has('userIds') &&
+      !searchParams.has('positionIds')
     ) {
       setFilters(prev => ({
         ...prev,
@@ -624,7 +636,7 @@ export default function PayrollListPage() {
       }));
       hasInitializedSectorsRef.current = true;
     }
-  }, [defaultSectorIds, filters.sectorIds, searchParams]);
+  }, [defaultSectorIds, filters.sectorIds, filters.userIds, filters.positionIds, searchParams]);
   const [showFilters, setShowFilters] = useState(false);
   const { visibleColumns: baseVisibleColumns, setVisibleColumns } = useColumnVisibility(
     "payroll-list-visible-columns",
@@ -822,16 +834,24 @@ export default function PayrollListPage() {
         }
 
         // Apply filters with proper null/undefined handling
-        if (filters.sectorIds && filters.sectorIds.length > 0 && !filters.sectorIds.includes(user?.sectorId)) {
-          return;
-        }
+        // When specific users are selected, skip sector/position filters
+        // This allows filtering by user regardless of their sector/position
+        const hasUserFilter = filters.userIds && filters.userIds.length > 0;
 
-        if (filters.positionIds && filters.positionIds.length > 0 && !filters.positionIds.includes(user?.positionId)) {
-          return;
-        }
+        if (hasUserFilter) {
+          // Only filter by userIds when users are explicitly selected
+          if (!filters.userIds!.includes(user?.id)) {
+            return;
+          }
+        } else {
+          // Apply sector and position filters only when no specific users are selected
+          if (filters.sectorIds && filters.sectorIds.length > 0 && !filters.sectorIds.includes(user?.sectorId)) {
+            return;
+          }
 
-        if (filters.userIds && filters.userIds.length > 0 && !filters.userIds.includes(user?.id)) {
-          return;
+          if (filters.positionIds && filters.positionIds.length > 0 && !filters.positionIds.includes(user?.positionId)) {
+            return;
+          }
         }
 
         if (filters.excludeUserIds && filters.excludeUserIds.length > 0 && filters.excludeUserIds.includes(user?.id)) {

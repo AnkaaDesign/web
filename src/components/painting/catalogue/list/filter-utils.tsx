@@ -1,7 +1,7 @@
 import type { PaintGetManyFormData } from "../../../../schemas";
 import type { PaintType, PaintBrand } from "../../../../types";
 import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH, TRUCK_MANUFACTURER } from "../../../../constants";
-import { IconSearch, IconPaint, IconBrush, IconTags, IconTruck, IconHash, IconFlask, IconCalendar } from "@tabler/icons-react";
+import { IconSearch, IconPaint, IconBrush, IconTags, IconTruck, IconHash, IconFlask, IconCalendar, IconPalette } from "@tabler/icons-react";
 import React from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";

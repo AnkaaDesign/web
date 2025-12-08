@@ -9,25 +9,37 @@ import React, {
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
+import { Plus, Trash2, Sun, ArrowDownRight } from "lucide-react";
+import { Combobox } from "@/components/ui/combobox";
 
 // =====================
 // Types
 // =====================
 
 export type PaintFinishType = "SOLID" | "METALLIC" | "PEARL";
+export type LightType = "BEAM" | "LINEAR";
+
+export interface LightSource {
+  id: string;
+  type: LightType;
+  color: string; // Light color (default white)
+  position: number; // 0-100 diagonal position
+  intensity: number; // 0-100 brightness
+  spread: number; // 0-100 how wide the light spreads (aperture)
+}
 
 export interface PaintPreviewSettings {
   baseColor: string;
   finish: PaintFinishType;
 
-  // Common Light Controls
-  lightPosition: number; // 0-100 diagonal position
-  lightIntensity: number; // 0-100 brightness
-  lightSpread: number; // 0-100 how wide the beam spreads
+  // Light sources - can have multiple
+  lights: LightSource[];
+
+  // Finish Effect Controls (separate from light)
+  effectIntensity: number; // 0-100 for metallic flakes / pearl interference
 
   // Metallic Controls
-  flakeSize: number; // 0-100 (scales texture pattern - now more granular)
-  flakeDensity: number; // 0-100 (sparkle count and visibility)
   flakeColor: string; // Metallic flake tint color (default silver)
 
   // Pearl Controls
@@ -51,15 +63,21 @@ export interface PaintPreviewGeneratorProps {
 // Default Settings
 // =====================
 
+const createDefaultLight = (id: string, type: LightType = "BEAM"): LightSource => ({
+  id,
+  type,
+  color: "#ffffff",
+  position: 50,
+  intensity: 70,
+  spread: 50,
+});
+
 const DEFAULT_SETTINGS: PaintPreviewSettings = {
   baseColor: "#3498db",
   finish: "SOLID",
-  lightPosition: 50,
-  lightIntensity: 70,
-  lightSpread: 50,
-  flakeSize: 30,
-  flakeDensity: 40,
-  flakeColor: "#c0c0c0", // Silver default - can be gold, bronze, etc.
+  lights: [createDefaultLight("light-1", "BEAM")],
+  effectIntensity: 60, // Separate from light intensity
+  flakeColor: "#c0c0c0", // Silver default
   flipColor: "#ffd700",
 };
 
@@ -266,9 +284,136 @@ function applyNormalMapLighting(
 }
 
 // =====================
+// Light Rendering Helpers
+// =====================
+
+/**
+ * BEAM Light (Focal/Point Light)
+ * - Renders as a visible colored ball/circle
+ * - Center: Full light color with high opacity
+ * - Edges: Fades to transparent based on spread (aperture)
+ * - Position: Moves diagonally from top-left (0) to bottom-right (100)
+ */
+function renderBeamLight(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  light: LightSource
+): void {
+  const position = light.position / 100;
+  const intensity = light.intensity / 100;
+  const spread = light.spread / 100;
+  const lightRgb = hexToRgb(light.color);
+
+  if (intensity <= 0) return;
+
+  // Position: diagonal from top-left (0,0) to bottom-right (width, height)
+  const centerX = width * position;
+  const centerY = height * position;
+
+  // Radius based on spread: small spread = small tight ball, large spread = big soft glow
+  const minRadius = Math.min(width, height) * 0.1;
+  const maxRadius = Math.max(width, height) * 0.7;
+  const radius = minRadius + spread * (maxRadius - minRadius);
+
+  // Create radial gradient - actual light color!
+  const beamGradient = ctx.createRadialGradient(
+    centerX, centerY, 0,
+    centerX, centerY, radius
+  );
+
+  // INCREASED intensity values for more visible light
+  // Core: bright light color (very visible)
+  const coreAlpha = Math.min(1, 0.95 * intensity); // Almost fully opaque at max
+  const midAlpha = 0.6 * intensity * (0.3 + spread * 0.7); // Visible even at low spread
+  const edgeAlpha = 0.15 * intensity * spread;
+
+  beamGradient.addColorStop(0, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${coreAlpha})`);
+  beamGradient.addColorStop(0.25, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${midAlpha})`);
+  beamGradient.addColorStop(0.6, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${edgeAlpha})`);
+  beamGradient.addColorStop(1, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},0)`);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen"; // Additive blending for light
+  ctx.fillStyle = beamGradient;
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+}
+
+/**
+ * LINEAR Light (Strip/Band Light)
+ * - Renders as a visible colored stripe going diagonally
+ * - Peak: Full light color at the position line
+ * - Edges: Gradient to transparent based on spread (aperture)
+ * - Position: Moves the stripe along the diagonal
+ */
+function renderLinearLight(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  light: LightSource
+): void {
+  const position = light.position / 100;
+  const intensity = light.intensity / 100;
+  const spread = light.spread / 100;
+  const lightRgb = hexToRgb(light.color);
+
+  if (intensity <= 0) return;
+
+  // Stripe width based on spread: small = thin strip, large = wide band
+  const stripeWidth = 0.08 + spread * 0.5; // 8% to 58% of diagonal
+
+  // Calculate stripe boundaries
+  const stripeStart = Math.max(0, position - stripeWidth / 2);
+  const stripeEnd = Math.min(1, position + stripeWidth / 2);
+
+  // INCREASED alpha values for more visible light
+  const peakAlpha = Math.min(1, 0.95 * intensity); // Almost fully opaque at max
+  const edgeAlpha = 0.25 * intensity * (0.2 + spread * 0.8); // Visible even at low spread
+
+  // Linear gradient across diagonal (top-left to bottom-right)
+  const linearGradient = ctx.createLinearGradient(0, 0, width, height);
+
+  // Outside the stripe: transparent
+  linearGradient.addColorStop(0, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},0)`);
+
+  // Fade in to stripe
+  if (stripeStart > 0.03) {
+    linearGradient.addColorStop(stripeStart - 0.03, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},0)`);
+  }
+  linearGradient.addColorStop(stripeStart, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${edgeAlpha})`);
+
+  // Peak at position
+  linearGradient.addColorStop(position, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${peakAlpha})`);
+
+  // Fade out from stripe
+  linearGradient.addColorStop(stripeEnd, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},${edgeAlpha})`);
+  if (stripeEnd < 0.97) {
+    linearGradient.addColorStop(stripeEnd + 0.03, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},0)`);
+  }
+
+  // Outside the stripe: transparent
+  linearGradient.addColorStop(1, `rgba(${lightRgb.r},${lightRgb.g},${lightRgb.b},0)`);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "screen"; // Additive blending for light
+  ctx.fillStyle = linearGradient;
+  ctx.fillRect(0, 0, width, height);
+  ctx.restore();
+}
+
+// =====================
 // Main Render Function
 // =====================
 
+/**
+ * Layer order (bottom to top):
+ * 1. Metallic/Pearl texture from normal map (base layer with texture)
+ * 2. Base color tinted over the texture
+ * 3. Flakes/Interference color overlay (controlled by effectIntensity)
+ * 4. Lights - visible light sources ON TOP
+ * 5. Clearcoat - subtle highlight
+ */
 function renderToCanvas(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -276,258 +421,110 @@ function renderToCanvas(
   settings: PaintPreviewSettings,
   textures: LoadedTextures
 ): void {
-  const beamPosition = settings.lightPosition / 100;
-  const intensity = settings.lightIntensity / 100;
-  const spread = settings.lightSpread / 100;
-  const beamWidth = 0.15 + spread * 0.7; // 0.15 to 0.85 based on spread
-
   const baseRgb = hexToRgb(settings.baseColor);
   const baseHsl = rgbToHsl(baseRgb.r, baseRgb.g, baseRgb.b);
+  const effectIntensity = settings.effectIntensity / 100;
 
-  // Light position for normal map (moves with beam)
-  const lightX = (beamPosition - 0.5) * 2;
-  const lightY = (0.5 - beamPosition) * 2;
-  const lightZ = 0.8;
+  // FIXED light direction for normal map
+  const fixedLightX = 0.5;
+  const fixedLightY = -0.5;
+  const fixedLightZ = 0.8;
 
-  // Step 1: Draw base color
+  // ========================================
+  // LAYER 1: Base Color
+  // ========================================
   ctx.fillStyle = settings.baseColor;
   ctx.fillRect(0, 0, width, height);
 
-  // Calculate beam boundaries (used by multiple layers)
-  const beamStart = Math.max(0, beamPosition - beamWidth / 2);
-  const beamEnd = Math.min(1, beamPosition + beamWidth / 2);
-
-  // Step 2: Draw beam highlight gradient (only if intensity > 0)
-  if (intensity > 0) {
-    const beamGradient = ctx.createLinearGradient(0, 0, width, height);
-
-    // Darkening and brightening scale with intensity
-    const darkL = Math.max(baseHsl.l - 8 * intensity, 0);
-    const midL = baseHsl.l;
-    const brightL = Math.min(baseHsl.l + 20 * intensity, 100);
-
-    beamGradient.addColorStop(0, `hsl(${baseHsl.h}, ${baseHsl.s}%, ${darkL}%)`);
-    beamGradient.addColorStop(
-      Math.max(0, beamStart - 0.05),
-      `hsl(${baseHsl.h}, ${baseHsl.s}%, ${midL}%)`
-    );
-    beamGradient.addColorStop(beamStart, `hsl(${baseHsl.h}, ${baseHsl.s}%, ${midL + 5 * intensity}%)`);
-    beamGradient.addColorStop(beamPosition, `hsl(${baseHsl.h}, ${baseHsl.s}%, ${brightL}%)`);
-    beamGradient.addColorStop(beamEnd, `hsl(${baseHsl.h}, ${baseHsl.s}%, ${midL + 5 * intensity}%)`);
-    beamGradient.addColorStop(
-      Math.min(1, beamEnd + 0.05),
-      `hsl(${baseHsl.h}, ${baseHsl.s}%, ${midL}%)`
-    );
-    beamGradient.addColorStop(1, `hsl(${baseHsl.h}, ${baseHsl.s}%, ${darkL}%)`);
-
-    ctx.fillStyle = beamGradient;
-    ctx.fillRect(0, 0, width, height);
-  }
-
-  // Step 3: Apply finish-specific effects
-  if (settings.finish === "METALLIC") {
-    // Effect color for metallic highlights (similar to pearl's interference color)
+  // ========================================
+  // LAYER 2: Metallic/Pearl Texture (controlled by effectIntensity)
+  // The normal map creates the flake texture - effectIntensity controls visibility
+  // ========================================
+  if (settings.finish === "METALLIC" && textures.metallicNormal && effectIntensity > 0) {
     const effectRgb = hexToRgb(settings.flakeColor);
 
-    // Apply metallic normal map lighting
-    if (textures.metallicNormal) {
-      const metallicBase = blendColors(baseRgb, effectRgb, intensity * 0.15);
-
-      const litData = applyNormalMapLighting(
-        ctx,
-        textures.metallicNormal,
-        width,
-        height,
-        lightX,
-        lightY,
-        lightZ,
-        metallicBase,
-        intensity * 0.6
-      );
-      ctx.putImageData(litData, 0, 0);
-    }
-
-    // Strong radial effect color at beam center - spread controls the radius
-    const beamCenterX = width * beamPosition;
-    const beamCenterY = height * (1 - beamPosition);
-    const beamRadius = Math.max(width, height) * (0.2 + spread * 0.6);
-
-    const metallicRadial = ctx.createRadialGradient(
-      beamCenterX,
-      beamCenterY,
-      0,
-      beamCenterX,
-      beamCenterY,
-      beamRadius
+    // Apply normal map with intensity controlled by effectIntensity
+    const metallicBase = blendColors(baseRgb, effectRgb, effectIntensity * 0.3);
+    const litData = applyNormalMapLighting(
+      ctx,
+      textures.metallicNormal,
+      width,
+      height,
+      fixedLightX,
+      fixedLightY,
+      fixedLightZ,
+      metallicBase,
+      effectIntensity * 0.9 // Strong effect when intensity is high
     );
+    ctx.putImageData(litData, 0, 0);
 
-    // Effect color intensity controlled by light intensity (stronger than pearl for metallic shine)
-    const peakAlpha = 0.7 * intensity;
-    metallicRadial.addColorStop(0, `rgba(${effectRgb.r},${effectRgb.g},${effectRgb.b},${peakAlpha})`);
-    metallicRadial.addColorStop(0.25, `rgba(${effectRgb.r},${effectRgb.g},${effectRgb.b},${peakAlpha * 0.6})`);
-    metallicRadial.addColorStop(0.5, `rgba(${effectRgb.r},${effectRgb.g},${effectRgb.b},${peakAlpha * 0.2})`);
-    metallicRadial.addColorStop(1, `rgba(${effectRgb.r},${effectRgb.g},${effectRgb.b},0)`);
+    // Flake color overlay - enhances the metallic look
+    const flakeOverlay = ctx.createRadialGradient(
+      width * 0.5, height * 0.5, 0,
+      width * 0.5, height * 0.5, Math.max(width, height) * 0.9
+    );
+    const flakeAlpha = 0.7 * effectIntensity;
+    flakeOverlay.addColorStop(0, `rgba(${effectRgb.r},${effectRgb.g},${effectRgb.b},${flakeAlpha})`);
+    flakeOverlay.addColorStop(0.4, `rgba(${effectRgb.r},${effectRgb.g},${effectRgb.b},${flakeAlpha * 0.6})`);
+    flakeOverlay.addColorStop(1, `rgba(${effectRgb.r},${effectRgb.g},${effectRgb.b},${flakeAlpha * 0.25})`);
 
     ctx.save();
     ctx.globalCompositeOperation = "overlay";
-    ctx.fillStyle = metallicRadial;
+    ctx.fillStyle = flakeOverlay;
     ctx.fillRect(0, 0, width, height);
     ctx.restore();
 
-    // Additional color layer using "color" blend for stronger tint
+    // Additional specular highlights from flakes
     ctx.save();
-    ctx.globalCompositeOperation = "color";
-    ctx.globalAlpha = intensity * 0.35;
-    ctx.fillStyle = metallicRadial;
+    ctx.globalCompositeOperation = "screen";
+    ctx.globalAlpha = effectIntensity * 0.3;
+    ctx.fillStyle = `rgba(${Math.min(255, effectRgb.r + 100)},${Math.min(255, effectRgb.g + 100)},${Math.min(255, effectRgb.b + 100)},0.5)`;
     ctx.fillRect(0, 0, width, height);
     ctx.restore();
 
-    // Linear gradient for angle-dependent metallic reflection
-    const halfSpread = beamWidth / 2;
-    const metallicGrad = ctx.createLinearGradient(0, 0, width, height);
-    metallicGrad.addColorStop(0, `rgba(${effectRgb.r},${effectRgb.g},${effectRgb.b},0)`);
-    metallicGrad.addColorStop(
-      Math.max(0, beamPosition - halfSpread),
-      `rgba(${effectRgb.r},${effectRgb.g},${effectRgb.b},${0.08 * intensity})`
-    );
-    metallicGrad.addColorStop(
-      beamPosition,
-      `rgba(${Math.min(255, effectRgb.r + 50)},${Math.min(255, effectRgb.g + 50)},${Math.min(255, effectRgb.b + 50)},${0.4 * intensity})`
-    );
-    metallicGrad.addColorStop(
-      Math.min(1, beamPosition + halfSpread),
-      `rgba(${effectRgb.r},${effectRgb.g},${effectRgb.b},${0.08 * intensity})`
-    );
-    metallicGrad.addColorStop(1, `rgba(${effectRgb.r},${effectRgb.g},${effectRgb.b},0)`);
-
-    ctx.save();
-    ctx.globalCompositeOperation = "overlay";
-    ctx.fillStyle = metallicGrad;
-    ctx.fillRect(0, 0, width, height);
-    ctx.restore();
-
-    // Subtle brightness variation at edges (metallic characteristic)
-    const effectHsl = rgbToHsl(effectRgb.r, effectRgb.g, effectRgb.b);
-    const brightShift = hslToRgb(effectHsl.h, Math.max(0, effectHsl.s - 20), Math.min(100, effectHsl.l + 30));
-    const darkShift = hslToRgb(effectHsl.h, Math.min(100, effectHsl.s + 10), Math.max(0, effectHsl.l - 20));
-
-    const edgeGrad = ctx.createLinearGradient(0, height, width, 0);
-    edgeGrad.addColorStop(
-      0,
-      `rgba(${darkShift.r},${darkShift.g},${darkShift.b},${0.06 * intensity})`
-    );
-    edgeGrad.addColorStop(
-      0.5,
-      `rgba(${effectRgb.r},${effectRgb.g},${effectRgb.b},${0.03 * intensity})`
-    );
-    edgeGrad.addColorStop(
-      1,
-      `rgba(${brightShift.r},${brightShift.g},${brightShift.b},${0.06 * intensity})`
-    );
-
-    ctx.save();
-    ctx.globalCompositeOperation = "overlay";
-    ctx.fillStyle = edgeGrad;
-    ctx.fillRect(0, 0, width, height);
-    ctx.restore();
-  } else if (settings.finish === "PEARL") {
-    // Apply pearl normal map
+  } else if (settings.finish === "PEARL" && textures.pearlNormal && effectIntensity > 0) {
     const flipRgb = hexToRgb(settings.flipColor);
 
-    if (textures.pearlNormal) {
-      const pearlBase = blendColors(baseRgb, flipRgb, intensity * 0.15);
-
-      const litData = applyNormalMapLighting(
-        ctx,
-        textures.pearlNormal,
-        width,
-        height,
-        lightX,
-        lightY,
-        lightZ,
-        pearlBase,
-        intensity * 0.5
-      );
-      ctx.putImageData(litData, 0, 0);
-    }
-
-    // Strong radial flip color at beam center - spread controls the radius
-    const beamCenterX = width * beamPosition;
-    const beamCenterY = height * (1 - beamPosition);
-    const beamRadius = Math.max(width, height) * (0.2 + spread * 0.6);
-
-    const flipRadial = ctx.createRadialGradient(
-      beamCenterX,
-      beamCenterY,
-      0,
-      beamCenterX,
-      beamCenterY,
-      beamRadius
+    // Apply normal map with intensity controlled by effectIntensity
+    const pearlBase = blendColors(baseRgb, flipRgb, effectIntensity * 0.25);
+    const litData = applyNormalMapLighting(
+      ctx,
+      textures.pearlNormal,
+      width,
+      height,
+      fixedLightX,
+      fixedLightY,
+      fixedLightZ,
+      pearlBase,
+      effectIntensity * 0.8
     );
+    ctx.putImageData(litData, 0, 0);
 
-    // Flip color intensity controlled by light intensity
-    const peakAlpha = 0.6 * intensity;
-    flipRadial.addColorStop(0, `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},${peakAlpha})`);
-    flipRadial.addColorStop(0.3, `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},${peakAlpha * 0.5})`);
-    flipRadial.addColorStop(0.6, `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},${peakAlpha * 0.15})`);
-    flipRadial.addColorStop(1, `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},0)`);
+    // Pearl interference overlay
+    const pearlOverlay = ctx.createRadialGradient(
+      width * 0.5, height * 0.5, 0,
+      width * 0.5, height * 0.5, Math.max(width, height) * 0.9
+    );
+    const pearlAlpha = 0.6 * effectIntensity;
+    pearlOverlay.addColorStop(0, `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},${pearlAlpha})`);
+    pearlOverlay.addColorStop(0.5, `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},${pearlAlpha * 0.5})`);
+    pearlOverlay.addColorStop(1, `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},${pearlAlpha * 0.15})`);
 
     ctx.save();
     ctx.globalCompositeOperation = "overlay";
-    ctx.fillStyle = flipRadial;
+    ctx.fillStyle = pearlOverlay;
     ctx.fillRect(0, 0, width, height);
     ctx.restore();
 
-    // Additional color layer using "color" blend for stronger tint
-    ctx.save();
-    ctx.globalCompositeOperation = "color";
-    ctx.globalAlpha = intensity * 0.3;
-    ctx.fillStyle = flipRadial;
-    ctx.fillRect(0, 0, width, height);
-    ctx.restore();
-
-    // Linear gradient for angle-dependent color shift (pearl characteristic)
-    const halfSpread = beamWidth / 2;
-    const iridescentGrad = ctx.createLinearGradient(0, 0, width, height);
-    iridescentGrad.addColorStop(0, `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},0)`);
-    iridescentGrad.addColorStop(
-      Math.max(0, beamPosition - halfSpread),
-      `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},${0.05 * intensity})`
-    );
-    iridescentGrad.addColorStop(
-      beamPosition,
-      `rgba(${Math.min(255, flipRgb.r + 30)},${Math.min(255, flipRgb.g + 30)},${Math.min(255, flipRgb.b + 30)},${0.3 * intensity})`
-    );
-    iridescentGrad.addColorStop(
-      Math.min(1, beamPosition + halfSpread),
-      `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},${0.05 * intensity})`
-    );
-    iridescentGrad.addColorStop(1, `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},0)`);
-
-    ctx.save();
-    ctx.globalCompositeOperation = "overlay";
-    ctx.fillStyle = iridescentGrad;
-    ctx.fillRect(0, 0, width, height);
-    ctx.restore();
-
-    // Subtle hue shift at edges
+    // Iridescent hue shift
     const baseHslFlip = rgbToHsl(flipRgb.r, flipRgb.g, flipRgb.b);
-    const hueShift1 = hslToRgb((baseHslFlip.h + 25) % 360, baseHslFlip.s, baseHslFlip.l);
-    const hueShift2 = hslToRgb((baseHslFlip.h - 25 + 360) % 360, baseHslFlip.s, baseHslFlip.l);
+    const hueShift1 = hslToRgb((baseHslFlip.h + 30) % 360, baseHslFlip.s, baseHslFlip.l);
+    const hueShift2 = hslToRgb((baseHslFlip.h - 30 + 360) % 360, baseHslFlip.s, baseHslFlip.l);
 
     const hueShiftGrad = ctx.createLinearGradient(0, height, width, 0);
-    hueShiftGrad.addColorStop(
-      0,
-      `rgba(${hueShift1.r},${hueShift1.g},${hueShift1.b},${0.04 * intensity})`
-    );
-    hueShiftGrad.addColorStop(
-      0.5,
-      `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},${0.02 * intensity})`
-    );
-    hueShiftGrad.addColorStop(
-      1,
-      `rgba(${hueShift2.r},${hueShift2.g},${hueShift2.b},${0.04 * intensity})`
-    );
+    hueShiftGrad.addColorStop(0, `rgba(${hueShift1.r},${hueShift1.g},${hueShift1.b},${0.2 * effectIntensity})`);
+    hueShiftGrad.addColorStop(0.5, `rgba(${flipRgb.r},${flipRgb.g},${flipRgb.b},${0.08 * effectIntensity})`);
+    hueShiftGrad.addColorStop(1, `rgba(${hueShift2.r},${hueShift2.g},${hueShift2.b},${0.2 * effectIntensity})`);
 
     ctx.save();
     ctx.globalCompositeOperation = "overlay";
@@ -536,24 +533,45 @@ function renderToCanvas(
     ctx.restore();
   }
 
-  // Step 4: Final clearcoat highlight
-  const clearcoatGrad = ctx.createRadialGradient(
-    width * beamPosition,
-    height * (1 - beamPosition),
-    0,
-    width * beamPosition,
-    height * (1 - beamPosition),
-    width * 0.8
-  );
-  clearcoatGrad.addColorStop(0, `rgba(255,255,255,${0.15 * intensity})`);
-  clearcoatGrad.addColorStop(0.3, `rgba(255,255,255,${0.05 * intensity})`);
-  clearcoatGrad.addColorStop(1, "rgba(255,255,255,0)");
+  // ========================================
+  // LAYER 4: Light Sources (ON TOP, clearly visible)
+  // ========================================
+  for (const light of settings.lights) {
+    if (light.type === "BEAM") {
+      renderBeamLight(ctx, width, height, light);
+    } else {
+      renderLinearLight(ctx, width, height, light);
+    }
+  }
 
-  ctx.save();
-  ctx.globalCompositeOperation = "overlay";
-  ctx.fillStyle = clearcoatGrad;
-  ctx.fillRect(0, 0, width, height);
-  ctx.restore();
+  // ========================================
+  // LAYER 5: Clearcoat Highlight
+  // ========================================
+  if (settings.lights.length > 0) {
+    const primaryLight = settings.lights[0];
+    const primaryPosition = primaryLight.position / 100;
+    const primaryIntensity = primaryLight.intensity / 100;
+
+    if (primaryIntensity > 0) {
+      const clearcoatGrad = ctx.createRadialGradient(
+        width * primaryPosition,
+        height * primaryPosition,
+        0,
+        width * primaryPosition,
+        height * primaryPosition,
+        width * 0.6
+      );
+      clearcoatGrad.addColorStop(0, `rgba(255,255,255,${0.15 * primaryIntensity})`);
+      clearcoatGrad.addColorStop(0.4, `rgba(255,255,255,${0.05 * primaryIntensity})`);
+      clearcoatGrad.addColorStop(1, "rgba(255,255,255,0)");
+
+      ctx.save();
+      ctx.globalCompositeOperation = "overlay";
+      ctx.fillStyle = clearcoatGrad;
+      ctx.fillRect(0, 0, width, height);
+      ctx.restore();
+    }
+  }
 }
 
 // Canvas dimensions - higher resolution for better quality exports
@@ -651,8 +669,41 @@ export const PaintPreviewGenerator = forwardRef<
     []
   );
 
-  const showMetallicControls = settings.finish === "METALLIC";
-  const showPearlControls = settings.finish === "PEARL";
+  // Light management functions
+  const updateLight = useCallback(
+    (lightId: string, key: keyof LightSource, value: LightSource[keyof LightSource]) => {
+      setSettings((prev) => ({
+        ...prev,
+        lights: prev.lights.map((light) =>
+          light.id === lightId ? { ...light, [key]: value } : light
+        ),
+      }));
+    },
+    []
+  );
+
+  const addLight = useCallback(() => {
+    const newId = `light-${Date.now()}`;
+    setSettings((prev) => ({
+      ...prev,
+      lights: [...prev.lights, createDefaultLight(newId, "BEAM")],
+    }));
+  }, []);
+
+  // Light type options for combobox
+  const lightTypeOptions = [
+    { value: "BEAM", label: "Focal" },
+    { value: "LINEAR", label: "Linear" },
+  ];
+
+  const removeLight = useCallback((lightId: string) => {
+    setSettings((prev) => ({
+      ...prev,
+      lights: prev.lights.filter((light) => light.id !== lightId),
+    }));
+  }, []);
+
+  const showEffectControls = settings.finish === "METALLIC" || settings.finish === "PEARL";
 
   return (
     <div className={className}>
@@ -670,188 +721,171 @@ export const PaintPreviewGenerator = forwardRef<
 
         {/* Controls */}
         <div className="space-y-4">
-          {/* Metallic Controls - simplified like Pearl */}
-          {showMetallicControls && (
+          {/* Light Sources */}
+          <Card>
+            <CardHeader className="py-3">
+              <div className="flex items-center justify-between">
+                <span className="text-base font-semibold">Fontes de Luz</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={addLight}
+                  title="Adicionar luz"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {settings.lights.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  Nenhuma luz configurada. Adicione uma luz acima.
+                </p>
+              )}
+
+              {settings.lights.map((light, index) => (
+                <div key={light.id} className="border rounded-lg p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {light.type === "BEAM" ? (
+                        <Sun className="h-4 w-4 text-yellow-500" />
+                      ) : (
+                        <ArrowDownRight className="h-4 w-4 text-blue-500" />
+                      )}
+                      <span className="text-sm font-medium">
+                        Luz {index + 1}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {/* Light Type - Combobox */}
+                      <Combobox
+                        value={light.type}
+                        onValueChange={(v) => updateLight(light.id, "type", v as LightType)}
+                        options={lightTypeOptions}
+                        placeholder="Tipo"
+                        searchable={false}
+                        clearable={false}
+                        className="w-24 h-8"
+                        triggerClassName="h-8 text-xs"
+                      />
+
+                      {/* Light Color */}
+                      <input
+                        type="color"
+                        value={light.color}
+                        onChange={(e) => updateLight(light.id, "color", e.target.value)}
+                        className="w-8 h-8 rounded cursor-pointer bg-transparent border-0"
+                        title="Cor da luz"
+                      />
+
+                      {/* Remove button */}
+                      {settings.lights.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeLight(light.id)}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Position */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Posição</Label>
+                      <span className="text-xs text-muted-foreground">{light.position}</span>
+                    </div>
+                    <Slider
+                      value={[light.position]}
+                      onValueChange={([v]) => updateLight(light.id, "position", v)}
+                      min={0}
+                      max={100}
+                      step={1}
+                    />
+                  </div>
+
+                  {/* Intensity */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Intensidade</Label>
+                      <span className="text-xs text-muted-foreground">{light.intensity}</span>
+                    </div>
+                    <Slider
+                      value={[light.intensity]}
+                      onValueChange={([v]) => updateLight(light.id, "intensity", v)}
+                      min={0}
+                      max={100}
+                      step={1}
+                    />
+                  </div>
+
+                  {/* Spread/Aperture */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Abertura</Label>
+                      <span className="text-xs text-muted-foreground">{light.spread}</span>
+                    </div>
+                    <Slider
+                      value={[light.spread]}
+                      onValueChange={([v]) => updateLight(light.id, "spread", v)}
+                      min={0}
+                      max={100}
+                      step={1}
+                    />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Effect Controls - only for Metallic/Pearl */}
+          {showEffectControls && (
             <Card>
               <CardHeader className="py-3">
-                <span className="text-base font-semibold">Efeito Metálico</span>
+                <span className="text-base font-semibold">
+                  {settings.finish === "METALLIC" ? "Efeito Metálico" : "Efeito Perolado"}
+                </span>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Flake Color - now labeled like pearl */}
+                {/* Effect Color */}
                 <div className="flex items-center justify-between">
-                  <Label>Cor do Efeito</Label>
+                  <Label>
+                    {settings.finish === "METALLIC" ? "Cor dos Flocos" : "Cor de Interferência"}
+                  </Label>
                   <input
                     type="color"
-                    value={settings.flakeColor}
-                    onChange={(e) => updateSetting("flakeColor", e.target.value)}
+                    value={settings.finish === "METALLIC" ? settings.flakeColor : settings.flipColor}
+                    onChange={(e) =>
+                      updateSetting(
+                        settings.finish === "METALLIC" ? "flakeColor" : "flipColor",
+                        e.target.value
+                      )
+                    }
                     className="w-16 h-8 rounded cursor-pointer bg-transparent border-0"
                   />
                 </div>
 
-                {/* Position */}
+                {/* Effect Intensity - independent from light */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label>Posição</Label>
-                    <span className="text-sm text-muted-foreground">{settings.lightPosition}</span>
+                    <Label>Intensidade do Efeito</Label>
+                    <span className="text-sm text-muted-foreground">{settings.effectIntensity}</span>
                   </div>
                   <Slider
-                    value={[settings.lightPosition]}
-                    onValueChange={([v]) => updateSetting("lightPosition", v)}
+                    value={[settings.effectIntensity]}
+                    onValueChange={([v]) => updateSetting("effectIntensity", v)}
                     min={0}
                     max={100}
                     step={1}
                   />
-                </div>
-
-                {/* Intensity */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Intensidade</Label>
-                    <span className="text-sm text-muted-foreground">{settings.lightIntensity}</span>
-                  </div>
-                  <Slider
-                    value={[settings.lightIntensity]}
-                    onValueChange={([v]) => updateSetting("lightIntensity", v)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                </div>
-
-                {/* Spread */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Abertura</Label>
-                    <span className="text-sm text-muted-foreground">{settings.lightSpread}</span>
-                  </div>
-                  <Slider
-                    value={[settings.lightSpread]}
-                    onValueChange={([v]) => updateSetting("lightSpread", v)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                  </div>
-                </CardContent>
-              </Card>
-          )}
-
-          {/* Pearl Controls - unified with light */}
-          {showPearlControls && (
-            <Card>
-              <CardHeader className="py-3">
-                <span className="text-base font-semibold">Efeito Perolado</span>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Flip Color */}
-                <div className="flex items-center justify-between">
-                  <Label>Cor de Interferência</Label>
-                  <input
-                    type="color"
-                    value={settings.flipColor}
-                    onChange={(e) => updateSetting("flipColor", e.target.value)}
-                    className="w-16 h-8 rounded cursor-pointer bg-transparent border-0"
-                  />
-                </div>
-
-                {/* Position */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Posição</Label>
-                    <span className="text-sm text-muted-foreground">{settings.lightPosition}</span>
-                  </div>
-                  <Slider
-                    value={[settings.lightPosition]}
-                    onValueChange={([v]) => updateSetting("lightPosition", v)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                </div>
-
-                {/* Intensity */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Intensidade</Label>
-                    <span className="text-sm text-muted-foreground">{settings.lightIntensity}</span>
-                  </div>
-                  <Slider
-                    value={[settings.lightIntensity]}
-                    onValueChange={([v]) => updateSetting("lightIntensity", v)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                </div>
-
-                {/* Spread */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Abertura</Label>
-                    <span className="text-sm text-muted-foreground">{settings.lightSpread}</span>
-                  </div>
-                  <Slider
-                    value={[settings.lightSpread]}
-                    onValueChange={([v]) => updateSetting("lightSpread", v)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Solid finish - basic light controls */}
-          {settings.finish === "SOLID" && (
-            <Card>
-              <CardHeader className="py-3">
-                <span className="text-base font-semibold">Luz</span>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Position */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Posição</Label>
-                    <span className="text-sm text-muted-foreground">{settings.lightPosition}</span>
-                  </div>
-                  <Slider
-                    value={[settings.lightPosition]}
-                    onValueChange={([v]) => updateSetting("lightPosition", v)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                </div>
-
-                {/* Intensity */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Intensidade</Label>
-                    <span className="text-sm text-muted-foreground">{settings.lightIntensity}</span>
-                  </div>
-                  <Slider
-                    value={[settings.lightIntensity]}
-                    onValueChange={([v]) => updateSetting("lightIntensity", v)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
-                </div>
-
-                {/* Spread */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Abertura</Label>
-                    <span className="text-sm text-muted-foreground">{settings.lightSpread}</span>
-                  </div>
-                  <Slider
-                    value={[settings.lightSpread]}
-                    onValueChange={([v]) => updateSetting("lightSpread", v)}
-                    min={0}
-                    max={100}
-                    step={1}
-                  />
+                  <p className="text-xs text-muted-foreground">
+                    {settings.finish === "METALLIC"
+                      ? "Controla a visibilidade dos flocos metálicos"
+                      : "Controla a iridescência perolada"}
+                  </p>
                 </div>
               </CardContent>
             </Card>

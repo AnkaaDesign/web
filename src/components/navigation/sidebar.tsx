@@ -646,44 +646,49 @@ export const Sidebar = memo(() => {
         timeoutRef.current = null;
       }
 
+      // Reset popover mouse state
+      mouseInPopover.current = false;
+
       const rect = element.getBoundingClientRect();
       setHoveredItemId(itemId);
 
       // Calculate initial position
       let top = rect.top;
-      let left = rect.right + 8;
 
       // Add viewport boundary checking for popover
-      // Estimate popover dimensions (will be adjusted after render if needed)
-      const estimatedPopoverWidth = 250; // Increased for better safety
-      const estimatedPopoverHeight = 400; // Increased conservative estimate
+      const estimatedPopoverHeight = 400;
       const minPadding = 8;
       const viewport = {
         width: window.innerWidth,
         height: window.innerHeight,
       };
 
-      // Adjust if popover would go off the right edge
-      if (left + estimatedPopoverWidth > viewport.width - minPadding) {
-        // Try to show on the left side of the sidebar instead
-        left = Math.max(minPadding, rect.left - estimatedPopoverWidth - 8);
+      // Sidebar is on the right side - position popover to the left of the sidebar
+      // Items with children have min-w-[200px], items without are smaller (just the title)
+      const hasChildren = item.children && item.children.length > 0;
+      const childCount = item.children?.length || 0;
+      const estimatedPopoverWidth = hasChildren || item.id === "favorites" ? 200 : 80;
 
-        // If still off-screen, constrain to viewport
-        if (left < minPadding) {
-          left = viewport.width - estimatedPopoverWidth - minPadding;
-        }
+      // Estimate height based on number of children (each item ~40px + header ~40px + padding)
+      const dynamicPopoverHeight = hasChildren ? Math.min(40 + childCount * 40 + 16, 400) : 50;
+
+      // Position popover to the left of the sidebar (sidebar is 64px wide when minimized)
+      // Use viewport width - 64px - 8px gap - popover width
+      const sidebarWidth = 64;
+      let left = viewport.width - sidebarWidth - 8 - estimatedPopoverWidth;
+
+      // Ensure left doesn't go negative
+      if (left < minPadding) {
+        left = minPadding;
       }
 
       // Adjust if popover would go off the bottom edge
-      if (top + estimatedPopoverHeight > viewport.height - minPadding) {
-        top = Math.max(minPadding, viewport.height - estimatedPopoverHeight - minPadding);
+      if (top + dynamicPopoverHeight > viewport.height - minPadding) {
+        top = Math.max(minPadding, viewport.height - dynamicPopoverHeight - minPadding);
       }
 
       // Ensure minimum padding from top edge
       top = Math.max(minPadding, top);
-
-      // Ensure minimum padding from left edge
-      left = Math.max(minPadding, left);
 
       setPopoverPosition({
         top,
@@ -725,7 +730,7 @@ export const Sidebar = memo(() => {
   }, []);
 
   // MenuItem component
-  const MenuItem = memo(({ item, level = 0 }: { item: any; level?: number }) => {
+  const MenuItem = ({ item, level = 0 }: { item: any; level?: number }) => {
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedMenus[item.id] || false;
     const isActive = isItemActive(item);
@@ -743,6 +748,38 @@ export const Sidebar = memo(() => {
       }
 
       e.preventDefault();
+
+      // When sidebar is minimized and item has children, show/keep popover open on click
+      if (!isOpen && hasChildren) {
+        // Clear any existing timeout
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+
+        const element = e.currentTarget as HTMLElement;
+        const rect = element.getBoundingClientRect();
+
+        // Calculate position for popover
+        const estimatedPopoverWidth = 200;
+        const estimatedPopoverHeight = 400;
+        const minPadding = 8;
+        let top = rect.top;
+        let left = rect.left - estimatedPopoverWidth - 8;
+
+        // Adjust if popover would go off the bottom edge
+        if (top + estimatedPopoverHeight > window.innerHeight - minPadding) {
+          top = Math.max(minPadding, window.innerHeight - estimatedPopoverHeight - minPadding);
+        }
+        top = Math.max(minPadding, top);
+
+        // Set popover state directly
+        setHoveredItemId(item.id);
+        setPopoverPosition({ top, left, item });
+        setIsPopoverAnimating(true);
+        mouseInPopover.current = true;
+        return;
+      }
 
       // If we have a path
       if (item.path) {
@@ -813,7 +850,7 @@ export const Sidebar = memo(() => {
         )}
       </div>
     );
-  });
+  };
 
   // Popover Portal
   const PopoverPortal = () => {
@@ -830,8 +867,9 @@ export const Sidebar = memo(() => {
           left,
           zIndex: 9999,
           opacity: isPopoverAnimating ? 1 : 0,
-          transform: isPopoverAnimating ? "translateX(0)" : "translateX(-8px)",
+          transform: isPopoverAnimating ? "translateX(0)" : "translateX(8px)",
           transition: "opacity 200ms, transform 200ms",
+          pointerEvents: isPopoverAnimating ? "auto" : "none",
         }}
         onMouseEnter={() => {
           mouseInPopover.current = true;

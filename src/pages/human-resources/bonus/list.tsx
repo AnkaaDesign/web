@@ -430,7 +430,15 @@ export default function BonusListPage() {
   }, [sectorsData?.data]);
 
   const filtersWithDefaults = useMemo(() => {
+    // Don't apply default sector filter if user has selected specific users or positions
+    // This allows filtering by user/position without being restricted by default sectors
     if (initialFilters.sectorIds && initialFilters.sectorIds.length > 0) {
+      return initialFilters;
+    }
+    if (initialFilters.userIds && initialFilters.userIds.length > 0) {
+      return initialFilters;
+    }
+    if (initialFilters.positionIds && initialFilters.positionIds.length > 0) {
       return initialFilters;
     }
     return { ...initialFilters, sectorIds: defaultSectorIds };
@@ -440,16 +448,26 @@ export default function BonusListPage() {
   const hasInitializedSectorsRef = React.useRef(false);
 
   useEffect(() => {
+    // Only apply default sectors if:
+    // 1. We haven't initialized yet
+    // 2. Default sectors are available
+    // 3. No sector filters are currently set
+    // 4. No user or position filters are set (user explicitly wants specific users/positions)
+    // 5. No URL parameters exist for sectors/users/positions
     if (
       !hasInitializedSectorsRef.current &&
       defaultSectorIds.length > 0 &&
       (!filters.sectorIds || filters.sectorIds.length === 0) &&
-      !searchParams.has('sectorIds')
+      (!filters.userIds || filters.userIds.length === 0) &&
+      (!filters.positionIds || filters.positionIds.length === 0) &&
+      !searchParams.has('sectorIds') &&
+      !searchParams.has('userIds') &&
+      !searchParams.has('positionIds')
     ) {
       setFilters(prev => ({ ...prev, sectorIds: defaultSectorIds }));
       hasInitializedSectorsRef.current = true;
     }
-  }, [defaultSectorIds, filters.sectorIds, searchParams]);
+  }, [defaultSectorIds, filters.sectorIds, filters.userIds, filters.positionIds, searchParams]);
 
   const [showFilters, setShowFilters] = useState(false);
   const { visibleColumns: baseVisibleColumns, setVisibleColumns } = useColumnVisibility(
@@ -482,11 +500,14 @@ export default function BonusListPage() {
   const selectedMonths = filters.months?.map(m => parseInt(m)) || [new Date().getMonth() + 1];
 
   // Use standard useBonusList hook - API handles saved vs live data transparently
+  // When specific users are selected, don't apply sector/position filters
+  // This allows filtering by user regardless of their sector/position
+  const hasUserFilter = filters.userIds && filters.userIds.length > 0;
   const { data: bonusData, isLoading, error } = useBonusList({
     year: selectedYear,
     months: selectedMonths,
-    sectorIds: filters.sectorIds,
-    positionIds: filters.positionIds,
+    sectorIds: hasUserFilter ? undefined : filters.sectorIds,
+    positionIds: hasUserFilter ? undefined : filters.positionIds,
     userIds: filters.userIds,
     include: {
       user: {
@@ -513,6 +534,25 @@ export default function BonusListPage() {
 
       const user = bonus.user;
       if (!user) return;
+
+      // Apply client-side filters (similar to payroll list)
+      // When specific users are selected, skip sector/position filters
+      const hasUserFilter = filters.userIds && filters.userIds.length > 0;
+
+      if (hasUserFilter) {
+        // Only filter by userIds when users are explicitly selected
+        if (!filters.userIds!.includes(user.id)) {
+          return;
+        }
+      } else {
+        // Apply sector and position filters only when no specific users are selected
+        if (filters.sectorIds && filters.sectorIds.length > 0 && !filters.sectorIds.includes(user.sectorId)) {
+          return;
+        }
+        if (filters.positionIds && filters.positionIds.length > 0 && !filters.positionIds.includes(user.positionId)) {
+          return;
+        }
+      }
 
       // Get month label
       const monthName = new Date(bonus.year, bonus.month - 1).toLocaleDateString('pt-BR', { month: 'short' });
@@ -562,7 +602,7 @@ export default function BonusListPage() {
         userName: user.name || 'Sem nome',
         userEmail: user.email,
         userCpf: user.cpf,
-        payrollNumber: bonus.payroll?.payrollNumber,
+        payrollNumber: user.payrollNumber,
         position: user.position ? {
           id: user.position.id,
           name: user.position.name,
@@ -648,7 +688,7 @@ export default function BonusListPage() {
       }
       return 0;
     });
-  }, [bonusData, sortConfigs]);
+  }, [bonusData, sortConfigs, filters]);
 
   const handleApplyFilters = async (newFilters: BonusFiltersData) => {
     setIsRefreshing(true);

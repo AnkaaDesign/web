@@ -338,9 +338,19 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
   // Fetch total count of all paints (without filters)
   const { data: totalPaintsData } = usePaints({ limit: 1 });
 
+  // Check if color similarity filter is active
+  const hasSimilarColorFilter = useMemo(() => {
+    return filters.similarColor && filters.similarColor.trim() !== "" && filters.similarColor !== "#000000";
+  }, [filters.similarColor]);
+
   // Process and sort paints for color display
   const sortedPaints = useMemo(() => {
     if (!paintsData?.data) return [];
+
+    // If color similarity filter is active, the API already sorted by similarity - don't re-sort
+    if (hasSimilarColorFilter) {
+      return paintsData.data;
+    }
 
     // If color sort is selected, use colorOrder (all paints have it now)
     if (currentSort === "color") {
@@ -350,7 +360,7 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
 
     // For other sorts, the API already sorted them
     return paintsData.data;
-  }, [paintsData?.data, currentSort]);
+  }, [paintsData?.data, currentSort, hasSimilarColorFilter]);
 
   // Get selected paints
   const selectedPaints = useMemo(() => {
@@ -559,7 +569,12 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
               </Button>
 
               {/* Sort Selector */}
-              <SortSelector currentSort={currentSort} onSortChange={handleSortChange} />
+              <SortSelector
+                currentSort={currentSort}
+                onSortChange={handleSortChange}
+                disabled={hasSimilarColorFilter}
+                disabledLabel="Similaridade"
+              />
 
               {/* View Toggle Button */}
               <Button variant="outline" size="icon" onClick={toggleView} title={isMinimized ? "Maximizar" : "Minimizar"}>

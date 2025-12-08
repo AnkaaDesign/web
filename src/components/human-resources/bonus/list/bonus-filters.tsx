@@ -179,7 +179,14 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
   };
 
   const handleUsersChange = (selectedIds: string[]) => {
-    setLocalFilters(prev => ({ ...prev, userIds: selectedIds }));
+    setLocalFilters(prev => ({
+      ...prev,
+      userIds: selectedIds,
+      // Clear sector and position filters when specific users are selected
+      // This allows viewing users regardless of their sector/position
+      sectorIds: selectedIds.length > 0 ? [] : prev.sectorIds,
+      positionIds: selectedIds.length > 0 ? [] : prev.positionIds,
+    }));
   };
 
   return (

@@ -232,54 +232,60 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                 }
                 break;
               case "layout":
-                // Copy truck layout data
+                // Copy truck layout data using truckLayoutData format expected by backend
                 if (sourceTask.truck) {
-                  const truckData: Record<string, unknown> = {
+                  // Ensure truck exists for target task (truck position data)
+                  updateData.truck = {
                     xPosition: sourceTask.truck.xPosition,
                     yPosition: sourceTask.truck.yPosition,
                   };
 
-                  // Copy layout sections if they exist
+                  // Build truckLayoutData in the format expected by backend API
+                  const layoutData: Record<string, unknown> = {};
+
                   if (sourceTask.truck.leftSideLayout) {
-                    truckData.leftSideLayout = {
+                    layoutData.leftSide = {
                       height: sourceTask.truck.leftSideLayout.height,
-                      photoId: sourceTask.truck.leftSideLayout.photoId,
-                      layoutSections: sourceTask.truck.leftSideLayout.layoutSections?.map((section) => ({
+                      photoId: sourceTask.truck.leftSideLayout.photoId || null,
+                      layoutSections: sourceTask.truck.leftSideLayout.layoutSections?.map((section, index) => ({
                         width: section.width,
                         isDoor: section.isDoor,
                         doorHeight: section.doorHeight,
-                        position: section.position,
+                        position: section.position ?? index,
                       })) || [],
                     };
                   }
 
                   if (sourceTask.truck.rightSideLayout) {
-                    truckData.rightSideLayout = {
+                    layoutData.rightSide = {
                       height: sourceTask.truck.rightSideLayout.height,
-                      photoId: sourceTask.truck.rightSideLayout.photoId,
-                      layoutSections: sourceTask.truck.rightSideLayout.layoutSections?.map((section) => ({
+                      photoId: sourceTask.truck.rightSideLayout.photoId || null,
+                      layoutSections: sourceTask.truck.rightSideLayout.layoutSections?.map((section, index) => ({
                         width: section.width,
                         isDoor: section.isDoor,
                         doorHeight: section.doorHeight,
-                        position: section.position,
+                        position: section.position ?? index,
                       })) || [],
                     };
                   }
 
                   if (sourceTask.truck.backSideLayout) {
-                    truckData.backSideLayout = {
+                    layoutData.backSide = {
                       height: sourceTask.truck.backSideLayout.height,
-                      photoId: sourceTask.truck.backSideLayout.photoId,
-                      layoutSections: sourceTask.truck.backSideLayout.layoutSections?.map((section) => ({
+                      photoId: sourceTask.truck.backSideLayout.photoId || null,
+                      layoutSections: sourceTask.truck.backSideLayout.layoutSections?.map((section, index) => ({
                         width: section.width,
                         isDoor: section.isDoor,
                         doorHeight: section.doorHeight,
-                        position: section.position,
+                        position: section.position ?? index,
                       })) || [],
                     };
                   }
 
-                  updateData.truck = truckData;
+                  // Only set truckLayoutData if there are layouts to copy
+                  if (Object.keys(layoutData).length > 0) {
+                    updateData.truckLayoutData = layoutData;
+                  }
                 }
                 break;
             }

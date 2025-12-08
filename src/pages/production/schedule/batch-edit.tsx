@@ -40,9 +40,18 @@ export const TaskBatchEditPage = () => {
         },
       },
       include: {
-        customer: true,
+        customer: {
+          include: {
+            logo: true,
+          },
+        },
         sector: true,
-        generalPainting: true,
+        generalPainting: {
+          include: {
+            paintType: true,
+            paintBrand: true,
+          },
+        },
         truck: true,
       },
       take: taskIds.length,

@@ -15,6 +15,8 @@ export type SortOption = "finish" | "color" | "paintBrand" | "manufacturer" | "n
 interface SortSelectorProps {
   currentSort: SortOption;
   onSortChange: (sort: SortOption) => void;
+  disabled?: boolean;
+  disabledLabel?: string;
 }
 
 const SORT_OPTIONS: Record<SortOption, string> = {
@@ -26,7 +28,17 @@ const SORT_OPTIONS: Record<SortOption, string> = {
   type: "Tipo",
 };
 
-export function SortSelector({ currentSort, onSortChange }: SortSelectorProps) {
+export function SortSelector({ currentSort, onSortChange, disabled, disabledLabel }: SortSelectorProps) {
+  // When disabled (e.g., color similarity filter active), show the disabled label
+  if (disabled) {
+    return (
+      <Button variant="outline" size="default" className="group cursor-not-allowed opacity-70" disabled>
+        <IconArrowsSort className="h-4 w-4 text-muted-foreground" />
+        <span className="text-foreground">Ordenar: {disabledLabel || "Similaridade"}</span>
+      </Button>
+    );
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

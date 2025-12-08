@@ -34,9 +34,9 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
     orderBy: { name: "asc" },
     include: { position: true, sector: true },
     where: {
-      // Users with payroll number and status NOT dismissed
+      // Only active users with payroll number
+      isActive: true,
       payrollNumber: { not: null },
-      status: { not: "DISMISSED" }
     },
     limit: 100, // Max 100 due to API limit
   });
@@ -149,7 +149,14 @@ export function PayrollFilters({ open, onOpenChange, filters, onApplyFilters }: 
   };
 
   const handleUsersChange = (selectedIds: string[]) => {
-    setLocalFilters(prev => ({ ...prev, userIds: selectedIds }));
+    setLocalFilters(prev => ({
+      ...prev,
+      userIds: selectedIds,
+      // Clear sector and position filters when specific users are selected
+      // This allows viewing users regardless of their sector/position
+      sectorIds: selectedIds.length > 0 ? [] : prev.sectorIds,
+      positionIds: selectedIds.length > 0 ? [] : prev.positionIds,
+    }));
   };
 
   return (
