@@ -547,17 +547,12 @@ export const TaskCreateForm = () => {
     }
   }
 
-  // Check if all required fields are filled
+  // Check if all required fields are filled (only name is required)
   const name = form.watch("name");
-  const customerId = form.watch("customerId");
-  const services = form.watch("services");
 
   const hasRequiredFields = Boolean(
     name &&
-    name.trim().length >= 3 &&
-    customerId &&
-    services &&
-    services.length > 0
+    name.trim().length >= 3
   );
 
   // Navigation actions
@@ -644,7 +639,7 @@ export const TaskCreateForm = () => {
                       />
 
                       {/* Customer */}
-                      <CustomerSelector control={form.control} disabled={isSubmitting} required />
+                      <CustomerSelector control={form.control} disabled={isSubmitting} />
                     </div>
 
                     {/* Serial Number, Plate, Chassis - in same row with 1/4, 1/4, 2/4 ratio */}
@@ -824,7 +819,7 @@ export const TaskCreateForm = () => {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <IconClipboardList className="h-5 w-5" />
-                      Serviços <span className="text-destructive">*</span>
+                      Serviços
                     </CardTitle>
                   </CardHeader>
                   <CardContent>

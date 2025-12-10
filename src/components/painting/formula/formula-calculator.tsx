@@ -261,7 +261,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
           hasError: isErrorComponent,
         };
       })
-      .sort((a, b) => b.ratio - a.ratio); // Sort by ratio (highest first)
+      .sort((a, b) => a.ratio - b.ratio); // Sort by ratio (lowest first)
   }, [formula, desiredVolume, itemsMap, correctionMode, errorRatio, errorComponentId, selectedComponents]);
 
   // Calculate totals with validation

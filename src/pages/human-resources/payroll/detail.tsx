@@ -590,21 +590,52 @@ export default function PayrollDetailPage() {
                       // Use reference for display (clean names like "I.N.S.S.")
                       const displayDescription = discount.reference || discount.description || "Desconto";
 
-                      // Calculate percentage for reference column
+                      // Calculate reference text based on discount type
                       let referenceText = "-";
                       const desc = discount.description?.toUpperCase() || "";
+                      const ref = discount.reference?.toUpperCase() || "";
+                      const discountType = discount.discountType;
 
-                      if (desc.includes("INSS") && payroll.inssBase) {
-                        const inssBase = getNumericValue(payroll.inssBase);
-                        if (inssBase > 0) {
-                          const percentage = (discountValue / inssBase) * 100;
-                          referenceText = `${percentage.toFixed(2)}%`;
+                      // Helper to format decimal hours to HH:MM
+                      const formatHoursToHHMM = (decimalHours: number): string => {
+                        const hours = Math.floor(decimalHours);
+                        const minutes = Math.round((decimalHours - hours) * 60);
+                        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                      };
+
+                      if (discountType === 'ABSENCE') {
+                        // Show hours in HH:MM format - prefer baseValue, fallback to payroll.absenceHours
+                        const hoursValue = getNumericValue(discount.baseValue) || getNumericValue(payroll.absenceHours);
+                        if (hoursValue > 0) {
+                          referenceText = formatHoursToHHMM(hoursValue);
                         }
-                      } else if (desc.includes("IRRF") && payroll.irrfBase) {
-                        const irrfBase = getNumericValue(payroll.irrfBase);
-                        if (irrfBase > 0 && discountValue > 0) {
-                          const percentage = (discountValue / irrfBase) * 100;
-                          referenceText = `${percentage.toFixed(2)}%`;
+                      } else if (discountType === 'LATE_ARRIVAL') {
+                        // Show hours in HH:MM format from baseValue
+                        const hoursValue = getNumericValue(discount.baseValue);
+                        if (hoursValue > 0) {
+                          referenceText = formatHoursToHHMM(hoursValue);
+                        }
+                      } else if (desc.includes("INSS") || ref.includes("INSS")) {
+                        // Use percentage field if available, otherwise calculate from base
+                        if (discount.percentage) {
+                          referenceText = `${getNumericValue(discount.percentage).toFixed(2)}%`;
+                        } else if (payroll.inssBase) {
+                          const inssBase = getNumericValue(payroll.inssBase);
+                          if (inssBase > 0) {
+                            const percentage = (discountValue / inssBase) * 100;
+                            referenceText = `${percentage.toFixed(2)}%`;
+                          }
+                        }
+                      } else if (desc.includes("IRRF") || ref.includes("IRRF")) {
+                        // Use percentage field if available, otherwise calculate from base
+                        if (discount.percentage) {
+                          referenceText = `${getNumericValue(discount.percentage).toFixed(2)}%`;
+                        } else if (payroll.irrfBase) {
+                          const irrfBase = getNumericValue(payroll.irrfBase);
+                          if (irrfBase > 0 && discountValue > 0) {
+                            const percentage = (discountValue / irrfBase) * 100;
+                            referenceText = `${percentage.toFixed(2)}%`;
+                          }
                         }
                       } else if (discount.percentage) {
                         referenceText = `${getNumericValue(discount.percentage).toFixed(2)}%`;
@@ -619,14 +650,6 @@ export default function PayrollDetailPage() {
                       );
                     })}
 
-                  {/* FGTS Info */}
-                  {getNumericValue(payroll.fgtsAmount) > 0 && (
-                    <tr className="border-b border-border/50 bg-muted/20">
-                      <td className="py-2 px-0 italic">FGTS (Empregador)</td>
-                      <td className="py-2 px-0 text-left text-muted-foreground text-xs">8%</td>
-                      <td className="py-2 px-0 text-right font-semibold">{formatAmount(getNumericValue(payroll.fgtsAmount))}</td>
-                    </tr>
-                  )}
 
                   {/* Totals */}
                   <tr className="border-t-2 border-border">

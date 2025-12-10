@@ -221,9 +221,13 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
   };
 
   const handleApprove = () => {
+    console.log("[handleApprove] Called", { contextMenu, hasOnApprove: !!onApprove });
     if (contextMenu && onApprove) {
+      console.log("[handleApprove] Calling onApprove with deliveries:", contextMenu.deliveries);
       onApprove(contextMenu.deliveries);
       setContextMenu(null);
+    } else {
+      console.warn("[handleApprove] Missing contextMenu or onApprove", { contextMenu, onApprove });
     }
   };
 

@@ -479,18 +479,12 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
     const errors: TaskFormValidationState["errors"] = {};
     let isValid = true;
 
-    // Validate name
+    // Validate name (only required field)
     if (!name.trim() || name.length < 3) {
       errors.name = "Nome da tarefa é obrigatório (mínimo 3 caracteres)";
       isValid = false;
     } else if (name.length > 200) {
       errors.name = "Nome deve ter no máximo 200 caracteres";
-      isValid = false;
-    }
-
-    // Validate customer
-    if (!customerId) {
-      errors.customerId = "Cliente é obrigatório";
       isValid = false;
     }
 
@@ -500,11 +494,8 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
       isValid = false;
     }
 
-    // Validate services
-    if (services.length === 0) {
-      errors.services = "Pelo menos um serviço deve ser adicionado";
-      isValid = false;
-    } else {
+    // Validate services (only if services are provided, ensure they have descriptions)
+    if (services.length > 0) {
       const hasInvalidService = services.some((service) => !service.description.trim());
       if (hasInvalidService) {
         errors.services = "Todos os serviços devem ter descrição";

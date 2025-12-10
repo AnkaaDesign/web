@@ -402,12 +402,20 @@ export default function BonusDetailPage() {
                 <span className="text-sm text-muted-foreground">Bônus Base</span>
                 <span className="text-sm font-medium">{formatBonusAmount(bonus.baseBonus)}</span>
               </div>
-              {hasDiscounts && bonus.bonusDiscounts!.map((discount: any) => (
-                <div key={discount.id} className="flex justify-between py-1">
-                  <span className="text-sm text-muted-foreground">Desconto: {discount.reference}</span>
-                  <span className="text-sm font-medium text-destructive">-{discount.percentage}%</span>
-                </div>
-              ))}
+              {hasDiscounts && bonus.bonusDiscounts!.map((discount: any) => {
+                const percentageValue = Number(discount.percentage) || 0;
+                const hasPercentage = percentageValue > 0;
+                return (
+                  <div key={discount.id} className="flex justify-between py-1">
+                    <span className="text-sm text-muted-foreground">Desconto: {discount.reference}</span>
+                    <span className="text-sm font-medium text-destructive">
+                      -{hasPercentage
+                        ? `${percentageValue}%`
+                        : formatCurrency(Number(discount.value) || 0)}
+                    </span>
+                  </div>
+                );
+              })}
               <div className="flex justify-between py-2 bg-green-50 dark:bg-green-950/20 rounded-lg px-3 mt-2">
                 <span className="text-sm font-medium text-muted-foreground">Bônus Final</span>
                 <span className="text-lg font-bold text-green-600">{formatCurrency(finalBonusValue)}</span>

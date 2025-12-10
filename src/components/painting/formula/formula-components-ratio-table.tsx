@@ -11,8 +11,8 @@ interface FormulaComponentsRatioTableProps {
 }
 
 export function FormulaComponentsRatioTable({ components, className, variant = "card" }: FormulaComponentsRatioTableProps) {
-  // Sort components by ratio (highest first) for better visualization
-  const sortedComponents = [...components].sort((a, b) => (b.ratio || 0) - (a.ratio || 0));
+  // Sort components by ratio (lowest first) for better visualization
+  const sortedComponents = [...components].sort((a, b) => (a.ratio || 0) - (b.ratio || 0));
 
   // Calculate total ratio for validation
   const totalRatio = components.reduce((sum, comp) => sum + (comp.ratio || 0), 0);

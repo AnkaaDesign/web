@@ -26,7 +26,7 @@ const EPIScheduleDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { updateAsync, deleteAsync } = usePpeDeliveryScheduleMutations();
-  const { data: currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
 
   // Dialog states
   const [showActivateDialog, setShowActivateDialog] = useState(false);

@@ -11,7 +11,7 @@ import { PpeDeliveryBatchResultDialog } from "@/components/ui/batch-operation-re
 export const EPIDeliveryCreate = () => {
   const navigate = useNavigate();
   const batchCreateMutation = useBatchCreatePpeDeliveries();
-  const { data: currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
 
   // Batch result dialog
   const { isOpen: isResultDialogOpen, result: batchResult, openDialog: openResultDialog, closeDialog: closeResultDialog } = useBatchResultDialog();

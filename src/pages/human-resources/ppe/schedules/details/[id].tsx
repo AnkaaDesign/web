@@ -28,7 +28,7 @@ export function PPEScheduleDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { deleteMutation } = usePpeDeliveryScheduleMutations();
-  const { data: currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
 
   // Dialog states
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);

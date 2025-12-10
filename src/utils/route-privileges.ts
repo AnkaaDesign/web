@@ -3,8 +3,8 @@ import { routes } from "../constants";
 
 // Enhanced route privilege mappings with support for arrays and granular permissions
 export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[]> = {
-  // Home - Basic access (all authenticated users can access)
-  "/": "BASIC",
+  // Home - All authenticated users can access (all privileges)
+  "/": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "LEADER", "HUMAN_RESOURCES", "EXTERNAL"],
 
   // Administração - Admin access with specific granular permissions
   "/administracao": "ADMIN",
@@ -74,12 +74,12 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/estoque/retiradas-externas/editar/:id": "WAREHOUSE", // External withdrawal edit
   "/estoque/retiradas-externas/cadastrar": "WAREHOUSE", // External withdrawal create
 
-  // Profile - Basic access (all authenticated users)
-  "/perfil": "BASIC",
+  // Profile - All authenticated users can access
+  "/perfil": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "LEADER", "HUMAN_RESOURCES", "EXTERNAL"],
 
-  // Personal - Basic access (personal info)
-  "/pessoal": "BASIC",
-  "/pessoal/*": "BASIC",
+  // Personal - All authenticated users can access (personal info)
+  "/pessoal": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "LEADER", "HUMAN_RESOURCES", "EXTERNAL"],
+  "/pessoal/*": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "LEADER", "HUMAN_RESOURCES", "EXTERNAL"],
 
   // Meu Pessoal - Leader access (sector employee management)
   "/meu-pessoal": "LEADER",
@@ -134,8 +134,8 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   [routes.production.observations.create]: ["PRODUCTION", "WAREHOUSE", "ADMIN"], // Only production/warehouse/admin can create
   [routes.production.observations.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "ADMIN"], // Only production/warehouse/admin can edit
 
-  // Registro de Ponto - Basic access
-  "/registro-de-ponto": "BASIC",
+  // Registro de Ponto - All authenticated users can access
+  "/registro-de-ponto": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "LEADER", "HUMAN_RESOURCES", "EXTERNAL"],
 
   // Recursos Humanos - HR with admin requirements for sensitive operations
   "/recursos-humanos": "HUMAN_RESOURCES",

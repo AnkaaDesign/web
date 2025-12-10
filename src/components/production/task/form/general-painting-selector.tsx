@@ -5,7 +5,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { getPaints } from "../../../../api-client";
 import type { Paint } from "../../../../types";
 import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH } from "../../../../constants";
-import { IconX } from "@tabler/icons-react";
+import { IconX, IconFlask } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 
@@ -51,6 +51,12 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
       include: {
         paintType: true,
         paintBrand: true,
+        formulas: true,
+        _count: {
+          select: {
+            formulas: true,
+          },
+        },
       },
     };
 
@@ -130,6 +136,16 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
             )}
           </div>
         </div>
+
+        {/* Formula indicator */}
+        <IconFlask
+          className={cn(
+            "h-4 w-4 flex-shrink-0 transition-colors",
+            ((paint._count?.formulas ?? 0) > 0 || (paint.formulas?.length ?? 0) > 0)
+              ? "text-green-600 group-hover:text-primary-foreground"
+              : "text-destructive"
+          )}
+        />
       </div>
     );
   };

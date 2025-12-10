@@ -53,7 +53,7 @@ type PpeDeliveryFormProps = CreatePpeDeliveryFormProps | UpdatePpeDeliveryFormPr
 export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
   const { isSubmitting, mode } = props;
   const navigate = useNavigate();
-  const { data: currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
 
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>(mode === "update" ? props.ppeDelivery.userId : undefined);
 

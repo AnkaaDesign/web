@@ -51,7 +51,7 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   const batchRejectMutation = useBatchRejectPpeDeliveries();
   const batchDeleteMutation = useBatchDeletePpeDeliveries();
   const { updateAsync } = usePpeDeliveryMutations();
-  const { data: currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const [deleteDialog, setDeleteDialog] = useState<{ items: PpeDelivery[]; isBulk: boolean } | null>(null);
 
   // Get table state for selected items functionality - shared with table component via URL
@@ -340,8 +340,13 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   }, [navigate]);
 
   const handleBulkApprove = useCallback(async (deliveries: PpeDelivery[]) => {
-    // Check permissions
-    if (!currentUser || !hasPrivilege(currentUser, SECTOR_PRIVILEGES.WAREHOUSE)) {
+    console.log("[handleBulkApprove] Called with deliveries:", deliveries);
+    console.log("[handleBulkApprove] currentUser:", currentUser);
+    console.log("[handleBulkApprove] hasAdminPrivilege:", currentUser ? hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) : false);
+
+    // Check permissions - only ADMIN can approve/reject deliveries
+    if (!currentUser || !hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN)) {
+      console.warn("[handleBulkApprove] Permission denied - user does not have ADMIN privilege");
       return;
     }
 
@@ -417,8 +422,8 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   }, [currentUser, markAsDeliveredMutation]);
 
   const handleBulkReject = useCallback(async (deliveries: PpeDelivery[]) => {
-    // Check permissions
-    if (!currentUser || !hasPrivilege(currentUser, SECTOR_PRIVILEGES.WAREHOUSE)) {
+    // Check permissions - only ADMIN can approve/reject deliveries
+    if (!currentUser || !hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN)) {
       return;
     }
 

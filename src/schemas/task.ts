@@ -1128,7 +1128,7 @@ export const taskCreateSchema = z
     startedAt: nullableDate.optional(),
     finishedAt: nullableDate.optional(),
     paintId: z.string().uuid("Tinta inválida").nullable().optional(),
-    customerId: z.string().uuid("Cliente inválido").min(1, "Cliente é obrigatório"),
+    customerId: z.string().uuid("Cliente inválido").nullable().optional(),
     sectorId: z.string().uuid("Setor inválido").nullable().optional(),
 
     // Relations - Many-to-many file relations (arrays)
@@ -1142,7 +1142,7 @@ export const taskCreateSchema = z
     // Legacy field names for backwards compatibility
     artworkIds: z.array(z.string().uuid("Artwork inválido")).optional(), // @deprecated Use fileIds instead
     observation: taskObservationCreateSchema.nullable().optional(),
-    services: z.array(taskServiceOrderCreateSchema).min(1, "Pelo menos um serviço é obrigatório"),
+    services: z.array(taskServiceOrderCreateSchema).optional(),
     truck: taskTruckCreateSchema.nullable().optional(),
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts

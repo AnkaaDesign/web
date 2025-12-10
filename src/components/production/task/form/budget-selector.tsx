@@ -120,8 +120,9 @@ export const BudgetSelector = forwardRef<
     for (let i = fields.length - 1; i >= 0; i--) {
       remove(i);
     }
-    // Also clear the expiresIn field and any validation errors
-    setValue("budget.expiresIn", null);
+    // Set budget to undefined entirely so the optional schema validation works
+    // Setting individual fields to null still leaves an object that triggers validation
+    setValue("budget", undefined);
     clearErrors("budget");
   }, [fields.length, remove, setValue, clearErrors]);
 

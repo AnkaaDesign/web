@@ -22,7 +22,7 @@ export type CutAction = "start" | "finish" | "request" | "view" | "delete";
 export function CutTableContextMenu({ contextMenu, onClose, onAction }: CutTableContextMenuProps) {
   if (!contextMenu) return null;
 
-  const { data: currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
   const { items } = contextMenu;
   const isMultiSelection = items.length > 1;
 

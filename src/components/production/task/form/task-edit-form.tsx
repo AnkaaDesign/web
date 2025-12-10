@@ -1437,7 +1437,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                       />
 
                       {/* Customer */}
-                      <CustomerSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} required initialCustomer={task.customer} />
+                      <CustomerSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} initialCustomer={task.customer} />
                     </div>
 
                     {/* Serial Number, Plate, Chassis - in same row with 1/4, 1/4, 2/4 ratio */}
@@ -1684,7 +1684,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <IconClipboardList className="h-5 w-5" />
-                      Serviços <span className="text-destructive">*</span>
+                      Serviços
                     </CardTitle>
                   </CardHeader>
                   <CardContent>

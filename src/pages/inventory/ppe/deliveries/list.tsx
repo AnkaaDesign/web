@@ -10,7 +10,7 @@ import { hasPrivilege } from "../../../../utils";
 
 export const PpeDeliveryListPage = () => {
   const navigate = useNavigate();
-  const { data: currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
 
   // Check if user can create PPE deliveries (HR or Admin only)
   const canCreate = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.HUMAN_RESOURCES) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN));

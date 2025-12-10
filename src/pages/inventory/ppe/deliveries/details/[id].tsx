@@ -27,7 +27,7 @@ const EPIDeliveryDetails = () => {
   const navigate = useNavigate();
   const { updateAsync: updateMutation, deleteAsync: deleteMutation } = usePpeDeliveryMutations();
   const markAsDeliveredMutation = useMarkPpeDeliveryAsDelivered();
-  const { data: currentUser } = useAuth();
+  const { user: currentUser } = useAuth();
 
   // Dialog states
   const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);

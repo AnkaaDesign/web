@@ -322,7 +322,8 @@ export const budgetGetManySchema = z
 // Nested Schemas for Relations (used in Task create/update)
 // =====================
 
-export const budgetCreateNestedSchema = z.object({
+// Base schema for budget validation when budget is present with items
+const budgetWithItemsSchema = z.object({
   expiresIn: z.coerce.date({
     required_error: "Data de validade é obrigatória",
     invalid_type_error: "Data de validade inválida",
@@ -338,6 +339,24 @@ export const budgetCreateNestedSchema = z.object({
       (items) => items.every((item) => item.amount && item.amount > 0),
       { message: "Todos os itens devem ter um valor maior que zero" }
     ),
+});
+
+// Schema that allows empty budget (no items) to pass validation
+// This handles the case where useFieldArray creates an empty budget.items array
+export const budgetCreateNestedSchema = z.union([
+  // Case 1: Budget has items - full validation required
+  budgetWithItemsSchema,
+  // Case 2: Budget is empty or has no items - treat as "no budget"
+  z.object({
+    expiresIn: z.any().optional(),
+    items: z.array(z.any()).max(0), // Empty array is valid (treated as "no budget")
+  }),
+]).transform((data) => {
+  // If items array is empty, return undefined to indicate no budget
+  if (!data.items || data.items.length === 0) {
+    return undefined;
+  }
+  return data;
 });
 
 // =====================
