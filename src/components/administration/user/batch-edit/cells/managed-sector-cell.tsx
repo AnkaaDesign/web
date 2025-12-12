@@ -1,46 +1,45 @@
-import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
-import { Combobox } from "@/components/ui/combobox";
-import { useSectors } from "../../../../../hooks";
-import type { UserBatchEditFormData } from "../types";
+import { FormField, FormItem, FormControl, FormMessage, FormLabel } from "@/components/ui/form";
+import { Switch } from "@/components/ui/switch";
+import { useWatch } from "react-hook-form";
 
 interface ManagedSectorCellProps {
   control: any;
   index: number;
   disabled?: boolean;
-  currentSectorName?: string;
 }
 
-export function ManagedSectorCell({ control, index, disabled, currentSectorName }: ManagedSectorCellProps) {
-  const { data: sectors, isLoading } = useSectors({
-    orderBy: { name: "asc" },
+/**
+ * Sector Leader Cell Component
+ *
+ * In the new workflow, a user can only manage their own sector.
+ * This component shows a switch to toggle whether the user is the leader
+ * of their currently assigned sector.
+ */
+export function ManagedSectorCell({ control, index, disabled }: ManagedSectorCellProps) {
+  // Watch the sectorId to know if a sector is selected
+  const sectorId = useWatch({
+    control,
+    name: `users.${index}.data.sectorId`,
   });
 
-  const sectorOptions =
-    sectors?.data?.map((sector) => ({
-      value: sector.id,
-      label: sector.name,
-    })) || [];
-
-  // Add "none" option for clearing the managed sector
-  const optionsWithNone = [{ value: "none", label: "Nenhum" }, ...sectorOptions];
+  const isDisabled = disabled || !sectorId;
 
   return (
     <FormField
       control={control}
-      name={`users.${index}.data.managedSectorId`}
+      name={`users.${index}.data.isSectorLeader`}
       render={({ field }) => (
-        <FormItem>
+        <FormItem className="flex items-center gap-2">
           <FormControl>
-            <Combobox
-              value={field.value || "none"}
-              onValueChange={(value: string | undefined) => field.onChange(value === "none" ? null : value)}
-              options={optionsWithNone}
-              placeholder={currentSectorName || "Selecione um setor"}
-              emptyText="Nenhum setor encontrado"
-              disabled={disabled || isLoading}
-              className="h-8"
+            <Switch
+              checked={field.value || false}
+              onCheckedChange={field.onChange}
+              disabled={isDisabled}
             />
           </FormControl>
+          <FormLabel className="text-xs text-muted-foreground cursor-pointer">
+            {sectorId ? "Líder" : "Selecione um setor"}
+          </FormLabel>
           <FormMessage />
         </FormItem>
       )}

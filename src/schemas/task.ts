@@ -1080,8 +1080,28 @@ const taskServiceOrderCreateSchema = z.object({
   finishedAt: nullableDate.optional(),
 });
 
-// Truck schema
+// Layout section schema for truck layouts
+const layoutSectionSchema = z.object({
+  width: z.number().positive(),
+  isDoor: z.boolean().default(false),
+  doorHeight: z.number().nullable().optional(),
+  position: z.number().int().min(0).optional(),
+});
+
+// Layout side schema (left, right, back)
+const layoutSideSchema = z
+  .object({
+    id: z.string().uuid().optional(), // Existing layout ID for updates
+    height: z.number().positive(),
+    layoutSections: z.array(layoutSectionSchema),
+    photoId: z.string().uuid().nullable().optional(),
+  })
+  .nullable()
+  .optional();
+
+// Consolidated truck schema with basic fields AND layouts
 const taskTruckCreateSchema = z.object({
+  // Basic truck fields
   plate: z
     .string()
     .optional()
@@ -1095,9 +1115,15 @@ const taskTruckCreateSchema = z.object({
     .optional()
     .nullable()
     .transform((val) => (val === "" ? null : val?.toUpperCase())),
+  // Truck spot in garage (e.g., "B1_F1_V1", "B2_F2_V3", "PATIO", or null)
+  spot: z.string().nullable().optional(),
   xPosition: z.number().nullable().optional(),
   yPosition: z.number().nullable().optional(),
   garageId: z.string().uuid("Garagem inválida").nullable().optional(),
+  // Layout data - embedded in truck for single payload
+  leftSideLayout: layoutSideSchema,
+  rightSideLayout: layoutSideSchema,
+  backSideLayout: layoutSideSchema,
 });
 
 // =====================

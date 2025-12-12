@@ -43,7 +43,7 @@ export const TaskSetSectorModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
   const { data: sectorsData, isLoading: sectorsLoading } = useSectors({
     where: {
       privileges: {
-        in: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN],
+        in: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.ADMIN],
       },
     },
     orderBy: { name: "asc" },

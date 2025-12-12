@@ -4,7 +4,7 @@ import { routes } from "../constants";
 // Enhanced route privilege mappings with support for arrays and granular permissions
 export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (keyof typeof SECTOR_PRIVILEGES)[]> = {
   // Home - All authenticated users can access (all privileges)
-  "/": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "LEADER", "HUMAN_RESOURCES", "EXTERNAL"],
+  "/": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL"],
 
   // Administração - Admin access with specific granular permissions
   "/administracao": "ADMIN",
@@ -16,19 +16,19 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   // Financeiro - Financial sector routes
   "/financeiro": "FINANCIAL",
   "/financeiro/*": "FINANCIAL",
-  "/financeiro/clientes": ["FINANCIAL", "LEADER", "ADMIN"], // Financial customers list page
-  "/financeiro/clientes/detalhes/:id": ["FINANCIAL", "LEADER", "ADMIN"], // Financial customer details
-  "/financeiro/clientes/editar/:id": ["FINANCIAL", "LEADER", "ADMIN"], // Financial customer edit
-  "/financeiro/clientes/cadastrar": ["FINANCIAL", "LEADER", "ADMIN"], // Financial customer create
+  "/financeiro/clientes": ["FINANCIAL", "ADMIN"], // Financial customers list page (team leaders check at component level)
+  "/financeiro/clientes/detalhes/:id": ["FINANCIAL", "ADMIN"], // Financial customer details
+  "/financeiro/clientes/editar/:id": ["FINANCIAL", "ADMIN"], // Financial customer edit
+  "/financeiro/clientes/cadastrar": ["FINANCIAL", "ADMIN"], // Financial customer create
   "/financeiro/producao": "FINANCIAL", // Redirects to /producao
   "/financeiro/producao/aerografia": "FINANCIAL", // Redirects to /producao/aerografia/listar
   "/financeiro/producao/cronograma": "FINANCIAL", // Redirects to /producao/cronograma (tasks)
   "/financeiro/producao/em-espera": "FINANCIAL", // Redirects to /producao/em-espera
   "/financeiro/producao/historico-tarefas": "FINANCIAL", // Redirects to /producao/historico
 
-  // Estatísticas - Leader/Admin access
-  "/statistics": ["LEADER", "ADMIN"],
-  "/statistics/*": ["LEADER", "ADMIN"],
+  // Estatísticas - Admin access (team leaders check at component level via isTeamLeader())
+  "/statistics": "ADMIN",
+  "/statistics/*": "ADMIN",
 
   // Estoque - Warehouse operations with full access
   // WAREHOUSE has full access to all inventory routes including create, edit, and delete operations
@@ -75,67 +75,68 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/estoque/retiradas-externas/cadastrar": "WAREHOUSE", // External withdrawal create
 
   // Profile - All authenticated users can access
-  "/perfil": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "LEADER", "HUMAN_RESOURCES", "EXTERNAL"],
+  "/perfil": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL"],
 
   // Personal - All authenticated users can access (personal info)
-  "/pessoal": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "LEADER", "HUMAN_RESOURCES", "EXTERNAL"],
-  "/pessoal/*": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "LEADER", "HUMAN_RESOURCES", "EXTERNAL"],
+  "/pessoal": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL"],
+  "/pessoal/*": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL"],
 
-  // Meu Pessoal - Leader access (sector employee management)
-  "/meu-pessoal": "LEADER",
+  // Meu Pessoal - Team leader access (sector employee management)
+  // Uses TEAM_LEADER virtual privilege which checks user.managedSector relation
+  "/meu-pessoal": "TEAM_LEADER",
 
   // Pintura - Warehouse operations (PRODUCTION excluded from paint catalog)
-  "/pintura": ["WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"],
-  "/pintura/catalogo": ["WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // PRODUCTION excluded
-  "/pintura/catalogo/detalhes/:id": ["WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // Paint detail pages - PRODUCTION excluded
+  "/pintura": ["WAREHOUSE", "DESIGNER", "ADMIN"],
+  "/pintura/catalogo": ["WAREHOUSE", "DESIGNER", "ADMIN"], // PRODUCTION excluded
+  "/pintura/catalogo/detalhes/:id": ["WAREHOUSE", "DESIGNER", "ADMIN"], // Paint detail pages - PRODUCTION excluded
   "/pintura/catalogo/editar/:id": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can edit paints
   "/pintura/catalogo/cadastrar": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can create paints
   "/pintura/producoes": ["PRODUCTION", "WAREHOUSE", "ADMIN"], // Designer excluded from paint productions
   "/pintura/producoes/detalhes/:id": ["PRODUCTION", "WAREHOUSE", "ADMIN"], // Paint production detail
-  "/pintura/tipos-de-tinta": ["WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // Paint types - PRODUCTION excluded
-  "/pintura/tipos-de-tinta/detalhes/:id": ["WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // Paint type detail
+  "/pintura/tipos-de-tinta": ["WAREHOUSE", "DESIGNER", "ADMIN"], // Paint types - PRODUCTION excluded
+  "/pintura/tipos-de-tinta/detalhes/:id": ["WAREHOUSE", "DESIGNER", "ADMIN"], // Paint type detail
   "/pintura/tipos-de-tinta/editar/:id": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can edit
   "/pintura/tipos-de-tinta/cadastrar": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can create
-  "/pintura/marcas": ["WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // Paint brands list - PRODUCTION excluded
-  "/pintura/marcas/detalhes/:id": ["WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // Paint brand detail
+  "/pintura/marcas": ["WAREHOUSE", "DESIGNER", "ADMIN"], // Paint brands list - PRODUCTION excluded
+  "/pintura/marcas/detalhes/:id": ["WAREHOUSE", "DESIGNER", "ADMIN"], // Paint brand detail
   "/pintura/marcas/editar/:id": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can edit
   "/pintura/marcas/cadastrar": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can create
-  "/pintura/formulas": ["WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // Formulas visible to DESIGNER and LEADER (view only)
-  "/pintura/formulas/detalhes/:id": ["WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // Formula detail pages
+  "/pintura/formulas": ["WAREHOUSE", "DESIGNER", "ADMIN"], // Formulas visible to DESIGNER (view only)
+  "/pintura/formulas/detalhes/:id": ["WAREHOUSE", "DESIGNER", "ADMIN"], // Formula detail pages
   "/pintura/formulas/editar/:id": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can edit
   "/pintura/formulas/cadastrar": ["WAREHOUSE", "ADMIN"], // Only WAREHOUSE and ADMIN can create
 
-  // Produção - Production with full WAREHOUSE access, read-only DESIGNER, FINANCIAL, LOGISTIC, and LEADER access
+  // Produção - Production with full WAREHOUSE access, read-only DESIGNER, FINANCIAL, LOGISTIC access
   // WAREHOUSE has full access to all production routes including create, edit, and delete operations
   // DESIGNER has read-only access to schedule, on-hold, history, and cuts
   // FINANCIAL has read-only access to production schedule, on-hold, history, and airbrushings routes
   // LOGISTIC has read-only access to schedule, on-hold, history, and garages (can edit layout only)
-  // LEADER has access to schedule, history (manages their sector's tasks)
-  [routes.production.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER"], // LEADER can view production
-  [routes.production.schedule.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER"], // LEADER can view schedule
-  [routes.production.schedule.create]: ["PRODUCTION", "WAREHOUSE"], // DESIGNER, FINANCIAL, and LEADER excluded (cannot create)
-  [routes.production.schedule.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER", "ADMIN"], // Task detail page
-  [routes.production.schedule.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "LEADER", "ADMIN"], // FINANCIAL, LOGISTIC, and LEADER can edit with restrictions
-  [routes.production.scheduleOnHold.root]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC"], // WAREHOUSE and LEADER excluded from on-hold
-  [routes.production.scheduleOnHold.details(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER", "ADMIN"], // On-hold task detail - WAREHOUSE excluded
-  [routes.production.history.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER"], // LEADER can view history
-  [routes.production.history.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER", "ADMIN"], // History detail page
+  // NOTE: Team leaders (checked via isTeamLeader()) can access schedule, history (manages their sector's tasks)
+  [routes.production.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC"], // Team leaders check at component level
+  [routes.production.schedule.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC"], // Team leaders check at component level
+  [routes.production.schedule.create]: ["PRODUCTION", "WAREHOUSE"], // DESIGNER, FINANCIAL excluded (cannot create)
+  [routes.production.schedule.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN"], // Task detail page
+  [routes.production.schedule.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "ADMIN"], // FINANCIAL, LOGISTIC can edit with restrictions
+  [routes.production.scheduleOnHold.root]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC"], // WAREHOUSE excluded from on-hold
+  [routes.production.scheduleOnHold.details(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN"], // On-hold task detail - WAREHOUSE excluded
+  [routes.production.history.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC"], // Team leaders check at component level
+  [routes.production.history.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN"], // History detail page
   [routes.production.airbrushings.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL"], // DESIGNER excluded from airbrushings
   [routes.production.airbrushings.list]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL"],
   [routes.production.airbrushings.create]: ["PRODUCTION", "WAREHOUSE"], // DESIGNER excluded (read-only)
   [routes.production.airbrushings.edit(":id")]: ["PRODUCTION", "WAREHOUSE"], // DESIGNER excluded (read-only)
 
   // Cut-related routes - DESIGNER has read-only access
-  [routes.production.cutting.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"],
-  [routes.production.cutting.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // Cutting detail
+  [routes.production.cutting.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "ADMIN"],
+  [routes.production.cutting.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "ADMIN"], // Cutting detail
 
   // Observations - accessible to all production-related sectors (read-only for most, edit for admin)
-  [routes.production.observations.root]: ["PRODUCTION", "WAREHOUSE", "LEADER", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN"],
+  [routes.production.observations.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN"],
   [routes.production.observations.create]: ["PRODUCTION", "WAREHOUSE", "ADMIN"], // Only production/warehouse/admin can create
   [routes.production.observations.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "ADMIN"], // Only production/warehouse/admin can edit
 
   // Registro de Ponto - All authenticated users can access
-  "/registro-de-ponto": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "LEADER", "HUMAN_RESOURCES", "EXTERNAL"],
+  "/registro-de-ponto": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL"],
 
   // Recursos Humanos - HR with admin requirements for sensitive operations
   "/recursos-humanos": "HUMAN_RESOURCES",
@@ -158,9 +159,10 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/human-resources/employees/create": "ADMIN", // Employee creation requires admin
   "/human-resources/vacations": "HUMAN_RESOURCES",
 
-  // Catalog routes (view-only for leaders and designers - NOTE: uses same details path as painting.catalog, so privileges defined on line 87)
-  [routes.catalog.root]: ["LEADER", "DESIGNER"],
-  // [routes.catalog.details(":id")]: ["LEADER", "DESIGNER"], // REMOVED: Conflicts with painting.catalog.details (same path), using hardcoded entry on line 87 instead
+  // Catalog routes (view-only for designers - NOTE: uses same details path as painting.catalog, so privileges defined on line 87)
+  // Team leaders check at component level via isTeamLeader()
+  [routes.catalog.root]: "DESIGNER",
+  // [routes.catalog.details(":id")]: "DESIGNER", // REMOVED: Conflicts with painting.catalog.details (same path), using hardcoded entry on line 87 instead
 
   // Maintenance routes (maintenance access for technicians)
   [routes.maintenance.root]: "MAINTENANCE",
@@ -168,19 +170,24 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/manutencao/editar/:id": "MAINTENANCE", // Dynamic route for editing
   [routes.maintenance.details(":id")]: "MAINTENANCE",
 
-  // My Team routes (team management for leaders)
-  [routes.myTeam.vacations]: "LEADER",
-  [routes.myTeam.warnings]: "LEADER",
-  [routes.myTeam.loans]: "LEADER",
+  // My Team routes (team management for team leaders)
+  // Uses TEAM_LEADER virtual privilege which checks user.managedSector relation
+  [routes.myTeam.vacations]: "TEAM_LEADER",
+  [routes.myTeam.warnings]: "TEAM_LEADER",
+  [routes.myTeam.loans]: "TEAM_LEADER",
+  [routes.myTeam.members]: "TEAM_LEADER",
+  [routes.myTeam.ppes]: "TEAM_LEADER",
+  [routes.myTeam.movements]: "TEAM_LEADER",
+  [routes.myTeam.calculations]: "TEAM_LEADER",
 
   // Fallback patterns (for broader route matching)
   "/administracao/*": "ADMIN",
   [`${routes.inventory.root}/*`]: "WAREHOUSE",
-  "/pintura/*": ["WAREHOUSE", "DESIGNER", "LEADER", "ADMIN"], // PRODUCTION excluded from paint routes
-  [`${routes.production.root}/*`]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "LEADER"], // DESIGNER, FINANCIAL, LOGISTIC, and LEADER have read access to production routes
+  "/pintura/*": ["WAREHOUSE", "DESIGNER", "ADMIN"], // PRODUCTION excluded from paint routes
+  [`${routes.production.root}/*`]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC"], // DESIGNER, FINANCIAL, LOGISTIC have read access to production routes
   "/recursos-humanos/*": "HUMAN_RESOURCES",
   "/human-resources/*": "HUMAN_RESOURCES",
-  "/meu-pessoal/*": "LEADER",
+  "/meu-pessoal/*": "TEAM_LEADER", // Team leader routes - uses virtual privilege
   "/manutencao/*": "MAINTENANCE",
 };
 

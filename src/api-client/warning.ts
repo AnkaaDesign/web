@@ -50,6 +50,20 @@ export class WarningService {
     return response.data;
   }
 
+  async getMyWarnings(params?: WarningGetManyFormData): Promise<WarningGetManyResponse> {
+    const response = await apiClient.get<WarningGetManyResponse>(`${this.basePath}/my-warnings`, {
+      params,
+    });
+    return response.data;
+  }
+
+  async getTeamWarnings(params?: WarningGetManyFormData): Promise<WarningGetManyResponse> {
+    const response = await apiClient.get<WarningGetManyResponse>(`${this.basePath}/team-warnings`, {
+      params,
+    });
+    return response.data;
+  }
+
   // =====================
   // Mutation Operations
   // =====================
@@ -117,6 +131,8 @@ export const warningService = new WarningService();
 // Query Operations
 export const getWarnings = (params?: WarningGetManyFormData) => warningService.getWarnings(params);
 export const getWarningById = (id: string, params?: Omit<WarningGetByIdFormData, "id">) => warningService.getWarningById(id, params);
+export const getMyWarnings = (params?: WarningGetManyFormData) => warningService.getMyWarnings(params);
+export const getTeamWarnings = (params?: WarningGetManyFormData) => warningService.getTeamWarnings(params);
 
 // Mutation Operations
 export const createWarning = (data: WarningCreateFormData | FormData, query?: WarningQueryFormData) => warningService.createWarning(data, query);

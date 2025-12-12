@@ -4,7 +4,7 @@ import { IconPlayerPlay, IconCheck, IconScissors, IconEye, IconTrash } from "@ta
 import { CUT_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Cut } from "../../../../types";
 import { useAuth } from "../../../../hooks";
-import { hasPrivilege } from "../../../../utils";
+import { hasPrivilege, isTeamLeader } from "../../../../utils";
 
 interface CutTableContextMenuProps {
   contextMenu: {
@@ -26,9 +26,10 @@ export function CutTableContextMenu({ contextMenu, onClose, onAction }: CutTable
   const { items } = contextMenu;
   const isMultiSelection = items.length > 1;
 
-  // Check if user can request new cuts (Leader or Admin only)
+  // Check if user can request new cuts (Team leaders or Admin only)
+  // Team leadership is determined by managedSector relationship
   const canRequestNewCut = currentUser && (
-    hasPrivilege(currentUser, SECTOR_PRIVILEGES.LEADER) ||
+    isTeamLeader(currentUser) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN)
   );
 
@@ -75,7 +76,7 @@ export function CutTableContextMenu({ contextMenu, onClose, onAction }: CutTable
           </DropdownMenuItem>
         )}
 
-        {/* Request new cut (single selection only, Leader and Admin only) */}
+        {/* Request new cut (single selection only, Team leaders and Admin only) */}
         {!isMultiSelection && !hasCompletedCuts && canRequestNewCut && (
           <DropdownMenuItem onClick={() => handleAction("request")}>
             <IconScissors className="mr-2 h-4 w-4" />

@@ -326,12 +326,16 @@ export const routes = {
     root: "/meu-pessoal",
   },
 
-  // My Team - Meu Pessoal - Team management for leaders (simplified routes)
+  // My Team - Minha Equipe - Team management for leaders (simplified routes)
   myTeam: {
+    calculations: "/meu-pessoal/calculos",
     loans: "/meu-pessoal/emprestimos",
+    members: "/meu-pessoal/usuarios",
+    movements: "/meu-pessoal/movimentacoes",
+    ppes: "/meu-pessoal/epis",
     root: "/meu-pessoal",
     vacations: "/meu-pessoal/ferias",
-    warnings: "/meu-pessoal/avisos",
+    warnings: "/meu-pessoal/advertencias",
   },
 
   // Painting - Pintura - Paint Management
@@ -393,8 +397,15 @@ export const routes = {
       root: "/pessoal/meus-emprestimos",
     },
     myActivities: {
-      details: (id: string) => `/pessoal/minhas-atividades/detalhes/${id}`,
-      root: "/pessoal/minhas-atividades",
+      details: (id: string) => `/pessoal/minhas-movimentacoes/detalhes/${id}`,
+      root: "/pessoal/minhas-movimentacoes",
+    },
+    myTimeEntries: {
+      root: "/pessoal/meus-pontos",
+    },
+    myWarnings: {
+      details: (id: string) => `/pessoal/minhas-advertencias/detalhes/${id}`,
+      root: "/pessoal/minhas-advertencias",
     },
     root: "/pessoal",
   },
@@ -441,6 +452,9 @@ export const routes = {
     scheduleOnHold: {
       root: "/producao/em-espera",
       details: (id: string) => `/producao/em-espera/detalhes/${id}`,
+    },
+    garages: {
+      root: "/producao/barracoes",
     },
   },
 

@@ -85,7 +85,7 @@ export const FinancialCustomersDetailsPage = () => {
 
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
         <CustomerDetailSkeleton />
       </PrivilegeRoute>
     );
@@ -107,7 +107,7 @@ export const FinancialCustomersDetailsPage = () => {
   };
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="space-y-6">
         <PageHeader
           variant="detail"

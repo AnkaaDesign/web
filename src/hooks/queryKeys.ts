@@ -853,3 +853,44 @@ export const serverKeys = {
 };
 
 // =====================================================
+// Team Staff Query Keys
+// =====================================================
+
+/**
+ * Query keys for team staff endpoints.
+ * These endpoints are secure and automatically filter data based on the authenticated user's managed sector.
+ */
+export const teamStaffKeys = {
+  all: ["teamStaff"] as const,
+
+  // Users in team leader's sector
+  users: () => ["teamStaff", "users"] as const,
+  usersList: (filters?: Partial<UserGetManyFormData>) => (filters ? (["teamStaff", "users", "list", filters] as const) : (["teamStaff", "users", "list"] as const)),
+
+  // Borrows for team members
+  borrows: () => ["teamStaff", "borrows"] as const,
+  borrowsList: (filters?: Partial<BorrowGetManyFormData>) => (filters ? (["teamStaff", "borrows", "list", filters] as const) : (["teamStaff", "borrows", "list"] as const)),
+
+  // Vacations for team members
+  vacations: () => ["teamStaff", "vacations"] as const,
+  vacationsList: (filters?: Partial<VacationGetManyFormData>) => (filters ? (["teamStaff", "vacations", "list", filters] as const) : (["teamStaff", "vacations", "list"] as const)),
+
+  // Warnings for team members
+  warnings: () => ["teamStaff", "warnings"] as const,
+  warningsList: (filters?: Partial<WarningGetManyFormData>) => (filters ? (["teamStaff", "warnings", "list", filters] as const) : (["teamStaff", "warnings", "list"] as const)),
+
+  // Activities for team members
+  activities: () => ["teamStaff", "activities"] as const,
+  activitiesList: (filters?: Partial<ActivityGetManyFormData>) =>
+    filters ? (["teamStaff", "activities", "list", filters] as const) : (["teamStaff", "activities", "list"] as const),
+
+  // EPIs (PPE Deliveries) for team members
+  epis: () => ["teamStaff", "epis"] as const,
+  episList: (filters?: Partial<PpeDeliveryGetManyFormData>) => (filters ? (["teamStaff", "epis", "list", filters] as const) : (["teamStaff", "epis", "list"] as const)),
+
+  // Payroll calculations for team members
+  calculations: () => ["teamStaff", "calculations"] as const,
+  calculationsByPeriod: (year: number, month: number) => ["teamStaff", "calculations", year, month] as const,
+};
+
+// =====================================================

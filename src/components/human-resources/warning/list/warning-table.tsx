@@ -8,7 +8,7 @@ import { routes, WARNING_SEVERITY_LABELS, WARNING_CATEGORY_LABELS } from "../../
 import { useAuth } from "../../../../hooks/useAuth";
 import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { formatDate } from "../../../../utils";
-import { useWarningMutations, useWarnings } from "../../../../hooks";
+import { useWarningMutations, useWarnings, useMyWarnings } from "../../../../hooks";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -81,34 +81,42 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
     resetSelectionOnPageChange: false,
   });
 
+  // Check if we should use the my-warnings endpoint
+  const useMyWarningsEndpoint = (filters as any)?._useMyWarningsEndpoint;
+
   // Memoize query parameters to prevent unnecessary re-fetches
   const queryParams = React.useMemo(
-    () => ({
-      // When showSelectedOnly is true, don't apply filters
-      ...(showSelectedOnly ? {} : filters),
-      page: page + 1, // Convert 0-based to 1-based for API
-      take: pageSize,
-      include: {
-        collaborator: true,
-        attachments: true,
-      },
-      // Convert sortConfigs to orderBy format for API
-      ...(sortConfigs.length > 0 && {
-        orderBy: convertSortConfigsToOrderBy(sortConfigs),
-      }),
-      // Filter by selected IDs when showSelectedOnly is true
-      ...(showSelectedOnly &&
-        selectedIds.length > 0 && {
-          where: {
-            id: { in: selectedIds },
-          },
+    () => {
+      const { _useMyWarningsEndpoint, ...restFilters } = filters as any;
+      return {
+        // When showSelectedOnly is true, don't apply filters
+        ...(showSelectedOnly ? {} : restFilters),
+        page: page + 1, // Convert 0-based to 1-based for API
+        take: pageSize,
+        include: {
+          collaborator: true,
+          attachments: true,
+        },
+        // Convert sortConfigs to orderBy format for API
+        ...(sortConfigs.length > 0 && {
+          orderBy: convertSortConfigsToOrderBy(sortConfigs),
         }),
-    }),
+        // Filter by selected IDs when showSelectedOnly is true
+        ...(showSelectedOnly &&
+          selectedIds.length > 0 && {
+            where: {
+              id: { in: selectedIds },
+            },
+          }),
+      };
+    },
     [filters, page, pageSize, sortConfigs, showSelectedOnly, selectedIds],
   );
 
-  // Fetch data in the table component
-  const { data: response, isLoading, error, refetch } = useWarnings(queryParams);
+  // Fetch data in the table component - use my-warnings endpoint if flag is set
+  const { data: response, isLoading, error, refetch } = useMyWarningsEndpoint
+    ? useMyWarnings(queryParams)
+    : useWarnings(queryParams);
 
   const warnings = response?.data || [];
   const totalRecords = response?.meta?.totalRecords || 0;

@@ -55,8 +55,10 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { LayoutForm } from "@/components/production/layout/layout-form";
+import { SpotSelector } from "./spot-selector";
 import { useLayoutsByTruck, useLayoutMutations } from "../../../../hooks";
 import { FormMoneyInput } from "@/components/ui/form-money-input";
+import { TRUCK_SPOT } from "../../../../constants";
 
 interface TaskEditFormProps {
   task: Task;
@@ -209,6 +211,23 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
   const { data: layoutsData } = useLayoutsByTruck(truckId || "", !!truckId);
 
+  // Calculate truck length from layout sections for spot selector
+  // Uses the same logic as garage view: sections sum + cabin (2.8m) if < 10m
+  const truckLength = useMemo(() => {
+    const layout = layoutsData?.leftSideLayout || layoutsData?.rightSideLayout;
+    if (!layout?.layoutSections || layout.layoutSections.length === 0) {
+      return null;
+    }
+    const sectionsSum = layout.layoutSections.reduce(
+      (sum: number, s: any) => sum + (s.width || 0),
+      0
+    );
+    // Add 2.8m cabin for trucks shorter than 10m
+    const CABIN_THRESHOLD = 10;
+    const CABIN_LENGTH = 2.8;
+    return sectionsSum < CABIN_THRESHOLD ? sectionsSum + CABIN_LENGTH : sectionsSum;
+  }, [layoutsData]);
+
   // Debug logging for layouts
   useEffect(() => {
     console.log('[TaskEditForm] Layout data changed:', {
@@ -218,8 +237,9 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       rightSideLayout: layoutsData?.rightSideLayout,
       leftSections: layoutsData?.leftSideLayout?.layoutSections,
       rightSections: layoutsData?.rightSideLayout?.layoutSections,
+      calculatedTruckLength: truckLength,
     });
-  }, [layoutsData, truckId]);
+  }, [layoutsData, truckId, truckLength]);
   const { createOrUpdateTruckLayout, delete: deleteLayout } = useLayoutMutations();
   const [shouldDeleteLayouts, setShouldDeleteLayouts] = useState(false);
 
@@ -307,30 +327,29 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     } else if (modifiedLayoutSides.size > 0) {
       console.log('[TaskEditForm] Skipping layout sync - user has pending modifications:', Array.from(modifiedLayoutSides));
     }
-  }, [layoutsData, modifiedLayoutSides.size]);
+  }, [layoutsData, modifiedLayoutSides.size, hasLayoutChanges]);
 
-  // When layout section opens, mark as having changes (because defaults are considered edits)
-  // Also mark all sides as modified if no existing layouts exist (to create all 3 sides with defaults)
+  // When layout section opens WITHOUT existing layouts, mark as having changes
+  // (because defaults will be created). DON'T mark changes when opening WITH existing layouts.
   useEffect(() => {
     if (isLayoutOpen && !hasLayoutChanges) {
-      console.log('');
-      console.log('🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢');
-      console.log('[TaskEditForm] Layout section opened!');
-      console.log('[TaskEditForm] Setting hasLayoutChanges = TRUE');
-      console.log('[TaskEditForm] Reason: Opening layout means user wants to configure it');
-
       // Check if this is a NEW layout (no existing layouts from backend)
       const hasExistingLayouts = !!(layoutsData?.leftSideLayout || layoutsData?.rightSideLayout || layoutsData?.backSideLayout);
 
       if (!hasExistingLayouts) {
-        // Mark ALL sides as modified so they all get created with default values
-        console.log('[TaskEditForm] No existing layouts - marking ALL sides as modified for creation');
+        // Only mark as having changes when creating NEW layouts (not editing existing ones)
+        console.log('');
+        console.log('🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢');
+        console.log('[TaskEditForm] Layout section opened with NO existing layouts!');
+        console.log('[TaskEditForm] Setting hasLayoutChanges = TRUE');
+        console.log('[TaskEditForm] Marking ALL sides as modified for creation');
         setModifiedLayoutSides(new Set(['left', 'right', 'back']));
+        setHasLayoutChanges(true);
+        console.log('🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢');
+        console.log('');
+      } else {
+        console.log('[TaskEditForm] Layout section opened with EXISTING layouts - no changes yet');
       }
-
-      console.log('🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢');
-      console.log('');
-      setHasLayoutChanges(true);
     }
   }, [isLayoutOpen, hasLayoutChanges, layoutsData]);
 
@@ -452,6 +471,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       truck: {
         plate: taskData.truck?.plate || null,
         chassisNumber: taskData.truck?.chassisNumber || null,
+        spot: taskData.truck?.spot || null,
         xPosition: taskData.truck?.xPosition || null,
         yPosition: taskData.truck?.yPosition || null,
         garageId: taskData.truck?.garageId || null,
@@ -640,46 +660,24 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           setShouldDeleteLayouts(false);
         }
 
+        // Consolidate truck data with layouts into single truck object
         if (hasLayoutChanges && !shouldDeleteLayouts) {
           console.log('');
           console.log('═══════════════════════════════════════════════════════════════');
-          console.log('[TaskEditForm SUBMIT] Layout changes detected - building payload');
+          console.log('[TaskEditForm SUBMIT] Layout changes detected - building consolidated truck payload');
           console.log('[TaskEditForm SUBMIT] Modified sides:', Array.from(modifiedLayoutSides));
-          console.log('[TaskEditForm SUBMIT] Current layout states (FULL DETAILS):', {
-            left: currentLayoutStates.left ? {
-              height: currentLayoutStates.left.height,
-              layoutSectionsCount: currentLayoutStates.left.layoutSections?.length,
-              layoutSections: currentLayoutStates.left.layoutSections,
-              photoId: currentLayoutStates.left.photoId,
-              hasPhotoFile: !!currentLayoutStates.left.photoFile,
-              photoFileName: currentLayoutStates.left.photoFile?.name,
-            } : null,
-            right: currentLayoutStates.right ? {
-              height: currentLayoutStates.right.height,
-              layoutSectionsCount: currentLayoutStates.right.layoutSections?.length,
-              layoutSections: currentLayoutStates.right.layoutSections,
-              photoId: currentLayoutStates.right.photoId,
-              hasPhotoFile: !!currentLayoutStates.right.photoFile,
-              photoFileName: currentLayoutStates.right.photoFile?.name,
-            } : null,
-            back: currentLayoutStates.back ? {
-              height: currentLayoutStates.back.height,
-              layoutSectionsCount: currentLayoutStates.back.layoutSections?.length,
-              layoutSections: currentLayoutStates.back.layoutSections,
-              photoId: currentLayoutStates.back.photoId,
-              hasPhotoFile: !!currentLayoutStates.back.photoFile,
-              photoFileName: currentLayoutStates.back.photoFile?.name,
-            } : null,
-          });
-          const truckLayoutData: any = {};
+
+          // Start with existing truck data from form
+          const consolidatedTruck: any = changedData.truck || {};
 
           // Add ONLY the sides that were actually modified by the user
           for (const side of modifiedLayoutSides) {
             console.log(`[TaskEditForm SUBMIT] Processing modified side: ${side}`);
             const sideData = currentLayoutStates[side];
-            console.log(`[TaskEditForm SUBMIT] sideData for ${side}:`, sideData);
 
             if (sideData && sideData.layoutSections && sideData.layoutSections.length > 0) {
+              // Map internal side names to API field names
+              const layoutFieldName = side === 'left' ? 'leftSideLayout' : side === 'right' ? 'rightSideLayout' : 'backSideLayout';
               const sideName = side === 'left' ? 'leftSide' : side === 'right' ? 'rightSide' : 'backSide';
 
               // Extract photo file if present
@@ -688,42 +686,26 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                 layoutPhotoFiles.push({ side: sideName, file: sideData.photoFile });
               }
 
-              truckLayoutData[sideName] = {
+              consolidatedTruck[layoutFieldName] = {
                 height: sideData.height,
                 layoutSections: sideData.layoutSections,
                 photoId: sideData.photoId || null,
-                // Don't include file in JSON - it will be in FormData
               };
-              console.log(`[TaskEditForm SUBMIT] ✅ Added modified ${sideName} to payload:`, {
-                height: truckLayoutData[sideName].height,
-                layoutSectionsCount: truckLayoutData[sideName].layoutSections.length,
-                layoutSections: truckLayoutData[sideName].layoutSections,
-                photoId: truckLayoutData[sideName].photoId,
-                hasPhotoFile: !!sideData.photoFile,
+              console.log(`[TaskEditForm SUBMIT] ✅ Added ${layoutFieldName} to consolidated truck:`, {
+                height: consolidatedTruck[layoutFieldName].height,
+                layoutSectionsCount: consolidatedTruck[layoutFieldName].layoutSections.length,
+                photoId: consolidatedTruck[layoutFieldName].photoId,
               });
             } else {
               console.log(`[TaskEditForm SUBMIT] ⚠️ Side ${side} has no layoutSections or invalid data!`);
-              console.log(`[TaskEditForm SUBMIT] Debug info:`, {
-                hasSideData: !!sideData,
-                hasLayoutSections: !!sideData?.layoutSections,
-                layoutSectionsLength: sideData?.layoutSections?.length,
-                sideDataKeys: sideData ? Object.keys(sideData) : [],
-              });
             }
           }
 
           console.log(`[TaskEditForm SUBMIT] 📷 Total photo files to upload:`, layoutPhotoFiles.length);
 
-          if (Object.keys(truckLayoutData).length > 0) {
-            changedData.truckLayoutData = truckLayoutData;
-            console.log('[TaskEditForm SUBMIT] ✅ Final truckLayoutData (only modified sides):', JSON.stringify(truckLayoutData, null, 2));
-          } else {
-            console.log('[TaskEditForm SUBMIT] ❌ No modified sides to send - this is wrong!');
-            console.log('[TaskEditForm SUBMIT] Debugging info:');
-            console.log('  - hasLayoutChanges:', hasLayoutChanges);
-            console.log('  - modifiedLayoutSides size:', modifiedLayoutSides.size);
-            console.log('  - modifiedLayoutSides array:', Array.from(modifiedLayoutSides));
-          }
+          // Merge consolidated truck back into changedData
+          changedData.truck = consolidatedTruck;
+          console.log('[TaskEditForm SUBMIT] ✅ Final consolidated truck:', JSON.stringify(changedData.truck, null, 2));
           console.log('═══════════════════════════════════════════════════════════════');
           console.log('');
         }
@@ -956,7 +938,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
           console.log('[TaskEditForm] ========== FINAL FORMDATA BEFORE NETWORK REQUEST ==========');
           console.log('[TaskEditForm] dataForFormData keys:', Object.keys(dataForFormData));
-          console.log('[TaskEditForm] dataForFormData.truckLayoutData:', dataForFormData.truckLayoutData ? JSON.stringify(dataForFormData.truckLayoutData, null, 2) : 'MISSING');
+          console.log('[TaskEditForm] dataForFormData.truck:', dataForFormData.truck ? JSON.stringify(dataForFormData.truck, null, 2) : 'MISSING');
           console.log('[TaskEditForm] files keys:', Object.keys(files));
           console.log('[TaskEditForm] FormData entries:');
           for (const [key, value] of (formData as any).entries()) {
@@ -1012,7 +994,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           console.log('[TaskEditForm] ========== FINAL JSON BEFORE NETWORK REQUEST ==========');
           console.log('[TaskEditForm] Using JSON submission (no files)');
           console.log('[TaskEditForm] submitData keys:', Object.keys(submitData));
-          console.log('[TaskEditForm] submitData.truckLayoutData:', submitData.truckLayoutData ? JSON.stringify(submitData.truckLayoutData, null, 2) : 'MISSING');
+          console.log('[TaskEditForm] submitData.truck:', submitData.truck ? JSON.stringify(submitData.truck, null, 2) : 'MISSING');
           console.log('[TaskEditForm] Full submitData:', JSON.stringify(submitData, null, 2));
           console.log('[TaskEditForm] ═══════════════════════════════════════════════════════════');
 
@@ -1943,6 +1925,23 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                     ) : null}
                   </CardContent>
                 </Card>
+                )}
+
+                {/* Truck Spot Selector - Available when truck layout is filled */}
+                {truckId && (
+                  <Card className="bg-transparent">
+                    <CardContent className="pt-4">
+                      <SpotSelector
+                        truckLength={truckLength}
+                        currentSpot={form.watch("truck.spot") as TRUCK_SPOT | null}
+                        truckId={truckId}
+                        onSpotChange={(spot) => {
+                          form.setValue("truck.spot", spot, { shouldDirty: true });
+                        }}
+                        disabled={isSubmitting || isFinancialUser || isWarehouseUser}
+                      />
+                    </CardContent>
+                  </Card>
                 )}
 
                 {/* Budget Card - Only visible to ADMIN and FINANCIAL users */}

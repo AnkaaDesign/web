@@ -48,7 +48,7 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
       positionId: user.positionId,
       performanceLevel: user.performanceLevel,
       sectorId: user.sectorId,
-      managedSectorId: user.managedSectorId,
+      isSectorLeader: Boolean(user.managedSector?.id),
       payrollNumber: user.payrollNumber,
       // Address fields
       address: user.address,

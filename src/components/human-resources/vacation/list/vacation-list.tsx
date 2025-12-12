@@ -18,16 +18,25 @@ import { VacationTable } from "./vacation-table";
 import { VacationFilters } from "./vacation-filters";
 import { VacationExport } from "./vacation-export";
 
+type VacationListMode = 'hr' | 'personal' | 'team';
+
 interface VacationListProps {
   selectedStatus?: VACATION_STATUS;
   userId?: string;
   onDataUpdate?: (data: Vacation[], meta?: VacationGetManyResponse["meta"]) => void;
   className?: string;
+  /**
+   * Mode determines which API endpoint to use:
+   * - 'hr': /vacations (requires HR privileges) - default
+   * - 'personal': /vacations/my-vacations (current user's vacations)
+   * - 'team': /vacations/team-vacations (team leader's team vacations)
+   */
+  mode?: VacationListMode;
 }
 
 const DEFAULT_PAGE_SIZE = 40;
 
-export function VacationList({ selectedStatus, userId, onDataUpdate, className }: VacationListProps) {
+export function VacationList({ selectedStatus, userId, onDataUpdate, className, mode = 'hr' }: VacationListProps) {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [tableData, setTableData] = useState<{ vacations: Vacation[]; totalRecords: number }>({ vacations: [], totalRecords: 0 });
 
@@ -305,7 +314,7 @@ export function VacationList({ selectedStatus, userId, onDataUpdate, className }
 
         {/* Table with integrated pagination */}
         <div className="flex-1 min-h-0">
-          <VacationTable filters={queryFilters} onDataChange={handleDataChange} className="h-full" />
+          <VacationTable filters={queryFilters} onDataChange={handleDataChange} className="h-full" mode={mode} />
         </div>
       </CardContent>
 

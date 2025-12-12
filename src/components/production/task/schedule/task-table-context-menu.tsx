@@ -5,6 +5,7 @@ import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditTasks, canDeleteTasks, canLeaderManageTask } from "@/utils/permissions/entity-permissions";
+import { isTeamLeader } from "@/utils/user";
 
 interface TaskTableContextMenuProps {
   contextMenu: {
@@ -32,12 +33,13 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
 
   // Permission checks
   const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
-  const isLeader = user?.sector?.privileges === SECTOR_PRIVILEGES.LEADER;
+  const isTeamLeaderUser = user ? isTeamLeader(user) : false;
   const canEdit = canEditTasks(user); // ADMIN, DESIGNER, FINANCIAL, LOGISTIC
   const canDelete = canDeleteTasks(user); // ADMIN only
 
-  // LEADER can only manage tasks in their sector or tasks without sector
-  const canLeaderManageTheseTasks = isLeader && tasks.every((t) => canLeaderManageTask(user, t.sectorId));
+  // Team leaders can only manage tasks in their managed sector or tasks without sector
+  // Team leadership is now determined by managedSector relationship
+  const canLeaderManageTheseTasks = isTeamLeaderUser && tasks.every((t) => canLeaderManageTask(user, t.sectorId));
   const canManageStatus = isAdmin || canLeaderManageTheseTasks;
 
   // No context menu if user has no permissions at all
@@ -60,7 +62,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
       >
         {isMultiSelection && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{tasks.length} tarefas selecionadas</div>}
 
-        {/* Status actions - LEADER (sector match) and ADMIN only */}
+        {/* Status actions - Team leaders (sector match) and ADMIN only */}
         {canManageStatus && (hasPendingTasks || hasOnHoldTasks) && (
           <DropdownMenuItem onClick={() => handleAction("start")} className="text-green-700 hover:text-white">
             <IconPlayerPlay className="mr-2 h-4 w-4" />

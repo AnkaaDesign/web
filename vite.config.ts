@@ -55,6 +55,7 @@ export default defineConfig(({ mode }) => {
         "react-hook-form",
         "@hookform/resolvers/zod",
         "axios",
+        "pdfjs-dist",
       ],
       esbuildOptions: {
         format: 'esm',
@@ -127,7 +128,8 @@ export default defineConfig(({ mode }) => {
             // PDF and file handling
             if (id.includes("jspdf") ||
                 id.includes("html2canvas") ||
-                id.includes("react-pdf")) {
+                id.includes("react-pdf") ||
+                id.includes("pdfjs-dist")) {
               return "vendor-pdf";
             }
 

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useSecullumCalculations, useUsers } from "../../../../../hooks";
+import { useSecullumCalculations, useMySecullumCalculations, useUsers } from "../../../../../hooks";
+import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CalculationTable } from "./calculation-table";
@@ -17,8 +18,16 @@ import { IconChevronLeft, IconChevronRight, IconCalendar } from "@tabler/icons-r
 import { addMonths, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+type CalculationListMode = 'hr' | 'personal';
+
 interface CalculationListProps {
   className?: string;
+  /**
+   * Mode determines the behavior:
+   * - 'hr': Shows user selector, fetches all users (requires HR privileges) - default
+   * - 'personal': Uses current user only, no user selector (accessible to all)
+   */
+  mode?: CalculationListMode;
 }
 
 interface CalculationRow {
@@ -69,8 +78,10 @@ const getPayrollPeriod = (selectedMonth: Date) => {
   };
 };
 
-export function CalculationList({ className }: CalculationListProps) {
+export function CalculationList({ className, mode = 'hr' }: CalculationListProps) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { user: currentUser } = useAuth();
+  const isPersonalMode = mode === 'personal';
 
   // Get selected month from URL or default to current month
   const [selectedMonth, setSelectedMonth] = useState<Date>(() => {
@@ -85,29 +96,40 @@ export function CalculationList({ className }: CalculationListProps) {
     return new Date(); // Default to current month
   });
 
-  // Get selected user from URL
+  // Get selected user from URL (only for HR mode)
   const [selectedUserId, setSelectedUserId] = useState(() => {
+    if (isPersonalMode) {
+      return currentUser?.id || "";
+    }
     return searchParams.get("userId") || "";
   });
 
+  // Update selectedUserId when currentUser changes in personal mode
+  useEffect(() => {
+    if (isPersonalMode && currentUser?.id) {
+      setSelectedUserId(currentUser.id);
+    }
+  }, [isPersonalMode, currentUser?.id]);
 
-  // Fetch users for filter
+  // Fetch users for filter (only in HR mode)
   const {
     data: usersData,
     isLoading: usersLoading,
-  } = useUsers({
-    statuses: [
-      USER_STATUS.EXPERIENCE_PERIOD_1,
-      USER_STATUS.EXPERIENCE_PERIOD_2,
-      USER_STATUS.EFFECTED
-    ],
-    orderBy: { name: "asc" },
-    take: 100,
-  });
+  } = useUsers(
+    isPersonalMode ? undefined : {
+      statuses: [
+        USER_STATUS.EXPERIENCE_PERIOD_1,
+        USER_STATUS.EXPERIENCE_PERIOD_2,
+        USER_STATUS.EFFECTED
+      ],
+      orderBy: { name: "asc" },
+      take: 100,
+    }
+  );
 
-  // Set first user as default when users are loaded and no user is selected
+  // Set first user as default when users are loaded and no user is selected (HR mode only)
   useEffect(() => {
-    if (!selectedUserId && usersData?.data && usersData.data.length > 0) {
+    if (!isPersonalMode && !selectedUserId && usersData?.data && usersData.data.length > 0) {
       const firstUserId = usersData.data[0].id;
       setSelectedUserId(firstUserId);
 
@@ -116,7 +138,7 @@ export function CalculationList({ className }: CalculationListProps) {
       params.set("userId", firstUserId);
       setSearchParams(params, { replace: true });
     }
-  }, [usersData?.data]); // Only depend on user data
+  }, [isPersonalMode, usersData?.data]); // Only depend on user data and mode
 
   // Get table state for selected items functionality
   const { selectionCount, showSelectedOnly, toggleShowSelectedOnly } = useTableState({
@@ -138,6 +160,17 @@ export function CalculationList({ className }: CalculationListProps) {
 
   // Build query parameters for Secullum API
   const queryParams = useMemo(() => {
+    // In personal mode, we don't need a userId - backend uses authenticated user
+    if (isPersonalMode) {
+      if (!selectedMonth) return null;
+      const period = getPayrollPeriod(selectedMonth);
+      return {
+        startDate: period.startDate,
+        endDate: period.endDate,
+      };
+    }
+
+    // In HR mode, we need a selected user
     if (!selectedUserId || !selectedMonth) {
       return null; // Don't fetch if required params are missing
     }
@@ -153,10 +186,14 @@ export function CalculationList({ className }: CalculationListProps) {
     };
 
     return params;
-  }, [selectedUserId, selectedMonth]);
+  }, [selectedUserId, selectedMonth, isPersonalMode]);
 
-  // Fetch calculations from Secullum
-  const { data, isLoading, error } = useSecullumCalculations(queryParams);
+  // Fetch calculations from Secullum - use personal endpoint in personal mode
+  const hrCalculations = useSecullumCalculations(!isPersonalMode ? queryParams : null);
+  const personalCalculations = useMySecullumCalculations(isPersonalMode ? queryParams : undefined);
+
+  // Select the active query based on mode
+  const { data, isLoading, error } = isPersonalMode ? personalCalculations : hrCalculations;
 
   // Debug logging
   useEffect(() => {
@@ -378,19 +415,21 @@ export function CalculationList({ className }: CalculationListProps) {
         <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
           <div className="flex-1 min-w-0">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              {/* User Selector */}
-              <div className="flex gap-1 flex-1 min-w-0">
-                <Combobox
-                  options={userOptions}
-                  value={selectedUserId || ""}
-                  onValueChange={(value) => handleUserChange(value || "")}
-                  placeholder={usersLoading ? "Carregando funcionários..." : "Selecione um funcionário"}
-                  emptyText="Nenhum funcionário encontrado"
-                  searchable={true}
-                  className="flex-1"
-                  disabled={usersLoading}
-                />
-              </div>
+              {/* User Selector - only shown in HR mode */}
+              {!isPersonalMode && (
+                <div className="flex gap-1 flex-1 min-w-0">
+                  <Combobox
+                    options={userOptions}
+                    value={selectedUserId || ""}
+                    onValueChange={(value) => handleUserChange(value || "")}
+                    placeholder={usersLoading ? "Carregando funcionários..." : "Selecione um funcionário"}
+                    emptyText="Nenhum funcionário encontrado"
+                    searchable={true}
+                    className="flex-1"
+                    disabled={usersLoading}
+                  />
+                </div>
+              )}
 
               {/* Month Selector */}
               <div className="flex items-center gap-2">

@@ -3,7 +3,7 @@ import { useParams, Navigate, useNavigate } from "react-router-dom";
 import { IconBeach, IconLoader2, IconCheck, IconX } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
-import { useVacationDetail } from "../../../../hooks";
+import { useVacationDetail, useVacationMutations } from "../../../../hooks";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/page-header";
@@ -13,6 +13,7 @@ import type { VacationUpdateFormData } from "../../../../schemas";
 
 export const EditVacationPage = () => {
   const navigate = useNavigate();
+  const { updateAsync } = useVacationMutations();
   const [formState, setFormState] = useState({
     isValid: false,
     isDirty: false,
@@ -50,13 +51,18 @@ export const EditVacationPage = () => {
   }, []);
 
   const handleFormSubmit = useCallback(async (data: VacationUpdateFormData) => {
+    if (!id) return;
     setIsSubmitting(true);
     try {
-      // Form will handle the actual submission
+      await updateAsync({ id, data });
+      navigate(routes.humanResources.vacations.details(id));
+    } catch (error) {
+      // Error is handled by the API client
+      console.error("Error updating vacation:", error);
     } finally {
       setIsSubmitting(false);
     }
-  }, []);
+  }, [id, updateAsync, navigate]);
 
   if (!id) {
     return <Navigate to={routes.humanResources.vacations.root} replace />;

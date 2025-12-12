@@ -407,7 +407,7 @@ export default function BonusDetailPage() {
                 const hasPercentage = percentageValue > 0;
                 return (
                   <div key={discount.id} className="flex justify-between py-1">
-                    <span className="text-sm text-muted-foreground">Desconto: {discount.reference}</span>
+                    <span className="text-sm text-muted-foreground">{discount.reference}</span>
                     <span className="text-sm font-medium text-destructive">
                       -{hasPercentage
                         ? `${percentageValue}%`

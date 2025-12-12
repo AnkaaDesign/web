@@ -8,11 +8,11 @@ import { routes, VACATION_STATUS_LABELS } from "../../../../constants";
 import { useAuth } from "../../../../hooks/useAuth";
 import { canEditHrEntities, canDeleteHrEntities, shouldShowInteractiveElements } from "@/utils/permissions/entity-permissions";
 import { formatDate, getWorkdaysBetween } from "../../../../utils";
-import { useVacationMutations, useVacations } from "../../../../hooks";
+import { useVacationMutations, useVacations, useMyVacations, useTeamVacations } from "../../../../hooks";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -33,10 +33,19 @@ import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { VacationListSkeleton } from "./vacation-list-skeleton";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 
+type VacationTableMode = 'hr' | 'personal' | 'team';
+
 interface VacationTableProps {
   filters: Partial<VacationGetManyFormData>;
   onDataChange?: (data: { vacations: Vacation[]; totalRecords: number }) => void;
   className?: string;
+  /**
+   * Mode determines which API endpoint to use:
+   * - 'hr': /vacations (requires HR privileges) - default
+   * - 'personal': /vacations/my-vacations (current user's vacations)
+   * - 'team': /vacations/team-vacations (team leader's team vacations)
+   */
+  mode?: VacationTableMode;
 }
 
 interface ContextMenuState {
@@ -45,7 +54,7 @@ interface ContextMenuState {
   vacations: Vacation[];
 }
 
-export function VacationTable({ filters, onDataChange, className }: VacationTableProps) {
+export function VacationTable({ filters, onDataChange, className, mode = 'hr' }: VacationTableProps) {
   const navigate = useNavigate();
   const { deleteAsync } = useVacationMutations();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -109,8 +118,16 @@ export function VacationTable({ filters, onDataChange, className }: VacationTabl
     [filters, page, pageSize, sortConfigs, showSelectedOnly, selectedIds],
   );
 
-  // Fetch data in the table component
-  const { data: response, isLoading, error, refetch } = useVacations(queryParams);
+  // Select the appropriate hook based on mode
+  const hrQuery = useVacations(mode === 'hr' ? queryParams : undefined);
+  const personalQuery = useMyVacations({ filters: mode === 'personal' ? queryParams : undefined });
+  const teamQuery = useTeamVacations({ filters: mode === 'team' ? queryParams : undefined });
+
+  // Get the active query based on mode
+  const { data: response, isLoading, error, refetch } =
+    mode === 'personal' ? personalQuery :
+    mode === 'team' ? teamQuery :
+    hrQuery;
 
   const vacations = response?.data || [];
   const totalRecords = response?.meta?.totalRecords || 0;
@@ -466,14 +483,10 @@ export function VacationTable({ filters, onDataChange, className }: VacationTabl
 
       {/* Context Menu */}
       {contextMenu && (
-        <DropdownMenu open={true} onOpenChange={() => setContextMenu(null)}>
-          <DropdownMenuTrigger asChild>
-            <div className="w-0 h-0" />
-          </DropdownMenuTrigger>
+        <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
           <PositionedDropdownMenuContent
             position={contextMenu}
             isOpen={!!contextMenu}
-            align="start"
             className="w-48"
             onCloseAutoFocus={(e) => e.preventDefault()}
           >

@@ -1,6 +1,6 @@
 import { useCurrentUser } from "./useAuth";
 import { SECTOR_PRIVILEGES } from "../constants";
-import { canAccessAnyPrivilege, canAccessAllPrivileges, canAccessSector, getSectorPrivilegeLevel, hasPrivilege, hasAnyPrivilege, hasAllPrivileges } from "../utils";
+import { canAccessAnyPrivilege, canAccessAllPrivileges, canAccessSector, getSectorPrivilegeSortOrder, hasPrivilege, hasAnyPrivilege, hasAllPrivileges } from "../utils";
 
 /**
  * Unified privilege validation hook for both web and mobile applications
@@ -65,7 +65,7 @@ export function usePrivileges() {
    * Common privilege shortcuts
    */
   const isAdmin = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.ADMIN) : false;
-  const isLeader = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.LEADER) : false;
+  const isTeamLeader = user ? user.managedSector !== null : false; // Team leader determined by managedSector relation
   const isHR = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.HUMAN_RESOURCES) : false;
   const isWarehouse = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.WAREHOUSE) : false;
   const isProduction = user ? hasPrivilegeAccess(SECTOR_PRIVILEGES.PRODUCTION) : false;
@@ -80,15 +80,15 @@ export function usePrivileges() {
 
   const canManageMaintenance = canAccess([SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.MAINTENANCE, SECTOR_PRIVILEGES.ADMIN]);
 
-  const canManageProduction = canAccess([SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]);
+  const canManageProduction = canAccess([SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.ADMIN]) || isTeamLeader;
 
   const canManageHR = canAccess([SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]);
 
-  const canManageEPI = canAccess([SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]);
+  const canManageEPI = canAccess([SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]) || isTeamLeader;
 
   const canCreateTasks = canAccess([SECTOR_PRIVILEGES.ADMIN]); // Only ADMIN can create tasks
 
-  const canViewStatistics = canAccess([SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]);
+  const canViewStatistics = isTeamLeader || canAccess([SECTOR_PRIVILEGES.ADMIN]);
 
   /**
    * User information
@@ -112,7 +112,7 @@ export function usePrivileges() {
           sector: user?.sector?.name,
           privilege: user?.sector?.privileges,
           isAdmin,
-          isLeader,
+          isTeamLeader,
           isHR,
           isWarehouse,
           isProduction,
@@ -139,7 +139,7 @@ export function usePrivileges() {
 
     // Common shortcuts
     isAdmin,
-    isLeader,
+    isTeamLeader,
     isHR,
     isWarehouse,
     isProduction,
@@ -182,9 +182,9 @@ export const privilegeUtils = {
   },
 
   /**
-   * Get privilege level number for sorting/comparison
+   * Get privilege sort order for display/sorting purposes
    */
-  getPrivilegeLevel: getSectorPrivilegeLevel,
+  getPrivilegeSortOrder: getSectorPrivilegeSortOrder,
 
   /**
    * Common privilege combinations for easy reference
@@ -192,10 +192,10 @@ export const privilegeUtils = {
   combinations: {
     WAREHOUSE_OPERATIONS: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
     MAINTENANCE_OPERATIONS: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.MAINTENANCE, SECTOR_PRIVILEGES.ADMIN],
-    PRODUCTION_MANAGEMENT: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN],
+    PRODUCTION_MANAGEMENT: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.ADMIN],
     HR_MANAGEMENT: [SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN],
-    PPE_MANAGEMENT: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
-    STATISTICS_ACCESS: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN],
+    PPE_MANAGEMENT: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN],
+    STATISTICS_ACCESS: [SECTOR_PRIVILEGES.ADMIN], // Team leaders checked via managedSector
     TASK_CREATION: [SECTOR_PRIVILEGES.ADMIN], // Only ADMIN can create tasks
   } as const,
 };

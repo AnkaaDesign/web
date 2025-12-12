@@ -156,8 +156,8 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
   // State
   const [taskQuantity, setTaskQuantity] = useState<number>(0); // Will be set from current period
   const [originalTaskQuantity, setOriginalTaskQuantity] = useState<number>(0); // Store original for restore
-  const [taskInput, setTaskInput] = useState<string>('0,0'); // String value for controlled input (Brazilian format)
-  const [averageInput, setAverageInput] = useState<string>('0,0'); // String value for controlled input (Brazilian format)
+  const [taskInput, setTaskInput] = useState<string>('0,0'); // String value for controlled input (Brazilian format) - 1 decimal
+  const [averageInput, setAverageInput] = useState<string>('0,00'); // String value for controlled input (Brazilian format) - 2 decimals
   const [simulatedUsers, setSimulatedUsers] = useState<SimulatedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -445,8 +445,8 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
 
     if (eligibleUserCount === 0) {
       console.log('[Effect 1] No eligible users, setting average to 0');
-      if (averageInput !== '0,0') {
-        setAverageInput('0,0');
+      if (averageInput !== '0,00') {
+        setAverageInput('0,00');
       }
       return;
     }
@@ -458,10 +458,10 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
     const currentParsed = parseFloat(averageInput.replace(',', '.'));
     const difference = Math.abs(currentParsed - newAverage);
 
-    // If difference is significant (more than 0.01), update the display
-    if (isNaN(currentParsed) || difference > 0.01) {
-      console.log('[Effect 1] Updating averageInput to:', newAverage.toFixed(1), 'difference:', difference);
-      setAverageInput(newAverage.toFixed(1).replace('.', ','));
+    // If difference is significant (more than 0.001), update the display
+    if (isNaN(currentParsed) || difference > 0.001) {
+      console.log('[Effect 1] Updating averageInput to:', newAverage.toFixed(2), 'difference:', difference);
+      setAverageInput(newAverage.toFixed(2).replace('.', ','));
     } else {
       console.log('[Effect 1] Skipping update - current value matches (difference:', difference, ')');
     }
@@ -754,7 +754,7 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
   const restoreCurrentPeriodTasks = () => {
     setTaskQuantity(originalTaskQuantity);
     setTaskInput(originalTaskQuantity.toFixed(1).replace('.', ','));
-    setAverageInput((originalTaskQuantity / eligibleUserCount).toFixed(1).replace('.', ','));
+    setAverageInput((originalTaskQuantity / eligibleUserCount).toFixed(2).replace('.', ','));
   };
 
   // Export handlers
@@ -1116,7 +1116,7 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
                 value={averageInput}
                 onChange={handleAveragePerUserChange}
                 className="h-10 text-center font-semibold bg-transparent"
-                placeholder="0,0"
+                placeholder="0,00"
                 title="Digite a média desejada por usuário para calcular tarefas totais"
               />
             </div>
@@ -1202,13 +1202,13 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
           const weightedCount = fullCommissionCount + (partialCommissionCount * 0.5);
 
           return (
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="flex items-center gap-2 text-sm text-blue-700">
+            <div className="mt-4 p-3 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg border border-blue-500/30">
+              <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
                 <IconCalculator className="h-4 w-4" />
                 <span className="font-medium">
                   Período atual ({currentPeriod.startDate.toLocaleDateString('pt-BR')} a {currentPeriod.endDate.toLocaleDateString('pt-BR')}):
                 </span>
-                <Badge variant="outline" className="bg-blue-100">
+                <Badge variant="outline" className="bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30">
                   {weightedCount.toFixed(1)} tarefas ponderadas
                 </Badge>
                 <span className="text-xs text-muted-foreground">
@@ -1337,7 +1337,7 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
                         </div>
                       </TableCell>
                       <TableCell className="w-48 p-0">
-                        <div className="px-4 py-2 text-sm text-gray-600 truncate">
+                        <div className="px-4 py-2 text-sm text-muted-foreground truncate">
                           {user.sectorName || '-'}
                         </div>
                       </TableCell>

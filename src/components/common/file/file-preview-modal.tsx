@@ -18,7 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../../types";
 import { isImageFile, isVideoFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension } from "../../../utils/file";
-// No PDF.js imports needed - using native browser PDF viewer
+import { InlinePdfViewer, type InlinePdfViewerRef } from "./inline-pdf-viewer";
+import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 
 // Types for touch gestures and zoom
 interface TouchState {
@@ -90,18 +91,22 @@ export function FilePreviewModal({
   const [panX, setPanX] = React.useState(0);
   const [panY, setPanY] = React.useState(0);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
-  const [pdfIframeHeight, setPdfIframeHeight] = React.useState<number>(0);
-  const [pdfBlobUrl, setPdfBlobUrl] = React.useState<string | null>(null);
 
   // Touch and gesture states
   const [touchState, setTouchState] = React.useState<TouchState | null>(null);
   const [swipeState, setSwipeState] = React.useState<SwipeState | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
 
+  // PDF state
+  const [pdfNumPages, setPdfNumPages] = React.useState<number>(0);
+  const [pdfPageNumber, setPdfPageNumber] = React.useState<number>(1);
+  const [pdfScale, setPdfScale] = React.useState<number>(1);
+
   // Refs
   const imageRef = React.useRef<HTMLImageElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const modalRef = React.useRef<HTMLDivElement>(null);
+  const pdfViewerRef = React.useRef<InlinePdfViewerRef>(null);
 
   // Filter previewable files and maintain mapping to original indices
   const previewableFiles = React.useMemo(() => files.map((file, index) => ({ file, originalIndex: index })).filter(({ file }) => isPreviewableFile(file)), [files]);
@@ -125,74 +130,53 @@ export function FilePreviewModal({
     setPanY(0);
     setImageLoading(true);
     setImageError(false);
+    // Reset PDF state
+    setPdfNumPages(0);
+    setPdfPageNumber(1);
+    setPdfScale(1);
   }, [currentIndex, fitZoom]);
 
-  // Fetch PDF as blob to bypass X-Frame-Options
-  React.useEffect(() => {
-    const currentFile = files[currentIndex];
-    const isPdfFile = currentFile && getFileExtension(currentFile.filename).toLowerCase() === "pdf";
+  // PDF control handlers
+  const handlePdfZoomIn = React.useCallback(() => {
+    setPdfScale((prev) => Math.min(prev + 0.25, 3));
+  }, []);
 
-    if (isPdfFile) {
-      const fetchPdfBlob = async () => {
-        try {
-          const response = await fetch(getFileUrl(currentFile, baseUrl));
-          const blob = await response.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          setPdfBlobUrl(blobUrl);
-        } catch (error) {
-          console.error("Error fetching PDF:", error);
-          setPdfBlobUrl(null);
-        }
-      };
-      fetchPdfBlob();
+  const handlePdfZoomOut = React.useCallback(() => {
+    setPdfScale((prev) => Math.max(prev - 0.25, 0.5));
+  }, []);
 
-      // Cleanup blob URL when component unmounts or file changes
-      return () => {
-        if (pdfBlobUrl) {
-          URL.revokeObjectURL(pdfBlobUrl);
-        }
-      };
-    } else {
-      setPdfBlobUrl(null);
+  const handlePdfResetZoom = React.useCallback(() => {
+    setPdfScale(1);
+  }, []);
+
+  const handlePdfRotate = React.useCallback(() => {
+    pdfViewerRef.current?.rotate();
+  }, []);
+
+  const handlePdfPrevPage = React.useCallback(() => {
+    if (pdfPageNumber > 1) {
+      setPdfPageNumber((prev) => prev - 1);
     }
-  }, [currentIndex, files, baseUrl]);
+  }, [pdfPageNumber]);
 
-  // Calculate PDF iframe height to fill available space
-  React.useEffect(() => {
-    const currentFile = files[currentIndex];
-    const isPdfFile = currentFile && getFileExtension(currentFile.filename).toLowerCase() === "pdf";
-
-    // Only calculate when PDF blob is loaded and modal is open
-    if (containerRef.current && isPdfFile && open && pdfBlobUrl) {
-      const updateHeight = () => {
-        if (containerRef.current) {
-          // Get the viewport height
-          const viewportHeight = window.innerHeight;
-
-          // Calculate all fixed UI elements that take space
-          const topPadding = 90; // Reduced top padding for PDF
-          const bottomPadding = totalImages > 1 ? 100 : 20; // Bottom thumbnails or minimal space
-          const verticalMargin = 10; // Minimal breathing room
-
-          // Available height = viewport - all fixed elements
-          const availableHeight = viewportHeight - topPadding - bottomPadding - verticalMargin;
-
-          setPdfIframeHeight(Math.max(availableHeight, 400));
-        }
-      };
-
-      // Wait for PDF blob to load and DOM to settle before calculating
-      const timeoutId = setTimeout(updateHeight, 150);
-
-      window.addEventListener('resize', updateHeight);
-      return () => {
-        clearTimeout(timeoutId);
-        window.removeEventListener('resize', updateHeight);
-      };
-    } else if (!isPdfFile) {
-      setPdfIframeHeight(0);
+  const handlePdfNextPage = React.useCallback(() => {
+    if (pdfPageNumber < pdfNumPages) {
+      setPdfPageNumber((prev) => prev + 1);
     }
-  }, [currentIndex, files, totalImages, open, isFullscreen, pdfBlobUrl]);
+  }, [pdfPageNumber, pdfNumPages]);
+
+  // Check if image is already loaded (handles race condition where onLoad fires before React attaches handler)
+  React.useEffect(() => {
+    // Use a small timeout to ensure the img element is rendered and ref is attached
+    const checkImageLoaded = setTimeout(() => {
+      if (imageRef.current && imageRef.current.complete && imageRef.current.naturalHeight !== 0) {
+        setImageLoading(false);
+        setImageError(false);
+      }
+    }, 100);
+
+    return () => clearTimeout(checkImageLoaded);
+  }, [currentIndex]);
 
   // Initialize current index
   React.useEffect(() => {
@@ -539,7 +523,7 @@ export function FilePreviewModal({
 
             <div className="flex items-center gap-2 pointer-events-auto">
               {/* Zoom and Tools for Images */}
-              {isCurrentFilePreviewable && !isPDF && (
+              {isCurrentFilePreviewable && !isPDF && !isVideo && (
                 <div className="flex items-center gap-1 bg-black/90 backdrop-blur-xl rounded-xl p-1 border border-white/20 shadow-2xl">
                   <Button
                     variant="ghost"
@@ -588,6 +572,80 @@ export function FilePreviewModal({
                       </Button>
                     </>
                   )}
+                </div>
+              )}
+
+              {/* PDF Controls */}
+              {isPDF && pdfNumPages > 0 && (
+                <div className="flex items-center gap-1 bg-black/90 backdrop-blur-xl rounded-xl p-1 border border-white/20 shadow-2xl">
+                  {/* Page Navigation */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-white hover:bg-white/20 transition-colors"
+                    onClick={handlePdfPrevPage}
+                    disabled={pdfPageNumber <= 1}
+                    title="Página anterior"
+                  >
+                    <IconChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-white text-xs px-2 min-w-16 text-center font-mono bg-white/10 rounded py-1">
+                    {pdfPageNumber} / {pdfNumPages}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-white hover:bg-white/20 transition-colors"
+                    onClick={handlePdfNextPage}
+                    disabled={pdfPageNumber >= pdfNumPages}
+                    title="Próxima página"
+                  >
+                    <IconChevronRight className="h-4 w-4" />
+                  </Button>
+                  <div className="w-px h-6 bg-white/20 mx-1" />
+                  {/* Zoom Controls */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-white hover:bg-white/20 transition-colors"
+                    onClick={handlePdfZoomOut}
+                    disabled={pdfScale <= 0.5}
+                    title="Diminuir zoom (-)"
+                  >
+                    <IconZoomOut className="h-4 w-4" />
+                  </Button>
+                  <span className="text-white text-xs px-2 min-w-14 text-center font-mono bg-white/10 rounded py-1">
+                    {Math.round(pdfScale * 100)}%
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-white hover:bg-white/20 transition-colors"
+                    onClick={handlePdfZoomIn}
+                    disabled={pdfScale >= 3}
+                    title="Aumentar zoom (+)"
+                  >
+                    <IconZoomIn className="h-4 w-4" />
+                  </Button>
+                  <div className="w-px h-6 bg-white/20 mx-1" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-white hover:bg-white/20 transition-colors"
+                    onClick={handlePdfResetZoom}
+                    title="Ajustar à tela (F)"
+                  >
+                    <IconMaximize className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-white hover:bg-white/20 transition-colors"
+                    onClick={handlePdfRotate}
+                    title="Girar (R)"
+                  >
+                    <IconRotateClockwise className="h-4 w-4" />
+                  </Button>
                 </div>
               )}
 
@@ -653,10 +711,10 @@ export function FilePreviewModal({
             ref={containerRef}
             className={cn("absolute inset-0 flex items-center justify-center overflow-hidden transition-all duration-300", isDragging && "cursor-grabbing")}
             style={{
-              paddingTop: isPDF ? "90px" : (isFullscreen ? "60px" : "100px"),
-              paddingBottom: isPDF ? (showThumbnailStrip && totalImages > 1 ? "100px" : "20px") : (showThumbnailStrip && totalImages > 1 ? "100px" : "20px"),
-              paddingLeft: isPDF ? "10px" : "20px",
-              paddingRight: isPDF ? "10px" : "20px",
+              paddingTop: isPDF ? "80px" : (isFullscreen ? "60px" : "100px"),
+              paddingBottom: showThumbnailStrip && totalImages > 1 ? "100px" : "20px",
+              paddingLeft: isPDF ? "16px" : "20px",
+              paddingRight: isPDF ? "16px" : "20px",
             }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
@@ -665,28 +723,25 @@ export function FilePreviewModal({
           >
             {isCurrentFilePreviewable ? (
               isPDF ? (
-                // Native PDF Viewer using blob URL to bypass X-Frame-Options
-                <div className="w-full flex items-center justify-center">
-                  {pdfBlobUrl ? (
-                    <iframe
-                      src={`${pdfBlobUrl}#view=Fit&pagemode=none&toolbar=1`}
-                      className="rounded-lg shadow-2xl"
-                      style={{
-                        width: '100%',
-                        height: `${pdfIframeHeight}px`,
-                        maxWidth: '100%',
-                        backgroundColor: 'white',
-                        border: 'none'
-                      }}
-                      title={currentFile.filename}
-                      onLoad={() => setImageLoading(false)}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center gap-4">
-                      <div className="animate-spin rounded-full h-12 w-12 border-2 border-white border-t-transparent" />
-                      <span className="text-white text-sm">Carregando PDF...</span>
-                    </div>
-                  )}
+                // Custom PDF Viewer using pdfjs-dist for better styling
+                <div className="w-full h-full flex items-center justify-center">
+                  <InlinePdfViewer
+                    ref={pdfViewerRef}
+                    url={getFileUrl(currentFile, baseUrl)}
+                    filename={currentFile.filename}
+                    onLoadSuccess={(numPages) => {
+                      setPdfNumPages(numPages);
+                      setImageLoading(false);
+                    }}
+                    onLoadError={() => {
+                      setImageError(true);
+                      setImageLoading(false);
+                    }}
+                    onDownload={handleDownload}
+                    scale={pdfScale}
+                    pageNumber={pdfPageNumber}
+                    maxHeight={isFullscreen ? "calc(100vh - 120px)" : "calc(100vh - 200px)"}
+                  />
                 </div>
               ) : isVideo ? (
                 <div className="w-full max-w-5xl mx-auto">

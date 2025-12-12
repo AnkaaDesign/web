@@ -22,7 +22,7 @@ export const MyVacationsPage = () => {
   return (
     <div className="container mx-auto py-6 space-y-6">
       <PageHeader title="Minhas Férias" subtitle="Suas solicitações e períodos de férias" />
-      <VacationList userId={user.id} className="flex-1 min-h-0" />
+      <VacationList mode="personal" className="flex-1 min-h-0" />
     </div>
   );
 };

@@ -216,7 +216,7 @@ export const ProductionRootPage = () => {
       return {
         tasksByType: [],
         productionWeekly: [],
-        productivityShift: [],
+        garageOccupancy: [],
       };
     }
 
@@ -235,6 +235,21 @@ export const ProductionRootPage = () => {
       };
     });
 
+    // Get garage occupancy data from API spotsByGarage chart data
+    // API returns: labels: ['Pátio', 'Barracão 1', 'Barracão 2', 'Barracão 3']
+    //              datasets[0].data: [patioCount, b1Count, b2Count, b3Count]
+    const garageData = data.garageUtilization;
+    const spotsByGarage = garageData?.spotsByGarage;
+    const garageOccupancy = spotsByGarage?.labels?.map((label: string, index: number) => ({
+      label: label,
+      value: spotsByGarage.datasets?.[0]?.data?.[index] || 0,
+    })) || [
+      { label: "Pátio", value: 0 },
+      { label: "Barracão 1", value: 0 },
+      { label: "Barracão 2", value: 0 },
+      { label: "Barracão 3", value: 0 },
+    ];
+
     return {
       tasksByType:
         data.productivityMetrics?.tasksBySector?.datasets?.[0]?.data?.map((value, index) => ({
@@ -242,14 +257,7 @@ export const ProductionRootPage = () => {
           value: value || 0,
         })) || [],
       productionWeekly: productionByDay,
-      productivityShift: data.productivityMetrics?.tasksByShift?.datasets?.[0]?.data?.map((value, index) => ({
-        label: data.productivityMetrics.tasksByShift.labels[index] || `Turno ${index + 1}`,
-        value: value || 0,
-      })) || [
-        { label: "Manhã", value: 0 },
-        { label: "Tarde", value: 0 },
-        { label: "Noite", value: 0 },
-      ],
+      garageOccupancy,
     };
   };
 
@@ -434,12 +442,12 @@ export const ProductionRootPage = () => {
                 <QuickAccessCard
                   title="Aerografia"
                   icon={IconSpray}
-                  onClick={() => navigate(routes.production.airbrush.root)}
+                  onClick={() => navigate(routes.production.airbrushings.root)}
                   count={dashboard?.data?.airbrushingMetrics?.totalAirbrushJobs?.value || 0}
                   color="purple"
                 />
                 <QuickAccessCard
-                  title="Garagens"
+                  title="Barracões"
                   icon={IconBuildingStore}
                   onClick={() => navigate(routes.production.garages.root)}
                   count={dashboard?.data?.garageUtilization?.totalGarages?.value || 0}
@@ -480,13 +488,13 @@ export const ProductionRootPage = () => {
                   color="orange"
                 />
                 <RecentActivitiesCard
-                  title="Utilização de Garagens"
+                  title="Utilização de Barracões"
                   activities={[
                     {
-                      item: `${dashboard?.data?.garageUtilization?.totalGarages?.value || 0} garagens`,
-                      info: "Total disponível",
-                      quantity: `${dashboard?.data?.garageUtilization?.utilizationRate?.value || 0}%`,
-                      time: "Taxa de uso",
+                      item: `${dashboard?.data?.garageUtilization?.occupiedSpots?.value || 0}/18`,
+                      info: "Vagas ocupadas",
+                      quantity: `${dashboard?.data?.garageUtilization?.totalGarages?.value || 3} barracões`,
+                      time: "Capacidade: 2 por faixa",
                     },
                   ]}
                   icon={IconGauge}
@@ -551,9 +559,9 @@ export const ProductionRootPage = () => {
                   color="green"
                 />
                 <ActivityPatternCard
-                  title="Produtividade por Turno"
-                  data={activityPatterns.productivityShift.length > 0 ? activityPatterns.productivityShift : [{ label: "Sem dados", value: 0 }]}
-                  icon={IconClock}
+                  title="Ocupação por Barracão"
+                  data={activityPatterns.garageOccupancy.length > 0 ? activityPatterns.garageOccupancy : [{ label: "Sem dados", value: 0 }]}
+                  icon={IconBuildingStore}
                   color="orange"
                 />
               </div>

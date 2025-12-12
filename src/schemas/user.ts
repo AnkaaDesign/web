@@ -210,7 +210,6 @@ export const userOrderBySchema = z.union([
       dismissedAt: orderByDirectionSchema.optional(),
       performanceLevel: orderByDirectionSchema.optional(),
       sectorId: orderByDirectionSchema.optional(),
-      managedSectorId: orderByDirectionSchema.optional(),
       createdAt: orderByDirectionSchema.optional(),
       updatedAt: orderByDirectionSchema.optional(),
 
@@ -270,7 +269,6 @@ export const userOrderBySchema = z.union([
         dismissedAt: orderByDirectionSchema.optional(),
         performanceLevel: orderByDirectionSchema.optional(),
         sectorId: orderByDirectionSchema.optional(),
-        managedSectorId: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
 
@@ -611,19 +609,6 @@ export const userWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      managedSectorId: z
-        .union([
-          z.string(),
-          z.null(),
-          z.object({
-            equals: z.union([z.string(), z.null()]).optional(),
-            not: z.union([z.string(), z.null()]).optional(),
-            in: z.array(z.string()).optional(),
-            notIn: z.array(z.string()).optional(),
-          }),
-        ])
-        .optional(),
-
       createdAt: z
         .union([
           z.date(),
@@ -718,14 +703,12 @@ const userFilters = {
   searchingFor: z.string().optional(),
   payrollNumber: z.coerce.number().int().optional(),
   sectorIds: z.array(z.string()).optional(),
-  managedSectorIds: z.array(z.string()).optional(),
   positionIds: z.array(z.string()).optional(),
   statuses: z.array(z.nativeEnum(USER_STATUS)).optional(),
   isActive: z.boolean().optional(),
   isVerified: z.boolean().optional(),
   hasPosition: z.boolean().optional(),
   hasSector: z.boolean().optional(),
-  hasManagedSector: z.boolean().optional(),
   hasPpeSize: z.boolean().optional(),
   hasActivities: z.boolean().optional(),
   hasTasks: z.boolean().optional(),
@@ -780,7 +763,6 @@ const userTransform = (data: any) => {
         { pis: { contains: searchTerm } },
         { position: { is: { name: { contains: searchTerm, mode: "insensitive" } } } },
         { sector: { is: { name: { contains: searchTerm, mode: "insensitive" } } } },
-        { managedSector: { is: { name: { contains: searchTerm, mode: "insensitive" } } } },
       ];
 
       andConditions.push({ OR: orConditions });
@@ -793,12 +775,6 @@ const userTransform = (data: any) => {
   if (data.sectorIds && Array.isArray(data.sectorIds) && data.sectorIds.length > 0) {
     andConditions.push({ sectorId: { in: data.sectorIds } });
     delete data.sectorIds;
-  }
-
-  // Handle managedSectorIds filter
-  if (data.managedSectorIds && Array.isArray(data.managedSectorIds) && data.managedSectorIds.length > 0) {
-    andConditions.push({ managedSectorId: { in: data.managedSectorIds } });
-    delete data.managedSectorIds;
   }
 
   // Handle positionIds filter
@@ -848,16 +824,6 @@ const userTransform = (data: any) => {
       andConditions.push({ sectorId: null });
     }
     delete data.hasSector;
-  }
-
-  // Handle hasManagedSector filter
-  if (typeof data.hasManagedSector === "boolean") {
-    if (data.hasManagedSector) {
-      andConditions.push({ managedSectorId: { not: null } });
-    } else {
-      andConditions.push({ managedSectorId: null });
-    }
-    delete data.hasManagedSector;
   }
 
   // Handle hasPpeSize filter
@@ -1022,7 +988,6 @@ export const userCreateSchema = z
     isActive: z.boolean().default(true),
     performanceLevel: z.number().int().min(0).max(5).default(0),
     sectorId: z.string().uuid("Setor inválido").nullable().optional(),
-    managedSectorId: z.string().uuid("Setor gerenciado inválido").nullable().optional(),
     password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres").nullable().optional(),
 
     // Address fields
@@ -1068,6 +1033,9 @@ export const userCreateSchema = z
     notificationPreferences: z.array(notificationPreferenceCreateNestedSchema).optional(),
     // Required for changelog tracking
     userId: z.string().optional(),
+    // Sector leader flag - when true, sets this user as manager of their sector
+    // The backend will update Sector.managerId accordingly
+    isSectorLeader: z.boolean().default(false),
   })
   .refine((data) => data.email || data.phone, {
     message: "Email ou telefone deve ser fornecido",
@@ -1092,7 +1060,6 @@ export const userUpdateSchema = z
     isActive: z.boolean().optional(),
     performanceLevel: z.number().int().min(0).max(5).optional(),
     sectorId: z.string().uuid("Setor inválido").nullable().optional(),
-    managedSectorId: z.string().uuid("Setor gerenciado inválido").nullable().optional(),
     password: z.string().min(8, "Senha deve ter pelo menos 8 caracteres").nullable().optional(),
 
     // Address fields
@@ -1151,6 +1118,9 @@ export const userUpdateSchema = z
     ppeSize: ppeSizeCreateNestedSchema.optional(),
     // Store current status for validation (used by backend)
     currentStatus: z.nativeEnum(USER_STATUS).optional(),
+    // Sector leader flag - when true, sets this user as manager of their sector
+    // The backend will update Sector.managerId accordingly
+    isSectorLeader: z.boolean().optional(),
   })
   .refine(
     (data) => {
@@ -1362,7 +1332,6 @@ export const mapUserToFormData = createMapToFormDataHelper<User, UserUpdateFormD
   isActive: user.isActive,
   performanceLevel: user.performanceLevel,
   sectorId: user.sectorId || undefined,
-  managedSectorId: user.managedSectorId || undefined,
   password: undefined, // Never map password from existing user
 
   // Address fields

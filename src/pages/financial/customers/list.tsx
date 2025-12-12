@@ -16,7 +16,7 @@ export const FinancialCustomersListPage = () => {
   });
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="flex flex-col h-full space-y-4">
         <div className="flex-shrink-0">
           <PageHeaderWithFavorite

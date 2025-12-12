@@ -33,7 +33,7 @@ export function SupervisorSelect({ control, disabled, required, initialSuperviso
         isActive: true,
         sector: {
           privileges: {
-            in: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES],
+            in: [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES],
           },
         },
       },

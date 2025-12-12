@@ -80,7 +80,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   const { data: sectorsData } = useSectors({
     where: {
       privileges: {
-        in: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN],
+        in: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.ADMIN],
       },
     },
     orderBy: { name: "asc" },
@@ -232,19 +232,16 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                 }
                 break;
               case "layout":
-                // Copy truck layout data using truckLayoutData format expected by backend
+                // Copy truck layout data using consolidated truck object format
                 if (sourceTask.truck) {
-                  // Ensure truck exists for target task (truck position data)
-                  updateData.truck = {
+                  // Build consolidated truck object with layouts
+                  const truckData: Record<string, unknown> = {
                     xPosition: sourceTask.truck.xPosition,
                     yPosition: sourceTask.truck.yPosition,
                   };
 
-                  // Build truckLayoutData in the format expected by backend API
-                  const layoutData: Record<string, unknown> = {};
-
                   if (sourceTask.truck.leftSideLayout) {
-                    layoutData.leftSide = {
+                    truckData.leftSideLayout = {
                       height: sourceTask.truck.leftSideLayout.height,
                       photoId: sourceTask.truck.leftSideLayout.photoId || null,
                       layoutSections: sourceTask.truck.leftSideLayout.layoutSections?.map((section, index) => ({
@@ -257,7 +254,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                   }
 
                   if (sourceTask.truck.rightSideLayout) {
-                    layoutData.rightSide = {
+                    truckData.rightSideLayout = {
                       height: sourceTask.truck.rightSideLayout.height,
                       photoId: sourceTask.truck.rightSideLayout.photoId || null,
                       layoutSections: sourceTask.truck.rightSideLayout.layoutSections?.map((section, index) => ({
@@ -270,7 +267,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                   }
 
                   if (sourceTask.truck.backSideLayout) {
-                    layoutData.backSide = {
+                    truckData.backSideLayout = {
                       height: sourceTask.truck.backSideLayout.height,
                       photoId: sourceTask.truck.backSideLayout.photoId || null,
                       layoutSections: sourceTask.truck.backSideLayout.layoutSections?.map((section, index) => ({
@@ -282,10 +279,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                     };
                   }
 
-                  // Only set truckLayoutData if there are layouts to copy
-                  if (Object.keys(layoutData).length > 0) {
-                    updateData.truckLayoutData = layoutData;
-                  }
+                  updateData.truck = truckData;
                 }
                 break;
             }

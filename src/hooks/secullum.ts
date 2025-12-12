@@ -141,6 +141,22 @@ export const useSecullumCalculations = (params?: {
   });
 };
 
+// Personal calculations hook (for current user's own time clock data)
+// Uses /personal/my-secullum-calculations endpoint - accessible to all authenticated users
+export const useMySecullumCalculations = (params?: {
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  take?: number;
+}) => {
+  return useQuery({
+    queryKey: [...secullumKeys.all, 'my-calculations', params],
+    queryFn: () => secullumService.getMyCalculations(params),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!params && !!params.startDate && !!params.endDate,
+  });
+};
+
 // Time Entries hook (removed duplicate - see line 421)
 
 // Department & Position hooks

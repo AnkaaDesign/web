@@ -11,7 +11,7 @@ export const TaskCreatePage = () => {
   });
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full">
         <TaskCreateForm />
       </div>

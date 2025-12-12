@@ -186,7 +186,9 @@ const MeasurementInput = React.memo(({
     if (isNaN(parsed)) return 0;
 
     // If value looks like it was typed without decimal (e.g., 840 for 8.40m)
-    if (!val.includes(",") && !val.includes(".") && parsed > 10) {
+    // Use threshold > 100 so that "11" is treated as 11m (1100cm), not 11cm
+    // Values like 840 (8.40m) or 240 (2.40m) are treated as cm
+    if (!val.includes(",") && !val.includes(".") && parsed > 100) {
       return parsed; // Already in cm
     }
 
@@ -230,9 +232,10 @@ const MeasurementInput = React.memo(({
     if (max !== undefined) cmValue = Math.min(max, cmValue);
 
     // Auto-format: if user types whole numbers like 840, treat as cm
+    // Use threshold > 100 so that "11" is treated as 11m, not 11cm
     if (!localValue.includes(",") && !localValue.includes(".")) {
       const numValue = parseFloat(localValue);
-      if (numValue > 10) {
+      if (numValue > 100) {
         cmValue = numValue;
       }
     }
@@ -308,8 +311,8 @@ export const LayoutForm = ({
   const isSavingRef = useRef(false);
 
   // Track last user interaction timestamp to prevent unwanted resets from backend data
-  // Initialize to current time to prevent initial sync from failing the check
-  const lastUserInteractionRef = useRef<number>(Date.now());
+  // Initialize to 0 to ALLOW initial sync from backend, then update when user interacts
+  const lastUserInteractionRef = useRef<number>(0);
 
   // Track if there are pending changes that shouldn't be overwritten
   const hasPendingChangesRef = useRef<boolean>(false);

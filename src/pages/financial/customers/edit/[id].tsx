@@ -107,7 +107,7 @@ export const FinancialCustomersEditPage = () => {
   ];
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col space-y-4">
         {/* Fixed Header */}
         <div className="flex-shrink-0">

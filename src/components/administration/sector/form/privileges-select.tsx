@@ -12,6 +12,7 @@ interface PrivilegesSelectProps {
 
 export function PrivilegesSelect({ control, disabled, required }: PrivilegesSelectProps) {
   // Define privilege descriptions and order
+  // Note: LEADER privilege removed - team leadership is now determined by managedSector relationship
   const privilegeInfo = {
     [SECTOR_PRIVILEGES.BASIC]: { order: 1, description: "Acesso básico aos recursos do sistema" },
     [SECTOR_PRIVILEGES.EXTERNAL]: { order: 2, description: "Acesso para colaboradores externos" },
@@ -20,10 +21,9 @@ export function PrivilegesSelect({ control, disabled, required }: PrivilegesSele
     [SECTOR_PRIVILEGES.PRODUCTION]: { order: 5, description: "Gestão de produção e tarefas" },
     [SECTOR_PRIVILEGES.MAINTENANCE]: { order: 6, description: "Manutenção e equipamentos" },
     [SECTOR_PRIVILEGES.LOGISTIC]: { order: 7, description: "Logística e transporte" },
-    [SECTOR_PRIVILEGES.LEADER]: { order: 8, description: "Liderança de equipe e supervisão" },
-    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: { order: 9, description: "Recursos humanos e pessoal" },
-    [SECTOR_PRIVILEGES.FINANCIAL]: { order: 10, description: "Controle financeiro e orçamentário" },
-    [SECTOR_PRIVILEGES.ADMIN]: { order: 11, description: "Administração completa do sistema" },
+    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: { order: 8, description: "Recursos humanos e pessoal" },
+    [SECTOR_PRIVILEGES.FINANCIAL]: { order: 9, description: "Controle financeiro e orçamentário" },
+    [SECTOR_PRIVILEGES.ADMIN]: { order: 10, description: "Administração completa do sistema" },
   };
 
   // Sort privileges by order

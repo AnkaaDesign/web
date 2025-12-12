@@ -87,6 +87,17 @@ export const secullumService = {
       }
     }),
 
+  // Personal calculations endpoint (accessible to all authenticated users for their own data)
+  getMyCalculations: (params?: { startDate?: string; endDate?: string; page?: number; take?: number }) =>
+    apiClient.get<{ success: boolean; data: any; meta?: any }>("/personal/my-secullum-calculations", {
+      params: {
+        startDate: params?.startDate,
+        endDate: params?.endDate,
+        page: params?.page,
+        take: params?.take,
+      }
+    }),
+
   // Departments & Positions
   getDepartments: () => apiClient.get<{ success: boolean; data: any }>("/integrations/secullum/departments"),
 

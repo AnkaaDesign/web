@@ -28,7 +28,7 @@ export function SectorSelector({ control: _control, disabled, required, producti
     if (!productionOnly || !sectors?.data) return sectors?.data || [];
 
     return sectors.data.filter((sector) => {
-      return sector.privileges === SECTOR_PRIVILEGES.PRODUCTION || sector.privileges === SECTOR_PRIVILEGES.LEADER;
+      return sector.privileges === SECTOR_PRIVILEGES.PRODUCTION;
     });
   }, [sectors?.data, productionOnly]);
 

@@ -6,9 +6,10 @@ export interface MenuItem {
   icon: string; // Icon name (generic, will be mapped to platform-specific icons)
   path?: string;
   children?: MenuItem[];
-  requiredPrivilege?: SECTOR_PRIVILEGES | SECTOR_PRIVILEGES[]; // Support single privilege or array
+  requiredPrivilege?: SECTOR_PRIVILEGES | SECTOR_PRIVILEGES[]; // Support single privilege or array (use TEAM_LEADER for team leader access)
   isControlPanel?: boolean; // Indicates if this is a control panel/dashboard
   isDynamic?: boolean; // Indicates if this is a dynamic route
+  onlyInStaging?: boolean; // Indicates if this menu item should only be shown in staging environment
 }
 
 // Comprehensive Tabler icon mapping for Brazilian manufacturing system
@@ -482,11 +483,11 @@ export const NAVIGATION_MENU: MenuItem[] = [
         title: "Clientes",
         icon: "users",
         path: "/administracao/clientes",
-        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN],
+        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
         children: [
-          { id: "clientes-cadastrar", title: "Cadastrar", icon: "plus", path: "/administracao/clientes/cadastrar", requiredPrivilege: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN] },
+          { id: "clientes-cadastrar", title: "Cadastrar", icon: "plus", path: "/administracao/clientes/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
           { id: "clientes-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/clientes/detalhes/:id", isDynamic: true },
-          { id: "clientes-editar", title: "Editar", icon: "edit", path: "/administracao/clientes/editar/:id", isDynamic: true, requiredPrivilege: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN] },
+          { id: "clientes-editar", title: "Editar", icon: "edit", path: "/administracao/clientes/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
         ],
       },
       {
@@ -525,13 +526,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
     ],
   },
 
-  // CATÁLOGO - View-only for Leaders and Designers (separate from Pintura module)
+  // CATÁLOGO - View-only for Designers and Team Leaders (separate from Pintura module)
   {
     id: "catalogo",
     title: "Catálogo",
     icon: "palette",
     path: "/pintura/catalogo-basico",
-    requiredPrivilege: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.DESIGNER],
+    requiredPrivilege: [SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.TEAM_LEADER],
     children: [{ id: "catalogo-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/catalogo/detalhes/:id", isDynamic: true }],
   },
 
@@ -782,36 +783,34 @@ export const NAVIGATION_MENU: MenuItem[] = [
     ],
   },
 
-  // MEU PESSOAL
+  // MINHA EQUIPE - Team leaders only (checked via managedSector relation, not privilege)
+  // This menu item is only visible to users who are sector managers (have managedSector relation)
   {
-    id: "meu-pessoal",
-    title: "Meu Pessoal",
+    id: "minha-equipe",
+    title: "Minha Equipe",
     icon: "team",
     path: "/meu-pessoal",
-    requiredPrivilege: SECTOR_PRIVILEGES.LEADER,
+    requiredPrivilege: [SECTOR_PRIVILEGES.TEAM_LEADER], // Only visible to sector managers
     children: [
-      { id: "avisos-equipe", title: "Advertências", icon: "alertTriangle", path: "/meu-pessoal/avisos", requiredPrivilege: SECTOR_PRIVILEGES.LEADER },
-      { id: "emprestimos-equipe", title: "Empréstimos", icon: "loan", path: "/meu-pessoal/emprestimos", requiredPrivilege: SECTOR_PRIVILEGES.LEADER },
-      { id: "ferias-equipe", title: "Férias", icon: "calendarWeek", path: "/meu-pessoal/ferias", requiredPrivilege: SECTOR_PRIVILEGES.LEADER },
+      { id: "membros-equipe", title: "Membros", icon: "users", path: "/meu-pessoal/usuarios" },
+      { id: "emprestimos-equipe", title: "Empréstimos", icon: "loan", path: "/meu-pessoal/emprestimos" },
+      { id: "ferias-equipe", title: "Férias", icon: "calendarWeek", path: "/meu-pessoal/ferias" },
+      { id: "advertencias-equipe", title: "Advertências", icon: "alertTriangle", path: "/meu-pessoal/advertencias" },
+      { id: "epis-equipe", title: "Entregas de EPI", icon: "helmet", path: "/meu-pessoal/epis" },
+      { id: "movimentacoes-equipe", title: "Movimentações", icon: "activity", path: "/meu-pessoal/movimentacoes" },
+      { id: "calculos-equipe", title: "Controle de Ponto", icon: "fingerprint", path: "/meu-pessoal/calculos" },
     ],
   },
 
-  // PESSOAL
+  // PESSOAL - Only for production workers (PRODUCTION, DESIGNER, WAREHOUSE)
   {
     id: "pessoal",
     title: "Pessoal",
     icon: "userCircle",
     path: "/pessoal",
-    requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.MAINTENANCE],
+    requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.WAREHOUSE],
     children: [
-      { id: "feriados", title: "Feriados", icon: "holiday", path: "/pessoal/feriados" },
-      {
-        id: "ferias",
-        title: "Férias",
-        icon: "calendarWeek",
-        path: "/pessoal/ferias",
-        children: [{ id: "ferias-detalhes", title: "Detalhes", icon: "eye", path: "/pessoal/ferias/detalhes/:id", isDynamic: true }],
-      },
+      { id: "meus-feriados", title: "Feriados", icon: "holiday", path: "/pessoal/feriados" },
       {
         id: "meus-emprestimos",
         title: "Meus Empréstimos",
@@ -829,9 +828,24 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "meus-epis-solicitar", title: "Solicitar EPI", icon: "plus", path: "/pessoal/meus-epis/solicitar" },
         ],
       },
+      { id: "meus-pontos", title: "Meus Pontos", icon: "fingerprint", path: "/pessoal/meus-pontos" },
+      {
+        id: "minhas-advertencias",
+        title: "Minhas Advertências",
+        icon: "alertTriangle",
+        path: "/pessoal/minhas-advertencias",
+        children: [{ id: "minhas-advertencias-detalhes", title: "Detalhes", icon: "eye", path: "/pessoal/minhas-advertencias/detalhes/:id", isDynamic: true }],
+      },
+      {
+        id: "minhas-ferias",
+        title: "Minhas Férias",
+        icon: "calendarWeek",
+        path: "/pessoal/ferias",
+        children: [{ id: "minhas-ferias-detalhes", title: "Detalhes", icon: "eye", path: "/pessoal/ferias/detalhes/:id", isDynamic: true }],
+      },
       {
         id: "minhas-movimentacoes",
-        title: "Minhas Movimentacoes",
+        title: "Minhas Movimentações",
         icon: "movement",
         path: "/pessoal/minhas-movimentacoes",
         children: [{ id: "minhas-movimentacoes-detalhes", title: "Detalhes", icon: "eye", path: "/pessoal/minhas-movimentacoes/detalhes/:id", isDynamic: true }],
@@ -908,14 +922,14 @@ export const NAVIGATION_MENU: MenuItem[] = [
     title: "Produção",
     icon: "factory",
     path: "/producao",
-    requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
+    requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
     children: [
       {
         id: "aerografia",
         title: "Aerografia",
         icon: "paintBrush",
         path: "/producao/aerografia",
-        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN], // LEADER excluded from airbrushing
+        requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN],
         children: [
           { id: "aerografia-cadastrar", title: "Cadastrar", icon: "plus", path: "/producao/aerografia/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
           { id: "aerografia-detalhes", title: "Detalhes", icon: "eye", path: "/producao/aerografia/detalhes/:id", isDynamic: true },
@@ -929,12 +943,13 @@ export const NAVIGATION_MENU: MenuItem[] = [
         path: "/producao/cronograma",
         children: [
           { id: "cronograma-detalhes", title: "Detalhes", icon: "eye", path: "/producao/cronograma/detalhes/:id", isDynamic: true },
-          { id: "cronograma-editar", title: "Editar", icon: "edit", path: "/producao/cronograma/editar/:id", isDynamic: true, requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN] },
+          { id: "cronograma-editar", title: "Editar", icon: "edit", path: "/producao/cronograma/editar/:id", isDynamic: true, requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN] },
           { id: "cronograma-cadastrar", title: "Nova Tarefa", icon: "plus", path: "/producao/cronograma/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
         ],
       },
       { id: "cronograma-em-espera", title: "Em Espera", icon: "pause", path: "/producao/em-espera", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
-      { id: "historico", title: "Histórico", icon: "history", path: "/producao/historico", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN] },
+      { id: "barracoes", title: "Barracões", icon: "warehouse", path: "/producao/barracoes", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN] },
+      { id: "historico", title: "Histórico", icon: "history", path: "/producao/historico", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN] },
       {
         id: "observacoes",
         title: "Observações",
@@ -946,7 +961,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "observacoes-editar", title: "Editar", icon: "edit", path: "/producao/observacoes/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
         ],
       },
-      { id: "recorte", title: "Recorte", icon: "scissors", path: "/producao/recorte", requiredPrivilege: [SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN] },
+      { id: "recorte", title: "Recorte", icon: "scissors", path: "/producao/recorte", requiredPrivilege: [SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN] },
     ],
   },
 

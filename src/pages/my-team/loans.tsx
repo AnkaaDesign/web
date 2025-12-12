@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo } from "react";
-import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { SECTOR_PRIVILEGES, BORROW_STATUS, BORROW_STATUS_LABELS } from "../../constants";
-import { useBorrows, useUsers } from "../../hooks";
+import { BORROW_STATUS, BORROW_STATUS_LABELS, routes } from "../../constants";
+import { useTeamStaffBorrows, useTeamStaffUsers } from "../../hooks";
 import { useAuth } from "@/contexts/auth-context";
+import { isTeamLeader } from "@/utils/user";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
@@ -21,15 +21,17 @@ import { usePageTracker } from "@/hooks/use-page-tracker";
 import { useDebounce } from "@/hooks/use-debounce";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
+import { Navigate } from "react-router-dom";
 
 export const TeamLoansPage = () => {
+  const { user: currentUser } = useAuth();
+
   // Track page access
   usePageTracker({
     title: "Empréstimos da Equipe",
     icon: "packages",
   });
 
-  const { user: currentUser } = useAuth();
   const [_filters] = useState<Partial<BorrowGetManyFormData>>({});
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
@@ -38,13 +40,13 @@ export const TeamLoansPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Fetch users from the same sector
-  const { data: usersResponse } = useUsers({
-    where: {
-      position: {
-        sectorId: currentUser?.sectorId || currentUser?.managedSectorId,
-      },
-    },
+  // Check if user is a team leader (based on managedSector relationship)
+  if (!currentUser || !isTeamLeader(currentUser)) {
+    return <Navigate to={routes.home} replace />;
+  }
+
+  // Fetch users from the team leader's managed sector using secure endpoint
+  const { data: usersResponse } = useTeamStaffUsers({
     include: {
       position: {
         include: {
@@ -60,15 +62,10 @@ export const TeamLoansPage = () => {
   const teamUsers = usersResponse?.data || [];
 
   // Prepare filters based on selections
+  // Note: No need to filter by sector - the secure team-staff endpoint handles this automatically
   const borrowFilters = useMemo(() => {
     const baseFilters: Partial<BorrowGetManyFormData> = {
-      where: {
-        user: {
-          position: {
-            sectorId: currentUser?.sectorId || currentUser?.managedSectorId,
-          },
-        },
-      },
+      where: {},
       include: {
         item: true,
         user: {
@@ -107,10 +104,10 @@ export const TeamLoansPage = () => {
     }
 
     return baseFilters;
-  }, [currentUser?.sectorId, currentUser?.managedSectorId, selectedUserId, selectedStatus, debouncedSearchTerm, currentPage, pageSize]);
+  }, [selectedUserId, selectedStatus, debouncedSearchTerm, currentPage, pageSize]);
 
-  // Fetch borrows
-  const { data: borrowsResponse, isLoading, refetch } = useBorrows(borrowFilters);
+  // Fetch borrows using secure team-staff endpoint (automatically filtered by managed sector)
+  const { data: borrowsResponse, isLoading, refetch } = useTeamStaffBorrows(borrowFilters);
   const borrows = borrowsResponse?.data || [];
   const totalRecords = borrowsResponse?.meta?.totalRecords || 0;
   const totalPages = Math.ceil(totalRecords / pageSize);
@@ -200,8 +197,7 @@ export const TeamLoansPage = () => {
   const hasActiveFilters = selectedUserId || selectedStatus || debouncedSearchTerm;
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.LEADER}>
-      <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-4 py-6">
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Empréstimos da Equipe</h1>
           <p className="text-muted-foreground mt-1">Gerencie os empréstimos dos colaboradores do seu setor</p>
@@ -391,7 +387,6 @@ export const TeamLoansPage = () => {
           </CardContent>
         </Card>
       </div>
-    </PrivilegeRoute>
   );
 };
 

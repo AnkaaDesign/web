@@ -1,6 +1,6 @@
 // packages/hooks/src/useVacation.ts
 
-import { getVacations, getVacationById, createVacation, updateVacation, deleteVacation, batchCreateVacations, batchUpdateVacations, batchDeleteVacations } from "../api-client";
+import { getVacations, getMyVacations, getTeamVacations, getVacationById, createVacation, updateVacation, deleteVacation, batchCreateVacations, batchUpdateVacations, batchDeleteVacations } from "../api-client";
 import type {
   VacationGetManyFormData,
   VacationCreateFormData,
@@ -111,6 +111,20 @@ export const useUpcomingVacations = createSpecializedQueryHook<{ filters?: Parti
       },
     });
   },
+  staleTime: 1000 * 60 * 5,
+});
+
+// Hook for current user's vacations (uses /vacations/my-vacations endpoint)
+export const useMyVacations = createSpecializedQueryHook<{ filters?: Partial<VacationGetManyFormData> }, VacationGetManyResponse>({
+  queryKeyFn: ({ filters }) => [...vacationKeys.all, 'my-vacations', filters],
+  queryFn: ({ filters }) => getMyVacations(filters),
+  staleTime: 1000 * 60 * 5,
+});
+
+// Hook for team vacations (uses /vacations/team-vacations endpoint for team leaders)
+export const useTeamVacations = createSpecializedQueryHook<{ filters?: Partial<VacationGetManyFormData> }, VacationGetManyResponse>({
+  queryKeyFn: ({ filters }) => [...vacationKeys.all, 'team-vacations', filters],
+  queryFn: ({ filters }) => getTeamVacations(filters),
   staleTime: 1000 * 60 * 5,
 });
 

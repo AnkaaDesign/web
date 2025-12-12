@@ -75,7 +75,7 @@ export function UserForm(props: UserFormProps) {
     positionId: null,
     performanceLevel: 0,
     sectorId: null,
-    managedSectorId: null,
+    isSectorLeader: false, // New field: indicates if user should be set as manager of selected sector
 
     // Address fields
     address: null,
@@ -134,7 +134,7 @@ export function UserForm(props: UserFormProps) {
       positionId: null,
       performanceLevel: 0,
       sectorId: null,
-      managedSectorId: null,
+      isSectorLeader: false,
       address: null,
       addressNumber: null,
       addressComplement: null,

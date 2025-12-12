@@ -62,8 +62,6 @@ const getPrivilegeColor = (privilege: string): "red" | "blue" | "purple" | "oran
   switch (privilege) {
     case SECTOR_PRIVILEGES.ADMIN:
       return "red"; // Red - admin privileges
-    case SECTOR_PRIVILEGES.LEADER:
-      return "blue"; // Blue - leadership role (same as production)
     case SECTOR_PRIVILEGES.PRODUCTION:
       return "blue"; // Blue - production role
     case SECTOR_PRIVILEGES.HUMAN_RESOURCES:

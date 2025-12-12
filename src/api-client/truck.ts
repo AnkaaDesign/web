@@ -98,6 +98,98 @@ export class TruckService {
     });
     return response.data;
   }
+
+  // =====================
+  // Lane Availability Operations
+  // =====================
+
+  async getLaneAvailability(
+    garageId: 'B1' | 'B2' | 'B3',
+    truckLength: number,
+    excludeTruckId?: string,
+  ): Promise<LaneAvailabilityResponse> {
+    const response = await apiClient.get<LaneAvailabilityResponse>(
+      `${this.basePath}/lane-availability/${garageId}`,
+      {
+        params: { truckLength, excludeTruckId },
+      },
+    );
+    return response.data;
+  }
+
+  async getGaragesAvailability(
+    truckLength: number,
+    excludeTruckId?: string,
+  ): Promise<GaragesAvailabilityResponse> {
+    const response = await apiClient.get<GaragesAvailabilityResponse>(
+      `${this.basePath}/garages-availability`,
+      {
+        params: { truckLength, excludeTruckId },
+      },
+    );
+    return response.data;
+  }
+
+  /**
+   * Batch update multiple trucks' spots in a single transaction
+   * Used by the garage view to save all pending changes at once
+   */
+  async batchUpdateSpots(
+    updates: Array<{ truckId: string; spot: string | null }>,
+  ): Promise<BatchUpdateSpotsResponse> {
+    const response = await apiClient.post<BatchUpdateSpotsResponse>(
+      `${this.basePath}/batch-update-spots`,
+      { updates },
+    );
+    return response.data;
+  }
+}
+
+// =====================
+// Lane Availability Types
+// =====================
+
+export interface SpotOccupant {
+  spotNumber: 1 | 2 | 3;
+  truckId: string;
+  taskName: string | null;
+  truckLength: number;
+}
+
+export interface LaneAvailability {
+  laneId: 'F1' | 'F2' | 'F3';
+  availableSpace: number;
+  currentTrucks: number;
+  canFit: boolean;
+  nextSpotNumber: 1 | 2 | 3 | null;
+  occupiedSpots: (1 | 2 | 3)[];
+  spotOccupants: SpotOccupant[];
+}
+
+export interface GarageAvailability {
+  garageId: 'B1' | 'B2' | 'B3';
+  totalSpots: number;
+  occupiedSpots: number;
+  canFit: boolean;
+  lanes: LaneAvailability[];
+}
+
+export interface LaneAvailabilityResponse {
+  success: boolean;
+  message: string;
+  data: LaneAvailability[];
+}
+
+export interface GaragesAvailabilityResponse {
+  success: boolean;
+  message: string;
+  data: GarageAvailability[];
+}
+
+export interface BatchUpdateSpotsResponse {
+  success: boolean;
+  message: string;
+  data: { success: boolean; updated: number };
 }
 
 // =====================
@@ -123,3 +215,13 @@ export const deleteTruck = (id: string) => truckService.deleteTruck(id);
 export const batchCreateTrucks = (data: TruckBatchCreateFormData, query?: TruckQueryFormData) => truckService.batchCreateTrucks(data, query);
 export const batchUpdateTrucks = (data: TruckBatchUpdateFormData, query?: TruckQueryFormData) => truckService.batchUpdateTrucks(data, query);
 export const batchDeleteTrucks = (data: TruckBatchDeleteFormData, query?: TruckQueryFormData) => truckService.batchDeleteTrucks(data, query);
+
+// Lane Availability Operations
+export const getLaneAvailability = (garageId: 'B1' | 'B2' | 'B3', truckLength: number, excludeTruckId?: string) =>
+  truckService.getLaneAvailability(garageId, truckLength, excludeTruckId);
+export const getGaragesAvailability = (truckLength: number, excludeTruckId?: string) =>
+  truckService.getGaragesAvailability(truckLength, excludeTruckId);
+
+// Batch Spot Operations
+export const batchUpdateSpots = (updates: Array<{ truckId: string; spot: string | null }>) =>
+  truckService.batchUpdateSpots(updates);

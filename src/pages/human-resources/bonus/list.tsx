@@ -155,7 +155,8 @@ interface BonusRow {
 
   // Bonus data
   bonusId?: string;
-  bonusAmount: number;
+  bonusAmount: number;      // Net bonus (after discounts) - used for summary calculations
+  baseBonus?: number;       // Base bonus (before discounts) - for reference
   tasksCompleted: number;
   averageTasks: number;
   totalWeightedTasks: number;
@@ -299,7 +300,7 @@ function BonusTableComponent({
     {
       key: "bonus",
       header: "Bônus Bruto",
-      accessor: (row: BonusRow) => <span className="whitespace-nowrap">{formatCurrency(row.bonusAmount)}</span>,
+      accessor: (row: BonusRow) => <span className="whitespace-nowrap">{formatCurrency(row.baseBonus || row.bonusAmount)}</span>,
       sortable: true,
       className: "text-sm w-32 font-mono font-semibold truncate",
       align: "left" as const,
@@ -420,11 +421,11 @@ export default function BonusListPage() {
 
   const defaultSectorIds = useMemo(() => {
     if (!sectorsData?.data) return [];
+    // Note: LEADER privilege was removed - filter only PRODUCTION and WAREHOUSE
     return sectorsData.data
       .filter(sector =>
         sector.privilege === 'PRODUCTION' ||
-        sector.privilege === 'WAREHOUSE' ||
-        sector.privilege === 'LEADER'
+        sector.privilege === 'WAREHOUSE'
       )
       .map(sector => sector.id);
   }, [sectorsData?.data]);
@@ -566,11 +567,15 @@ export default function BonusListPage() {
           : Number(bonus.baseBonus) || 0)
         : 0;
 
-      // Calculate discounts
-      const totalDiscounts = (bonus.bonusDiscounts || []).reduce((sum: number, d: any) => {
-        const discountAmount = bonusAmount * (d.percentage / 100);
-        return sum + discountAmount;
-      }, 0);
+      // Get net bonus directly from the database field
+      const netBonusAmount = bonus.netBonus
+        ? (typeof bonus.netBonus === 'object' && bonus.netBonus?.toNumber
+          ? bonus.netBonus.toNumber()
+          : Number(bonus.netBonus) || 0)
+        : bonusAmount;
+
+      // Calculate total discounts as the difference between base and net
+      const totalDiscounts = bonusAmount - netBonusAmount;
 
       // Get period-level task count (total tasks in the period - same for all users)
       // bonus.tasks contains ALL tasks for the period
@@ -616,7 +621,8 @@ export default function BonusListPage() {
         performanceLevel: bonus.performanceLevel || user.performanceLevel || 0,
 
         bonusId: bonus.id,
-        bonusAmount: bonusAmount,
+        bonusAmount: netBonusAmount,              // Net bonus (after discounts) for summary calculations
+        baseBonus: bonusAmount,                   // Base bonus (before discounts) for reference
         tasksCompleted: totalTasksInPeriod,       // Total raw task count for the period
         averageTasks: averageTasks,               // Pre-calculated average from API
         totalWeightedTasks: totalWeightedTasks,   // Total weighted tasks for the period
@@ -624,7 +630,7 @@ export default function BonusListPage() {
         totalCollaborators: totalCollaborators,   // Total bonifiable users
 
         totalDiscounts: totalDiscounts,
-        netBonus: bonusAmount - totalDiscounts,
+        netBonus: netBonusAmount,
 
         monthLabel,
         month: bonus.month,

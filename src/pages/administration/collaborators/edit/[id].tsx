@@ -103,7 +103,7 @@ const EditCollaboratorPage = () => {
       positionId: user.positionId ?? null,
       performanceLevel: user.performanceLevel,
       sectorId: user.sectorId ?? null,
-      managedSectorId: user.managedSectorId ?? null,
+      isSectorLeader: Boolean(user.managedSector?.id),
       status: user.status,
       currentStatus: user.status, // Store current status for validation
       verified: user.verified,

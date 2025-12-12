@@ -43,6 +43,20 @@ export class VacationService {
     return response.data;
   }
 
+  async getMyVacations(params?: VacationGetManyFormData): Promise<VacationGetManyResponse> {
+    const response = await apiClient.get<VacationGetManyResponse>(`${this.basePath}/my-vacations`, {
+      params,
+    });
+    return response.data;
+  }
+
+  async getTeamVacations(params?: VacationGetManyFormData): Promise<VacationGetManyResponse> {
+    const response = await apiClient.get<VacationGetManyResponse>(`${this.basePath}/team-vacations`, {
+      params,
+    });
+    return response.data;
+  }
+
   async getVacationById(id: string, params?: Omit<VacationGetByIdFormData, "id">): Promise<VacationGetUniqueResponse> {
     const response = await apiClient.get<VacationGetUniqueResponse>(`${this.basePath}/${id}`, {
       params,
@@ -112,6 +126,8 @@ export const vacationService = new VacationService();
 
 // Query Operations
 export const getVacations = (params?: VacationGetManyFormData) => vacationService.getVacations(params);
+export const getMyVacations = (params?: VacationGetManyFormData) => vacationService.getMyVacations(params);
+export const getTeamVacations = (params?: VacationGetManyFormData) => vacationService.getTeamVacations(params);
 export const getVacationById = (id: string, params?: Omit<VacationGetByIdFormData, "id">) => vacationService.getVacationById(id, params);
 
 // Mutation Operations

@@ -6,7 +6,7 @@ import { usePageTracker } from "@/hooks/use-page-tracker";
 import { IconPaint } from "@tabler/icons-react";
 
 /**
- * View-only Catalog List Page for Leaders and Designers
+ * View-only Catalog List Page for Designers
  *
  * This page provides read-only access to the paint catalog.
  * Features:
@@ -25,7 +25,7 @@ export default function CatalogListPage() {
   const actions: never[] = [];
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.DESIGNER]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.DESIGNER]}>
       <div className="flex flex-col h-full space-y-4">
         <div className="flex-shrink-0">
           <PageHeaderWithFavorite

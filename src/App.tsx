@@ -176,6 +176,8 @@ const PersonalMyPpes = lazy(() => import("@/pages/personal/my-ppes").then((modul
 const PersonalMyPpesRequest = lazy(() => import("@/pages/personal/my-ppes").then((module) => ({ default: module.PersonalMyPpesRequest })));
 const PersonalMyLoans = lazy(() => import("@/pages/personal/my-loans").then((module) => ({ default: module.MyLoansPage })));
 const PersonalMyActivities = lazy(() => import("@/pages/personal/my-activities").then((module) => ({ default: module.MyActivitiesPage })));
+const PersonalMyWarnings = lazy(() => import("@/pages/personal/my-warnings").then((module) => ({ default: module.MyWarningsPage })));
+const PersonalMyTimeEntries = lazy(() => import("@/pages/personal/my-time-entries").then((module) => ({ default: module.MyTimeEntriesPage })));
 
 // Painting (Pintura)
 const Paint = lazy(() => import("@/pages/painting/root").then((module) => ({ default: module.Painting })));
@@ -223,6 +225,7 @@ const ProductionTasksCreate = lazy(() => import("@/pages/production/schedule/cre
 const ProductionTasksEdit = lazy(() => import("@/pages/production/schedule/edit/[id]").then((module) => ({ default: module.TaskEditPage })));
 const ProductionTasksDetails = lazy(() => import("@/pages/production/schedule/details/[id]").then((module) => ({ default: module.TaskDetailsPage })));
 const ProductionScheduleOnHold = lazy(() => import("@/pages/production/schedule-on-hold").then((module) => ({ default: module.ScheduleOnHoldPage })));
+const ProductionGarages = lazy(() => import("@/pages/production/barracoes").then((module) => ({ default: module.GaragesPage })));
 
 // Human Resources
 const HumanResources = lazy(() => import("@/pages/human-resources/root").then((module) => ({ default: module.HumanResourcesRootPage })));
@@ -271,6 +274,10 @@ const MyTeam = lazy(() => import("@/pages/my-team/index").then((module) => ({ de
 const MyTeamVacations = lazy(() => import("@/pages/my-team/vacations").then((module) => ({ default: module.default })));
 const MyTeamWarnings = lazy(() => import("@/pages/my-team/warnings").then((module) => ({ default: module.default })));
 const MyTeamLoans = lazy(() => import("@/pages/my-team/loans").then((module) => ({ default: module.default })));
+const MyTeamMembers = lazy(() => import("@/pages/my-team/members").then((module) => ({ default: module.default })));
+const MyTeamPpes = lazy(() => import("@/pages/my-team/ppes").then((module) => ({ default: module.default })));
+const MyTeamMovements = lazy(() => import("@/pages/my-team/movements").then((module) => ({ default: module.default })));
+const MyTeamCalculations = lazy(() => import("@/pages/my-team/calculations").then((module) => ({ default: module.default })));
 
 // Server
 const Server = lazy(() => import("@/pages/server/root").then((module) => ({ default: module.ServerRootPage })));
@@ -516,6 +523,16 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ProductionAirbrushingDetails />
+                    </Suspense>
+                  }
+                />
+
+                {/* Garages route */}
+                <Route
+                  path={routes.production.garages.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProductionGarages />
                     </Suspense>
                   }
                 />
@@ -1406,6 +1423,22 @@ function App() {
                     </Suspense>
                   }
                 />
+                <Route
+                  path={routes.personal.myWarnings.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonalMyWarnings />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.personal.myTimeEntries.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <PersonalMyTimeEntries />
+                    </Suspense>
+                  }
+                />
 
                 {/* Paint routes */}
                 <Route
@@ -1962,6 +1995,38 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <MyTeamLoans />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.myTeam.members}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <MyTeamMembers />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.myTeam.ppes}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <MyTeamPpes />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.myTeam.movements}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <MyTeamMovements />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.myTeam.calculations}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <MyTeamCalculations />
                     </Suspense>
                   }
                 />

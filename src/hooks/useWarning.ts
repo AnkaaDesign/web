@@ -1,6 +1,6 @@
 // packages/hooks/src/useWarning.ts
 
-import { createWarning, deleteWarning, getWarningById, getWarnings, updateWarning, batchCreateWarnings, batchUpdateWarnings, batchDeleteWarnings } from "../api-client";
+import { createWarning, deleteWarning, getWarningById, getWarnings, getMyWarnings, getTeamWarnings, updateWarning, batchCreateWarnings, batchUpdateWarnings, batchDeleteWarnings } from "../api-client";
 import type {
   WarningCreateFormData,
   WarningUpdateFormData,
@@ -99,6 +99,20 @@ export const useActiveWarnings = createSpecializedQueryHook<Partial<WarningGetMa
 export const usePendingFollowUpWarnings = createSpecializedQueryHook<Partial<WarningGetManyFormData>, WarningGetManyResponse>({
   queryKeyFn: (filters) => warningKeys.pendingFollowUp(filters),
   queryFn: (filters) => getWarnings({ ...filters, hasFollowUp: true, isActive: true }),
+  staleTime: 1000 * 60 * 5,
+});
+
+// Hook for user's own warnings (calls /warnings/my-warnings endpoint)
+export const useMyWarnings = createSpecializedQueryHook<Partial<WarningGetManyFormData>, WarningGetManyResponse>({
+  queryKeyFn: (filters) => [...warningKeys.all, 'my-warnings', filters],
+  queryFn: (filters) => getMyWarnings(filters),
+  staleTime: 1000 * 60 * 5,
+});
+
+// Hook for team warnings (calls /warnings/team-warnings endpoint)
+export const useTeamWarnings = createSpecializedQueryHook<Partial<WarningGetManyFormData>, WarningGetManyResponse>({
+  queryKeyFn: (filters) => [...warningKeys.all, 'team-warnings', filters],
+  queryFn: (filters) => getTeamWarnings(filters),
   staleTime: 1000 * 60 * 5,
 });
 

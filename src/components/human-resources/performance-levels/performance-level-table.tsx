@@ -400,7 +400,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
           <AlertCircle className="h-5 w-5 mr-2" />
           Erro ao carregar dados
         </div>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-muted-foreground">
           Tente recarregar a página ou contate o suporte técnico.
         </p>
       </div>
@@ -410,7 +410,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
   if (!users || users.length === 0) {
     return (
       <div className="p-6 text-center">
-        <p className="text-gray-500">Nenhum colaborador encontrado.</p>
+        <p className="text-muted-foreground">Nenhum colaborador encontrado.</p>
       </div>
     );
   }
@@ -418,8 +418,8 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
   return (
     <div className="rounded-lg flex flex-col overflow-hidden h-full">
       {isUpdating && (
-        <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10 rounded-lg">
-          <div className="bg-white p-4 rounded-lg shadow-lg flex items-center space-x-2">
+        <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded-lg">
+          <div className="bg-card p-4 rounded-lg shadow-lg flex items-center space-x-2 border border-border">
             <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
             <span className="text-sm">Salvando alterações...</span>
           </div>
@@ -577,12 +577,12 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
                   "cursor-pointer transition-colors border-b border-border h-10",
                   index % 2 === 1 && "bg-muted/10",
                   "hover:bg-muted/20",
-                  isModified && "bg-yellow-50 hover:bg-yellow-100"
+                  isModified && "bg-yellow-500/10 hover:bg-yellow-500/20"
                 )}
               >
                 {visibleColumns.has("payrollNumber") && (
                   <TableCell className="w-32 p-0">
-                    <div className="px-3 py-1.5 text-sm text-gray-600 font-medium truncate">
+                    <div className="px-3 py-1.5 text-sm text-muted-foreground font-medium truncate">
                       {user.payrollNumber || "—"}
                     </div>
                   </TableCell>
@@ -599,28 +599,28 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
                 )}
                 {visibleColumns.has("email") && (
                   <TableCell className="w-48 p-0">
-                    <div className="px-3 py-1.5 text-sm text-gray-600 truncate">
+                    <div className="px-3 py-1.5 text-sm text-muted-foreground truncate">
                       {user.email || "—"}
                     </div>
                   </TableCell>
                 )}
                 {visibleColumns.has("phone") && (
                   <TableCell className="w-40 p-0">
-                    <div className="px-3 py-1.5 text-sm text-gray-600 truncate">
+                    <div className="px-3 py-1.5 text-sm text-muted-foreground truncate">
                       {user.phone || "—"}
                     </div>
                   </TableCell>
                 )}
                 {visibleColumns.has("position") && (
                   <TableCell className="w-48 p-0">
-                    <div className="px-3 py-1.5 text-sm text-gray-600 truncate">
+                    <div className="px-3 py-1.5 text-sm text-muted-foreground truncate">
                       {user.position?.name || "—"}
                     </div>
                   </TableCell>
                 )}
                 {visibleColumns.has("sector") && (
                   <TableCell className="w-40 p-0">
-                    <div className="px-3 py-1.5 text-sm text-gray-600 truncate">
+                    <div className="px-3 py-1.5 text-sm text-muted-foreground truncate">
                       {user.sector?.name || "—"}
                     </div>
                   </TableCell>
@@ -662,7 +662,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
                               )}
                             </div>
                           ) : (
-                            <span className="text-gray-400">—</span>
+                            <span className="text-muted-foreground/50">—</span>
                           )}
                         </>
                       )}
@@ -680,7 +680,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
       {visibleColumns.has("bonus") && (totalBonusSum > 0 || averageTasksPerUser > 0) && (
         <div className={cn(
           "border-l border-r border-b border-border rounded-b-lg",
-          hasModifiedUsers ? "bg-orange-50/50" : "bg-muted/30"
+          hasModifiedUsers ? "bg-orange-500/10" : "bg-muted/30"
         )}>
           <div className="flex flex-col gap-2 px-4 py-3">
             {/* Average Tasks Per User */}
@@ -701,7 +701,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-sm">Total de Bonificações:</span>
                   {hasModifiedUsers && (
-                    <Badge variant="secondary" className="text-xs bg-orange-100">
+                    <Badge variant="secondary" className="text-xs bg-orange-500/20 text-orange-600 dark:text-orange-400">
                       {modifiedUsers.size} com alterações
                     </Badge>
                   )}

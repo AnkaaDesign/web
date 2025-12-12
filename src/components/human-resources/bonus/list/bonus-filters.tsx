@@ -47,12 +47,11 @@ export function BonusFilters({ open, onOpenChange, filters, onApplyFilters }: Bo
   // Get default sector IDs (production, warehouse, leader privileges)
   const defaultSectorIds = useMemo(() => {
     if (!sectorsData?.data) return [];
-
+    // Note: LEADER privilege was removed - filter only PRODUCTION and WAREHOUSE
     return sectorsData.data
       .filter(sector =>
         sector.privilege === 'PRODUCTION' ||
-        sector.privilege === 'WAREHOUSE' ||
-        sector.privilege === 'LEADER'
+        sector.privilege === 'WAREHOUSE'
       )
       .map(sector => sector.id);
   }, [sectorsData?.data]);

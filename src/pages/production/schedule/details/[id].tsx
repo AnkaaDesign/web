@@ -30,6 +30,7 @@ import {
   COMMISSION_STATUS_LABELS,
 } from "../../../../constants";
 import { formatDate, formatDateTime, formatCurrency, formatChassis, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
+import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { generateBudgetPDF } from "../../../../utils/budget-pdf-generator";
 import { usePageTracker } from "@/hooks/use-page-tracker";
@@ -86,6 +87,7 @@ import {
   IconBarcode,
   IconList,
   IconCoin,
+  IconMapPin,
   IconLayersIntersect,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
@@ -465,8 +467,8 @@ export const TaskDetailsPage = () => {
   // Check if user is from Warehouse sector (should hide documents, budgets, and changelog)
   const isWarehouseSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
 
-  // Check if user can edit service orders (Admin or Leader only)
-  const canEditServiceOrders = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.LEADER) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN));
+  // Check if user can edit service orders (Admin or team leader only - based on managedSector)
+  const canEditServiceOrders = currentUser && (isTeamLeader(currentUser) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN));
 
   // Check if user can view airbrushing financial data (FINANCIAL or ADMIN only)
   const canViewAirbrushingFinancials = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN));
@@ -792,7 +794,7 @@ export const TaskDetailsPage = () => {
   const isOverdue = task.term && new Date(task.term) < new Date() && task.status !== TASK_STATUS.COMPLETED && task.status !== TASK_STATUS.CANCELLED;
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LEADER, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="space-y-6">
         <div className="animate-in fade-in-50 duration-500">
           <PageHeader
@@ -947,6 +949,19 @@ export const TaskDetailsPage = () => {
                   Nº Chassi
                     </span>
                     <span className="text-sm font-semibold text-foreground">{formatChassis(task.truck.chassisNumber)}</span>
+                  </div>
+                )}
+
+                {/* Truck Location/Spot */}
+                {task.truck?.spot && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconMapPin className="h-4 w-4" />
+                      Local
+                    </span>
+                    <Badge variant="outline" className="font-mono">
+                      {task.truck.spot === "PATIO" ? "Pátio" : task.truck.spot.replace(/_/g, "-")}
+                    </Badge>
                   </div>
                 )}
 

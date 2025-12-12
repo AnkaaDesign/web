@@ -143,6 +143,7 @@ export default function PayrollDetailPage() {
       return {
         baseRemuneration: 0,
         bonusAmount: 0,
+        netBonusAmount: 0,
         overtime50Amount: 0,
         overtime50Hours: 0,
         overtime100Amount: 0,
@@ -161,7 +162,9 @@ export default function PayrollDetailPage() {
       getNumericValue(payroll.user?.position?.baseRemuneration) ||
       0;
 
+    // Use base bonus for display, net bonus for totals calculation
     const bonusAmount = payroll.bonus ? getNumericValue(payroll.bonus.baseBonus) : 0;
+    const netBonusAmount = payroll.bonus ? (getNumericValue(payroll.bonus.netBonus) || bonusAmount) : 0;
 
     // Get Secullum data - overtime and DSR
     const overtime50Amount = getNumericValue(payroll.overtime50Amount);
@@ -172,8 +175,8 @@ export default function PayrollDetailPage() {
     const nightHours = getNumericValue(payroll.nightHours);
     const dsrAmount = getNumericValue(payroll.dsrAmount);
 
-    // Total gross includes ALL earnings
-    const totalGross = baseRemuneration + bonusAmount + overtime50Amount + overtime100Amount + nightDifferentialAmount + dsrAmount;
+    // Total gross includes ALL earnings (use netBonusAmount since bonus discounts are internal to the bonus)
+    const totalGross = baseRemuneration + netBonusAmount + overtime50Amount + overtime100Amount + nightDifferentialAmount + dsrAmount;
 
     // Calculate discounts
     let totalDiscounts = 0;
@@ -188,29 +191,13 @@ export default function PayrollDetailPage() {
       });
     }
 
-    // Calculate bonus discounts
-    let bonusDiscounts = 0;
-    if (payroll.bonus?.bonusDiscounts && payroll.bonus.bonusDiscounts.length > 0) {
-      let currentBonusAmount = bonusAmount;
-      payroll.bonus.bonusDiscounts
-        .sort((a: any, b: any) => (a.calculationOrder || 0) - (b.calculationOrder || 0))
-        .forEach((discount: any) => {
-          if (discount.percentage) {
-            const discountValue = currentBonusAmount * (getNumericValue(discount.percentage) / 100);
-            bonusDiscounts += discountValue;
-            currentBonusAmount -= discountValue;
-          } else if (discount.value) {
-            bonusDiscounts += getNumericValue(discount.value);
-            currentBonusAmount -= getNumericValue(discount.value);
-          }
-        });
-    }
-
-    const totalNet = totalGross - totalDiscounts - bonusDiscounts;
+    // Bonus discounts are already factored into netBonusAmount, so we don't need to calculate them separately
+    const totalNet = totalGross - totalDiscounts;
 
     return {
       baseRemuneration,
       bonusAmount,
+      netBonusAmount,
       overtime50Amount,
       overtime50Hours,
       overtime100Amount,
@@ -219,7 +206,7 @@ export default function PayrollDetailPage() {
       nightHours,
       dsrAmount,
       totalGross,
-      totalDiscounts: totalDiscounts + bonusDiscounts,
+      totalDiscounts,
       totalNet,
     };
   }, [payroll]);
@@ -561,17 +548,47 @@ export default function PayrollDetailPage() {
                     </tr>
                   )}
 
-                  {/* Bonus */}
+                  {/* Bonus - Base, Discounts, Net */}
                   {isBonifiable && calculations.bonusAmount > 0 && (
-                    <tr className="border-b border-border/50">
-                      <td className="py-2 px-0">Bônus</td>
-                      <td className="py-2 px-0 text-left text-muted-foreground text-xs">
-                        {payroll.bonus?.weightedTasks !== undefined
-                          ? Number(payroll.bonus.weightedTasks).toFixed(1)
-                          : "-"}
-                      </td>
-                      <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.bonusAmount)}</td>
-                    </tr>
+                    <>
+                      {/* Base Bonus */}
+                      <tr className="border-b border-border/50">
+                        <td className="py-2 px-0">Bônus</td>
+                        <td className="py-2 px-0 text-left text-muted-foreground text-xs">
+                          {payroll.bonus?.weightedTasks !== undefined
+                            ? Number(payroll.bonus.weightedTasks).toFixed(1)
+                            : "-"}
+                        </td>
+                        <td className="py-2 px-0 text-right font-semibold text-green-600">{formatAmount(calculations.bonusAmount)}</td>
+                      </tr>
+                      {/* Bonus Discounts */}
+                      {hasBonusDiscounts && payroll.bonus.bonusDiscounts.map((discount: any, index: number) => {
+                        const discountValue = discount.percentage
+                          ? calculations.bonusAmount * (getNumericValue(discount.percentage) / 100)
+                          : getNumericValue(discount.value);
+                        return (
+                          <tr key={discount.id || `bonus-discount-${index}`} className="border-b border-border/50">
+                            <td className="py-2 px-0 pl-4 text-muted-foreground">{discount.reference || 'Desconto Bônus'}</td>
+                            <td className="py-2 px-0 text-left text-muted-foreground text-xs">
+                              {discount.percentage ? `${getNumericValue(discount.percentage).toFixed(2)}%` : '-'}
+                            </td>
+                            <td className="py-2 px-0 text-right font-semibold text-destructive">-{formatAmount(discountValue)}</td>
+                          </tr>
+                        );
+                      })}
+                      {/* Net Bonus (only if there are discounts) */}
+                      {hasBonusDiscounts && (
+                        <tr className="border-b border-border/50 bg-muted/30">
+                          <td className="py-2 px-0 pl-4 font-medium">Bônus Líquido</td>
+                          <td className="py-2 px-0 text-left text-muted-foreground text-xs">-</td>
+                          <td className="py-2 px-0 text-right font-semibold text-green-600">
+                            {formatAmount(getNumericValue(payroll.bonus.netBonus) || (calculations.bonusAmount - (payroll.bonus.bonusDiscounts || []).reduce((sum: number, d: any) => {
+                              return sum + (d.percentage ? calculations.bonusAmount * (getNumericValue(d.percentage) / 100) : getNumericValue(d.value));
+                            }, 0)))}
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   )}
 
                   {/* Discounts */}

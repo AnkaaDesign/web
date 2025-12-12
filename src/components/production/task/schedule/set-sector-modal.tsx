@@ -34,7 +34,7 @@ export function SetSectorModal({ open, onOpenChange, tasks, onConfirm }: SetSect
   const { data: sectorsData } = useSectors({
     where: {
       privileges: {
-        in: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.LEADER],
+        in: [SECTOR_PRIVILEGES.PRODUCTION],
       },
     },
     orderBy: { name: "asc" },

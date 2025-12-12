@@ -77,7 +77,7 @@ export function UserBatchEditTable({ users, onCancel }: UserBatchEditTableProps)
           cpf: user.cpf,
           positionId: user.positionId,
           sectorId: user.sectorId,
-          managedSectorId: user.managedSectorId,
+          isSectorLeader: Boolean(user.managedSector?.id),
           status: user.status,
         },
       })),
@@ -102,7 +102,7 @@ export function UserBatchEditTable({ users, onCancel }: UserBatchEditTableProps)
         user.data.cpf !== originalUser.cpf ||
         user.data.positionId !== originalUser.positionId ||
         user.data.sectorId !== originalUser.sectorId ||
-        user.data.managedSectorId !== originalUser.managedSectorId ||
+        user.data.isSectorLeader !== Boolean(originalUser.managedSector?.id) ||
         user.data.status !== originalUser.status;
 
       return hasChanges;
