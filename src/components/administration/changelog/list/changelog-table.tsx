@@ -46,6 +46,7 @@ export function ChangelogTable({ visibleColumns, className, filters = {}, onData
     isSelected,
     isAllSelected,
     isPartiallySelected,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -122,8 +123,8 @@ export function ChangelogTable({ visibleColumns, className, filters = {}, onData
     toggleSelectAll(currentPageItemIds);
   };
 
-  const handleSelectItem = (changelogId: string) => {
-    toggleSelection(changelogId);
+  const handleSelectItem = (changelogId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(changelogId, currentPageItemIds, event?.shiftKey || false);
   };
 
   const renderSortIndicator = (columnKey: string) => {
@@ -248,7 +249,10 @@ export function ChangelogTable({ visibleColumns, className, filters = {}, onData
                   >
                     {/* Selection checkbox */}
                     <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectItem(changelog.id, e);
+                      }}>
                         <Checkbox checked={changelogIsSelected} onCheckedChange={() => handleSelectItem(changelog.id)} aria-label={`Select changelog ${changelog.id}`} />
                       </div>
                     </TableCell>

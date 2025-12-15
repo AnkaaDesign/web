@@ -104,6 +104,7 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
     selectionCount,
     resetSelection: _resetSelection,
     removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -314,8 +315,8 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
     toggleSelectAll(currentPageBorrowIds);
   };
 
-  const handleSelectBorrow = (borrowId: string) => {
-    toggleSelection(borrowId);
+  const handleSelectBorrow = (borrowId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(borrowId, currentPageBorrowIds, event?.shiftKey || false);
   };
 
   const renderSortIndicator = (columnKey: string) => {
@@ -635,7 +636,7 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
                     {/* Selection checkbox */}
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => { e.stopPropagation(); handleSelectBorrow(borrow.id, e); }}>
                           <Checkbox
                             checked={borrowIsSelected}
                             onCheckedChange={() => handleSelectBorrow(borrow.id)}

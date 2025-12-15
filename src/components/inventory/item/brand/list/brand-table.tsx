@@ -73,6 +73,7 @@ export function BrandTable({ columns: allColumns, visibleColumns, className, onE
     selectionCount,
     resetSelection: _resetSelection,
     removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -165,8 +166,8 @@ export function BrandTable({ columns: allColumns, visibleColumns, className, onE
     toggleSelectAll(currentPageBrandIds);
   };
 
-  const handleSelectBrand = (brandId: string) => {
-    toggleSelection(brandId);
+  const handleSelectBrand = (brandId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(brandId, currentPageBrandIds, event?.shiftKey || false);
   };
 
   const renderSortIndicator = (columnKey: string) => {
@@ -350,7 +351,7 @@ export function BrandTable({ columns: allColumns, visibleColumns, className, onE
                     {/* Selection checkbox */}
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => { e.stopPropagation(); handleSelectBrand(brand.id, e); }}>
                           <Checkbox checked={brandIsSelected} onCheckedChange={() => handleSelectBrand(brand.id)} aria-label={`Select ${brand.name}`} data-checkbox />
                         </div>
                       </TableCell>

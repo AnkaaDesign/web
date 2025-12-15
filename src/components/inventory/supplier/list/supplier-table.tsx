@@ -65,6 +65,7 @@ export function SupplierTable({ visibleColumns, className, onEdit, onDelete, fil
     selectionCount,
     resetSelection: _resetSelection,
     removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -167,8 +168,8 @@ export function SupplierTable({ visibleColumns, className, onEdit, onDelete, fil
     toggleSelectAll(currentPageSupplierIds);
   };
 
-  const handleSelectSupplier = (supplierId: string) => {
-    toggleSelection(supplierId);
+  const handleSelectSupplier = (supplierId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(supplierId, currentPageSupplierIds, event?.shiftKey || false);
   };
 
   const renderSortIndicator = (columnKey: string) => {
@@ -376,10 +377,15 @@ export function SupplierTable({ visibleColumns, className, onEdit, onDelete, fil
                     {/* Selection checkbox */}
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className="flex items-center justify-center h-full w-full px-2 py-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectSupplier(supplier.id, e);
+                          }}
+                        >
                           <Checkbox
                             checked={supplierIsSelected}
-                            onCheckedChange={() => handleSelectSupplier(supplier.id)}
                             aria-label={`Select ${supplier.fantasyName}`}
                             data-checkbox
                           />

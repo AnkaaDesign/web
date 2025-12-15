@@ -69,6 +69,7 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
     selectionCount,
     resetSelection,
     removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -464,8 +465,8 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
     toggleSelectAll(currentPageItemIds);
   };
 
-  const handleSelectItem = (itemId: string) => {
-    toggleSelection(itemId);
+  const handleSelectItem = (itemId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(itemId, currentPageItemIds, event?.shiftKey || false);
   };
 
   const renderSortIndicator = (columnKey: string) => {
@@ -711,8 +712,14 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
                     {/* Selection checkbox */}
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select ${item.name}`} data-checkbox />
+                        <div
+                          className="flex items-center justify-center h-full w-full px-2 py-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectItem(item.id, e);
+                          }}
+                        >
+                          <Checkbox checked={itemIsSelected} aria-label={`Select ${item.name}`} data-checkbox />
                         </div>
                       </TableCell>
                     )}

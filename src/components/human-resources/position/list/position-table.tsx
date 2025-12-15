@@ -77,6 +77,7 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
     isPartiallySelected,
     selectionCount,
     resetSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -174,9 +175,9 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
       if (event) {
         event.stopPropagation();
       }
-      toggleSelection(positionId);
+      handleRowClickSelection(positionId, currentPagePositionIds, event?.shiftKey || false);
     },
-    [toggleSelection],
+    [handleRowClickSelection, currentPagePositionIds],
   );
 
   const handleRowClick = useCallback(
@@ -469,7 +470,10 @@ export function PositionTable({ filters, onDataChange, className }: PositionTabl
                   >
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectPosition(position.id, e);
+                        }}>
                           <Checkbox
                             checked={isPositionSelected}
                             onCheckedChange={() => handleSelectPosition(position.id)}

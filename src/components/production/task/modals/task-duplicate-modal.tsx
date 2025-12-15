@@ -1,18 +1,18 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useState, useCallback } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useTaskMutations } from "../../../../hooks";
+import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { TASK_STATUS } from "../../../../constants";
-import { IconLoader2 } from "@tabler/icons-react";
+import { IconLoader2, IconPlus, IconTrash } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 
-// Schema for duplicate form
-const duplicateSchema = z.object({
+// Schema for a single copy entry
+const copyEntrySchema = z.object({
   serialNumber: z
     .string()
     .nullable()
@@ -30,6 +30,11 @@ const duplicateSchema = z.object({
     .transform((val) => val?.trim().replace(/\s/g, "").toUpperCase() || null),
 });
 
+// Schema for multiple copies
+const duplicateSchema = z.object({
+  copies: z.array(copyEntrySchema).min(1, "Adicione pelo menos uma cópia"),
+});
+
 type DuplicateFormData = z.infer<typeof duplicateSchema>;
 
 interface TaskDuplicateModalProps {
@@ -42,26 +47,94 @@ interface TaskDuplicateModalProps {
 export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: TaskDuplicateModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { createAsync } = useTaskMutations();
+  const { batchCreateAsync } = useTaskBatchMutations();
 
   const form = useForm<DuplicateFormData>({
     resolver: zodResolver(duplicateSchema),
     defaultValues: {
-      serialNumber: "",
-      plate: "",
-      chassisNumber: "",
+      copies: [{ serialNumber: "", plate: "", chassisNumber: "" }],
     },
   });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "copies",
+  });
+
+  // Add a new copy entry
+  const handleAddCopy = useCallback(() => {
+    append({ serialNumber: "", plate: "", chassisNumber: "" });
+  }, [append]);
 
   // Reset form when task changes
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen && task) {
       form.reset({
-        serialNumber: "",
-        plate: "",
-        chassisNumber: "",
+        copies: [{ serialNumber: "", plate: "", chassisNumber: "" }],
       });
     }
     onOpenChange(newOpen);
+  };
+
+  // Build task data for a single copy
+  const buildTaskData = (copyData: { serialNumber?: string | null; plate?: string | null; chassisNumber?: string | null }) => {
+    if (!task) return null;
+
+    return {
+      // Basic fields
+      name: task.name,
+      status: TASK_STATUS.PENDING,
+      // Sanitize serialNumber - remove invalid characters, keep only A-Z, 0-9, and -
+      serialNumber: (copyData.serialNumber || String(task.serialNumber || "")).replace(/[^A-Z0-9-]/gi, "").toUpperCase() || null,
+      details: task.details,
+      entryDate: task.entryDate,
+      term: task.term,
+      startedAt: null, // Reset
+      finishedAt: null, // Reset
+      paintId: task.paintId,
+      customerId: task.customerId,
+      sectorId: task.sectorId,
+      commission: task.commission, // Required field
+      budgetId: task.budgetId,
+      nfeId: task.nfeId,
+      receiptId: task.receiptId,
+
+      // Relations - copy artwork and paint IDs
+      artworkIds: task.artworks?.map((file) => file.id),
+      paintIds: task.logoPaints?.map((paint) => paint.id),
+
+      // Complex relations - copy nested data
+      observation: task.observation
+        ? {
+            description: task.observation.description,
+            artworkIds: task.observation.artworks?.map((file) => file.id) || [],
+          }
+        : null,
+
+      services: task.services?.map((service) => ({
+        status: service.status,
+        statusOrder: service.statusOrder,
+        description: service.description,
+        startedAt: null, // Reset service dates
+        finishedAt: null,
+      })),
+
+      // Truck with new plate and chassis from form (only if there's data)
+      truck: (copyData.plate || copyData.chassisNumber || task.truck)
+        ? {
+            plate: copyData.plate || task.truck?.plate || null,
+            chassisNumber: copyData.chassisNumber || task.truck?.chassisNumber || null,
+            spot: task.truck?.spot || null,
+          }
+        : null,
+
+      // Note: cuts are not duplicated as they are separate records
+      // The new task will need new cut entries if required
+      cut: null,
+
+      // Note: airbrushings are not duplicated as they are separate records
+      // The new task will need new airbrushing entries if required
+    };
   };
 
   const handleSubmit = async (data: DuplicateFormData) => {
@@ -70,76 +143,31 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
     try {
       setIsSubmitting(true);
 
-      // Create new task with all the same data except:
-      // - New serial number, plate and chassis from form
-      // - Reset status to PENDING
-      // - Reset dates
-      // - New ID (generated by API)
-      const newTaskData = {
-        // Basic fields
-        name: task.name,
-        status: TASK_STATUS.PENDING,
-        // Sanitize serialNumber - remove invalid characters, keep only A-Z, 0-9, and -
-        serialNumber: (data.serialNumber || String(task.serialNumber || "")).replace(/[^A-Z0-9-]/gi, "").toUpperCase(),
-        details: task.details,
-        entryDate: task.entryDate,
-        term: task.term,
-        startedAt: null, // Reset
-        finishedAt: null, // Reset
-        paintId: task.paintId,
-        customerId: task.customerId,
-        sectorId: task.sectorId,
-        commission: task.commission, // Required field
-        budgetId: task.budgetId,
-        nfeId: task.nfeId,
-        receiptId: task.receiptId,
+      // Build task data for each copy
+      const tasksToCreate = data.copies.map((copy) => buildTaskData(copy)).filter(Boolean) as any[];
 
-        // Relations - copy artwork and paint IDs
-        artworkIds: task.artworks?.map((file) => file.id),
-        paintIds: task.logoPaints?.map((paint) => paint.id),
+      if (tasksToCreate.length === 0) {
+        return;
+      }
 
-        // Complex relations - copy nested data
-        observation: task.observation
-          ? {
-              description: task.observation.description,
-              artworkIds: task.observation.artworks?.map((file) => file.id) || [],
-            }
-          : null,
+      let success = false;
 
-        services: task.services?.map((service) => ({
-          status: service.status,
-          statusOrder: service.statusOrder,
-          description: service.description,
-          startedAt: null, // Reset service dates
-          finishedAt: null,
-        })),
+      if (tasksToCreate.length === 1) {
+        // Single copy - use regular create
+        const result = await createAsync(tasksToCreate[0]);
+        success = result.success;
+      } else {
+        // Multiple copies - use batch create
+        const result = await batchCreateAsync({ tasks: tasksToCreate });
+        success = result.success;
+      }
 
-        // Truck with new plate and chassis from form
-        truck: {
-          plate: data.plate || task.truck?.plate || null,
-          chassisNumber: data.chassisNumber || task.truck?.chassisNumber || null,
-          model: task.truck?.model || "",
-          manufacturer: task.truck?.manufacturer || "OTHER",
-          xPosition: null,
-          yPosition: null,
-        },
-
-        // Note: cuts are not duplicated as they are separate records
-        // The new task will need new cut entries if required
-        cut: null,
-
-        // Note: airbrushings are not duplicated as they are separate records
-        // The new task will need new airbrushing entries if required
-      };
-
-      const result = await createAsync(newTaskData);
-
-      if (result.success) {
+      if (success) {
         handleOpenChange(false);
         onSuccess?.();
       }
     } catch (error) {
-      console.error("Error duplicating task:", error);
+      console.error("Error creating copies:", error);
       // Error is handled by the mutation hook
     } finally {
       setIsSubmitting(false);
@@ -148,89 +176,131 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
 
   if (!task) return null;
 
+  const copyCount = fields.length;
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Duplicar Tarefa</DialogTitle>
-          <DialogDescription>Criando uma cópia de "{task.name}". Informe o número de série, placa e chassi para a nova tarefa.</DialogDescription>
+          <DialogTitle>Criar Cópias</DialogTitle>
+          <DialogDescription>
+            Criando {copyCount > 1 ? `${copyCount} cópias` : "uma cópia"} de "{task.name}". Informe o número de série, placa e chassi para cada cópia.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            {/* Serial Number */}
-            <FormField
-              control={form.control}
-              name="serialNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Número de Série</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Ex: ABC-12345"
-                      className="uppercase"
-                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      disabled={isSubmitting}
-                      autoFocus
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-hidden">
+            <div className="max-h-[40vh] overflow-y-auto space-y-2 py-2">
+              {fields.map((field, index) => (
+                <div
+                  key={field.id}
+                  className="flex items-end gap-2"
+                >
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2">
+                    {/* Serial Number */}
+                    <FormField
+                      control={form.control}
+                      name={`copies.${index}.serialNumber`}
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          {index === 0 && <FormLabel>Nº Série</FormLabel>}
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value || ""}
+                              placeholder="Ex: ABC-12345"
+                              className="uppercase"
+                              onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                              disabled={isSubmitting}
+                              autoFocus={index === 0}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
-            {/* Plate */}
-            <FormField
-              control={form.control}
-              name="plate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Placa</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      value={field.value || ""}
-                      placeholder="Ex: ABC1D23"
-                      className="uppercase"
-                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      disabled={isSubmitting}
+                    {/* Plate */}
+                    <FormField
+                      control={form.control}
+                      name={`copies.${index}.plate`}
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          {index === 0 && <FormLabel>Placa</FormLabel>}
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value || ""}
+                              placeholder="Ex: ABC1D23"
+                              className="uppercase"
+                              onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
-            {/* Chassis Number */}
-            <FormField
-              control={form.control}
-              name="chassisNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Número do Chassi</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      value={field.value || ""}
-                      placeholder="Ex: 9BWZZZ377VT004251"
-                      className="uppercase"
-                      onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      disabled={isSubmitting}
+                    {/* Chassis Number */}
+                    <FormField
+                      control={form.control}
+                      name={`copies.${index}.chassisNumber`}
+                      render={({ field }) => (
+                        <FormItem className="space-y-1">
+                          {index === 0 && <FormLabel>Nº Chassi</FormLabel>}
+                          <FormControl>
+                            <Input
+                              {...field}
+                              value={field.value || ""}
+                              placeholder="Ex: 9BWZZZ377VT004251"
+                              className="uppercase"
+                              onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                              disabled={isSubmitting}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                  </div>
 
-            <DialogFooter>
+                  {/* Remove Button - always show to maintain layout consistency */}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => remove(index)}
+                    disabled={isSubmitting || fields.length <= 1}
+                    className={fields.length > 1 ? "text-destructive shrink-0" : "text-muted-foreground/30 shrink-0 cursor-not-allowed"}
+                    title={fields.length > 1 ? "Remover cópia" : "Não é possível remover a única cópia"}
+                  >
+                    <IconTrash className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            {/* Adicionar Button - full width */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAddCopy}
+              disabled={isSubmitting}
+              className="w-full mt-2"
+            >
+              <IconPlus className="h-4 w-4 mr-2" />
+              Adicionar
+            </Button>
+
+            <DialogFooter className="mt-4 pt-4 border-t">
               <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Duplicar Tarefa
+                {copyCount > 1 ? `Criar ${copyCount} Cópias` : "Criar Cópia"}
               </Button>
             </DialogFooter>
           </form>

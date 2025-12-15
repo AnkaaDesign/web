@@ -42,6 +42,9 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   // Shared selection state across all tables
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
 
+  // Track the last clicked task for shift+click selection across tables
+  const [lastClickedTaskId, setLastClickedTaskId] = useState<string | null>(null);
+
   // Copy from task state
   const [copyFromTaskState, setCopyFromTaskState] = useState<CopyFromTaskState>(initialCopyFromTaskState);
 
@@ -391,6 +394,75 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
     return grouped;
   }, [filteredTasks, productionSectors]);
 
+  // Global ordered task list for shift+click selection across tables
+  // This maintains the visual order: sector by sector, then undefined
+  const globalOrderedTasks = useMemo(() => {
+    const orderedTasks: Task[] = [];
+
+    // Add tasks from each production sector in order
+    productionSectors.forEach((sector) => {
+      const sectorTasks = tasksBySector.get(sector.id) || [];
+      orderedTasks.push(...sectorTasks);
+    });
+
+    // Add undefined sector tasks at the end
+    const undefinedTasks = tasksBySector.get("undefined") || [];
+    orderedTasks.push(...undefinedTasks);
+
+    return orderedTasks;
+  }, [productionSectors, tasksBySector]);
+
+  // Handle shift+click selection across tables using global task order
+  const handleShiftClickSelect = useCallback((taskId: string) => {
+    console.log("[ShiftClick] handleShiftClickSelect called", {
+      taskId,
+      lastClickedTaskId,
+      globalOrderedTasksLength: globalOrderedTasks.length,
+    });
+
+    if (!lastClickedTaskId) {
+      // No previous selection, just select this task
+      console.log("[ShiftClick] No lastClickedTaskId, selecting single task");
+      setLastClickedTaskId(taskId);
+      setSelectedTaskIds(new Set([taskId]));
+      return;
+    }
+
+    // Find indices in the global ordered list
+    const lastIndex = globalOrderedTasks.findIndex((t) => t.id === lastClickedTaskId);
+    const currentIndex = globalOrderedTasks.findIndex((t) => t.id === taskId);
+
+    console.log("[ShiftClick] Indices found", { lastIndex, currentIndex });
+
+    if (lastIndex === -1 || currentIndex === -1) {
+      // Fallback: just select the clicked task
+      console.log("[ShiftClick] Index not found, falling back to single selection");
+      setLastClickedTaskId(taskId);
+      return;
+    }
+
+    // Select all tasks between lastIndex and currentIndex (inclusive)
+    const start = Math.min(lastIndex, currentIndex);
+    const end = Math.max(lastIndex, currentIndex);
+    const rangeIds = globalOrderedTasks.slice(start, end + 1).map((t) => t.id);
+
+    console.log("[ShiftClick] Range selection", { start, end, rangeCount: rangeIds.length });
+
+    // Add to existing selection
+    setSelectedTaskIds((prev) => {
+      const newSelection = new Set(prev);
+      rangeIds.forEach((id) => newSelection.add(id));
+      console.log("[ShiftClick] New selection size:", newSelection.size);
+      return newSelection;
+    });
+  }, [lastClickedTaskId, globalOrderedTasks]);
+
+  // Handle single click selection (updates last clicked)
+  const handleSingleClickSelect = useCallback((taskId: string) => {
+    console.log("[SingleClick] handleSingleClickSelect called", { taskId });
+    setLastClickedTaskId(taskId);
+  }, []);
+
   if (isLoading) {
     return (
       <div className={cn("h-full flex items-center justify-center", className)}>
@@ -485,6 +557,8 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                       isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
                       onSourceTaskSelect={handleSourceTaskSelected}
                       onStartCopyFromTask={handleStartCopyFromTask}
+                      onShiftClickSelect={handleShiftClickSelect}
+                      onSingleClickSelect={handleSingleClickSelect}
                     />
                   </div>
                 );
@@ -506,6 +580,8 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                       isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
                       onSourceTaskSelect={handleSourceTaskSelected}
                       onStartCopyFromTask={handleStartCopyFromTask}
+                      onShiftClickSelect={handleShiftClickSelect}
+                      onSingleClickSelect={handleSingleClickSelect}
                     />
                   </div>
                 ) : null;

@@ -63,6 +63,7 @@ export function CategoryTable({ visibleColumns, className, onEdit, onDelete, fil
     selectionCount,
     resetSelection: _resetSelection,
     removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -158,8 +159,8 @@ export function CategoryTable({ visibleColumns, className, onEdit, onDelete, fil
     toggleSelectAll(currentPageCategoryIds);
   };
 
-  const handleSelectCategory = (categoryId: string) => {
-    toggleSelection(categoryId);
+  const handleSelectCategory = (categoryId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(categoryId, currentPageCategoryIds, event?.shiftKey || false);
   };
 
   const renderSortIndicator = (columnKey: string) => {
@@ -343,7 +344,7 @@ export function CategoryTable({ visibleColumns, className, onEdit, onDelete, fil
                     {/* Selection checkbox */}
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => { e.stopPropagation(); handleSelectCategory(category.id, e); }}>
                           <Checkbox checked={categoryIsSelected} onCheckedChange={() => handleSelectCategory(category.id)} aria-label={`Select ${category.name}`} />
                         </div>
                       </TableCell>

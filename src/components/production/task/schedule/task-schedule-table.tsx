@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { TaskTableContextMenu, type TaskAction } from "./task-table-context-menu";
-import { DuplicateTaskModal } from "./duplicate-task-modal";
+import { DuplicateTaskModal, type DuplicateTaskCopyData } from "./duplicate-task-modal";
 import { SetSectorModal } from "./set-sector-modal";
 import { SetStatusModal } from "./set-status-modal";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
@@ -36,6 +36,9 @@ interface TaskScheduleTableProps {
   isSelectingSourceTask?: boolean; // True when in "copy from task" source selection mode
   onSourceTaskSelect?: (task: Task) => void; // Callback when source task is selected
   onStartCopyFromTask?: (targetTasks: Task[]) => void; // Callback to start copy from task flow
+  // Props for cross-table shift+click selection
+  onShiftClickSelect?: (taskId: string) => void; // Handler for shift+click selection across tables
+  onSingleClickSelect?: (taskId: string) => void; // Handler to update last clicked task
 }
 
 interface TaskRow extends Task {
@@ -43,7 +46,7 @@ interface TaskRow extends Task {
   hoursRemaining: number | null;
 }
 
-export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: externalSelectedTaskIds, onSelectedTaskIdsChange, advancedActionsRef: externalAdvancedActionsRef, allSelectedTasks, isSelectingSourceTask, onSourceTaskSelect, onStartCopyFromTask }: TaskScheduleTableProps) {
+export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: externalSelectedTaskIds, onSelectedTaskIdsChange, advancedActionsRef: externalAdvancedActionsRef, allSelectedTasks, isSelectingSourceTask, onSourceTaskSelect, onStartCopyFromTask, onShiftClickSelect, onSingleClickSelect }: TaskScheduleTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canEdit = canEditTasks(user);
@@ -269,8 +272,19 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
 
   const handleRowClick = useCallback(
     (e: React.MouseEvent, taskId: string) => {
+      console.log("[RowClick] handleRowClick called", {
+        taskId,
+        shiftKey: e.shiftKey,
+        ctrlKey: e.ctrlKey,
+        metaKey: e.metaKey,
+        selectedTaskIdsSize: selectedTaskIds.size,
+        hasOnShiftClickSelect: !!onShiftClickSelect,
+        hasOnSingleClickSelect: !!onSingleClickSelect,
+      });
+
       // Don't navigate if clicking checkbox or if it's a context menu click
       if ((e.target as HTMLElement).closest("[data-checkbox]") || e.button === 2) {
+        console.log("[RowClick] Clicked on checkbox or context menu, ignoring");
         return;
       }
 
@@ -285,25 +299,37 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
 
       // Handle selection with Ctrl/Cmd or Shift
       if (e.ctrlKey || e.metaKey) {
+        console.log("[RowClick] Ctrl/Cmd click - toggling selection");
         handleSelectTask(taskId, !selectedTaskIds.has(taskId));
-      } else if (e.shiftKey && selectedTaskIds.size > 0) {
-        // Implement shift-click range selection
-        const lastSelectedId = Array.from(selectedTaskIds).pop();
-        const lastSelectedIndex = preparedTasks.findIndex((t) => t.id === lastSelectedId);
-        const currentIndex = preparedTasks.findIndex((t) => t.id === taskId);
+        // Update last clicked task for cross-table shift+click
+        onSingleClickSelect?.(taskId);
+      } else if (e.shiftKey) {
+        // Shift+click - use cross-table selection (works even with no prior selection)
+        console.log("[RowClick] Shift click detected");
+        if (onShiftClickSelect) {
+          console.log("[RowClick] Calling onShiftClickSelect");
+          onShiftClickSelect(taskId);
+        } else if (selectedTaskIds.size > 0) {
+          console.log("[RowClick] No onShiftClickSelect, using fallback");
+          // Fallback: Implement shift-click range selection within this table only
+          const lastSelectedId = Array.from(selectedTaskIds).pop();
+          const lastSelectedIndex = preparedTasks.findIndex((t) => t.id === lastSelectedId);
+          const currentIndex = preparedTasks.findIndex((t) => t.id === taskId);
 
-        if (lastSelectedIndex !== -1 && currentIndex !== -1) {
-          const start = Math.min(lastSelectedIndex, currentIndex);
-          const end = Math.max(lastSelectedIndex, currentIndex);
-          const rangeIds = preparedTasks.slice(start, end + 1).map((t) => t.id);
-          setSelectedTaskIds(new Set([...selectedTaskIds, ...rangeIds]));
+          if (lastSelectedIndex !== -1 && currentIndex !== -1) {
+            const start = Math.min(lastSelectedIndex, currentIndex);
+            const end = Math.max(lastSelectedIndex, currentIndex);
+            const rangeIds = preparedTasks.slice(start, end + 1).map((t) => t.id);
+            setSelectedTaskIds(new Set([...selectedTaskIds, ...rangeIds]));
+          }
         }
       } else {
         // Normal click - navigate
+        console.log("[RowClick] Normal click - navigating");
         navigate(routes.production.schedule.details(taskId));
       }
     },
-    [navigate, selectedTaskIds, preparedTasks, handleSelectTask, isSelectingSourceTask, onSourceTaskSelect],
+    [navigate, selectedTaskIds, preparedTasks, handleSelectTask, isSelectingSourceTask, onSourceTaskSelect, onShiftClickSelect, onSingleClickSelect],
   );
 
   const handleContextMenu = useCallback(
@@ -481,16 +507,16 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
     }
   };
 
-  const handleDuplicateConfirm = async (data: { serialNumber?: string; plate?: string }) => {
-    if (!taskToDuplicate) return;
+  const handleDuplicateConfirm = async (copies: DuplicateTaskCopyData) => {
+    if (!taskToDuplicate || copies.length === 0) return;
 
-    // Create new task with only the fields expected by taskCreateSchema
-    const newTask = {
+    // Build task data for each copy
+    const buildTaskData = (copyData: { serialNumber?: string; plate?: string }) => ({
       // Basic fields
       name: taskToDuplicate.name,
       status: TASK_STATUS.PENDING,
-      serialNumber: data.serialNumber || null,
-      plate: data.plate || null,
+      serialNumber: copyData.serialNumber || null,
+      plate: copyData.plate || null,
       details: taskToDuplicate.details,
       entryDate: taskToDuplicate.entryDate,
       term: taskToDuplicate.term,
@@ -521,11 +547,12 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
           }))
         : [],
 
-      // Truck (if exists)
-      truck: taskToDuplicate.truck
+      // Truck (if exists or if plate provided)
+      truck: taskToDuplicate.truck || copyData.plate
         ? {
-            xPosition: taskToDuplicate.truck.xPosition,
-            yPosition: taskToDuplicate.truck.yPosition,
+            plate: copyData.plate || taskToDuplicate.truck?.plate || null,
+            chassisNumber: taskToDuplicate.truck?.chassisNumber || null,
+            spot: taskToDuplicate.truck?.spot || null,
           }
         : null,
 
@@ -536,9 +563,17 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
             artworkIds: taskToDuplicate.observation.artworks?.map((file) => file.id) || [],
           }
         : null,
-    };
+    });
 
-    await createAsync(newTask);
+    // Create all copies - use Promise.all for parallel creation
+    const tasksToCreate = copies.map(buildTaskData);
+    await Promise.all(tasksToCreate.map(taskData => createAsync(taskData)));
+
+    toast.success(
+      copies.length > 1 ? `${copies.length} cópias criadas com sucesso` : "Cópia criada com sucesso",
+      { description: taskToDuplicate.name }
+    );
+
     setTaskToDuplicate(null);
   };
 
@@ -678,8 +713,38 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
                 {columns.map((column) => (
                   <TableCell key={column.id} className="py-2 truncate max-w-0 whitespace-nowrap">
                     {column.id === "select" && (
-                      <div className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={(checked) => handleSelectTask(task.id, checked as boolean)} data-checkbox />
+                      <div
+                        className="flex items-center justify-center"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const isCurrentlySelected = selectedTaskIds.has(task.id);
+
+                          console.log("[Checkbox] Click detected", {
+                            taskId: task.id,
+                            shiftKey: e.shiftKey,
+                            isCurrentlySelected,
+                          });
+
+                          // Handle shift+click for range selection
+                          if (e.shiftKey && onShiftClickSelect) {
+                            console.log("[Checkbox] Shift+click - calling onShiftClickSelect");
+                            onShiftClickSelect(task.id);
+                          } else {
+                            // Normal click - toggle selection
+                            handleSelectTask(task.id, !isCurrentlySelected);
+                            // Track last clicked for shift+click selection
+                            if (!isCurrentlySelected) {
+                              onSingleClickSelect?.(task.id);
+                            }
+                          }
+                        }}
+                      >
+                        <Checkbox
+                          checked={selectedTaskIds.has(task.id)}
+                          // Prevent double-handling - we handle everything in the parent div onClick
+                          onCheckedChange={() => {}}
+                          data-checkbox
+                        />
                       </div>
                     )}
                     {column.id === "name" && <span className="font-medium truncate block">{task.name}</span>}

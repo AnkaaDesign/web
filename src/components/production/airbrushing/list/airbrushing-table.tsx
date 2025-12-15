@@ -83,6 +83,7 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
     selectionCount,
     resetSelection,
     removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -197,8 +198,8 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
     toggleSelectAll(currentPageItemIds);
   };
 
-  const handleSelectItem = (itemId: string) => {
-    toggleSelection(itemId);
+  const handleSelectItem = (itemId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(itemId, currentPageItemIds, event?.shiftKey || false);
   };
 
   const renderSortIndicator = (columnKey: string) => {
@@ -439,7 +440,7 @@ export function AirbrushingTable({ visibleColumns, className, filters = {}, onDa
                       {/* Selection checkbox */}
                       {showInteractive && (
                         <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                          <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => { e.stopPropagation(); handleSelectItem(airbrushing.id, e); }}>
                             <Checkbox
                               checked={itemIsSelected}
                               onCheckedChange={() => handleSelectItem(airbrushing.id)}

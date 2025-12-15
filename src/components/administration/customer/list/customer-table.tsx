@@ -67,6 +67,7 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
     isPartiallySelected,
     selectionCount,
     removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -168,8 +169,8 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
     toggleSelectAll(currentPageCustomerIds);
   };
 
-  const handleSelectCustomer = (customerId: string) => {
-    toggleSelection(customerId);
+  const handleSelectCustomer = (customerId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(customerId, currentPageCustomerIds, event?.shiftKey || false);
   };
 
   const renderSortIndicator = (columnKey: string) => {
@@ -405,10 +406,15 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
                     {/* Selection checkbox */}
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className="flex items-center justify-center h-full w-full px-2 py-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectCustomer(customer.id, e);
+                          }}
+                        >
                           <Checkbox
                             checked={customerIsSelected}
-                            onCheckedChange={() => handleSelectCustomer(customer.id)}
                             aria-label={`Select ${customer.fantasyName}`}
                             data-checkbox
                           />

@@ -99,7 +99,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
         {isAdmin && !isMultiSelection && (
           <DropdownMenuItem onClick={() => handleAction("duplicate")}>
             <IconCopy className="mr-2 h-4 w-4" />
-            Duplicar
+            Criar Cópias
           </DropdownMenuItem>
         )}
 

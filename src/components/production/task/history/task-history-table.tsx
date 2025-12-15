@@ -67,6 +67,7 @@ export function TaskHistoryTable({
     selectionCount,
     resetSelection,
     removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = tableState;
 
   // Log table state
@@ -231,8 +232,8 @@ export function TaskHistoryTable({
     toggleSelectAll(currentPageIds);
   };
 
-  const handleSelectItem = (id: string) => {
-    toggleSelection(id);
+  const handleSelectItem = (id: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(id, currentPageIds, event?.shiftKey || false);
   };
 
   const handleContextMenuClose = React.useCallback(() => {
@@ -443,7 +444,7 @@ export function TaskHistoryTable({
                     {/* Selection checkbox - only show for users who can edit */}
                     {canEdit && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => { e.stopPropagation(); handleSelectItem(task.id, e); }}>
                           <Checkbox checked={taskIsSelected} onCheckedChange={() => handleSelectItem(task.id)} aria-label={`Select ${task.name}`} data-checkbox />
                         </div>
                       </TableCell>

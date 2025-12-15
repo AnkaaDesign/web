@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
 // Type definitions
@@ -149,6 +149,9 @@ export function useTableState(options: UseTableStateOptions = {}) {
   const { defaultPageSize = 40, resetSelectionOnPageChange = false, defaultSort = [] } = options;
 
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Track last clicked item for shift+click range selection
+  const lastClickedIdRef = useRef<string | null>(null);
 
   // Parse current state from URL
   const paginationState = useMemo(() => {
@@ -348,6 +351,64 @@ export function useTableState(options: UseTableStateOptions = {}) {
     [tableState.selectedIds, setSelectedIds],
   );
 
+  /**
+   * Select a range of items between startId and endId (inclusive)
+   * @param orderedIds - Array of IDs in the order they appear in the table
+   * @param startId - First ID of the range
+   * @param endId - Last ID of the range
+   */
+  const selectRange = useCallback(
+    (orderedIds: string[], startId: string, endId: string) => {
+      const startIndex = orderedIds.indexOf(startId);
+      const endIndex = orderedIds.indexOf(endId);
+
+      if (startIndex === -1 || endIndex === -1) return;
+
+      const start = Math.min(startIndex, endIndex);
+      const end = Math.max(startIndex, endIndex);
+      const rangeIds = orderedIds.slice(start, end + 1);
+
+      // Add range to current selection
+      const currentSelected = new Set(tableState.selectedIds);
+      rangeIds.forEach((id) => currentSelected.add(id));
+      setSelectedIds(Array.from(currentSelected));
+    },
+    [tableState.selectedIds, setSelectedIds],
+  );
+
+  /**
+   * Handle row click with shift+click support for range selection
+   * @param id - The ID of the clicked row
+   * @param orderedIds - Array of all IDs in the order they appear in the table
+   * @param isShiftKey - Whether shift key was held during click
+   */
+  const handleRowClick = useCallback(
+    (id: string, orderedIds: string[], isShiftKey: boolean) => {
+      if (isShiftKey && lastClickedIdRef.current) {
+        // Shift+click: select range from last clicked to current
+        selectRange(orderedIds, lastClickedIdRef.current, id);
+      } else {
+        // Regular click: toggle selection
+        toggleSelection(id);
+      }
+      // Always update last clicked ID
+      lastClickedIdRef.current = id;
+    },
+    [selectRange, toggleSelection],
+  );
+
+  /**
+   * Get the last clicked ID (useful for external shift+click handling)
+   */
+  const getLastClickedId = useCallback(() => lastClickedIdRef.current, []);
+
+  /**
+   * Set the last clicked ID (useful when selection happens outside of handleRowClick)
+   */
+  const setLastClickedId = useCallback((id: string | null) => {
+    lastClickedIdRef.current = id;
+  }, []);
+
   // Sort methods
   const setSortConfigs = useCallback(
     (sortConfigs: Array<{ column: string; direction: "asc" | "desc" }>) => {
@@ -520,6 +581,12 @@ export function useTableState(options: UseTableStateOptions = {}) {
     isAllSelected,
     isPartiallySelected,
     resetSelection,
+
+    // Shift+click range selection
+    selectRange,
+    handleRowClick,
+    getLastClickedId,
+    setLastClickedId,
 
     // Sorting
     sortConfigs: tableState.sortConfigs,

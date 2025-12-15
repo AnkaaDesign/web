@@ -87,6 +87,7 @@ export function CalculationTable({
     isAllSelected,
     isPartiallySelected,
     selectionCount,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 999999, // Effectively disable pagination
     resetSelectionOnPageChange: false,
@@ -160,8 +161,8 @@ export function CalculationTable({
     toggleSelectAll(currentPageItemIds);
   };
 
-  const handleSelectItem = (itemId: string) => {
-    toggleSelection(itemId);
+  const handleSelectItem = (itemId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(itemId, currentPageItemIds, event?.shiftKey || false);
   };
 
   const renderSortIndicator = (columnKey: string) => {
@@ -280,7 +281,10 @@ export function CalculationTable({
                     >
                       {/* Selection checkbox */}
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectItem(item.id, e);
+                        }}>
                           <Checkbox
                             checked={itemIsSelected}
                             onCheckedChange={() => handleSelectItem(item.id)}

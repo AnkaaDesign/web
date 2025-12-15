@@ -76,6 +76,7 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
     isPartiallySelected,
     selectionCount,
     resetSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -169,9 +170,9 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
       if (event) {
         event.stopPropagation();
       }
-      toggleSelection(warningId);
+      handleRowClickSelection(warningId, currentPageWarningIds, event?.shiftKey || false);
     },
-    [toggleSelection],
+    [handleRowClickSelection, currentPageWarningIds],
   );
 
   const handleRowClick = useCallback(
@@ -445,8 +446,14 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
                   >
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox checked={isWarningSelected} onCheckedChange={() => handleSelectWarning(warning.id)} aria-label={`Selecionar advertência`} data-checkbox />
+                        <div
+                          className="flex items-center justify-center h-full w-full px-2 py-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectWarning(warning.id, e);
+                          }}
+                        >
+                          <Checkbox checked={isWarningSelected} aria-label={`Selecionar advertência`} data-checkbox />
                         </div>
                       </TableCell>
                     )}

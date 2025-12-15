@@ -65,6 +65,7 @@ export function PpeScheduleTable({ visibleColumns, className, onEdit, onActivate
     selectionCount,
     resetSelection: _resetSelection,
     removeFromSelection: _removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -137,8 +138,8 @@ export function PpeScheduleTable({ visibleColumns, className, onEdit, onActivate
     toggleSelectAll(currentPageScheduleIds);
   };
 
-  const handleSelectSchedule = (scheduleId: string) => {
-    toggleSelection(scheduleId);
+  const handleSelectSchedule = (scheduleId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(scheduleId, currentPageScheduleIds, event?.shiftKey || false);
   };
 
   // Context menu state
@@ -330,7 +331,7 @@ export function PpeScheduleTable({ visibleColumns, className, onEdit, onActivate
                   >
                     {/* Selection checkbox */}
                     <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => { e.stopPropagation(); handleSelectSchedule(schedule.id, e); }}>
                         <Checkbox checked={scheduleIsSelected} onCheckedChange={() => handleSelectSchedule(schedule.id)} aria-label={`Select schedule`} data-checkbox />
                       </div>
                     </TableCell>

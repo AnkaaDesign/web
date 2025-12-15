@@ -77,6 +77,7 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
     selectionCount,
     resetSelection: _resetSelection,
     removeFromSelection: _removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -207,8 +208,8 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
     toggleSelectAll(currentPageMaintenanceIds);
   };
 
-  const handleSelectMaintenance = (maintenanceId: string) => {
-    toggleSelection(maintenanceId);
+  const handleSelectMaintenance = (maintenanceId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(maintenanceId, currentPageMaintenanceIds, event?.shiftKey || false);
   };
 
   // Context menu state
@@ -412,8 +413,14 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
                     {/* Selection checkbox */}
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox checked={maintenanceIsSelected} onCheckedChange={() => handleSelectMaintenance(maintenance.id)} aria-label={`Select ${maintenance.name}`} />
+                        <div
+                          className="flex items-center justify-center h-full w-full px-2 py-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectMaintenance(maintenance.id, e);
+                          }}
+                        >
+                          <Checkbox checked={maintenanceIsSelected} aria-label={`Select ${maintenance.name}`} />
                         </div>
                       </TableCell>
                     )}

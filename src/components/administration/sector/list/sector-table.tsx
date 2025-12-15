@@ -127,6 +127,7 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
     isPartiallySelected,
     selectionCount,
     resetSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -207,9 +208,10 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
       if (event) {
         event.stopPropagation();
       }
-      toggleSelection(sectorId);
+      // Use shift+click range selection
+      handleRowClickSelection(sectorId, currentPageSectorIds, event?.shiftKey || false);
     },
-    [toggleSelection],
+    [handleRowClickSelection, currentPageSectorIds],
   );
 
   const handleRowClick = useCallback(
@@ -512,8 +514,14 @@ export function SectorTable({ filters, onDataChange, className }: SectorTablePro
                   >
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox checked={isSectorSelected} onCheckedChange={() => handleSelectSector(sector.id)} aria-label={`Selecionar setor ${sector.name}`} data-checkbox />
+                        <div
+                          className="flex items-center justify-center h-full w-full px-2 py-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectSector(sector.id, e);
+                          }}
+                        >
+                          <Checkbox checked={isSectorSelected} aria-label={`Selecionar setor ${sector.name}`} data-checkbox />
                         </div>
                       </TableCell>
                     )}

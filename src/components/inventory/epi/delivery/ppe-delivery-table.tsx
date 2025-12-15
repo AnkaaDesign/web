@@ -55,6 +55,7 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
     resetSelection: _resetSelection,
     removeFromSelection: _removeFromSelection,
     toggleShowSelectedOnly,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -174,10 +175,10 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
     toggleSelectAll(currentPageDeliveryIds);
   }, [toggleSelectAll, currentPageDeliveryIds]);
 
-  const handleSelectDelivery = React.useCallback((deliveryId: string) => {
+  const handleSelectDelivery = React.useCallback((deliveryId: string, event?: React.MouseEvent) => {
     console.log("[PpeDeliveryTable] handleSelectDelivery called with ID:", deliveryId);
-    toggleSelection(deliveryId);
-  }, [toggleSelection]);
+    handleRowClickSelection(deliveryId, currentPageDeliveryIds, event?.shiftKey || false);
+  }, [handleRowClickSelection, currentPageDeliveryIds]);
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -379,7 +380,7 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
                   >
                     {/* Selection checkbox */}
                     <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                      <div className="flex items-center justify-center h-full w-full px-2 py-2 min-h-[2.5rem]" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center h-full w-full px-2 py-2 min-h-[2.5rem]" onClick={(e) => { e.stopPropagation(); handleSelectDelivery(delivery.id, e); }}>
                         <Checkbox
                           checked={deliveryIsSelected}
                           onCheckedChange={() => handleSelectDelivery(delivery.id)}

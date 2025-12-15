@@ -74,6 +74,7 @@ export function PaintTypeTable({ visibleColumns, className, onEdit, onDelete, fi
     selectionCount,
     resetSelection: _resetSelection,
     removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -178,8 +179,8 @@ export function PaintTypeTable({ visibleColumns, className, onEdit, onDelete, fi
     toggleSelectAll(currentPagePaintTypeIds);
   };
 
-  const handleSelectPaintType = (paintTypeId: string) => {
-    toggleSelection(paintTypeId);
+  const handleSelectPaintType = (paintTypeId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(paintTypeId, currentPagePaintTypeIds, event?.shiftKey || false);
   };
 
   const renderSortIndicator = (columnKey: string) => {
@@ -422,7 +423,10 @@ export function PaintTypeTable({ visibleColumns, className, onEdit, onDelete, fi
                     {/* Selection checkbox */}
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectPaintType(paintType.id, e);
+                        }}>
                           <Checkbox checked={paintTypeIsSelected} onCheckedChange={() => handleSelectPaintType(paintType.id)} aria-label={`Select ${paintType.name}`} data-checkbox />
                         </div>
                       </TableCell>

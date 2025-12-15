@@ -74,6 +74,7 @@ export function MaintenanceScheduleTable({
     selectionCount,
     resetSelection: _resetSelection,
     removeFromSelection: _removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -146,8 +147,8 @@ export function MaintenanceScheduleTable({
     toggleSelectAll(currentPageScheduleIds);
   };
 
-  const handleSelectSchedule = (scheduleId: string) => {
-    toggleSelection(scheduleId);
+  const handleSelectSchedule = (scheduleId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(scheduleId, currentPageScheduleIds, event?.shiftKey || false);
   };
 
   // Context menu state
@@ -403,7 +404,7 @@ export function MaintenanceScheduleTable({
                     <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
                       <div
                         className="flex items-center justify-center h-full w-full px-2 py-2"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); handleSelectSchedule(schedule.id, e); }}
                       >
                         <Checkbox
                           checked={scheduleIsSelected}

@@ -88,6 +88,7 @@ export function TaskTable({
     selectionCount,
     resetSelection: _resetSelection,
     removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -227,8 +228,8 @@ export function TaskTable({
   };
 
   // Handle row selection
-  const handleSelectItem = (itemId: string) => {
-    toggleSelection(itemId);
+  const handleSelectItem = (itemId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(itemId, currentPageItemIds, event?.shiftKey || false);
   };
 
   // Context menu handlers
@@ -578,7 +579,7 @@ export function TaskTable({
                     {/* Selection checkbox - only show if user has edit permissions */}
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0 relative z-20")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => { e.stopPropagation(); handleSelectItem(item.id, e); }}>
                           <Checkbox checked={itemIsSelected} onCheckedChange={() => handleSelectItem(item.id)} aria-label={`Select ${item.name}`} data-checkbox />
                         </div>
                       </TableCell>
@@ -662,7 +663,7 @@ export function TaskTable({
               {canEdit && (
                 <DropdownMenuItem onClick={handleDuplicate}>
                   <IconCopy className="h-4 w-4 mr-2" />
-                  Duplicar
+                  Criar Cópias
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />

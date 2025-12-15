@@ -74,6 +74,7 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
     selectionCount,
     resetSelection: _resetSelection,
     removeFromSelection,
+    handleRowClick: handleRowClickSelection,
   } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
@@ -178,8 +179,8 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
     toggleSelectAll(currentPagePaintBrandIds);
   };
 
-  const handleSelectPaintBrand = (paintBrandId: string) => {
-    toggleSelection(paintBrandId);
+  const handleSelectPaintBrand = (paintBrandId: string, event?: React.MouseEvent) => {
+    handleRowClickSelection(paintBrandId, currentPagePaintBrandIds, event?.shiftKey || false);
   };
 
   const renderSortIndicator = (columnKey: string) => {
@@ -422,10 +423,15 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
                     {/* Selection checkbox */}
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className="flex items-center justify-center h-full w-full px-2 py-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectPaintBrand(paintBrand.id, e);
+                          }}
+                        >
                           <Checkbox
                             checked={paintBrandIsSelected}
-                            onCheckedChange={() => handleSelectPaintBrand(paintBrand.id)}
                             aria-label={`Select ${paintBrand.name}`}
                             data-checkbox
                           />
