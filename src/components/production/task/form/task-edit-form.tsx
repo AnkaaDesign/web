@@ -24,6 +24,7 @@ import {
   IconId,
   IconNotes,
   IconStatusChange,
+  IconMapPin,
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
@@ -1719,11 +1720,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                       <CardTitle className="flex items-center gap-2">
                         <IconRuler className="h-5 w-5" />
                         Layout do Caminhão
-                        {(layoutsData?.leftSideLayout || layoutsData?.rightSideLayout || layoutsData?.backSideLayout) && truckId && (
-                          <span className="text-xs text-muted-foreground font-normal">
-                            (ID: {truckId.slice(0, 8)}...)
-                          </span>
-                        )}
                       </CardTitle>
                       {!isLayoutOpen ? (
                         <Button
@@ -1930,7 +1926,13 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                 {/* Truck Spot Selector - Available when truck layout is filled */}
                 {truckId && (
                   <Card className="bg-transparent">
-                    <CardContent className="pt-4">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <IconMapPin className="h-5 w-5" />
+                        Local do Caminhão
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
                       <SpotSelector
                         truckLength={truckLength}
                         currentSpot={form.watch("truck.spot") as TRUCK_SPOT | null}

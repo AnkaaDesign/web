@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Combobox } from '@/components/ui/combobox';
-import { Label } from '@/components/ui/label';
-import { IconMapPin } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
 import {
   getGaragesAvailability,
@@ -283,11 +281,6 @@ export function SpotSelector({
 
   return (
     <div className={cn('space-y-2', className)}>
-      <div className="flex items-center gap-2">
-        <IconMapPin className="h-4 w-4 text-muted-foreground" />
-        <Label className="text-sm font-medium">Local do Caminhão</Label>
-      </div>
-
       {!truckLength || truckLength <= 0 ? (
         <p className="text-sm text-muted-foreground italic">
           Preencha o layout do caminhão para selecionar o local
