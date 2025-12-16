@@ -139,7 +139,7 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
   return (
     <div className="space-y-4">
       <FormLabel>
-        Serviços <span className="text-destructive">*</span>
+        Serviços
       </FormLabel>
 
       <div className="space-y-3">
