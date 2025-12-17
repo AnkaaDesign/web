@@ -936,6 +936,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "aerografia-editar", title: "Editar", icon: "edit", path: "/producao/aerografia/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
         ],
       },
+      { id: "barracoes", title: "Barracões", icon: "warehouse", path: "/producao/barracoes", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN] },
       {
         id: "cronograma",
         title: "Cronograma",
@@ -948,7 +949,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       { id: "cronograma-em-espera", title: "Em Espera", icon: "pause", path: "/producao/em-espera", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
-      { id: "barracoes", title: "Barracões", icon: "warehouse", path: "/producao/barracoes", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN] },
       { id: "historico", title: "Histórico", icon: "history", path: "/producao/historico", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN] },
       {
         id: "observacoes",
