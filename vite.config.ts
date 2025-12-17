@@ -75,81 +75,9 @@ export default defineConfig(({ mode }) => {
         include: [/node_modules/],
       },
       rollupOptions: {
-        external: [],
         output: {
-          manualChunks: (id) => {
-            // React core - must load first
-            if (id.includes("node_modules/react/") ||
-                id.includes("node_modules/react-dom/") ||
-                id.includes("node_modules/react/jsx-runtime")) {
-              return "vendor-react";
-            }
-
-            // React ecosystem libraries
-            if (id.includes("@tanstack/react-query") ||
-                id.includes("react-router-dom") ||
-                id.includes("react-hook-form") ||
-                id.includes("@hookform/resolvers")) {
-              return "vendor-react-libs";
-            }
-
-            // Radix UI components
-            if (id.includes("@radix-ui")) {
-              return "vendor-radix-ui";
-            }
-
-            // Icon libraries
-            if (id.includes("lucide-react") || id.includes("@tabler/icons-react")) {
-              return "vendor-icons";
-            }
-
-            // Utility libraries
-            if (id.includes("clsx") ||
-                id.includes("tailwind-merge") ||
-                id.includes("class-variance-authority")) {
-              return "vendor-utils";
-            }
-
-            // Chart libraries
-            if (id.includes("echarts") ||
-                id.includes("recharts") ||
-                id.includes("@react-three")) {
-              return "vendor-charts";
-            }
-
-            // Data processing libraries
-            if (id.includes("lodash") ||
-                id.includes("papaparse") ||
-                id.includes("xlsx") ||
-                id.includes("jszip")) {
-              return "vendor-data";
-            }
-
-            // PDF and file handling
-            if (id.includes("jspdf") ||
-                id.includes("html2canvas") ||
-                id.includes("react-pdf") ||
-                id.includes("pdfjs-dist")) {
-              return "vendor-pdf";
-            }
-
-            // Date utilities
-            if (id.includes("date-fns") || id.includes("react-day-picker")) {
-              return "vendor-date";
-            }
-
-            // DnD kit
-            if (id.includes("@dnd-kit")) {
-              return "vendor-dnd";
-            }
-
-            // All other node_modules
-            if (id.includes("node_modules")) {
-              return "vendor-other";
-            }
-          },
-          // Ensure correct import order
-          format: "es",
+          // Let Vite handle ALL chunking automatically
+          // This ensures correct module loading order for React and its ecosystem
           chunkFileNames: "assets/[name]-[hash].js",
           entryFileNames: "assets/[name]-[hash].js",
           assetFileNames: "assets/[name]-[hash].[ext]",

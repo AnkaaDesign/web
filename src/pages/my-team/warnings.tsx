@@ -104,7 +104,7 @@ export default function MyTeamWarningsPage() {
   }, [selectedUserId, currentPage, pageSize]);
 
   // Fetch warnings using secure team-staff endpoint (automatically filtered by managed sector)
-  const { data: warningsResponse, isLoading, refetch } = useTeamStaffWarnings(warningFilters);
+  const { data: warningsResponse, isLoading: isLoadingWarnings, refetch } = useTeamStaffWarnings(warningFilters);
   const warnings = warningsResponse?.data || [];
   const totalRecords = warningsResponse?.meta?.totalRecords || 0;
   const totalPages = Math.ceil(totalRecords / pageSize);
@@ -203,7 +203,7 @@ export default function MyTeamWarningsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoading ? (
+                  {isLoadingWarnings ? (
                     <TableRow>
                       <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         Carregando...
