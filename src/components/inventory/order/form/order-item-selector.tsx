@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback, MouseEvent } from "react";
 import { IconSearch, IconFilter, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
 import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
 import { Button } from "@/components/ui/button";
@@ -122,6 +122,9 @@ export const OrderItemSelector = ({
 }: OrderItemSelectorProps) => {
   // Use direct filter update for immediate, atomic URL updates
   const { updateFilters: directUpdateFilters } = useDirectFilterUpdate();
+
+  // Ref to track last clicked item for shift+click range selection
+  const lastClickedIdRef = useRef<string | null>(null);
 
   // Form state - always use local state for immediate UI updates
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTermProp || "");
@@ -483,6 +486,54 @@ export const OrderItemSelector = ({
     );
   };
 
+  // Handle row selection with shift+click support
+  const handleRowSelection = useCallback(
+    (item: typeof items[0], event?: MouseEvent) => {
+      const itemIsSelected = selectedItems.has(item.id);
+
+      // Shift+click: select range of items
+      if (event?.shiftKey && lastClickedIdRef.current) {
+        const lastIndex = currentPageItemIds.indexOf(lastClickedIdRef.current);
+        const currentIndex = currentPageItemIds.indexOf(item.id);
+
+        if (lastIndex !== -1 && currentIndex !== -1) {
+          const start = Math.min(lastIndex, currentIndex);
+          const end = Math.max(lastIndex, currentIndex);
+          const rangeIds = currentPageItemIds.slice(start, end + 1);
+
+          // Select all items in range that are not already selected
+          rangeIds.forEach((id) => {
+            if (!selectedItems.has(id)) {
+              const rangeItem = items.find((i) => i.id === id);
+              if (rangeItem) {
+                const defaultPrice = rangeItem.prices?.[0]?.value || 0;
+                const defaultIcms = rangeItem.icms || 0;
+                const defaultIpi = rangeItem.ipi || 0;
+                onSelectItem(id, 1, defaultPrice, defaultIcms, defaultIpi);
+              }
+            }
+          });
+        }
+      } else {
+        // Regular click: toggle single item
+        if (itemIsSelected) {
+          // Deselect - call with no parameters
+          onSelectItem(item.id);
+        } else {
+          // Select - call with default values
+          const defaultPrice = item.prices?.[0]?.value || 0;
+          const defaultIcms = item.icms || 0;
+          const defaultIpi = item.ipi || 0;
+          onSelectItem(item.id, 1, defaultPrice, defaultIcms, defaultIpi);
+        }
+      }
+
+      // Always update last clicked ID
+      lastClickedIdRef.current = item.id;
+    },
+    [selectedItems, currentPageItemIds, items, onSelectItem]
+  );
+
   // Check if all current page items are selected
   const allCurrentPageSelected = currentPageItemIds.length > 0 && currentPageItemIds.every((id) => selectedItems.has(id));
   const someCurrentPageSelected = currentPageItemIds.some((id) => selectedItems.has(id));
@@ -797,36 +848,20 @@ export const OrderItemSelector = ({
                         if (target.closest('input, button, [role="checkbox"]')) {
                           return;
                         }
-                        // For row clicks, truly toggle the item selection
-                        if (itemIsSelected) {
-                          // Deselect - call with no parameters
-                          onSelectItem(item.id);
-                        } else {
-                          // Select - call with default values
-                          const defaultPrice = item.prices?.[0]?.value || 0;
-                          const defaultIcms = item.icms || 0;
-                          const defaultIpi = item.ipi || 0;
-                          onSelectItem(item.id, 1, defaultPrice, defaultIcms, defaultIpi);
-                        }
+                        // Use shift+click aware handler
+                        handleRowSelection(item, e);
                       }}
                     >
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-1">
+                        <div
+                          className="flex items-center justify-center h-full w-full px-2 py-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRowSelection(item, e as unknown as MouseEvent<HTMLTableRowElement>);
+                          }}
+                        >
                           <Checkbox
                             checked={itemIsSelected}
-                            onCheckedChange={() => {
-                              // For checkbox clicks, truly toggle the item selection
-                              if (itemIsSelected) {
-                                // Deselect - call with no parameters
-                                onSelectItem(item.id);
-                              } else {
-                                // Select - call with default values
-                                const defaultPrice = item.prices?.[0]?.value || 0;
-                                const defaultIcms = item.icms || 0;
-                                const defaultIpi = item.ipi || 0;
-                                onSelectItem(item.id, 1, defaultPrice, defaultIcms, defaultIpi);
-                              }
-                            }}
                             className="h-4 w-4"
                           />
                         </div>

@@ -95,11 +95,10 @@ export function ItemBrandSelector({ disabled, required, initialBrand }: BrandSel
       });
 
       if (result.success && result.data) {
-        toast.success("Marca criada", `A marca "${name}" foi criada com sucesso.`);
         return result.data.id;
       }
     } catch (error) {
-      toast.error("Erro ao criar marca", "Não foi possível criar a marca. Tente novamente.");
+      console.error("Error creating brand:", error);
       throw error;
     } finally {
       setIsCreating(false);

@@ -139,7 +139,6 @@ const MaintenanceDetailsPage = () => {
         refetch();
       }
     } catch (error) {
-      toast.error("Erro ao iniciar manutenção");
       console.error("Error starting maintenance:", error);
     }
   };
@@ -158,7 +157,6 @@ const MaintenanceDetailsPage = () => {
         refetch();
       }
     } catch (error) {
-      toast.error("Erro ao concluir manutenção");
       console.error("Error finishing maintenance:", error);
     }
   };
@@ -172,7 +170,6 @@ const MaintenanceDetailsPage = () => {
         navigate(routes.inventory.maintenance.root);
       }
     } catch (error) {
-      toast.error("Erro ao excluir manutenção");
       console.error("Error deleting maintenance:", error);
     } finally {
       setIsDeleting(false);

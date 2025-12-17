@@ -148,6 +148,7 @@ const InventoryProductsEdit = lazy(() => import("@/pages/inventory/products/edit
 const InventoryProductsDetails = lazy(() => import("@/pages/inventory/products/details/[id]").then((module) => ({ default: module.default })));
 const InventoryProductsBatchEdit = lazy(() => import("@/pages/inventory/products/batch-edit").then((module) => ({ default: module.default })));
 const InventoryProductsStockBalance = lazy(() => import("@/pages/inventory/products/stock-balance").then((module) => ({ default: module.default })));
+const InventoryStockBalanceCreate = lazy(() => import("@/pages/inventory/stock-balance/create").then((module) => ({ default: module.StockBalanceCreatePage })));
 const InventoryProductsCategories = lazy(() => import("@/pages/inventory/products/categories/list").then((module) => ({ default: module.default })));
 const InventoryProductsCategoriesCreate = lazy(() => import("@/pages/inventory/products/categories/create").then((module) => ({ default: module.default })));
 const InventoryProductsCategoriesEdit = lazy(() => import("@/pages/inventory/products/categories/edit/[id]").then((module) => ({ default: module.default })));
@@ -1282,6 +1283,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <InventoryProductsStockBalance />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.inventory.stockBalance.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <InventoryStockBalanceCreate />
                     </Suspense>
                   }
                 />

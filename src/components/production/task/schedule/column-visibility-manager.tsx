@@ -22,6 +22,7 @@ const TASK_SCHEDULE_COLUMNS: TaskScheduleColumn[] = [
   { id: "measures", header: "MEDIDAS", sortable: true, width: "w-[110px]" },
   { id: "generalPainting", header: "PINTURA", sortable: true, width: "w-[100px]" },
   { id: "serialNumberOrPlate", header: "Nº SÉRIE", sortable: true, width: "w-[120px]" },
+  { id: "spot", header: "LOCAL", sortable: true, width: "w-[120px]" },
   { id: "chassisNumber", header: "Nº CHASSI", sortable: true, width: "w-[140px]" },
   { id: "sector.name", header: "SETOR", sortable: true, width: "w-[120px]" },
   { id: "entryDate", header: "ENTRADA", sortable: true, width: "w-[110px]" },

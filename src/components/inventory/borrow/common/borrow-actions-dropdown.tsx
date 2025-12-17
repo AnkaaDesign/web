@@ -50,9 +50,7 @@ export function BorrowActionsDropdown({ borrow, onEdit, onDelete, className }: B
     } else {
       try {
         await deleteMutation.mutateAsync(borrow.id);
-        toast.success("Empréstimo excluído com sucesso");
       } catch (error) {
-        // Error is handled by the API client with detailed message
         console.error("Error deleting borrow:", error);
       }
     }

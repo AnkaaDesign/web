@@ -77,10 +77,9 @@ export function PPEScheduleDetailsPage() {
 
     try {
       await deleteMutation.mutateAsync(ppeSchedule.data.id);
-      toast.success("Agendamento excluído com sucesso");
       navigate(routes.humanResources.ppe.schedules.root);
     } catch (error) {
-      toast.error("Erro ao excluir agendamento");
+      console.error("Error deleting schedule:", error);
     } finally {
       setShowDeleteDialog(false);
     }

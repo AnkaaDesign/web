@@ -127,7 +127,6 @@ export const PersonalMyPpesRequest = () => {
     },
     onSuccess: (data) => {
       console.log('[PPE Request] Mutation succeeded:', data);
-      toast.success("Solicitações de EPI enviadas com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["ppeDeliveries", "my-requests"] });
       navigate(routes.personal.myPpes.root);
     },
@@ -138,7 +137,6 @@ export const PersonalMyPpesRequest = () => {
         response: error.response,
         stack: error.stack,
       });
-      toast.error(`Erro ao solicitar EPIs: ${error.message || "Erro desconhecido"}`);
     },
   });
 

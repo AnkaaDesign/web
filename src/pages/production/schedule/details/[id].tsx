@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { useTaskDetail, useTaskMutations, useServiceOrderMutations, useCutsByTask, useLayoutsByTruck, useCurrentUser } from "../../../../hooks";
+import { useTaskDetail, useTaskMutations, useServiceOrderMutations, useCutsByTask, useLayoutsByTruck, useCurrentUser, useAirbrushingsByTask } from "../../../../hooks";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +29,7 @@ import {
   AIRBRUSHING_STATUS_LABELS,
   COMMISSION_STATUS_LABELS,
 } from "../../../../constants";
-import { formatDate, formatDateTime, formatCurrency, formatChassis, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
+import { formatDate, formatDateTime, formatCurrency, formatChassis, formatTruckSpot, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { generateBudgetPDF } from "../../../../utils/budget-pdf-generator";
@@ -543,16 +543,7 @@ export const TaskDetailsPage = () => {
           files: true,
         },
       },
-      airbrushings: {
-        include: {
-          receipts: true,
-          invoices: true,
-          artworks: true,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      },
+      // Note: airbrushings are fetched separately with useAirbrushingsByTask to get artworks included
       generalPainting: {
         include: {
           paintType: true,
@@ -600,8 +591,27 @@ export const TaskDetailsPage = () => {
 
   const cuts = cutsResponse?.data || [];
 
-  // Get airbrushings directly from task (they're included in the task query)
-  const airbrushings = task?.airbrushings || [];
+  // Fetch airbrushings separately to get artworks included (nested includes don't work)
+  const { data: airbrushingsResponse } = useAirbrushingsByTask(
+    {
+      taskId: id!,
+      params: {
+        include: {
+          artworks: true,
+          receipts: true,
+          invoices: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      },
+    },
+    {
+      enabled: !!id,
+    },
+  );
+
+  const airbrushings = airbrushingsResponse?.data || [];
 
   // Fetch layouts for truck dimensions
   const { data: layouts } = useLayoutsByTruck(task?.truck?.id || '', {
@@ -673,7 +683,6 @@ export const TaskDetailsPage = () => {
       await update(updateData);
       setStatusChangeDialogOpen(false);
     } catch (error) {
-      toast.error("Erro ao atualizar status da tarefa");
       console.error("Error updating task status:", error);
     } finally {
       setIsUpdating(false);
@@ -711,7 +720,6 @@ export const TaskDetailsPage = () => {
         }
       }
     } catch (error) {
-      toast.error("Erro ao atualizar status da ordem de serviço");
       console.error("Error updating service order status:", error);
     }
   };
@@ -733,7 +741,6 @@ export const TaskDetailsPage = () => {
       setPendingServiceOrder(null);
       setNextServiceOrderToStart(null);
     } catch (error) {
-      toast.error("Erro ao iniciar próxima ordem de serviço");
       console.error("Error starting next service order:", error);
     }
   };
@@ -959,9 +966,9 @@ export const TaskDetailsPage = () => {
                       <IconMapPin className="h-4 w-4" />
                       Local
                     </span>
-                    <Badge variant="outline" className="font-mono">
-                      {task.truck.spot === "PATIO" ? "Pátio" : task.truck.spot.replace(/_/g, "-")}
-                    </Badge>
+                    <span className="text-sm font-semibold text-foreground">
+                      {formatTruckSpot(task.truck.spot)}
+                    </span>
                   </div>
                 )}
 
@@ -1773,72 +1780,149 @@ export const TaskDetailsPage = () => {
                   </CardHeader>
               <CardContent className="pt-0 flex-1">
                 <div className="space-y-3">
-                  {airbrushings.map((airbrushing, index) => (
-                <div key={airbrushing.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                  <IconBrush className="h-4 w-4 text-muted-foreground" />
-                  <h4 className="font-semibold text-sm">
-                    {canViewAirbrushingFinancials && airbrushing.price
-                      ? formatCurrency(airbrushing.price)
-                      : `Aerografia #${index + 1}`}
-                  </h4>
-                    </div>
-                    <Badge variant={ENTITY_BADGE_CONFIG.AIRBRUSHING[airbrushing.status] || "default"} className="text-xs">
-                  {AIRBRUSHING_STATUS_LABELS[airbrushing.status]}
-                    </Badge>
-                  </div>
+                  {airbrushings.map((airbrushing, index) => {
+                    const firstArtwork = airbrushing.artworks?.[0];
+                    let apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env?.VITE_API_URL || "http://localhost:3030";
+                    apiUrl = apiUrl.replace(/\/+$/, ''); // Remove trailing slashes
 
-                  {(airbrushing.startDate || airbrushing.finishDate || airbrushing.createdAt) && (
-                    <div className="flex flex-wrap gap-4 text-xs text-muted-foreground mb-2">
-                  {airbrushing.startDate && (
-                    <div className="flex items-center gap-1">
-                      <IconClock className="h-3 w-3" />
-                      <span>Data de início: {formatDate(airbrushing.startDate)}</span>
-                    </div>
-                  )}
-                  {airbrushing.finishDate && (
-                    <div className="flex items-center gap-1">
-                      <IconCheck className="h-3 w-3 text-green-600" />
-                      <span>Data de finalização: {formatDate(airbrushing.finishDate)}</span>
-                    </div>
-                  )}
-                  {!airbrushing.startDate && !airbrushing.finishDate && airbrushing.createdAt && (
-                    <div className="flex items-center gap-1">
-                      <IconCalendar className="h-3 w-3" />
-                      <span>Criado: {formatDate(airbrushing.createdAt)}</span>
-                    </div>
-                  )}
-                    </div>
-                  )}
+                    // Generate proper thumbnail URL - same logic as FileItem component
+                    const getArtworkThumbnailUrl = () => {
+                      if (!firstArtwork) return null;
 
-                  {/* Files count */}
-                  {((canViewAirbrushingFinancials && ((airbrushing.receipts?.length ?? 0) > 0 || (airbrushing.invoices?.length ?? 0) > 0)) || (airbrushing.artworks?.length ?? 0) > 0) && (
-                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-                  <div className="flex gap-3">
-                    {(airbrushing.artworks?.length ?? 0) > 0 && (
-                      <div className="flex items-center gap-1">
-                    <IconFiles className="h-3 w-3" />
-                    <span>{airbrushing.artworks?.length ?? 0} arte(s)</span>
+                      // If thumbnailUrl exists and is already a full URL
+                      if (firstArtwork.thumbnailUrl?.startsWith("http")) {
+                        return firstArtwork.thumbnailUrl;
+                      }
+
+                      // If thumbnailUrl exists (relative path), use thumbnail endpoint
+                      if (firstArtwork.thumbnailUrl) {
+                        return `${apiUrl}/files/thumbnail/${firstArtwork.id}?size=small`;
+                      }
+
+                      // For images without thumbnails, check mimetype and use serve endpoint
+                      const mimetype = firstArtwork.mimetype || firstArtwork.mimeType || '';
+                      if (mimetype.startsWith('image/')) {
+                        return `${apiUrl}/files/serve/${firstArtwork.id}`;
+                      }
+
+                      // Fallback: try to serve anyway (backend will handle it)
+                      return `${apiUrl}/files/serve/${firstArtwork.id}`;
+                    };
+                    const artworkThumbnailUrl = getArtworkThumbnailUrl();
+
+                    return (
+                      <div
+                        key={airbrushing.id}
+                        className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => navigate(routes.production.airbrushings.details(airbrushing.id))}
+                      >
+                        <div className="flex gap-4">
+                          {/* Artwork thumbnail - clickable to open file viewer */}
+                          {firstArtwork && artworkThumbnailUrl && (
+                            <div
+                              className="flex-shrink-0 cursor-pointer"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (fileViewerContext && airbrushing.artworks) {
+                                  fileViewerContext.actions.viewFiles(airbrushing.artworks, 0);
+                                }
+                              }}
+                            >
+                              <div className="w-20 h-20 rounded-lg overflow-hidden bg-muted ring-1 ring-border hover:ring-2 hover:ring-primary transition-all">
+                                <img
+                                  src={artworkThumbnailUrl}
+                                  alt="Arte"
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  onError={(e) => {
+                                    // Hide image and show icon on error
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const parent = target.parentElement;
+                                    if (parent) {
+                                      parent.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg></div>';
+                                    }
+                                  }}
+                                />
+                              </div>
+                              {(airbrushing.artworks?.length ?? 0) > 1 && (
+                                <p className="text-xs text-muted-foreground text-center mt-1">
+                                  +{(airbrushing.artworks?.length ?? 0) - 1} mais
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex items-center gap-2">
+                                <IconBrush className="h-4 w-4 text-muted-foreground" />
+                                <h4 className="font-semibold text-sm">
+                                  {canViewAirbrushingFinancials && airbrushing.price
+                                    ? formatCurrency(airbrushing.price)
+                                    : `Aerografia #${index + 1}`}
+                                </h4>
+                              </div>
+                              <Badge variant={ENTITY_BADGE_CONFIG.AIRBRUSHING[airbrushing.status] || "default"} className="text-xs">
+                                {AIRBRUSHING_STATUS_LABELS[airbrushing.status]}
+                              </Badge>
+                            </div>
+
+                            {/* Dates in column layout */}
+                            {(airbrushing.startDate || airbrushing.finishDate || airbrushing.createdAt) && (
+                              <div className="flex flex-col gap-1 text-xs text-muted-foreground mb-2">
+                                {airbrushing.startDate && (
+                                  <div className="flex items-center gap-1">
+                                    <IconCalendar className="h-3 w-3" />
+                                    <span>Início: {formatDate(airbrushing.startDate)}</span>
+                                  </div>
+                                )}
+                                {airbrushing.finishDate && (
+                                  <div className="flex items-center gap-1">
+                                    <IconCalendarEvent className="h-3 w-3" />
+                                    <span>Finalização: {formatDate(airbrushing.finishDate)}</span>
+                                  </div>
+                                )}
+                                {!airbrushing.startDate && !airbrushing.finishDate && airbrushing.createdAt && (
+                                  <div className="flex items-center gap-1">
+                                    <IconCalendar className="h-3 w-3" />
+                                    <span>Criado: {formatDate(airbrushing.createdAt)}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Files count */}
+                            {((canViewAirbrushingFinancials && ((airbrushing.receipts?.length ?? 0) > 0 || (airbrushing.invoices?.length ?? 0) > 0)) || (!firstArtwork && (airbrushing.artworks?.length ?? 0) > 0)) && (
+                              <div className="flex items-center text-xs text-muted-foreground pt-2 border-t">
+                                <div className="flex gap-3">
+                                  {!firstArtwork && (airbrushing.artworks?.length ?? 0) > 0 && (
+                                    <div className="flex items-center gap-1">
+                                      <IconFiles className="h-3 w-3" />
+                                      <span>{airbrushing.artworks?.length ?? 0} arte(s)</span>
+                                    </div>
+                                  )}
+                                  {canViewAirbrushingFinancials && (airbrushing.receipts?.length ?? 0) > 0 && (
+                                    <div className="flex items-center gap-1">
+                                      <IconFile className="h-3 w-3" />
+                                      <span>{airbrushing.receipts?.length ?? 0} recibo(s)</span>
+                                    </div>
+                                  )}
+                                  {canViewAirbrushingFinancials && (airbrushing.invoices?.length ?? 0) > 0 && (
+                                    <div className="flex items-center gap-1">
+                                      <IconFileText className="h-3 w-3" />
+                                      <span>{airbrushing.invoices?.length ?? 0} NFe(s)</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    {canViewAirbrushingFinancials && (airbrushing.receipts?.length ?? 0) > 0 && (
-                      <div className="flex items-center gap-1">
-                    <IconFile className="h-3 w-3" />
-                    <span>{airbrushing.receipts?.length ?? 0} recibo(s)</span>
-                      </div>
-                    )}
-                    {canViewAirbrushingFinancials && (airbrushing.invoices?.length ?? 0) > 0 && (
-                      <div className="flex items-center gap-1">
-                    <IconFileText className="h-3 w-3" />
-                    <span>{airbrushing.invoices?.length ?? 0} NFe(s)</span>
-                      </div>
-                    )}
-                  </div>
-                    </div>
-                  )}
-                </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
                 </Card>

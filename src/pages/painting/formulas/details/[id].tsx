@@ -83,8 +83,7 @@ export default function FormulaDetails() {
       });
       navigate(routes.painting.productions.root);
     } catch (error) {
-      toast.error("Erro ao criar produção");
-      console.error("Erro ao criar produção:", error);
+      console.error("Error creating production:", error);
     }
   };
 

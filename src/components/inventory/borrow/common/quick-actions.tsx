@@ -64,12 +64,9 @@ export function QuickActions({ selectedBorrows = [], className, size = "default"
       );
 
       await Promise.all(returnPromises);
-
-      toast.success("Devoluções processadas", { description: `${activeBorrows.length} empréstimo(s) devolvido(s) com sucesso.` });
-
       setShowBatchReturnDialog(false);
     } catch (error) {
-      toast.error("Erro ao processar devoluções", { description: "Algumas devoluções falharam. Verifique e tente novamente." });
+      console.error("Error processing batch returns:", error);
     } finally {
       setIsProcessing(false);
     }
@@ -218,12 +215,9 @@ export function BorrowQuickActions({ borrow, className, showLabels = true }: Bor
           returnedAt: new Date(),
         },
       });
-
-      toast.success(`Empréstimo devolvido - ${borrow.quantity} unidade(s) de ${borrow.item?.name} devolvida(s).`);
-
       setShowReturnDialog(false);
     } catch (error) {
-      toast.error("Não foi possível processar a devolução.");
+      console.error("Error processing return:", error);
     }
   };
 

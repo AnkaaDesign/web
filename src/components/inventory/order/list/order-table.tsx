@@ -582,7 +582,7 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
 
               {/* Order-specific actions */}
               {canEdit && contextMenu?.orders[0] && contextMenu.orders[0].status === ORDER_STATUS.CREATED && (
-                <DropdownMenuItem onClick={handleMarkAsFulfilledFromMenu} className="text-amber-600 dark:text-amber-400">
+                <DropdownMenuItem onClick={handleMarkAsFulfilledFromMenu} className="text-blue-600 dark:text-blue-400">
                   <IconCheck className="mr-2 h-4 w-4" />
                   Marcar como feito
                 </DropdownMenuItem>
@@ -596,7 +596,7 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
               )}
 
               {canEdit && contextMenu?.orders[0] && contextMenu.orders[0].status !== ORDER_STATUS.CANCELLED && contextMenu.orders[0].status !== ORDER_STATUS.RECEIVED && (
-                <DropdownMenuItem onClick={handleMarkAsCancelledFromMenu}>
+                <DropdownMenuItem onClick={handleMarkAsCancelledFromMenu} className="text-red-700 dark:text-red-400">
                   <IconX className="mr-2 h-4 w-4" />
                   Cancelar pedido
                 </DropdownMenuItem>

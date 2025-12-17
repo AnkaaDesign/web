@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback, MouseEvent } from "react";
 import { IconSearch, IconFilter, IconChevronUp, IconChevronDown, IconRefresh, IconSelector } from "@tabler/icons-react";
 import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
 import { Button } from "@/components/ui/button";
@@ -101,6 +101,9 @@ export const ActivityItemSelector = ({
 }: ActivityItemSelectorProps) => {
   // Use direct filter update for immediate, atomic URL updates
   const { updateFilters: directUpdateFilters } = useDirectFilterUpdate();
+
+  // Ref to track last clicked item for shift+click range selection
+  const lastClickedIdRef = useRef<string | null>(null);
 
   // Form state - always use local state for immediate UI updates
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTermProp || "");
@@ -446,6 +449,39 @@ export const ActivityItemSelector = ({
     );
   };
 
+  // Handle row selection with shift+click support
+  const handleRowSelection = useCallback(
+    (item: typeof items[0], event?: MouseEvent) => {
+      const itemIsSelected = selectedItems.has(item.id);
+
+      // Shift+click: select range of items
+      if (event?.shiftKey && lastClickedIdRef.current) {
+        const lastIndex = currentPageItemIds.indexOf(lastClickedIdRef.current);
+        const currentIndex = currentPageItemIds.indexOf(item.id);
+
+        if (lastIndex !== -1 && currentIndex !== -1) {
+          const start = Math.min(lastIndex, currentIndex);
+          const end = Math.max(lastIndex, currentIndex);
+          const rangeIds = currentPageItemIds.slice(start, end + 1);
+
+          // Select all items in range that are not already selected
+          rangeIds.forEach((id) => {
+            if (!selectedItems.has(id)) {
+              onSelectItem(id, 1);
+            }
+          });
+        }
+      } else {
+        // Regular click: toggle single item
+        onSelectItem(item.id, 1);
+      }
+
+      // Always update last clicked ID
+      lastClickedIdRef.current = item.id;
+    },
+    [selectedItems, currentPageItemIds, onSelectItem]
+  );
+
   // Check if all current page items are selected
   const allCurrentPageSelected = currentPageItemIds.length > 0 && currentPageItemIds.every((id) => selectedItems.has(id));
   const someCurrentPageSelected = currentPageItemIds.some((id) => selectedItems.has(id));
@@ -708,16 +744,19 @@ export const ActivityItemSelector = ({
                         if (target.closest('input, button, [role="checkbox"]')) {
                           return;
                         }
-                        onSelectItem(item.id, 1);
+                        handleRowSelection(item, e);
                       }}
                     >
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                        <div
+                          className="flex items-center justify-center h-full w-full px-2 py-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRowSelection(item, e as unknown as MouseEvent<HTMLTableRowElement>);
+                          }}
+                        >
                           <Checkbox
                             checked={itemIsSelected}
-                            onCheckedChange={() => {
-                              onSelectItem(item.id, 1);
-                            }}
                             aria-label={`Select ${item.name}`}
                             data-checkbox
                           />

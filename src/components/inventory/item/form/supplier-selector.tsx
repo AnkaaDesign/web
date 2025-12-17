@@ -114,11 +114,10 @@ export function ItemSupplierSelector({ disabled, initialSupplier }: SupplierSele
       });
 
       if (result.success && result.data) {
-        toast.success("Fornecedor criado", `O fornecedor "${fantasyName}" foi criado com sucesso. Complete as informações restantes posteriormente.`);
         return result.data.id;
       }
     } catch (error) {
-      toast.error("Erro ao criar fornecedor", "Não foi possível criar o fornecedor. Tente novamente.");
+      console.error("Error creating supplier:", error);
       throw error;
     } finally {
       setIsCreating(false);

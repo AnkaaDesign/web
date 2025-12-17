@@ -95,11 +95,9 @@ const EPIDeliveryDetails = () => {
         id: ppeDelivery.id,
         deliveryDate: new Date(),
       });
-
-      toast.success("Entrega marcada como realizada com sucesso");
       refetch();
     } catch (error) {
-      toast.error("Erro ao marcar entrega como realizada");
+      console.error("Error marking delivery as delivered:", error);
     } finally {
       setShowDeliveryDialog(false);
     }
@@ -115,11 +113,9 @@ const EPIDeliveryDetails = () => {
           status: PPE_DELIVERY_STATUS.CANCELLED,
         },
       });
-
-      toast.success("Entrega cancelada com sucesso");
       refetch();
     } catch (error) {
-      toast.error("Erro ao cancelar entrega");
+      console.error("Error cancelling delivery:", error);
     } finally {
       setShowCancelDialog(false);
     }
@@ -130,10 +126,9 @@ const EPIDeliveryDetails = () => {
 
     try {
       await deleteMutation(ppeDelivery.id);
-      toast.success("Entrega excluída com sucesso");
       navigate(routes.inventory.ppe.deliveries.root);
     } catch (error) {
-      toast.error("Erro ao excluir entrega");
+      console.error("Error deleting delivery:", error);
     } finally {
       setShowDeleteDialog(false);
     }

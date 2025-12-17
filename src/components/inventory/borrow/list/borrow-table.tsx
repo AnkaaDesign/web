@@ -24,6 +24,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useBorrowMutations, useBorrowBatchMutations, useBorrows } from "../../../../hooks";
+import { useBatchResultDialog } from "@/hooks/use-batch-result-dialog";
+import { BorrowBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import type { BorrowGetManyFormData } from "../../../../schemas";
 import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
@@ -73,8 +75,12 @@ const formatDateWithRelative = (date: Date | string) => {
 export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDelete, filters = {}, onDataChange }: BorrowTableProps) {
   const navigate = useNavigate();
   const { user, isLoading: isAuthLoading } = useAuth();
-  const { deleteMutation, markAsLostMutation } = useBorrowMutations();
-  const { batchDelete, batchUpdate } = useBorrowBatchMutations();
+  const { deleteMutation } = useBorrowMutations();
+  const { batchDelete, batchUpdateAsync } = useBorrowBatchMutations();
+
+  // Batch result dialogs
+  const returnResultDialog = useBatchResultDialog();
+  const markAsLostResultDialog = useBatchResultDialog();
 
   // Permission checks
   const canEdit = user ? canEditBorrows(user) : false;
@@ -387,41 +393,31 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
         onReturn(contextMenu.items);
       } else {
         try {
-          if (contextMenu.isBulk && contextMenu.items.length > 1) {
-            // Bulk return
-            const updates = contextMenu.items
-              .filter((item) => item.status === BORROW_STATUS.ACTIVE)
-              .map((item) => ({
-                id: item.id,
-                data: {
-                  status: BORROW_STATUS.RETURNED,
-                  returnedAt: new Date(),
-                },
-              }));
+          // Filter active items and prepare batch update
+          const itemsToReturn = contextMenu.items.filter((item) => item.status === BORROW_STATUS.ACTIVE);
 
-            if (updates.length > 0) {
-              await batchUpdate({ borrows: updates });
+          if (itemsToReturn.length > 0) {
+            const updates = itemsToReturn.map((item) => ({
+              id: item.id,
+              data: {
+                status: BORROW_STATUS.RETURNED,
+                returnedAt: new Date(),
+              },
+            }));
+
+            // Request item and user data to be included in the response for the result dialog
+            const result = await batchUpdateAsync(
+              { borrows: updates },
+              { item: true, user: true },
+            );
+
+            if (result.data) {
+              // Open result dialog to show detailed results
+              returnResultDialog.openDialog(result.data);
+
               // Remove returned items from selection
               const returnedIds = updates.map((update) => update.id);
               removeFromSelection(returnedIds);
-            }
-          } else {
-            // Single return
-            if (contextMenu.items[0].status === BORROW_STATUS.ACTIVE) {
-              const itemId = contextMenu.items[0].id;
-              await batchUpdate({
-                borrows: [
-                  {
-                    id: itemId,
-                    data: {
-                      status: BORROW_STATUS.RETURNED,
-                      returnedAt: new Date(),
-                    },
-                  },
-                ],
-              });
-              // Remove returned item from selection
-              removeFromSelection([itemId]);
             }
           }
         } catch (error) {
@@ -477,35 +473,30 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
   const confirmMarkAsLost = async () => {
     if (markAsLostDialog) {
       try {
-        if (markAsLostDialog.isBulk && markAsLostDialog.items.length > 1) {
-          // Bulk mark as lost - process one by one using markAsLost
-          const itemsToMark = markAsLostDialog.items.filter((item) => item.status !== BORROW_STATUS.LOST);
+        // Filter items that are not already lost and prepare batch update
+        const itemsToMark = markAsLostDialog.items.filter((item) => item.status !== BORROW_STATUS.LOST);
 
-          if (itemsToMark.length > 0) {
-            let successCount = 0;
-            let errorCount = 0;
+        if (itemsToMark.length > 0) {
+          const updates = itemsToMark.map((item) => ({
+            id: item.id,
+            data: {
+              status: BORROW_STATUS.LOST,
+            },
+          }));
 
-            for (const item of itemsToMark) {
-              try {
-                await markAsLostMutation.mutateAsync({ id: item.id });
-                successCount++;
-              } catch (error) {
-                errorCount++;
-              }
-            }
+          // Request item and user data to be included in the response for the result dialog
+          const result = await batchUpdateAsync(
+            { borrows: updates },
+            { item: true, user: true },
+          );
 
-            // Success and error handling by API client
-            // Remove all attempted items from selection
-            const attemptedIds = itemsToMark.map((item) => item.id);
-            removeFromSelection(attemptedIds);
-          }
-        } else {
-          // Single mark as lost
-          if (markAsLostDialog.items[0].status !== BORROW_STATUS.LOST) {
-            const itemId = markAsLostDialog.items[0].id;
-            await markAsLostMutation.mutateAsync({ id: itemId });
-            // Remove marked item from selection
-            removeFromSelection([itemId]);
+          if (result.data) {
+            // Open result dialog to show detailed results
+            markAsLostResultDialog.openDialog(result.data);
+
+            // Remove marked items from selection
+            const markedIds = updates.map((update) => update.id);
+            removeFromSelection(markedIds);
           }
         }
       } catch (error) {
@@ -636,10 +627,15 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
                     {/* Selection checkbox */}
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => { e.stopPropagation(); handleSelectBorrow(borrow.id, e); }}>
+                        <div
+                          className="flex items-center justify-center h-full w-full px-2 py-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectBorrow(borrow.id, e);
+                          }}
+                        >
                           <Checkbox
                             checked={borrowIsSelected}
-                            onCheckedChange={() => handleSelectBorrow(borrow.id)}
                             aria-label={`Select ${borrow.item?.name || "borrow"}`}
                             data-checkbox
                           />
@@ -758,6 +754,22 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Return Result Dialog */}
+      <BorrowBatchResultDialog
+        open={returnResultDialog.isOpen}
+        onOpenChange={returnResultDialog.closeDialog}
+        result={returnResultDialog.result}
+        operationType="update"
+      />
+
+      {/* Mark as Lost Result Dialog */}
+      <BorrowBatchResultDialog
+        open={markAsLostResultDialog.isOpen}
+        onOpenChange={markAsLostResultDialog.closeDialog}
+        result={markAsLostResultDialog.result}
+        operationType="update"
+      />
     </div>
   );
 }

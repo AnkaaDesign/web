@@ -370,6 +370,19 @@ function TruckElement({ truck, scale, isDragging }: TruckElementProps) {
       >
         {displayLength.toFixed(1).replace('.', ',')}m
       </text>
+      {/* Serial number label at bottom */}
+      {truck.serialNumber && (
+        <text
+          x={width / 2}
+          y={height - 4}
+          textAnchor="middle"
+          fill={textColor}
+          fontSize={8}
+          style={{ pointerEvents: 'none' }}
+        >
+          {truck.serialNumber}
+        </text>
+      )}
     </g>
   );
 }

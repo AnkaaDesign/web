@@ -92,13 +92,11 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
       });
 
       if (result.success && result.data) {
-        toast.success("Usuário criado", `O usuário "${name}" foi criado com sucesso. Complete as informações restantes posteriormente.`);
-
         // Return the newly created user ID
         return result.data.id;
       }
     } catch (error) {
-      toast.error("Erro ao criar usuário", "Não foi possível criar o usuário. Tente novamente.");
+      console.error("Error creating user:", error);
       throw error;
     } finally {
       setIsCreating(false);

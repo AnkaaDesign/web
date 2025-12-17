@@ -3,7 +3,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
-import { IconPackage, IconPlus } from "@tabler/icons-react";
+import { IconPackage, IconPlus, IconClipboardCheck } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
 export const ProductListPage = () => {
@@ -25,6 +25,13 @@ export const ProductListPage = () => {
             favoritePage={FAVORITE_PAGES.ESTOQUE_PRODUTOS_LISTAR}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque", href: routes.inventory.root }, { label: "Produtos" }]}
             actions={[
+              {
+                key: "stock-balance",
+                label: "Balanco",
+                icon: IconClipboardCheck,
+                onClick: () => navigate(routes.inventory.stockBalance.create),
+                variant: "outline",
+              },
               {
                 key: "create",
                 label: "Cadastrar",

@@ -500,8 +500,7 @@ export const TaskCreateForm = () => {
           toast.error(result?.message || "Erro ao criar tarefa");
         }
       } catch (error) {
-        console.error("🔴 Error creating task:", error);
-        toast.error("Erro ao criar tarefa. Por favor, tente novamente.");
+        console.error("Error creating task:", error);
       } finally {
         setIsSubmitting(false);
       }

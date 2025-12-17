@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAirbrushing, useAirbrushingMutations } from "../../../../hooks";
-import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
+import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AirbrushingInfoCard } from "@/components/production/airbrushing/detail/airbrushing-info-card";
+import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { IconBrush, IconEdit, IconTrash } from "@tabler/icons-react";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import {
@@ -60,10 +61,9 @@ export const AirbrushingDetails = () => {
 
     try {
       await deleteMutation.mutateAsync(id);
-      toast.success("Aerografia excluída com sucesso");
       navigate(routes.production.airbrushings.root);
     } catch (error) {
-      toast.error("Erro ao excluir aerografia");
+      console.error("Error deleting airbrushing:", error);
     }
     setIsDeleteDialogOpen(false);
   };
@@ -132,35 +132,48 @@ export const AirbrushingDetails = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="space-y-6">
-        <PageHeader
-          variant="detail"
-          title="Aerografia"
-          icon={IconBrush}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Produção", href: routes.production.root },
-            { label: "Aerografia", href: routes.production.airbrushings.root },
-            { label: "Aerografia" },
-          ]}
-          actions={[
-            {
-              key: "edit",
-              label: "Editar",
-              icon: IconEdit,
-              onClick: () => navigate(routes.production.airbrushings.edit(airbrushing.id)),
-            },
-            {
-              key: "delete",
-              label: "Excluir",
-              icon: IconTrash,
-              onClick: () => setIsDeleteDialogOpen(true),
-              disabled: isDeleting,
-            },
-          ]}
-        />
+      <div className="h-full flex flex-col space-y-4">
+        <div className="flex-shrink-0">
+          <PageHeader
+            variant="detail"
+            title={airbrushing.task?.name || "Aerografia"}
+            icon={IconBrush}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Produção", href: routes.production.root },
+              { label: "Aerografia", href: routes.production.airbrushings.root },
+              { label: airbrushing.task?.name || "Detalhes" },
+            ]}
+            actions={[
+              {
+                key: "edit",
+                label: "Editar",
+                icon: IconEdit,
+                onClick: () => navigate(routes.production.airbrushings.edit(airbrushing.id)),
+              },
+              {
+                key: "delete",
+                label: "Excluir",
+                icon: IconTrash,
+                onClick: () => setIsDeleteDialogOpen(true),
+                disabled: isDeleting,
+              },
+            ]}
+          />
+        </div>
 
         <AirbrushingInfoCard airbrushing={airbrushing as any} />
+
+        {/* Changelog Section */}
+        <Card className="border flex flex-col animate-in fade-in-50 duration-1000" level={1}>
+          <ChangelogHistory
+            entityType={CHANGE_LOG_ENTITY_TYPE.AIRBRUSHING}
+            entityId={airbrushing.id}
+            entityName={`Aerografia - ${airbrushing.task?.name || airbrushing.id.slice(0, 8)}`}
+            entityCreatedAt={airbrushing.createdAt}
+            className="h-full"
+          />
+        </Card>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

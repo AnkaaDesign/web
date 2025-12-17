@@ -118,6 +118,13 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
         dataType: "custom",
       },
       {
+        key: "spot",
+        header: "LOCAL",
+        sortable: true,
+        accessor: (task: TaskRow) => task.truck?.spot || "",
+        dataType: "string",
+      },
+      {
         key: "chassisNumber",
         header: "Nº CHASSI",
         sortable: true,
@@ -194,6 +201,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       { id: "measures", header: "MEDIDAS", width: "w-[110px]", sortable: true },
       { id: "generalPainting", header: "PINTURA", width: "w-[100px]", sortable: true },
       { id: "serialNumberOrPlate", header: "Nº SÉRIE", width: "w-[120px]", sortable: true },
+      { id: "spot", header: "LOCAL", width: "w-[120px]", sortable: true },
       { id: "chassisNumber", header: "Nº CHASSI", width: "w-[140px]", sortable: true },
       { id: "sector.name", header: "SETOR", width: "w-[120px]", sortable: true },
       { id: "entryDate", header: "ENTRADA", width: "w-[110px]", sortable: true },
@@ -569,11 +577,6 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
     const tasksToCreate = copies.map(buildTaskData);
     await Promise.all(tasksToCreate.map(taskData => createAsync(taskData)));
 
-    toast.success(
-      copies.length > 1 ? `${copies.length} cópias criadas com sucesso` : "Cópia criada com sucesso",
-      { description: taskToDuplicate.name }
-    );
-
     setTaskToDuplicate(null);
   };
 
@@ -792,6 +795,17 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
                           })()
                         : "-")}
                     {column.id === "serialNumberOrPlate" && <span className="truncate block font-mono">{task.serialNumber || task.truck?.plate || "-"}</span>}
+                    {column.id === "spot" && (
+                      task.truck?.spot ? (
+                        task.truck.spot === "PATIO" ? (
+                          <Badge variant="secondary" className="font-mono">Pátio</Badge>
+                        ) : (
+                          <Badge variant="default" className="font-mono">{task.truck.spot.replace(/_/g, "-")}</Badge>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )
+                    )}
                     {column.id === "chassisNumber" && <span className="truncate block font-mono">{task.truck?.chassisNumber || "-"}</span>}
                     {column.id === "sector.name" && <span className="truncate block">{task.sector?.name || "-"}</span>}
                     {column.id === "entryDate" && <span className="truncate block">{task.entryDate ? formatDate(task.entryDate) : "-"}</span>}

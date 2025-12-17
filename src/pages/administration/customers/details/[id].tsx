@@ -89,10 +89,9 @@ export const CustomerDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await deleteAsync(id);
-      toast.success("Cliente excluído com sucesso");
       navigate(routes.administration.customers.root);
     } catch (error) {
-      toast.error("Erro ao excluir cliente");
+      console.error("Error deleting customer:", error);
     }
     setIsDeleteDialogOpen(false);
   };

@@ -135,10 +135,9 @@ export const LoanDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await deleteMutation.mutateAsync(borrow.id);
-      toast.success("Empréstimo excluído com sucesso");
       navigate(routes.inventory.loans.root);
     } catch (error) {
-      toast.error("Erro ao excluir empréstimo");
+      console.error("Error deleting borrow:", error);
     }
   };
 
@@ -164,7 +163,7 @@ export const LoanDetailsPage = () => {
       setShowMarkLostDialog(false);
       refetch();
     } catch (error) {
-      toast.error("Erro ao marcar empréstimo como perdido");
+      console.error("Error marking borrow as lost:", error);
     }
   };
 

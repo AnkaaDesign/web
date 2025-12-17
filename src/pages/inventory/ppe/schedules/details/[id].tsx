@@ -87,11 +87,9 @@ const EPIScheduleDetails = () => {
           isActive: true,
         },
       });
-
-      toast.success("Agendamento ativado com sucesso");
       refetch();
     } catch (error) {
-      toast.error("Erro ao ativar agendamento");
+      console.error("Error activating schedule:", error);
     } finally {
       setIsProcessing(false);
       setShowActivateDialog(false);
@@ -109,11 +107,9 @@ const EPIScheduleDetails = () => {
           isActive: false,
         },
       });
-
-      toast.success("Agendamento desativado com sucesso");
       refetch();
     } catch (error) {
-      toast.error("Erro ao desativar agendamento");
+      console.error("Error deactivating schedule:", error);
     } finally {
       setIsProcessing(false);
       setShowDeactivateDialog(false);
@@ -126,10 +122,9 @@ const EPIScheduleDetails = () => {
     setIsProcessing(true);
     try {
       await deleteAsync(ppeSchedule.id);
-      toast.success("Agendamento excluído com sucesso");
       navigate("/estoque/epi/agendamentos");
     } catch (error) {
-      toast.error("Erro ao excluir agendamento");
+      console.error("Error deleting schedule:", error);
       setIsProcessing(false);
     } finally {
       setShowDeleteDialog(false);

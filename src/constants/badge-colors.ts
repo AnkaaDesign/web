@@ -436,10 +436,10 @@ export const ENTITY_BADGE_CONFIG = {
 
   // Airbrushing Status
   AIRBRUSHING: {
-    [AIRBRUSHING_STATUS.PENDING]: "pending" as BadgeVariant,
-    [AIRBRUSHING_STATUS.IN_PRODUCTION]: "blue" as BadgeVariant,
-    [AIRBRUSHING_STATUS.COMPLETED]: "completed" as BadgeVariant,
-    [AIRBRUSHING_STATUS.CANCELLED]: "cancelled" as BadgeVariant,
+    [AIRBRUSHING_STATUS.PENDING]: "gray" as BadgeVariant,          // Gray - not started (consistent with other entities)
+    [AIRBRUSHING_STATUS.IN_PRODUCTION]: "blue" as BadgeVariant,    // Blue - in progress
+    [AIRBRUSHING_STATUS.COMPLETED]: "completed" as BadgeVariant,   // Green - completed
+    [AIRBRUSHING_STATUS.CANCELLED]: "cancelled" as BadgeVariant,   // Red - cancelled
   },
 
   // Cut Status

@@ -123,10 +123,9 @@ const ExternalWithdrawalDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await deleteMutation.mutateAsync(withdrawal.id);
-      toast.success("Retirada externa excluída com sucesso");
       navigate(routes.inventory.externalWithdrawals?.list || "/inventory/external-withdrawals");
     } catch (error) {
-      toast.error("Erro ao excluir retirada externa");
+      console.error("Error deleting external withdrawal:", error);
     }
   };
 

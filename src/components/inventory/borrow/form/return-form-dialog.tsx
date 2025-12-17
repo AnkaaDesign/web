@@ -82,10 +82,6 @@ export function ReturnFormDialog({ open, onOpenChange, borrow }: ReturnFormDialo
         },
       });
 
-      toast.success("Devolução registrada com sucesso", {
-        description: `${borrow.item?.name} devolvido em condição ${RETURN_CONDITION_LABELS[data.condition as RETURN_CONDITION]}`,
-      });
-
       // Close the dialog
       onOpenChange(false);
 
@@ -93,9 +89,6 @@ export function ReturnFormDialog({ open, onOpenChange, borrow }: ReturnFormDialo
       form.reset();
     } catch (error) {
       console.error("Error processing return:", error);
-      toast.error("Erro ao processar devolução", {
-        description: "Ocorreu um erro ao registrar a devolução. Tente novamente.",
-      });
     }
   };
 

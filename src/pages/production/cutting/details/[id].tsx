@@ -36,6 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { LoadingSpinner } from "@/components/ui/loading";
+import { Separator } from "@/components/ui/separator";
 import { FileItem } from "@/components/common/file";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import {
@@ -168,10 +169,8 @@ export const CuttingDetailsPage = () => {
 
       await update({ id: cut.id, data: updateData });
       setStatusChangeDialogOpen(false);
-      toast.success("Status do recorte atualizado com sucesso!");
     } catch (error) {
       console.error("Error updating cut status:", error);
-      toast.error("Erro ao atualizar status do recorte");
     } finally {
       setIsUpdating(false);
     }

@@ -82,10 +82,9 @@ export const WarningDetailPage = () => {
   const handleDelete = async () => {
     try {
       await deleteMutation.mutateAsync(id);
-      toast.success("Advertência excluída com sucesso");
       navigate(routes.humanResources.warnings.root);
     } catch (error) {
-      toast.error("Erro ao excluir advertência");
+      console.error("Error deleting warning:", error);
     }
     setIsDeleteDialogOpen(false);
   };

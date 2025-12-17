@@ -27,7 +27,7 @@ import { createAirbrushingFormData } from "@/utils/form-data-helper";
 export interface AirbrushingFormHandle {
   handleNext: () => void;
   handlePrev: () => void;
-  handleSubmit: () => void;
+  handleSubmit: () => Promise<boolean>;
   getCurrentStep: () => number;
   isLastStep: () => boolean;
   isFirstStep: () => boolean;
@@ -284,12 +284,18 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
   // Stage validation
   const validateCurrentStep = useCallback(async (): Promise<boolean> => {
+    console.log("[FORM validateCurrentStep] ENTERED");
+    console.log("[FORM validateCurrentStep] currentStep:", currentStep);
+    console.log("[FORM validateCurrentStep] selectedTasks.size:", selectedTasks.size);
+    console.log("[FORM validateCurrentStep] form errors before validation:", form.formState.errors);
+
     switch (currentStep) {
       case 1:
         // Basic info validation - dates and price are optional
         // Trigger validation for step 1 fields
         const step1Fields = ["startDate", "finishDate", "price"] as const;
         const step1Valid = await form.trigger(step1Fields);
+        console.log("[FORM validateCurrentStep] step 1 valid:", step1Valid);
         return step1Valid;
 
       case 2:
@@ -298,21 +304,31 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
           form.setError("taskId", { message: "Uma tarefa deve ser selecionada" });
           toast.error("Uma tarefa deve ser selecionada");
           setStepErrors((prev) => ({ ...prev, 2: true }));
+          console.log("[FORM validateCurrentStep] step 2 failed - no task selected");
           return false;
         }
         form.clearErrors("taskId");
         setStepErrors((prev) => ({ ...prev, 2: false }));
+        console.log("[FORM validateCurrentStep] step 2 valid");
         return true;
 
       case 3:
         // Final validation
+        console.log("[FORM validateCurrentStep] step 3 - checking task selection");
         if (selectedTasks.size === 0) {
           form.setError("taskId", { message: "Uma tarefa deve ser selecionada" });
           toast.error("Uma tarefa deve ser selecionada");
+          console.log("[FORM validateCurrentStep] step 3 failed - no task selected");
           return false;
         }
-        // Validate all fields before submission
-        const isValid = await form.trigger();
+        // Only validate fields that matter, NOT file ID fields (receiptIds, invoiceIds, artworkIds)
+        // File ID fields are handled separately during submission - new files don't have valid UUIDs yet
+        console.log("[FORM validateCurrentStep] step 3 - triggering form validation");
+        console.log("[FORM validateCurrentStep] form values before trigger:", form.getValues());
+        const step3Fields = ["startDate", "finishDate", "price", "taskId", "status"] as const;
+        const isValid = await form.trigger(step3Fields);
+        console.log("[FORM validateCurrentStep] step 3 form.trigger() returned:", isValid);
+        console.log("[FORM validateCurrentStep] form errors:", form.formState.errors);
         return isValid;
 
       default:
@@ -354,7 +370,12 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
   // Handle receipt file changes
   const handleReceiptFilesChange = (files: FileWithPreview[]) => {
     setReceiptFiles(files);
-    const fileIds = files.map((f) => f.uploadedFileId || f.id).filter(Boolean);
+    // Only include IDs from already uploaded files (valid UUIDs)
+    // New files don't have valid UUIDs yet - they're sent as FormData during submission
+    const fileIds = files
+      .filter(f => f.uploaded && f.uploadedFileId)
+      .map(f => f.uploadedFileId!)
+      .filter(Boolean);
     setReceiptFileIds(fileIds);
     form.setValue("receiptIds", fileIds);
   };
@@ -362,7 +383,12 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
   // Handle NFe file changes
   const handleNfeFilesChange = (files: FileWithPreview[]) => {
     setNfeFiles(files);
-    const fileIds = files.map((f) => f.uploadedFileId || f.id).filter(Boolean);
+    // Only include IDs from already uploaded files (valid UUIDs)
+    // New files don't have valid UUIDs yet - they're sent as FormData during submission
+    const fileIds = files
+      .filter(f => f.uploaded && f.uploadedFileId)
+      .map(f => f.uploadedFileId!)
+      .filter(Boolean);
     setNfeFileIds(fileIds);
     form.setValue("invoiceIds", fileIds);
   };
@@ -370,21 +396,40 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
   // Handle artwork file changes
   const handleArtworkFilesChange = (files: FileWithPreview[]) => {
     setArtworkFiles(files);
-    const fileIds = files.map((f) => f.uploadedFileId || f.id).filter(Boolean);
+    // Only include IDs from already uploaded files (valid UUIDs)
+    // New files don't have valid UUIDs yet - they're sent as FormData during submission
+    const fileIds = files
+      .filter(f => f.uploaded && f.uploadedFileId)
+      .map(f => f.uploadedFileId!)
+      .filter(Boolean);
     setArtworkFileIds(fileIds);
     form.setValue("artworkIds", fileIds);
   };
 
   // Handle form submission
-  const handleSubmit = useCallback(async () => {
-    try {
-      // Validate final form
-      const isValid = await validateCurrentStep();
-      if (!isValid) {
-        return;
-      }
+  // Returns true on success, false on validation failure, throws on error
+  const handleSubmit = useCallback(async (): Promise<boolean> => {
+    console.log("[FORM] handleSubmit called");
+    console.log("[FORM] currentStep:", currentStep);
+    console.log("[FORM] selectedTasks:", selectedTasks);
+    console.log("[FORM] selectedTasks.size:", selectedTasks.size);
+    console.log("[FORM] form.getValues():", form.getValues());
 
+    // Validate final form
+    console.log("[FORM] Validating current step...");
+    console.log("[FORM] validateCurrentStep function id:", (validateCurrentStep as any).__id || "no-id");
+    const isValid = await validateCurrentStep();
+    console.log("[FORM] validateCurrentStep returned:", isValid);
+
+    if (!isValid) {
+      console.log("[FORM] Validation failed, returning false");
+      return false;
+    }
+
+    try {
+      console.log("[FORM] Validation passed, getting form values...");
       const data = form.getValues();
+      console.log("[FORM] Form values:", data);
 
       // Separate existing files from new files using the 'uploaded' flag
       // Existing files have uploaded=true, new files have uploaded=false
@@ -472,10 +517,13 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       } else if (result?.data?.id) {
         navigate(routes.production.airbrushings.details(result.data.id));
       }
+
+      return true;
     } catch (error) {
-      toast.error(`Erro ao ${mode === "create" ? "criar" : "atualizar"} aerografia`);
+      console.error("Error submitting airbrushing form:", error);
+      throw error; // Rethrow so parent can handle
     }
-  }, [validateCurrentStep, form, mode, create, update, airbrushingId, onSuccess, navigate, receiptFiles, nfeFiles, artworkFiles, selectedTask]);
+  }, [validateCurrentStep, form, mode, create, update, airbrushingId, onSuccess, navigate, receiptFiles, nfeFiles, artworkFiles, selectedTask, selectedTasks, currentStep]);
 
   const isLastStep = currentStep === steps.length;
   const isFirstStep = currentStep === 1;
@@ -491,16 +539,13 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       isLastStep: () => isLastStep,
       isFirstStep: () => isFirstStep,
       canSubmit: () => {
-        // For edit mode, allow submit if form is valid (even without dirty state)
-        // Files changes don't mark form as dirty but should enable submit
-        if (mode === "edit") {
-          return selectedTasks.size > 0 && form.formState.isValid;
-        }
-        // For create mode, require valid form
-        return selectedTasks.size > 0 && form.formState.isValid;
+        // For both create and edit modes, just check if a task is selected
+        // The actual validation happens during submission in validateCurrentStep
+        // form.formState.isValid can be unreliable when values are set programmatically
+        return selectedTasks.size > 0;
       },
     }),
-    [handleNext, prevStep, handleSubmit, currentStep, isLastStep, isFirstStep, selectedTasks, form.formState.isValid, receiptFiles, nfeFiles, artworkFiles, mode],
+    [handleNext, prevStep, handleSubmit, currentStep, isLastStep, isFirstStep, selectedTasks, receiptFiles, nfeFiles, artworkFiles, mode],
   );
 
   // Notify parent about step changes
@@ -510,13 +555,13 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
     }
   }, [currentStep, onStepChange]);
 
-  // Notify parent about form state changes (file changes, validity changes)
+  // Notify parent about form state changes (file changes, task selection changes)
   // This allows the parent to update the button state
   useEffect(() => {
     if (onFormStateChange) {
       onFormStateChange();
     }
-  }, [receiptFiles, nfeFiles, artworkFiles, form.formState.isValid, onFormStateChange]);
+  }, [receiptFiles, nfeFiles, artworkFiles, selectedTasks, onFormStateChange]);
 
   // Loading state
   if (mode === "edit" && isLoadingAirbrushing) {

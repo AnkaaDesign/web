@@ -65,8 +65,6 @@ export function PriceCreateForm({ itemId, onSuccess, onCancel }: PriceCreateForm
       }
     } catch (error: any) {
       console.error("Error creating price:", error);
-      const errorMessage = error.response?.data?.message || error.message || "Erro ao criar preço";
-      toast.error(errorMessage);
     }
   };
 

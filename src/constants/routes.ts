@@ -293,6 +293,9 @@ export const routes = {
       root: "/estoque/produtos",
     },
     root: "/estoque",
+    stockBalance: {
+      create: "/estoque/balanco",
+    },
     suppliers: {
       batchEdit: "/estoque/fornecedores/editar-em-lote",
       create: "/estoque/fornecedores/cadastrar",

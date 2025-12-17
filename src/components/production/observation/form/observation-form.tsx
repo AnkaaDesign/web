@@ -381,7 +381,6 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       }
     } catch (error) {
       console.error("Error submitting form:", error);
-      toast.error(`Erro ao ${mode === "create" ? "criar" : "atualizar"} observação`);
     }
   };
 

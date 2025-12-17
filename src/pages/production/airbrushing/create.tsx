@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
@@ -24,7 +24,6 @@ export const AirbrushingCreate = () => {
   usePageTracker({ title: "Aerografia - Criar" });
 
   const handleSuccess = (airbrushing: Airbrushing) => {
-    setIsSubmitting(false);
     navigate(routes.production.airbrushings.details(airbrushing.id));
   };
 
@@ -39,6 +38,13 @@ export const AirbrushingCreate = () => {
       setCanSubmit(formRef.current.canSubmit());
     }
   };
+
+  // Update canSubmit whenever form state changes
+  const handleFormStateChange = useCallback(() => {
+    if (formRef.current) {
+      setCanSubmit(formRef.current.canSubmit());
+    }
+  }, []);
 
   // Calculate step states exactly like order form
   const isLastStep = currentStep === 3;
@@ -56,6 +62,17 @@ export const AirbrushingCreate = () => {
     disabled: isSubmitting,
   });
 
+  // Back button for non-first steps
+  if (!isFirstStep) {
+    navigationActions.push({
+      key: "back",
+      label: "Voltar",
+      onClick: () => formRef.current?.handlePrev(),
+      variant: "outline" as const,
+      disabled: isSubmitting,
+    });
+  }
+
   // Next button for non-last steps
   if (!isLastStep) {
     navigationActions.push({
@@ -69,15 +86,36 @@ export const AirbrushingCreate = () => {
 
   // Submit button for last step only
   if (isLastStep) {
+    console.log("[CREATE PAGE] Rendering submit button - isSubmitting:", isSubmitting, "canSubmit:", canSubmit, "disabled:", isSubmitting || !canSubmit);
     navigationActions.push({
       key: "submit",
       label: "Cadastrar",
       icon: isSubmitting ? IconLoader2 : IconCheck,
       onClick: async () => {
+        console.log("[CREATE PAGE] Button clicked");
+        console.log("[CREATE PAGE] formRef.current:", formRef.current);
+
+        if (!formRef.current) {
+          console.log("[CREATE PAGE] formRef.current is null, returning");
+          return;
+        }
+
+        console.log("[CREATE PAGE] Setting isSubmitting to true");
         setIsSubmitting(true);
+
         try {
-          await formRef.current?.handleSubmit();
+          console.log("[CREATE PAGE] Calling handleSubmit...");
+          const success = await formRef.current.handleSubmit();
+          console.log("[CREATE PAGE] handleSubmit returned:", success);
+
+          // If validation failed (returned false), reset submitting state
+          if (!success) {
+            console.log("[CREATE PAGE] Validation failed, resetting isSubmitting");
+            setIsSubmitting(false);
+          }
+          // If success (returned true), navigation will unmount the component
         } catch (error) {
+          console.error("[CREATE PAGE] Error submitting airbrushing:", error);
           setIsSubmitting(false);
         }
       },
@@ -113,15 +151,8 @@ export const AirbrushingCreate = () => {
               initialTaskId={taskId || undefined}
               onSuccess={handleSuccess}
               onCancel={handleCancel}
-              onStepChange={(step) => {
-                handleStepChange(step);
-                // Update canSubmit state when form state changes
-                setTimeout(() => {
-                  if (formRef.current) {
-                    setCanSubmit(formRef.current.canSubmit());
-                  }
-                }, 100);
-              }}
+              onStepChange={handleStepChange}
+              onFormStateChange={handleFormStateChange}
             />
         </div>
       </div>

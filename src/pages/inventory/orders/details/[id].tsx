@@ -127,8 +127,7 @@ const OrderDetailsPage = () => {
       await deleteMutation.mutateAsync(order.id);
       navigate(routes.inventory.orders.list);
     } catch (error) {
-      toast.error("Erro ao excluir pedido");
-      console.error(error);
+      console.error("Error deleting order:", error);
     }
   };
 
@@ -147,8 +146,7 @@ const OrderDetailsPage = () => {
       setShowCompleteDialog(false);
       refetch();
     } catch (error) {
-      toast.error("Erro ao marcar pedido como recebido");
-      console.error(error);
+      console.error("Error completing order:", error);
     }
   };
 
@@ -226,8 +224,7 @@ const OrderDetailsPage = () => {
           }
           refetch();
         } catch (error) {
-          toast.error("Erro ao marcar pedido como feito");
-          console.error(error);
+          console.error("Error marking order as done:", error);
         }
       },
     });

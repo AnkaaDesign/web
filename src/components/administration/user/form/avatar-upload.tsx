@@ -68,14 +68,13 @@ export function AvatarUpload({ user, disabled, onAvatarChange }: AvatarUploadPro
       const response = await uploadPhoto(file);
 
       if (response.success && response.data.avatarId) {
-        toast.success("Foto atualizada!");
         onAvatarChange?.(response.data.avatarId);
         if (response.data.avatar) {
           setAvatarUrl(response.data.avatar.url || null);
         }
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Erro ao fazer upload");
+      console.error("Error uploading photo:", error);
       // Restore previous avatar on error
       setAvatarUrl(user?.avatar?.url || null);
     } finally {
@@ -93,12 +92,11 @@ export function AvatarUpload({ user, disabled, onAvatarChange }: AvatarUploadPro
       const response = await deletePhoto();
 
       if (response.success) {
-        toast.success("Foto removida!");
         setAvatarUrl(null);
         onAvatarChange?.(null);
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Erro ao remover foto");
+      console.error("Error deleting photo:", error);
     } finally {
       setIsUploading(false);
       setShowDeleteDialog(false);

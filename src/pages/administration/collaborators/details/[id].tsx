@@ -75,10 +75,9 @@ const CollaboratorDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await mutations.delete(id);
-      toast.success("Colaborador excluído com sucesso");
       navigate(routes.administration.collaborators.root);
     } catch (error) {
-      toast.error("Erro ao excluir colaborador");
+      console.error("Error deleting collaborator:", error);
     }
     setIsDeleteDialogOpen(false);
   };

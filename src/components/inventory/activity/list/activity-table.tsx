@@ -355,10 +355,15 @@ export const ActivityTable = ({ filters, visibleColumns, onDataChange, className
                     {/* Selection checkbox - only show if user has edit permissions */}
                     {showInteractive && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => { e.stopPropagation(); handleSelectActivity(activity.id, e); }}>
+                        <div
+                          className="flex items-center justify-center h-full w-full px-2 py-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSelectActivity(activity.id, e);
+                          }}
+                        >
                           <Checkbox
                             checked={isActivitySelected}
-                            onCheckedChange={() => handleSelectActivity(activity.id)}
                             aria-label={`Selecionar movimentação ${activity.id}`}
                             data-checkbox
                           />

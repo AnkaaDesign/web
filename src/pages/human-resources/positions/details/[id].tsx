@@ -101,10 +101,9 @@ export const PositionDetailPage = () => {
   const handleDelete = async () => {
     try {
       await deleteAsync(id);
-      toast.success("Cargo excluído com sucesso");
       navigate(routes.humanResources.positions.root);
     } catch (error) {
-      toast.error("Erro ao excluir cargo");
+      console.error("Error deleting position:", error);
     }
     setIsDeleteDialogOpen(false);
   };

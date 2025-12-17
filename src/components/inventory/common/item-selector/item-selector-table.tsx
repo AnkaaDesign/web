@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef, MouseEvent } from "react";
 import { IconFilter, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
 import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,9 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTermProp || "");
   const [localFilters, setLocalFilters] = useState<Partial<ItemGetManyFormData>>(filtersProp || {});
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+
+  // Ref to track last clicked item for shift+click range selection
+  const lastClickedIdRef = useRef<string | null>(null);
 
   // Sync prop changes to local state
   useEffect(() => {
@@ -337,16 +340,51 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
 
   const hasActiveFilters = activeFilters.length > 0;
 
-  // Handle row click (selection)
+  // Get current page item IDs for shift+click range selection
+  const currentPageItemIds = useMemo(() => items.map((item) => item.id), [items]);
+
+  // Handle row click (selection) with shift+click support
   const handleRowClick = useCallback(
-    (item: Item) => {
-      // Pass item data (price, icms, ipi) when selecting via row click
+    (item: Item, event?: MouseEvent) => {
+      // Pass item data (quantity/stock, price, icms, ipi) when selecting via row click
+      const quantity = item.quantity; // Current stock
       const price = item.prices?.[0]?.value;
       const icms = item.icms;
       const ipi = item.ipi;
-      onSelectItem(item.id, undefined, price, icms, ipi);
+
+      // Shift+click: select range of items
+      if (event?.shiftKey && lastClickedIdRef.current) {
+        const lastIndex = currentPageItemIds.indexOf(lastClickedIdRef.current);
+        const currentIndex = currentPageItemIds.indexOf(item.id);
+
+        if (lastIndex !== -1 && currentIndex !== -1) {
+          const start = Math.min(lastIndex, currentIndex);
+          const end = Math.max(lastIndex, currentIndex);
+          const rangeIds = currentPageItemIds.slice(start, end + 1);
+
+          // Select all items in range that are not already selected
+          rangeIds.forEach((id) => {
+            if (!selectedItems.has(id)) {
+              const rangeItem = items.find((i) => i.id === id);
+              if (rangeItem) {
+                const rangeQuantity = rangeItem.quantity;
+                const rangePrice = rangeItem.prices?.[0]?.value;
+                const rangeIcms = rangeItem.icms;
+                const rangeIpi = rangeItem.ipi;
+                onSelectItem(id, rangeQuantity, rangePrice, rangeIcms, rangeIpi);
+              }
+            }
+          });
+        }
+      } else {
+        // Regular click: toggle single item
+        onSelectItem(item.id, quantity, price, icms, ipi);
+      }
+
+      // Always update last clicked ID
+      lastClickedIdRef.current = item.id;
     },
-    [onSelectItem]
+    [onSelectItem, currentPageItemIds, items, selectedItems]
   );
 
   // Handle select all on current page
@@ -358,10 +396,14 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
       // Deselect all on current page
       items.forEach((item) => onSelectItem(item.id));
     } else {
-      // Select all on current page
+      // Select all on current page - pass quantity (current stock) for each item
       items.forEach((item) => {
         if (!selectedItems.has(item.id)) {
-          onSelectItem(item.id);
+          const quantity = item.quantity;
+          const price = item.prices?.[0]?.value;
+          const icms = item.icms;
+          const ipi = item.ipi;
+          onSelectItem(item.id, quantity, price, icms, ipi);
         }
       });
     }
@@ -550,17 +592,19 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
                           // Selected state overrides alternating colors
                           itemIsSelected && "bg-muted/30 hover:bg-muted/40"
                         )}
-                        onClick={() => handleRowClick(item)}
+                        onClick={(e) => handleRowClick(item, e)}
                       >
                         {/* Checkbox cell */}
                         <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
                           <div
                             className="flex items-center justify-start h-full w-full px-4 py-2"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRowClick(item, e as unknown as MouseEvent<HTMLTableRowElement>);
+                            }}
                           >
                             <Checkbox
                               checked={itemIsSelected}
-                              onCheckedChange={() => onSelectItem(item.id)}
                               aria-label={`Select ${item.name}`}
                               data-checkbox
                             />

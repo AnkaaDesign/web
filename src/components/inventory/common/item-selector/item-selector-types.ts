@@ -84,8 +84,8 @@ export interface FixedColumnsConfig {
 export interface ItemSelectorTableProps {
   /** Currently selected item IDs */
   selectedItems: Set<string>;
-  /** Handler for item selection */
-  onSelectItem: (itemId: string) => void;
+  /** Handler for item selection - receives item data (quantity/stock, price, icms, ipi) when selecting */
+  onSelectItem: (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => void;
   /** Handler for select all */
   onSelectAll: () => void;
   /** Optional className for styling */

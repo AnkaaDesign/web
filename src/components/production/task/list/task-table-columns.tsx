@@ -149,13 +149,25 @@ export const createTaskColumns = (): TaskColumn[] => [
     accessorFn: (row) => row.truck?.spot || "",
     sortable: true,
     filterable: true,
-    defaultVisible: false,
+    defaultVisible: true,
     width: "120px",
     formatter: (value: string | null) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
       // Format spot name for display (e.g., "B1_F1_V1" -> "B1-F1-V1", "PATIO" -> "Pátio")
-      if (value === "PATIO") return <span className="text-sm">Pátio</span>;
-      return <span className="font-mono text-sm">{value.replace(/_/g, "-")}</span>;
+      if (value === "PATIO") {
+        return (
+          <Badge variant="secondary" className="font-mono">
+            Pátio
+          </Badge>
+        );
+      }
+      // Format garage spot (e.g., "B1_F1_V1" -> "B1-F1-V1")
+      const formattedSpot = value.replace(/_/g, "-");
+      return (
+        <Badge variant="default" className="font-mono">
+          {formattedSpot}
+        </Badge>
+      );
     },
   },
   {

@@ -102,15 +102,12 @@ export function BorrowReturnForm({ borrow, onCancel }: BorrowReturnFormProps) {
       });
 
       if (result.success) {
-        const duration = Math.ceil((returnDate.getTime() - borrowDate.getTime()) / (1000 * 60 * 60 * 24));
-        // Success toast is handled automatically by API client
         navigate(routes.inventory.loans.list);
       } else {
-        toast.error("Erro ao processar devolução. Tente novamente.");
+        setValidationErrors(["Erro ao processar devolução. Tente novamente."]);
       }
     } catch (error) {
       console.error("Error returning borrow:", error);
-      toast.error("Erro inesperado ao devolver empréstimo. Tente novamente.");
       setValidationErrors(["Erro inesperado ao processar devolução"]);
     }
   };

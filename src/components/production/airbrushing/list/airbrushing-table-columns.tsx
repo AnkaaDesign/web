@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { IconPhoto } from "@tabler/icons-react";
 import { formatDate, formatCurrency } from "../../../../utils";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
-import { AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
+import { AIRBRUSHING_STATUS_LABELS, ENTITY_BADGE_CONFIG } from "../../../../constants";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import type { Airbrushing } from "../../../../types";
 
@@ -59,15 +59,7 @@ export function createAirbrushingColumns(): AirbrushingColumn[] {
       header: "STATUS",
       accessor: (airbrushing) => (
         <Badge
-          variant={
-            airbrushing.status === "PENDING"
-              ? "secondary"
-              : airbrushing.status === "IN_PRODUCTION"
-                ? "default"
-                : airbrushing.status === "COMPLETED"
-                  ? "success"
-                  : "destructive"
-          }
+          variant={ENTITY_BADGE_CONFIG.AIRBRUSHING[airbrushing.status] || "default"}
           className="whitespace-nowrap"
         >
           {AIRBRUSHING_STATUS_LABELS[airbrushing.status]}

@@ -62,8 +62,6 @@ export function PriceEditForm({ priceId, onSuccess, onCancel }: PriceEditFormPro
       }
     } catch (error: any) {
       console.error("Error updating price:", error);
-      const errorMessage = error.response?.data?.message || error.message || "Erro ao atualizar preço";
-      toast.error(errorMessage);
     }
   };
 

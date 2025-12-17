@@ -67,10 +67,9 @@ export const VacationDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await deleteAsync(id);
-      toast.success("Férias excluída com sucesso");
       navigate(routes.humanResources.vacations.root);
     } catch (error) {
-      toast.error("Erro ao excluir férias");
+      console.error("Error deleting vacation:", error);
     }
     setIsDeleteDialogOpen(false);
   };

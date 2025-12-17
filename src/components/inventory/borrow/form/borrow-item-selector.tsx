@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback, MouseEvent } from "react";
 import { IconSearch, IconFilter, IconChevronUp, IconChevronDown, IconRefresh, IconSelector } from "@tabler/icons-react";
 import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
 import { Button } from "@/components/ui/button";
@@ -99,6 +99,9 @@ export const BorrowItemSelector = ({
   updateSelectedItems,
 }: BorrowItemSelectorProps) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Ref to track last clicked item for shift+click range selection
+  const lastClickedIdRef = useRef<string | null>(null);
 
   // Use direct filter update for immediate, atomic URL updates
   const { updateFilters: directUpdateFilters } = useDirectFilterUpdate();
@@ -315,6 +318,60 @@ export const BorrowItemSelector = ({
       scrollContainerRef.current.scrollTop = 0;
     }
   };
+
+  // Get current page item IDs for shift+click range selection
+  const currentPageItemIds = useMemo(() => items.map((item) => item.id), [items]);
+
+  // Handle row selection with shift+click support
+  const handleRowSelection = useCallback(
+    (item: typeof items[0], event?: MouseEvent) => {
+      // Calculate available stock
+      const activeBorrowsQuantity =
+        item.borrows?.reduce((total, borrow) => {
+          return borrow.status === "ACTIVE" ? total + borrow.quantity : total;
+        }, 0) || 0;
+      const availableStock = item.quantity - activeBorrowsQuantity;
+
+      // Don't allow selection of items without stock
+      if (availableStock <= 0) return;
+
+      // Shift+click: select range of items
+      if (event?.shiftKey && lastClickedIdRef.current) {
+        const lastIndex = currentPageItemIds.indexOf(lastClickedIdRef.current);
+        const currentIndex = currentPageItemIds.indexOf(item.id);
+
+        if (lastIndex !== -1 && currentIndex !== -1) {
+          const start = Math.min(lastIndex, currentIndex);
+          const end = Math.max(lastIndex, currentIndex);
+          const rangeIds = currentPageItemIds.slice(start, end + 1);
+
+          // Select all items in range that are not already selected (and have stock)
+          rangeIds.forEach((id) => {
+            if (!selectedItems.has(id)) {
+              const rangeItem = items.find((i) => i.id === id);
+              if (rangeItem) {
+                const rangeActiveBorrows =
+                  rangeItem.borrows?.reduce((total, borrow) => {
+                    return borrow.status === "ACTIVE" ? total + borrow.quantity : total;
+                  }, 0) || 0;
+                const rangeAvailableStock = rangeItem.quantity - rangeActiveBorrows;
+                if (rangeAvailableStock > 0) {
+                  onSelectItem(id);
+                }
+              }
+            }
+          });
+        }
+      } else {
+        // Regular click: toggle single item
+        onSelectItem(item.id);
+      }
+
+      // Always update last clicked ID
+      lastClickedIdRef.current = item.id;
+    },
+    [selectedItems, currentPageItemIds, items, onSelectItem]
+  );
 
   // Check if all current page items are selected
   const allPageItemsSelected = items.length > 0 && items.every((item) => isSelected(item.id));
@@ -750,13 +807,18 @@ export const BorrowItemSelector = ({
                           hasStock && "hover:bg-muted/20",
                           itemIsSelected && "bg-muted/30 hover:bg-muted/40",
                         )}
-                        onClick={() => hasStock && onSelectItem(item.id)}
+                        onClick={(e) => hasStock && handleRowSelection(item, e)}
                       >
                         <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                          <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                          <div
+                            className="flex items-center justify-center h-full w-full px-2 py-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (hasStock) handleRowSelection(item, e as unknown as MouseEvent<HTMLTableRowElement>);
+                            }}
+                          >
                             <Checkbox
                               checked={itemIsSelected}
-                              onCheckedChange={() => hasStock && onSelectItem(item.id)}
                               aria-label={`Select ${item.name}`}
                               disabled={!hasStock}
                               data-checkbox

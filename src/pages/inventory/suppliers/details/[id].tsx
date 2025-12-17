@@ -81,10 +81,9 @@ const SupplierDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await deleteSupplier.mutateAsync(id);
-      toast.success("Fornecedor excluído com sucesso");
       navigate(routes.inventory.suppliers.root);
     } catch (error) {
-      toast.error("Erro ao excluir fornecedor");
+      console.error("Error deleting supplier:", error);
     }
     setIsDeleteDialogOpen(false);
   };

@@ -653,7 +653,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
               console.log('[TaskEditForm SUBMIT] ✅ Successfully deleted', deletePromises.length, 'layout(s)');
             } catch (error) {
               console.error('[TaskEditForm SUBMIT] ❌ Error deleting layouts:', error);
-              toast.error('Erro ao remover layouts');
             }
           }
 

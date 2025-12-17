@@ -81,10 +81,9 @@ export const ObservationDetailsPage = () => {
   const handleDelete = async () => {
     try {
       await deleteAsync(id);
-      toast.success("Observação excluída com sucesso");
       navigate(routes.production.observations.root);
     } catch (error) {
-      toast.error("Erro ao excluir observação");
+      console.error("Error deleting observation:", error);
     }
     setIsDeleteDialogOpen(false);
   };

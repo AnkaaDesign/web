@@ -137,11 +137,10 @@ export function ProfilePage() {
       const response = await updateProfile(data);
 
       if (response.success) {
-        toast.success("Perfil atualizado com sucesso!");
         setUser(response.data);
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Erro ao atualizar perfil");
+      console.error("Error updating profile:", error);
     } finally {
       setIsSaving(false);
     }
@@ -183,14 +182,13 @@ export function ProfilePage() {
       const response = await uploadPhoto(file, user?.name);
 
       if (response.success) {
-        toast.success("Foto atualizada com sucesso!");
         setUser(response.data);
         if (response.data.avatar) {
           setPhotoPreview(response.data.avatar.url || null);
         }
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Erro ao fazer upload da foto");
+      console.error("Error uploading photo:", error);
       // Restore previous photo on error
       if (user?.avatar) {
         setPhotoPreview(user.avatar.url || null);
@@ -208,12 +206,11 @@ export function ProfilePage() {
       const response = await deletePhoto();
 
       if (response.success) {
-        toast.success("Foto removida com sucesso!");
         setUser(response.data);
         setPhotoPreview(null);
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Erro ao remover foto");
+      console.error("Error deleting photo:", error);
     } finally {
       setIsUploadingPhoto(false);
       setShowDeletePhotoDialog(false);

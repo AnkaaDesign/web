@@ -102,8 +102,7 @@ export const SectorDetailPage = () => {
       await deleteAsync(id);
       navigate(routes.administration.sectors.root);
     } catch (error) {
-      toast.error("Erro ao excluir setor");
-      console.error(error);
+      console.error("Error deleting sector:", error);
     }
     setIsDeleteDialogOpen(false);
   };

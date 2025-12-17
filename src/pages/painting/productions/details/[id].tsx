@@ -29,7 +29,11 @@ export function ProductionDetailsPage() {
     include: {
       formula: {
         include: {
-          paint: true,
+          paint: {
+            include: {
+              paintBrand: true,
+            },
+          },
           components: {
             include: {
               item: true,

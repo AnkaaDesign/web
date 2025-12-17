@@ -53,7 +53,7 @@ export const SectorBatchEditPage = () => {
       const result = await batchUpdate(data);
 
       if (result.data) {
-        // Success toast is handled automatically by API client
+        // Batch operations need manual toast since API client skips them
         toast.success(`${result.data.totalSuccess} setor${result.data.totalSuccess !== 1 ? "es" : ""} processado${result.data.totalSuccess !== 1 ? "s" : ""}`);
 
         if (result.data.totalFailed > 0) {

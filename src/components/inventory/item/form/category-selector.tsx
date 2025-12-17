@@ -98,14 +98,12 @@ export function CategorySelector({ disabled, required, onCategoryChange, initial
       });
 
       if (result.success && result.data) {
-        toast.success("Categoria criada", `A categoria "${name}" foi criada com sucesso.`);
-
         // Set the newly created category as selected
         const newCategoryId = result.data.id;
         return newCategoryId;
       }
     } catch (error) {
-      toast.error("Erro ao criar categoria", "Não foi possível criar a categoria. Tente novamente.");
+      console.error("Error creating category:", error);
       throw error;
     } finally {
       setIsCreating(false);

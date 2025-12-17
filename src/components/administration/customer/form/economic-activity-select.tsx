@@ -16,7 +16,7 @@ export function EconomicActivitySelect() {
       queryClient.invalidateQueries({ queryKey: ["economic-activities"] });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Erro ao criar atividade econômica");
+      console.error("Error creating economic activity:", error);
     },
   });
 
@@ -32,7 +32,6 @@ export function EconomicActivitySelect() {
       });
 
       form.setValue("economicActivityId", result.data.id, { shouldDirty: true, shouldValidate: true });
-      toast.success(result.message || "Atividade econômica configurada com sucesso");
     } catch (error) {
       // Error handled by mutation
     }

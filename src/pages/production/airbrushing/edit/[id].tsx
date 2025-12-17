@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { useAirbrushing } from "../../../../hooks";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
@@ -64,9 +64,10 @@ export const AirbrushingEdit = () => {
   };
 
   // Handle form state changes to re-render button state
-  const handleFormStateChange = () => {
+  // IMPORTANT: Must be memoized to prevent infinite loops
+  const handleFormStateChange = useCallback(() => {
     forceUpdate({});
-  };
+  }, []);
 
   // Loading state
   if (isLoading) {
