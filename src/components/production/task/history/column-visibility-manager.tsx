@@ -13,9 +13,11 @@ interface ColumnVisibilityManagerProps {
   columns: TaskColumn[];
   visibleColumns: Set<string>;
   onVisibilityChange: (columns: Set<string>) => void;
+  /** Custom default columns to use for reset. If not provided, uses column definitions' defaultVisible property */
+  defaultColumns?: Set<string>;
 }
 
-export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityChange }: ColumnVisibilityManagerProps) {
+export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityChange, defaultColumns }: ColumnVisibilityManagerProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [localVisible, setLocalVisible] = useState(visibleColumns);
@@ -45,7 +47,8 @@ export function ColumnVisibilityManager({ columns, visibleColumns, onVisibilityC
   };
 
   const handleReset = () => {
-    setLocalVisible(getDefaultVisibleColumns(columns));
+    // Use custom defaults if provided, otherwise use column definitions' defaultVisible property
+    setLocalVisible(defaultColumns || getDefaultVisibleColumns(columns));
   };
 
   const handleApply = () => {

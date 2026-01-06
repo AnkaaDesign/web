@@ -298,7 +298,7 @@ export function CustomerForm(props: CustomerFormProps) {
 
   return (
     <Form {...form}>
-      <form id="customer-form" onSubmit={form.handleSubmit(onSubmit)}>
+      <form id="customer-form" onSubmit={form.handleSubmit(onSubmit)} className="container mx-auto max-w-4xl">
         {/* Hidden submit button for programmatic form submission */}
         <button id="customer-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
           Submit

@@ -52,19 +52,20 @@ export const CreateCustomerPage = () => {
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-      <PageHeader
-        title="Cadastrar Cliente"
-        icon={IconUsers}
-        favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_CADASTRAR}
-        breadcrumbs={[
-          { label: "Início", href: routes.home },
-          { label: "Administração", href: routes.administration.root },
-          { label: "Clientes", href: routes.administration.customers.root },
-          { label: "Cadastrar" },
-        ]}
-        actions={actions}
-        className="flex-shrink-0"
-      />
+      <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <PageHeader
+          title="Cadastrar Cliente"
+          icon={IconUsers}
+          favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_CADASTRAR}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Administração", href: routes.administration.root },
+            { label: "Clientes", href: routes.administration.customers.root },
+            { label: "Cadastrar" },
+          ]}
+          actions={actions}
+        />
+      </div>
       <div className="flex-1 overflow-y-auto pb-6">
         <CustomerForm mode="create" onSubmit={handleSubmit} isSubmitting={createCustomer.isPending} onFormStateChange={setFormState} />
       </div>

@@ -104,34 +104,34 @@ const EditBrandPage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col px-4 pt-4">
-      <PageHeader
-        variant="form"
-        title={`Editar ${brand.name}`}
-        icon={IconTag}
-        breadcrumbs={[
-          { label: "Início", href: routes.home },
-          { label: "Estoque", href: routes.inventory.root },
-          { label: "Produtos", href: routes.inventory.products.root },
-          { label: "Marcas", href: routes.inventory.products.brands.root },
-          { label: brand.name, href: routes.inventory.products.brands.details(id!) },
-          { label: "Editar" },
-        ]}
-        actions={actions}
-      />
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <PageHeader
+          variant="form"
+          title={`Editar ${brand.name}`}
+          icon={IconTag}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Estoque", href: routes.inventory.root },
+            { label: "Produtos", href: routes.inventory.products.root },
+            { label: "Marcas", href: routes.inventory.products.brands.root },
+            { label: brand.name, href: routes.inventory.products.brands.details(id!) },
+            { label: "Editar" },
+          ]}
+          actions={actions}
+        />
+      </div>
       <div className="flex-1 overflow-y-auto pb-6">
-        <div className="mt-4 space-y-4">
-          <BrandForm
-            mode="update"
-            defaultValues={{
-              name: brand.name,
-              itemIds: currentItemIds,
-            }}
-            initialItems={brandItems}
-            onSubmit={handleFormSubmit}
-            isSubmitting={updateMutation.isPending}
-          />
-        </div>
+        <BrandForm
+          mode="update"
+          defaultValues={{
+            name: brand.name,
+            itemIds: currentItemIds,
+          }}
+          initialItems={brandItems}
+          onSubmit={handleFormSubmit}
+          isSubmitting={updateMutation.isPending}
+        />
       </div>
     </div>
   );

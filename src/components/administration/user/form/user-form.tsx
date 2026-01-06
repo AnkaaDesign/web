@@ -300,7 +300,7 @@ export function UserForm(props: UserFormProps) {
 
   return (
     <Form {...form}>
-      <form id="user-form" onSubmit={form.handleSubmit(onSubmit)}>
+      <form id="user-form" onSubmit={form.handleSubmit(onSubmit)} className="container mx-auto max-w-4xl">
         {/* Hidden submit button for programmatic form submission */}
         <button id="user-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
           Submit

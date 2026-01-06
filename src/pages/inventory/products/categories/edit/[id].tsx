@@ -103,34 +103,34 @@ const EditCategoryPage = () => {
   }
 
   return (
-    <div className="h-full flex flex-col px-4 pt-4">
-      <PageHeader
-        variant="form"
-        title={`Editar ${category.name}`}
-        icon={IconCategory}
-        breadcrumbs={[
-          { label: "Início", href: routes.home },
-          { label: "Estoque", href: routes.inventory.root },
-          { label: "Produtos", href: routes.inventory.products.root },
-          { label: "Categorias", href: routes.inventory.products.categories.root },
-          { label: category.name, href: routes.inventory.products.categories.details(id!) },
-          { label: "Editar" },
-        ]}
-        actions={actions}
-      />
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <PageHeader
+          variant="form"
+          title={`Editar ${category.name}`}
+          icon={IconCategory}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Estoque", href: routes.inventory.root },
+            { label: "Produtos", href: routes.inventory.products.root },
+            { label: "Categorias", href: routes.inventory.products.categories.root },
+            { label: category.name, href: routes.inventory.products.categories.details(id!) },
+            { label: "Editar" },
+          ]}
+          actions={actions}
+        />
+      </div>
       <div className="flex-1 overflow-y-auto pb-6">
-        <div className="mt-4 space-y-4">
-          <CategoryForm
-            mode="update"
-            defaultValues={{
-              name: category.name,
-              itemIds: currentItemIds,
-            }}
-            initialItems={currentItems}
-            onSubmit={handleFormSubmit}
-            isSubmitting={updateMutation.isPending}
-          />
-        </div>
+        <CategoryForm
+          mode="update"
+          defaultValues={{
+            name: category.name,
+            itemIds: currentItemIds,
+          }}
+          initialItems={currentItems}
+          onSubmit={handleFormSubmit}
+          isSubmitting={updateMutation.isPending}
+        />
       </div>
     </div>
   );

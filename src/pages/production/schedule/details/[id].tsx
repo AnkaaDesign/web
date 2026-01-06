@@ -32,6 +32,8 @@ import {
 import { formatDate, formatDateTime, formatCurrency, formatChassis, formatTruckSpot, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
+import { canViewServiceOrderType, canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
+import { SERVICE_ORDER_TYPE } from "../../../../constants";
 import { generateBudgetPDF } from "../../../../utils/budget-pdf-generator";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import {
@@ -577,23 +579,23 @@ export const TaskDetailsPage = () => {
   const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("list");
   const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("list");
 
-  // Check if user is from Financial sector
+  // Get user's sector privilege for service order permissions
+  const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
+
+  // Check if user is from Financial sector (for other UI elements)
   const isFinancialSector = currentUser ? hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) && currentUser.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL : false;
-
-  // Check if user is from Designer sector
-  const isDesignerSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
-
-  // Check if user is from Logistic sector
-  const isLogisticSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC;
-
-  // Check if user should see service orders and artworks (hide for Financial, Designer, Logistic)
-  const shouldHideServiceOrdersAndArtworks = isFinancialSector || isDesignerSector || isLogisticSector;
 
   // Check if user is from Warehouse sector (should hide documents, budgets, and changelog)
   const isWarehouseSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
 
-  // Check if user can edit service orders (Admin or team leader only - based on managedSector)
-  const canEditServiceOrders = currentUser && (isTeamLeader(currentUser) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN));
+  // Get visible service order types based on user's sector privilege
+  const visibleServiceOrderTypes = useMemo(
+    () => getVisibleServiceOrderTypes(userSectorPrivilege),
+    [userSectorPrivilege]
+  );
+
+  // Check if user has any visible service order types
+  const hasVisibleServiceOrders = visibleServiceOrderTypes.length > 0;
 
   // Check if user can view airbrushing financial data (FINANCIAL or ADMIN only)
   const canViewAirbrushingFinancials = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN));
@@ -668,7 +670,11 @@ export const TaskDetailsPage = () => {
         },
       },
       createdBy: true,
-      services: true,
+      services: {
+        include: {
+          assignedTo: true,
+        },
+      },
       artworks: true,
       budget: true,
       budgets: true,
@@ -768,15 +774,25 @@ export const TaskDetailsPage = () => {
     return { width: totalWidth, height };
   }, [layouts]);
 
-  // Filter service orders to show only PENDING, IN_PROGRESS, and COMPLETED
+  // Filter service orders by:
+  // 1. Status: only PENDING, IN_PROGRESS, and COMPLETED
+  // 2. Type: only types the user has permission to view based on sector privilege
   const filteredServiceOrders = useMemo(() => {
     if (!task?.services) return [];
     return task.services
-      .filter(
-        (service) => service.status === SERVICE_ORDER_STATUS.PENDING || service.status === SERVICE_ORDER_STATUS.IN_PROGRESS || service.status === SERVICE_ORDER_STATUS.COMPLETED,
-      )
+      .filter((service) => {
+        // Filter by status
+        const hasValidStatus = service.status === SERVICE_ORDER_STATUS.PENDING ||
+          service.status === SERVICE_ORDER_STATUS.IN_PROGRESS ||
+          service.status === SERVICE_ORDER_STATUS.COMPLETED;
+        if (!hasValidStatus) return false;
+
+        // Filter by type based on user's sector privilege
+        const serviceType = service.type as SERVICE_ORDER_TYPE;
+        return visibleServiceOrderTypes.includes(serviceType);
+      })
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [task?.services]);
+  }, [task?.services, visibleServiceOrderTypes]);
 
   // Determine if we came from history, preparation, or schedule
   const isFromHistory = location.pathname.includes('/historico/');
@@ -1388,8 +1404,8 @@ export const TaskDetailsPage = () => {
                 </Card>
               )}
 
-              {/* Service Orders Card - Hidden for Financial, Designer, Logistic sectors */}
-              {sectionVisibility.isSectionVisible("serviceOrders") && !shouldHideServiceOrdersAndArtworks && filteredServiceOrders.length > 0 && (
+              {/* Service Orders Card - Visibility based on sector privilege and service order type */}
+              {sectionVisibility.isSectionVisible("serviceOrders") && hasVisibleServiceOrders && filteredServiceOrders.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-900">
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
@@ -1410,6 +1426,13 @@ export const TaskDetailsPage = () => {
                     <h4 className="text-sm font-semibold">{serviceOrder.description}</h4>
                   </div>
 
+                  {serviceOrder.assignedTo && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <IconUser className="h-3 w-3" />
+                      <span>Responsável: {serviceOrder.assignedTo.name}</span>
+                    </div>
+                  )}
+
                   {(serviceOrder.startedAt || serviceOrder.finishedAt) && (
                     <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                       {serviceOrder.startedAt && (
@@ -1428,9 +1451,14 @@ export const TaskDetailsPage = () => {
                   )}
                     </div>
 
-                    {/* Status Change Dropdown - Only for Admin and Leader */}
+                    {/* Status Change Dropdown - Permission-based per service order type and assignment */}
                     <div className="flex items-center">
-                  {canEditServiceOrders ? (
+                  {canEditServiceOrder(
+                    userSectorPrivilege,
+                    serviceOrder.type as SERVICE_ORDER_TYPE,
+                    serviceOrder.assignedToId,
+                    currentUser?.id
+                  ) ? (
                     <Combobox
                       value={serviceOrder.status || undefined}
                       onValueChange={(newStatus) => handleServiceOrderStatusChange(serviceOrder.id, newStatus as SERVICE_ORDER_STATUS)}
@@ -1533,8 +1561,8 @@ export const TaskDetailsPage = () => {
                 </Card>
               )}
 
-              {/* Artworks Card - 1/2 width - Hidden for Financial, Designer, Logistic sectors */}
-              {sectionVisibility.isSectionVisible("artworks") && !shouldHideServiceOrdersAndArtworks && task.artworks && task.artworks.length > 0 && (
+              {/* Artworks Card - 1/2 width - Visibility based on sector privilege for ARTWORK type */}
+              {sectionVisibility.isSectionVisible("artworks") && canViewServiceOrderType(userSectorPrivilege, SERVICE_ORDER_TYPE.ARTWORK) && task.artworks && task.artworks.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1">
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">

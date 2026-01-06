@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { TaskScheduleTable } from "./task-schedule-table";
 import { TaskScheduleEmptyState } from "./task-schedule-empty-state";
 import { TaskScheduleFilters } from "./task-schedule-filters";
-import { ColumnVisibilityManager } from "./column-visibility-manager";
+import { ColumnVisibilityManager, getDefaultVisibleColumns } from "./column-visibility-manager";
 import { TaskScheduleExport } from "./task-schedule-export";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { CopyFromTaskModal, type CopyableField } from "./copy-from-task-modal";
@@ -60,11 +60,8 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   // Check if user can export (Admin or Financial only)
   const canExport = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL));
 
-  // Default visible columns
-  const defaultVisibleColumns = useMemo(
-    () => new Set(["name", "customer.fantasyName", "generalPainting", "serialNumberOrPlate", "entryDate", "term", "remainingTime"]),
-    []
-  );
+  // Default visible columns - use shared function to ensure consistency with ColumnVisibilityManager
+  const defaultVisibleColumns = useMemo(() => getDefaultVisibleColumns(), []);
 
   // Visible columns state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility("task-schedule-visible-columns", defaultVisibleColumns);

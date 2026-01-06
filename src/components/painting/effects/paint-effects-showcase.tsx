@@ -91,8 +91,8 @@ export const PaintEffectsShowcase: React.FC = () => {
             <div className="space-y-3">
               <Label>Cor Base</Label>
               <div className="flex gap-2">
-                <Input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-16 h-10 p-1 rounded border" />
-                <Input type="text" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} placeholder="#FF6B35" className="flex-1" />
+                <Input type="color" value={selectedColor} onChange={(value) => setSelectedColor(String(value || ""))} className="w-16 h-10 p-1 rounded border" />
+                <Input type="text" value={selectedColor} onChange={(value) => setSelectedColor(String(value || ""))} placeholder="#FF6B35" className="flex-1" />
               </div>
 
               {/* Preset Colors */}

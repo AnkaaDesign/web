@@ -115,20 +115,21 @@ export const SupplierEditPage = () => {
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-      <PageHeader
-        variant="form"
-        title="Editar Fornecedor"
-        icon={IconBuilding}
-        breadcrumbs={[
-          { label: "Início", href: routes.home },
-          { label: "Estoque", href: routes.inventory.root },
-          { label: "Fornecedores", href: routes.inventory.suppliers.root },
-          { label: supplier.fantasyName, href: routes.inventory.suppliers.details(id!) },
-          { label: "Editar" },
-        ]}
-        actions={actions}
-        className="flex-shrink-0"
-      />
+      <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <PageHeader
+          variant="form"
+          title="Editar Fornecedor"
+          icon={IconBuilding}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Estoque", href: routes.inventory.root },
+            { label: "Fornecedores", href: routes.inventory.suppliers.root },
+            { label: supplier.fantasyName, href: routes.inventory.suppliers.details(id!) },
+            { label: "Editar" },
+          ]}
+          actions={actions}
+        />
+      </div>
       <div className="flex-1 overflow-y-auto pb-6">
         <SupplierEditForm supplier={supplier} onSubmit={handleSubmit} isSubmitting={updateSupplier.isPending} onFormStateChange={setFormState} />
       </div>

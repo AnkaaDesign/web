@@ -53,24 +53,24 @@ const CreateBrandPage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col px-4 pt-4">
-      <PageHeader
-        title="Cadastrar Marca"
-        icon={IconTag}
-        favoritePage={FAVORITE_PAGES.ESTOQUE_PRODUTOS_MARCAS_CADASTRAR}
-        breadcrumbs={[
-          { label: "Início", href: routes.home },
-          { label: "Estoque", href: routes.inventory.root },
-          { label: "Produtos", href: routes.inventory.products.root },
-          { label: "Marcas", href: routes.inventory.products.brands.root },
-          { label: "Cadastrar" },
-        ]}
-        actions={actions}
-      />
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <PageHeader
+          title="Cadastrar Marca"
+          icon={IconTag}
+          favoritePage={FAVORITE_PAGES.ESTOQUE_PRODUTOS_MARCAS_CADASTRAR}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Estoque", href: routes.inventory.root },
+            { label: "Produtos", href: routes.inventory.products.root },
+            { label: "Marcas", href: routes.inventory.products.brands.root },
+            { label: "Cadastrar" },
+          ]}
+          actions={actions}
+        />
+      </div>
       <div className="flex-1 overflow-y-auto pb-6">
-        <div className="mt-4 space-y-4">
-          <BrandForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
-        </div>
+        <BrandForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
       </div>
     </div>
   );

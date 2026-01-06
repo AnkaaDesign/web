@@ -49,9 +49,9 @@ export const TableSearchInput = forwardRef<HTMLInputElement, TableSearchInputPro
           ref={ref}
           type="text"
           value={value}
-          onChange={(newValue) => {
-            // The Input component already gives us the cleaned value
-            onChange(typeof newValue === "string" ? newValue : "");
+          onChange={(value) => {
+            // Input component now passes the value directly (string)
+            onChange(typeof value === "string" ? value : "");
           }}
           placeholder={placeholder}
           disabled={disabled}

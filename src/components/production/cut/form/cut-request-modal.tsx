@@ -172,7 +172,7 @@ export function CutRequestModal({ open, onOpenChange, cutItem, onSuccess }: CutR
                 <FormItem>
                   <FormLabel>Quantidade de Novos Cortes</FormLabel>
                   <FormControl>
-                    <Input type="number" min={1} max={100} placeholder="1" {...field} onChange={(e) => field.onChange(e.target.valueAsNumber || 1)} />
+                    <Input type="number" min={1} max={100} placeholder="1" {...field} onChange={(value) => field.onChange(typeof value === "number" ? value : 1)} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

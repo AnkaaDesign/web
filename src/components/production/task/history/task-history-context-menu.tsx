@@ -1,15 +1,18 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconArrowBackUp } from "@tabler/icons-react";
+import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
-import { getChangeLogs } from "../../../../api-client";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
 import { SetStatusModal } from "../schedule/set-status-modal";
 import { SetSectorModal } from "../schedule/set-sector-modal";
+import { DuplicateTaskModal, type DuplicateTaskCopyData } from "../schedule/duplicate-task-modal";
 import { useAuth } from "@/contexts/auth-context";
+import { canDeleteTasks } from "@/utils/permissions/entity-permissions";
+import { isTeamLeader } from "@/utils/user";
+import { canLeaderManageTask } from "@/utils/permissions/entity-permissions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +30,8 @@ interface TaskHistoryContextMenuProps {
   onClose: () => void;
   selectedIds: string[];
   navigationRoute?: 'history' | 'preparation' | 'schedule';
+  advancedActionsRef?: React.RefObject<{ openModal: (type: string, taskIds: string[]) => void } | null>;
+  onStartCopyFromTask?: (targetTasks: Task[]) => void;
 }
 
 export function TaskHistoryContextMenu({
@@ -34,21 +39,20 @@ export function TaskHistoryContextMenu({
   position,
   onClose,
   selectedIds,
-  navigationRoute = 'schedule'
+  navigationRoute = 'schedule',
+  advancedActionsRef,
+  onStartCopyFromTask,
 }: TaskHistoryContextMenuProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { update, remove } = useTaskMutations();
+  const { update, remove, createAsync } = useTaskMutations();
   const { batchUpdate, batchDelete } = useTaskBatchMutations();
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(true);
   const openingModalRef = React.useRef(false);
   const justOpenedRef = React.useRef(true);
-  const [restoreDialog, setRestoreDialog] = useState<{ open: boolean; tasks: Task[] }>({
-    open: false,
-    tasks: [],
-  });
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; tasks: Task[] }>({
     open: false,
     tasks: [],
@@ -58,11 +62,26 @@ export function TaskHistoryContextMenu({
   const taskIds = tasks.map(t => t.id);
   const task = tasks[0];
 
-  // Check if all tasks are ON_HOLD
-  const allTasksOnHold = tasks.every(t => t.status === TASK_STATUS.ON_HOLD);
+  // Check task statuses for status actions
+  const hasInProgressTasks = tasks.some((t) => t.status === TASK_STATUS.IN_PRODUCTION);
+  const hasPendingTasks = tasks.some((t) => t.status === TASK_STATUS.PENDING);
+  const hasPreparationTasks = tasks.some((t) => t.status === TASK_STATUS.PREPARATION);
+  const hasCompletedTasks = tasks.some((t) => t.status === TASK_STATUS.COMPLETED);
+
+  // Permission checks
+  const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+  const isTeamLeaderUser = user ? isTeamLeader(user) : false;
+  const canDelete = canDeleteTasks(user);
+
+  // Team leaders can only manage tasks in their managed sector or tasks without sector
+  const canLeaderManageTheseTasks = isTeamLeaderUser && tasks.every((t) => canLeaderManageTask(user, t.sectorId));
+  const canManageStatus = isAdmin || canLeaderManageTheseTasks;
 
   // FINANCIAL users should only see View and Edit options
   const isFinancialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
+
+  // Check if we're on the preparation/agenda route (to hide Definir Setor)
+  const isPreparationRoute = navigationRoute === 'preparation';
 
   // Reset justOpened flag whenever position changes (new right-click)
   React.useEffect(() => {
@@ -80,14 +99,14 @@ export function TaskHistoryContextMenu({
 
   // When a modal or dialog opens, close the dropdown
   React.useEffect(() => {
-    if (setStatusModalOpen || setSectorModalOpen || restoreDialog.open || deleteDialog.open) {
+    if (setStatusModalOpen || setSectorModalOpen || duplicateModalOpen || deleteDialog.open) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('[TaskHistoryContextMenu] Modal/Dialog opened, closing dropdown');
       }
       openingModalRef.current = false;
       setDropdownOpen(false);
     }
-  }, [setStatusModalOpen, setSectorModalOpen, restoreDialog.open, deleteDialog.open]);
+  }, [setStatusModalOpen, setSectorModalOpen, duplicateModalOpen, deleteDialog.open]);
 
   // Close the entire component when dropdown closes and no modals/dialogs are open
   React.useEffect(() => {
@@ -96,21 +115,21 @@ export function TaskHistoryContextMenu({
         dropdownOpen,
         setStatusModalOpen,
         setSectorModalOpen,
-        restoreDialogOpen: restoreDialog.open,
+        duplicateModalOpen,
         deleteDialogOpen: deleteDialog.open,
         openingModal: openingModalRef.current,
-        shouldClose: !dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !restoreDialog.open && !deleteDialog.open && !openingModalRef.current
+        shouldClose: !dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !duplicateModalOpen && !deleteDialog.open && !openingModalRef.current
       });
     }
 
     // Don't close if we're in the process of opening a modal or if any dialog is open
-    if (!dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !restoreDialog.open && !deleteDialog.open && !openingModalRef.current) {
+    if (!dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !duplicateModalOpen && !deleteDialog.open && !openingModalRef.current) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('[TaskHistoryContextMenu] Calling onClose()');
       }
       onClose();
     }
-  }, [dropdownOpen, setStatusModalOpen, setSectorModalOpen, restoreDialog.open, deleteDialog.open, onClose]);
+  }, [dropdownOpen, setStatusModalOpen, setSectorModalOpen, duplicateModalOpen, deleteDialog.open, onClose]);
 
   const handleView = () => {
     if (task && !isBulk) {
@@ -213,80 +232,6 @@ export function TaskHistoryContextMenu({
     }
   };
 
-  const handleRestore = () => {
-    setRestoreDialog({ open: true, tasks });
-    setDropdownOpen(false);
-  };
-
-  const handleRestoreConfirm = async () => {
-    const tasksToRestore = restoreDialog.tasks;
-    try {
-      // Process each task
-      const updates = await Promise.all(
-        tasksToRestore.map(async (task) => {
-          try {
-            // Fetch changelogs for this task
-            const changelogsResponse = await getChangeLogs({
-              entityType: "Task",
-              entityId: task.id,
-              field: "status",
-              orderBy: { createdAt: "desc" },
-              limit: 100,
-            });
-
-            // Find the changelog entry where the task was put ON_HOLD
-            const onHoldChange = changelogsResponse.data.find(
-              (log: any) => log.field === "status" && log.newValue === TASK_STATUS.ON_HOLD
-            );
-
-            if (onHoldChange && onHoldChange.oldValue) {
-              const previousStatus = onHoldChange.oldValue;
-              if (process.env.NODE_ENV !== 'production') {
-                console.log(`[TaskHistoryContextMenu] Restoring task ${task.id} to previous status:`, previousStatus);
-              }
-
-              const updateData: any = { status: previousStatus };
-
-              // Set appropriate dates based on the status
-              // Always include dates for statuses that require them
-              if (previousStatus === TASK_STATUS.IN_PRODUCTION) {
-                updateData.startedAt = task.startedAt || new Date();
-              } else if (previousStatus === TASK_STATUS.COMPLETED) {
-                updateData.finishedAt = task.finishedAt || new Date();
-                updateData.startedAt = task.startedAt || new Date();
-              }
-
-              return { id: task.id, data: updateData };
-            } else {
-              if (process.env.NODE_ENV !== 'production') {
-                console.warn(`[TaskHistoryContextMenu] No previous status found for task ${task.id}, defaulting to PENDING`);
-              }
-              return { id: task.id, data: { status: TASK_STATUS.PENDING } };
-            }
-          } catch (error) {
-            if (process.env.NODE_ENV !== 'production') {
-              console.error(`Error fetching changelog for task ${task.id}:`, error);
-            }
-            // Default to PENDING if we can't fetch the changelog
-            return { id: task.id, data: { status: TASK_STATUS.PENDING } };
-          }
-        })
-      );
-
-      if (updates.length === 1) {
-        await update(updates[0]);
-      } else {
-        await batchUpdate({ items: updates });
-      }
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error("Error restoring task(s):", error);
-      }
-    } finally {
-      setRestoreDialog({ open: false, tasks: [] });
-    }
-  };
-
   const handleDelete = () => {
     setDeleteDialog({ open: true, tasks });
     setDropdownOpen(false);
@@ -307,6 +252,155 @@ export function TaskHistoryContextMenu({
     } finally {
       setDeleteDialog({ open: false, tasks: [] });
     }
+  };
+
+  // Status action handlers
+  const handleStart = async () => {
+    try {
+      for (const t of tasks) {
+        if (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.PREPARATION) {
+          await update({
+            id: t.id,
+            data: { status: TASK_STATUS.IN_PRODUCTION, startedAt: new Date() },
+          });
+        }
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error starting task(s):", error);
+      }
+    }
+    setDropdownOpen(false);
+  };
+
+  const handleFinish = async () => {
+    try {
+      for (const t of tasks) {
+        if (t.status === TASK_STATUS.IN_PRODUCTION) {
+          await update({
+            id: t.id,
+            data: { status: TASK_STATUS.COMPLETED, finishedAt: new Date() },
+          });
+        }
+      }
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error finishing task(s):", error);
+      }
+    }
+    setDropdownOpen(false);
+  };
+
+  const handleDuplicate = () => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskHistoryContextMenu] handleDuplicate called');
+    }
+    openingModalRef.current = true;
+    setDuplicateModalOpen(true);
+  };
+
+  const handleDuplicateConfirm = async (copies: DuplicateTaskCopyData) => {
+    if (!task || copies.length === 0) return;
+
+    try {
+      // Build task data for each copy
+      const buildTaskData = (copyData: { serialNumber?: string; plate?: string }) => ({
+        // Basic fields
+        name: task.name,
+        status: TASK_STATUS.PENDING,
+        serialNumber: copyData.serialNumber || null,
+        plate: copyData.plate || null,
+        details: task.details,
+        entryDate: task.entryDate,
+        term: task.term,
+        startedAt: null,
+        finishedAt: null,
+
+        // ID fields only (no relation objects)
+        paintId: task.paintId,
+        customerId: task.customerId,
+        sectorId: task.sectorId,
+        budgetId: task.budgetId,
+        nfeId: task.nfeId,
+        receiptId: task.receiptId,
+        commission: task.commission,
+
+        // Relations - only IDs
+        artworkIds: task.artworks?.map((file) => file.id) || [],
+        paintIds: task.logoPaints?.map((paint) => paint.id) || [],
+
+        // Services
+        services: Array.isArray(task.services)
+          ? task.services.map((service) => ({
+              status: service.status,
+              statusOrder: service.statusOrder,
+              description: service.description,
+              startedAt: null,
+              finishedAt: null,
+            }))
+          : [],
+
+        // Truck
+        truck: task.truck || copyData.plate
+          ? {
+              plate: copyData.plate || task.truck?.plate || null,
+              chassisNumber: task.truck?.chassisNumber || null,
+              spot: task.truck?.spot || null,
+            }
+          : null,
+
+        // Observation
+        observation: task.observation
+          ? {
+              description: task.observation.description,
+              artworkIds: task.observation.artworks?.map((file) => file.id) || [],
+            }
+          : null,
+      });
+
+      const tasksToCreate = copies.map(buildTaskData);
+      await Promise.all(tasksToCreate.map(taskData => createAsync(taskData)));
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error duplicating task:", error);
+      }
+    }
+  };
+
+  // Advanced bulk operations handlers
+  const handleBulkArts = () => {
+    if (advancedActionsRef?.current) {
+      advancedActionsRef.current.openModal("arts", taskIds);
+    }
+    setDropdownOpen(false);
+  };
+
+  const handleBulkDocuments = () => {
+    if (advancedActionsRef?.current) {
+      advancedActionsRef.current.openModal("documents", taskIds);
+    }
+    setDropdownOpen(false);
+  };
+
+  const handleBulkPaints = () => {
+    if (advancedActionsRef?.current) {
+      advancedActionsRef.current.openModal("paints", taskIds);
+    }
+    setDropdownOpen(false);
+  };
+
+  const handleBulkCuttingPlans = () => {
+    if (advancedActionsRef?.current) {
+      advancedActionsRef.current.openModal("cuttingPlans", taskIds);
+    }
+    setDropdownOpen(false);
+  };
+
+  const handleCopyFromTask = () => {
+    if (onStartCopyFromTask) {
+      onStartCopyFromTask(tasks);
+    }
+    setDropdownOpen(false);
   };
 
   if (!position || taskIds.length === 0) return null;
@@ -358,6 +452,24 @@ export function TaskHistoryContextMenu({
             </div>
           )}
 
+          {/* Status actions - Team leaders (sector match) and ADMIN only */}
+          {canManageStatus && (hasPendingTasks || hasPreparationTasks) && (
+            <DropdownMenuItem onClick={handleStart} className="text-green-700 hover:text-white">
+              <IconPlayerPlay className="mr-2 h-4 w-4" />
+              Iniciar
+            </DropdownMenuItem>
+          )}
+
+          {canManageStatus && hasInProgressTasks && (
+            <DropdownMenuItem onClick={handleFinish} className="text-green-700 hover:text-white">
+              <IconCheck className="mr-2 h-4 w-4" />
+              Finalizar
+            </DropdownMenuItem>
+          )}
+
+          {/* Separator if we have status actions */}
+          {canManageStatus && (hasPendingTasks || hasInProgressTasks || hasPreparationTasks) && <DropdownMenuSeparator />}
+
           {/* View action - single selection only */}
           {!isBulk && task && (
             <DropdownMenuItem onClick={handleView}>
@@ -369,49 +481,82 @@ export function TaskHistoryContextMenu({
           {/* Edit action */}
           <DropdownMenuItem onClick={handleEdit}>
             <IconEdit className="mr-2 h-4 w-4" />
-            {isBulk ? "Editar selecionadas" : "Editar"}
+            {isBulk ? "Editar em lote" : "Editar"}
           </DropdownMenuItem>
 
-          <DropdownMenuSeparator />
-
-          {/* Restore or Set Status action - Available for all users including FINANCIAL */}
-          {allTasksOnHold ? (
-            // Show "Restaurar" only for ON_HOLD tasks
-            <DropdownMenuItem onClick={handleRestore}>
-              <IconArrowBackUp className="mr-2 h-4 w-4" />
-              Restaurar
+          {/* Admin-only actions: duplicate, setSector (conditionally), setStatus */}
+          {isAdmin && !isBulk && (
+            <DropdownMenuItem onClick={handleDuplicate}>
+              <IconCopy className="mr-2 h-4 w-4" />
+              Criar Cópias
             </DropdownMenuItem>
-          ) : (
-            // Show "Definir Status" for non-ON_HOLD tasks
+          )}
+
+          {/* Set Sector action - Admin only, hidden for preparation route */}
+          {isAdmin && !isPreparationRoute && (
+            <DropdownMenuItem
+              onClick={handleSetSector}
+              onSelect={(e) => e.preventDefault()}
+            >
+              <IconBuildingFactory2 className="mr-2 h-4 w-4" />
+              {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}
+            </DropdownMenuItem>
+          )}
+
+          {/* Set Status for completed tasks */}
+          {isAdmin && hasCompletedTasks && (
             <DropdownMenuItem
               onClick={handleSetStatus}
               onSelect={(e) => e.preventDefault()}
             >
               <IconFileInvoice className="mr-2 h-4 w-4" />
-              Definir Status
+              Alterar Status
             </DropdownMenuItem>
           )}
 
-          {/* Additional actions - not available for FINANCIAL users */}
-          {!isFinancialUser && (
-            <>
-              {/* Set Sector action */}
-              <DropdownMenuItem
-                onClick={handleSetSector}
-                onSelect={(e) => e.preventDefault()}
-              >
-                <IconBuildingFactory2 className="mr-2 h-4 w-4" />
-                {tasks.some((t) => t.sectorId) ? "Alterar Setor" : "Definir Setor"}
-              </DropdownMenuItem>
+          {/* Advanced bulk operations - ADMIN only */}
+          {isAdmin && <DropdownMenuSeparator />}
 
-              <DropdownMenuSeparator />
+          {isAdmin && (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="data-[state=open]:bg-accent data-[state=open]:text-accent-foreground">
+                <IconSettings2 className="mr-2 h-4 w-4" />
+                <span className="data-[state=open]:text-accent-foreground">Avançados</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem onClick={handleBulkArts}>
+                  <IconPhoto className="mr-2 h-4 w-4" />
+                  Adicionar Artes
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleBulkDocuments}>
+                  <IconFileText className="mr-2 h-4 w-4" />
+                  Adicionar Documentos
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleBulkPaints}>
+                  <IconPalette className="mr-2 h-4 w-4" />
+                  Adicionar Tintas
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleBulkCuttingPlans}>
+                  <IconCut className="mr-2 h-4 w-4" />
+                  Adicionar Plano de Corte
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleCopyFromTask}>
+                  <IconClipboardCopy className="mr-2 h-4 w-4" />
+                  Copiar de Outra Tarefa
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          )}
 
-              {/* Delete action */}
-              <DropdownMenuItem onClick={handleDelete} className="text-destructive">
-                <IconTrash className="mr-2 h-4 w-4" />
-                {isBulk ? "Deletar selecionadas" : "Deletar"}
-              </DropdownMenuItem>
-            </>
+          {/* Delete action - ADMIN only */}
+          {canDelete && <DropdownMenuSeparator />}
+
+          {canDelete && (
+            <DropdownMenuItem onClick={handleDelete} className="text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              {isBulk ? "Excluir selecionadas" : "Excluir"}
+            </DropdownMenuItem>
           )}
         </PositionedDropdownMenuContent>
       </DropdownMenu>
@@ -443,27 +588,18 @@ export function TaskHistoryContextMenu({
         allowedStatuses={[TASK_STATUS.IN_PRODUCTION, TASK_STATUS.COMPLETED, TASK_STATUS.INVOICED, TASK_STATUS.SETTLED]}
       />
 
-      {/* Restore Confirmation Dialog */}
-      <AlertDialog open={restoreDialog.open} onOpenChange={(open) => setRestoreDialog({ open, tasks: [] })}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {restoreDialog.tasks.length > 1 ? "Restaurar tarefas" : "Restaurar tarefa"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {restoreDialog.tasks.length > 1
-                ? `Tem certeza que deseja restaurar ${restoreDialog.tasks.length} tarefas para o status anterior? As tarefas serão retornadas ao status que tinham antes de serem colocadas em espera.`
-                : "Tem certeza que deseja restaurar esta tarefa para o status anterior? A tarefa será retornada ao status que tinha antes de ser colocada em espera."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRestoreConfirm}>
-              Restaurar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Duplicate Task Modal */}
+      <DuplicateTaskModal
+        open={duplicateModalOpen}
+        onOpenChange={(open) => {
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[TaskHistoryContextMenu] DuplicateTaskModal onOpenChange:', open);
+          }
+          setDuplicateModalOpen(open);
+        }}
+        task={task}
+        onConfirm={handleDuplicateConfirm}
+      />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, tasks: [] })}>

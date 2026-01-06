@@ -283,7 +283,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                     Dia do Mês <span className="text-destructive">*</span>
                   </FormLabel>
                   <FormControl>
-                    <Input type="number" min={1} max={31} value={field.value || ""} onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)} placeholder="1-31" className="bg-transparent" />
+                    <Input type="number" min={1} max={31} value={field.value || ""} onChange={(value) => field.onChange(typeof value === "number" ? value : undefined)} placeholder="1-31" className="bg-transparent" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -455,7 +455,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                     <FormItem>
                       <FormLabel>A cada</FormLabel>
                       <FormControl>
-                        <Input type="number" min={1} value={field.value} onChange={(e) => field.onChange(parseInt(e.target.value) || 1)} placeholder="1" className="bg-transparent" />
+                        <Input type="number" min={1} value={field.value} onChange={(value) => field.onChange(typeof value === "number" ? value : 1)} placeholder="1" className="bg-transparent" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

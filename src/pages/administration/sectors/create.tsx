@@ -63,19 +63,20 @@ export const SectorCreatePage = () => {
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <PageHeader
-          title="Novo Setor"
-          icon={IconBuildingSkyscraper}
-          favoritePage={FAVORITE_PAGES.ADMINISTRACAO_SETORES_CADASTRAR}
-          breadcrumbs={[
-            { label: "Início", href: "/" },
-            { label: "Administração", href: routes.administration.root },
-            { label: "Setores", href: routes.administration.sectors.root },
-            { label: "Novo" },
-          ]}
-          actions={actions}
-          className="flex-shrink-0"
-        />
+        <div className="container mx-auto max-w-4xl flex-shrink-0">
+          <PageHeader
+            title="Novo Setor"
+            icon={IconBuildingSkyscraper}
+            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_SETORES_CADASTRAR}
+            breadcrumbs={[
+              { label: "Início", href: "/" },
+              { label: "Administração", href: routes.administration.root },
+              { label: "Setores", href: routes.administration.sectors.root },
+              { label: "Novo" },
+            ]}
+            actions={actions}
+          />
+        </div>
         <div className="flex-1 overflow-y-auto pb-6">
           <SectorForm mode="create" onSubmit={handleSubmit} isSubmitting={false} />
         </div>

@@ -1,6 +1,6 @@
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconPlayerPlay, IconPlayerPause, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconTrash, IconEditCircle, IconFileInvoice, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy } from "@tabler/icons-react";
+import { IconPlayerPlay, IconCheck, IconCopy, IconBuildingFactory2, IconEdit, IconTrash, IconEditCircle, IconFileInvoice, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy } from "@tabler/icons-react";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
 import type { Task } from "../../../../types";
 import { useAuth } from "@/contexts/auth-context";
@@ -17,7 +17,7 @@ interface TaskTableContextMenuProps {
   onAction: (action: TaskAction, tasks: Task[]) => void;
 }
 
-export type TaskAction = "start" | "finish" | "pause" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkDocuments" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask";
+export type TaskAction = "start" | "finish" | "duplicate" | "setSector" | "setStatus" | "view" | "edit" | "delete" | "bulkArts" | "bulkDocuments" | "bulkPaints" | "bulkCuttingPlans" | "copyFromTask";
 
 export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTableContextMenuProps) {
   const { user } = useAuth();
@@ -28,7 +28,6 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
   const isMultiSelection = tasks.length > 1;
   const hasInProgressTasks = tasks.some((t) => t.status === TASK_STATUS.IN_PRODUCTION);
   const hasPendingTasks = tasks.some((t) => t.status === TASK_STATUS.PENDING);
-  const hasOnHoldTasks = tasks.some((t) => t.status === TASK_STATUS.ON_HOLD);
   const hasCompletedTasks = tasks.some((t) => t.status === TASK_STATUS.COMPLETED);
 
   // Permission checks
@@ -63,17 +62,10 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
         {isMultiSelection && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{tasks.length} tarefas selecionadas</div>}
 
         {/* Status actions - Team leaders (sector match) and ADMIN only */}
-        {canManageStatus && (hasPendingTasks || hasOnHoldTasks) && (
+        {canManageStatus && hasPendingTasks && (
           <DropdownMenuItem onClick={() => handleAction("start")} className="text-green-700 hover:text-white">
             <IconPlayerPlay className="mr-2 h-4 w-4" />
             Iniciar
-          </DropdownMenuItem>
-        )}
-
-        {canManageStatus && (hasInProgressTasks || hasOnHoldTasks || hasPendingTasks) && (
-          <DropdownMenuItem onClick={() => handleAction("pause")} className="text-blue-600 hover:text-white">
-            <IconPlayerPause className="mr-2 h-4 w-4" />
-            {hasPendingTasks && !hasInProgressTasks ? "Colocar em Espera" : "Pausar"}
           </DropdownMenuItem>
         )}
 
@@ -85,7 +77,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
         )}
 
         {/* Separator if we have status actions */}
-        {canManageStatus && (hasPendingTasks || hasOnHoldTasks || hasInProgressTasks) && <DropdownMenuSeparator />}
+        {canManageStatus && (hasPendingTasks || hasInProgressTasks) && <DropdownMenuSeparator />}
 
         {/* Edit action - ADMIN, DESIGNER, FINANCIAL, LOGISTIC */}
         {canEdit && (

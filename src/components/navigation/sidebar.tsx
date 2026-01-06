@@ -814,7 +814,7 @@ export const Sidebar = memo(() => {
     };
 
     return (
-      <div key={item.id} style={{ paddingLeft: level > 0 ? `${Math.min(level * 32, 96)}px` : "0" }}>
+      <div key={item.id} style={{ paddingLeft: level > 0 ? `${Math.min(8 + level * 16, 56)}px` : "0" }}>
         <div
           className={cn(
             "group relative flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 min-h-[40px]",

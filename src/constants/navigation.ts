@@ -936,6 +936,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "aerografia-editar", title: "Editar", icon: "edit", path: "/producao/aerografia/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
         ],
       },
+      { id: "agenda", title: "Agenda", icon: "preparation", path: "/producao/agenda", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
       { id: "barracoes", title: "Barracões", icon: "warehouse", path: "/producao/barracoes", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN] },
       {
         id: "cronograma",
@@ -948,7 +949,6 @@ export const NAVIGATION_MENU: MenuItem[] = [
           // { id: "cronograma-cadastrar", title: "Nova Tarefa", icon: "plus", path: "/producao/cronograma/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN }, // Removed - tasks are now created in the "in preparation" page
         ],
       },
-      { id: "cronograma-em-preparacao", title: "Agenda", icon: "preparation", path: "/producao/agenda", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
       { id: "historico", title: "Histórico", icon: "history", path: "/producao/historico", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN] },
       {
         id: "observacoes",

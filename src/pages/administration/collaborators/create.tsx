@@ -56,19 +56,20 @@ const CreateCollaboratorPage = () => {
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <PageHeader
-          title="Cadastrar Colaborador"
-          icon={IconUsers}
-          favoritePage={FAVORITE_PAGES.ADMINISTRACAO_COLABORADORES_CADASTRAR}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Administração", href: routes.administration.root },
-            { label: "Colaboradores", href: routes.administration.collaborators.root },
-            { label: "Cadastrar" },
-          ]}
-          actions={actions}
-          className="flex-shrink-0"
-        />
+        <div className="container mx-auto max-w-4xl flex-shrink-0">
+          <PageHeader
+            title="Cadastrar Colaborador"
+            icon={IconUsers}
+            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_COLABORADORES_CADASTRAR}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Administração", href: routes.administration.root },
+              { label: "Colaboradores", href: routes.administration.collaborators.root },
+              { label: "Cadastrar" },
+            ]}
+            actions={actions}
+          />
+        </div>
         <div className="flex-1 overflow-y-auto pb-6">
           <UserForm mode="create" onSubmit={handleSubmit} isSubmitting={isCreating} onFormStateChange={setFormState} />
         </div>

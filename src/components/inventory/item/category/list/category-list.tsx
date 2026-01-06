@@ -347,7 +347,7 @@ export function CategoryList({ className }: CategoryListProps) {
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex-1 relative">
             <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input ref={searchInputRef} type="text" placeholder="Buscar categorias..." value={displaySearchText} onChange={(e) => handleSearch(e.target.value)} transparent={true} className="pl-9" />
+            <Input ref={searchInputRef} type="text" placeholder="Buscar categorias..." value={displaySearchText} onChange={(value) => handleSearch(String(value || ""))} transparent={true} className="pl-9" />
           </div>
           <div className="flex gap-2">
             <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />

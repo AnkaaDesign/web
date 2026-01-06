@@ -196,11 +196,11 @@ export function PaintProductionAdvancedFilters({ filters, onFilterChange, classN
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Mínimo</Label>
-            <Input type="number" placeholder="Volume mínimo" value={volumeMin} onChange={(e) => handleVolumeChange("min", e.target.value)} min="0.001" max="100" step="0.001" />
+            <Input type="number" placeholder="Volume mínimo" value={volumeMin} onChange={(value) => handleVolumeChange("min", String(value ?? ""))} min="0.001" max="100" step="0.001" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Máximo</Label>
-            <Input type="number" placeholder="Volume máximo" value={volumeMax} onChange={(e) => handleVolumeChange("max", e.target.value)} min="0.001" max="100" step="0.001" />
+            <Input type="number" placeholder="Volume máximo" value={volumeMax} onChange={(value) => handleVolumeChange("max", String(value ?? ""))} min="0.001" max="100" step="0.001" />
           </div>
         </div>
       </div>

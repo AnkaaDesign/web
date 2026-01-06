@@ -846,10 +846,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         setCursorPosition(null);
 
         if (onChange) {
-          // Call onChange - it accepts either event (react-hook-form) or value (custom)
-          // We'll always pass the event, which works for react-hook-form
-          // For custom usage, users should extract the value from e.target.value if needed
-          (onChange as any)(e);
+          // Pass the value directly (consistent with all other input types like cpf, phone, etc.)
+          // This matches the interface: onChange?: ((value: string | number | null) => void)
+          (onChange as any)(rawValue);
         }
         return;
       }

@@ -322,7 +322,7 @@ export function CutPlanForm({ fileId, fileName, taskId, taskName, onSuccess, onC
                             <FormItem>
                               <FormLabel>Quantidade</FormLabel>
                               <FormControl>
-                                <Input type="number" min={1} max={50} placeholder="1" {...field} onChange={(e) => field.onChange(e.target.valueAsNumber || 1)} />
+                                <Input type="number" min={1} max={50} placeholder="1" {...field} onChange={(value) => field.onChange(typeof value === "number" ? value : 1)} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

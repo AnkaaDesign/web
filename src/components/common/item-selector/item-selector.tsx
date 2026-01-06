@@ -449,7 +449,7 @@ export const ItemSelector = ({
           {/* Search Input */}
           <div className="relative flex-1">
             <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Pesquisar por nome, código, marca ou categoria..." value={searchTerm} onChange={(e) => handleSearch(e.target.value)} className="pl-10" />
+            <Input placeholder="Pesquisar por nome, código, marca ou categoria..." value={searchTerm} onChange={(value) => handleSearch(String(value || ""))} className="pl-10" />
           </div>
 
           {/* Action buttons row */}

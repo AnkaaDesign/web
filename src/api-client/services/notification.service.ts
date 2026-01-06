@@ -30,9 +30,15 @@ export interface UpdatePreferencePayload {
 export interface BatchUpdatePreferencesPayload {
   preferences: Array<{
     type: string;
-    eventType: string | null;
+    eventType: string;
     channels: string[];
   }>;
+}
+
+export interface BatchUpdatePreferencesResponse {
+  success: boolean;
+  message: string;
+  data: { updated: number };
 }
 
 // =====================
@@ -60,6 +66,37 @@ export const notificationPreferenceService = {
       `/users/${userId}/notification-preferences/${type}`,
       data
     ),
+
+  /**
+   * Batch update notification preferences
+   */
+  batchUpdatePreferences: (userId: string, data: BatchUpdatePreferencesPayload) => {
+    // Ensure arrays are properly serialized (not as objects with numeric keys)
+    const cleanData = {
+      preferences: Array.isArray(data.preferences)
+        ? data.preferences.map(p => ({
+            type: p.type,
+            eventType: p.eventType,
+            channels: Array.isArray(p.channels) ? [...p.channels] : Object.values(p.channels as any),
+          }))
+        : Object.values(data.preferences as any).map((p: any) => ({
+            type: p.type,
+            eventType: p.eventType,
+            channels: Array.isArray(p.channels) ? [...p.channels] : Object.values(p.channels),
+          })),
+    };
+
+    return apiClient.put<BatchUpdatePreferencesResponse>(
+      `/users/${userId}/notification-preferences/batch`,
+      cleanData,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        transformRequest: [(data) => JSON.stringify(data)],
+      }
+    );
+  },
 
   /**
    * Reset preferences to defaults

@@ -93,18 +93,19 @@ export const TaskEditPage = () => {
   if (error || !task) {
     return (
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <PageHeader
-          variant="form"
-          title="Editar Tarefa"
-          className="flex-shrink-0"
-          breadcrumbs={[
-            { label: "Produção", href: routes.production.root },
-            { label: "Agenda", href: routes.production.schedule.list },
-            { label: "Editar" },
-          ]}
-        />
+        <div className="container mx-auto max-w-4xl flex-shrink-0">
+          <PageHeader
+            variant="form"
+            title="Editar Tarefa"
+            breadcrumbs={[
+              { label: "Produção", href: routes.production.root },
+              { label: "Agenda", href: routes.production.schedule.list },
+              { label: "Editar" },
+            ]}
+          />
+        </div>
         <div className="flex-1 overflow-y-auto pb-6">
-          <div className="container mx-auto py-6 max-w-3xl">
+          <div className="container mx-auto py-6 max-w-4xl">
             <div className="text-center">
               <h2 className="text-2xl font-semibold mb-2">Tarefa não encontrada</h2>
               <p className="text-muted-foreground mb-4">A tarefa que você está procurando não existe ou foi removida.</p>
@@ -148,18 +149,19 @@ export const TaskEditPage = () => {
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <PageHeader
-          variant="form"
-          title={`Editar ${getTaskDisplayName(task)}`}
-          breadcrumbs={[
-            { label: "Produção", href: routes.production.root },
-            { label: "Agenda", href: routes.production.schedule.list },
-            { label: getTaskDisplayName(task), href: routes.production.schedule.details(id!) },
-            { label: "Editar" },
-          ]}
-          actions={actions}
-          className="flex-shrink-0"
-        />
+        <div className="container mx-auto max-w-4xl flex-shrink-0">
+          <PageHeader
+            variant="form"
+            title={`Editar ${getTaskDisplayName(task)}`}
+            breadcrumbs={[
+              { label: "Produção", href: routes.production.root },
+              { label: "Agenda", href: routes.production.schedule.list },
+              { label: getTaskDisplayName(task), href: routes.production.schedule.details(id!) },
+              { label: "Editar" },
+            ]}
+            actions={actions}
+          />
+        </div>
         <div className="flex-1 overflow-y-auto pb-6">
           <TaskEditForm task={task} onFormStateChange={setFormState} />
         </div>

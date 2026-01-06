@@ -25,6 +25,10 @@ interface TaskHistoryTableProps {
   filters?: Partial<TaskGetManyFormData>;
   onDataChange?: (data: { items: Task[]; totalRecords: number }) => void;
   navigationRoute?: 'history' | 'preparation' | 'schedule';
+  advancedActionsRef?: React.RefObject<{ openModal: (type: string, taskIds: string[]) => void } | null>;
+  onStartCopyFromTask?: (targetTasks: Task[]) => void;
+  isSelectingSourceTask?: boolean;
+  onSourceTaskSelect?: (task: Task) => void;
 }
 
 export function TaskHistoryTable({
@@ -33,6 +37,10 @@ export function TaskHistoryTable({
   filters = {},
   onDataChange,
   navigationRoute = 'history',
+  advancedActionsRef,
+  onStartCopyFromTask,
+  isSelectingSourceTask,
+  onSourceTaskSelect,
 }: TaskHistoryTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -377,10 +385,18 @@ export function TaskHistoryTable({
                       "hover:bg-muted/20",
                       // Selected state overrides alternating colors
                       taskIsSelected && "bg-muted/30 hover:bg-muted/40",
+                      // Source selection mode highlight
+                      isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary",
                     )}
                     onClick={(e) => {
                       // Don't navigate if clicking checkbox
                       if ((e.target as HTMLElement).closest("[data-checkbox]")) {
+                        return;
+                      }
+
+                      // Handle source task selection mode
+                      if (isSelectingSourceTask && onSourceTaskSelect) {
+                        onSourceTaskSelect(task);
                         return;
                       }
 
@@ -464,6 +480,8 @@ export function TaskHistoryTable({
           onClose={handleContextMenuClose}
           selectedIds={contextMenu.isBulk ? selectedIds : [contextMenu.tasks[0]?.id].filter(Boolean)}
           navigationRoute={navigationRoute}
+          advancedActionsRef={advancedActionsRef}
+          onStartCopyFromTask={onStartCopyFromTask}
         />
       )}
     </div>

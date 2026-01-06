@@ -274,7 +274,7 @@ export function CutCreateForm({ fileId, fileName, taskId, taskName, parentCutId,
                 <FormItem>
                   <FormLabel>Quantidade</FormLabel>
                   <FormControl>
-                    <Input type="number" min={1} max={100} placeholder="1" {...field} onChange={(e) => field.onChange(e.target.valueAsNumber || 1)} />
+                    <Input type="number" min={1} max={100} placeholder="1" {...field} onChange={(value) => field.onChange(typeof value === "number" ? value : 1)} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

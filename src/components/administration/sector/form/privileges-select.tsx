@@ -12,8 +12,7 @@ interface PrivilegesSelectProps {
 
 export function PrivilegesSelect({ control, disabled, required }: PrivilegesSelectProps) {
   // Define privilege descriptions and order
-  // Note: LEADER privilege removed - team leadership is now determined by managedSector relationship
-  const privilegeInfo = {
+  const privilegeInfo: Record<string, { order: number; description: string }> = {
     [SECTOR_PRIVILEGES.BASIC]: { order: 1, description: "Acesso básico aos recursos do sistema" },
     [SECTOR_PRIVILEGES.EXTERNAL]: { order: 2, description: "Acesso para colaboradores externos" },
     [SECTOR_PRIVILEGES.WAREHOUSE]: { order: 3, description: "Controle de estoque e almoxarifado" },
@@ -24,11 +23,12 @@ export function PrivilegesSelect({ control, disabled, required }: PrivilegesSele
     [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: { order: 8, description: "Recursos humanos e pessoal" },
     [SECTOR_PRIVILEGES.FINANCIAL]: { order: 9, description: "Controle financeiro e orçamentário" },
     [SECTOR_PRIVILEGES.ADMIN]: { order: 10, description: "Administração completa do sistema" },
+    [SECTOR_PRIVILEGES.TEAM_LEADER]: { order: 11, description: "Liderança de equipe do setor" },
   };
 
-  // Sort privileges by order
+  // Sort privileges by order (with fallback for any missing entries)
   const sortedPrivileges = Object.entries(SECTOR_PRIVILEGES_LABELS).sort(
-    ([a], [b]) => privilegeInfo[a as keyof typeof privilegeInfo].order - privilegeInfo[b as keyof typeof privilegeInfo].order,
+    ([a], [b]) => (privilegeInfo[a]?.order ?? 999) - (privilegeInfo[b]?.order ?? 999),
   );
 
   return (

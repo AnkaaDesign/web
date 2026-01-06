@@ -138,7 +138,7 @@ export function NotificationList({ className }: NotificationListProps) {
         <div className="flex items-center gap-4">
           <div className="relative flex-1">
             <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input placeholder="Buscar notificações..." className="pl-10" value={searchInput} onChange={(e) => handleSearchInputChange(e.target.value)} />
+            <Input placeholder="Buscar notificações..." className="pl-10" value={searchInput} onChange={(value) => handleSearchInputChange(String(value || ""))} />
           </div>
           <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className={activeFiltersCount > 0 ? "border-blue-500 text-blue-600" : ""}>
             <IconFilter className="w-4 h-4 mr-2" />

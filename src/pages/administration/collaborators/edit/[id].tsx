@@ -204,20 +204,21 @@ const EditCollaboratorPage = () => {
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <PageHeader
-          variant="form"
-          title="Editar Colaborador"
-          icon={IconUsers}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Administração", href: routes.administration.root },
-            { label: "Colaboradores", href: routes.administration.collaborators.root },
-            { label: truncateName(user.name), href: routes.administration.collaborators.details(id!) },
-            { label: "Editar" },
-          ]}
-          actions={actions}
-          className="flex-shrink-0"
-        />
+        <div className="container mx-auto max-w-4xl flex-shrink-0">
+          <PageHeader
+            variant="form"
+            title="Editar Colaborador"
+            icon={IconUsers}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Administração", href: routes.administration.root },
+              { label: "Colaboradores", href: routes.administration.collaborators.root },
+              { label: truncateName(user.name), href: routes.administration.collaborators.details(id!) },
+              { label: "Editar" },
+            ]}
+            actions={actions}
+          />
+        </div>
         <div className="flex-1 overflow-y-auto pb-6">
           <UserForm mode="update" defaultValues={defaultValues} onSubmit={handleSubmit} isSubmitting={isUpdating} onFormStateChange={setFormState} />
         </div>

@@ -39,6 +39,7 @@ export * from "./item-category";
 export * from "./item-price";
 export * from "./maintenance";
 export * from "./notification";
+export { notificationPreferenceService, whatsAppService } from "./services/notification.service";
 export * from "./notify";
 export * from "./observation";
 export * from "./order";

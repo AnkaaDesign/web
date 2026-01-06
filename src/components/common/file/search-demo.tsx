@@ -113,7 +113,7 @@ export function SearchDemo() {
             <div className="space-y-2">
               <div className="relative">
                 <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input type="text" placeholder="Try typing and backspacing here..." value={displaySearchText} onChange={(e) => handleOldSearch(e.target.value)} className="pl-10" />
+                <Input type="text" placeholder="Try typing and backspacing here..." value={displaySearchText} onChange={(value) => handleOldSearch(String(value || ""))} className="pl-10" />
               </div>
               <div className="text-sm text-muted-foreground space-y-1">
                 <div>

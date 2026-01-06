@@ -83,6 +83,11 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
       if (fieldPath[0] === "status") {
         return { statusOrder: config.direction };
       }
+      // Special case: identificador is a computed field (serialNumber || truck.plate)
+      // Sort by serialNumber as the primary identifier
+      if (fieldPath[0] === "identificador") {
+        return { serialNumber: config.direction };
+      }
       return { [fieldPath[0]]: config.direction };
     } else if (fieldPath.length === 2) {
       // Nested field

@@ -6,8 +6,8 @@ import { routes } from "../../../../constants";
 
 export const TaskEditSkeleton = () => {
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <div className="flex-shrink-0">
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <div className="container mx-auto max-w-4xl flex-shrink-0">
         <PageHeader
           variant="form"
           title="Carregando..."
@@ -22,7 +22,8 @@ export const TaskEditSkeleton = () => {
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-6 pb-6">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-6">
+        <div className="container mx-auto max-w-4xl space-y-6">
         {/* Basic Information Card */}
         <Card>
           <CardHeader>
@@ -91,6 +92,7 @@ export const TaskEditSkeleton = () => {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
     </div>
   );

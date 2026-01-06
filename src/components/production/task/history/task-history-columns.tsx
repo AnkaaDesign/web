@@ -16,8 +16,10 @@ import {
   SERVICE_ORDER_TYPE,
   SERVICE_ORDER_TYPE_LABELS,
   SERVICE_ORDER_TYPE_COLUMN_LABELS,
+  SECTOR_PRIVILEGES,
   getBadgeVariant
 } from "../../../../constants";
+import { canViewServiceOrderType } from "../../../../utils/permissions/service-order-permissions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { ServiceOrderCell } from "./service-order-cell";
@@ -83,10 +85,9 @@ const getCompletedByUser = (task: Task) => {
 export const createTaskHistoryColumns = (options?: {
   canViewPrice?: boolean;
   currentUserId?: string;
-  includeFinancialColumns?: boolean; // Show FINANCIAL, NEGOTIATION, ARTWORK columns (only for agenda)
-  isAdmin?: boolean; // Admin users see all columns regardless of page
+  sectorPrivilege?: SECTOR_PRIVILEGES; // User's sector privilege for column filtering
 }): TaskColumn[] => {
-  const { canViewPrice = true, currentUserId, includeFinancialColumns = false, isAdmin = false } = options || {};
+  const { canViewPrice = true, currentUserId, sectorPrivilege } = options || {};
 
   const allColumns: TaskColumn[] = [
   {
@@ -156,7 +157,7 @@ export const createTaskHistoryColumns = (options?: {
     accessorFn: (row) => row.generalPainting,
     sortable: false,
     filterable: true,
-    defaultVisible: true,
+    defaultVisible: false,
     width: "140px",
     formatter: (_value: any, row: Task) => {
       if (!row.generalPainting) {
@@ -209,7 +210,7 @@ export const createTaskHistoryColumns = (options?: {
     accessorFn: (row) => row.sector?.name || "",
     sortable: true,
     filterable: true,
-    defaultVisible: true,
+    defaultVisible: false,
     width: "140px",
     formatter: (value: string, row: Task) => {
       if (!row.sector) return <span className="text-muted-foreground">-</span>;
@@ -227,7 +228,7 @@ export const createTaskHistoryColumns = (options?: {
     accessorKey: "status",
     sortable: true,
     filterable: true,
-    defaultVisible: true,
+    defaultVisible: false,
     width: "140px",
     formatter: (value: string | null) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
@@ -260,7 +261,7 @@ export const createTaskHistoryColumns = (options?: {
     accessorKey: "serialNumber",
     sortable: true,
     filterable: true,
-    defaultVisible: true,
+    defaultVisible: false,
     width: "140px",
     formatter: (value: string | null) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
@@ -319,7 +320,7 @@ export const createTaskHistoryColumns = (options?: {
     accessorKey: "finishedAt",
     sortable: true,
     filterable: true,
-    defaultVisible: true,
+    defaultVisible: false,
     width: "140px",
     formatter: (value: Date | null) => renderDate(value),
   },
@@ -339,7 +340,7 @@ export const createTaskHistoryColumns = (options?: {
     accessorKey: "forecastDate",
     sortable: true,
     filterable: true,
-    defaultVisible: true,
+    defaultVisible: false,
     width: "120px",
     formatter: (value: Date | null) => renderDate(value),
   },
@@ -579,16 +580,32 @@ export const createTaskHistoryColumns = (options?: {
   // Always remove the old "SERVIÇOS" column (replaced by individual service order type columns)
   filteredColumns = filteredColumns.filter(col => col.id !== 'services');
 
-  // Admin users see all service order columns regardless of page
-  // For non-admin users:
-  // - Filter out FINANCIAL, NEGOTIATION, ARTWORK columns unless includeFinancialColumns is true
-  // - PRODUCTION column is always included
-  if (!isAdmin && !includeFinancialColumns) {
-    filteredColumns = filteredColumns.filter(col =>
-      col.id !== 'serviceOrders.financial' &&
-      col.id !== 'serviceOrders.negotiation' &&
-      col.id !== 'serviceOrders.artwork'
-    );
+  // Filter service order columns based on sector privilege
+  // Each sector has specific visibility for each service order type:
+  // - ADMIN: sees all
+  // - DESIGNER: sees ARTWORK + PRODUCTION (view only)
+  // - FINANCIAL: sees FINANCIAL only
+  // - LOGISTIC: sees PRODUCTION + NEGOTIATION + ARTWORK
+  // - PRODUCTION/WAREHOUSE/BASIC/EXTERNAL/MAINTENANCE: sees PRODUCTION only
+  // - HR: sees none
+  if (sectorPrivilege) {
+    filteredColumns = filteredColumns.filter(col => {
+      // Check service order columns
+      if (col.id === 'serviceOrders.production') {
+        return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.PRODUCTION);
+      }
+      if (col.id === 'serviceOrders.negotiation') {
+        return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.NEGOTIATION);
+      }
+      if (col.id === 'serviceOrders.artwork') {
+        return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.ARTWORK);
+      }
+      if (col.id === 'serviceOrders.financial') {
+        return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.FINANCIAL);
+      }
+      // Keep all other columns
+      return true;
+    });
   }
 
   // Filter out price column if user doesn't have permission

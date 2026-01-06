@@ -523,24 +523,30 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       if (config.url?.includes("/batch") && config.method?.toLowerCase() === "put") {
         // Skip object transformation if data is FormData
         if (config.data && typeof config.data === "object" && !Array.isArray(config.data) && !(config.data instanceof FormData)) {
-          // Generic fix for any array field that was serialized as an object
-          const fixedData: any = {};
-          for (const key in config.data) {
-            const value = config.data[key];
-            // Check if this looks like an array that was serialized as an object (has numeric keys)
-            if (value && typeof value === "object" && !Array.isArray(value)) {
-              const keys = Object.keys(value);
-              const isNumericKeys = keys.every((k) => /^\d+$/.test(k));
-              if (isNumericKeys) {
-                fixedData[key] = Object.values(value);
-              } else {
-                fixedData[key] = value;
-              }
-            } else {
-              fixedData[key] = value;
+          // Recursively fix any array field that was serialized as an object with numeric keys
+          const fixArrays = (obj: any): any => {
+            if (obj === null || obj === undefined) return obj;
+            if (Array.isArray(obj)) {
+              return obj.map(item => fixArrays(item));
             }
-          }
-          config.data = fixedData;
+            if (typeof obj === "object") {
+              const keys = Object.keys(obj);
+              const isNumericKeys = keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
+              if (isNumericKeys) {
+                // Convert object with numeric keys to array, then recursively fix items
+                return Object.values(obj).map(item => fixArrays(item));
+              }
+              // Regular object, recursively fix all properties
+              const fixed: any = {};
+              for (const key of keys) {
+                fixed[key] = fixArrays(obj[key]);
+              }
+              return fixed;
+            }
+            return obj;
+          };
+
+          config.data = fixArrays(config.data);
 
           // Force proper JSON serialization
           config.data = JSON.parse(JSON.stringify(config.data));

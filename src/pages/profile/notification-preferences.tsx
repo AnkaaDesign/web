@@ -15,23 +15,32 @@ import {
   ShoppingCart,
   ClipboardList,
   Save,
+  RotateCcw,
+  Shield,
+  Calendar,
 } from "lucide-react";
-import { getProfile } from "@/api-client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getProfile, notificationPreferenceService } from "@/api-client";
+import type { UserNotificationPreference } from "@/types";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { routes } from "@/constants";
 import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 import { cn } from "@/lib/utils";
-import { useNotificationPreferences, useUpdatePreference, useResetPreferences } from "@/hooks/useNotificationPreferences";
-import type { UserNotificationPreference } from "@/types";
 
 // =====================
 // Types and Schemas
 // =====================
 
 type NotificationChannel = "IN_APP" | "EMAIL" | "PUSH" | "WHATSAPP";
+
+const ALL_CHANNELS: NotificationChannel[] = ["IN_APP", "EMAIL", "PUSH", "WHATSAPP"];
 
 interface NotificationEventPreference {
   channels: NotificationChannel[];
@@ -40,16 +49,39 @@ interface NotificationEventPreference {
 
 interface NotificationPreferences {
   task: {
+    // Basic fields
     status: NotificationEventPreference;
-    artwork: NotificationEventPreference;
+    name: NotificationEventPreference;
+    details: NotificationEventPreference;
+    serialNumber: NotificationEventPreference;
+    // Date fields
+    entryDate: NotificationEventPreference;
+    term: NotificationEventPreference;
+    forecastDate: NotificationEventPreference;
+    startedAt: NotificationEventPreference;
+    finishedAt: NotificationEventPreference;
     deadline: NotificationEventPreference;
-    assignment: NotificationEventPreference;
-    comment: NotificationEventPreference;
-    priority: NotificationEventPreference;
-    description: NotificationEventPreference;
-    customer: NotificationEventPreference;
+    // Assignment fields
     sector: NotificationEventPreference;
-    completion: NotificationEventPreference;
+    customer: NotificationEventPreference;
+    // Financial fields (ADMIN/FINANCIAL only)
+    invoiceTo: NotificationEventPreference;
+    commission: NotificationEventPreference;
+    budgets: NotificationEventPreference;
+    invoices: NotificationEventPreference;
+    receipts: NotificationEventPreference;
+    reimbursements: NotificationEventPreference;
+    invoiceReimbursements: NotificationEventPreference;
+    // Artwork fields
+    artworks: NotificationEventPreference;
+    // Negotiation fields
+    negotiatingWith: NotificationEventPreference;
+    // Production fields
+    paint: NotificationEventPreference;
+    observation: NotificationEventPreference;
+    // Task lifecycle
+    created: NotificationEventPreference;
+    overdue: NotificationEventPreference;
   };
   order: {
     created: NotificationEventPreference;
@@ -63,139 +95,96 @@ interface NotificationPreferences {
     out: NotificationEventPreference;
     restock: NotificationEventPreference;
   };
+  system: {
+    maintenance: NotificationEventPreference;
+    update: NotificationEventPreference;
+    security: NotificationEventPreference;
+  };
+  vacation: {
+    requested: NotificationEventPreference;
+    approved: NotificationEventPreference;
+    rejected: NotificationEventPreference;
+    reminder: NotificationEventPreference;
+  };
 }
+
+const channelSchema = z.object({
+  channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
+  mandatory: z.boolean(),
+});
 
 const notificationPreferencesSchema = z.object({
   task: z.object({
-    status: z.object({
-      channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-      mandatory: z.boolean(),
-    }),
-    artwork: z.object({
-      channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-      mandatory: z.boolean(),
-    }),
-    deadline: z.object({
-      channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-      mandatory: z.boolean(),
-    }),
-    assignment: z.object({
-      channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-      mandatory: z.boolean(),
-    }),
-    comment: z.object({
-      channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-      mandatory: z.boolean(),
-    }),
+    // Basic fields
+    status: channelSchema,
+    name: channelSchema,
+    details: channelSchema,
+    serialNumber: channelSchema,
+    // Date fields
+    entryDate: channelSchema,
+    term: channelSchema,
+    forecastDate: channelSchema,
+    startedAt: channelSchema,
+    finishedAt: channelSchema,
+    deadline: channelSchema,
+    // Assignment fields
+    sector: channelSchema,
+    customer: channelSchema,
+    // Financial fields (ADMIN/FINANCIAL only)
+    invoiceTo: channelSchema,
+    commission: channelSchema,
+    budgets: channelSchema,
+    invoices: channelSchema,
+    receipts: channelSchema,
+    reimbursements: channelSchema,
+    invoiceReimbursements: channelSchema,
+    // Artwork fields
+    artworks: channelSchema,
+    // Negotiation fields
+    negotiatingWith: channelSchema,
+    // Production fields
+    paint: channelSchema,
+    observation: channelSchema,
+    // Task lifecycle
+    created: channelSchema,
+    overdue: channelSchema,
   }),
   order: z.object({
-    created: z.object({
-      channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-      mandatory: z.boolean(),
-    }),
-    statusChange: z.object({
-      channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-      mandatory: z.boolean(),
-    }),
-    delivered: z.object({
-      channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-      mandatory: z.boolean(),
-    }),
-    cancelled: z.object({
-      channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-      mandatory: z.boolean(),
-    }),
+    created: channelSchema,
+    status: channelSchema,
+    fulfilled: channelSchema,
+    cancelled: channelSchema,
+    overdue: channelSchema,
   }),
   stock: z.object({
-    lowStock: z.object({
-      channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-      mandatory: z.boolean(),
-    }),
-    outOfStock: z.object({
-      channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-      mandatory: z.boolean(),
-    }),
-    reorderNeeded: z.object({
-      channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-      mandatory: z.boolean(),
-    }),
+    low: channelSchema,
+    out: channelSchema,
+    restock: channelSchema,
+  }),
+  system: z.object({
+    maintenance: channelSchema,
+    update: channelSchema,
+    security: channelSchema,
+  }),
+  vacation: z.object({
+    requested: channelSchema,
+    approved: channelSchema,
+    rejected: channelSchema,
+    reminder: channelSchema,
   }),
 });
 
 type NotificationPreferencesFormData = z.infer<typeof notificationPreferencesSchema>;
 
 // =====================
-// Helper Functions
-// =====================
-
-/**
- * Transform API preferences to form data structure
- */
-const transformApiToForm = (apiPreferences: UserNotificationPreference[]): Partial<NotificationPreferencesFormData> => {
-  const grouped: Record<string, Record<string, UserNotificationPreference>> = {};
-
-  apiPreferences.forEach((pref) => {
-    const type = pref.notificationType.toLowerCase();
-    const eventType = pref.eventType || "general";
-
-    if (!grouped[type]) {
-      grouped[type] = {};
-    }
-
-    grouped[type][eventType] = pref;
-  });
-
-  const result: any = {
-    task: {},
-    order: {},
-    stock: {},
-  };
-
-  // Map task preferences
-  const taskEvents = ["status", "artwork", "deadline", "assignment", "comment", "priority", "description", "customer", "sector", "completion"];
-  taskEvents.forEach(event => {
-    if (grouped.task?.[event]) {
-      result.task[event] = {
-        channels: grouped.task[event].channels as NotificationChannel[],
-        mandatory: grouped.task[event].isMandatory,
-      };
-    }
-  });
-
-  // Map order preferences
-  const orderEvents = ["created", "status", "fulfilled", "cancelled", "overdue"];
-  orderEvents.forEach(event => {
-    if (grouped.order?.[event]) {
-      result.order[event] = {
-        channels: grouped.order[event].channels as NotificationChannel[],
-        mandatory: grouped.order[event].isMandatory,
-      };
-    }
-  });
-
-  // Map stock preferences
-  const stockEvents = ["low", "out", "restock"];
-  stockEvents.forEach(event => {
-    if (grouped.stock?.[event]) {
-      result.stock[event] = {
-        channels: grouped.stock[event].channels as NotificationChannel[],
-        mandatory: grouped.stock[event].isMandatory,
-      };
-    }
-  });
-
-  return result;
-};
-
-// =====================
 // Channel Metadata
 // =====================
 
-const channelMetadata: Record<NotificationChannel, { icon: typeof Smartphone; label: string; color: string }> = {
-  PUSH: { icon: Smartphone, label: "Push Móvel", color: "text-blue-500" },
-  EMAIL: { icon: Mail, label: "E-mail", color: "text-purple-500" },
-  WHATSAPP: { icon: MessageCircle, label: "WhatsApp", color: "text-green-500" },
-  IN_APP: { icon: BellDot, label: "In-App", color: "text-orange-500" },
+const channelMetadata: Record<NotificationChannel, { icon: typeof Smartphone; label: string; color: string; bgColor: string }> = {
+  IN_APP: { icon: BellDot, label: "In-App", color: "text-orange-500", bgColor: "bg-orange-500/10" },
+  EMAIL: { icon: Mail, label: "E-mail", color: "text-purple-500", bgColor: "bg-purple-500/10" },
+  PUSH: { icon: Smartphone, label: "Push", color: "text-blue-500", bgColor: "bg-blue-500/10" },
+  WHATSAPP: { icon: MessageCircle, label: "WhatsApp", color: "text-green-500", bgColor: "bg-green-500/10" },
 };
 
 // =====================
@@ -205,21 +194,19 @@ const channelMetadata: Record<NotificationChannel, { icon: typeof Smartphone; la
 interface PreferenceRowProps {
   label: string;
   description: string;
-  channels: NotificationChannel[];
   selectedChannels: NotificationChannel[];
   onChange: (channels: NotificationChannel[]) => void;
   mandatory: boolean;
-  disabled: boolean;
+  disabled?: boolean;
 }
 
 function PreferenceRow({
   label,
   description,
-  channels,
   selectedChannels,
   onChange,
   mandatory,
-  disabled,
+  disabled = false,
 }: PreferenceRowProps) {
   const handleChannelToggle = (channel: NotificationChannel) => {
     if (disabled) return;
@@ -228,7 +215,6 @@ function PreferenceRow({
       ? selectedChannels.filter((c) => c !== channel)
       : [...selectedChannels, channel];
 
-    // Validate at least one channel is selected
     if (newChannels.length === 0) {
       toast.error("Pelo menos um canal deve estar selecionado");
       return;
@@ -238,29 +224,27 @@ function PreferenceRow({
   };
 
   return (
-    <div className="flex items-start justify-between py-4 gap-4">
-      <div className="flex-1 space-y-1">
+    <div className="flex items-start justify-between py-3 gap-4 border-b border-border last:border-b-0">
+      <div className="flex-1 space-y-0.5">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            {label}
-          </label>
+          <span className="text-sm font-medium">{label}</span>
           {mandatory && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Esta notificação é obrigatória e não pode ser desativada</p>
+                  <p>Notificação obrigatória</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}
         </div>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <p className="text-xs text-muted-foreground">{description}</p>
       </div>
-      <div className="flex items-center gap-3">
-        {channels.map((channel) => {
+      <div className="flex items-center gap-2">
+        {ALL_CHANNELS.map((channel) => {
           const metadata = channelMetadata[channel];
           const Icon = metadata.icon;
           const isSelected = selectedChannels.includes(channel);
@@ -276,7 +260,7 @@ function PreferenceRow({
                     className={cn(
                       "p-2 rounded-md border transition-all",
                       isSelected
-                        ? "border-primary bg-primary/10"
+                        ? `border-primary ${metadata.bgColor}`
                         : "border-border bg-transparent hover:bg-muted",
                       disabled && "opacity-50 cursor-not-allowed"
                     )}
@@ -298,89 +282,176 @@ function PreferenceRow({
 }
 
 // =====================
-// Section Component
+// Section Data
 // =====================
 
-interface SectionProps {
-  title: string;
-  icon: typeof Package;
-  children: React.ReactNode;
+interface NotificationEvent {
+  key: string;
+  label: string;
+  description: string;
+  mandatory: boolean;
 }
 
-function Section({ title, icon: Icon, children }: SectionProps) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Icon className="h-5 w-5" />
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="divide-y">{children}</div>
-      </CardContent>
-    </Card>
-  );
+interface NotificationSection {
+  id: string;
+  title: string;
+  icon: typeof ClipboardList;
+  events: NotificationEvent[];
 }
+
+const notificationSections: NotificationSection[] = [
+  {
+    id: "task",
+    title: "Tarefas",
+    icon: ClipboardList,
+    events: [
+      // Lifecycle
+      { key: "created", label: "Nova Tarefa", description: "Quando uma nova tarefa é criada", mandatory: false },
+      { key: "status", label: "Mudança de Status", description: "Quando o status de uma tarefa é alterado", mandatory: true },
+      { key: "finishedAt", label: "Conclusão", description: "Quando uma tarefa é concluída", mandatory: false },
+      { key: "overdue", label: "Tarefa Atrasada", description: "Quando uma tarefa está atrasada", mandatory: true },
+      // Basic info
+      { key: "name", label: "Nome Alterado", description: "Quando o nome da tarefa é alterado", mandatory: false },
+      { key: "details", label: "Detalhes Alterados", description: "Quando os detalhes da tarefa são modificados", mandatory: false },
+      { key: "serialNumber", label: "Número de Série", description: "Quando o número de série é alterado", mandatory: false },
+      // Dates
+      { key: "entryDate", label: "Data de Entrada", description: "Quando a data de entrada é definida/alterada", mandatory: false },
+      { key: "term", label: "Prazo Alterado", description: "Quando o prazo da tarefa é alterado", mandatory: true },
+      { key: "forecastDate", label: "Data Prevista", description: "Quando a previsão de disponibilidade é alterada", mandatory: false },
+      { key: "startedAt", label: "Início da Produção", description: "Quando a produção é iniciada", mandatory: false },
+      { key: "deadline", label: "Prazo Próximo", description: "Quando uma tarefa está próxima do prazo", mandatory: true },
+      // Assignment
+      { key: "sector", label: "Setor Alterado", description: "Quando o setor responsável é alterado", mandatory: false },
+      { key: "customer", label: "Cliente Alterado", description: "Quando o cliente da tarefa é alterado", mandatory: false },
+      // Artwork
+      { key: "artworks", label: "Atualização de Arte", description: "Quando arquivos de arte são adicionados/removidos", mandatory: false },
+      // Negotiation
+      { key: "negotiatingWith", label: "Negociação", description: "Quando o contato de negociação é alterado", mandatory: false },
+      // Production
+      { key: "paint", label: "Pintura Geral", description: "Quando a pintura geral é definida/alterada", mandatory: false },
+      { key: "observation", label: "Observação", description: "Quando observações são adicionadas", mandatory: false },
+      // Financial (ADMIN/FINANCIAL only)
+      { key: "invoiceTo", label: "Faturar Para", description: "Quando o cliente de faturamento é alterado", mandatory: false },
+      { key: "commission", label: "Comissão", description: "Quando o status de comissão é alterado", mandatory: false },
+      { key: "budgets", label: "Orçamentos", description: "Quando orçamentos são adicionados/removidos", mandatory: false },
+      { key: "invoices", label: "Notas Fiscais", description: "Quando notas fiscais são adicionadas/removidas", mandatory: true },
+      { key: "receipts", label: "Comprovantes", description: "Quando comprovantes são adicionados/removidos", mandatory: false },
+      { key: "reimbursements", label: "Reembolsos", description: "Quando documentos de reembolso são alterados", mandatory: false },
+      { key: "invoiceReimbursements", label: "NF de Reembolso", description: "Quando NFs de reembolso são alteradas", mandatory: false },
+    ],
+  },
+  {
+    id: "order",
+    title: "Pedidos",
+    icon: ShoppingCart,
+    events: [
+      { key: "created", label: "Novo Pedido", description: "Quando um novo pedido é criado", mandatory: false },
+      { key: "status", label: "Mudança de Status", description: "Quando o status de um pedido é alterado", mandatory: false },
+      { key: "fulfilled", label: "Pedido Finalizado", description: "Quando um pedido é finalizado/entregue", mandatory: false },
+      { key: "cancelled", label: "Pedido Cancelado", description: "Quando um pedido é cancelado", mandatory: false },
+      { key: "overdue", label: "Pedido Atrasado", description: "Quando um pedido está atrasado", mandatory: true },
+    ],
+  },
+  {
+    id: "stock",
+    title: "Estoque",
+    icon: Package,
+    events: [
+      { key: "low", label: "Estoque Baixo", description: "Quando um item está abaixo do mínimo", mandatory: false },
+      { key: "out", label: "Estoque Esgotado", description: "Quando um item fica sem estoque", mandatory: true },
+      { key: "restock", label: "Reabastecimento", description: "Quando é necessário reabastecer", mandatory: false },
+    ],
+  },
+  {
+    id: "system",
+    title: "Sistema",
+    icon: Shield,
+    events: [
+      { key: "maintenance", label: "Manutenção", description: "Avisos de manutenção programada", mandatory: true },
+      { key: "update", label: "Atualizações", description: "Novidades e atualizações do sistema", mandatory: false },
+      { key: "security", label: "Segurança", description: "Alertas de segurança importantes", mandatory: true },
+    ],
+  },
+  {
+    id: "vacation",
+    title: "Férias",
+    icon: Calendar,
+    events: [
+      { key: "requested", label: "Solicitação", description: "Quando férias são solicitadas", mandatory: false },
+      { key: "approved", label: "Aprovação", description: "Quando férias são aprovadas", mandatory: true },
+      { key: "rejected", label: "Rejeição", description: "Quando férias são rejeitadas", mandatory: true },
+      { key: "reminder", label: "Lembrete", description: "Lembretes sobre férias próximas", mandatory: false },
+    ],
+  },
+];
 
 // =====================
 // Default Preferences
 // =====================
 
+const createDefaultPreference = (mandatory: boolean): NotificationEventPreference => ({
+  channels: mandatory ? ["IN_APP", "EMAIL"] : ["IN_APP"],
+  mandatory,
+});
+
 const defaultPreferences: NotificationPreferencesFormData = {
   task: {
-    status: {
-      channels: ["IN_APP", "EMAIL"],
-      mandatory: true,
-    },
-    artwork: {
-      channels: ["IN_APP"],
-      mandatory: false,
-    },
-    deadline: {
-      channels: ["IN_APP", "EMAIL", "PUSH"],
-      mandatory: true,
-    },
-    assignment: {
-      channels: ["IN_APP", "EMAIL"],
-      mandatory: true,
-    },
-    comment: {
-      channels: ["IN_APP"],
-      mandatory: false,
-    },
+    // Lifecycle
+    created: createDefaultPreference(false),
+    status: createDefaultPreference(true),
+    finishedAt: createDefaultPreference(false),
+    overdue: createDefaultPreference(true),
+    // Basic info
+    name: createDefaultPreference(false),
+    details: createDefaultPreference(false),
+    serialNumber: createDefaultPreference(false),
+    // Dates
+    entryDate: createDefaultPreference(false),
+    term: createDefaultPreference(true),
+    forecastDate: createDefaultPreference(false),
+    startedAt: createDefaultPreference(false),
+    deadline: createDefaultPreference(true),
+    // Assignment
+    sector: createDefaultPreference(false),
+    customer: createDefaultPreference(false),
+    // Artwork
+    artworks: createDefaultPreference(false),
+    // Negotiation
+    negotiatingWith: createDefaultPreference(false),
+    // Production
+    paint: createDefaultPreference(false),
+    observation: createDefaultPreference(false),
+    // Financial (ADMIN/FINANCIAL only)
+    invoiceTo: createDefaultPreference(false),
+    commission: createDefaultPreference(false),
+    budgets: createDefaultPreference(false),
+    invoices: createDefaultPreference(true),
+    receipts: createDefaultPreference(false),
+    reimbursements: createDefaultPreference(false),
+    invoiceReimbursements: createDefaultPreference(false),
   },
   order: {
-    created: {
-      channels: ["IN_APP"],
-      mandatory: false,
-    },
-    statusChange: {
-      channels: ["IN_APP", "EMAIL"],
-      mandatory: false,
-    },
-    delivered: {
-      channels: ["IN_APP"],
-      mandatory: false,
-    },
-    cancelled: {
-      channels: ["IN_APP", "EMAIL"],
-      mandatory: false,
-    },
+    created: createDefaultPreference(false),
+    status: createDefaultPreference(false),
+    fulfilled: createDefaultPreference(false),
+    cancelled: createDefaultPreference(false),
+    overdue: createDefaultPreference(true),
   },
   stock: {
-    lowStock: {
-      channels: ["IN_APP"],
-      mandatory: false,
-    },
-    outOfStock: {
-      channels: ["IN_APP", "EMAIL"],
-      mandatory: false,
-    },
-    reorderNeeded: {
-      channels: ["IN_APP"],
-      mandatory: false,
-    },
+    low: createDefaultPreference(false),
+    out: createDefaultPreference(true),
+    restock: createDefaultPreference(false),
+  },
+  system: {
+    maintenance: createDefaultPreference(true),
+    update: createDefaultPreference(false),
+    security: createDefaultPreference(true),
+  },
+  vacation: {
+    requested: createDefaultPreference(false),
+    approved: createDefaultPreference(true),
+    rejected: createDefaultPreference(true),
+    reminder: createDefaultPreference(false),
   },
 };
 
@@ -392,31 +463,89 @@ export function NotificationPreferencesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [openAccordions, setOpenAccordions] = useState<string[]>([]);
 
   const form = useForm<NotificationPreferencesFormData>({
     resolver: zodResolver(notificationPreferencesSchema),
     defaultValues: defaultPreferences,
   });
 
-  // Load user profile and preferences
   useEffect(() => {
     loadPreferences();
   }, []);
 
+  /**
+   * Transform API preferences to form format
+   */
+  const transformPreferencesToForm = (
+    preferences: UserNotificationPreference[]
+  ): NotificationPreferencesFormData => {
+    const formData = { ...defaultPreferences };
+
+    for (const pref of preferences) {
+      const section = pref.notificationType.toLowerCase() as keyof NotificationPreferencesFormData;
+      const eventKey = pref.eventType || 'default';
+
+      if (formData[section] && eventKey in (formData[section] as Record<string, NotificationEventPreference>)) {
+        (formData[section] as Record<string, NotificationEventPreference>)[eventKey] = {
+          channels: pref.channels as NotificationChannel[],
+          mandatory: pref.isMandatory,
+        };
+      }
+    }
+
+    return formData;
+  };
+
+  /**
+   * Transform form data to API format for saving
+   */
+  const transformFormToPreferences = (
+    data: NotificationPreferencesFormData
+  ): Array<{ type: string; eventType: string | null; channels: string[] }> => {
+    const preferences: Array<{ type: string; eventType: string | null; channels: string[] }> = [];
+
+    for (const [sectionKey, section] of Object.entries(data)) {
+      const type = sectionKey.toUpperCase(); // e.g., "task" -> "TASK"
+
+      for (const [eventKey, eventData] of Object.entries(section as Record<string, NotificationEventPreference>)) {
+        preferences.push({
+          type,
+          eventType: eventKey,
+          channels: eventData.channels,
+        });
+      }
+    }
+
+    return preferences;
+  };
+
   const loadPreferences = async () => {
     try {
       setIsLoading(true);
-      const response = await getProfile();
+      const profileResponse = await getProfile();
 
-      if (response.success && response.data) {
-        setUserId(response.data.id);
+      if (profileResponse.success && profileResponse.data) {
+        const currentUserId = profileResponse.data.id;
+        setUserId(currentUserId);
 
-        // TODO: Load actual preferences from API when available
-        // For now, use default preferences
-        form.reset(defaultPreferences);
+        // Load user's notification preferences from API
+        const prefsResponse = await notificationPreferenceService.getPreferences(currentUserId);
+
+        // Note: axios returns AxiosResponse, so actual data is in prefsResponse.data
+        const responseData = prefsResponse.data;
+        if (responseData?.success && responseData?.data && responseData.data.length > 0) {
+          const formData = transformPreferencesToForm(responseData.data);
+          form.reset(formData);
+        } else {
+          // No preferences saved yet, use defaults
+          form.reset(defaultPreferences);
+        }
       }
     } catch (error: any) {
+      console.error("Error loading preferences:", error);
       toast.error(error?.response?.data?.message || "Erro ao carregar preferências");
+      form.reset(defaultPreferences);
     } finally {
       setIsLoading(false);
     }
@@ -431,18 +560,28 @@ export function NotificationPreferencesPage() {
     try {
       setIsSaving(true);
 
-      // TODO: Implement API call to save preferences
-      // await updateNotificationPreferences(userId, data);
+      // Transform form data to API format
+      const preferences = transformFormToPreferences(data);
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Use batch update for efficiency
+      const response = await notificationPreferenceService.batchUpdatePreferences(userId, {
+        preferences: preferences.map(p => ({
+          type: p.type,
+          eventType: p.eventType || '',
+          channels: p.channels,
+        })),
+      });
 
-      toast.success("Preferências salvas com sucesso!");
-    } catch (error: any) {
-      toast.error("Erro ao salvar preferências");
-      if (process.env.NODE_ENV !== 'production') {
-        console.error("Error saving preferences:", error);
+      // Note: axios returns AxiosResponse, so actual data is in response.data
+      const responseData = response.data;
+      if (responseData?.success) {
+        toast.success(`${responseData.data?.updated || 0} preferências salvas com sucesso!`);
+      } else {
+        toast.error(responseData?.message || "Erro ao salvar preferências");
       }
+    } catch (error: any) {
+      console.error("Error saving preferences:", error);
+      toast.error(error?.response?.data?.message || "Erro ao salvar preferências");
     } finally {
       setIsSaving(false);
     }
@@ -469,16 +608,7 @@ export function NotificationPreferencesPage() {
     <div className={cn("flex flex-col h-full", DETAIL_PAGE_SPACING.CONTAINER)}>
       <div className="flex-shrink-0">
         <PageHeader
-          title="Notificações"
-          subtitle={
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">Escolha como você quer ser notificado</p>
-              <p className="text-sm text-muted-foreground">
-                Configure os canais de notificação para cada tipo de evento. Algumas notificações são obrigatórias para garantir
-                que você não perca informações importantes.
-              </p>
-            </div>
-          }
+          title="Preferências de Notificação"
           icon={Bell}
           breadcrumbs={[
             { label: "Início", href: routes.home },
@@ -496,7 +626,7 @@ export function NotificationPreferencesPage() {
             },
             {
               key: "save",
-              label: "Salvar Preferências",
+              label: "Salvar",
               icon: Save,
               onClick: handleSave,
               variant: "default",
@@ -508,147 +638,77 @@ export function NotificationPreferencesPage() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto">
-        <div className="space-y-6 pb-8">
-
-          {/* Task Notifications */}
-          <Section title="Notificações de Tarefas" icon={ClipboardList}>
-            <PreferenceRow
-              label="Mudanças de Status"
-              description="Quando o status de uma tarefa é atualizado"
-              channels={["IN_APP", "EMAIL", "PUSH", "WHATSAPP"]}
-              selectedChannels={form.watch("task.status.channels")}
-              onChange={(channels) => form.setValue("task.status.channels", channels, { shouldDirty: true })}
-              mandatory={form.watch("task.status.mandatory")}
-              disabled={form.watch("task.status.mandatory")}
-            />
-            <PreferenceRow
-              label="Atualizações de Arte"
-              description="Quando arquivos de arte são adicionados ou modificados"
-              channels={["IN_APP", "EMAIL", "PUSH", "WHATSAPP"]}
-              selectedChannels={form.watch("task.artwork.channels")}
-              onChange={(channels) => form.setValue("task.artwork.channels", channels, { shouldDirty: true })}
-              mandatory={form.watch("task.artwork.mandatory")}
-              disabled={form.watch("task.artwork.mandatory")}
-            />
-            <PreferenceRow
-              label="Prazos Próximos"
-              description="Quando uma tarefa está próxima do prazo de entrega"
-              channels={["IN_APP", "EMAIL", "PUSH", "WHATSAPP"]}
-              selectedChannels={form.watch("task.deadline.channels")}
-              onChange={(channels) => form.setValue("task.deadline.channels", channels, { shouldDirty: true })}
-              mandatory={form.watch("task.deadline.mandatory")}
-              disabled={form.watch("task.deadline.mandatory")}
-            />
-            <PreferenceRow
-              label="Atribuição de Tarefas"
-              description="Quando uma tarefa é atribuída a você"
-              channels={["IN_APP", "EMAIL", "PUSH", "WHATSAPP"]}
-              selectedChannels={form.watch("task.assignment.channels")}
-              onChange={(channels) => form.setValue("task.assignment.channels", channels, { shouldDirty: true })}
-              mandatory={form.watch("task.assignment.mandatory")}
-              disabled={form.watch("task.assignment.mandatory")}
-            />
-            <PreferenceRow
-              label="Comentários"
-              description="Quando alguém comenta em uma tarefa que você segue"
-              channels={["IN_APP", "EMAIL", "PUSH", "WHATSAPP"]}
-              selectedChannels={form.watch("task.comment.channels")}
-              onChange={(channels) => form.setValue("task.comment.channels", channels, { shouldDirty: true })}
-              mandatory={form.watch("task.comment.mandatory")}
-              disabled={form.watch("task.comment.mandatory")}
-            />
-          </Section>
-
-          {/* Order Notifications */}
-          <Section title="Notificações de Pedidos" icon={ShoppingCart}>
-            <PreferenceRow
-              label="Novos Pedidos"
-              description="Quando um novo pedido é criado"
-              channels={["IN_APP", "EMAIL", "PUSH"]}
-              selectedChannels={form.watch("order.created.channels")}
-              onChange={(channels) => form.setValue("order.created.channels", channels, { shouldDirty: true })}
-              mandatory={form.watch("order.created.mandatory")}
-              disabled={form.watch("order.created.mandatory")}
-            />
-            <PreferenceRow
-              label="Mudanças de Status"
-              description="Quando o status de um pedido é alterado"
-              channels={["IN_APP", "EMAIL", "PUSH"]}
-              selectedChannels={form.watch("order.statusChange.channels")}
-              onChange={(channels) => form.setValue("order.statusChange.channels", channels, { shouldDirty: true })}
-              mandatory={form.watch("order.statusChange.mandatory")}
-              disabled={form.watch("order.statusChange.mandatory")}
-            />
-            <PreferenceRow
-              label="Pedidos Entregues"
-              description="Quando um pedido é marcado como entregue"
-              channels={["IN_APP", "EMAIL", "PUSH"]}
-              selectedChannels={form.watch("order.delivered.channels")}
-              onChange={(channels) => form.setValue("order.delivered.channels", channels, { shouldDirty: true })}
-              mandatory={form.watch("order.delivered.mandatory")}
-              disabled={form.watch("order.delivered.mandatory")}
-            />
-            <PreferenceRow
-              label="Pedidos Cancelados"
-              description="Quando um pedido é cancelado"
-              channels={["IN_APP", "EMAIL", "PUSH"]}
-              selectedChannels={form.watch("order.cancelled.channels")}
-              onChange={(channels) => form.setValue("order.cancelled.channels", channels, { shouldDirty: true })}
-              mandatory={form.watch("order.cancelled.mandatory")}
-              disabled={form.watch("order.cancelled.mandatory")}
-            />
-          </Section>
-
-          {/* Stock Notifications */}
-          <Section title="Notificações de Estoque" icon={Package}>
-            <PreferenceRow
-              label="Estoque Baixo"
-              description="Quando o estoque de um item está abaixo do mínimo"
-              channels={["IN_APP", "EMAIL", "PUSH"]}
-              selectedChannels={form.watch("stock.lowStock.channels")}
-              onChange={(channels) => form.setValue("stock.lowStock.channels", channels, { shouldDirty: true })}
-              mandatory={form.watch("stock.lowStock.mandatory")}
-              disabled={form.watch("stock.lowStock.mandatory")}
-            />
-            <PreferenceRow
-              label="Estoque Esgotado"
-              description="Quando um item fica sem estoque"
-              channels={["IN_APP", "EMAIL", "PUSH"]}
-              selectedChannels={form.watch("stock.outOfStock.channels")}
-              onChange={(channels) => form.setValue("stock.outOfStock.channels", channels, { shouldDirty: true })}
-              mandatory={form.watch("stock.outOfStock.mandatory")}
-              disabled={form.watch("stock.outOfStock.mandatory")}
-            />
-            <PreferenceRow
-              label="Reabastecimento Necessário"
-              description="Quando é necessário fazer um novo pedido de reabastecimento"
-              channels={["IN_APP", "EMAIL", "PUSH"]}
-              selectedChannels={form.watch("stock.reorderNeeded.channels")}
-              onChange={(channels) => form.setValue("stock.reorderNeeded.channels", channels, { shouldDirty: true })}
-              mandatory={form.watch("stock.reorderNeeded.mandatory")}
-              disabled={form.watch("stock.reorderNeeded.mandatory")}
-            />
-          </Section>
-
+        <div className="pb-8 pt-6">
           {/* Channel Legend */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Canais de Notificação</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {(Object.entries(channelMetadata) as [NotificationChannel, typeof channelMetadata[NotificationChannel]][]).map(([channel, metadata]) => {
-                  const Icon = metadata.icon;
-                  return (
-                    <div key={channel} className="flex items-center gap-2">
-                      <Icon className={cn("h-4 w-4", metadata.color)} />
-                      <span className="text-sm">{metadata.label}</span>
+          <div className="flex items-center gap-4 mb-6 p-3 bg-card border border-border rounded-lg">
+            <span className="text-sm text-muted-foreground">Canais:</span>
+            {ALL_CHANNELS.map((channel) => {
+              const metadata = channelMetadata[channel];
+              const Icon = metadata.icon;
+              return (
+                <div key={channel} className="flex items-center gap-1.5">
+                  <Icon className={cn("h-4 w-4", metadata.color)} />
+                  <span className="text-sm">{metadata.label}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Accordion Sections */}
+          <Accordion
+            type="multiple"
+            value={openAccordions}
+            onValueChange={setOpenAccordions}
+            className="space-y-2"
+          >
+            {notificationSections.map((section) => {
+              const Icon = section.icon;
+              const sectionKey = section.id as keyof NotificationPreferencesFormData;
+
+              return (
+                <AccordionItem
+                  key={section.id}
+                  value={section.id}
+                  className="border rounded-lg px-4 bg-card"
+                >
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-primary/10 rounded-md">
+                        <Icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="text-left">
+                        <span className="font-medium">{section.title}</span>
+                        <span className="text-xs text-muted-foreground ml-2">
+                          ({section.events.length} eventos)
+                        </span>
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                  </AccordionTrigger>
+                  <AccordionContent className="pb-4">
+                    <div className="pt-2">
+                      {section.events.map((event) => {
+                        const eventKey = event.key as keyof (typeof defaultPreferences)[typeof sectionKey];
+                        const watchPath = `${sectionKey}.${eventKey}` as const;
+
+                        return (
+                          <PreferenceRow
+                            key={event.key}
+                            label={event.label}
+                            description={event.description}
+                            selectedChannels={form.watch(`${watchPath}.channels` as any) || []}
+                            onChange={(channels) =>
+                              form.setValue(`${watchPath}.channels` as any, channels, { shouldDirty: true })
+                            }
+                            mandatory={event.mandatory}
+                          />
+                        );
+                      })}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
         </div>
       </div>
     </div>

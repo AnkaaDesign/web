@@ -112,7 +112,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       },
       {
         key: "serialNumberOrPlate",
-        header: "Nº SÉRIE",
+        header: "IDENTIFICADOR",
         sortable: true,
         accessor: (task: TaskRow) => task.serialNumber || task.truck?.plate || "",
         customSortFunction: sortSerialNumberOrPlate,
@@ -151,13 +151,6 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
         header: "INICIADO EM",
         sortable: true,
         accessor: "startedAt",
-        dataType: "date",
-      },
-      {
-        key: "finishedAt",
-        header: "FINALIZADO EM",
-        sortable: true,
-        accessor: "finishedAt",
         dataType: "date",
       },
       {
@@ -202,13 +195,12 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       { id: "measures", header: "MEDIDAS", width: "w-[110px]", sortable: true },
       { id: "generalPainting", header: "PINTURA", width: "w-[100px]", sortable: true },
       { id: "serviceOrders.production", header: "PRODUÇÃO", width: "w-[120px]", sortable: true },
-      { id: "serialNumberOrPlate", header: "Nº SÉRIE", width: "w-[120px]", sortable: true },
+      { id: "serialNumberOrPlate", header: "IDENTIFICADOR", width: "w-[140px]", sortable: true },
       { id: "spot", header: "LOCAL", width: "w-[120px]", sortable: true },
       { id: "chassisNumber", header: "Nº CHASSI", width: "w-[140px]", sortable: true },
       { id: "sector.name", header: "SETOR", width: "w-[120px]", sortable: true },
       { id: "entryDate", header: "ENTRADA", width: "w-[110px]", sortable: true },
       { id: "startedAt", header: "INICIADO EM", width: "w-[110px]", sortable: true },
-      { id: "finishedAt", header: "FINALIZADO EM", width: "w-[110px]", sortable: true },
       { id: "term", header: "PRAZO", width: "w-[110px]", sortable: true },
       { id: "remainingTime", header: "TEMPO RESTANTE", width: "w-[130px]", sortable: true },
     ],
@@ -377,7 +369,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       switch (action) {
         case "start":
           for (const task of tasks) {
-            if (task.status === TASK_STATUS.PENDING || task.status === TASK_STATUS.ON_HOLD) {
+            if (task.status === TASK_STATUS.PENDING) {
               await updateAsync({
                 id: task.id,
                 data: { status: TASK_STATUS.IN_PRODUCTION, startedAt: new Date() },
@@ -392,17 +384,6 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
               await updateAsync({
                 id: task.id,
                 data: { status: TASK_STATUS.COMPLETED, finishedAt: new Date() },
-              });
-            }
-          }
-          break;
-
-        case "pause":
-          for (const task of tasks) {
-            if (task.status === TASK_STATUS.IN_PRODUCTION || task.status === TASK_STATUS.PENDING) {
-              await updateAsync({
-                id: task.id,
-                data: { status: TASK_STATUS.ON_HOLD },
               });
             }
           }
@@ -800,7 +781,6 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
                     {column.id === "sector.name" && <span className="truncate block">{task.sector?.name || "-"}</span>}
                     {column.id === "entryDate" && <span className="truncate block">{task.entryDate ? formatDate(task.entryDate) : "-"}</span>}
                     {column.id === "startedAt" && <span className="truncate block">{task.startedAt ? formatDate(task.startedAt) : "-"}</span>}
-                    {column.id === "finishedAt" && <span className="truncate block">{task.finishedAt ? formatDate(task.finishedAt) : "-"}</span>}
                     {column.id === "term" && (task.term ? <span className="truncate block">{formatDate(task.term)}</span> : "-")}
                     {column.id === "measures" && <span className="truncate block">{formatTaskMeasures(task)}</span>}
                     {column.id === "remainingTime" &&

@@ -136,7 +136,7 @@ export function SectorForm(props: SectorFormProps) {
 
   return (
     <FormProvider {...form}>
-      <form id="sector-form" onSubmit={form.handleSubmit(handleSubmit)}>
+      <form id="sector-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-4xl">
         {/* Hidden submit button for external form submission */}
         <button id="sector-form-submit" type="submit" className="hidden" disabled={isSubmitting} />
 

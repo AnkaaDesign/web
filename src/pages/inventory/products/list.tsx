@@ -17,7 +17,7 @@ export const ProductListPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="h-full flex flex-col bg-background px-4 pt-4">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"
           title="Produtos"

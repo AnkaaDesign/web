@@ -191,7 +191,7 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
 
     try {
       await markAllAsReadMutation.mutateAsync(user.id);
-      toast.success("Sucesso", "Todas as notificações foram marcadas como lidas");
+      // Note: Toast is shown by axios interceptor based on API response message
     } catch (error) {
       console.error("Failed to mark all notifications as read:", error);
       toast.error("Erro", "Não foi possível marcar todas as notificações como lidas");

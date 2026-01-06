@@ -33,19 +33,44 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
   } = useNotificationCenter();
 
   const handleNotificationClick = async (notification: Notification) => {
+    // Debug: log notification data to help diagnose navigation issues
+    console.log("[NotificationCenter] Clicked notification:", {
+      id: notification.id,
+      title: notification.title,
+      actionUrl: notification.actionUrl,
+      link: (notification as any).link,
+      type: notification.type,
+    });
+
     // Mark as read
     await markAsRead(notification.id);
 
     // Navigate to notification target if available (using actionUrl field)
-    const targetUrl = (notification as any).link || notification.actionUrl;
+    let targetUrl = (notification as any).link || notification.actionUrl;
+
+    // Debug: log resolved URL
+    console.log("[NotificationCenter] Target URL:", targetUrl);
+
     if (targetUrl) {
+      // Handle legacy /tasks/:id URLs - convert to new /producao/agenda/detalhes/:id
+      // This handles old notifications that were created before the URL fix
+      if (targetUrl.startsWith("/tasks/")) {
+        const taskId = targetUrl.replace("/tasks/", "");
+        // Default to agenda for old URLs (user can navigate to correct page from there)
+        targetUrl = `/producao/agenda/detalhes/${taskId}`;
+        console.log("[NotificationCenter] Converted legacy URL to:", targetUrl);
+      }
+
       // Handle both internal routes and external URLs
       if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
         window.open(targetUrl, "_blank");
       } else {
+        console.log("[NotificationCenter] Navigating to:", targetUrl);
         navigate(targetUrl);
       }
       setIsOpen(false);
+    } else {
+      console.warn("[NotificationCenter] No actionUrl found for notification:", notification.id);
     }
   };
 

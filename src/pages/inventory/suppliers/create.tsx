@@ -56,19 +56,20 @@ export default function SupplierCreate() {
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-      <PageHeader
-        title="Cadastrar Fornecedor"
-        icon={IconBuilding}
-        favoritePage={FAVORITE_PAGES.ESTOQUE_FORNECEDORES_CADASTRAR}
-        breadcrumbs={[
-          { label: "Início", href: routes.home },
-          { label: "Estoque", href: routes.inventory.root },
-          { label: "Fornecedores", href: routes.inventory.suppliers.root },
-          { label: "Cadastrar" },
-        ]}
-        actions={actions}
-        className="flex-shrink-0"
-      />
+      <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <PageHeader
+          title="Cadastrar Fornecedor"
+          icon={IconBuilding}
+          favoritePage={FAVORITE_PAGES.ESTOQUE_FORNECEDORES_CADASTRAR}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Estoque", href: routes.inventory.root },
+            { label: "Fornecedores", href: routes.inventory.suppliers.root },
+            { label: "Cadastrar" },
+          ]}
+          actions={actions}
+        />
+      </div>
       <div className="flex-1 overflow-y-auto pb-6">
         <SupplierForm mode="create" onSubmit={handleSubmit} isSubmitting={createSupplier.isPending} onFormStateChange={handleFormStateChange} />
       </div>

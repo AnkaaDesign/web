@@ -274,7 +274,7 @@ export function ItemForm(props: ItemFormProps) {
 
   return (
     <FormProvider {...form}>
-      <form id="item-form" onSubmit={form.handleSubmit(handleSubmit)}>
+      <form id="item-form" onSubmit={form.handleSubmit(handleSubmit)} className="container mx-auto max-w-4xl">
           {/* Hidden submit button for programmatic form submission */}
           <button id="item-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
             Submit

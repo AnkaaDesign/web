@@ -5,7 +5,7 @@ import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useSector } from "../../../../hooks";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeader } from "@/components/page-header";
+import { PageHeader } from "@/components/ui/page-header";
 import { SectorForm } from "@/components/administration/sector/form";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 
@@ -49,19 +49,20 @@ export const SectorEditPage = () => {
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <PageHeader
-          variant="form"
-          title="Editar Setor"
-          icon={IconBuildingSkyscraper}
-          breadcrumbs={[
-            { label: "Início", href: "/" },
-            { label: "Administração" },
-            { label: "Setores", href: routes.administration.sectors.root },
-            { label: sector.data.name || "Carregando...", href: routes.administration.sectors.details(id) },
-            { label: "Editar" },
-          ]}
-          className="flex-shrink-0"
-        />
+        <div className="container mx-auto max-w-4xl flex-shrink-0">
+          <PageHeader
+            variant="form"
+            title="Editar Setor"
+            icon={IconBuildingSkyscraper}
+            breadcrumbs={[
+              { label: "Início", href: "/" },
+              { label: "Administração" },
+              { label: "Setores", href: routes.administration.sectors.root },
+              { label: sector.data.name || "Carregando...", href: routes.administration.sectors.details(id) },
+              { label: "Editar" },
+            ]}
+          />
+        </div>
         <div className="flex-1 overflow-y-auto pb-6">
           <SectorForm mode="update" sector={sector.data} />
         </div>

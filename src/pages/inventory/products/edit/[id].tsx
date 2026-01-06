@@ -110,19 +110,20 @@ export const EditProductPage = () => {
 
   return (
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-      <PageHeader
-        variant="form"
-        title={`Editar ${item.name}`}
-        icon={IconPackage}
-        breadcrumbs={[
-          { label: "Estoque", href: routes.inventory.root },
-          { label: "Produtos", href: routes.inventory.products.root },
-          { label: item.name, href: routes.inventory.products.details(id!) },
-          { label: "Editar" },
-        ]}
-        actions={actions}
-        className="flex-shrink-0"
-      />
+      <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <PageHeader
+          variant="form"
+          title={`Editar ${item.name}`}
+          icon={IconPackage}
+          breadcrumbs={[
+            { label: "Estoque", href: routes.inventory.root },
+            { label: "Produtos", href: routes.inventory.products.root },
+            { label: item.name, href: routes.inventory.products.details(id!) },
+            { label: "Editar" },
+          ]}
+          actions={actions}
+        />
+      </div>
       <div className="flex-1 overflow-y-auto pb-6">
         <ItemEditForm item={item} onSubmit={handleFormSubmit} isSubmitting={updateMutation.isPending} onFormStateChange={setFormState} />
       </div>
