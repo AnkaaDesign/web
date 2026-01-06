@@ -126,7 +126,7 @@ export function ServerServicesPage() {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="h-full flex flex-col px-4 pt-4">
       {/* Fixed Header */}
       <div className="flex-shrink-0">
         <PageHeader
@@ -149,8 +149,8 @@ export function ServerServicesPage() {
       </div>
 
       {/* Content Card */}
-      <Card className="flex-1 flex flex-col min-h-0" level={1}>
-        <CardContent className="flex-1 overflow-auto space-y-4">
+      <Card className="flex-1 flex flex-col min-h-0 mt-4">
+        <CardContent className="flex-1 overflow-auto space-y-4 pb-6">
           {isLoading ? (
             <div className="space-y-4">
               {Array.from({ length: 5 }).map((_, i) => (

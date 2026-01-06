@@ -74,8 +74,8 @@ export const MediaGallery: React.FC<MediaGalleryProps> = ({
             key={item.id}
             onClick={() => openViewer(index)}
             className={cn(
-              'group relative rounded-lg overflow-hidden shadow-md',
-              'hover:shadow-xl hover:scale-[1.02] transition-all duration-300',
+              'group relative rounded-lg overflow-hidden shadow-sm',
+              'hover:shadow-sm hover:scale-[1.02] transition-all duration-300',
               'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
               getAspectRatioClass()
             )}

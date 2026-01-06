@@ -63,7 +63,9 @@ export function ThemeProvider({ children, defaultTheme = "system", storageKey = 
       try {
         localStorage.setItem(storageKey, newTheme);
       } catch (error) {
-        console.warn("Failed to save theme to localStorage:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn("Failed to save theme to localStorage:", error);
+        }
       }
       setTheme(newTheme);
     },

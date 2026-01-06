@@ -6,6 +6,7 @@ import {
   ASSIGNMENT_TYPE,
   TASK_STATUS,
   SERVICE_ORDER_STATUS,
+  SERVICE_ORDER_TYPE,
   AIRBRUSHING_STATUS,
   CUT_TYPE,
   CUT_STATUS,
@@ -146,13 +147,11 @@ export const USER_STATUS_LABELS: Record<USER_STATUS, string> = {
 };
 
 export const TASK_STATUS_LABELS: Record<TASK_STATUS, string> = {
-  [TASK_STATUS.PENDING]: "Aguardando",
+  [TASK_STATUS.PREPARATION]: "Em Preparação",
+  [TASK_STATUS.WAITING_PRODUCTION]: "Aguardando Produção",
   [TASK_STATUS.IN_PRODUCTION]: "Em Produção",
   [TASK_STATUS.COMPLETED]: "Concluído",
   [TASK_STATUS.CANCELLED]: "Cancelado",
-  [TASK_STATUS.ON_HOLD]: "Em Espera",
-  [TASK_STATUS.INVOICED]: "Faturado",
-  [TASK_STATUS.SETTLED]: "Liquidado",
 };
 
 export const SERVICE_ORDER_STATUS_LABELS: Record<SERVICE_ORDER_STATUS, string> = {
@@ -160,6 +159,22 @@ export const SERVICE_ORDER_STATUS_LABELS: Record<SERVICE_ORDER_STATUS, string> =
   [SERVICE_ORDER_STATUS.IN_PROGRESS]: "Em Andamento",
   [SERVICE_ORDER_STATUS.COMPLETED]: "Concluído",
   [SERVICE_ORDER_STATUS.CANCELLED]: "Cancelado",
+};
+
+// Form labels (camelCase for better readability in dropdowns)
+export const SERVICE_ORDER_TYPE_LABELS: Record<SERVICE_ORDER_TYPE, string> = {
+  [SERVICE_ORDER_TYPE.PRODUCTION]: "Produção",
+  [SERVICE_ORDER_TYPE.FINANCIAL]: "Financeiro",
+  [SERVICE_ORDER_TYPE.NEGOTIATION]: "Negociação",
+  [SERVICE_ORDER_TYPE.ARTWORK]: "Arte",
+};
+
+// Column labels (UPPERCASE for table headers and column visibility)
+export const SERVICE_ORDER_TYPE_COLUMN_LABELS: Record<SERVICE_ORDER_TYPE, string> = {
+  [SERVICE_ORDER_TYPE.PRODUCTION]: "PRODUÇÃO",
+  [SERVICE_ORDER_TYPE.FINANCIAL]: "FINANCEIRO",
+  [SERVICE_ORDER_TYPE.NEGOTIATION]: "NEGOCIAÇÃO",
+  [SERVICE_ORDER_TYPE.ARTWORK]: "ARTE",
 };
 
 export const AIRBRUSHING_STATUS_LABELS: Record<AIRBRUSHING_STATUS, string> = {

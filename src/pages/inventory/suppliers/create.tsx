@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { routes, FAVORITE_PAGES } from "../../../constants";
 import { useCreateSupplier } from "../../../hooks";
 import { SupplierForm } from "@/components/inventory/supplier/form";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { IconBuilding, IconCheck, IconLoader2 } from "@tabler/icons-react";
 import type { SupplierCreateFormData } from "../../../schemas";
 
@@ -21,7 +21,9 @@ export default function SupplierCreate() {
       }
     } catch (error: any) {
       // Error is already handled by the API client and mutation
-      console.error("Error creating supplier:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating supplier:", error);
+      }
     }
   };
 
@@ -53,30 +55,22 @@ export default function SupplierCreate() {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-4xl mx-auto">
-          <PageHeaderWithFavorite
-            title="Cadastrar Fornecedor"
-            icon={IconBuilding}
-            favoritePage={FAVORITE_PAGES.ESTOQUE_FORNECEDORES_CADASTRAR}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Estoque", href: routes.inventory.root },
-              { label: "Fornecedores", href: routes.inventory.suppliers.root },
-              { label: "Cadastrar" },
-            ]}
-            actions={actions}
-          />
-        </div>
-      </div>
-
-      {/* Main Content Card - Dashboard style scrolling */}
-      <div className="flex-1 overflow-hidden max-w-4xl mx-auto w-full">
-        <div className="h-full bg-white rounded-lg shadow-sm border overflow-hidden">
-          <SupplierForm mode="create" onSubmit={handleSubmit} isSubmitting={createSupplier.isPending} onFormStateChange={handleFormStateChange} />
-        </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        title="Cadastrar Fornecedor"
+        icon={IconBuilding}
+        favoritePage={FAVORITE_PAGES.ESTOQUE_FORNECEDORES_CADASTRAR}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Fornecedores", href: routes.inventory.suppliers.root },
+          { label: "Cadastrar" },
+        ]}
+        actions={actions}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <SupplierForm mode="create" onSubmit={handleSubmit} isSubmitting={createSupplier.isPending} onFormStateChange={handleFormStateChange} />
       </div>
     </div>
   );

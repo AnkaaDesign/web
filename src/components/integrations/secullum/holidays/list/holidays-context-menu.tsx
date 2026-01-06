@@ -62,7 +62,9 @@ export function HolidaysContextMenu({ contextMenu, onClose, onEdit }: HolidaysCo
       });
     } catch (error) {
       // Error is handled by the API client
-      console.error("Error deleting holiday:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting holiday:", error);
+      }
       setShowDeleteDialog(false);
       setHolidayToDelete(null);
     }

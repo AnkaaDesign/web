@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from "react";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -127,20 +127,21 @@ const BackupManagementPage = () => {
 
       setLoadingFolders(true);
       try {
-        console.log("Fetching WebDAV folders...");
         const folders = await backupApi.getWebDAVFolders();
-        console.log("WebDAV folders received:", folders);
 
         if (folders && folders.length > 0) {
           const formattedFolders = folders.map(f => ({ value: f, label: f }));
-          console.log("Formatted folders:", formattedFolders);
           setWebdavFolders(formattedFolders);
         } else {
-          console.warn("No WebDAV folders found");
+          if (process.env.NODE_ENV !== "production") {
+            console.warn("No WebDAV folders found");
+          }
           setWebdavFolders([]);
         }
       } catch (error) {
-        console.error("Failed to fetch WebDAV folders:", error);
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Failed to fetch WebDAV folders:", error);
+        }
         toast.error("Erro ao carregar pastas do WebDAV");
         setWebdavFolders([]);
       } finally {
@@ -631,8 +632,6 @@ const BackupManagementPage = () => {
 
   const handleCreateSchedule = useCallback(async () => {
     try {
-      console.log("handleCreateSchedule called", newSchedule);
-
       if (!newSchedule.name.trim()) {
         toast.error("Nome do agendamento é obrigatório");
         return;
@@ -655,7 +654,6 @@ const BackupManagementPage = () => {
       }
 
       const cronExpression = generateCronExpression(newSchedule.frequency, newSchedule.time);
-      console.log("Generated cron:", cronExpression);
 
       // Format time for display (handle Date object from DateTimeInput)
       let timeDisplay: string;
@@ -680,11 +678,7 @@ const BackupManagementPage = () => {
         paths: pathsToBackup,
       };
 
-      console.log("Scheduling backup with data:", scheduleData);
-
       const success = await scheduleBackup(scheduleData);
-
-      console.log("Schedule backup result:", success);
 
       if (success) {
         setScheduleDialogOpen(false);
@@ -703,7 +697,9 @@ const BackupManagementPage = () => {
         });
       }
     } catch (error) {
-      console.error("Error in handleCreateSchedule:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error in handleCreateSchedule:", error);
+      }
       toast.error(`Erro ao criar agendamento: ${error.message || "Erro desconhecido"}`);
     }
   }, [newSchedule, scheduleBackup, getFrequencyLabel, generateCronExpression]);
@@ -959,10 +955,10 @@ const BackupManagementPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="h-full flex flex-col px-4 pt-4">
         {/* Page Header */}
         <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
+          <PageHeader
             title="Gerenciamento de Backups"
             icon={IconDatabase}
             favoritePage={FAVORITE_PAGES.ADMINISTRACAO_COLABORADORES_LISTAR} // Reusing existing favorite
@@ -971,7 +967,7 @@ const BackupManagementPage = () => {
           />
         </div>
 
-        <div className="flex-1 min-h-0 space-y-6">
+        <div className="flex-1 overflow-y-auto pb-6 space-y-6 mt-4">
           {/* Summary Statistics */}
           {systemHealth && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

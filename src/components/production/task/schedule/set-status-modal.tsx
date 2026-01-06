@@ -26,7 +26,9 @@ interface SetStatusModalProps {
 }
 
 export function SetStatusModal({ open, onOpenChange, tasks, onConfirm, allowedStatuses }: SetStatusModalProps) {
-  console.log('[SetStatusModal] Rendering with open:', open, 'tasks:', tasks.length);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[SetStatusModal] Rendering with open:', open, 'tasks:', tasks.length);
+  }
 
   // Determine the initial status value
   // If all tasks have the same status, use that; otherwise leave empty
@@ -34,12 +36,14 @@ export function SetStatusModal({ open, onOpenChange, tasks, onConfirm, allowedSt
     if (tasks.length === 0) return undefined;
     const firstStatus = tasks[0].status;
     const allSameStatus = tasks.every(t => t.status === firstStatus);
-    console.log('[SetStatusModal] Initial status calculated:', {
-      tasksCount: tasks.length,
-      firstStatus,
-      allSameStatus,
-      result: allSameStatus ? firstStatus : undefined
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[SetStatusModal] Initial status calculated:', {
+        tasksCount: tasks.length,
+        firstStatus,
+        allSameStatus,
+        result: allSameStatus ? firstStatus : undefined
+      });
+    }
     return allSameStatus ? firstStatus : undefined;
   }, [tasks]);
 
@@ -53,7 +57,9 @@ export function SetStatusModal({ open, onOpenChange, tasks, onConfirm, allowedSt
   // Reset form with current status when modal opens
   React.useEffect(() => {
     if (open && initialStatus) {
-      console.log('[SetStatusModal] Setting initial status:', initialStatus);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[SetStatusModal] Setting initial status:', initialStatus);
+      }
       form.reset({ status: initialStatus as any });
     }
   }, [open, initialStatus, form]);

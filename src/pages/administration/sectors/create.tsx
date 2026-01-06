@@ -3,7 +3,7 @@ import { IconBuildingSkyscraper, IconCheck, IconLoader2 } from "@tabler/icons-re
 import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import type { SectorCreateFormData } from "../../../schemas";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { SectorForm } from "@/components/administration/sector/form";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { useSectorMutations } from "../../../hooks";
@@ -31,7 +31,9 @@ export const SectorCreatePage = () => {
         navigate(routes.administration.sectors.root);
       }
     } catch (error) {
-      console.error("Error creating sector:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating sector:", error);
+      }
     }
   };
 
@@ -60,30 +62,22 @@ export const SectorCreatePage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="h-full flex flex-col">
-        {/* Fixed Header */}
-        <div className="flex-shrink-0">
-          <div className="max-w-3xl mx-auto">
-            <PageHeaderWithFavorite
-              title="Novo Setor"
-              icon={IconBuildingSkyscraper}
-              favoritePage={FAVORITE_PAGES.ADMINISTRACAO_SETORES_CADASTRAR}
-              breadcrumbs={[
-                { label: "Início", href: "/" },
-                { label: "Administração", href: routes.administration.root },
-                { label: "Setores", href: routes.administration.sectors.root },
-                { label: "Novo" },
-              ]}
-              actions={actions}
-            />
-          </div>
-        </div>
-
-        {/* Scrollable Form Container */}
-        <div className="flex-1 overflow-y-auto mt-6">
-          <div className="max-w-3xl mx-auto h-full">
-            <SectorForm mode="create" onSubmit={handleSubmit} isSubmitting={false} />
-          </div>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          title="Novo Setor"
+          icon={IconBuildingSkyscraper}
+          favoritePage={FAVORITE_PAGES.ADMINISTRACAO_SETORES_CADASTRAR}
+          breadcrumbs={[
+            { label: "Início", href: "/" },
+            { label: "Administração", href: routes.administration.root },
+            { label: "Setores", href: routes.administration.sectors.root },
+            { label: "Novo" },
+          ]}
+          actions={actions}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <SectorForm mode="create" onSubmit={handleSubmit} isSubmitting={false} />
         </div>
       </div>
     </PrivilegeRoute>

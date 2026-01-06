@@ -49,7 +49,9 @@ export function OrderScheduleForm({ initialData, onSubmit, onCancel, isLoading =
     try {
       await onSubmit(data);
     } catch (error) {
-      console.error("Erro ao salvar cronograma:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Erro ao salvar cronograma:", error);
+      }
     }
   };
 

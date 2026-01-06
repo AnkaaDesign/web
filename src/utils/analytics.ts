@@ -21,10 +21,6 @@ export interface AnalyticsEvent {
  */
 export const trackEvent = (eventName: string, properties: AnalyticsEvent): void => {
   try {
-    // In development, log to console
-    if (process.env.NODE_ENV === "development") {
-    }
-
     // TODO: Integrate with analytics service (Google Analytics, Mixpanel, etc.)
     // Example for Google Analytics:
     // if (window.gtag) {
@@ -40,7 +36,9 @@ export const trackEvent = (eventName: string, properties: AnalyticsEvent): void 
     // analyticsService.track(eventName, properties);
   } catch (error) {
     // Silently fail - analytics should never break the app
-    console.warn("Analytics tracking failed:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Analytics tracking failed:", error);
+    }
   }
 };
 

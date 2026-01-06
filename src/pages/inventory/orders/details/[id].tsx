@@ -27,6 +27,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES } from "../../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { OrderTotalBadge } from "@/components/inventory/order/common/order-total-calculator";
+import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 const OrderDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -88,7 +89,7 @@ const OrderDetailsPage = () => {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
-          <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
+          <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
             <div className="flex flex-1 items-center justify-center min-h-[60vh]">
               <div className="text-center px-4 max-w-md mx-auto">
                 <div className="animate-in fade-in-50 duration-500">
@@ -127,7 +128,9 @@ const OrderDetailsPage = () => {
       await deleteMutation.mutateAsync(order.id);
       navigate(routes.inventory.orders.list);
     } catch (error) {
-      console.error("Error deleting order:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting order:", error);
+      }
     }
   };
 
@@ -146,7 +149,9 @@ const OrderDetailsPage = () => {
       setShowCompleteDialog(false);
       refetch();
     } catch (error) {
-      console.error("Error completing order:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error completing order:", error);
+      }
     }
   };
 
@@ -224,7 +229,9 @@ const OrderDetailsPage = () => {
           }
           refetch();
         } catch (error) {
-          console.error("Error marking order as done:", error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error("Error marking order as done:", error);
+          }
         }
       },
     });
@@ -242,13 +249,10 @@ const OrderDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="space-y-6">
-        {/* Hero Section - Enhanced Header with Actions */}
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
           title={order.description}
-          icon={IconShoppingCart}
-          className="shadow-lg"
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Estoque", href: routes.inventory.root },
@@ -275,39 +279,29 @@ const OrderDetailsPage = () => {
               : []),
             ...(customActions.map((action) => ({ key: "delete", ...action })) as PageAction[]),
           ]}
+          className="flex-shrink-0"
         />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Core Information Grid */}
+              <OrderInfoCard order={order} className="h-full" />
+              <ChangelogHistory
+                entityType={CHANGE_LOG_ENTITY_TYPE.ORDER}
+                entityId={order.id}
+                entityName={order.description}
+                entityCreatedAt={order.createdAt}
+                className="h-full"
+              />
+            </div>
 
-        {/* Core Information Grid */}
-        {/* Top Section: Info and Changelog */}
-        {/* Mobile: Single column stacked */}
-        <div className="block lg:hidden space-y-4 animate-in fade-in-50 duration-700">
-          <OrderInfoCard order={order} className="h-full" />
-          <ChangelogHistory
-            entityType={CHANGE_LOG_ENTITY_TYPE.ORDER}
-            entityId={order.id}
-            entityName={order.description}
-            entityCreatedAt={order.createdAt}
-            className="h-full"
-          />
+            {/* Bottom Section: Items and Documents */}
+            <OrderItemsCard order={order} className="w-full" onOrderUpdate={handleOrderUpdate} />
+
+            {/* Documents Section */}
+            <OrderDocumentsCard order={order} className="w-full" />
+          </div>
         </div>
-
-        {/* Desktop/Tablet: 2 columns grid with 1/2 and 1/2 split */}
-        <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in-50 duration-700">
-          <OrderInfoCard order={order} className="h-full" />
-          <ChangelogHistory
-            entityType={CHANGE_LOG_ENTITY_TYPE.ORDER}
-            entityId={order.id}
-            entityName={order.description}
-            entityCreatedAt={order.createdAt}
-            className="h-full"
-          />
-        </div>
-
-        {/* Bottom Section: Items and Documents */}
-        <OrderItemsCard order={order} className="w-full" onOrderUpdate={handleOrderUpdate} />
-
-        {/* Documents Section */}
-        <OrderDocumentsCard order={order} className="w-full" />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

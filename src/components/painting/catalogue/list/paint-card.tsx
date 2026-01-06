@@ -205,8 +205,8 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
       <Card
         id={`paint-card-${paint.id}`}
         className={cn(
-          "overflow-hidden hover:shadow-lg transition-all duration-200 cursor-pointer h-full flex flex-col",
-          selected && "border-2 border-primary shadow-xl"
+          "overflow-hidden hover:shadow-sm transition-all duration-200 cursor-pointer h-full flex flex-col",
+          selected && "border-2 border-primary shadow-sm"
         )}
         onClick={() => {
           // If in selection mode (any paints selected), toggle selection
@@ -239,7 +239,7 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
             <div className="absolute top-2 left-2 animate-in fade-in duration-200">
               <Checkbox
                 checked={true}
-                className="h-5 w-5 bg-white/90 shadow-lg pointer-events-none"
+                className="h-5 w-5 bg-white/90 shadow-sm pointer-events-none"
               />
             </div>
           )}

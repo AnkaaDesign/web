@@ -10,6 +10,7 @@ import { SpecificationsCard } from "@/components/inventory/item/brand/detail/spe
 import { RelatedItemsCard } from "@/components/inventory/item/brand/detail/related-items-card";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditItems } from "@/utils/permissions/entity-permissions";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 const BrandDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -47,7 +48,7 @@ const BrandDetailsPage = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
-        <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
+        <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
           <div className="animate-pulse space-y-6">
             {/* Header Skeleton */}
             <div className="space-y-4">
@@ -100,7 +101,7 @@ const BrandDetailsPage = () => {
   if (error || !brand) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
-        <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
+        <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
           <div className="flex flex-1 items-center justify-center min-h-[60vh]">
             <div className="text-center px-4 max-w-md mx-auto">
               <div className="animate-in fade-in-50 duration-500">
@@ -134,15 +135,14 @@ const BrandDetailsPage = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section - Enhanced Header with Actions */}
-      <div className="animate-in fade-in-50 duration-500">
-        <PageHeader
-          variant="detail"
-          title={brand.name}
-          icon={IconTag}
-          className="shadow-lg"
-          breadcrumbs={[
+    <div className="h-full flex flex-col px-4 pt-4">
+      <div className="flex-shrink-0">
+        <div className="animate-in fade-in-50 duration-500">
+          <PageHeader
+            variant="detail"
+            title={brand.name}
+            className="shadow-sm"
+            breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Estoque", href: routes.inventory.root },
             { label: "Produtos", href: routes.inventory.products.root },
@@ -163,36 +163,40 @@ const BrandDetailsPage = () => {
               onClick: handleEdit,
             }] : []),
           ]}
-        />
-      </div>
-
-      {/* Core Information Section - Specifications and Changelog */}
-      <div className="animate-in fade-in-50 duration-700">
-        {/* Mobile: Single column stacked */}
-        <div className="block lg:hidden space-y-4">
-          <SpecificationsCard brand={brand} itemCount={items.length} className="h-full" />
-          <ChangelogHistory
-            entityType={CHANGE_LOG_ENTITY_TYPE.ITEM_BRAND}
-            entityId={brand.id}
-            entityName={brand.name}
-            entityCreatedAt={brand.createdAt}
-            className="h-full"
-            maxHeight="500px"
           />
         </div>
-
-        {/* Desktop/Tablet: 2-column grid */}
-        <div className="hidden lg:block">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        </div>
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4 mt-4">
+            {/* Core Information Section - Specifications and Changelog */}
+            <div className="animate-in fade-in-50 duration-700">
+          {/* Mobile: Single column stacked */}
+          <div className="block lg:hidden space-y-4">
             <SpecificationsCard brand={brand} itemCount={items.length} className="h-full" />
-            <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.ITEM_BRAND} entityId={brand.id} entityName={brand.name} entityCreatedAt={brand.createdAt} className="h-full" />
+            <ChangelogHistory
+              entityType={CHANGE_LOG_ENTITY_TYPE.ITEM_BRAND}
+              entityId={brand.id}
+              entityName={brand.name}
+              entityCreatedAt={brand.createdAt}
+              className="h-full"
+              maxHeight="500px"
+            />
+          </div>
+
+          {/* Desktop/Tablet: 2-column grid */}
+          <div className="hidden lg:block">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <SpecificationsCard brand={brand} itemCount={items.length} className="h-full" />
+              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.ITEM_BRAND} entityId={brand.id} entityName={brand.name} entityCreatedAt={brand.createdAt} className="h-full" />
+            </div>
+            </div>
+
+            {/* Related Items - Full Width Section */}
+            <div className="animate-in fade-in-50 duration-900">
+              <RelatedItemsCard items={items} brandId={brand.id} brandName={brand.name} />
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Related Items - Full Width Section */}
-      <div className="animate-in fade-in-50 duration-900">
-        <RelatedItemsCard items={items} brandId={brand.id} brandName={brand.name} />
       </div>
     </div>
   );

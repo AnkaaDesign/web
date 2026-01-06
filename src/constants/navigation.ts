@@ -59,8 +59,8 @@ export const TABLER_ICONS = {
   stop: "IconPlayerStop",
   clock: "IconClock",
   pending: "IconClock",
+  preparation: "IconClipboardList",
   inProgress: "IconPlayerPlay",
-  onHold: "IconPlayerPause",
   completed: "IconCircleCheck",
   cancelled: "IconX",
 
@@ -762,7 +762,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [
           { id: "aerografia-financeiro", title: "Aerografia", icon: "paintBrush", path: "/financeiro/producao/aerografia" },
           { id: "cronograma-financeiro", title: "Cronograma", icon: "clock", path: "/financeiro/producao/cronograma" },
-          { id: "em-espera-financeiro", title: "Em Espera", icon: "pause", path: "/financeiro/producao/em-espera" },
+          { id: "em-preparacao-financeiro", title: "Agenda", icon: "preparation", path: "/financeiro/producao/agenda" },
           { id: "historico-tarefas-financeiro", title: "Histórico de Tarefas", icon: "history", path: "/financeiro/producao/historico-tarefas" },
         ],
       },
@@ -945,10 +945,10 @@ export const NAVIGATION_MENU: MenuItem[] = [
         children: [
           { id: "cronograma-detalhes", title: "Detalhes", icon: "eye", path: "/producao/cronograma/detalhes/:id", isDynamic: true },
           { id: "cronograma-editar", title: "Editar", icon: "edit", path: "/producao/cronograma/editar/:id", isDynamic: true, requiredPrivilege: [SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN] },
-          { id: "cronograma-cadastrar", title: "Nova Tarefa", icon: "plus", path: "/producao/cronograma/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
+          // { id: "cronograma-cadastrar", title: "Nova Tarefa", icon: "plus", path: "/producao/cronograma/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN }, // Removed - tasks are now created in the "in preparation" page
         ],
       },
-      { id: "cronograma-em-espera", title: "Em Espera", icon: "pause", path: "/producao/em-espera", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
+      { id: "cronograma-em-preparacao", title: "Agenda", icon: "preparation", path: "/producao/agenda", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
       { id: "historico", title: "Histórico", icon: "history", path: "/producao/historico", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN] },
       {
         id: "observacoes",

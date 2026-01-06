@@ -311,7 +311,9 @@ export function TaskList({ className }: TaskListProps) {
         await batchUpdate({ tasks: updates });
       }
     } catch (error) {
-      console.error("Error starting tasks:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error starting tasks:", error);
+      }
     }
   };
 
@@ -334,7 +336,9 @@ export function TaskList({ className }: TaskListProps) {
         await batchUpdate({ tasks: updates });
       }
     } catch (error) {
-      console.error("Error finishing tasks:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error finishing tasks:", error);
+      }
     }
   };
 
@@ -357,7 +361,9 @@ export function TaskList({ className }: TaskListProps) {
         await batchUpdate({ tasks: updates });
       }
     } catch (error) {
-      console.error("Error putting tasks on hold:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error putting tasks on hold:", error);
+      }
     }
   };
 
@@ -389,7 +395,9 @@ export function TaskList({ className }: TaskListProps) {
         await batchUpdate({ tasks: updates });
       }
     } catch (error) {
-      console.error("Error cancelling tasks:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error cancelling tasks:", error);
+      }
     } finally {
       setCancelDialog(null);
     }
@@ -409,21 +417,25 @@ export function TaskList({ className }: TaskListProps) {
       const ids = deleteDialog.items.map((item) => item.id);
       await batchDelete({ taskIds: ids });
     } catch (error) {
-      console.error("Error deleting tasks:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting tasks:", error);
+      }
     } finally {
       setDeleteDialog(null);
     }
   };
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <TableSearchInput
             ref={searchInputRef}
             value={displaySearchText}
-            onChange={(value) => setSearch(value)}
+            onChange={(value) => {
+              setSearch(value);
+            }}
             placeholder="Buscar por nome, número de série, placa, detalhes..."
             isPending={displaySearchText !== searchingFor}
           />
@@ -446,7 +458,7 @@ export function TaskList({ className }: TaskListProps) {
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />}
 
         {/* Paginated table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <TaskTable
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}

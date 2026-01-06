@@ -10,7 +10,9 @@ function getGlobalQueryClient(): QueryClient | null {
     }
     // Check if initialization is in progress but not yet complete
     if ((window as any).__QUERY_CLIENT_INITIALIZED__ === true) {
-      console.warn("[QueryClient] Global client flag set but instance not found");
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("[QueryClient] Global client flag set but instance not found");
+      }
     }
   }
   return null;
@@ -29,7 +31,9 @@ async function waitForGlobalQueryClient(maxWaitMs = 5000): Promise<QueryClient |
     await new Promise(resolve => setTimeout(resolve, 10));
   }
 
-  console.error("[QueryClient] Timeout waiting for global QueryClient");
+  if (process.env.NODE_ENV !== 'production') {
+    console.error("[QueryClient] Timeout waiting for global QueryClient");
+  }
   return null;
 }
 

@@ -23,7 +23,7 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/financeiro/producao": "FINANCIAL", // Redirects to /producao
   "/financeiro/producao/aerografia": "FINANCIAL", // Redirects to /producao/aerografia/listar
   "/financeiro/producao/cronograma": "FINANCIAL", // Redirects to /producao/cronograma (tasks)
-  "/financeiro/producao/em-espera": "FINANCIAL", // Redirects to /producao/em-espera
+  "/financeiro/producao/em-preparacao": "FINANCIAL", // Redirects to /producao/em-preparacao
   "/financeiro/producao/historico-tarefas": "FINANCIAL", // Redirects to /producao/historico
 
   // Estatísticas - Admin access (team leaders check at component level via isTeamLeader())
@@ -114,11 +114,11 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   // NOTE: Team leaders (checked via isTeamLeader()) can access schedule, history (manages their sector's tasks)
   [routes.production.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC"], // Team leaders check at component level
   [routes.production.schedule.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC"], // Team leaders check at component level
-  [routes.production.schedule.create]: ["PRODUCTION", "WAREHOUSE"], // DESIGNER, FINANCIAL excluded (cannot create)
+  // [routes.production.schedule.create]: ["PRODUCTION", "WAREHOUSE"], // Removed - tasks are now created in the "in preparation" page
   [routes.production.schedule.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN"], // Task detail page
   [routes.production.schedule.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "ADMIN"], // FINANCIAL, LOGISTIC can edit with restrictions
-  [routes.production.scheduleOnHold.root]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC"], // WAREHOUSE excluded from on-hold
-  [routes.production.scheduleOnHold.details(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN"], // On-hold task detail - WAREHOUSE excluded
+  [routes.production.preparation.root]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC"], // WAREHOUSE excluded from preparation
+  [routes.production.preparation.details(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN"], // Preparation task detail - WAREHOUSE excluded
   [routes.production.history.root]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC"], // Team leaders check at component level
   [routes.production.history.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN"], // History detail page
   [routes.production.airbrushings.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL"], // DESIGNER excluded from airbrushings

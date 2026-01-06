@@ -101,7 +101,9 @@ export function EntitySelectors({
 
       return { data: options, hasMore };
     } catch (error) {
-      console.error("Error fetching categories:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching categories:", error);
+      }
       return { data: [], hasMore: false };
     }
   }, []);
@@ -138,7 +140,9 @@ export function EntitySelectors({
 
       return { data: options, hasMore };
     } catch (error) {
-      console.error("Error fetching brands:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching brands:", error);
+      }
       return { data: [], hasMore: false };
     }
   }, []);
@@ -178,7 +182,9 @@ export function EntitySelectors({
 
       return { data: options, hasMore };
     } catch (error) {
-      console.error("Error fetching suppliers:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching suppliers:", error);
+      }
       return { data: [], hasMore: false };
     }
   }, []);

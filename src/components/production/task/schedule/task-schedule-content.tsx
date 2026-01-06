@@ -75,7 +75,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   // Filters state
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState<Partial<TaskGetManyFormData>>({
-    status: [TASK_STATUS.PENDING, TASK_STATUS.IN_PRODUCTION],
+    status: [TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION],
     limit: 1000,
   });
 
@@ -414,15 +414,8 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
 
   // Handle shift+click selection across tables using global task order
   const handleShiftClickSelect = useCallback((taskId: string) => {
-    console.log("[ShiftClick] handleShiftClickSelect called", {
-      taskId,
-      lastClickedTaskId,
-      globalOrderedTasksLength: globalOrderedTasks.length,
-    });
-
     if (!lastClickedTaskId) {
       // No previous selection, just select this task
-      console.log("[ShiftClick] No lastClickedTaskId, selecting single task");
       setLastClickedTaskId(taskId);
       setSelectedTaskIds(new Set([taskId]));
       return;
@@ -432,11 +425,8 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
     const lastIndex = globalOrderedTasks.findIndex((t) => t.id === lastClickedTaskId);
     const currentIndex = globalOrderedTasks.findIndex((t) => t.id === taskId);
 
-    console.log("[ShiftClick] Indices found", { lastIndex, currentIndex });
-
     if (lastIndex === -1 || currentIndex === -1) {
       // Fallback: just select the clicked task
-      console.log("[ShiftClick] Index not found, falling back to single selection");
       setLastClickedTaskId(taskId);
       return;
     }
@@ -446,20 +436,16 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
     const end = Math.max(lastIndex, currentIndex);
     const rangeIds = globalOrderedTasks.slice(start, end + 1).map((t) => t.id);
 
-    console.log("[ShiftClick] Range selection", { start, end, rangeCount: rangeIds.length });
-
     // Add to existing selection
     setSelectedTaskIds((prev) => {
       const newSelection = new Set(prev);
       rangeIds.forEach((id) => newSelection.add(id));
-      console.log("[ShiftClick] New selection size:", newSelection.size);
       return newSelection;
     });
   }, [lastClickedTaskId, globalOrderedTasks]);
 
   // Handle single click selection (updates last clicked)
   const handleSingleClickSelect = useCallback((taskId: string) => {
-    console.log("[SingleClick] handleSingleClickSelect called", { taskId });
     setLastClickedTaskId(taskId);
   }, []);
 
@@ -477,7 +463,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
 
   return (
     <Card className={cn("h-full flex flex-col", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Source selection mode banner */}
         {copyFromTaskState.step === "selecting_source" && (
           <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10 border border-primary/20 animate-in fade-in slide-in-from-top-2 duration-200">

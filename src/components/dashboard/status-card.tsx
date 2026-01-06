@@ -56,7 +56,7 @@ export function StatusCard({ status, quantity, total, icon: Icon, color = "blue"
   const colors = colorMap[color];
 
   return (
-    <Card className={cn("hover:shadow-sm transition-shadow", onClick && "cursor-pointer hover:shadow-md", className)} onClick={onClick}>
+    <Card className={cn("hover:shadow-sm transition-shadow", onClick && "cursor-pointer hover:shadow-sm", className)} onClick={onClick}>
       <CardContent className="p-3">
         <div className="flex items-center justify-between mb-2">
           <Icon className={cn("w-3.5 h-3.5", colors.icon)} />

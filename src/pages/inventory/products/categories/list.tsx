@@ -3,7 +3,7 @@ import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { FAVORITE_PAGES, SECTOR_PRIVILEGES, routes } from "../../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
-import { IconCategory, IconPlus } from "@tabler/icons-react";
+import { IconPlus } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
 const CategoryListPage = () => {
@@ -17,11 +17,10 @@ const CategoryListPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.BASIC}>
-      <div className="flex flex-col h-full space-y-4">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
-          variant="default"
+          variant="list"
           title="Categorias"
-          icon={IconCategory}
           favoritePage={FAVORITE_PAGES.ESTOQUE_PRODUTOS_CATEGORIAS_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
@@ -38,8 +37,12 @@ const CategoryListPage = () => {
               variant: "default",
             },
           ]}
+          className="flex-shrink-0"
         />
-        <CategoryList className="flex-1" />
+
+        <div className="flex-1 min-h-0 pb-6 flex flex-col">
+          <CategoryList className="h-full" />
+        </div>
       </div>
     </PrivilegeRoute>
   );

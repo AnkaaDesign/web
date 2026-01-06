@@ -84,7 +84,6 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
       uploadedFileId: file.id,
       thumbnailUrl: file.thumbnailUrl,
     } as FileWithPreview));
-    console.log('[ExternalWithdrawalEditForm] Initialized receipt files:', files.length, files);
     return files;
   }, [withdrawal.receipts]);
 
@@ -100,7 +99,6 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
       uploadedFileId: file.id,
       thumbnailUrl: file.thumbnailUrl,
     } as FileWithPreview));
-    console.log('[ExternalWithdrawalEditForm] Initialized invoice files:', files.length, files);
     return files;
   }, [withdrawal.invoices]);
 
@@ -358,12 +356,6 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
       const newNfeFiles = nfeFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
       const hasNewFiles = newReceiptFiles.length > 0 || newNfeFiles.length > 0;
 
-      console.log('[EXTERNAL WITHDRAWAL EDIT] Submission data:', {
-        hasNewFiles,
-        receiptFilesCount: newReceiptFiles.length,
-        nfeFilesCount: newNfeFiles.length,
-      });
-
       const updateData = {
         withdrawerName: withdrawerName?.trim() || "",
         type: withdrawalType,
@@ -371,7 +363,6 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
       };
 
       if (hasNewFiles) {
-        console.log('[EXTERNAL WITHDRAWAL EDIT] Creating FormData with files');
         const formData = createWithdrawalFormData(
           updateData,
           {
@@ -386,7 +377,6 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
           data: formData as any,
         });
       } else {
-        console.log('[EXTERNAL WITHDRAWAL EDIT] Submitting without files');
         await updateAsync({
           id: withdrawal.id,
           data: updateData,
@@ -396,7 +386,9 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
       // Success notification is handled by API client
       navigate(routes.inventory.externalWithdrawals?.list || "/inventory/external-withdrawals");
     } catch (error) {
-      console.error("Error updating external withdrawal:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error updating external withdrawal:", error);
+      }
       // Error is handled by the mutation hook
     }
   }, [validateCurrentStep, selectedItems, quantities, prices, withdrawerName, withdrawalType, notes, updateAsync, withdrawal.id, navigate, receiptFiles, nfeFiles]);
@@ -813,12 +805,6 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
     });
   } else {
     const submitDisabled = isSubmitting || !hasFormChanges || selectionCount === 0;
-    console.log('[ExternalWithdrawalEditForm] Submit Button State:', {
-      isSubmitting,
-      hasFormChanges,
-      selectionCount,
-      submitDisabled,
-    });
     navigationActions.push({
       key: "submit",
       label: "Salvar Alterações",
@@ -831,24 +817,31 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <div className="flex-shrink-0">
-        <PageHeader
-          title="Editar Retirada Externa"
-          icon={IconPackageExport}
-          variant="form"
-          breadcrumbs={[
-            { label: "Início", href: "/" },
-            { label: "Estoque", href: "/estoque" },
-            { label: "Retiradas Externas", href: routes.inventory.externalWithdrawals?.list || "/inventory/external-withdrawals" },
-            { label: "Editar" },
-          ]}
-          actions={navigationActions}
-        />
+    <div className="h-full flex flex-col bg-background">
+      {/* Fixed Header - stays at top */}
+      <div className="flex-shrink-0 bg-background border-b border-border">
+        <div className="max-w-5xl mx-auto px-4 py-4">
+          <PageHeader
+            title="Editar Retirada Externa"
+            icon={IconPackageExport}
+            variant="form"
+            breadcrumbs={[
+              { label: "Início", href: "/" },
+              { label: "Estoque", href: "/estoque" },
+              { label: "Retiradas Externas", href: routes.inventory.externalWithdrawals?.list || "/inventory/external-withdrawals" },
+              { label: "Editar" },
+            ]}
+            actions={navigationActions}
+          />
+        </div>
       </div>
 
-      <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-        <CardContent className="flex-1 flex flex-col p-6 overflow-hidden min-h-0">
+      {/* Scrollable Content Area - only this scrolls */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-4 py-6">
+          <div className="pb-6">
+          <Card className="shadow-sm border border-border">
+            <CardContent className="p-4">
           <Form {...form}>
             <form className="flex flex-col h-full">
               {/* Step Indicator */}
@@ -1151,8 +1144,11 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
               </div>
             </form>
           </Form>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

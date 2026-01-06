@@ -331,11 +331,10 @@ export default function BonusDetailPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="space-y-6">
+      <div className="p-4 space-y-4">
         <PageHeader
           variant="detail"
           title={title}
-          icon={IconCurrencyReal}
           breadcrumbs={breadcrumbs}
           actions={[
             {
@@ -354,7 +353,7 @@ export default function BonusDetailPage() {
         />
 
         {/* Info Cards - 2 columns */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2">
           {/* General Info Card */}
           <Card>
             <CardHeader className="pb-4">

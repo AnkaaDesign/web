@@ -28,22 +28,21 @@ export const MyTimeEntriesPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <div className="flex-shrink-0">
-        <PageHeader
-          variant="default"
-          title="Meus Pontos"
-          icon={IconCalculator}
-          favoritePage={FAVORITE_PAGES.PESSOAL_MEUS_PONTOS}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Pessoal", href: routes.personal.root },
-            { label: "Meus Pontos" },
-          ]}
-        />
-      </div>
-      <div className="flex-1 min-h-0">
-        <CalculationList className="h-full" mode="personal" />
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        className="flex-shrink-0"
+        variant="default"
+        title="Meus Pontos"
+        icon={IconCalculator}
+        favoritePage={FAVORITE_PAGES.PESSOAL_MEUS_PONTOS}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Pessoal", href: routes.personal.root },
+          { label: "Meus Pontos" },
+        ]}
+      />
+      <div className="flex-1 min-h-0 pb-6">
+        <CalculationList mode="personal" />
       </div>
     </div>
   );

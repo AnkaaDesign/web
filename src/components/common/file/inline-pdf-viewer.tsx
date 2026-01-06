@@ -157,7 +157,9 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           onLoadSuccess?.(pdfDoc.numPages);
         } catch (err) {
           if (cancelled) return;
-          console.error("[InlinePdfViewer] Error loading PDF:", err);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error("[InlinePdfViewer] Error loading PDF:", err);
+          }
           setError("Erro ao carregar o PDF");
           setLoading(false);
           onLoadError?.(err as Error);
@@ -227,7 +229,9 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           await renderTaskRef.current.promise;
         } catch (err: any) {
           if (cancelled || err?.name === "RenderingCancelledException") return;
-          console.error("[InlinePdfViewer] Error rendering page:", err);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error("[InlinePdfViewer] Error rendering page:", err);
+          }
           setError("Erro ao renderizar página do PDF");
         }
       };

@@ -49,12 +49,12 @@ export const ExternalWithdrawalEditPage = () => {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="flex flex-col h-full space-y-4">
+        <div className="h-full flex flex-col px-4 pt-4">
           <div className="flex-shrink-0">
             <div className="h-32 bg-muted rounded-xl animate-pulse"></div>
           </div>
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="h-96 bg-muted rounded-xl animate-pulse"></div>
+          <div className="flex-1 overflow-y-auto pb-6">
+            <div className="mt-4 h-96 bg-muted rounded-xl animate-pulse"></div>
           </div>
         </div>
       </PrivilegeRoute>
@@ -64,7 +64,7 @@ export const ExternalWithdrawalEditPage = () => {
   if (error || !withdrawal) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="flex flex-col h-full space-y-4">
+        <div className="h-full flex flex-col px-4 pt-4">
           <div className="flex-shrink-0">
             <PageHeader
               variant="form"
@@ -82,8 +82,9 @@ export const ExternalWithdrawalEditPage = () => {
             />
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <Card>
+          <div className="flex-1 overflow-y-auto pb-6">
+            <div className="mt-4">
+              <Card>
               <CardContent className="flex flex-col items-center justify-center py-16">
                 <div className="text-center max-w-md mx-auto">
                   <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
@@ -104,6 +105,7 @@ export const ExternalWithdrawalEditPage = () => {
                 </div>
               </CardContent>
             </Card>
+            </div>
           </div>
         </div>
       </PrivilegeRoute>
@@ -116,7 +118,7 @@ export const ExternalWithdrawalEditPage = () => {
   if (!canEdit) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="flex flex-col h-full space-y-4">
+        <div className="h-full flex flex-col px-4 pt-4">
           <div className="flex-shrink-0">
             <PageHeader
               variant="form"
@@ -135,8 +137,9 @@ export const ExternalWithdrawalEditPage = () => {
             />
           </div>
 
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <Card>
+          <div className="flex-1 overflow-y-auto pb-6">
+            <div className="mt-4">
+              <Card>
               <CardContent className="flex flex-col items-center justify-center py-16">
                 <div className="text-center max-w-md mx-auto">
                   <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
@@ -162,6 +165,7 @@ export const ExternalWithdrawalEditPage = () => {
                 </div>
               </CardContent>
             </Card>
+            </div>
           </div>
         </div>
       </PrivilegeRoute>

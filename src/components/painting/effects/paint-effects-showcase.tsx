@@ -68,7 +68,7 @@ export const PaintEffectsShowcase: React.FC = () => {
   ];
 
   return (
-    <div className="container mx-auto p-6 space-y-8">
+    <div className="container mx-auto p-4 space-y-8">
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold flex items-center justify-center gap-3">
           <IconPalette className="h-8 w-8" />

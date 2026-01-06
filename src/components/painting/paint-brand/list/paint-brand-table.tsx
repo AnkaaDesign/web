@@ -295,7 +295,9 @@ export function PaintBrandTable({ visibleColumns, className, onEdit, onDelete, f
         }
       } catch (error) {
         // Error is handled by the API client with detailed message
-        console.error("Error deleting paint brand(s):", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error deleting paint brand(s):", error);
+        }
       }
       setDeleteDialog(null);
     }

@@ -234,7 +234,9 @@ export const securityUtils = {
   reportViolation(type: string, details: any): void {
     if (import.meta.env.PROD) {
       // In production, send to monitoring service
-      console.warn(`Security violation: ${type}`, details);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`Security violation: ${type}`, details);
+      }
 
       // Example: Send to API
       fetch(`${import.meta.env.VITE_API_URL}/api/security/security-report`, {
@@ -247,9 +249,15 @@ export const securityUtils = {
           userAgent: navigator.userAgent,
           url: window.location.href,
         }),
-      }).catch(console.error);
+      }).catch((error) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error(error);
+        }
+      });
     } else {
-      console.warn(`Security violation: ${type}`, details);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`Security violation: ${type}`, details);
+      }
     }
   },
 };

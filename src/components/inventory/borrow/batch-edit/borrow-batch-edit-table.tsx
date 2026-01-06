@@ -93,13 +93,15 @@ export function BorrowBatchEditTable({ borrows, onCancel, onSubmit }: BorrowBatc
         navigate(routes.inventory.loans.root);
       }
     } catch (error: any) {
-      console.error("Step 6 - Error during batch update:", error);
-      console.error("Error details:", {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status,
-        stack: error?.stack,
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Step 6 - Error during batch update:", error);
+        console.error("Error details:", {
+          message: error?.message,
+          response: error?.response?.data,
+          status: error?.response?.status,
+          stack: error?.stack,
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -124,7 +126,7 @@ export function BorrowBatchEditTable({ borrows, onCancel, onSubmit }: BorrowBatc
       <Card className="h-full flex flex-col">
         {/* Hidden submit button for page header to trigger */}
         <button id="borrow-batch-form-submit" type="button" onClick={form.handleSubmit(handleSubmit)} style={{ display: "none" }} disabled={isSubmitting} />
-        <CardContent className="p-6 flex-1 overflow-hidden flex flex-col">
+        <CardContent className="p-4 flex-1 overflow-hidden flex flex-col">
           <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>

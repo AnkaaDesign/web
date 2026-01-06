@@ -175,7 +175,9 @@ export const ConfigurableChart: React.FC<ConfigurableChartProps> = ({
         link.click();
       }
     } catch (err) {
-      console.error('Failed to export chart:', err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Failed to export chart:', err);
+      }
     }
   };
 

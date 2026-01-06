@@ -154,7 +154,9 @@ export function CustomerForm(props: CustomerFormProps) {
           // Invalidate the query cache so the combobox refetches and includes the new activity
           queryClient.invalidateQueries({ queryKey: ["economic-activities"] });
         } catch (error) {
-          console.error("Error handling economic activity:", error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error("Error handling economic activity:", error);
+          }
           // Don't fail the whole process if economic activity fails
         }
       }
@@ -258,27 +260,8 @@ export function CustomerForm(props: CustomerFormProps) {
       // Get logoFile from both submitted data AND current form state (in case it wasn't included in submission)
       const logoFile = (transformedData as any).logoFile || form.getValues('logoFile' as any);
 
-      // Debug logging (production enabled temporarily for debugging)
-      console.log('[CustomerForm] onSubmit - logoFile check:', {
-        hasLogoFile: !!logoFile,
-        isFile: logoFile instanceof File,
-        logoFileType: logoFile?.constructor?.name,
-        fromData: !!(transformedData as any).logoFile,
-        fromFormState: !!form.getValues('logoFile' as any),
-        allKeys: Object.keys(transformedData),
-        mode: mode,
-      });
-
       // If we have a file, create FormData with proper context
       if (logoFile && logoFile instanceof File) {
-        console.log('[CustomerForm] Creating FormData with logoFile:', {
-          fileName: logoFile.name,
-          fileSize: logoFile.size,
-          fileType: logoFile.type,
-          customerId: mode === "update" ? defaultValues?.id : undefined,
-          customerName: transformedData.corporateName || transformedData.fantasyName,
-        });
-
         // Extract logoFile from data and prepare clean data object
         const { logoFile: _, ...dataWithoutFile } = transformedData as any;
 
@@ -293,15 +276,11 @@ export function CustomerForm(props: CustomerFormProps) {
           }
         );
 
-        console.log('[CustomerForm] FormData created, submitting...');
-
         if (mode === "create") {
           await (props as CreateCustomerFormProps).onSubmit(formData as any);
         } else {
           await (props as UpdateCustomerFormProps).onSubmit(formData as any);
         }
-
-        console.log('[CustomerForm] FormData submission completed');
       } else {
         // No file, send as regular JSON (remove logoFile field if present)
         const { logoFile: _, ...dataWithoutFile } = transformedData as any;
@@ -318,9 +297,14 @@ export function CustomerForm(props: CustomerFormProps) {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+    <Form {...form}>
+      <form id="customer-form" onSubmit={form.handleSubmit(onSubmit)}>
+        {/* Hidden submit button for programmatic form submission */}
+        <button id="customer-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
+          Submit
+        </button>
+
+        <div className="space-y-4">
           {/* Basic Information */}
           <Card>
             <CardHeader>
@@ -447,13 +431,8 @@ export function CustomerForm(props: CustomerFormProps) {
               <TagsInput control={form.control} disabled={isSubmitting} />
             </CardContent>
           </Card>
-
-          {/* Hidden submit button that can be triggered by the header button */}
-          <button id="customer-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
-            Submit
-          </button>
-        </form>
-      </Form>
-    </div>
+        </div>
+      </form>
+    </Form>
   );
 }

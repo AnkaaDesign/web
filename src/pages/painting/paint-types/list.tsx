@@ -6,6 +6,8 @@ import { usePageTracker } from "@/hooks/use-page-tracker";
 import { IconPaint, IconPlus } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { useMemo } from "react";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 export function PaintTypesListPage() {
   const navigate = useNavigate();
@@ -35,18 +37,18 @@ export function PaintTypesListPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeader
-            variant="default"
-            title="Tipos de Tinta"
-            icon={IconPaint}
-            breadcrumbs={breadcrumbs}
-            favoritePage={FAVORITE_PAGES.PINTURA_TIPOS_TINTA_LISTAR}
-            actions={actions}
-          />
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="list"
+          title="Tipos de Tinta"
+          breadcrumbs={breadcrumbs}
+          favoritePage={FAVORITE_PAGES.PINTURA_TIPOS_TINTA_LISTAR}
+          actions={actions}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 min-h-0 pb-6 flex flex-col">
+          <PaintTypeList className="h-full" />
         </div>
-        <PaintTypeList className="flex-1 min-h-0" />
       </div>
     </PrivilegeRoute>
   );

@@ -30,7 +30,7 @@ export function ObservationDetailSkeleton() {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 space-y-6">
           {/* Basic Information Card */}
-          <div className="rounded-xl border bg-card p-6 space-y-4">
+          <div className="rounded-xl border bg-card p-4 space-y-4">
             <div className="flex items-center gap-3 mb-4">
               <Skeleton className="h-10 w-10 rounded-lg" />
               <Skeleton className="h-6 w-48" />
@@ -108,7 +108,7 @@ export function ObservationDetailSkeleton() {
           </div>
 
           {/* Files Card */}
-          <div className="rounded-xl border bg-card p-6 space-y-4">
+          <div className="rounded-xl border bg-card p-4 space-y-4">
             <div className="flex items-center gap-3 mb-4">
               <Skeleton className="h-10 w-10 rounded-lg" />
               <Skeleton className="h-6 w-36" />

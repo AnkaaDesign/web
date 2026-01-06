@@ -85,7 +85,9 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error("Error fetching items:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching items:", error);
+      }
       return {
         data: [],
         hasMore: false,
@@ -126,7 +128,9 @@ export function PpeDeliveryFilters({ open, onOpenChange, filters, onFilterChange
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error("Error fetching users:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching users:", error);
+      }
       return {
         data: [],
         hasMore: false,

@@ -10,7 +10,7 @@ interface FormulaCardSkeletonProps {
 
 export function FormulaCardSkeleton({ className, itemCount = 3 }: FormulaCardSkeletonProps) {
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-primary/10">

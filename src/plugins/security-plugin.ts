@@ -45,8 +45,7 @@ export function securityPlugin(): Plugin {
     },
 
     generateBundle() {
-      // Log security configuration during build
-      console.log("🔒 Security headers configured");
+      // Security headers configured during build
     },
 
     // Removed transformIndexHtml to avoid duplicate CSP headers
@@ -66,18 +65,20 @@ export function securityValidationPlugin(): Plugin {
         const { isSecure, warnings, recommendations } = validateSecurityConfigBuild();
 
         if (!isSecure) {
-          console.warn("⚠️  Security warnings detected:");
-          warnings.forEach((warning) => console.warn(`   - ${warning}`));
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn("⚠️  Security warnings detected:");
+            warnings.forEach((warning) => console.warn(`   - ${warning}`));
 
-          if (recommendations.length > 0) {
-            console.warn("📋 Recommendations:");
-            recommendations.forEach((rec) => console.warn(`   - ${rec}`));
+            if (recommendations.length > 0) {
+              console.warn("📋 Recommendations:");
+              recommendations.forEach((rec) => console.warn(`   - ${rec}`));
+            }
           }
-        } else {
-          console.log("✅ Security configuration validated");
         }
       } catch (error) {
-        console.warn("⚠️  Security validation failed:", error instanceof Error ? error.message : "Unknown error");
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn("⚠️  Security validation failed:", error instanceof Error ? error.message : "Unknown error");
+        }
       }
     },
   };

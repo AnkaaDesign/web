@@ -74,13 +74,13 @@ export default function MyTeamPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4">
       <h1 className="text-3xl font-bold mb-2">Minha Equipe</h1>
       <p className="text-gray-600 mb-8">Gerencie os colaboradores do seu setor com facilidade</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {teamMenuItems.map((item) => (
-          <Card key={item.id} className="hover:shadow-lg transition-shadow">
+          <Card key={item.id} className="hover:shadow-sm transition-shadow">
             <CardHeader>
               <CardTitle className="text-xl">{item.title}</CardTitle>
               <CardDescription>{item.description}</CardDescription>

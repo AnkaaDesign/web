@@ -114,8 +114,21 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
         setValue(`components.${index}.weightInGrams`, rounded);
         setValue(`components.${index}.rawInput`, value); // Keep the space
       }
+    } else {
+      // CRITICAL FIX: Always try to parse and set weightInGrams, even without spacebar
+      // This ensures the value is captured even if user submits without blurring
+      const trimmedValue = value.trim();
+      if (trimmedValue) {
+        const parts = trimmedValue.split(/\s+/).filter(Boolean);
+        const numbers = parts.map(p => parseFloat(p.replace(",", "."))).filter(n => !isNaN(n));
+
+        if (numbers.length > 0) {
+          const sum = numbers.reduce((acc, num) => acc + num, 0);
+          const rounded = Math.round(sum * 100) / 100;
+          setValue(`components.${index}.weightInGrams`, rounded);
+        }
+      }
     }
-    // Don't do anything else - just keep the raw input as typed
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, index: number, field: "combobox" | "input") => {
@@ -231,8 +244,9 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
                     type="text"
                     placeholder="0"
                     value={watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`) || ""}
-                    onChange={(value) => {
-                      // Input component passes value directly, not event object
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      // Input component passes event object (react-hook-form compatible)
+                      const value = e.target.value;
                       const previousValue = watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`)?.toString() || "";
                       handleAmountChange(index, value, previousValue);
                     }}

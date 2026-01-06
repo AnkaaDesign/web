@@ -77,7 +77,7 @@ export default function HolidayCalendarPage() {
       />
 
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-4">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-semibold capitalize flex items-center gap-2">
               <IconCalendar className="h-6 w-6" />

@@ -19,7 +19,7 @@ export function TargetItemCard({ item, className }: TargetItemCardProps) {
   const navigate = useNavigate();
   if (!item) {
     return (
-      <Card className={cn("shadow-sm border border-border", className)} level={1}>
+      <Card className={cn("shadow-sm border border-border", className)}>
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2">
           <IconBox className="h-5 w-5 text-muted-foreground" />
@@ -78,7 +78,7 @@ export function TargetItemCard({ item, className }: TargetItemCardProps) {
   };
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">

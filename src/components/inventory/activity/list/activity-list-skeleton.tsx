@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export const ActivityListSkeleton = () => {
   return (
-    <Card className="h-full flex flex-col rounded-md">
+    <Card className="flex flex-col rounded-md">
       <CardHeader className="px-8 py-3 flex-shrink-0 border-b border-neutral-200 dark:border-neutral-700">
         <div className="flex items-start justify-between">
           <div className="flex flex-col gap-2">

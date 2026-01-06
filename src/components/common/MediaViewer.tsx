@@ -173,7 +173,9 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Download failed:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Download failed:', error);
+      }
     }
   }, [currentItem]);
 
@@ -523,7 +525,7 @@ export const MediaViewer: React.FC<MediaViewerProps> = ({
               {!isPlaying && !isLoading && (
                 <button
                   onClick={togglePlayPause}
-                  className="p-6 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+                  className="p-4 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
                 >
                   <Play className="w-12 h-12 text-white" />
                 </button>

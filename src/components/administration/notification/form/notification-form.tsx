@@ -105,7 +105,9 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
 
       await onSubmit(data);
     } catch (error) {
-      console.error("Erro ao salvar notificação:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Erro ao salvar notificação:", error);
+      }
     }
   };
 

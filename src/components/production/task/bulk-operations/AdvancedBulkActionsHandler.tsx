@@ -350,7 +350,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
             setCutsCount(computed.cuts.length);
           }
         } catch (error) {
-          console.error("Error fetching tasks for bulk operations:", error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error("Error fetching tasks for bulk operations:", error);
+          }
         } finally {
           setIsLoadingData(false);
         }
@@ -618,7 +620,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
       handleClose();
       onClearSelection();
     } catch (error) {
-      console.error("Bulk operation error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Bulk operation error:", error);
+      }
       // Error toast is handled by the API client
     } finally {
       setIsSubmitting(false);
@@ -807,7 +811,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
         </DialogHeader>
 
         <ScrollArea className="flex-1 min-h-0">
-          <div className="p-6">
+          <div className="p-4">
             {isLoadingData ? (
               <div className="flex items-center justify-center py-12">
                 <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />

@@ -98,7 +98,9 @@ export const authService = {
       const decoded = jwtDecode<User>(token);
       return decoded;
     } catch (error) {
-      console.error("Falha ao decodificar token:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Falha ao decodificar token:", error);
+      }
       return null;
     }
   },

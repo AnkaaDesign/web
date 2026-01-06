@@ -196,6 +196,8 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
     if (changeHandler) {
       changeHandler(parsed);
     }
+    // Mark field as touched/dirty for React Hook Form
+    field?.onBlur();
   };
 
   // Date constraint validation
@@ -272,6 +274,8 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
         if (changeHandler) {
           changeHandler(date);
         }
+        // Mark field as touched/dirty for React Hook Form
+        field?.onBlur();
       }
       setIsOpen(false);
     };
@@ -300,6 +304,8 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
         if (changeHandler) {
           changeHandler(newDate);
         }
+        // Mark field as touched/dirty for React Hook Form
+        field?.onBlur();
       }
 
       // Close the year selector after selection
@@ -330,6 +336,8 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
         if (changeHandler) {
           changeHandler(newDate);
         }
+        // Mark field as touched/dirty for React Hook Form
+        field?.onBlur();
       }
 
       // Close the month selector after selection
@@ -375,6 +383,8 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
         if (changeHandler) {
           changeHandler(newDate);
         }
+        // Mark field as touched/dirty for React Hook Form
+        field?.onBlur();
         setSelectedHour(hour);
         setSelectedMinute(minute);
         // Don't close anything - allow continuous selection
@@ -943,6 +953,8 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
               if (changeHandler) {
                 changeHandler({ from: parsed, to: range?.to } as DateRange);
               }
+              // Mark field as touched/dirty for React Hook Form
+              field?.onBlur();
             }}
             onFocus={onFocus}
             onBlur={onBlur}
@@ -980,6 +992,8 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
               if (changeHandler) {
                 changeHandler({ from: range?.from, to: parsed } as DateRange);
               }
+              // Mark field as touched/dirty for React Hook Form
+              field?.onBlur();
             }}
             onFocus={onFocus}
             onBlur={onBlur}
@@ -1015,35 +1029,56 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
       {/* Single date/time mode - one input field */}
       <div
         className={cn(
-          "flex h-10 w-full rounded-md border border-border bg-transparent transition-all duration-200 ease-in-out",
+          "flex h-10 w-full rounded-md border border-border bg-transparent transition-all duration-200 ease-in-out relative overflow-hidden",
           disabled && "opacity-50 cursor-not-allowed",
           className,
         )}
       >
-        {/* HTML input with hidden browser calendar/clock */}
-        <input
-          type={getHTMLInputType()}
-          value={htmlInputValue}
-          onChange={handleHTMLInputChange}
-          onFocus={onFocus}
-          onBlur={onBlur}
-          placeholder={placeholder}
-          disabled={disabled}
-          readOnly={readOnly}
-          className="hide-date-picker flex-1 bg-transparent px-2 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed border-0 outline-none"
-          style={{
-            // Comprehensive CSS to hide all browser date/time picker indicators
-            WebkitAppearance: "none",
-            MozAppearance: "textfield",
-            appearance: "none",
-          }}
-        />
+        {/* Overlay to display formatted date - clickable to open popover */}
+        {!hideIcon && currentValue && (
+          <div
+            className="absolute inset-0 flex items-center px-2 pointer-events-none z-10"
+            style={{ marginRight: '28px' }}
+          >
+            <span className="text-sm text-foreground">
+              {formatDateTime(currentValue, mode)}
+            </span>
+          </div>
+        )}
+
+        {/* Input wrapper with clipping to hide native icons */}
+        <div className="flex-1 relative overflow-hidden">
+          <input
+            type={getHTMLInputType()}
+            value={htmlInputValue}
+            onChange={handleHTMLInputChange}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            placeholder={placeholder}
+            disabled={disabled}
+            readOnly={readOnly}
+            className={cn(
+              "hide-date-picker w-full bg-transparent px-2 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed border-0 outline-none",
+              currentValue && !hideIcon && "opacity-0"
+            )}
+            style={{
+              // Comprehensive CSS to hide all browser date/time picker indicators
+              WebkitAppearance: "none",
+              MozAppearance: "textfield",
+              appearance: "none",
+              colorScheme: "light dark",
+              // Clip off any native icons by extending beyond container
+              width: 'calc(100% + 30px)',
+              marginRight: '-30px',
+            }}
+          />
+        </div>
 
         {/* Integrated calendar/clock icon */}
         {!hideIcon && (
           <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
-              <div className={cn("h-10 w-7 flex items-center justify-center cursor-pointer transition-colors -mt-0.5", disabled && "cursor-not-allowed opacity-50")}>
+              <div className={cn("h-10 w-7 flex items-center justify-center cursor-pointer transition-colors -mt-0.5 z-20 relative", disabled && "cursor-not-allowed opacity-50")}>
                 <Icon className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
               </div>
             </PopoverTrigger>
@@ -1061,8 +1096,10 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
                         if (changeHandler) {
                           changeHandler(parsed);
                         }
+                        // Mark field as touched/dirty for React Hook Form
+                        field?.onBlur();
                       }}
-                      className="rounded border px-2 py-1 text-sm"
+                      className="hide-date-picker rounded border px-2 py-1 text-sm"
                     />
                   </div>
                 </div>

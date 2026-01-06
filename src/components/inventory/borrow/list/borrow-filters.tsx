@@ -87,7 +87,9 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
 
       return { data: options, hasMore };
     } catch (error) {
-      console.error("Error fetching items:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching items:", error);
+      }
       return { data: [], hasMore: false };
     }
   }, []);
@@ -120,7 +122,9 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
 
       return { data: options, hasMore };
     } catch (error) {
-      console.error("Error fetching users:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching users:", error);
+      }
       return { data: [], hasMore: false };
     }
   }, []);
@@ -150,7 +154,9 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
 
       return { data: options, hasMore };
     } catch (error) {
-      console.error("Error fetching brands:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching brands:", error);
+      }
       return { data: [], hasMore: false };
     }
   }, []);
@@ -181,7 +187,9 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
 
       return { data: options, hasMore };
     } catch (error) {
-      console.error("Error fetching categories:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching categories:", error);
+      }
       return { data: [], hasMore: false };
     }
   }, []);

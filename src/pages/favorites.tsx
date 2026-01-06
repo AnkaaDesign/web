@@ -10,6 +10,7 @@ import { ThemedBackground } from "@/components/ui";
 import { IconStar, IconStarOff, IconPlus, IconFile } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import * as TablerIcons from "@tabler/icons-react";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 export function FavoritesPage() {
   const navigate = useNavigate();
@@ -55,15 +56,18 @@ export function FavoritesPage() {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <PageHeader variant="list" title="Favoritos" icon={IconStar} breadcrumbs={[{ label: "Início", href: "/" }, { label: "Favoritos" }]} />
-
-      {favorites.length === 0 ? (
+    <div className="h-full flex flex-col px-4 pt-4">
+      <div className="flex-shrink-0">
+        <PageHeader variant="list" title="Favoritos" icon={IconStar} breadcrumbs={[{ label: "Início", href: "/" }, { label: "Favoritos" }]} />
+      </div>
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="mt-4">
+          {favorites.length === 0 ? (
         <ThemedBackground className="p-4 rounded-lg flex-1">
           <div className="flex items-center justify-center min-h-[calc(100vh-16rem)]">
             <div className="text-center space-y-4 max-w-md">
               <div className="flex justify-center mb-4">
-                <div className="bg-yellow-100 dark:bg-yellow-900/20 p-6 rounded-full">
+                <div className="bg-yellow-100 dark:bg-yellow-900/20 p-4 rounded-full">
                   <IconStarOff className="h-16 w-16 text-yellow-600 dark:text-yellow-500" />
                 </div>
               </div>
@@ -85,7 +89,7 @@ export function FavoritesPage() {
                   className={cn(
                     "cursor-pointer transition-shadow duration-200",
                     "rounded-md border border-neutral-300 dark:border-neutral-700",
-                    "hover:shadow-lg hover:shadow-neutral-200 dark:hover:shadow-neutral-900",
+                    "hover:shadow-sm hover:shadow-neutral-200 dark:hover:shadow-neutral-900",
                   )}
                   onClick={() => handleNavigate(favorite.path)}
                 >
@@ -99,6 +103,8 @@ export function FavoritesPage() {
           </div>
         </ThemedBackground>
       )}
+        </div>
+      </div>
     </div>
   );
 }

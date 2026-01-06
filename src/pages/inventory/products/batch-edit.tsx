@@ -6,7 +6,7 @@ import { routes, FAVORITE_PAGES } from "../../../constants";
 import { ItemBatchEditTable } from "@/components/inventory/item/batch-edit/item-batch-edit-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { IconPackage, IconAlertTriangle, IconLoader, IconDeviceFloppy, IconArrowLeft } from "@tabler/icons-react";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 
@@ -59,7 +59,7 @@ export default function ItemBatchEditPage() {
 
   if (itemIds.length === 0) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -83,7 +83,7 @@ export default function ItemBatchEditPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <div>
@@ -102,7 +102,7 @@ export default function ItemBatchEditPage() {
 
   if (error || !hasValidItems) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -163,36 +163,31 @@ export default function ItemBatchEditPage() {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <PageHeaderWithFavorite
-          title="Editar Produtos em Lote"
-          icon={IconPackage}
-          favoritePage={FAVORITE_PAGES.ESTOQUE_PRODUTOS_LISTAR}
-          breadcrumbs={[
-            { label: "Início", href: "/" },
-            { label: "Estoque", href: routes.inventory.root },
-            { label: "Produtos", href: routes.inventory.products.list },
-            { label: "Editar em Lote" },
-          ]}
-          actions={actions}
-        />
-      </div>
-
-      {/* Scrollable Content Container */}
-      <div className="flex-1 overflow-hidden">
+    <div className="h-full flex flex-col bg-background px-4 pt-4">
+      <PageHeader
+        title="Editar Produtos em Lote"
+        icon={IconPackage}
+        favoritePage={FAVORITE_PAGES.ESTOQUE_PRODUTOS_LISTAR}
+        breadcrumbs={[
+          { label: "Início", href: "/" },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Produtos", href: routes.inventory.products.list },
+          { label: "Editar em Lote" },
+        ]}
+        actions={actions}
+      />
+      <div className="flex-1 overflow-hidden pt-4 pb-6">
         <ItemBatchEditTable
-            items={items}
-            onCancel={handleCancel}
-            onSubmit={() => {
-              // This will be triggered from the page header save button
-              const submitButton = document.getElementById("item-batch-form-submit");
-              if (submitButton) {
-                submitButton.click();
-              }
-            }}
-          />
+          items={items}
+          onCancel={handleCancel}
+          onSubmit={() => {
+            // This will be triggered from the page header save button
+            const submitButton = document.getElementById("item-batch-form-submit");
+            if (submitButton) {
+              submitButton.click();
+            }
+          }}
+        />
       </div>
     </div>
   );

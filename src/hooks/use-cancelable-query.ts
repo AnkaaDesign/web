@@ -76,7 +76,9 @@ export function useCancelableQuery({
       }
       activeRequestsRef.current.delete(requestInfo.requestId);
     } catch (error) {
-      console.warn("Error cleaning up request:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("Error cleaning up request:", error);
+      }
     }
   }, []);
 

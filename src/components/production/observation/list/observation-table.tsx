@@ -295,7 +295,9 @@ export function ObservationTable({ visibleColumns, className, filters = {}, onDa
       }
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error("Error deleting observation(s):", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting observation(s):", error);
+      }
     } finally {
       setDeleteDialog(null);
     }

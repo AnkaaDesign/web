@@ -29,9 +29,12 @@ export interface Task extends BaseEntity {
   term: Date | null;
   startedAt: Date | null;
   finishedAt: Date | null;
+  forecastDate: Date | null;
   paintId: string | null;
   customerId: string | null;
+  invoiceToId: string | null;
   sectorId: string | null;
+  negotiatingWith: { name: string; phone: string } | null;
   createdById: string | null;
   priority?: string | null;
   price?: number | null; // Calculated from budget total
@@ -39,6 +42,7 @@ export interface Task extends BaseEntity {
   // Relations
   sector?: Sector;
   customer?: Customer;
+  invoiceTo?: Customer;
   budget?: Budget; // Budget with items
   budgets?: File[]; // Many-to-many relation (budget files)
   invoices?: File[]; // Many-to-many relation

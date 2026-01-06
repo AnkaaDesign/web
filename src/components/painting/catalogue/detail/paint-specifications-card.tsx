@@ -91,7 +91,7 @@ export function PaintSpecificationsCard({ paint, className }: PaintSpecification
   const lab = rgb ? rgbToLab(rgb.r, rgb.g, rgb.b) : null;
 
   return (
-    <Card className={cn("shadow-sm border border-border", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border", className)}>
       <CardHeader className="pb-6">
         <CardTitle className="flex items-center gap-2">
           <IconInfoCircle className="h-5 w-5 text-muted-foreground" />

@@ -187,7 +187,9 @@ export function useCepLookup(options?: UseCepLookupOptions) {
         options?.onSuccess?.(data);
         return data;
       } catch (error) {
-        console.error("Error looking up CEP:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error looking up CEP:", error);
+        }
         options?.onError?.(error as Error);
         return null;
       } finally {

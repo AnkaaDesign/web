@@ -83,7 +83,9 @@ export function useSecullumIntegration() {
       setConfiguration(response.data.data);
     } catch (err: any) {
       setError(err.message || "Erro ao buscar configuração");
-      console.error("Error fetching configuration:", err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching configuration:", err);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -97,7 +99,9 @@ export function useSecullumIntegration() {
       setTimeEntries(response.data.data || []);
     } catch (err: any) {
       setError(err.message || "Erro ao buscar registros de ponto");
-      console.error("Error fetching time entries:", err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching time entries:", err);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -111,7 +115,9 @@ export function useSecullumIntegration() {
       setJustifications(response.data.data);
     } catch (err: any) {
       setError(err.message || "Erro ao buscar justificativas");
-      console.error("Error fetching justifications:", err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching justifications:", err);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +128,9 @@ export function useSecullumIntegration() {
       const response = await secullumService.getTimeEntryPhoto(userId, fonteDadosId);
       return response.data.data?.FotoBatida || null;
     } catch (err: any) {
-      console.error("Error fetching photo:", err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching photo:", err);
+      }
       return null;
     }
   }, []);
@@ -138,7 +146,9 @@ export function useSecullumIntegration() {
       return true;
     } catch (err: any) {
       setError(err.message || "Erro ao salvar registros");
-      console.error("Error saving time entries:", err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error saving time entries:", err);
+      }
       return false;
     } finally {
       setIsLoading(false);

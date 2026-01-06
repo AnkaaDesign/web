@@ -197,7 +197,9 @@ export function FileUploadField({
       const finalFiles = updatedFiles.slice(0, maxFiles);
 
       if (updatedFiles.length > maxFiles) {
-        console.warn(`Limite de ${maxFiles} arquivos excedido. Alguns arquivos não foram adicionados.`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`Limite de ${maxFiles} arquivos excedido. Alguns arquivos não foram adicionados.`);
+        }
       }
 
       setFiles(finalFiles);
@@ -396,7 +398,7 @@ export function FileUploadField({
       <div
         {...getRootProps()}
         className={cn(
-          "border-2 border-dashed rounded-lg p-6 text-center transition-colors",
+          "border-2 border-dashed rounded-lg p-4 text-center transition-colors",
           !isAtLimit && !disabled && "cursor-pointer hover:border-primary/50 hover:bg-muted/30",
           isDragActive && !isAtLimit && "border-primary bg-primary/5",
           (disabled || isAtLimit) && "cursor-not-allowed opacity-50 bg-muted/10",

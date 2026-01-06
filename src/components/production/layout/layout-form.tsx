@@ -418,17 +418,13 @@ export const LayoutForm = ({
 
     // Don't sync if user has pending changes
     if (hasPendingChangesRef.current) {
-      console.log('[LayoutForm] Skipping layouts sync - user has pending changes');
       return;
     }
 
     // Don't sync if currently saving
     if (isSavingRef.current) {
-      console.log('[LayoutForm] Skipping layouts sync - currently saving');
       return;
     }
-
-    console.log('[LayoutForm] Syncing state from layouts prop (plural):', layouts);
 
     setSideStates(prev => {
       const newStates = { ...prev };
@@ -467,12 +463,6 @@ export const LayoutForm = ({
           state.doors = extractedDoors;
           newStates[side as 'left' | 'right' | 'back'] = state;
           hasChanges = true;
-
-          console.log(`[LayoutForm] Synced ${side} side from layouts prop:`, {
-            height: state.height,
-            totalWidth: state.totalWidth,
-            doorsCount: state.doors.length,
-          });
         }
       });
 
@@ -483,42 +473,30 @@ export const LayoutForm = ({
   // Sync layout prop changes with internal state
   // Only sync when layout data actually changes, not when just switching sides
   useEffect(() => {
-    console.log('[LayoutForm] useEffect triggered', { selectedSide, isSaving: isSavingRef.current, hasLayout: !!layout });
-
     // Don't sync if we're in the middle of saving
     if (isSavingRef.current) {
-      console.log('[LayoutForm] Skipping sync - currently saving');
       return;
     }
 
     // CRITICAL FIX: Don't sync if user has pending changes or made changes recently
     // This prevents backend refetch from overwriting user's door removal/edits
     if (hasPendingChangesRef.current) {
-      console.log('[LayoutForm] Skipping sync - user has pending changes (not yet saved)');
       return;
     }
 
     const timeSinceLastInteraction = Date.now() - lastUserInteractionRef.current;
     const protectionWindow = 5000; // 5 seconds protection window
     if (timeSinceLastInteraction < protectionWindow) {
-      console.log('[LayoutForm] Skipping sync - user made changes recently', {
-        timeSinceLastInteraction,
-        protectionWindow,
-        timeRemaining: protectionWindow - timeSinceLastInteraction,
-        lastInteraction: new Date(lastUserInteractionRef.current).toISOString()
-      });
       return;
     }
 
     if (!layout) {
-      console.log('[LayoutForm] Skipping sync - no layout prop');
       return;
     }
 
     // Don't reset state if backend returns incomplete data (layoutSections: null)
     // This happens when the backend doesn't include layoutSections in the response
     if (layout.layoutSections === null || layout.layoutSections === undefined) {
-      console.log('[LayoutForm] Skipping sync - backend returned incomplete data (layoutSections: null)');
       return;
     }
 
@@ -526,19 +504,8 @@ export const LayoutForm = ({
     const layoutKey = `${selectedSide}-${JSON.stringify(layout)}`;
     const lastKey = lastLayoutRef.current[selectedSide];
 
-    console.log('[LayoutForm] Checking if should sync', {
-      selectedSide,
-      layoutKey: layoutKey.substring(0, 100) + '...',
-      lastKey: lastKey?.substring(0, 100) + '...',
-      isSame: layoutKey === lastKey,
-      currentDoors: sideStates[selectedSide]?.doors?.length || 0,
-      layoutSections: layout.layoutSections?.length,
-      timeSinceLastInteraction
-    });
-
     // Only update if the layout data actually changed (not just selectedSide)
     if (layoutKey === lastKey) {
-      console.log('[LayoutForm] Layout data unchanged - skipping sync');
       return;
     }
 
@@ -575,15 +542,10 @@ export const LayoutForm = ({
       state.doors = extractedDoors;
     }
 
-    console.log('[LayoutForm] RESETTING state for side', selectedSide, 'with', state.doors.length, 'doors');
-    console.log('[LayoutForm] Layout object:', { layout, hasPhoto: !!layout.photo, photoId: layout.photo?.id });
-
     // Clear pending changes flag since we're syncing fresh data from backend
     hasPendingChangesRef.current = false;
-    console.log('[LayoutForm] Cleared pending changes flag - syncing with backend data');
 
     setSideStates(prev => {
-      console.log('[LayoutForm] Previous state before reset', { selectedSide, previousDoors: prev[selectedSide]?.doors?.length || 0 });
       return {
         ...prev,
         [selectedSide]: state
@@ -595,40 +557,24 @@ export const LayoutForm = ({
   // This runs independently to avoid circular dependency issues
   useEffect(() => {
     if (!layout) {
-      console.log('[LayoutForm PHOTO SYNC] Skipping - no layout');
       return;
     }
 
     // For back side only, sync photo from layout
     if (selectedSide !== 'back') {
-      console.log('[LayoutForm PHOTO SYNC] Skipping - not back side');
       return;
     }
 
-    console.log('[LayoutForm PHOTO SYNC] Checking photo sync', {
-      hasLayoutPhoto: !!layout.photo,
-      layoutPhotoId: layout.photo?.id,
-      currentPhotoStateId: photoState.photoId,
-      hasUserSelectedFile: !!photoState.file,
-    });
-
     // If user has selected a new file, don't overwrite it
     if (photoState.file) {
-      console.log('[LayoutForm PHOTO SYNC] ⏭️  Skipping - user has selected a new file');
       return;
     }
 
     if (layout.photo) {
       // Only sync if the photo ID changed
       if (photoState.photoId === layout.photo.id) {
-        console.log('[LayoutForm PHOTO SYNC] ⏭️  Skipping - photo already synced');
         return;
       }
-
-      console.log('[LayoutForm PHOTO SYNC] ✅ Syncing photo from layout:', {
-        photoId: layout.photo.id,
-        photoName: layout.photo.filename || layout.photo.name,
-      });
 
       const apiUrl = (window as any).__ANKAA_API_URL__ || import.meta.env.VITE_API_URL || "http://localhost:3030";
       const imageUrl = `${apiUrl}/files/${layout.photo.id}/download`;
@@ -641,7 +587,6 @@ export const LayoutForm = ({
     } else {
       // Layout has no photo - clear photoState only if it had a photoId (not a new file)
       if (photoState.photoId && !photoState.file) {
-        console.log('[LayoutForm PHOTO SYNC] ❌ Clearing photo state - layout has no photo');
         setPhotoState({});
       }
     }
@@ -650,41 +595,23 @@ export const LayoutForm = ({
   // Emit initial state to parent when selected side changes and has no saved layout
   // This ensures parent knows the default values
   useEffect(() => {
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('[LayoutForm INITIAL STATE EMISSION] Starting check', {
-      selectedSide,
-      hasOnChange: !!onChange,
-      hasLayout: !!layout,
-      hasLayoutSections: !!(layout && layout.layoutSections),
-      alreadyEmitted: initialStateEmittedRef.current[selectedSide],
-    });
-
     // Skip if no onChange handler
     if (!onChange) {
-      console.log('[LayoutForm INITIAL STATE EMISSION] ❌ SKIPPED: No onChange handler');
       return;
     }
 
     // Skip if we've already emitted initial state for this side
     if (initialStateEmittedRef.current[selectedSide]) {
-      console.log('[LayoutForm INITIAL STATE EMISSION] ❌ SKIPPED: Already emitted for this side');
       return;
     }
 
     // Skip if we have a layout prop (already synced above)
     if (layout && layout.layoutSections) {
-      console.log('[LayoutForm INITIAL STATE EMISSION] ❌ SKIPPED: Already has saved layout');
       initialStateEmittedRef.current[selectedSide] = true;
       return;
     }
 
     const state = sideStates[selectedSide];
-    console.log('[LayoutForm INITIAL STATE EMISSION] Current state:', {
-      selectedSide,
-      height: state.height,
-      totalWidth: state.totalWidth,
-      doorsCount: state.doors.length,
-    });
 
     // Calculate segments
     const segments: Array<{ type: 'segment' | 'door'; start: number; end: number; width: number; door?: Door }> = [];
@@ -743,23 +670,11 @@ export const LayoutForm = ({
       photoFile: photoState?.file || null, // Include file for upload
     };
 
-    console.log('[LayoutForm INITIAL STATE EMISSION] ✅ EMITTING:', {
-      selectedSide,
-      layoutData: {
-        height: layoutData.height,
-        layoutSectionsCount: layoutSections.length,
-        layoutSections: layoutSections.map(s => ({ width: s.width, isDoor: s.isDoor })),
-        totalWidth: layoutSections.reduce((sum, s) => sum + s.width, 0),
-      },
-    });
-
     // Mark this side as having emitted state
     initialStateEmittedRef.current[selectedSide] = true;
 
     // Emit to parent
     onChange(selectedSide, layoutData);
-    console.log('[LayoutForm INITIAL STATE EMISSION] ✅ onChange() called successfully');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   }, [selectedSide, layout, onChange]); // Run when selected side or layout changes
 
   // Get current side's state
@@ -768,23 +683,10 @@ export const LayoutForm = ({
 
   // Update state for current side
   const updateCurrentSide = useCallback((updates: Partial<SideState>) => {
-    console.log('╔══════════════════════════════════════════════════════════════╗');
-    console.log('║ [LayoutForm UPDATE] User made a change                       ║');
-    console.log('╚══════════════════════════════════════════════════════════════╝');
-    console.log('[LayoutForm UPDATE] Input:', {
-      selectedSide,
-      updates,
-      updateKeys: Object.keys(updates),
-    });
-
     // CRITICAL FIX: Record timestamp of user interaction and mark as having pending changes
     // This prevents backend refetch from overwriting changes (especially door removals)
     lastUserInteractionRef.current = Date.now();
     hasPendingChangesRef.current = true;
-    console.log('[LayoutForm UPDATE] Recorded user interaction:', {
-      timestamp: new Date().toISOString(),
-      hasPendingChanges: true
-    });
 
     setSideStates(prev => {
       const newState = {
@@ -796,12 +698,6 @@ export const LayoutForm = ({
       };
 
       const state = newState[selectedSide];
-      console.log('[LayoutForm UPDATE] New state calculated:', {
-        selectedSide,
-        height: state.height,
-        totalWidth: state.totalWidth,
-        doorsCount: state.doors.length,
-      });
 
       // Emit changes for current side
       const segments = calculateSegments(state.doors, state.totalWidth);
@@ -820,44 +716,27 @@ export const LayoutForm = ({
         photoFile: photoState?.file || null, // Include file for upload
       };
 
-      console.log('[LayoutForm UPDATE] Layout data to emit:', {
-        selectedSide,
-        layoutData: {
-          height: layoutData.height,
-          layoutSectionsCount: layoutSections.length,
-          layoutSections: layoutSections.map(s => ({ width: s.width, isDoor: s.isDoor, doorHeight: s.doorHeight })),
-          totalWidth: layoutSections.reduce((sum, s) => sum + s.width, 0),
-        },
-      });
-
       // Set saving flag to prevent state reset during save
       isSavingRef.current = true;
 
       // Support both callback patterns
       if (onChange) {
-        console.log('[LayoutForm UPDATE] ✅ Calling onChange callback');
         onChange(selectedSide, layoutData);
-        console.log('[LayoutForm UPDATE] ✅ onChange completed');
       } else if (onSave) {
-        console.log('[LayoutForm UPDATE] ✅ Calling onSave callback');
-
         // Call onSave and handle the promise
         const saveResult = onSave(layoutData);
 
         // If onSave returns a promise, wait for it to complete
         if (saveResult && typeof saveResult.then === 'function') {
           saveResult.finally(() => {
-            console.log('[LayoutForm] Save completed, resetting flag after delay');
             // Reset the flag after a delay to allow the backend to process
             setTimeout(() => {
-              console.log('[LayoutForm] isSavingRef reset to false');
               isSavingRef.current = false;
             }, 500);
           });
         } else {
           // If not a promise, reset after a delay
           setTimeout(() => {
-            console.log('[LayoutForm] isSavingRef reset to false (no promise)');
             isSavingRef.current = false;
           }, 500);
         }
@@ -1220,8 +1099,6 @@ export const LayoutForm = ({
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        console.log('[LayoutForm] Photo selected (will be uploaded with task):', file.name);
-
         // Create a URL for the uploaded file to display preview
         const imageUrl = URL.createObjectURL(file);
 
@@ -1235,13 +1112,8 @@ export const LayoutForm = ({
         // This ensures the photo upload is protected from backend resets
         lastUserInteractionRef.current = Date.now();
         hasPendingChangesRef.current = true;
-        console.log('[LayoutForm] Photo upload - marked as pending changes:', {
-          timestamp: new Date().toISOString(),
-          hasPendingChanges: true
-        });
 
         // Trigger parent notification to include the photo file
-        console.log('[LayoutForm] Triggering parent notification with photo file');
         if (!currentState) return;
 
         // Calculate current segments to send with the photo
@@ -1259,14 +1131,6 @@ export const LayoutForm = ({
           photoId: newPhotoState.photoId || null,
           photoFile: file, // Include the file
         };
-
-        console.log('[LayoutForm] Emitting layout with photo file:', {
-          hasFile: !!file,
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
-          layoutSectionsCount: layoutSections.length,
-        });
 
         // Notify parent immediately with photo file
         if (onChange) {
@@ -1304,7 +1168,7 @@ export const LayoutForm = ({
   // Early return if no current state
   if (!currentState) {
     return (
-      <div className="space-y-4 p-6 border rounded-lg bg-background/50">
+      <div className="space-y-4 p-4 border rounded-lg bg-background/50">
         <p className="text-muted-foreground">Carregando layout...</p>
       </div>
     );
@@ -1313,7 +1177,7 @@ export const LayoutForm = ({
   return (
     <div className="space-y-4">
       {/* Preview Container with centered content */}
-      <div className="p-6 border rounded-lg bg-background/50">
+      <div className="p-4 border rounded-lg bg-background/50">
         {/* Centered Layout Container */}
         <div className="flex flex-col items-center">
           {/* Main Layout with Height Input and Width Inputs */}

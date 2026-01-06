@@ -150,7 +150,9 @@ export function usePaginationState(meta: Partial<PaginationMeta> = {}, options: 
   // Auto-correct page out of bounds
   useEffect(() => {
     if (autoCorrectPageOutOfBounds && currentState.isPageOutOfBounds && !isLoading) {
-      console.warn(`Page ${currentState.page + 1} is out of bounds. Auto-correcting to last page.`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`Page ${currentState.page + 1} is out of bounds. Auto-correcting to last page.`);
+      }
       goToLastPage();
       onPageOutOfBounds?.(currentState.page + 1, currentState.totalPages);
     }
@@ -260,7 +262,9 @@ export function usePaginationState(meta: Partial<PaginationMeta> = {}, options: 
       // If current page would be out of bounds after deletion
       if (currentState.page >= newTotalPages && newTotalPages > 0) {
         const targetPage = newTotalPages - 1;
-        console.log(`Data deletion would put page ${currentState.page + 1} out of bounds. Moving to page ${targetPage + 1}.`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.log(`Data deletion would put page ${currentState.page + 1} out of bounds. Moving to page ${targetPage + 1}.`);
+        }
         goToPage(targetPage);
       }
     },

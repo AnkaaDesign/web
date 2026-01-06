@@ -47,30 +47,23 @@ export const PPEScheduleCreatePage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-5xl mx-auto">
-          <PageHeader
-            variant="form"
-            title="Novo Agendamento de EPI"
-            icon={IconCalendar}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "RH", href: routes.humanResources.root },
-              { label: "EPIs", href: routes.humanResources.ppe.root },
-              { label: "Agendamentos", href: routes.humanResources.ppe.schedules.root },
-              { label: "Criar" },
-            ]}
-            actions={actions}
-            favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR}
-          />
-        </div>
-      </div>
-
-      {/* Scrollable Form Container */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="max-w-5xl mx-auto h-full">
+    <div className="h-full flex flex-col px-4 pt-4">
+      <PageHeader
+        variant="form"
+        title="Novo Agendamento de EPI"
+        icon={IconCalendar}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "RH", href: routes.humanResources.root },
+          { label: "EPIs", href: routes.humanResources.ppe.root },
+          { label: "Agendamentos", href: routes.humanResources.ppe.schedules.root },
+          { label: "Criar" },
+        ]}
+        actions={actions}
+        favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_AGENDAMENTOS_CADASTRAR}
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="mt-4 space-y-4">
           <PpeScheduleForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} />
         </div>
       </div>

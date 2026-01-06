@@ -67,7 +67,9 @@ export function MaintenanceExport({ className, filters, currentMaintenance = [],
 
       return allMaintenance;
     } catch (error) {
-      console.error("Error fetching all maintenance:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching all maintenance:", error);
+      }
       throw error;
     }
   };
@@ -78,7 +80,9 @@ export function MaintenanceExport({ className, filters, currentMaintenance = [],
       // including CSV, Excel, and PDF generation// If you need custom export logic, you can implement it here
       // For now, we'll let the BaseExportPopover handle it
     } catch (error) {
-      console.error("Export error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Export error:", error);
+      }
       throw error;
     }
   };

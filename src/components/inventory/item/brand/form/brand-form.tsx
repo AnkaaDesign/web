@@ -184,7 +184,7 @@ export function BrandForm(props: BrandFormProps) {
 
   return (
     <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden min-h-0">
         <Form {...form}>
           <form id="brand-form" onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-y-auto space-y-6">
             {/* Hidden submit button for programmatic form submission */}

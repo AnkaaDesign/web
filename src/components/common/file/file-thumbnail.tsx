@@ -163,7 +163,7 @@ export const FileThumbnail: React.FC<FileThumbnailProps> = ({ file, size = "md",
         className={cn(
           "relative flex items-center justify-center rounded-lg bg-muted/30 border border-border/20 overflow-hidden transition-all duration-200 cursor-pointer hover:border-primary/30 hover:scale-105",
           sizeConfig.container,
-          onClick && "hover:shadow-md",
+          onClick && "hover:shadow-sm",
         )}
         onClick={handleClick}
       >

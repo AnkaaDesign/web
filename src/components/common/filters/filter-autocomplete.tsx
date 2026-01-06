@@ -221,7 +221,9 @@ export function FilterAutocomplete({
       })
       .catch((error) => {
         if (error.name !== "AbortError") {
-          console.error("Error fetching suggestions:", error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error("Error fetching suggestions:", error);
+          }
           setSuggestions(staticSuggestions);
         }
       })
@@ -402,7 +404,7 @@ export function FilterAutocomplete({
           <CommandList>
             <ScrollArea className="max-h-[300px]">
               {isLoading ? (
-                <div className="flex items-center justify-center p-6 text-sm text-muted-foreground">
+                <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
                   <IconLoader2 className="mr-2 h-4 w-4 animate-spin" />
                   {loadingMessage}
                 </div>

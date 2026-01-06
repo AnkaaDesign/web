@@ -126,15 +126,18 @@ export const ExternalWithdrawalCreateForm = () => {
   // Keep form in sync with URL state
   useEffect(() => {
     form.setValue("withdrawerName", withdrawerName || "");
-  }, [withdrawerName, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [withdrawerName]);
 
   useEffect(() => {
     form.setValue("type", withdrawalType);
-  }, [withdrawalType, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [withdrawalType]);
 
   useEffect(() => {
     form.setValue("notes", notes || "");
-  }, [notes, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes]);
 
   // Mutations
   const { createAsync, isLoading: isSubmitting } = useExternalWithdrawalMutations();
@@ -370,7 +373,9 @@ export const ExternalWithdrawalCreateForm = () => {
       }; // Validate with schema before submitting
       const parseResult = externalWithdrawalCreateSchema.safeParse(withdrawalData);
       if (!parseResult.success) {
-        console.error("Schema validation failed:", parseResult.error);
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Schema validation failed:", parseResult.error);
+        }
         toast.error("Erro na validação dos dados");
         return;
       }
@@ -380,15 +385,8 @@ export const ExternalWithdrawalCreateForm = () => {
       const newNfeFiles = nfeFiles.filter(f => f instanceof File && !(f as any).uploadedFileId);
       const hasNewFiles = newReceiptFiles.length > 0 || newNfeFiles.length > 0;
 
-      console.log('[EXTERNAL WITHDRAWAL CREATE] Submission data:', {
-        hasNewFiles,
-        receiptFilesCount: newReceiptFiles.length,
-        nfeFilesCount: newNfeFiles.length,
-      });
-
       let result;
       if (hasNewFiles) {
-        console.log('[EXTERNAL WITHDRAWAL CREATE] Creating FormData with files');
         const formData = createWithdrawalFormData(
           withdrawalData,
           {
@@ -399,7 +397,6 @@ export const ExternalWithdrawalCreateForm = () => {
         );
         result = await createAsync(formData as any);
       } else {
-        console.log('[EXTERNAL WITHDRAWAL CREATE] Submitting without files');
         result = await createAsync(withdrawalData);
       }
 
@@ -419,7 +416,9 @@ export const ExternalWithdrawalCreateForm = () => {
         }, 1500);
       }
     } catch (error) {
-      console.error("Submission error:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Submission error:", error);
+      }
       // Error is handled by the mutation hook, but let's log it
     }
   }, [validateCurrentStep, withdrawerName, withdrawalType, notes, selectedItems, quantities, prices, createAsync, form, clearAllSelections, navigate, receiptFiles, nfeFiles]);
@@ -990,24 +989,31 @@ export const ExternalWithdrawalCreateForm = () => {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <div className="flex-shrink-0">
-        <PageHeader
-          title="Cadastrar Retirada Externa"
-          icon={IconPackageExport}
-          variant="form"
-          breadcrumbs={[
-            { label: "Início", href: "/" },
-            { label: "Estoque", href: "/estoque" },
-            { label: "Retiradas Externas", href: routes.inventory.externalWithdrawals?.root || "/inventory/external-withdrawals" },
-            { label: "Cadastrar" },
-          ]}
-          actions={navigationActions}
-        />
+    <div className="h-full flex flex-col bg-background">
+      {/* Fixed Header - stays at top */}
+      <div className="flex-shrink-0 bg-background border-b border-border">
+        <div className="max-w-5xl mx-auto px-4 py-4">
+          <PageHeader
+            title="Cadastrar Retirada Externa"
+            icon={IconPackageExport}
+            variant="form"
+            breadcrumbs={[
+              { label: "Início", href: "/" },
+              { label: "Estoque", href: "/estoque" },
+              { label: "Retiradas Externas", href: routes.inventory.externalWithdrawals?.root || "/inventory/external-withdrawals" },
+              { label: "Cadastrar" },
+            ]}
+            actions={navigationActions}
+          />
+        </div>
       </div>
 
-      <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-        <CardContent className="flex-1 flex flex-col p-6 overflow-hidden min-h-0">
+      {/* Scrollable Content Area - only this scrolls */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-4 py-6">
+          <div className="pb-6">
+          <Card className="shadow-sm border border-border">
+            <CardContent className="p-4">
           <Form {...form}>
             <form className="flex flex-col h-full">
               {/* Step Indicator */}
@@ -1355,8 +1361,11 @@ export const ExternalWithdrawalCreateForm = () => {
               </div>
             </form>
           </Form>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

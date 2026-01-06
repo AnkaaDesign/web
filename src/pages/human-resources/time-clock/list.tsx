@@ -12,9 +12,11 @@ import { IconCalendar, IconClock, IconChevronLeft, IconChevronRight, IconDeviceF
 import { Combobox } from "@/components/ui/combobox";
 import type { ComboboxOption } from "@/components/ui/combobox";
 import { useUsers } from "../../../hooks";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { routes, FAVORITE_PAGES, USER_STATUS } from "../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 export default function TimeClockListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -162,7 +164,9 @@ export default function TimeClockListPage() {
           setEndDateInput(formattedEnd);
         }
       } catch (__error) {
-        console.error("Error parsing config dates:", __error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error parsing config dates:", __error);
+        }
       }
     }
     // If config is loaded but has no date range and we have no dates, use defaults
@@ -447,43 +451,41 @@ export default function TimeClockListPage() {
   }, [usersData]);
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <div className="flex-shrink-0">
-        <PageHeaderWithFavorite
-          title="Controle de Ponto"
-          icon={IconClock}
-          favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.humanResources.root }, { label: "Controle de Ponto" }]}
-          actions={
-            changedRowsCount > 0
-              ? [
-                  {
-                    key: "restore",
-                    label: "Restaurar",
-                    icon: IconRestore,
-                    onClick: () => tableRef.current?.handleRestore(),
-                    variant: "outline" as const,
-                  },
-                  {
-                    key: "save",
-                    label: `Salvar (${changedRowsCount})`,
-                    icon: IconDeviceFloppy,
-                    onClick: () => tableRef.current?.handleSubmit(),
-                    variant: "default" as const,
-                  },
-                ]
-              : []
-          }
-        />
-      </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
+      <PageHeader
+        className="flex-shrink-0"
+        title="Controle de Ponto"
+        favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
+        breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.humanResources.root }, { label: "Controle de Ponto" }]}
+        actions={
+          changedRowsCount > 0
+            ? [
+                {
+                  key: "restore",
+                  label: "Restaurar",
+                  icon: IconRestore,
+                  onClick: () => tableRef.current?.handleRestore(),
+                  variant: "outline" as const,
+                },
+                {
+                  key: "save",
+                  label: `Salvar (${changedRowsCount})`,
+                  icon: IconDeviceFloppy,
+                  onClick: () => tableRef.current?.handleSubmit(),
+                  variant: "default" as const,
+                },
+              ]
+            : []
+        }
+      />
+
+      {/* Debug info */}
+      {usersError && <div className="text-red-600 text-sm p-2 bg-red-50 rounded flex-shrink-0">Error loading users: {String(usersError)}</div>}
 
       <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-        <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
-          {/* Debug info */}
-          {usersError && <div className="text-red-600 text-sm p-2 bg-red-50 rounded">Error loading users: {String(usersError)}</div>}
-
+        <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
           {/* Filters */}
-          <div className="flex gap-2 w-full">
+          <div className="flex gap-2 w-full flex-shrink-0">
             <div className="flex gap-1 flex-1">
               <Combobox
                 options={userOptions}

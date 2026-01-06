@@ -138,36 +138,19 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
 
   // Update cut field using setValue to avoid re-mounting components
   const updateCutField = useCallback((index: number, fieldName: string, value: any) => {
-    console.log('[MultiCutSelector] updateCutField:', { index, fieldName, value: value?.name || value });
     setValue(`cuts.${index}.${fieldName}`, value, { shouldDirty: true, shouldTouch: true });
   }, [setValue]);
 
   // Handle file change for a specific cut
   const handleFileChange = useCallback(
     (index: number, files: FileWithPreview[]) => {
-      const fieldId = fields[index]?.id;
-      console.log('[MultiCutSelector] ========== FILE CHANGE ==========');
-      console.log('[MultiCutSelector] Cut index:', index);
-      console.log('[MultiCutSelector] Field ID:', fieldId);
-      console.log('[MultiCutSelector] Files received:', files.length);
-      console.log('[MultiCutSelector] Current expandedItems:', expandedItems);
-
       if (files.length === 0) {
-        console.log('[MultiCutSelector] No files - clearing file from cut');
         updateCutField(index, 'file', undefined);
         updateCutField(index, 'fileId', undefined);
         return;
       }
 
       const file = files[0];
-      console.log('[MultiCutSelector] Updating cut with file:', {
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        isFileInstance: file instanceof File,
-        hasUploadedFileId: !!file.uploadedFileId,
-        uploaded: file.uploaded,
-      });
 
       // Store the file in the cut item
       updateCutField(index, 'file', file);
@@ -177,10 +160,6 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
       } else {
         updateCutField(index, 'fileId', undefined);
       }
-
-      console.log('[MultiCutSelector] Cut updated with file');
-      console.log('[MultiCutSelector] Form value after update:', getValues(`cuts.${index}`));
-      console.log('[MultiCutSelector] expandedItems after update:', expandedItems);
     },
     [updateCutField, fields, expandedItems, getValues],
   );
@@ -195,7 +174,6 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
           type="multiple"
           value={expandedItems}
           onValueChange={(value) => {
-            console.log('[MultiCutSelector] Accordion value changed to:', value);
             setExpandedItems(value);
           }}
           className="w-full space-y-2">

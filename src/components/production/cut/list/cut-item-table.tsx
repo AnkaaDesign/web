@@ -230,7 +230,6 @@ export function CutItemTable({ filters = {}, className, onDataChange, visibleCol
 
     // Validate item
     if (!item || !item.id) {
-      console.error("Invalid item passed to handleContextMenu:", item);
       return;
     }
 

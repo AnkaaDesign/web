@@ -107,7 +107,7 @@ export function RelatedServiceOrdersCard({ customer, className }: RelatedService
 
   if (serviceOrders.length === 0) {
     return (
-      <Card className={cn("shadow-sm border border-border", className)} level={1}>
+      <Card className={cn("shadow-sm border border-border", className)}>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -127,7 +127,7 @@ export function RelatedServiceOrdersCard({ customer, className }: RelatedService
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border", className)}>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">

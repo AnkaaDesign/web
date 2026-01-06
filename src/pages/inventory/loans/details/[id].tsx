@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useBorrowMutations } from "../../../../hooks";
+import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 export const LoanDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -137,7 +138,9 @@ export const LoanDetailsPage = () => {
       await deleteMutation.mutateAsync(borrow.id);
       navigate(routes.inventory.loans.root);
     } catch (error) {
-      console.error("Error deleting borrow:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting borrow:", error);
+      }
     }
   };
 
@@ -163,7 +166,9 @@ export const LoanDetailsPage = () => {
       setShowMarkLostDialog(false);
       refetch();
     } catch (error) {
-      console.error("Error marking borrow as lost:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error marking borrow as lost:", error);
+      }
     }
   };
 
@@ -196,13 +201,10 @@ export const LoanDetailsPage = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section - Enhanced Header with Actions */}
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <PageHeader
         variant="detail"
         title={`Empréstimo #${borrow.id.slice(-8)}`}
-        icon={IconPackage}
-        className="shadow-lg"
         breadcrumbs={[
           { label: "Início", href: routes.home },
           { label: "Estoque", href: routes.inventory.root },
@@ -229,23 +231,20 @@ export const LoanDetailsPage = () => {
             : []),
           ...customActions,
         ]}
+        className="flex-shrink-0"
       />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Core Information Grid - Specifications and Item */}
+            <BorrowSpecificationsCard borrow={borrow} className="h-full" />
+            <BorrowItemCard borrow={borrow} className="h-full" />
+          </div>
 
-      {/* Core Information Grid - Specifications and Item */}
-      {/* Mobile: Single column stacked */}
-      <div className="block lg:hidden space-y-4 animate-in fade-in-50 duration-700">
-        <BorrowSpecificationsCard borrow={borrow} className="h-full" />
-        <BorrowItemCard borrow={borrow} className="h-full" />
+          {/* History Section - Full width */}
+          <BorrowHistoryCard borrow={borrow} className="h-full" />
+        </div>
       </div>
-
-      {/* Desktop/Tablet: 2 columns grid */}
-      <div className="hidden lg:grid grid-cols-2 gap-6 animate-in fade-in-50 duration-700">
-        <BorrowSpecificationsCard borrow={borrow} className="h-full" />
-        <BorrowItemCard borrow={borrow} className="h-full" />
-      </div>
-
-      {/* History Section - Full width */}
-      <BorrowHistoryCard borrow={borrow} className="h-full animate-in fade-in-50 duration-900" />
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

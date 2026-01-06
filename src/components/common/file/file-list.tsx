@@ -268,7 +268,9 @@ export function FileList({ className }: FileListProps) {
       const ids = filesToDelete.map((file) => file.id);
       await batchDelete({ fileIds: ids });
     } catch (error) {
-      console.error("Error deleting file(s):", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting file(s):", error);
+      }
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
@@ -277,8 +279,8 @@ export function FileList({ className }: FileListProps) {
   };
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex-1 relative">
@@ -324,7 +326,7 @@ export function FileList({ className }: FileListProps) {
               {filesData.data.map((file) => (
                 <div
                   key={file.id}
-                  className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  className="border rounded-lg p-4 hover:shadow-sm transition-shadow cursor-pointer"
                   onClick={() => alert("Visualização de arquivo em desenvolvimento")}
                 >
                   <div className="flex items-center gap-2 mb-2">

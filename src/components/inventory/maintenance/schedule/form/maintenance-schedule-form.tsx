@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +14,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Combobox } from "@/components/ui/combobox";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { MaintenanceItemSelector } from "@/components/inventory/maintenance/form/item-selector";
-import { cn } from "@/lib/utils";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 
 interface BaseMaintenanceScheduleFormProps {
@@ -219,20 +219,13 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
         await (props as UpdateMaintenanceScheduleFormProps).onSubmit(processedData);
       }
     } catch (error) {
-      console.error("Form submission error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Form submission error:", error);
+      }
       // Error handling done by parent component
     }
   };
 
-  // Log validation errors for debugging
-  React.useEffect(() => {
-    const errors = form.formState.errors;
-    if (Object.keys(errors).length > 0) {
-      // Also log if submit was attempted
-      if (form.formState.isSubmitted) {
-      }
-    }
-  }, [form.formState.errors, form.formState.isSubmitted]);
 
   // Track form state changes for submit button
   useEffect(() => {
@@ -248,7 +241,7 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
 
   return (
     <Card className="h-full flex flex-col shadow-sm border border-border overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
             {/* Hidden submit button for programmatic form submission */}

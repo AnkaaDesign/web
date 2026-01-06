@@ -279,7 +279,9 @@ export const OrderBatchCreateForm = () => {
           }, 1500);
         }
       } catch (error) {
-        console.error("Submission error:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Submission error:", error);
+        }
         // Error is handled by the mutation hook, but let's log it
       }
     },
@@ -765,7 +767,7 @@ export const OrderBatchCreateForm = () => {
       </div>
 
       <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-        <CardContent className="flex-1 flex flex-col p-6 overflow-hidden min-h-0">
+        <CardContent className="flex-1 flex flex-col p-4 overflow-hidden min-h-0">
           <Form {...form}>
             <form className="flex flex-col h-full">
               {/* Form content wrapper with scrolling */}

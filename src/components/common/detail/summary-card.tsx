@@ -86,7 +86,7 @@ export const SummaryCard = ({ essentialInfo, visualStatus, className }: SummaryC
 
       case "badge":
         return (
-          <div className="flex items-center justify-center p-6">
+          <div className="flex items-center justify-center p-4">
             <div
               className={cn(
                 "px-6 py-3 rounded-full font-semibold text-lg",
@@ -108,7 +108,7 @@ export const SummaryCard = ({ essentialInfo, visualStatus, className }: SummaryC
 
   return (
     <Card className={cn("overflow-hidden", className)}>
-      <CardContent className="p-6">
+      <CardContent className="p-4">
         <div className="grid grid-cols-1 lg:grid-cols-[1fr,auto] gap-6">
           {/* Essential Info Grid */}
           <div

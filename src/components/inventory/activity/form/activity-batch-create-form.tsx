@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import { useActivityFormUrlState } from "@/hooks/use-activity-form-url-state";
 import { ActivityBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
@@ -174,41 +174,40 @@ export const ActivityBatchCreateForm = () => {
 
   return (
     <>
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Criar Movimentações"
-            icon={IconPackage}
-            favoritePage={FAVORITE_PAGES.ESTOQUE_MOVIMENTACOES_CADASTRAR}
-            breadcrumbs={[
-              { label: "Home", href: "/" },
-              { label: "Estoque", href: "/estoque" },
-              { label: "Movimentações", href: routes.inventory.movements.list },
-              { label: "Criar" },
-            ]}
-            actions={[
-              {
-                key: "cancel",
-                label: "Cancelar",
-                onClick: handleCancel,
-                variant: "outline",
-                disabled: isSubmitting,
-              },
-              {
-                key: "submit",
-                label: `Criar ${selectionCount} Movimentaç${selectionCount === 1 ? "ão" : "ões"}`,
-                icon: isSubmitting ? IconLoader2 : IconCheck,
-                onClick: handleSubmit,
-                variant: "default",
-                disabled: isSubmitting || selectionCount === 0,
-                loading: isSubmitting,
-              },
-            ]}
-          />
-        </div>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
+        <PageHeader
+          className="flex-shrink-0"
+          title="Criar Movimentações"
+          icon={IconPackage}
+          favoritePage={FAVORITE_PAGES.ESTOQUE_MOVIMENTACOES_CADASTRAR}
+          breadcrumbs={[
+            { label: "Home", href: "/" },
+            { label: "Estoque", href: "/estoque" },
+            { label: "Movimentações", href: routes.inventory.movements.list },
+            { label: "Criar" },
+          ]}
+          actions={[
+            {
+              key: "cancel",
+              label: "Cancelar",
+              onClick: handleCancel,
+              variant: "outline",
+              disabled: isSubmitting,
+            },
+            {
+              key: "submit",
+              label: `Criar ${selectionCount} Movimentaç${selectionCount === 1 ? "ão" : "ões"}`,
+              icon: isSubmitting ? IconLoader2 : IconCheck,
+              onClick: handleSubmit,
+              variant: "default",
+              disabled: isSubmitting || selectionCount === 0,
+              loading: isSubmitting,
+            },
+          ]}
+        />
 
         <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-          <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
+          <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden min-h-0">
             {/* Configuration Section */}
             <div className="space-y-3 flex-shrink-0">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

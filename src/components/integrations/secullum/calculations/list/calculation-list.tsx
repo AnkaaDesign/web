@@ -197,33 +197,15 @@ export function CalculationList({ className, mode = 'hr' }: CalculationListProps
 
   // Debug logging
   useEffect(() => {
-    console.log('[CalculationList] Query Params:', queryParams);
-    if (data) {
-      console.log('[CalculationList] Response:', {
-        success: data?.success,
-        message: data?.message,
-        hasData: !!data?.data,
-        dataStructure: data?.data ? Object.keys(data.data) : null
-      });
-      if (data?.data) {
-        console.log('[CalculationList] Calculation Data:', {
-          Colunas: data.data.Colunas?.length || 0,
-          Linhas: data.data.Linhas?.length || 0,
-          Totais: data.data.Totais?.length || 0
-        });
-      }
-    }
-    console.log('[CalculationList] Loading:', isLoading);
-    if (error) {
+    if (process.env.NODE_ENV !== 'production') {
       console.error('[CalculationList] Error:', error);
     }
-  }, [queryParams, data, isLoading, error]);
+  }, [error]);
 
   // Transform Secullum calculation data to table rows and totals
   const { calculationRows, totalsRow } = useMemo((): { calculationRows: CalculationRow[], totalsRow: any } => {
     // Check if we have a successful response with data
     if (!data) {
-      console.log('[CalculationList] No response data yet');
       return { calculationRows: [], totalsRow: null };
     }
 
@@ -233,24 +215,16 @@ export function CalculationList({ className, mode = 'hr' }: CalculationListProps
 
     // Check if the response was successful
     if (apiResponse.success === false) {
-      console.log('[CalculationList] API returned error:', apiResponse.message);
       return { calculationRows: [], totalsRow: null };
     }
 
     // Get the actual calculation data
     const secullumData = apiResponse.data;
     if (!secullumData) {
-      console.log('[CalculationList] No calculation data in response');
       return { calculationRows: [], totalsRow: null };
     }
 
     const { Colunas = [], Linhas = [], Totais = [] } = secullumData;
-
-    console.log('[CalculationList] Processing Secullum data:', {
-      columnsCount: Colunas.length,
-      rowsCount: Linhas.length,
-      hasTotals: Totais.length > 0
-    });
 
     // Create a mapping of column names to indices for easier access
     const columnMap = new Map<string, number>();
@@ -401,8 +375,8 @@ export function CalculationList({ className, mode = 'hr' }: CalculationListProps
 
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 min-h-0">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 min-h-0">
         {/* Error display */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -479,7 +453,7 @@ export function CalculationList({ className, mode = 'hr' }: CalculationListProps
         </div>
 
         {/* Calculation table */}
-        <div className="flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-auto">
           <CalculationTable
             visibleColumns={visibleColumns}
             data={calculationRows || []}

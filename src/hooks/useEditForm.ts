@@ -78,15 +78,15 @@ function deepCompare(value1: any, value2: any): boolean {
   // Handle arrays - IMPORTANT: Order matters for arrays like services
   if (Array.isArray(value1) && Array.isArray(value2)) {
     // Debug paintIds array comparison
-    if (value1.length > 0 && typeof value1[0] === "string" && value1[0].length > 20) {
-      console.log('[deepCompare] 🎨 Comparing arrays (likely paintIds):');
-      console.log('  Array1 length:', value1.length, 'items:', value1);
-      console.log('  Array2 length:', value2.length, 'items:', value2);
+    if (process.env.NODE_ENV !== 'production' && value1.length > 0 && typeof value1[0] === "string" && value1[0].length > 20) {
+      console.error('[deepCompare] 🎨 Comparing arrays (likely paintIds):');
+      console.error('  Array1 length:', value1.length, 'items:', value1);
+      console.error('  Array2 length:', value2.length, 'items:', value2);
     }
 
     if (value1.length !== value2.length) {
-      if (value1.length > 0 && typeof value1[0] === "string" && value1[0].length > 20) {
-        console.log('[deepCompare] 🎨 Arrays have different lengths - returning false');
+      if (process.env.NODE_ENV !== 'production' && value1.length > 0 && typeof value1[0] === "string" && value1[0].length > 20) {
+        console.error('[deepCompare] 🎨 Arrays have different lengths - returning false');
       }
       return false;
     }
@@ -104,8 +104,8 @@ function deepCompare(value1: any, value2: any): boolean {
     // Only sort for primitive arrays where we're sure order doesn't matter (like paintIds)
     // For now, compare directly to detect any changes
     const result = _.isEqual(value1, value2);
-    if (value1.length > 0 && typeof value1[0] === "string" && value1[0].length > 20) {
-      console.log('[deepCompare] 🎨 Lodash comparison result:', result);
+    if (process.env.NODE_ENV !== 'production' && value1.length > 0 && typeof value1[0] === "string" && value1[0].length > 20) {
+      console.error('[deepCompare] 🎨 Lodash comparison result:', result);
     }
     return result;
   }
@@ -178,27 +178,46 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
       const currentValue = formData[typedKey];
       const originalValue = original[typedKey];
 
-      // Special debugging for paintIds
-      if (key === "paintIds") {
-        console.log('[useEditForm] 🎨 Checking paintIds:');
+      // Special debugging for services, paintIds and date fields
+      if (process.env.NODE_ENV !== 'production' && key === "services") {
+        console.log('[useEditForm] 🔧 Checking services:');
         console.log('  Current:', currentValue);
         console.log('  Original:', originalValue);
         console.log('  deepCompare result:', deepCompare(currentValue, originalValue));
         console.log('  In omit list?', fieldsToOmitIfUnchanged.includes(typedKey));
       }
 
+      if (process.env.NODE_ENV !== 'production' && key === "paintIds") {
+        console.error('[useEditForm] 🎨 Checking paintIds:');
+        console.error('  Current:', currentValue);
+        console.error('  Original:', originalValue);
+        console.error('  deepCompare result:', deepCompare(currentValue, originalValue));
+        console.error('  In omit list?', fieldsToOmitIfUnchanged.includes(typedKey));
+      }
+
+      // Debug date fields
+      if (process.env.NODE_ENV !== 'production' && (key === "entryDate" || key === "term" || key === "startedAt" || key === "finishedAt")) {
+        console.error(`[useEditForm] 📅 Checking date field "${key}":`);
+        console.error('  Current:', currentValue, typeof currentValue, currentValue instanceof Date);
+        console.error('  Original:', originalValue, typeof originalValue, originalValue instanceof Date);
+        console.error('  deepCompare result:', deepCompare(currentValue, originalValue));
+      }
+
       // Skip if field is in omit list and hasn't changed
       if (fieldsToOmitIfUnchanged.includes(typedKey) && deepCompare(currentValue, originalValue)) {
-        if (key === "paintIds") {
-          console.log('[useEditForm] 🎨 Skipping paintIds - no change detected');
+        if (process.env.NODE_ENV !== 'production' && key === "services") {
+          console.log('[useEditForm] 🔧 Skipping services - deepCompare says no change');
+        }
+        if (process.env.NODE_ENV !== 'production' && key === "paintIds") {
+          console.error('[useEditForm] 🎨 Skipping paintIds - no change detected');
         }
         return;
       }
 
       // Check if value has changed
       if (!deepCompare(currentValue, originalValue)) {
-        if (key === "paintIds") {
-          console.log('[useEditForm] 🎨 paintIds CHANGED - including in changedFields');
+        if (process.env.NODE_ENV !== 'production' && key === "paintIds") {
+          console.error('[useEditForm] 🎨 paintIds CHANGED - including in changedFields');
         }
         // Special handling for certain fields
         if (key === "services") {
@@ -211,9 +230,27 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
             const filteredCurrent = currentServices.filter((s: any) => s && s.description && s.description.trim() !== "");
             const filteredOriginal = originalServices.filter((s: any) => s && s.description && s.description.trim() !== "");
 
-            // _.isEqual checks both content AND order, so this will detect order changes
-            if (!_.isEqual(filteredCurrent, filteredOriginal)) {
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('[useEditForm] 🔧 Services special handling:');
+              console.log('  currentServices.length:', currentServices.length);
+              console.log('  originalServices.length:', originalServices.length);
+              console.log('  filteredCurrent.length:', filteredCurrent.length);
+              console.log('  filteredOriginal.length:', filteredOriginal.length);
+              console.log('  _.isEqual(filteredCurrent, filteredOriginal):', _.isEqual(filteredCurrent, filteredOriginal));
+            }
+
+            // Include services if either:
+            // 1. The filtered services are different
+            // 2. The array lengths changed (even if all services are empty)
+            if (!_.isEqual(filteredCurrent, filteredOriginal) || currentServices.length !== originalServices.length) {
+              if (process.env.NODE_ENV !== 'production') {
+                console.log('[useEditForm] 🔧 Adding services to changedFields');
+              }
               changedFields[typedKey] = filteredCurrent as any;
+            } else {
+              if (process.env.NODE_ENV !== 'production') {
+                console.log('[useEditForm] 🔧 NOT adding services to changedFields');
+              }
             }
           } else if (currentValue !== originalValue) {
             changedFields[typedKey] = currentValue;
@@ -251,13 +288,22 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
   // Handle form submission
   const handleSubmitChanges = (onValid?: (data: Partial<TFieldValues>) => unknown, onInvalid?: (errors: any) => unknown) => {
     return form.handleSubmit(() => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[useEditForm] ✅ Form validation PASSED - proceeding with submission');
+      }
       const changedFields = getChangedFields();
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[useEditForm] Changed fields to submit:', changedFields);
+        console.error('[useEditForm] Number of changed fields:', Object.keys(changedFields).length);
+      }
 
       // Call onSubmit with changed fields
       const result = onSubmit(changedFields);
       if (onValid) onValid(changedFields);
       return result;
     }, (errors) => {
+      console.error('[useEditForm] ❌ Form validation FAILED');
+      console.error('[useEditForm] Validation errors:', errors);
       if (onInvalid) onInvalid(errors);
     });
   };

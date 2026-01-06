@@ -194,8 +194,8 @@ export function CutList({ className }: CutListProps) {
   }, [filterTags, searchingFor, setSearch]);
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <TableSearchInput
@@ -223,7 +223,7 @@ export function CutList({ className }: CutListProps) {
         {allFilterTags.length > 0 && <FilterIndicators filters={allFilterTags} onClearAll={clearAllFilters} />}
 
         {/* Paginated table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <CutItemTable filters={queryFilters} className="h-full" onDataChange={handleTableDataChange} visibleColumns={visibleColumns} />
         </div>
       </CardContent>

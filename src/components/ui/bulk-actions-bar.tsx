@@ -187,7 +187,9 @@ export function BulkActionsBar({
           await action.action(selectedIds);
         }
       } catch (error) {
-        console.error("Bulk action failed:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Bulk action failed:", error);
+        }
         if (showProgress) {
           setProgress({
             completed: 0,
@@ -231,7 +233,7 @@ export function BulkActionsBar({
   const progressPercentage = progress ? (progress.completed / progress.total) * 100 : 0;
 
   const containerClasses = cn(
-    "bg-primary text-primary-foreground shadow-lg rounded-lg border",
+    "bg-primary text-primary-foreground shadow-sm rounded-lg border",
     position === "sticky" && "sticky top-4 z-50",
     position === "bottom" && "fixed bottom-4 left-4 right-4 z-50",
     compact && "py-2 px-3",

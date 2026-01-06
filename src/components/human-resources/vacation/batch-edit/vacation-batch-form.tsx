@@ -119,7 +119,9 @@ export function VacationBatchForm({ vacations }: VacationBatchFormProps) {
         navigate(`${routes.humanResources.vacations.root}?${params.toString()}`);
       }
     } catch (error) {
-      console.error("Error updating vacations:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating vacations:", error);
+      }
       toast.error("Erro inesperado ao atualizar as férias. Tente novamente.");
     } finally {
       setIsSubmitting(false);

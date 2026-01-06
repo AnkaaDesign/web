@@ -28,6 +28,7 @@ import {
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES } from "../../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
+import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 const ExternalWithdrawalDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -84,7 +85,7 @@ const ExternalWithdrawalDetailsPage = () => {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
-          <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
+          <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
             <div className="flex flex-1 items-center justify-center min-h-[60vh]">
               <div className="text-center px-4 max-w-md mx-auto">
                 <div className="animate-in fade-in-50 duration-500">
@@ -125,7 +126,9 @@ const ExternalWithdrawalDetailsPage = () => {
       await deleteMutation.mutateAsync(withdrawal.id);
       navigate(routes.inventory.externalWithdrawals?.list || "/inventory/external-withdrawals");
     } catch (error) {
-      console.error("Error deleting external withdrawal:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting external withdrawal:", error);
+      }
     }
   };
 
@@ -236,70 +239,61 @@ const ExternalWithdrawalDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="space-y-6">
-        {/* Hero Section - Enhanced Header with Actions */}
-        <PageHeader
-          variant="detail"
-          title={withdrawal.withdrawerName}
-          icon={IconPackage}
-          className="shadow-lg"
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Estoque", href: routes.inventory.root },
-            { label: "Retiradas Externas", href: routes.inventory.externalWithdrawals?.list || "/inventory/external-withdrawals" },
-            { label: withdrawal.withdrawerName },
-          ]}
-          actions={[
-            {
-              key: "refresh",
-              label: "Atualizar",
-              icon: IconRefresh,
-              onClick: handleRefresh,
-            },
-            ...withdrawalActions,
-            ...(canEdit
-              ? [
-                  {
-                    key: "edit",
-                    label: "Editar",
-                    icon: IconEdit,
-                    onClick: handleEdit,
-                    variant: "default" as const,
-                  },
-                ]
-              : []),
-            ...customActions,
-          ]}
-        />
-
-        {/* Core Information Grid */}
-        {/* Top Section: Info and Changelog */}
-        {/* Mobile: Single column stacked */}
-        <div className="block lg:hidden space-y-4 animate-in fade-in-50 duration-700">
-          <ExternalWithdrawalInfoCard withdrawal={withdrawal} className="h-full" />
-          <ChangelogHistory
-            entityType={CHANGE_LOG_ENTITY_TYPE.EXTERNAL_WITHDRAWAL}
-            entityId={withdrawal.id}
-            entityName={withdrawal.withdrawerName}
-            entityCreatedAt={withdrawal.createdAt}
-            className="h-full"
+      <div className="h-full flex flex-col px-4 pt-4">
+        <div className="flex-shrink-0">
+          <PageHeader
+            variant="detail"
+            title={withdrawal.withdrawerName}
+            className="shadow-sm"
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Estoque", href: routes.inventory.root },
+              { label: "Retiradas Externas", href: routes.inventory.externalWithdrawals?.list || "/inventory/external-withdrawals" },
+              { label: withdrawal.withdrawerName },
+            ]}
+            actions={[
+              {
+                key: "refresh",
+                label: "Atualizar",
+                icon: IconRefresh,
+                onClick: handleRefresh,
+              },
+              ...withdrawalActions,
+              ...(canEdit
+                ? [
+                    {
+                      key: "edit",
+                      label: "Editar",
+                      icon: IconEdit,
+                      onClick: handleEdit,
+                      variant: "default" as const,
+                    },
+                  ]
+                : []),
+              ...customActions,
+            ]}
           />
         </div>
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4 mt-4">
+            {/* Core Information Grid */}
+            <div className={DETAIL_PAGE_SPACING.HEADER_TO_GRID}>
+            <div className={getDetailGridClasses()}>
+              <ExternalWithdrawalInfoCard withdrawal={withdrawal} className="h-full" />
+              <ChangelogHistory
+                entityType={CHANGE_LOG_ENTITY_TYPE.EXTERNAL_WITHDRAWAL}
+                entityId={withdrawal.id}
+                entityName={withdrawal.withdrawerName}
+                entityCreatedAt={withdrawal.createdAt}
+                className="h-full"
+              />
+              </div>
+            </div>
 
-        {/* Desktop/Tablet: 2 columns grid with 1/2 and 1/2 split */}
-        <div className="hidden lg:grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in-50 duration-700">
-          <ExternalWithdrawalInfoCard withdrawal={withdrawal} className="h-full" />
-          <ChangelogHistory
-            entityType={CHANGE_LOG_ENTITY_TYPE.EXTERNAL_WITHDRAWAL}
-            entityId={withdrawal.id}
-            entityName={withdrawal.withdrawerName}
-            entityCreatedAt={withdrawal.createdAt}
-            className="h-full"
-          />
+            {/* Bottom Section: Items Full Width */}
+            <ExternalWithdrawalItemsCard withdrawal={withdrawal} className="w-full" onWithdrawalUpdate={refetch} />
+          </div>
         </div>
-
-        {/* Bottom Section: Items Full Width */}
-        <ExternalWithdrawalItemsCard withdrawal={withdrawal} className="w-full" onWithdrawalUpdate={refetch} />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

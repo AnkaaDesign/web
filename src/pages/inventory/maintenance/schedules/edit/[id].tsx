@@ -52,7 +52,9 @@ export const EditMaintenanceSchedulePage = () => {
       navigate(routes.inventory.maintenance.schedules.details(id));
     } catch (error: any) {
       // Error is already handled by the API client and mutation
-      console.error("Error updating maintenance schedule:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating maintenance schedule:", error);
+      }
     }
   };
 
@@ -174,31 +176,24 @@ export const EditMaintenanceSchedulePage = () => {
   };
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-5xl mx-auto">
-          <PageHeader
-            variant="form"
-            title="Editar Agendamento de Manutenção"
-            icon={IconCalendar}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Estoque", href: routes.inventory.root },
-              { label: "Manutenção", href: routes.inventory.maintenance.root },
-              { label: "Agendamentos", href: routes.inventory.maintenance.schedules.root },
-              { label: schedule.name, href: routes.inventory.maintenance.schedules.details(schedule.id) },
-              { label: "Editar" },
-            ]}
-            actions={actions}
-            favoritePage={FAVORITE_PAGES.ESTOQUE_MANUTENCAO_AGENDAMENTOS_EDITAR}
-          />
-        </div>
-      </div>
-
-      {/* Scrollable Form Container */}
-      <div className="flex-1 min-h-0 overflow-y-auto mt-6">
-        <div className="max-w-5xl mx-auto h-full">
+    <div className="h-full flex flex-col px-4 pt-4">
+      <PageHeader
+        variant="form"
+        title="Editar Agendamento de Manutenção"
+        icon={IconCalendar}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Manutenção", href: routes.inventory.maintenance.root },
+          { label: "Agendamentos", href: routes.inventory.maintenance.schedules.root },
+          { label: schedule.name, href: routes.inventory.maintenance.schedules.details(schedule.id) },
+          { label: "Editar" },
+        ]}
+        actions={actions}
+        favoritePage={FAVORITE_PAGES.ESTOQUE_MANUTENCAO_AGENDAMENTOS_EDITAR}
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="mt-4 space-y-4">
           <MaintenanceScheduleForm
             mode="update"
             onSubmit={handleSubmit}

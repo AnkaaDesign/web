@@ -49,7 +49,7 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
   }, [item]);
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6">
         <CardTitle className="flex items-center gap-2">
           <IconChartBar className="h-5 w-5 text-muted-foreground" />
@@ -59,7 +59,7 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
       <CardContent className="pt-0 flex-1">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Current Price */}
-          <div className="p-6 rounded-xl bg-primary/5 border-0">
+          <div className="p-4 rounded-xl bg-primary/5 border-0">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
               <IconCurrencyDollar className="h-4 w-4 text-primary" />
               Preço Atual
@@ -69,7 +69,7 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
           </div>
 
           {/* Stock Value */}
-          <div className="p-6 rounded-xl bg-primary/5 border-0">
+          <div className="p-4 rounded-xl bg-primary/5 border-0">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
               <IconCurrencyDollar className="h-4 w-4 text-primary" />
               Valor em Estoque
@@ -81,7 +81,7 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
           </div>
 
           {/* Movements */}
-          <div className="p-6 rounded-xl bg-muted/50 border-0">
+          <div className="p-4 rounded-xl bg-muted/50 border-0">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-4">
               <IconActivity className="h-4 w-4 text-muted-foreground" />
               Movimentações
@@ -101,7 +101,7 @@ export function MetricsCard({ item, className }: MetricsCardProps) {
           </div>
 
           {/* Stock Status */}
-          <div className="p-6 rounded-xl bg-muted/50 border-0">
+          <div className="p-4 rounded-xl bg-muted/50 border-0">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-3">
               <IconAlertTriangle className="h-4 w-4 text-muted-foreground" />
               Status do Estoque

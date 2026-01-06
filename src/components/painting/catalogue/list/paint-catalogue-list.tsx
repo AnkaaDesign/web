@@ -397,7 +397,9 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
         setShowMergeDialog(false);
       } catch (error) {
         // Error is handled by the API client
-        console.error("Erro ao mesclar tintas:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Erro ao mesclar tintas:", error);
+        }
       }
     },
     [selectedPaintIds, mergePaints, clearSelection],
@@ -545,8 +547,8 @@ function PaintCatalogueListContent({ className, onOrderStateChange, onSaveOrderR
 
   return (
     <ContextMenuProvider>
-      <Card className={cn("h-full w-full flex flex-col shadow-sm border border-border", className)}>
-        <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden w-full">
+      <Card className={cn("w-full flex flex-col shadow-sm border border-border", className)}>
+        <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden w-full">
           {/* Search and controls */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="flex-1">

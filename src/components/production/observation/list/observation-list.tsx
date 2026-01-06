@@ -252,8 +252,8 @@ export function ObservationList({ className }: ObservationListProps) {
   };
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and Controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex-1 relative">
@@ -274,7 +274,7 @@ export function ObservationList({ className }: ObservationListProps) {
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearFilter={handleClearFilter} onClearAll={handleClearAllFilters} />}
 
         {/* Table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <LoadingSpinner />

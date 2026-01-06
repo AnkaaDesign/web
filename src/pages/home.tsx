@@ -116,7 +116,7 @@ export function HomePage() {
           {adminQuickAccess.map((item) => (
             <Card
               key={item.path}
-              className="cursor-pointer hover:shadow-lg shadow-[#fff] transition-shadow duration-200 rounded-md border border-neutral-300 dark:border-neutral-700"
+              className="cursor-pointer hover:shadow-sm shadow-[#fff] transition-shadow duration-200 rounded-md border border-neutral-300 dark:border-neutral-700"
               onClick={() => navigate(item.path)}
             >
               <CardContent className="p-4">
@@ -161,7 +161,7 @@ export function HomePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Production Access */}
           {user?.sector?.privileges && hasPrivilege(user as any, SECTOR_PRIVILEGES.PRODUCTION) && (
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(routes.production.schedule.root)}>
+            <Card className="cursor-pointer hover:shadow-sm transition-shadow" onClick={() => navigate(routes.production.schedule.root)}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <IconFileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -176,7 +176,7 @@ export function HomePage() {
 
           {/* Warehouse Access */}
           {user?.sector?.privileges && hasPrivilege(user as any, SECTOR_PRIVILEGES.WAREHOUSE) && (
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(routes.inventory.products.root)}>
+            <Card className="cursor-pointer hover:shadow-sm transition-shadow" onClick={() => navigate(routes.inventory.products.root)}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <IconPackage className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -191,7 +191,7 @@ export function HomePage() {
 
           {/* Maintenance Access */}
           {user?.sector?.privileges && hasPrivilege(user as any, SECTOR_PRIVILEGES.MAINTENANCE) && (
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(routes.inventory.maintenance.root)}>
+            <Card className="cursor-pointer hover:shadow-sm transition-shadow" onClick={() => navigate(routes.inventory.maintenance.root)}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <IconTool className="h-5 w-5 text-red-600 dark:text-red-400" />
@@ -206,7 +206,7 @@ export function HomePage() {
 
           {/* HR Access */}
           {user?.sector?.privileges && hasPrivilege(user as any, SECTOR_PRIVILEGES.HUMAN_RESOURCES) && (
-            <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => navigate(routes.humanResources.root)}>
+            <Card className="cursor-pointer hover:shadow-sm transition-shadow" onClick={() => navigate(routes.humanResources.root)}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <IconUsers className="h-5 w-5 text-purple-600 dark:text-purple-400" />

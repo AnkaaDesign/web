@@ -18,12 +18,10 @@ export function mapTaskStatusToPrisma(status: TASK_STATUS | string): TaskStatus 
  */
 export function isValidTaskStatusTransition(fromStatus: TASK_STATUS, toStatus: TASK_STATUS): boolean {
   const validTransitions: Record<TASK_STATUS, TASK_STATUS[]> = {
-    [TASK_STATUS.PENDING]: [TASK_STATUS.IN_PRODUCTION, TASK_STATUS.ON_HOLD, TASK_STATUS.CANCELLED],
-    [TASK_STATUS.IN_PRODUCTION]: [TASK_STATUS.COMPLETED, TASK_STATUS.ON_HOLD, TASK_STATUS.CANCELLED],
-    [TASK_STATUS.ON_HOLD]: [TASK_STATUS.IN_PRODUCTION, TASK_STATUS.PENDING, TASK_STATUS.CANCELLED],
-    [TASK_STATUS.COMPLETED]: [TASK_STATUS.INVOICED], // Can transition to invoiced
-    [TASK_STATUS.INVOICED]: [TASK_STATUS.SETTLED], // Can transition to settled
-    [TASK_STATUS.SETTLED]: [], // Final state
+    [TASK_STATUS.PREPARATION]: [TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.CANCELLED],
+    [TASK_STATUS.WAITING_PRODUCTION]: [TASK_STATUS.IN_PRODUCTION, TASK_STATUS.PREPARATION, TASK_STATUS.CANCELLED],
+    [TASK_STATUS.IN_PRODUCTION]: [TASK_STATUS.COMPLETED, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.CANCELLED],
+    [TASK_STATUS.COMPLETED]: [], // Final state
     [TASK_STATUS.CANCELLED]: [], // Final state
   };
 
@@ -42,13 +40,11 @@ export function getTaskStatusLabel(status: TASK_STATUS): string {
  */
 export function getTaskStatusColor(status: TASK_STATUS): string {
   const colors: Record<TASK_STATUS, string> = {
-    [TASK_STATUS.PENDING]: "gray",           // Gray - not started yet
-    [TASK_STATUS.IN_PRODUCTION]: "blue",     // Blue - in progress
-    [TASK_STATUS.COMPLETED]: "green",        // Green - finished
-    [TASK_STATUS.CANCELLED]: "red",          // Red - cancelled
-    [TASK_STATUS.ON_HOLD]: "orange",         // Orange - paused
-    [TASK_STATUS.INVOICED]: "purple",        // Purple - invoiced (financial)
-    [TASK_STATUS.SETTLED]: "teal",           // Teal - settled/finalized
+    [TASK_STATUS.PREPARATION]: "orange",            // Orange - in preparation
+    [TASK_STATUS.WAITING_PRODUCTION]: "gray",       // Gray - waiting for production
+    [TASK_STATUS.IN_PRODUCTION]: "blue",            // Blue - in progress
+    [TASK_STATUS.COMPLETED]: "green",               // Green - finished
+    [TASK_STATUS.CANCELLED]: "red",                 // Red - cancelled
   };
   return colors[status] || "default";
 }
@@ -58,13 +54,11 @@ export function getTaskStatusColor(status: TASK_STATUS): string {
  */
 export function getTaskStatusVariant(status: TASK_STATUS): "default" | "secondary" | "destructive" | "outline" {
   const variants: Record<TASK_STATUS, "default" | "secondary" | "destructive" | "outline"> = {
-    [TASK_STATUS.PENDING]: "outline",
+    [TASK_STATUS.PREPARATION]: "outline",
+    [TASK_STATUS.WAITING_PRODUCTION]: "outline",
     [TASK_STATUS.IN_PRODUCTION]: "default",
     [TASK_STATUS.COMPLETED]: "secondary",
     [TASK_STATUS.CANCELLED]: "destructive",
-    [TASK_STATUS.ON_HOLD]: "outline",
-    [TASK_STATUS.INVOICED]: "secondary",
-    [TASK_STATUS.SETTLED]: "secondary",
   };
   return variants[status] || "default";
 }
@@ -75,12 +69,10 @@ export function getTaskStatusVariant(status: TASK_STATUS): "default" | "secondar
 export function getTaskPriority(status: TASK_STATUS): number {
   const priorities: Record<TASK_STATUS, number> = {
     [TASK_STATUS.IN_PRODUCTION]: 1,
-    [TASK_STATUS.PENDING]: 2,
-    [TASK_STATUS.ON_HOLD]: 3,
+    [TASK_STATUS.WAITING_PRODUCTION]: 2,
+    [TASK_STATUS.PREPARATION]: 3,
     [TASK_STATUS.COMPLETED]: 4,
-    [TASK_STATUS.INVOICED]: 5,
-    [TASK_STATUS.SETTLED]: 6,
-    [TASK_STATUS.CANCELLED]: 7,
+    [TASK_STATUS.CANCELLED]: 5,
   };
   return priorities[status] || 999;
 }
@@ -90,12 +82,10 @@ export function getTaskPriority(status: TASK_STATUS): number {
  */
 export function getTaskProgress(status: TASK_STATUS): number {
   const statusProgress: Record<TASK_STATUS, number> = {
-    [TASK_STATUS.PENDING]: 0,
-    [TASK_STATUS.ON_HOLD]: 10,
+    [TASK_STATUS.PREPARATION]: 0,
+    [TASK_STATUS.WAITING_PRODUCTION]: 25,
     [TASK_STATUS.IN_PRODUCTION]: 50,
     [TASK_STATUS.COMPLETED]: 100,
-    [TASK_STATUS.INVOICED]: 100,
-    [TASK_STATUS.SETTLED]: 100,
     [TASK_STATUS.CANCELLED]: 0,
   };
   return statusProgress[status] || 0;
@@ -105,7 +95,7 @@ export function getTaskProgress(status: TASK_STATUS): number {
  * Check if task is active
  */
 export function isTaskActive(task: Task): boolean {
-  return task.status === TASK_STATUS.IN_PRODUCTION || task.status === TASK_STATUS.PENDING;
+  return task.status === TASK_STATUS.IN_PRODUCTION || task.status === TASK_STATUS.WAITING_PRODUCTION;
 }
 
 /**
@@ -125,8 +115,8 @@ export function isTaskCancelled(task: Task): boolean {
 /**
  * Check if task is on hold
  */
-export function isTaskOnHold(task: Task): boolean {
-  return task.status === TASK_STATUS.ON_HOLD;
+export function isTaskInPreparation(task: Task): boolean {
+  return task.status === TASK_STATUS.PREPARATION;
 }
 
 /**
@@ -316,7 +306,7 @@ export function calculateTaskStats(tasks: Task[]) {
   const active = tasks.filter(isTaskActive).length;
   const completed = tasks.filter(isTaskCompleted).length;
   const cancelled = tasks.filter(isTaskCancelled).length;
-  const onHold = tasks.filter(isTaskOnHold).length;
+  const preparation = tasks.filter(isTaskInPreparation).length;
   const overdue = tasks.filter(isTaskOverdue).length;
 
   const completionRate = total > 0 ? (completed / total) * 100 : 0;
@@ -327,7 +317,7 @@ export function calculateTaskStats(tasks: Task[]) {
     active,
     completed,
     cancelled,
-    onHold,
+    preparation,
     overdue,
     completionRate: Math.round(completionRate),
   };

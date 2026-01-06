@@ -48,30 +48,22 @@ export const SectorEditPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="h-full flex flex-col">
-        {/* Fixed Header */}
-        <div className="flex-shrink-0">
-          <div className="max-w-3xl mx-auto">
-            <PageHeader
-              variant="form"
-              title="Editar Setor"
-              icon={IconBuildingSkyscraper}
-              breadcrumbs={[
-                { label: "Início", href: "/" },
-                { label: "Administração" },
-                { label: "Setores", href: routes.administration.sectors.root },
-                { label: sector.data.name || "Carregando...", href: routes.administration.sectors.details(id) },
-                { label: "Editar" },
-              ]}
-            />
-          </div>
-        </div>
-
-        {/* Scrollable Form Container */}
-        <div className="flex-1 overflow-y-auto mt-6">
-          <div className="max-w-3xl mx-auto h-full">
-            <SectorForm mode="update" sector={sector.data} />
-          </div>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="form"
+          title="Editar Setor"
+          icon={IconBuildingSkyscraper}
+          breadcrumbs={[
+            { label: "Início", href: "/" },
+            { label: "Administração" },
+            { label: "Setores", href: routes.administration.sectors.root },
+            { label: sector.data.name || "Carregando...", href: routes.administration.sectors.details(id) },
+            { label: "Editar" },
+          ]}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <SectorForm mode="update" sector={sector.data} />
         </div>
       </div>
     </PrivilegeRoute>

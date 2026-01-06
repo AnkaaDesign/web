@@ -75,7 +75,9 @@ export function BackupForm({ open, onClose, onSuccess }: BackupFormProps) {
 
       onClose();
     } catch (error) {
-      console.error('Failed to create backup:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Failed to create backup:', error);
+      }
     }
   };
 

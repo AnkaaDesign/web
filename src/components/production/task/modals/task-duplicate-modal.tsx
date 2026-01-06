@@ -167,7 +167,9 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
         onSuccess?.();
       }
     } catch (error) {
-      console.error("Error creating copies:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating copies:", error);
+      }
       // Error is handled by the mutation hook
     } finally {
       setIsSubmitting(false);

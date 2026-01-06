@@ -10,10 +10,11 @@ import { cn } from "@/lib/utils";
 import { DeadlineCountdown } from "./deadline-countdown";
 import { getRowColorClass } from "./task-table-utils";
 import { IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
-import { PAINT_FINISH, PAINT_FINISH_LABELS, PAINT_BRAND_LABELS, TRUCK_MANUFACTURER_LABELS } from "../../../../constants";
+import { PAINT_FINISH, PAINT_FINISH_LABELS, PAINT_BRAND_LABELS, TRUCK_MANUFACTURER_LABELS, SERVICE_ORDER_TYPE } from "../../../../constants";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
+import { ServiceOrderCell } from "../history/service-order-cell";
 import { TaskTableContextMenu, type TaskAction } from "./task-table-context-menu";
 import { DuplicateTaskModal, type DuplicateTaskCopyData } from "./duplicate-task-modal";
 import { SetSectorModal } from "./set-sector-modal";
@@ -200,6 +201,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       { id: "customer.fantasyName", header: "CLIENTE", width: "w-[150px]", sortable: true },
       { id: "measures", header: "MEDIDAS", width: "w-[110px]", sortable: true },
       { id: "generalPainting", header: "PINTURA", width: "w-[100px]", sortable: true },
+      { id: "serviceOrders.production", header: "PRODUÇÃO", width: "w-[120px]", sortable: true },
       { id: "serialNumberOrPlate", header: "Nº SÉRIE", width: "w-[120px]", sortable: true },
       { id: "spot", header: "LOCAL", width: "w-[120px]", sortable: true },
       { id: "chassisNumber", header: "Nº CHASSI", width: "w-[140px]", sortable: true },
@@ -280,19 +282,8 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
 
   const handleRowClick = useCallback(
     (e: React.MouseEvent, taskId: string) => {
-      console.log("[RowClick] handleRowClick called", {
-        taskId,
-        shiftKey: e.shiftKey,
-        ctrlKey: e.ctrlKey,
-        metaKey: e.metaKey,
-        selectedTaskIdsSize: selectedTaskIds.size,
-        hasOnShiftClickSelect: !!onShiftClickSelect,
-        hasOnSingleClickSelect: !!onSingleClickSelect,
-      });
-
       // Don't navigate if clicking checkbox or if it's a context menu click
       if ((e.target as HTMLElement).closest("[data-checkbox]") || e.button === 2) {
-        console.log("[RowClick] Clicked on checkbox or context menu, ignoring");
         return;
       }
 
@@ -313,12 +304,9 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
         onSingleClickSelect?.(taskId);
       } else if (e.shiftKey) {
         // Shift+click - use cross-table selection (works even with no prior selection)
-        console.log("[RowClick] Shift click detected");
         if (onShiftClickSelect) {
-          console.log("[RowClick] Calling onShiftClickSelect");
           onShiftClickSelect(taskId);
         } else if (selectedTaskIds.size > 0) {
-          console.log("[RowClick] No onShiftClickSelect, using fallback");
           // Fallback: Implement shift-click range selection within this table only
           const lastSelectedId = Array.from(selectedTaskIds).pop();
           const lastSelectedIndex = preparedTasks.findIndex((t) => t.id === lastSelectedId);
@@ -333,7 +321,6 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
         }
       } else {
         // Normal click - navigate
-        console.log("[RowClick] Normal click - navigating");
         navigate(routes.production.schedule.details(taskId));
       }
     },
@@ -509,7 +496,9 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       }
       setSelectedTaskIds(new Set());
     } catch (error) {
-      console.error("Error deleting task(s):", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting task(s):", error);
+      }
     } finally {
       setDeleteDialog(null);
     }
@@ -794,6 +783,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
                             );
                           })()
                         : "-")}
+                    {column.id === "serviceOrders.production" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} />}
                     {column.id === "serialNumberOrPlate" && <span className="truncate block font-mono">{task.serialNumber || task.truck?.plate || "-"}</span>}
                     {column.id === "spot" && (
                       task.truck?.spot ? (

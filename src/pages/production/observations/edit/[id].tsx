@@ -53,23 +53,22 @@ export const ObservationEdit = () => {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-        <div className="h-full flex flex-col space-y-4">
-          <div className="flex-shrink-0">
-            <PageHeader
-              variant="form"
-              title="Carregando..."
-              icon={IconAlertCircle}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Produção", href: routes.production.root },
-                { label: "Observações", href: routes.production.observations.root },
-                { label: "Editar" },
-              ]}
-            />
-          </div>
-          <div className="flex-1">
+        <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+          <PageHeader
+            variant="form"
+            title="Carregando..."
+            icon={IconAlertCircle}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Produção", href: routes.production.root },
+              { label: "Observações", href: routes.production.observations.root },
+              { label: "Editar" },
+            ]}
+            className="flex-shrink-0"
+          />
+          <div className="flex-1 overflow-y-auto pb-6">
             <Card>
-              <CardContent className="p-6">
+              <CardContent className="p-4">
                 <div className="space-y-4">
                   <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-32 w-full" />
@@ -87,26 +86,25 @@ export const ObservationEdit = () => {
   if (isError || !observation) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-        <div className="h-full flex flex-col space-y-4">
-          <div className="flex-shrink-0">
-            <PageHeader
-              variant="form"
-              title="Observação não encontrada"
-              icon={IconAlertCircle}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Produção", href: routes.production.root },
-                { label: "Observações", href: routes.production.observations.root },
-                { label: "Editar" },
-              ]}
-              backButton={{
-                onClick: () => navigate(routes.production.observations.root),
-              }}
-            />
-          </div>
-          <div className="flex-1">
+        <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+          <PageHeader
+            variant="form"
+            title="Observação não encontrada"
+            icon={IconAlertCircle}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Produção", href: routes.production.root },
+              { label: "Observações", href: routes.production.observations.root },
+              { label: "Editar" },
+            ]}
+            backButton={{
+              onClick: () => navigate(routes.production.observations.root),
+            }}
+            className="flex-shrink-0"
+          />
+          <div className="flex-1 overflow-y-auto pb-6">
             <Card>
-              <CardContent className="p-6">
+              <CardContent className="p-4">
                 <div className="text-center">
                   <div className="p-4 rounded-lg bg-red-50 border border-red-200">
                     <p className="text-red-800 font-medium">Observação não encontrada</p>
@@ -123,8 +121,31 @@ export const ObservationEdit = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="h-full">
-        <ObservationForm observationId={observation.id} mode="edit" onSuccess={handleSuccess} onCancel={handleCancel} />
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="form"
+          title={`Editar Observação`}
+          icon={IconAlertCircle}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Produção", href: routes.production.root },
+            { label: "Observações", href: routes.production.observations.root },
+            { label: observation.id, href: routes.production.observations.details(observation.id) },
+            { label: "Editar" },
+          ]}
+          actions={[
+            {
+              key: "cancel",
+              label: "Cancelar",
+              onClick: handleCancel,
+              variant: "outline" as const,
+            },
+          ]}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <ObservationForm observationId={observation.id} mode="edit" onSuccess={handleSuccess} onCancel={handleCancel} />
+        </div>
       </div>
     </PrivilegeRoute>
   );

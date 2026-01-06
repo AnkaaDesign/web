@@ -222,7 +222,9 @@ export function ItemMergeDialog({ open, onOpenChange, items, onMerge }: ItemMerg
       await onMerge(targetItemId, resolvedData);
       onOpenChange(false);
     } catch (error) {
-      console.error("Merge failed:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Merge failed:", error);
+      }
     } finally {
       setIsLoading(false);
     }

@@ -136,7 +136,7 @@ export const FilePreviewCard: React.FC<FilePreviewCardProps> = ({
   return (
     <Card
       className={cn(
-        "group relative transition-all duration-200 hover:shadow-lg cursor-pointer overflow-hidden",
+        "group relative transition-all duration-200 hover:shadow-sm cursor-pointer overflow-hidden",
         !className?.includes("w-") && !className?.includes("h-") && sizeClasses[size],
         "border-2 hover:border-primary/20",
         className,

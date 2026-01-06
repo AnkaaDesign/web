@@ -1,4 +1,4 @@
-import { IconBeach, IconPlus } from "@tabler/icons-react";
+import { IconPlus } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 
 import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
@@ -14,26 +14,26 @@ export const VacationListPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeader
-            variant="default"
-            title="Férias"
-            icon={IconBeach}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.humanResources.root }, { label: "Férias" }]}
-            favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_FERIAS_LISTAR}
-            actions={[
-              {
-                key: "create",
-                label: "Nova Solicitação",
-                icon: IconPlus,
-                onClick: () => navigate(routes.humanResources.vacations.create),
-                variant: "default",
-              },
-            ]}
-          />
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="list"
+          title="Férias"
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.humanResources.root }, { label: "Férias" }]}
+          favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_FERIAS_LISTAR}
+          actions={[
+            {
+              key: "create",
+              label: "Nova Solicitação",
+              icon: IconPlus,
+              onClick: () => navigate(routes.humanResources.vacations.create),
+              variant: "default",
+            },
+          ]}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 min-h-0 pb-6 flex flex-col">
+          <VacationList className="h-full" />
         </div>
-        <VacationList className="flex-1 min-h-0" />
       </div>
     </PrivilegeRoute>
   );

@@ -15,17 +15,17 @@ export default function ProductionsListPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeader
-            variant="default"
-            title="Produções de Tinta"
-            icon={IconFlask}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura", href: routes.painting.root }, { label: "Produções" }]}
-            favoritePage={FAVORITE_PAGES.PINTURA_PRODUCOES_LISTAR}
-          />
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="list"
+          title="Produções de Tinta"
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura", href: routes.painting.root }, { label: "Produções" }]}
+          favoritePage={FAVORITE_PAGES.PINTURA_PRODUCOES_LISTAR}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 min-h-0 pb-6 flex flex-col">
+          <PaintProductionList className="h-full" />
         </div>
-        <PaintProductionList className="flex-1 min-h-0" />
       </div>
     </PrivilegeRoute>
   );

@@ -17,7 +17,7 @@ import {
 } from "@tabler/icons-react";
 import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { BonusFilters } from "@/components/human-resources/bonus/list/bonus-filters";
 import { BonusSummary } from "@/components/human-resources/bonus/list/bonus-summary";
 import { BonusExport } from "@/components/human-resources/bonus/export/bonus-export";
@@ -29,6 +29,8 @@ import { useBonusList, useSectors, usePositions, useUsers } from "../../../hooks
 import { calculatePonderedTasks } from "../../../utils/bonus";
 import { StandardizedTable } from "@/components/ui/standardized-table";
 import type { StandardizedColumn } from "@/components/ui/standardized-table";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 // Extended filters interface with bonus-specific fields
 interface BonusFiltersData {
@@ -759,30 +761,28 @@ export default function BonusListPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Bônus"
-            icon={IconGift}
-            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_BONUS}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }, { label: "Bônus" }]}
-            description={(() => {
-              if (filters.year && filters.months && filters.months.length > 0) {
-                if (filters.months.length === 1) {
-                  const monthName = new Date(filters.year, parseInt(filters.months[0]) - 1).toLocaleDateString("pt-BR", { month: "long" });
-                  return `Período: ${monthName} de ${filters.year}`;
-                } else {
-                  return `Período: ${filters.months.length} meses de ${filters.year}`;
-                }
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
+        <PageHeader
+          className="flex-shrink-0"
+          title="Bônus"
+          favoritePage={FAVORITE_PAGES.ADMINISTRACAO_BONUS}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos" }, { label: "Bônus" }]}
+          description={(() => {
+            if (filters.year && filters.months && filters.months.length > 0) {
+              if (filters.months.length === 1) {
+                const monthName = new Date(filters.year, parseInt(filters.months[0]) - 1).toLocaleDateString("pt-BR", { month: "long" });
+                return `Período: ${monthName} de ${filters.year}`;
+              } else {
+                return `Período: ${filters.months.length} meses de ${filters.year}`;
               }
-              return "Visualização de bônus com cálculos de tarefas e bonificações";
-            })()}
-            actions={[]}
-          />
-        </div>
+            }
+            return "Visualização de bônus com cálculos de tarefas e bonificações";
+          })()}
+          actions={[]}
+        />
 
         {hasError && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="flex-shrink-0">
             <IconAlertCircle className="h-4 w-4" />
             <AlertDescription>
               Erro ao carregar dados de bônus. Verifique a conexão e tente novamente.
@@ -790,91 +790,89 @@ export default function BonusListPage() {
           </Alert>
         )}
 
-        <div className="flex-1 overflow-hidden">
-          <Card className="h-full flex flex-col shadow-sm border border-border">
-            <CardContent className="px-6 pt-6 pb-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => setShowFilters(!showFilters)}
-                    variant={hasActiveFilters ? "default" : "outline"}
-                    size="default"
-                  >
-                    <IconFilter className="h-4 w-4 mr-2" />
-                    {hasActiveFilters ? `Filtros (${activeFiltersCount})` : "Filtros"}
-                  </Button>
+        <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
+          <CardContent className="px-6 pt-6 pb-4 flex-shrink-0">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setShowFilters(!showFilters)}
+                  variant={hasActiveFilters ? "default" : "outline"}
+                  size="default"
+                >
+                  <IconFilter className="h-4 w-4 mr-2" />
+                  {hasActiveFilters ? `Filtros (${activeFiltersCount})` : "Filtros"}
+                </Button>
 
-                  <BonusColumnVisibilityManager
-                    visibleColumns={visibleColumns}
-                    onVisibilityChange={setVisibleColumns}
-                  />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => navigate(routes.humanResources.bonus.simulation)}
-                    variant="outline"
-                    size="default"
-                  >
-                    <IconCalculator className="h-4 w-4 mr-2" />
-                    Simulação de Bônus
-                  </Button>
-
-                  <BonusExport
-                    filters={filters}
-                    currentPageData={processedBonuses}
-                    totalRecords={processedBonuses.length}
-                    visibleColumns={visibleColumns}
-                  />
-                </div>
-              </div>
-
-              {/* Active Filter Badges */}
-              {activeFilterBadges.length > 0 && (
-                <FilterIndicators
-                  filters={activeFilterBadges}
-                  onClearAll={clearAllFilters}
-                  className="mt-4"
-                />
-              )}
-            </CardContent>
-
-            <CardContent className="flex-1 overflow-hidden p-6 pt-0 relative">
-              <div className="h-full flex flex-col overflow-hidden rounded-lg border border-border">
-                <BonusTableComponent
-                  data={processedBonuses}
+                <BonusColumnVisibilityManager
                   visibleColumns={visibleColumns}
-                  onRowClick={handleRowClick}
-                  isLoading={isLoading}
-                  error={hasError ? error : null}
-                  multiMonth={filters.months ? filters.months.length > 1 : false}
-                  onSort={toggleSort}
-                  getSortDirection={getSortDirection}
-                  getSortOrder={getSortOrder}
-                  sortConfigs={sortConfigs}
+                  onVisibilityChange={setVisibleColumns}
                 />
-
-                {(isRefreshing || isLoading) && (
-                  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <IconRefresh className="h-4 w-4 animate-spin" />
-                      <span className="text-sm font-medium">
-                        {isRefreshing ? "Aplicando filtros..." : "Carregando dados..."}
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
-            </CardContent>
 
-            {/* Summary - At bottom, no spacing between table */}
-            {processedBonuses.length > 0 && (
-              <div className="px-6 pb-6">
-                <BonusSummary bonuses={processedBonuses} />
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => navigate(routes.humanResources.bonus.simulation)}
+                  variant="outline"
+                  size="default"
+                >
+                  <IconCalculator className="h-4 w-4 mr-2" />
+                  Simulação de Bônus
+                </Button>
+
+                <BonusExport
+                  filters={filters}
+                  currentPageData={processedBonuses}
+                  totalRecords={processedBonuses.length}
+                  visibleColumns={visibleColumns}
+                />
+              </div>
+            </div>
+
+            {/* Active Filter Badges */}
+            {activeFilterBadges.length > 0 && (
+              <FilterIndicators
+                filters={activeFilterBadges}
+                onClearAll={clearAllFilters}
+                className="mt-4"
+              />
+            )}
+          </CardContent>
+
+          <CardContent className="flex-1 flex flex-col p-4 pt-0 relative min-h-0">
+            <div className="flex-1 min-h-0 rounded-lg border border-border">
+              <BonusTableComponent
+                data={processedBonuses}
+                visibleColumns={visibleColumns}
+                onRowClick={handleRowClick}
+                isLoading={isLoading}
+                error={hasError ? error : null}
+                multiMonth={filters.months ? filters.months.length > 1 : false}
+                onSort={toggleSort}
+                getSortDirection={getSortDirection}
+                getSortOrder={getSortOrder}
+                sortConfigs={sortConfigs}
+              />
+            </div>
+
+            {(isRefreshing || isLoading) && (
+              <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <IconRefresh className="h-4 w-4 animate-spin" />
+                  <span className="text-sm font-medium">
+                    {isRefreshing ? "Aplicando filtros..." : "Carregando dados..."}
+                  </span>
+                </div>
               </div>
             )}
-          </Card>
-        </div>
+          </CardContent>
+
+          {/* Summary - At bottom, no spacing between table */}
+          {processedBonuses.length > 0 && (
+            <div className="px-6 pb-6 flex-shrink-0">
+              <BonusSummary bonuses={processedBonuses} />
+            </div>
+          )}
+        </Card>
 
         <BonusFilters
           open={showFilters}

@@ -253,6 +253,11 @@ const ActionButton = React.memo(function ActionButton({ action }: { action: Page
     );
   }
 
+  // Debug logging for submit button
+  if (action.key === "submit" && process.env.NODE_ENV !== 'production') {
+    console.error('[PageHeader ActionButton] Rendering submit button with disabled:', action.disabled);
+  }
+
   return (
     <Button
       key={action.key}
@@ -595,23 +600,16 @@ export function PageHeader<T extends BaseEntity = BaseEntity>(props: PageHeaderP
   const titleString = typeof displayTitle === "string" ? displayTitle : entityInfo?.name || "Page";
 
   return (
-    <Card className={cn("shadow-sm border border-border", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border", className)}>
       <CardContent className="p-0">
         {/* Header Section */}
-        <div className="px-4 py-2 sm:px-6 sm:py-2">
+        <div className="px-4 py-3">
           <div className="flex items-start gap-3">
-            {/* Entity Icon */}
-            {Icon && (
-              <div className="p-2 bg-muted/50 rounded-lg shadow-sm">
-                <Icon className="h-6 w-6 text-muted-foreground" />
-              </div>
-            )}
-
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex-1 min-w-0 space-y-1.5">
                   {/* Back Button (inline with title) */}
-                  <div className="flex items-center gap-3 h-8">
+                  <div className="flex items-center gap-3 h-7">
                     {backButton && (
                       <Button variant="ghost" size="icon" onClick={backButton.onClick} className="shrink-0">
                         <IconArrowLeft className="h-4 w-4" />
@@ -619,7 +617,7 @@ export function PageHeader<T extends BaseEntity = BaseEntity>(props: PageHeaderP
                     )}
 
                     {/* Page Title */}
-                    <h2 className="text-xl sm:text-2xl font-bold leading-none">{displayTitle}</h2>
+                    <h2 className="text-base sm:text-lg font-bold leading-none">{displayTitle}</h2>
 
                     {/* Favorite Button */}
                     {favoritePage && <FavoriteButton page={favoritePage} pageTitle={titleString} size="sm" variant="ghost" />}
@@ -637,7 +635,7 @@ export function PageHeader<T extends BaseEntity = BaseEntity>(props: PageHeaderP
 
                   {/* Breadcrumb Navigation */}
                   {breadcrumbs && (
-                    <div className="mt-2">
+                    <div>
                       <Breadcrumb items={breadcrumbs} />
                     </div>
                   )}
@@ -669,7 +667,11 @@ export function PageHeader<T extends BaseEntity = BaseEntity>(props: PageHeaderP
           </div>
 
           {/* Variant-specific content */}
-          {variant === "list" && (
+          {variant === "list" &&
+            ((variantProps as ListPageHeaderProps).search ||
+             (variantProps as ListPageHeaderProps).viewControls ||
+             (variantProps as ListPageHeaderProps).filters ||
+             (variantProps as ListPageHeaderProps).export) && (
             <div className="mt-4">
               <ListControls
                 search={(variantProps as ListPageHeaderProps).search}

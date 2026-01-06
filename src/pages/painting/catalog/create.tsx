@@ -8,7 +8,7 @@ import type { PaintCreateFormData, PaintFormulaCreateFormData } from "../../../s
 import type { PaintFormula } from "../../../types";
 import { getDefaultFormValues } from "@/utils/url-form-state";
 import { useState, useRef } from "react";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { IconPalette, IconCheck, IconLoader2, IconArrowLeft, IconArrowRight } from "@tabler/icons-react";
 
 export function CatalogCreatePage() {
@@ -57,7 +57,7 @@ export function CatalogCreatePage() {
         for (const formula of formulas) {
           const validComponents =
             formula.components?.filter((c) => {
-              return c.itemId && c.ratio > 0;
+              return c.itemId && c.weightInGrams && c.weightInGrams > 0;
             }) || [];
 
           if (validComponents.length === 0) {
@@ -71,7 +71,7 @@ export function CatalogCreatePage() {
             description: formula.description || "Fórmula Principal",
             components: validComponents.map((c) => ({
               itemId: c.itemId,
-              ratio: c.ratio,
+              weightInGrams: c.weightInGrams, // Backend will calculate ratio from weight
             })),
           };
 
@@ -88,7 +88,9 @@ export function CatalogCreatePage() {
 
       navigate(routes.painting.catalog.root, { replace: true });
     } catch (error) {
-      console.error("[CreatePage] Error in handleSubmit:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[CreatePage] Error in handleSubmit:", error);
+      }
       // Error is handled by the API client
     } finally {
       setIsSubmitting(false);
@@ -169,40 +171,32 @@ export function CatalogCreatePage() {
   };
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-6xl mx-auto">
-          <PageHeaderWithFavorite
-            title="Cadastrar Tinta"
-            icon={IconPalette}
-            favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_CADASTRAR}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Pintura", href: routes.painting.root },
-              { label: "Catálogo", href: routes.painting.catalog.root },
-              { label: "Cadastrar" },
-            ]}
-            actions={getNavigationActions()}
-          />
-        </div>
-      </div>
-
-      {/* Main Content Card - Dashboard style scrolling */}
-      <div className="flex-1 overflow-hidden max-w-6xl mx-auto w-full">
-        <div className="h-full bg-card rounded-lg shadow-md border-muted overflow-hidden">
-          <PaintForm
-            ref={paintFormRef}
-            mode="create"
-            onSubmit={handleSubmit}
-            onCancel={handleCancel}
-            isSubmitting={isSubmitting}
-            defaultValues={defaultValues}
-            onStepChange={setCurrentStep}
-            onPaintTypeChange={setCurrentPaintTypeId}
-            currentStep={currentStep}
-          />
-        </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        title="Cadastrar Tinta"
+        icon={IconPalette}
+        favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_CADASTRAR}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Pintura", href: routes.painting.root },
+          { label: "Catálogo", href: routes.painting.catalog.root },
+          { label: "Cadastrar" },
+        ]}
+        actions={getNavigationActions()}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <PaintForm
+          ref={paintFormRef}
+          mode="create"
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+          isSubmitting={isSubmitting}
+          defaultValues={defaultValues}
+          onStepChange={setCurrentStep}
+          onPaintTypeChange={setCurrentPaintTypeId}
+          currentStep={currentStep}
+        />
       </div>
     </div>
   );

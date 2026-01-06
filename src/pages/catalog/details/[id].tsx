@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { LoadingPage } from "@/components/navigation/loading-page";
 import { ErrorCard } from "@/components/ui/error-card";
 import { PaintSpecificationsCard, PaintFormulasCard, RelatedPaintsCard, GroundPaintsCard } from "@/components/painting/catalogue/detail";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 /**
  * View-only Catalog Details Page for Designers
@@ -105,68 +106,67 @@ export default function CatalogDetailsPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.DESIGNER]}>
-      <div className="space-y-6">
-        {/* Hero Section - No edit/delete actions */}
-        <div className="animate-in fade-in-50 duration-500">
-          <PageHeader
-            variant="detail"
-            entity={paint}
-            title={paint.name}
-            icon={IconPaint}
-            actions={[
-              {
-                key: "refresh",
-                label: "Atualizar",
-                icon: IconRefresh,
-                onClick: handleRefresh,
-                loading: isRefetching,
-              },
-              // No edit or delete buttons - view only
-            ]}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Catálogo", href: routes.catalog.root },
-              { label: paint.name },
-            ]}
-          />
-        </div>
+      <div className="h-full flex flex-col px-4 pt-4">
+        <PageHeader
+          variant="detail"
+          entity={paint}
+          title={paint.name}
+          actions={[
+            {
+              key: "refresh",
+              label: "Atualizar",
+              icon: IconRefresh,
+              onClick: handleRefresh,
+              loading: isRefetching,
+            },
+            // No edit or delete buttons - view only
+          ]}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Catálogo", href: routes.catalog.root },
+            { label: paint.name },
+          ]}
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="mt-4">
+            {/* Row 1: Specifications + (Formulas + Fundos Recomendados) */}
+            <div className="animate-in fade-in-50 duration-500 transition-all">
+            {/* Mobile: Single column */}
+            <div className="block lg:hidden space-y-4">
+              <PaintSpecificationsCard paint={paint} className="h-auto" />
+              <PaintFormulasCard paint={paint} className="h-auto" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
+              {paint.paintGrounds && paint.paintGrounds.length > 0 && (
+                <GroundPaintsCard paint={paint} className="h-auto" />
+              )}
+            </div>
 
-        {/* Row 1: Specifications + (Formulas + Fundos Recomendados) */}
-        <div className="animate-in fade-in-50 duration-500 transition-all">
-          {/* Mobile: Single column */}
-          <div className="block lg:hidden space-y-4">
-            <PaintSpecificationsCard paint={paint} className="h-auto" />
-            <PaintFormulasCard paint={paint} className="h-auto" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
-            {paint.paintGrounds && paint.paintGrounds.length > 0 && (
-              <GroundPaintsCard paint={paint} className="h-auto" />
-            )}
-          </div>
+            {/* Desktop: 2 columns - Specifications + (Formulas + Fundos) */}
+            <div className="hidden lg:block">
+              <div className="grid grid-cols-2 gap-4 items-start">
+                {/* Column 1: Specifications */}
+                <PaintSpecificationsCard paint={paint} className="h-full" />
 
-          {/* Desktop: 2 columns - Specifications + (Formulas + Fundos) */}
-          <div className="hidden lg:block">
-            <div className="grid grid-cols-2 gap-6 items-start">
-              {/* Column 1: Specifications */}
-              <PaintSpecificationsCard paint={paint} className="h-full" />
-
-              {/* Column 2: Formulas + Fundos Recomendados */}
-              <div className="flex flex-col gap-4 h-full">
-                <PaintFormulasCard paint={paint} className="flex-1 min-h-0" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
-                {paint.paintGrounds && paint.paintGrounds.length > 0 && (
-                  <GroundPaintsCard paint={paint} className="h-[200px] flex-shrink-0" />
-                )}
+                {/* Column 2: Formulas + Fundos Recomendados */}
+                <div className="flex flex-col gap-4 h-full">
+                  <PaintFormulasCard paint={paint} className="flex-1 min-h-0" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
+                  {paint.paintGrounds && paint.paintGrounds.length > 0 && (
+                    <GroundPaintsCard paint={paint} className="h-[200px] flex-shrink-0" />
+                  )}
+                </div>
               </div>
             </div>
+            </div>
+
+            {/* Row 2: Related Paints Section */}
+            {((paint.relatedPaints && paint.relatedPaints.length > 0) || (paint.relatedTo && paint.relatedTo.length > 0)) && (
+              <div className="animate-in fade-in-50 duration-700 transition-all">
+                <RelatedPaintsCard paint={paint} />
+              </div>
+            )}
+
+            {/* Note: No Task History or Production History - these are warehouse-specific features */}
           </div>
         </div>
-
-        {/* Row 2: Related Paints Section */}
-        {((paint.relatedPaints && paint.relatedPaints.length > 0) || (paint.relatedTo && paint.relatedTo.length > 0)) && (
-          <div className="animate-in fade-in-50 duration-700 transition-all">
-            <RelatedPaintsCard paint={paint} />
-          </div>
-        )}
-
-        {/* Note: No Task History or Production History - these are warehouse-specific features */}
       </div>
     </PrivilegeRoute>
   );

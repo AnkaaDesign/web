@@ -81,7 +81,7 @@ export type BadgeVariant =
   | "verified"
   | "expired"
   | "failed"
-  | "onHold"
+  | "preparation"
   | "blocked"
   | "suspended"
   | "returned"
@@ -259,7 +259,7 @@ export const BADGE_COLORS: Record<
   },
 
   // Orange status variants (use orange-600)
-  onHold: {
+  preparation: {
     bg: "bg-orange-600",
     text: "text-white",
     hover: "hover:bg-orange-700",
@@ -378,13 +378,11 @@ export const ENTITY_BADGE_CONFIG = {
 
   // Task Status
   TASK: {
-    [TASK_STATUS.PENDING]: "gray" as BadgeVariant,           // Gray - not started yet
-    [TASK_STATUS.IN_PRODUCTION]: "blue" as BadgeVariant,     // Blue - in progress
-    [TASK_STATUS.ON_HOLD]: "orange" as BadgeVariant,         // Orange - paused
-    [TASK_STATUS.COMPLETED]: "green" as BadgeVariant,        // Green - finished
-    [TASK_STATUS.CANCELLED]: "red" as BadgeVariant,          // Red - cancelled
-    [TASK_STATUS.INVOICED]: "purple" as BadgeVariant,        // Purple - invoiced (financial)
-    [TASK_STATUS.SETTLED]: "teal" as BadgeVariant,           // Teal - settled/finalized
+    [TASK_STATUS.PREPARATION]: "orange" as BadgeVariant,            // Orange - in preparation
+    [TASK_STATUS.WAITING_PRODUCTION]: "gray" as BadgeVariant,       // Gray - waiting for production
+    [TASK_STATUS.IN_PRODUCTION]: "blue" as BadgeVariant,            // Blue - in progress
+    [TASK_STATUS.COMPLETED]: "green" as BadgeVariant,               // Green - finished
+    [TASK_STATUS.CANCELLED]: "red" as BadgeVariant,                 // Red - cancelled
   },
 
   // Maintenance Status
@@ -707,7 +705,7 @@ export const GENERIC_STATUS_CONFIG: Record<string, BadgeVariant> = {
   FULFILLED: "amber",
   RECEIVED: "received",
   SENT: "sent",
-  ON_HOLD: "onHold",
+  PREPARATION: "preparation",
   SUSPENDED: "suspended",
   BLOCKED: "blocked",
   PROCESSING: "processing",

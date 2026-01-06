@@ -18,6 +18,7 @@ import { ActivityExport } from "@/components/inventory/activity/list/activity-ex
 import { ColumnVisibilityManager } from "@/components/inventory/activity/list/column-visibility-manager";
 import { getActivityColumns, getDefaultVisibleColumns } from "@/components/inventory/activity/list/activity-table-columns";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 import { cn } from "@/lib/utils";
 
 /**
@@ -112,21 +113,20 @@ export const MyActivitiesPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <div className="flex-shrink-0">
-        <PageHeader
-          variant="default"
-          title="Minhas Atividades"
-          icon={IconArrowsExchange}
-          favoritePage={FAVORITE_PAGES.PESSOAL_MINHAS_ATIVIDADES_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal", href: routes.personal.root }, { label: "Minhas Atividades" }]}
-        />
-      </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
+      <PageHeader
+        className="flex-shrink-0"
+        variant="default"
+        title="Minhas Atividades"
+        icon={IconArrowsExchange}
+        favoritePage={FAVORITE_PAGES.PESSOAL_MINHAS_ATIVIDADES_LISTAR}
+        breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal", href: routes.personal.root }, { label: "Minhas Atividades" }]}
+      />
 
-      <Card className="h-full flex flex-col shadow-sm border border-border">
-        <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+      <Card className="flex-1 flex flex-col shadow-sm border border-border min-h-0">
+        <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
           {/* Search and controls */}
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 sm:flex-row flex-shrink-0">
             <TableSearchInput value={displaySearchText} onChange={(value) => setSearch(value)} placeholder="Buscar por item, descrição..." isPending={displaySearchText !== searchingFor} />
             <div className="flex gap-2">
               <ShowSelectedToggle showSelectedOnly={showSelectedOnly} onToggle={toggleShowSelectedOnly} selectionCount={selectionCount} />

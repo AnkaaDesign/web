@@ -11,7 +11,9 @@ interface PriceCellProps {
 export function PriceCell({ control, index }: PriceCellProps) {
   // Defensive check to prevent undefined field names
   if (typeof index !== "number" || index < 0) {
-    console.error("PriceCell: Invalid index provided:", index);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("PriceCell: Invalid index provided:", index);
+    }
     return <div className="text-red-500 text-xs">Error: Invalid index</div>;
   }
 

@@ -199,65 +199,56 @@ export function RateLimitingPage() {
     type: "all" | "blocked" | "selected",
     keys?: (ThrottlerKey | BlockedKey)[]
   ) => {
-    console.log("[RateLimiting] openClearDialog called:", { type, keysCount: keys?.length, keys });
     setClearAction({ type, keys });
     setClearDialogOpen(true);
-    console.log("[RateLimiting] Dialog state set to open");
   };
 
   const handleClearKeys = (keys: (ThrottlerKey | BlockedKey)[]) => {
-    console.log("[RateLimiting] handleClearKeys called with keys:", keys);
     openClearDialog("selected", keys);
   };
 
   const confirmClearAction = async () => {
-    console.log("[RateLimiting] confirmClearAction called, clearAction:", clearAction);
     if (!clearAction) {
-      console.error("[RateLimiting] No clearAction set!");
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[RateLimiting] No clearAction set!");
+      }
       return;
     }
 
     try {
-      console.log("[RateLimiting] Starting clear action:", clearAction.type);
       switch (clearAction.type) {
         case "all":
-          console.log("[RateLimiting] Calling clearKeys.mutateAsync()");
           await clearKeys.mutateAsync();
           break;
         case "blocked":
-          console.log("[RateLimiting] Calling clearBlockedKeys.mutateAsync()");
           await clearBlockedKeys.mutateAsync();
           break;
         case "selected":
-          console.log("[RateLimiting] Clearing selected keys, count:", clearAction.keys?.length);
           if (clearAction.keys && clearAction.keys.length > 0) {
             // Clear keys one by one (API client handles toasts)
             await Promise.all(
               clearAction.keys.map((key) => {
-                console.log("[RateLimiting] Clearing specific key:", key.key);
                 return clearSpecificKey.mutateAsync(key.key);
               })
             );
-            console.log("[RateLimiting] All selected keys cleared");
           }
           break;
       }
 
       // Refresh data
-      console.log("[RateLimiting] Refreshing data after clear");
       await refetchStats();
       await refetchKeys();
       await refetchBlocked();
-      console.log("[RateLimiting] Data refreshed successfully");
     } catch (err) {
-      console.error("[RateLimiting] Error clearing keys:", err);
-      console.error("[RateLimiting] Error details:", {
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-        clearAction,
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[RateLimiting] Error clearing keys:", err);
+        console.error("[RateLimiting] Error details:", {
+          message: err instanceof Error ? err.message : String(err),
+          stack: err instanceof Error ? err.stack : undefined,
+          clearAction,
+        });
+      }
     } finally {
-      console.log("[RateLimiting] Closing dialog and clearing action");
       setClearDialogOpen(false);
       setClearAction(null);
     }
@@ -281,7 +272,6 @@ export function RateLimitingPage() {
       (advancedFilters.identifiers?.length || 0) > 0 ||
       (advancedFilters.throttlerNames?.length || 0) > 0
     );
-    console.log("[RateLimiting] hasActiveFilters:", result, advancedFilters);
     return result;
   }, [advancedFilters]);
 
@@ -291,13 +281,11 @@ export function RateLimitingPage() {
       (advancedFilters.identifiers?.length || 0) +
       (advancedFilters.throttlerNames?.length || 0)
     );
-    console.log("[RateLimiting] totalFilterCount:", count);
     return count;
   }, [advancedFilters]);
 
   const isClearAllDisabled = useMemo(() => {
     const disabled = !stats?.data?.totalKeys || stats.data.totalKeys === 0;
-    console.log("[RateLimiting] Clear all disabled:", disabled, "type:", typeof disabled, "stats:", stats);
     return Boolean(disabled);
   }, [stats]);
 
@@ -328,7 +316,6 @@ export function RateLimitingPage() {
             label: "Limpar Tudo",
             icon: IconTrash as any,
             onClick: () => {
-              console.log("[RateLimiting] Clear all clicked, disabled:", isClearAllDisabled);
               openClearDialog("all");
             },
             variant: "destructive" as const,
@@ -339,7 +326,7 @@ export function RateLimitingPage() {
 
       <div className="flex-1 flex flex-col min-h-0">
         <Card className="flex-1 flex flex-col shadow-sm border border-border overflow-hidden">
-          <CardContent className="flex-1 flex flex-col p-6 space-y-4 min-h-0 overflow-hidden">
+          <CardContent className="flex-1 flex flex-col p-4 space-y-4 min-h-0 overflow-hidden">
           {/* Stats Overview */}
           {!statsLoading && stats?.data ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

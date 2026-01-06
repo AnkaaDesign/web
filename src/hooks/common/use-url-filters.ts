@@ -139,7 +139,9 @@ export function useUrlFilters<T extends Record<string, any>>(filterConfigs: { [K
       if (value !== undefined) {
         const result = config.schema.safeParse(value);
         if (!result.success) {
-          console.warn(`Invalid filter value for "${String(key)}":`, result.error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn(`Invalid filter value for "${String(key)}":`, result.error);
+          }
           return;
         }
       }
@@ -177,7 +179,9 @@ export function useUrlFilters<T extends Record<string, any>>(filterConfigs: { [K
           if (value !== undefined) {
             const result = config.schema.safeParse(value);
             if (!result.success) {
-              console.warn(`Invalid filter value for "${String(key)}":`, result.error);
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn(`Invalid filter value for "${String(key)}":`, result.error);
+              }
               continue;
             }
           }

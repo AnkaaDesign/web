@@ -164,7 +164,9 @@ export function PaintFormulaRatioCalculator({ formula }: PaintFormulaRatioCalcul
         navigate(routes.painting.productions.root);
       }
     } catch (error) {
-      console.error("Error creating production:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating production:", error);
+      }
       // Error handled by API client
     } finally {
       setIsCreatingProduction(false);

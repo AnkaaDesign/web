@@ -37,10 +37,11 @@ const VALID_ROUTES = [
   // Production routes
   routes.production.root,
   routes.production.schedule.root,
-  routes.production.schedule.create,
+  // routes.production.schedule.create, // Removed - tasks are now created in the "in preparation" page
   routes.production.schedule.edit(":id"),
   routes.production.schedule.details(":id"),
-  routes.production.scheduleOnHold,
+  routes.production.preparation.root,
+  routes.production.preparation.details(":id"),
   routes.production.history.root,
   routes.production.history.cancelled,
   routes.production.history.completed,
@@ -309,7 +310,8 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/financeiro/producao": "/producao",
   "/financeiro/producao/aerografia": "/producao/aerografia/listar",
   "/financeiro/producao/cronograma": "/producao/cronograma",
-  "/financeiro/producao/em-espera": "/producao/em-espera",
+  "/financeiro/producao/em-espera": "/producao/em-preparacao",
+  "/financeiro/producao/em-preparacao": "/producao/em-preparacao",
   "/financeiro/producao/historico-tarefas": "/producao/historico",
 
   // Designer sector routes - no redirects needed, they use regular production/painting routes directly
@@ -337,7 +339,8 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/human-resources/vacations/details": "/recursos-humanos/ferias",
   "/human-resources/vacations/[id]/approve": "/recursos-humanos/ferias",
   "/human-resources/vacations/[id]/reject": "/recursos-humanos/ferias",
-  "/producao/cronograma/aguardando": "/producao/em-espera",
+  "/producao/cronograma/aguardando": "/producao/em-preparacao",
+  "/producao/em-espera": "/producao/em-preparacao",
   "/pintura/formulas/cadastrar": "/pintura/catalogo/cadastrar",
   "/pintura/producoes/cadastrar": "/pintura/producoes",
   "/pintura/tintas": "/pintura/tipos-de-tinta",
@@ -461,7 +464,9 @@ export function isValidRoute(path: string): boolean {
   return VALID_ROUTES.some((route) => {
     // Type guard to ensure route is a string
     if (typeof route !== "string") {
-      console.warn("Non-string value found in VALID_ROUTES:", route);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("Non-string value found in VALID_ROUTES:", route);
+      }
       return false;
     }
 

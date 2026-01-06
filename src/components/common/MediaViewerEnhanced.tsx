@@ -274,7 +274,9 @@ export const MediaViewerEnhanced: React.FC<MediaViewerEnhancedProps> = ({
         );
       }
     } catch (error) {
-      console.error('Download failed:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Download failed:', error);
+      }
     }
   }, [currentItem, onDownload]);
 
@@ -285,7 +287,11 @@ export const MediaViewerEnhanced: React.FC<MediaViewerEnhancedProps> = ({
       navigator.share({
         title: currentItem.title || 'Media',
         url: currentItem.url,
-      }).catch((error) => console.log('Share failed:', error));
+      }).catch((error) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('Share failed:', error);
+        }
+      });
     }
   }, [currentItem, onShare]);
 
@@ -425,7 +431,9 @@ export const MediaViewerEnhanced: React.FC<MediaViewerEnhancedProps> = ({
         setIsVideoFullscreen(true);
       }
     } catch (error) {
-      console.error('Fullscreen failed:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Fullscreen failed:', error);
+      }
     }
   }, []);
 
@@ -745,7 +753,7 @@ export const MediaViewerEnhanced: React.FC<MediaViewerEnhancedProps> = ({
               {!isPlaying && !isLoading && (
                 <button
                   onClick={togglePlayPause}
-                  className="p-6 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+                  className="p-4 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
                 >
                   <Play className="w-12 h-12 text-white" />
                 </button>
@@ -755,7 +763,7 @@ export const MediaViewerEnhanced: React.FC<MediaViewerEnhancedProps> = ({
             {/* Video controls bar */}
             <div
               className={cn(
-                'absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-6 transition-all duration-300',
+                'absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-4 transition-all duration-300',
                 !showControls && isPlaying && 'opacity-0 pointer-events-none'
               )}
             >
@@ -767,7 +775,7 @@ export const MediaViewerEnhanced: React.FC<MediaViewerEnhancedProps> = ({
                   max={duration || 100}
                   value={currentTime}
                   onChange={(e) => handleSeek(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-white/30 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-lg"
+                  className="w-full h-1.5 bg-white/30 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-sm"
                 />
                 <div className="flex justify-between text-white text-xs mt-2">
                   <span>{formatDuration(currentTime)}</span>
@@ -901,7 +909,7 @@ export const MediaViewerEnhanced: React.FC<MediaViewerEnhancedProps> = ({
                     'flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden transition-all relative',
                     'hover:ring-2 hover:ring-white/50',
                     currentIndex === index
-                      ? 'ring-2 ring-white scale-110 shadow-lg'
+                      ? 'ring-2 ring-white scale-110 shadow-sm'
                       : 'ring-1 ring-white/20 opacity-60 hover:opacity-100'
                   )}
                 >

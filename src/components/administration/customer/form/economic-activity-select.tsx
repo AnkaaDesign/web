@@ -16,7 +16,9 @@ export function EconomicActivitySelect() {
       queryClient.invalidateQueries({ queryKey: ["economic-activities"] });
     },
     onError: (error: any) => {
-      console.error("Error creating economic activity:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating economic activity:", error);
+      }
     },
   });
 

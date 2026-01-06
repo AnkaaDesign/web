@@ -110,3 +110,4 @@ export {
 } from "./services/monitoring";
 export * from "./services/deployment";
 export * from "./platform-utils";
+export * from "./push-notifications";

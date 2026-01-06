@@ -30,6 +30,7 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Combobox } from "@/components/ui/combobox";
 import { PpeItemsConfiguration } from "./ppe-items-configuration";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 interface BasePpeScheduleFormProps {
   isSubmitting?: boolean;
@@ -137,7 +138,9 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error("Error fetching users:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching users:", error);
+      }
       return {
         data: [],
         hasMore: false,
@@ -163,12 +166,16 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
       }
       navigate(routes.inventory.ppe.root);
     } catch (error) {
-      console.error("Error submitting form:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error submitting form:", error);
+      }
     }
   };
 
   const handleError = (errors: Record<string, any>) => {
-    console.error("PPE schedule form validation errors:", errors);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("PPE schedule form validation errors:", errors);
+    }
     // Scroll to first error field if exists
     const firstErrorField = Object.keys(errors)[0];
     if (firstErrorField) {
@@ -291,7 +298,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
 
   return (
     <Card className="h-full flex flex-col shadow-sm border border-border overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4">
         <Form {...form}>
           <form id="ppe-schedule-form" onSubmit={form.handleSubmit(handleSubmit, handleError)} className="space-y-8">
             {/* Hidden submit button for programmatic form submission */}

@@ -97,6 +97,12 @@ export * from "./dashboard";
 export * from "./useMediaViewer";
 
 // =====================================================
+// Real-time Communication Hooks
+// =====================================================
+export * from "./use-socket";
+export * from "./use-notification-socket";
+
+// =====================================================
 // Other Module Hooks
 // =====================================================
 export * from "./useCustomer";

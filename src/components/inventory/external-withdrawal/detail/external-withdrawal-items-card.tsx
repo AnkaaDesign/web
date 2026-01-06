@@ -182,7 +182,9 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
       }
     } catch (error) {
       toast.error("Erro ao atualizar quantidades devolvidas");
-      console.error("Error updating withdrawal items:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error updating withdrawal items:", error);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -238,7 +240,7 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
 
   if (items.length === 0) {
     return (
-      <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+      <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
         <CardHeader className="pb-6">
           <CardTitle className="flex items-center gap-2">
           <IconPackage className="h-5 w-5 text-muted-foreground" />
@@ -256,7 +258,7 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">

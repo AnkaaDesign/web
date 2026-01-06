@@ -769,8 +769,6 @@ export function useMarkPpeDeliveryAsDelivered() {
   return useMutation({
     mutationFn: ({ id, deliveryDate }: { id: string; deliveryDate?: Date }) => markPpeDeliveryAsDelivered(id, deliveryDate),
     onSuccess: (_data, variables) => {
-      console.log("Mark as delivered success, invalidating queries for ID:", variables.id);
-
       // Invalidate PPE delivery queries using correct key structure
       queryClient.invalidateQueries({ queryKey: ppeDeliveryKeys.all });
       queryClient.invalidateQueries({ queryKey: ppeDeliveryKeys.detail(variables.id) });
@@ -781,11 +779,11 @@ export function useMarkPpeDeliveryAsDelivered() {
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: userKeys.all });
       queryClient.invalidateQueries({ queryKey: itemKeys.all });
-
-      console.log("Query invalidation completed");
     },
     onError: (error) => {
-      console.error("Mark as delivered failed:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Mark as delivered failed:", error);
+      }
     },
   });
 }

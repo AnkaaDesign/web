@@ -181,12 +181,6 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
   const { year: periodYear, month: periodMonth } = getCurrentPayrollPeriod();
   const currentPeriod = getBonusPeriod(periodYear, periodMonth);
 
-  console.log('Current bonus period:', {
-    startDate: currentPeriod.startDate.toLocaleDateString('pt-BR'),
-    endDate: currentPeriod.endDate.toLocaleDateString('pt-BR'),
-    startDateISO: currentPeriod.startDate.toISOString(),
-    endDateISO: currentPeriod.endDate.toISOString()
-  });
 
   // Fetch sectors for filtering (Sector model has no status field)
   const { data: sectorsData } = useSectors({
@@ -216,8 +210,6 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
     limit: 1000, // Maximum allowed by API
     enabled: true // Always enabled to get the count
   };
-
-  console.log('Task query being sent:', taskQuery);
 
   const { data: currentPeriodTasks } = useTasks(taskQuery);
 
@@ -255,30 +247,12 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
         t => t.commission === COMMISSION_STATUS.PARTIAL_COMMISSION
       ).length;
 
-      console.log('Commission-eligible tasks from API:', {
-        total: currentPeriodTasks.data.length,
-        fullCommission: fullCommissionCount,
-        partialCommission: partialCommissionCount,
-        weightedCount: weightedTaskCount
-      });
-
-      console.log('First few tasks:', currentPeriodTasks.data.slice(0, 5).map(task => ({
-        id: task.id,
-        name: task.name,
-        status: task.status,
-        commission: task.commission,
-        finishedAt: task.finishedAt
-      })));
-
       // Only set if taskQuantity is still 0 (initial state)
       if (taskQuantity === 0) {
-        console.log('Setting initial weighted task quantity to:', weightedTaskCount);
         setTaskQuantity(weightedTaskCount);
         setOriginalTaskQuantity(weightedTaskCount);
         setTaskInput(weightedTaskCount.toFixed(1).replace('.', ','));
       }
-    } else {
-      console.log('No tasks data or failed request:', currentPeriodTasks);
     }
   }, [currentPeriodTasks]);
 
@@ -441,10 +415,7 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
   // Effect 1: Update average input when task quantity or eligible count changes
   // Don't overwrite if user is typing (check if current value matches calculated)
   useEffect(() => {
-    console.log('[Effect 1] Running - taskQuantity:', taskQuantity, 'eligibleUserCount:', eligibleUserCount, 'averageInput:', averageInput);
-
     if (eligibleUserCount === 0) {
-      console.log('[Effect 1] No eligible users, setting average to 0');
       if (averageInput !== '0,00') {
         setAverageInput('0,00');
       }
@@ -452,7 +423,6 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
     }
 
     const newAverage = taskQuantity / eligibleUserCount;
-    console.log('[Effect 1] Calculated average:', newAverage);
 
     // Only update if the current input value doesn't match (to avoid overwriting while typing)
     const currentParsed = parseFloat(averageInput.replace(',', '.'));
@@ -460,24 +430,17 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
 
     // If difference is significant (more than 0.001), update the display
     if (isNaN(currentParsed) || difference > 0.001) {
-      console.log('[Effect 1] Updating averageInput to:', newAverage.toFixed(2), 'difference:', difference);
       setAverageInput(newAverage.toFixed(2).replace('.', ','));
-    } else {
-      console.log('[Effect 1] Skipping update - current value matches (difference:', difference, ')');
     }
   }, [taskQuantity, eligibleUserCount, averageInput]);
 
   // Effect 2: Recalculate bonuses when average or filtered users change
   useEffect(() => {
-    console.log('[Effect 2] Running - taskQuantity:', taskQuantity, 'filteredUsers.length:', filteredUsers.length, 'eligibleUserCount:', eligibleUserCount);
-
     if (filteredUsers.length === 0) {
-      console.log('[Effect 2] No filtered users, skipping');
       return;
     }
 
     const currentAverage = eligibleUserCount > 0 ? taskQuantity / eligibleUserCount : 0;
-    console.log('[Effect 2] Current average for bonus calculation:', currentAverage);
 
     // Only update bonuses if needed (avoid unnecessary recalculations)
     setSimulatedUsers(prev => {
@@ -489,11 +452,8 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
         return Math.abs(user.bonusAmount - expectedBonus) > 0.01; // Allow small rounding differences
       });
 
-      console.log('[Effect 2] needsUpdate:', needsUpdate);
-
       if (!needsUpdate) return prev;
 
-      console.log('[Effect 2] Updating bonuses for all users');
       return prev.map(user => {
         const isFiltered = filteredUsers.find(f => f.id === user.id);
         if (!isFiltered) {
@@ -511,34 +471,28 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
     let value = typeof e === 'string' ? e : e?.target?.value;
 
     if (value === undefined) {
-      console.error('[Handler] No value received:', e);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[Handler] No value received:', e);
+      }
       return;
     }
-
-    console.log('[Handler] Task input changed to:', value);
 
     // Replace period with comma for Brazilian format
     value = value.replace('.', ',');
 
     // Allow empty string, numbers, and decimal commas while typing
     if (value === '' || value === ',' || /^\d*,?\d*$/.test(value)) {
-      console.log('[Handler] Value passed regex validation');
       setTaskInput(value); // Update input string immediately for smooth typing
 
       // Only update taskQuantity if it's a valid number (not just a comma or empty)
       if (value !== '' && value !== ',') {
         const num = parseFloat(value.replace(',', '.'));
-        console.log('[Handler] Parsed number:', num);
         if (!isNaN(num) && num >= 0) {
-          console.log('[Handler] Setting taskQuantity to:', num);
           setTaskQuantity(num);
         }
       } else if (value === '') {
-        console.log('[Handler] Empty value, setting taskQuantity to 0');
         setTaskQuantity(0);
       }
-    } else {
-      console.log('[Handler] Value failed regex validation:', value);
     }
   };
 
@@ -547,39 +501,33 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
     let value = typeof e === 'string' ? e : e?.target?.value;
 
     if (value === undefined) {
-      console.error('[Handler] No value received:', e);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[Handler] No value received:', e);
+      }
       return;
     }
-
-    console.log('[Handler] Average input changed to:', value);
 
     // Replace period with comma for Brazilian format
     value = value.replace('.', ',');
 
     // Allow empty string, numbers, and decimal commas while typing
     if (value === '' || value === ',' || /^\d*,?\d*$/.test(value)) {
-      console.log('[Handler] Average value passed regex validation');
       setAverageInput(value); // Update input string immediately for smooth typing
 
       // Only update taskQuantity if it's a valid number and we have eligible users
       if (value !== '' && value !== ',' && eligibleUserCount > 0) {
         const num = parseFloat(value.replace(',', '.'));
-        console.log('[Handler] Parsed average:', num, 'eligibleUserCount:', eligibleUserCount);
         if (!isNaN(num) && num >= 0) {
           // Update task quantity based on average (reverse calculation)
           // Formula: taskQuantity = average × eligible_users
           const newTaskQuantity = num * eligibleUserCount;
-          console.log('[Handler] Calculated newTaskQuantity:', newTaskQuantity);
           setTaskQuantity(newTaskQuantity);
           setTaskInput(newTaskQuantity.toFixed(1).replace('.', ',')); // Format with 1 decimal, Brazilian format
         }
       } else if (value === '') {
-        console.log('[Handler] Empty average, setting taskQuantity to 0');
         setTaskQuantity(0);
         setTaskInput('0');
       }
-    } else {
-      console.log('[Handler] Average value failed regex validation:', value);
     }
   };
 
@@ -1054,19 +1002,6 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
 
   const isTaskQuantityModified = taskQuantity !== originalTaskQuantity && originalTaskQuantity > 0;
 
-  // Debug logging - render state
-  console.log('[Render] Current state:', {
-    taskQuantity,
-    taskInput,
-    averageInput,
-    eligibleUserCount,
-    sortedUsersLength: sortedUsers.length,
-    isTaskQuantityModified,
-    originalTaskQuantity,
-    sortColumn,
-    sortDirection
-  });
-
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
       {/* Header with Task Input and Summary */}
@@ -1225,7 +1160,7 @@ export function BonusSimulationInteractiveTable({ className, embedded = false }:
       <div className="flex-1 min-h-0 p-4">
         <div className="h-full flex flex-col overflow-hidden rounded-lg border border-border">
           {isLoading ? (
-            <div className="p-6">
+            <div className="p-4">
               <div className="space-y-4">
                 {[...Array(8)].map((_, i) => (
                   <Skeleton key={i} className="h-12 w-full" />

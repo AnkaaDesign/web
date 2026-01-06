@@ -38,7 +38,9 @@ export function VerifyCodePage() {
       // Redirect back to login or specified return URL
       navigate(returnTo);
     } catch (error) {
-      console.error("Verification failed:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Verification failed:", error);
+      }
 
       let message = "Código inválido. Verifique o código e tente novamente.";
 
@@ -71,7 +73,9 @@ export function VerifyCodePage() {
 
       // API client will handle success notifications automatically
     } catch (error) {
-      console.error("Resend failed:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Resend failed:", error);
+      }
 
       if (error instanceof Error) {
         if (error.message.includes("Limite de requisições excedido") || error.message.includes("rate limit")) {

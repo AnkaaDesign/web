@@ -79,7 +79,9 @@ export function BackupList({ className, onViewDetails }: BackupListProps) {
       await mutations.delete.mutateAsync(deleteTarget);
       setDeleteTarget(null);
     } catch (error) {
-      console.error('Failed to delete backup:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Failed to delete backup:', error);
+      }
     }
   };
 
@@ -87,7 +89,9 @@ export function BackupList({ className, onViewDetails }: BackupListProps) {
     try {
       await mutations.restore.mutateAsync({ id: backupId });
     } catch (error) {
-      console.error('Failed to restore backup:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Failed to restore backup:', error);
+      }
     }
   };
 

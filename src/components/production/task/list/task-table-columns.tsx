@@ -10,6 +10,9 @@ import {
   PAINT_FINISH_LABELS,
   PAINT_BRAND_LABELS,
   TRUCK_MANUFACTURER_LABELS,
+  SERVICE_ORDER_TYPE,
+  SERVICE_ORDER_TYPE_LABELS,
+  SERVICE_ORDER_TYPE_COLUMN_LABELS,
 } from "../../../../constants";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
@@ -17,6 +20,7 @@ import { IconClock, IconCalendar, IconCheck, IconX, IconAlertCircle } from "@tab
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
 
 import { DeadlineCountdown } from "../schedule/deadline-countdown";
+import { ServiceOrderCell } from "../history/service-order-cell";
 
 // Helper function to render status badge
 const renderStatusBadge = (status: TASK_STATUS) => {
@@ -67,7 +71,7 @@ const renderServiceCount = (task: Task) => {
   if (count === 0) return <span className="text-muted-foreground">-</span>;
 
   return (
-    <Badge variant="secondary" className="font-mono">
+    <Badge variant="secondary">
       {count}
     </Badge>
   );
@@ -140,7 +144,7 @@ export const createTaskColumns = (): TaskColumn[] => [
     width: "100px",
     formatter: (value: string | null) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
-      return <span className="font-mono uppercase">{value}</span>;
+      return <span className="uppercase">{value}</span>;
     },
   },
   {
@@ -156,7 +160,7 @@ export const createTaskColumns = (): TaskColumn[] => [
       // Format spot name for display (e.g., "B1_F1_V1" -> "B1-F1-V1", "PATIO" -> "Pátio")
       if (value === "PATIO") {
         return (
-          <Badge variant="secondary" className="font-mono">
+          <Badge variant="secondary">
             Pátio
           </Badge>
         );
@@ -164,7 +168,7 @@ export const createTaskColumns = (): TaskColumn[] => [
       // Format garage spot (e.g., "B1_F1_V1" -> "B1-F1-V1")
       const formattedSpot = value.replace(/_/g, "-");
       return (
-        <Badge variant="default" className="font-mono">
+        <Badge variant="default">
           {formattedSpot}
         </Badge>
       );
@@ -180,7 +184,7 @@ export const createTaskColumns = (): TaskColumn[] => [
     width: "200px",
     formatter: (value: string | null) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
-      return <span className="font-mono">{value}</span>;
+      return <span>{value}</span>;
     },
   },
   {
@@ -193,7 +197,7 @@ export const createTaskColumns = (): TaskColumn[] => [
     width: "200px",
     formatter: (value: string | null) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
-      return <span className="font-mono">{value}</span>;
+      return <span>{value}</span>;
     },
   },
   {
@@ -212,14 +216,96 @@ export const createTaskColumns = (): TaskColumn[] => [
     },
   },
   {
-    id: "services",
-    header: "SERVIÇOS",
-    accessorFn: (row) => row.services?.length || 0,
-    sortable: false,
+    id: "serviceOrders.production",
+    header: (
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.PRODUCTION]}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.PRODUCTION].toLowerCase()}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.PRODUCTION).length || 0,
+    sortable: true,
+    filterable: false,
+    defaultVisible: true,
+    width: "120px",
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} />,
+  },
+  {
+    id: "serviceOrders.financial",
+    header: (
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.FINANCIAL]}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.FINANCIAL].toLowerCase()}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.FINANCIAL).length || 0,
+    sortable: true,
+    filterable: false,
+    defaultVisible: true,
+    width: "120px",
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.FINANCIAL} />,
+  },
+  {
+    id: "serviceOrders.negotiation",
+    header: (
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.NEGOTIATION]}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.NEGOTIATION].toLowerCase()}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.NEGOTIATION).length || 0,
+    sortable: true,
+    filterable: false,
+    defaultVisible: true,
+    width: "140px",
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.NEGOTIATION} />,
+  },
+  {
+    id: "serviceOrders.artwork",
+    header: (
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.ARTWORK]}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.ARTWORK].toLowerCase()}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.ARTWORK).length || 0,
+    sortable: true,
     filterable: false,
     defaultVisible: true,
     width: "100px",
-    formatter: (_: any, row: Task) => renderServiceCount(row),
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.ARTWORK} />,
   },
   {
     id: "generalPainting",
@@ -365,7 +451,7 @@ export const createTaskColumns = (): TaskColumn[] => [
       const count = row.artworks?.length || 0;
       if (count === 0) return <span className="text-muted-foreground">-</span>;
       return (
-        <Badge variant="secondary" className="font-mono">
+        <Badge variant="secondary">
           {count}
         </Badge>
       );

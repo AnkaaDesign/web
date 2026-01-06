@@ -35,7 +35,9 @@ export const CreateMaintenancePage = () => {
       navigate(routes.inventory.maintenance.details(result.data?.id || ""));
     } catch (error: any) {
       // Error is already handled by the API client and mutation
-      console.error("Error creating maintenance:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating maintenance:", error);
+      }
     }
   };
 
@@ -65,31 +67,23 @@ export const CreateMaintenancePage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-5xl mx-auto">
-          <PageHeader
-            variant="form"
-            title="Cadastrar Manutenção"
-            icon={IconTool}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Estoque", href: routes.inventory.root },
-              { label: "Manutenção", href: routes.inventory.maintenance.root },
-              { label: "Cadastrar" },
-            ]}
-            actions={actions}
-            favoritePage={FAVORITE_PAGES.ESTOQUE_MANUTENCAO_CADASTRAR}
-          />
-        </div>
-      </div>
-
-      {/* Scrollable Form Container */}
-      <div className="flex-1 overflow-y-auto mt-6">
-        <div className="max-w-5xl mx-auto h-full">
-          <MaintenanceForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} onFormStateChange={setFormState} />
-        </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        variant="form"
+        title="Cadastrar Manutenção"
+        icon={IconTool}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Manutenção", href: routes.inventory.maintenance.root },
+          { label: "Cadastrar" },
+        ]}
+        actions={actions}
+        favoritePage={FAVORITE_PAGES.ESTOQUE_MANUTENCAO_CADASTRAR}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <MaintenanceForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} onFormStateChange={setFormState} />
       </div>
     </div>
   );

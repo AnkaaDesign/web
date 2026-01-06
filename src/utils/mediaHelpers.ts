@@ -123,7 +123,9 @@ export const downloadFile = async (
 
     window.URL.revokeObjectURL(blobUrl);
   } catch (error) {
-    console.error('Download failed:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Download failed:', error);
+    }
     throw error;
   }
 };
@@ -205,7 +207,9 @@ export const fileToMediaItem = async (file: File): Promise<MediaItem> => {
       metadata = { ...metadata, ...videoMetadata };
     }
   } catch (error) {
-    console.error('Failed to get media metadata:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Failed to get media metadata:', error);
+    }
   }
 
   return {

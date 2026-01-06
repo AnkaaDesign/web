@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconBuildingSkyscraper } from "@tabler/icons-react";
 
@@ -9,7 +9,6 @@ import { sectorCreateSchema, sectorUpdateSchema } from "../../../../schemas";
 import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useSectorMutations } from "../../../../hooks";
 
-import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { NameInput } from "./name-input";
@@ -129,37 +128,37 @@ export function SectorForm(props: SectorFormProps) {
         }
       }
     } catch (error) {
-      console.error("Error submitting form:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error submitting form:", error);
+      }
     }
   };
 
   return (
-    <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-y-auto space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconBuildingSkyscraper className="h-5 w-5 text-muted-foreground" />
-                  Informações do Setor
-                </CardTitle>
-                <CardDescription>Preencha as informações básicas do setor</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4">
-                  <NameInput control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
+    <FormProvider {...form}>
+      <form id="sector-form" onSubmit={form.handleSubmit(handleSubmit)}>
+        {/* Hidden submit button for external form submission */}
+        <button id="sector-form-submit" type="submit" className="hidden" disabled={isSubmitting} />
 
-                  <PrivilegesSelect control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
-                </div>
-              </CardContent>
-            </Card>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconBuildingSkyscraper className="h-5 w-5 text-muted-foreground" />
+                Informações do Setor
+              </CardTitle>
+              <CardDescription>Preencha as informações básicas do setor</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                <NameInput control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
 
-            {/* Hidden submit button for external form submission */}
-            <button id="sector-form-submit" type="submit" className="hidden" disabled={isSubmitting} />
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+                <PrivilegesSelect control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </form>
+    </FormProvider>
   );
 }

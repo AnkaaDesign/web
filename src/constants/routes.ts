@@ -434,6 +434,7 @@ export const routes = {
       completed: "/producao/historico/concluidos",
       root: "/producao/historico",
       details: (id: string) => `/producao/historico/detalhes/${id}`,
+      edit: (id: string) => `/producao/historico/editar/${id}`,
     },
     observations: {
       create: "/producao/observacoes/cadastrar",
@@ -452,9 +453,10 @@ export const routes = {
       list: "/producao/cronograma",
       root: "/producao/cronograma",
     },
-    scheduleOnHold: {
-      root: "/producao/em-espera",
-      details: (id: string) => `/producao/em-espera/detalhes/${id}`,
+    preparation: {
+      root: "/producao/agenda",
+      details: (id: string) => `/producao/agenda/detalhes/${id}`,
+      edit: (id: string) => `/producao/agenda/editar/${id}`,
     },
     garages: {
       root: "/producao/barracoes",
@@ -536,6 +538,7 @@ export const routes = {
 
   // Profile - User profile page
   profile: "/perfil",
+  profileNotifications: "/perfil/notificacoes",
 } as const;
 
 // Export types for type safety

@@ -88,7 +88,9 @@ export function ReturnFormDialog({ open, onOpenChange, borrow }: ReturnFormDialo
       // Reset form
       form.reset();
     } catch (error) {
-      console.error("Error processing return:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error processing return:", error);
+      }
     }
   };
 

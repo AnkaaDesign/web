@@ -16,7 +16,9 @@ export function getFavoritePages(): FavoritePage[] {
 
     return JSON.parse(storedData) as FavoritePage[];
   } catch (error) {
-    console.error("Failed to get favorite pages:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Failed to get favorite pages:", error);
+    }
     return [];
   }
 }
@@ -46,7 +48,9 @@ export function toggleFavoritePage(page: FAVORITE_PAGES): boolean {
       return true; // Now favorited
     }
   } catch (error) {
-    console.error("Failed to toggle favorite page:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Failed to toggle favorite page:", error);
+    }
     return false;
   }
 }
@@ -66,7 +70,9 @@ export function addFavoritePage(page: FAVORITE_PAGES): boolean {
 
     return true;
   } catch (error) {
-    console.error("Failed to add favorite page:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Failed to add favorite page:", error);
+    }
     return false;
   }
 }
@@ -83,7 +89,9 @@ export function removeFavoritePage(page: FAVORITE_PAGES): boolean {
 
     return false;
   } catch (error) {
-    console.error("Failed to remove favorite page:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Failed to remove favorite page:", error);
+    }
     return false;
   }
 }
@@ -92,7 +100,9 @@ export function clearFavoritePages(): void {
   try {
     localStorage.removeItem(FAVORITES_KEY);
   } catch (error) {
-    console.error("Failed to clear favorite pages:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Failed to clear favorite pages:", error);
+    }
   }
 }
 

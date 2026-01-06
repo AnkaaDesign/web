@@ -3,7 +3,8 @@ import { useEffect } from "react";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { type SupplierCreateFormData, type SupplierUpdateFormData } from "../../../../schemas";
-
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 // Import all form components
 import { FantasyNameInput } from "./fantasy-name-input";
 import { CorporateNameInput } from "./corporate-name-input";
@@ -17,7 +18,8 @@ import { CityInput } from "./city-input";
 import { SupplierStateSelector } from "./state-selector";
 import { LogoInput } from "./logo-input";
 import { FormInput } from "@/components/ui/form-input";
-
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 interface BaseSupplierFormProps {
   isSubmitting?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
@@ -86,14 +88,16 @@ export function SupplierFormNoValidation(props: SupplierFormProps) {
       }
     } catch (error) {
       // Error is handled by the parent component
-      console.error("Error submitting supplier form:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error submitting supplier form:", error);
+      }
     }
   };
 
   return (
     <Card className="h-full flex flex-col">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 flex-1 overflow-y-auto p-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 flex-1 overflow-y-auto p-4">
           {/* Basic Information */}
           <Card>
             <CardHeader>

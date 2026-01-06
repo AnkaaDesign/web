@@ -48,13 +48,17 @@ export function MaintenanceFinishForm({ maintenance, onCancel }: MaintenanceFini
     try {
       // Validate that the maintenance can be finished
       if (!canFinish) {
-        console.error("Cannot finish maintenance in current status:", maintenance.status);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Cannot finish maintenance in current status:", maintenance.status);
+        }
         return;
       }
 
       // Validate that required data is present
       if (!maintenance.id) {
-        console.error("Cannot finish maintenance: missing ID");
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Cannot finish maintenance: missing ID");
+        }
         return;
       }
 
@@ -69,11 +73,14 @@ export function MaintenanceFinishForm({ maintenance, onCancel }: MaintenanceFini
       if (result.success) {
         navigate(routes.inventory.maintenance.list);
       } else {
-        console.error("Failed to finish maintenance:", result);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Failed to finish maintenance:", result);
+        }
       }
     } catch (error) {
-      console.error("Error finishing maintenance:", error);
-      // The error should be handled by the mutation itself, but we log it here for debugging
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error finishing maintenance:", error);
+      }
     }
   };
 

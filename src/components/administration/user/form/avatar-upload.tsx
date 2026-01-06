@@ -74,7 +74,9 @@ export function AvatarUpload({ user, disabled, onAvatarChange }: AvatarUploadPro
         }
       }
     } catch (error: any) {
-      console.error("Error uploading photo:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error uploading photo:", error);
+      }
       // Restore previous avatar on error
       setAvatarUrl(user?.avatar?.url || null);
     } finally {
@@ -96,7 +98,9 @@ export function AvatarUpload({ user, disabled, onAvatarChange }: AvatarUploadPro
         onAvatarChange?.(null);
       }
     } catch (error: any) {
-      console.error("Error deleting photo:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting photo:", error);
+      }
     } finally {
       setIsUploading(false);
       setShowDeleteDialog(false);

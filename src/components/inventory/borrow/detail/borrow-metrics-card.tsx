@@ -57,7 +57,7 @@ export function BorrowMetricsCard({ borrow, className }: BorrowMetricsCardProps)
   const isOverdue = !isReturned && daysBorrowed > 30;
 
   return (
-    <Card className={cn("shadow-sm border border-border", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border", className)}>
       <CardHeader className="pb-6">
         <CardTitle className="flex items-center gap-2">
           <IconTrendingUp className="h-5 w-5 text-muted-foreground" />

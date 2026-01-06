@@ -408,7 +408,7 @@ export const FileViewerCard: React.FC<FileViewerCardProps> = ({
     <div
       className={cn(
         "group relative overflow-hidden transition-all duration-200 rounded-lg",
-        enableHover && !disabled && "hover:shadow-lg hover:scale-105 cursor-pointer",
+        enableHover && !disabled && "hover:shadow-sm hover:scale-105 cursor-pointer",
         disabled && "opacity-50 cursor-not-allowed",
         className
       )}

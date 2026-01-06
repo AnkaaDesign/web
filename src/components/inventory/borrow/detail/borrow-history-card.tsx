@@ -312,7 +312,7 @@ export function BorrowHistoryCard({ borrow, className, maxHeight = "500px" }: Bo
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-4 flex-shrink-0">
         <CardTitle className="flex items-center gap-2">
           <IconHistory className="h-5 w-5 text-muted-foreground" />

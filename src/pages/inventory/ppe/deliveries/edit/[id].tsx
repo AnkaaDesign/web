@@ -97,7 +97,7 @@ export const EPIDeliveryEdit = () => {
           />
 
           <Card>
-            <div className="p-6 space-y-4">
+            <div className="p-4 space-y-4">
               <Skeleton className="h-6 w-48" />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -137,7 +137,7 @@ export const EPIDeliveryEdit = () => {
           />
 
           <Card>
-            <CardContent className="p-6 text-center">
+            <CardContent className="p-4 text-center">
               <IconShield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold">Entrega não encontrada</h3>
               <p className="text-muted-foreground mb-4">A entrega de EPI solicitada não foi encontrada ou não existe.</p>
@@ -151,38 +151,37 @@ export const EPIDeliveryEdit = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="space-y-4">
-        <div className="max-w-6xl mx-auto">
-          <PageHeader
-            variant="form"
-            title={`Editar Entrega #${ppeDelivery.id.slice(-8)}`}
-            subtitle={`${ppeDelivery.item?.name} para ${ppeDelivery.user?.name}`}
-            icon={IconShield}
-            breadcrumbs={[
-              { label: "Home", href: "/" },
-              { label: "Estoque", href: routes.inventory.root },
-              { label: "EPI", href: routes.inventory.ppe.root },
-              { label: "Entregas", href: routes.inventory.ppe.deliveries.list },
-              { label: `#${ppeDelivery.id.slice(-8)}`, href: routes.inventory.ppe.deliveries.details(ppeDelivery.id) },
-              { label: "Editar" },
-            ]}
-            actions={actions}
-          />
-        </div>
-
-        <div className="max-w-6xl mx-auto">
-          <PpeDeliveryForm
-            mode="update"
-            ppeDelivery={ppeDelivery}
-            onSubmit={handleSubmit}
-            isSubmitting={updateMutation.isPending}
-            defaultValues={{
-              quantity: ppeDelivery.quantity,
-              status: ppeDelivery.status,
-              scheduledDate: ppeDelivery.scheduledDate,
-              actualDeliveryDate: ppeDelivery.actualDeliveryDate,
-            }}
-          />
+      <div className="h-full flex flex-col px-4 pt-4">
+        <PageHeader
+          variant="form"
+          title={`Editar Entrega #${ppeDelivery.id.slice(-8)}`}
+          subtitle={`${ppeDelivery.item?.name} para ${ppeDelivery.user?.name}`}
+          icon={IconShield}
+          breadcrumbs={[
+            { label: "Home", href: "/" },
+            { label: "Estoque", href: routes.inventory.root },
+            { label: "EPI", href: routes.inventory.ppe.root },
+            { label: "Entregas", href: routes.inventory.ppe.deliveries.list },
+            { label: `#${ppeDelivery.id.slice(-8)}`, href: routes.inventory.ppe.deliveries.details(ppeDelivery.id) },
+            { label: "Editar" },
+          ]}
+          actions={actions}
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="mt-4 space-y-4">
+            <PpeDeliveryForm
+              mode="update"
+              ppeDelivery={ppeDelivery}
+              onSubmit={handleSubmit}
+              isSubmitting={updateMutation.isPending}
+              defaultValues={{
+                quantity: ppeDelivery.quantity,
+                status: ppeDelivery.status,
+                scheduledDate: ppeDelivery.scheduledDate,
+                actualDeliveryDate: ppeDelivery.actualDeliveryDate,
+              }}
+            />
+          </div>
         </div>
       </div>
     </PrivilegeRoute>

@@ -38,7 +38,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ isVisible, messa
 
   return (
     <div className={cn("fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm", className)} role="progressbar" aria-label={message}>
-      <div className="flex flex-col items-center gap-3 p-6 rounded-lg shadow-lg bg-card border">
+      <div className="flex flex-col items-center gap-3 p-4 rounded-lg shadow-sm bg-card border">
         <LoadingSpinner size="lg" />
         <p className="text-sm font-medium text-center text-muted-foreground">{message}</p>
       </div>
@@ -122,7 +122,7 @@ interface SkeletonCardProps {
 
 export const SkeletonCard: React.FC<SkeletonCardProps> = ({ className }) => {
   return (
-    <div className={cn("p-6 space-y-4 rounded-lg bg-card border", className)}>
+    <div className={cn("p-4 space-y-4 rounded-lg bg-card border", className)}>
       <div className="flex items-center gap-4">
         <Skeleton className="h-12 w-12 rounded-full" />
         <div className="flex-1 space-y-2">

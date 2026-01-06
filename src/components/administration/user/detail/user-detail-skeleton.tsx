@@ -29,7 +29,7 @@ export function UserDetailSkeleton() {
           {/* Core Information Grid (2x2) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Basic Info Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Skeleton className="h-5 w-5" />
                 <Skeleton className="h-6 w-40" />
@@ -62,7 +62,7 @@ export function UserDetailSkeleton() {
             </div>
 
             {/* Contact Info Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Skeleton className="h-5 w-5" />
                 <Skeleton className="h-6 w-36" />
@@ -91,7 +91,7 @@ export function UserDetailSkeleton() {
           {/* Address and Position Grid (2x2) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Address Info Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Skeleton className="h-5 w-5" />
                 <Skeleton className="h-6 w-32" />
@@ -125,7 +125,7 @@ export function UserDetailSkeleton() {
             </div>
 
             {/* Position Info Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Skeleton className="h-5 w-5" />
                 <Skeleton className="h-6 w-36" />
@@ -154,7 +154,7 @@ export function UserDetailSkeleton() {
           {/* EPI and Changelog Grid (2x2) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* EPI Info Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Skeleton className="h-5 w-5" />
                 <Skeleton className="h-6 w-48" />
@@ -176,7 +176,7 @@ export function UserDetailSkeleton() {
             </div>
 
             {/* Changelog History */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Skeleton className="h-5 w-5" />
                 <Skeleton className="h-6 w-48" />
@@ -202,7 +202,7 @@ export function UserDetailSkeleton() {
           {/* HR Information Grid (Multiple 2x2 sections) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Vacations Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Skeleton className="h-5 w-5" />
@@ -224,7 +224,7 @@ export function UserDetailSkeleton() {
             </div>
 
             {/* Reprimands Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Skeleton className="h-5 w-5" />
@@ -248,7 +248,7 @@ export function UserDetailSkeleton() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Warnings Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Skeleton className="h-5 w-5" />
@@ -270,7 +270,7 @@ export function UserDetailSkeleton() {
             </div>
 
             {/* Overtimes Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Skeleton className="h-5 w-5" />
@@ -292,7 +292,7 @@ export function UserDetailSkeleton() {
             </div>
 
             {/* Absences Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Skeleton className="h-5 w-5" />
@@ -315,7 +315,7 @@ export function UserDetailSkeleton() {
           </div>
 
           {/* Related Tasks Full Width */}
-          <div className="rounded-xl border bg-card p-6 space-y-4">
+          <div className="rounded-xl border bg-card p-4 space-y-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Skeleton className="h-5 w-5" />

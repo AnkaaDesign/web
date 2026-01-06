@@ -138,7 +138,7 @@ export function PayrollDetailsCard({ users, year, month }: PayrollDetailsCardPro
   const monthName = monthNames[month - 1] || "Mês";
 
   return (
-    <Card className="shadow-sm border border-border" level={1}>
+    <Card className="shadow-sm border border-border">
       <CardHeader className="pb-4">
         <CardTitle className="text-lg font-semibold flex items-center gap-2">
           <IconCalendar className="h-5 w-5 text-muted-foreground" />

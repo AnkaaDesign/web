@@ -96,7 +96,9 @@ export function useEntityDetails(entityIds: {
             details.categories.set(id, response.data.name || "");
           }
         } catch (error) {
-          console.error(`Failed to fetch category ${id}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch category ${id}:`, error);
+          }
         }
       });
 
@@ -108,7 +110,9 @@ export function useEntityDetails(entityIds: {
             details.brands.set(id, response.data.name || "");
           }
         } catch (error) {
-          console.error(`Failed to fetch brand ${id}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch brand ${id}:`, error);
+          }
         }
       });
 
@@ -120,7 +124,9 @@ export function useEntityDetails(entityIds: {
             details.suppliers.set(id, response.data.fantasyName || response.data.name || "");
           }
         } catch (error) {
-          console.error(`Failed to fetch supplier ${id}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch supplier ${id}:`, error);
+          }
         }
       });
 
@@ -132,7 +138,9 @@ export function useEntityDetails(entityIds: {
             details.users.set(id, (response.data as any).name || `Usuário ${id.slice(0, 8)}`);
           }
         } catch (error) {
-          console.error(`Failed to fetch user ${id}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch user ${id}:`, error);
+          }
         }
       });
 
@@ -144,7 +152,9 @@ export function useEntityDetails(entityIds: {
             details.customers.set(id, (response.data as any).fantasyName || (response.data as any).name || `Cliente ${id.slice(0, 8)}`);
           }
         } catch (error) {
-          console.error(`Failed to fetch customer ${id}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch customer ${id}:`, error);
+          }
         }
       });
 
@@ -156,7 +166,9 @@ export function useEntityDetails(entityIds: {
             details.sectors.set(id, response.data.name || "");
           }
         } catch (error) {
-          console.error(`Failed to fetch sector ${id}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch sector ${id}:`, error);
+          }
         }
       });
 
@@ -174,7 +186,9 @@ export function useEntityDetails(entityIds: {
             details.paints.set(id, response.data);
           }
         } catch (error) {
-          console.error(`Failed to fetch paint ${id}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch paint ${id}:`, error);
+          }
         }
       });
 
@@ -186,7 +200,9 @@ export function useEntityDetails(entityIds: {
             details.formulas.set(id, (response.data as any).description || (response.data as any).code || `Fórmula ${id.slice(0, 8)}`);
           }
         } catch (error) {
-          console.error(`Failed to fetch formula ${id}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch formula ${id}:`, error);
+          }
         }
       });
 
@@ -198,7 +214,9 @@ export function useEntityDetails(entityIds: {
             details.items.set(id, response.data.name || "");
           }
         } catch (error) {
-          console.error(`Failed to fetch item ${id}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch item ${id}:`, error);
+          }
         }
       });
 
@@ -210,7 +228,9 @@ export function useEntityDetails(entityIds: {
             details.files.set(id, response.data.filename || "");
           }
         } catch (error) {
-          console.error(`Failed to fetch file ${id}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch file ${id}:`, error);
+          }
         }
       });
 
@@ -222,7 +242,9 @@ export function useEntityDetails(entityIds: {
             details.observations.set(id, (response.data as any).content || (response.data as any).description || `Observação ${id.slice(0, 8)}`);
           }
         } catch (error) {
-          console.error(`Failed to fetch observation ${id}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch observation ${id}:`, error);
+          }
         }
       });
 
@@ -234,7 +256,9 @@ export function useEntityDetails(entityIds: {
             details.trucks.set(id, (response.data as any).plate || (response.data as any).model || `Caminhão ${id.slice(0, 8)}`);
           }
         } catch (error) {
-          console.error(`Failed to fetch truck ${id}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch truck ${id}:`, error);
+          }
         }
       });
 

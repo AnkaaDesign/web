@@ -46,7 +46,9 @@ const EditBrandPage = () => {
       navigate(routes.inventory.products.brands.root, { replace: true });
     } catch (error) {
       // Error handled by mutation hook
-      console.error("Error updating brand:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating brand:", error);
+      }
     }
   };
 
@@ -102,32 +104,23 @@ const EditBrandPage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="px-4 pt-4">
-          <div className="max-w-5xl mx-auto">
-            <PageHeader
-              variant="form"
-              title={`Editar ${brand.name}`}
-              icon={IconTag}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Estoque", href: routes.inventory.root },
-                { label: "Produtos", href: routes.inventory.products.root },
-                { label: "Marcas", href: routes.inventory.products.brands.root },
-                { label: brand.name, href: routes.inventory.products.brands.details(id!) },
-                { label: "Editar" },
-              ]}
-              actions={actions}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Scrollable Form Container */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-5xl mx-auto h-full">
+    <div className="h-full flex flex-col px-4 pt-4">
+      <PageHeader
+        variant="form"
+        title={`Editar ${brand.name}`}
+        icon={IconTag}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Produtos", href: routes.inventory.products.root },
+          { label: "Marcas", href: routes.inventory.products.brands.root },
+          { label: brand.name, href: routes.inventory.products.brands.details(id!) },
+          { label: "Editar" },
+        ]}
+        actions={actions}
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="mt-4 space-y-4">
           <BrandForm
             mode="update"
             defaultValues={{

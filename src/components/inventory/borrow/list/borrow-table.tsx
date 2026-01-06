@@ -249,7 +249,9 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
       accessor: (borrow: Borrow) => {
         // Check if status exists
         if (!borrow.status) {
-          console.error("Borrow status is undefined:", borrow);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error("Borrow status is undefined:", borrow);
+          }
           return <div className="text-muted-foreground">-</div>;
         }
 
@@ -257,7 +259,9 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
         const label = BORROW_STATUS_LABELS[status];
 
         if (!label) {
-          console.error("Unknown status:", status);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error("Unknown status:", status);
+          }
           return <Badge variant="default">{status}</Badge>;
         }
 

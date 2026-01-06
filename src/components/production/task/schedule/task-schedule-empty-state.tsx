@@ -1,7 +1,4 @@
-import { IconCalendarOff, IconPlus } from "@tabler/icons-react";
-import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
-import { routes } from "../../../../constants";
+import { IconCalendarOff } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
 interface TaskScheduleEmptyStateProps {
@@ -10,11 +7,9 @@ interface TaskScheduleEmptyStateProps {
 }
 
 export function TaskScheduleEmptyState({ className, hasSectors = true }: TaskScheduleEmptyStateProps) {
-  const navigate = useNavigate();
-
   return (
     <div className={cn("flex flex-col items-center justify-center py-16 px-4", className)}>
-      <div className="bg-muted/30 rounded-full p-6 mb-6">
+      <div className="bg-muted/30 rounded-full p-4 mb-6">
         <IconCalendarOff className="h-16 w-16 text-muted-foreground" />
       </div>
 
@@ -22,16 +17,9 @@ export function TaskScheduleEmptyState({ className, hasSectors = true }: TaskSch
 
       <p className="text-muted-foreground text-center max-w-md mb-8">
         {hasSectors
-          ? "Não há tarefas pendentes ou em produção no momento. Crie uma nova tarefa para começar a organizar o cronograma."
+          ? "Não há tarefas pendentes ou em produção no momento."
           : "Configure os setores de produção antes de criar tarefas para o cronograma."}
       </p>
-
-      {hasSectors && (
-        <Button onClick={() => navigate(routes.production.schedule.create)} size="lg" className="gap-2">
-          <IconPlus className="h-5 w-5" />
-          Criar Nova Tarefa
-        </Button>
-      )}
 
       <div className="mt-12 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
         <div className="flex flex-col items-center gap-2">

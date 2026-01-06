@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { routes, FAVORITE_PAGES } from "../../../constants";
 import { PaintBrandForm } from "@/components/painting/paint-brand/form/paint-brand-form";
 import { usePaintBrandMutations } from "../../../hooks";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { IconCheck, IconLoader2, IconTag } from "@tabler/icons-react";
 import type { PaintBrandCreateFormData } from "../../../schemas";
 
@@ -46,36 +46,28 @@ export function PaintBrandsCreatePage() {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-4xl mx-auto">
-          <PageHeaderWithFavorite
-            title="Cadastrar Marca de Tinta"
-            icon={IconTag}
-            favoritePage={FAVORITE_PAGES.PINTURA_MARCAS_TINTA_CADASTRAR}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Pintura", href: routes.painting.root },
-              { label: "Marcas de Tinta", href: routes.painting.paintBrands.root },
-              { label: "Cadastrar" },
-            ]}
-            actions={actions}
-          />
-        </div>
-      </div>
-
-      {/* Main Content Card - Dashboard style scrolling */}
-      <div className="flex-1 overflow-hidden max-w-4xl mx-auto w-full">
-        <div className="h-full bg-card rounded-lg shadow-md border-muted overflow-hidden">
-          <PaintBrandForm
-            mode="create"
-            onSubmit={handleSubmit}
-            onCancel={handleCancel}
-            isSubmitting={createMutation.isPending}
-            onFormStateChange={setFormState}
-          />
-        </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        title="Cadastrar Marca de Tinta"
+        icon={IconTag}
+        favoritePage={FAVORITE_PAGES.PINTURA_MARCAS_TINTA_CADASTRAR}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Pintura", href: routes.painting.root },
+          { label: "Marcas de Tinta", href: routes.painting.paintBrands.root },
+          { label: "Cadastrar" },
+        ]}
+        actions={actions}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <PaintBrandForm
+          mode="create"
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+          isSubmitting={createMutation.isPending}
+          onFormStateChange={setFormState}
+        />
       </div>
     </div>
   );

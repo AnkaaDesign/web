@@ -165,7 +165,7 @@ export function PaintProductionAdvancedFilters({ filters, onFilterChange, classN
 
           {/* Formula Search Results */}
           {showFormulaSearch && formulaSearchTerm && filteredFormulas.length > 0 && (
-            <div className="border rounded-md bg-background shadow-md max-h-48 overflow-y-auto">
+            <div className="border rounded-md bg-background shadow-sm max-h-48 overflow-y-auto">
               {filteredFormulas.slice(0, 10).map((formula: PaintFormulaWithIncludes) => (
                 <button
                   key={formula.id}

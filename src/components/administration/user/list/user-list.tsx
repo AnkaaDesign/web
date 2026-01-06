@@ -444,7 +444,9 @@ export function UserList({ className }: UserListProps) {
       setDeleteDialog(null);
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error("Error deleting user(s):", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting user(s):", error);
+      }
     }
   };
 
@@ -464,7 +466,9 @@ export function UserList({ className }: UserListProps) {
       setContractDialog(null);
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error("Error marking user(s) as effected:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error marking user(s) as effected:", error);
+      }
     }
   };
 
@@ -481,7 +485,9 @@ export function UserList({ className }: UserListProps) {
       setDismissDialog(null);
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error("Error marking user(s) as dismissed:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error marking user(s) as dismissed:", error);
+      }
     }
   };
 
@@ -508,22 +514,23 @@ export function UserList({ className }: UserListProps) {
         setMergeDialog({ open: false, users: [] });
       } catch (error) {
         // Error is handled by the API client
-        console.error("Error merging users:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error merging users:", error);
+        }
       }
     },
     [mergeMutation, mergeDialog.users]
   );
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <TableSearchInput
             ref={searchInputRef}
             value={displaySearchText}
             onChange={(value) => {
-              console.log("[UserList] Search input changed to:", value);
               setSearch(value);
             }}
             placeholder="Buscar: nome, email, CPF ou nº folha (apenas números)"
@@ -551,7 +558,7 @@ export function UserList({ className }: UserListProps) {
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />}
 
         {/* Paginated table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <UserTable
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}

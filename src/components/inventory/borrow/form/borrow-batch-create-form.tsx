@@ -10,7 +10,7 @@ import { routes, FAVORITE_PAGES, USER_STATUS } from "../../../../constants";
 import { Card, CardContent } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import { useBorrowFormUrlState } from "@/hooks/use-borrow-form-url-state";
 import { BorrowBatchResultDialog } from "@/components/ui/batch-operation-result-dialog";
@@ -43,8 +43,6 @@ type BorrowBatchFormData = z.infer<typeof borrowBatchFormSchema>;
 
 export const BorrowBatchCreateForm = () => {
   const navigate = useNavigate();
-
-  console.log("=== BorrowBatchCreateForm rendered ===");
 
   // URL state management
   const urlState = useBorrowFormUrlState({
@@ -80,6 +78,7 @@ export const BorrowBatchCreateForm = () => {
     updateGlobalUserId,
     selectionCount,
     clearAllSelections,
+    batchUpdateSelection,
   } = urlState;
 
   // Form setup with validation
@@ -94,10 +93,6 @@ export const BorrowBatchCreateForm = () => {
 
   // Mutations and data
   const batchMutations = useBorrowBatchMutations();
-  console.log("=== Batch Mutations Result ===");
-  console.log("batchMutations:", batchMutations);
-  console.log("Available methods:", Object.keys(batchMutations));
-  console.log("Has batchCreateAsync?", "batchCreateAsync" in batchMutations);
 
   const { batchCreateAsync, isLoading: isSubmitting } = batchMutations;
 
@@ -142,14 +137,16 @@ export const BorrowBatchCreateForm = () => {
       quantity: quantities[itemId] || 1,
     }));
     form.setValue("items", items, { shouldValidate: true });
-  }, [selectedItems, quantities, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItems, quantities]);
 
   // Sync global user ID with form
   useEffect(() => {
     if (globalUserId) {
       form.setValue("userId", globalUserId, { shouldValidate: true });
     }
-  }, [globalUserId, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalUserId]);
 
   // Handle item selection
   const handleSelectItem = useCallback(
@@ -158,6 +155,26 @@ export const BorrowBatchCreateForm = () => {
       toggleItemSelection(itemId);
     },
     [toggleItemSelection],
+  );
+
+  // Handle batch selection for shift-click range selection
+  const handleBatchSelectItems = useCallback(
+    (itemIds: string[], itemData: Record<string, { quantity?: number; price?: number; icms?: number; ipi?: number }>) => {
+      // Build the new selection state
+      const newSelected = new Set(selectedItems);
+      const newQuantities = { ...quantities };
+
+      itemIds.forEach((itemId) => {
+        if (!newSelected.has(itemId)) {
+          newSelected.add(itemId);
+          newQuantities[itemId] = itemData[itemId]?.quantity || 1;
+        }
+      });
+
+      // Batch update using the batch update function from URL state
+      batchUpdateSelection(newSelected, newQuantities);
+    },
+    [selectedItems, quantities, batchUpdateSelection],
   );
 
   // Handle select all (from paginated selector)
@@ -187,9 +204,6 @@ export const BorrowBatchCreateForm = () => {
   // Handle form submission
   const onSubmit = useCallback(
     async (data: BorrowBatchFormData) => {
-      console.log("=== BATCH FORM SUBMIT ===");
-      console.log("Form data:", data);
-      console.log("Selected items count:", data.items.length);
 
       try {
         // Basic frontend validation - just check if required fields are present
@@ -212,20 +226,19 @@ export const BorrowBatchCreateForm = () => {
           userId: data.userId,
         }));
 
-        console.log("Submitting batch borrows:", borrowsData);
-
         // Check if batchCreateAsync is available
         if (!batchCreateAsync) {
-          console.error("batchCreateAsync is not available!");
-          console.log("Available mutations:", batchMutations);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error("batchCreateAsync is not available!");
+          }
 
           // Try alternative methods
           if (batchMutations.batchCreate) {
-            console.log("Using batchCreate instead");
+            
             batchMutations.batchCreate({ borrows: borrowsData });
             return;
           } else if (batchMutations.batchCreateMutation?.mutateAsync) {
-            console.log("Using batchCreateMutation.mutateAsync directly");
+            
             const result = await batchMutations.batchCreateMutation.mutateAsync({ borrows: borrowsData });
             if (result.data) {
               openDialog(result.data);
@@ -234,14 +247,15 @@ export const BorrowBatchCreateForm = () => {
             }
             return;
           } else {
-            console.error("No batch create method available!");
+            if (process.env.NODE_ENV !== 'production') {
+              console.error("No batch create method available!");
+            }
             alert("Erro interno: método de criação em lote não disponível");
             return;
           }
         }
 
         const result = await batchCreateAsync({ borrows: borrowsData });
-        console.log("Batch create result:", result);
 
         if (result.data) {
           // Open dialog to show detailed results
@@ -252,10 +266,12 @@ export const BorrowBatchCreateForm = () => {
           form.reset();
         }
       } catch (error) {
-        console.error("=== BATCH CREATE ERROR ===");
-        console.error("Full error object:", error);
-        console.error("Error message:", (error as any)?.message);
-        console.error("Error response:", (error as any)?.response);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("=== BATCH CREATE ERROR ===");
+          console.error("Full error object:", error);
+          console.error("Error message:", (error as any)?.message);
+          console.error("Error response:", (error as any)?.response);
+        }
 
         // Show a more detailed error message
         const errorMessage = (error as any)?.response?.data?.message || (error as any)?.message || "Erro ao criar empréstimos em lote";
@@ -271,128 +287,124 @@ export const BorrowBatchCreateForm = () => {
 
   return (
     <>
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Criar Empréstimos"
-            icon={IconPackage}
-            favoritePage={FAVORITE_PAGES.ESTOQUE_EMPRESTIMOS_CADASTRAR}
-            breadcrumbs={[{ label: "Início", href: "/" }, { label: "Estoque", href: "/estoque" }, { label: "Empréstimos", href: routes.inventory.loans.list }, { label: "Criar" }]}
-            actions={[
-              {
-                key: "cancel",
-                label: "Cancelar",
-                onClick: handleCancel,
-                variant: "outline",
-                disabled: isSubmitting,
-              },
-              {
-                key: "submit",
-                label: `Criar ${selectionCount} Empréstimo${selectionCount === 1 ? "" : "s"}`,
-                icon: isSubmitting ? IconLoader2 : IconCheck,
-                onClick: () => {
-                  console.log("=== BATCH SUBMIT BUTTON CLICKED ===");
-                  console.log("Form values:", form.getValues());
-                  console.log("Form errors:", form.formState.errors);
-                  console.log("Form is valid:", form.formState.isValid);
-                  console.log("Selection count:", selectionCount);
-                  console.log("Is submitting:", isSubmitting);
-                  const handleSubmitFn = form.handleSubmit(onSubmit);
-                  handleSubmitFn();
-                },
-                variant: "default",
-                disabled: isSubmitting || selectionCount === 0 || !form.formState.isValid,
-                loading: isSubmitting,
-              },
-            ]}
-          />
-        </div>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          title="Criar Empréstimos"
+          icon={IconPackage}
+          favoritePage={FAVORITE_PAGES.ESTOQUE_EMPRESTIMOS_CADASTRAR}
+          breadcrumbs={[{ label: "Início", href: "/" }, { label: "Estoque", href: "/estoque" }, { label: "Empréstimos", href: routes.inventory.loans.list }, { label: "Criar" }]}
+          actions={[
+            {
+              key: "cancel",
+              label: "Cancelar",
+              onClick: handleCancel,
+              variant: "outline",
+              disabled: isSubmitting,
+            },
+            {
+              key: "submit",
+              label: `Criar ${selectionCount} Empréstimo${selectionCount === 1 ? "" : "s"}`,
+              icon: isSubmitting ? IconLoader2 : IconCheck,
+              onClick: () => {
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 min-h-0 flex flex-col">
-            <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-              <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
-                {/* Configuration Section */}
-                <div className="space-y-3 flex-shrink-0">
-                  <div className="grid grid-cols-1 gap-4">
-                    {/* Global User - Full width */}
-                    <FormField
-                      control={form.control}
-                      name="userId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>
-                            Usuário Responsável <span className="text-destructive">*</span>
-                          </FormLabel>
-                          <FormControl>
-                            <Combobox
-                              options={users.map((user) => ({
-                                value: user.id,
-                                label: `${user.name}${user.sector ? ` - ${user.sector.name}` : ""}`,
-                              }))}
-                              value={field.value}
-                              onValueChange={(value) => {
-                                field.onChange(value);
-                                handleGlobalUserChange(value);
-                              }}
-                              placeholder="Selecionar usuário"
-                              className="h-10"
-                              searchable
-                              emptyText="Nenhum usuário encontrado"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                const handleSubmitFn = form.handleSubmit(onSubmit);
+                handleSubmitFn();
+              },
+              variant: "default",
+              disabled: isSubmitting || selectionCount === 0 || !form.formState.isValid,
+              loading: isSubmitting,
+            },
+          ]}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full">
+              <Card className="flex flex-col shadow-sm border border-border h-full">
+                <CardContent className="flex flex-col p-6 space-y-4 overflow-hidden min-h-0 flex-1">
+                  {/* Configuration Section */}
+                  <div className="space-y-3 flex-shrink-0">
+                    <div className="grid grid-cols-1 gap-4">
+                      {/* Global User - Full width */}
+                      <FormField
+                        control={form.control}
+                        name="userId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              Usuário Responsável <span className="text-destructive">*</span>
+                            </FormLabel>
+                            <FormControl>
+                              <Combobox
+                                options={users.map((user) => ({
+                                  value: user.id,
+                                  label: `${user.name}${user.sector ? ` - ${user.sector.name}` : ""}`,
+                                }))}
+                                value={field.value}
+                                onValueChange={(value) => {
+                                  field.onChange(value);
+                                  handleGlobalUserChange(value);
+                                }}
+                                placeholder="Selecionar usuário"
+                                className="h-10"
+                                searchable
+                                emptyText="Nenhum usuário encontrado"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Paginated Item Selector */}
+                  <div className="flex-1 min-h-0">
+                    <ItemSelectorTable
+                      selectedItems={selectedItems}
+                      onSelectItem={handleSelectItem}
+                      onSelectAll={handleSelectAll}
+                      onBatchSelectItems={handleBatchSelectItems}
+                      quantities={quantities}
+                      onQuantityChange={handleQuantityChange}
+                      editableColumns={{
+                        showQuantityInput: true,
+                      }}
+                      fixedColumnsConfig={{
+                        fixedColumns: ['name', 'quantity'],
+                        fixedReasons: {
+                          name: 'Essencial para identificar o item',
+                          quantity: 'Necessário para verificar estoque disponível e evitar empréstimos acima do estoque',
+                        },
+                      }}
+                      defaultColumns={['uniCode', 'name', 'category.name', 'brand.name', 'measures', 'quantity']}
+                      storageKey="borrow-item-selector"
+                      additionalFilters={{
+                        where: {
+                          category: {
+                            type: 'TOOL',
+                          },
+                        },
+                      }}
+                      // URL state management
+                      page={page}
+                      pageSize={pageSize}
+                      showSelectedOnly={showSelectedOnly}
+                      searchTerm={searchTerm}
+                      filters={filters}
+                      onPageChange={setPage}
+                      onPageSizeChange={setPageSize}
+                      onShowSelectedOnlyChange={setShowSelectedOnly}
+                      onSearchTermChange={setSearchTerm}
+                      onFiltersChange={handleFiltersChange}
+                      className="h-full"
                     />
                   </div>
-                </div>
-
-                {/* Paginated Item Selector */}
-                <div className="flex-1 min-h-0">
-                  <ItemSelectorTable
-                    selectedItems={selectedItems}
-                    onSelectItem={handleSelectItem}
-                    onSelectAll={handleSelectAll}
-                    quantities={quantities}
-                    onQuantityChange={handleQuantityChange}
-                    editableColumns={{
-                      showQuantityInput: true,
-                    }}
-                    fixedColumnsConfig={{
-                      fixedColumns: ['name', 'quantity'],
-                      fixedReasons: {
-                        name: 'Essencial para identificar o item',
-                        quantity: 'Necessário para verificar estoque disponível e evitar empréstimos acima do estoque',
-                      },
-                    }}
-                    defaultColumns={['uniCode', 'name', 'category.name', 'brand.name', 'measures', 'quantity']}
-                    storageKey="borrow-item-selector"
-                    additionalFilters={{
-                      where: {
-                        category: {
-                          type: 'TOOL',
-                        },
-                      },
-                    }}
-                    // URL state management
-                    page={page}
-                    pageSize={pageSize}
-                    showSelectedOnly={showSelectedOnly}
-                    searchTerm={searchTerm}
-                    filters={filters}
-                    onPageChange={setPage}
-                    onPageSizeChange={setPageSize}
-                    onShowSelectedOnlyChange={setShowSelectedOnly}
-                    onSearchTermChange={setSearchTerm}
-                    onFiltersChange={handleFiltersChange}
-                    className="h-full"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </form>
-        </Form>
+                </CardContent>
+              </Card>
+            </form>
+          </Form>
+        </div>
       </div>
 
       {/* Batch Result Dialog */}

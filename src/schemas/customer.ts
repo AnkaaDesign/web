@@ -457,10 +457,8 @@ const customerTransform = (data: any) => {
 
   // Text search (case insensitive)
   if (searchingFor) {
-    console.log("[CustomerTransform] Processing searchingFor:", searchingFor);
     // Clean the search term to get just numbers for document searches
     const cleanedSearch = searchingFor.replace(/\D/g, "");
-    console.log("[CustomerTransform] Cleaned search (numbers only):", cleanedSearch);
 
     const searchConditions: any[] = [
       { fantasyName: { contains: searchingFor, mode: "insensitive" } },
@@ -490,7 +488,6 @@ const customerTransform = (data: any) => {
     }
 
     andConditions.push({ OR: searchConditions });
-    console.log("[CustomerTransform] Added search OR conditions, total searchConditions:", searchConditions.length);
   }
 
   // Has tasks filter
@@ -590,8 +587,6 @@ const customerTransform = (data: any) => {
   delete data.taskCreatedBy;
 
   // Apply conditions to where clause
-  console.log("[CustomerTransform] andConditions count:", andConditions.length);
-  console.log("[CustomerTransform] Existing data.where:", JSON.stringify(data.where || {}).substring(0, 200));
   if (andConditions.length > 0) {
     if (data.where) {
       // Merge existing where conditions with new andConditions
@@ -608,7 +603,6 @@ const customerTransform = (data: any) => {
     }
   }
 
-  console.log("[CustomerTransform] Final data.where:", JSON.stringify(data.where || {}).substring(0, 300));
   return data;
 };
 

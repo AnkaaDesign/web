@@ -130,7 +130,7 @@ export function BonusDiscountList({
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
-          <CardContent className="flex flex-col items-center justify-center p-6">
+          <CardContent className="flex flex-col items-center justify-center p-4">
             <p className="text-sm font-medium text-muted-foreground">Valor Base</p>
             <p className="text-2xl font-bold text-green-600">
               {formatCurrency(bonus.baseBonus)}
@@ -139,7 +139,7 @@ export function BonusDiscountList({
         </Card>
 
         <Card>
-          <CardContent className="flex flex-col items-center justify-center p-6">
+          <CardContent className="flex flex-col items-center justify-center p-4">
             <p className="text-sm font-medium text-muted-foreground">Total de Descontos</p>
             <p className="text-2xl font-bold text-red-600">
               -{formatCurrency(totalDiscountValue)}
@@ -151,7 +151,7 @@ export function BonusDiscountList({
         </Card>
 
         <Card>
-          <CardContent className="flex flex-col items-center justify-center p-6">
+          <CardContent className="flex flex-col items-center justify-center p-4">
             <p className="text-sm font-medium text-muted-foreground">Valor Final</p>
             <p className="text-2xl font-bold text-blue-600">
               {formatCurrency(finalBonusAmount)}

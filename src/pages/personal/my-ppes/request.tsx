@@ -103,16 +103,8 @@ export const PersonalMyPpesRequest = () => {
   // Mutation for submitting requests
   const requestMutation = useMutation({
     mutationFn: async (data: RequestFormData) => {
-      console.log('[PPE Request] Starting mutation with data:', data);
-      console.log('[PPE Request] Number of requests:', data.requests.length);
-
       // Create individual requests for each item
-      const promises = data.requests.map((request, index) => {
-        console.log(`[PPE Request] Creating request ${index + 1}:`, {
-          itemId: request.itemId,
-          quantity: 1,
-          reason: request.reason,
-        });
+      const promises = data.requests.map((request) => {
         return requestPpeDelivery({
           itemId: request.itemId,
           quantity: 1,
@@ -120,39 +112,34 @@ export const PersonalMyPpesRequest = () => {
         });
       });
 
-      console.log('[PPE Request] Waiting for all promises...');
       const results = await Promise.all(promises);
-      console.log('[PPE Request] All requests completed successfully:', results);
       return results;
     },
-    onSuccess: (data) => {
-      console.log('[PPE Request] Mutation succeeded:', data);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ppeDeliveries", "my-requests"] });
       navigate(routes.personal.myPpes.root);
     },
     onError: (error: any) => {
-      console.error('[PPE Request] Mutation failed:', error);
-      console.error('[PPE Request] Error details:', {
-        message: error.message,
-        response: error.response,
-        stack: error.stack,
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[PPE Request] Mutation failed:', error);
+        console.error('[PPE Request] Error details:', {
+          message: error.message,
+          response: error.response,
+          stack: error.stack,
+        });
+      }
     },
   });
 
   // Add PPE to request list
   const handleAddPpe = (item: Item) => {
-    console.log('[PPE Request] Add PPE clicked:', item);
-
     // Check if already added
     const exists = ppeRequests.find((r) => r.itemId === item.id);
     if (exists) {
-      console.log('[PPE Request] Item already exists in cart');
       toast.warning("Este EPI já foi adicionado à solicitação");
       return;
     }
 
-    console.log('[PPE Request] Adding item to cart');
     setPpeRequests([
       ...ppeRequests,
       {
@@ -179,12 +166,7 @@ export const PersonalMyPpesRequest = () => {
 
   // Submit form
   const handleSubmit = () => {
-    console.log('[PPE Request] Submit button clicked');
-    console.log('[PPE Request] Current PPE requests:', ppeRequests);
-    console.log('[PPE Request] Number of items in cart:', ppeRequests.length);
-
     if (ppeRequests.length === 0) {
-      console.log('[PPE Request] Validation failed: No items in cart');
       toast.error("Adicione pelo menos um EPI à solicitação");
       return;
     }
@@ -192,17 +174,12 @@ export const PersonalMyPpesRequest = () => {
     // Validate all items have reasons
     const itemsWithoutReason = ppeRequests.filter((r) => !r.reason.trim());
     if (itemsWithoutReason.length > 0) {
-      console.log('[PPE Request] Validation failed: Items without reason:', itemsWithoutReason);
       toast.error("Preencha a justificativa de todos os EPIs");
       return;
     }
 
-    console.log('[PPE Request] Validation passed, setting form values');
     form.setValue("requests", ppeRequests);
-
-    console.log('[PPE Request] Calling form.handleSubmit');
     form.handleSubmit((data) => {
-      console.log('[PPE Request] Form validation passed, calling mutation');
       requestMutation.mutate(data);
     })();
   };

@@ -66,11 +66,12 @@ export const createItemSelectorColumns = (
           <Checkbox
             checked={isSelected}
             onCheckedChange={() => {
-              // Pass item data (price, icms, ipi) when selecting
+              // Pass item data (quantity/stock, price, icms, ipi) when selecting
+              const quantity = item.quantity; // Current stock
               const price = item.prices?.[0]?.value;
               const icms = item.icms;
               const ipi = item.ipi;
-              ctx?.onSelectItem?.(item.id, undefined, price, icms, ipi);
+              ctx?.onSelectItem?.(item.id, quantity, price, icms, ipi);
             }}
           />
         );
@@ -356,9 +357,9 @@ export const createItemSelectorColumns = (
 
         return (
           <Input
-            type="number"
-            min="0.01"
-            step="0.01"
+            type="decimal"
+            min={0.01}
+            step={0.01}
             value={quantity || ""}
             onChange={(value) => {
               const numValue = typeof value === "string" ? parseFloat(value) : value;
@@ -420,10 +421,10 @@ export const createItemSelectorColumns = (
 
         return (
           <Input
-            type="number"
-            min="0"
-            max="100"
-            step="0.01"
+            type="decimal"
+            min={0}
+            max={100}
+            step={0.01}
             value={icms || ""}
             onChange={(value) => {
               const numValue = typeof value === "string" ? parseFloat(value) : value;
@@ -453,10 +454,10 @@ export const createItemSelectorColumns = (
 
         return (
           <Input
-            type="number"
-            min="0"
-            max="100"
-            step="0.01"
+            type="decimal"
+            min={0}
+            max={100}
+            step={0.01}
             value={ipi || ""}
             onChange={(value) => {
               const numValue = typeof value === "string" ? parseFloat(value) : value;

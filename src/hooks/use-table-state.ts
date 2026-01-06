@@ -66,12 +66,9 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
     return undefined;
   }
 
-  console.log("[convertSortConfigsToOrderBy] Input sortConfigs:", JSON.stringify(sortConfigs, null, 2));
-
   const orderByArray = sortConfigs.map((config, index) => {
     // Guard against undefined column
     if (!config.column) {
-      console.log(`[convertSortConfigsToOrderBy] Config at index ${index} has no column:`, config);
       return {};
     }
 
@@ -286,10 +283,8 @@ export function useTableState(options: UseTableStateOptions = {}) {
   // Selection methods
   const setSelectedIds = useCallback(
     (selectedIds: string[]) => {
-      console.log("[useTableState] setSelectedIds called with:", selectedIds);
       updateUrl((params) => {
         const serialized = serializeValue(selectedIds);
-        console.log("[useTableState] Serialized selection:", serialized);
         if (serialized === null) {
           params.delete("selected");
         } else {
@@ -302,18 +297,11 @@ export function useTableState(options: UseTableStateOptions = {}) {
 
   const toggleSelection = useCallback(
     (id: string) => {
-      console.log("[useTableState] toggleSelection called:", {
-        id,
-        currentSelectedIds: tableState.selectedIds,
-        wasSelected: tableState.selectedIds.includes(id),
-      });
       const currentSelected = new Set(tableState.selectedIds);
       if (currentSelected.has(id)) {
         currentSelected.delete(id);
-        console.log("[useTableState] Removing from selection, new IDs:", Array.from(currentSelected));
       } else {
         currentSelected.add(id);
-        console.log("[useTableState] Adding to selection, new IDs:", Array.from(currentSelected));
       }
       setSelectedIds(Array.from(currentSelected));
     },

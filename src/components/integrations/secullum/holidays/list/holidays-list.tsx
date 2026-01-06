@@ -218,8 +218,8 @@ export function HolidaysList({ className }: HolidaysListProps) {
   const filterCount = (yearFilter && yearFilter !== currentYear.toString() ? 1 : 0) + (monthFilter ? 1 : 0);
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border overflow-hidden", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
+    <Card className={cn("flex flex-col shadow-sm border border-border overflow-hidden", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden min-h-0 pb-6">
         {/* Search and Controls */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">

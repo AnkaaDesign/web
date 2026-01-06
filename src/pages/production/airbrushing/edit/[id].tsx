@@ -3,7 +3,6 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { useAirbrushing } from "../../../../hooks";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
 import { AirbrushingForm, type AirbrushingFormHandle } from "@/components/production/airbrushing/form/airbrushing-form";
 import { IconBrush, IconCheck, IconArrowLeft } from "@tabler/icons-react";
 import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
@@ -21,7 +20,9 @@ export const AirbrushingEdit = () => {
   // Redirect if no ID is provided
   useEffect(() => {
     if (!id) {
-      console.error('[AirbrushingEdit] No ID provided, redirecting to list');
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[AirbrushingEdit] No ID provided, redirecting to list');
+      }
       navigate(routes.production.airbrushings.root);
     }
   }, [id, navigate]);
@@ -73,31 +74,32 @@ export const AirbrushingEdit = () => {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}>
-        <div className="h-full flex flex-col space-y-4">
-          <div className="flex-shrink-0">
-            <PageHeader
-              variant="form"
-              title="Carregando..."
-              icon={IconBrush}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Produção", href: routes.production.root },
-                { label: "Aerografia", href: routes.production.airbrushings.root },
-                { label: "Editar" },
-              ]}
-            />
-          </div>
-          <div className="flex-1 space-y-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <Skeleton className="h-8 w-1/3" />
-                  <Skeleton className="h-4 w-1/2" />
-                  <Skeleton className="h-4 w-2/3" />
-                  <Skeleton className="h-32 w-full" />
-                </div>
-              </CardContent>
-            </Card>
+        <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+          <PageHeader
+            variant="form"
+            title="Carregando..."
+            icon={IconBrush}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Produção", href: routes.production.root },
+              { label: "Aerografia", href: routes.production.airbrushings.root },
+              { label: "Editar" },
+            ]}
+            className="flex-shrink-0"
+          />
+          <div className="flex-1 overflow-y-auto pb-6">
+            <div className="space-y-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="space-y-4">
+                    <Skeleton className="h-8 w-1/3" />
+                    <Skeleton className="h-4 w-1/2" />
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-32 w-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
       </PrivilegeRoute>
@@ -108,26 +110,22 @@ export const AirbrushingEdit = () => {
   if (isError || !airbrushing) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}>
-        <div className="h-full flex flex-col space-y-4">
-          <div className="flex-shrink-0">
-            <PageHeader
-              variant="form"
-              title="Aerografia não encontrada"
-              icon={IconBrush}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Produção", href: routes.production.root },
-                { label: "Aerografia", href: routes.production.airbrushings.root },
-                { label: "Editar" },
-              ]}
-              backButton={{
-                onClick: () => navigate(routes.production.airbrushings.root),
-              }}
-            />
-          </div>
-          <div className="flex-1">
+        <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+          <PageHeader
+            variant="form"
+            title="Aerografia não encontrada"
+            icon={IconBrush}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Produção", href: routes.production.root },
+              { label: "Aerografia", href: routes.production.airbrushings.root },
+              { label: "Editar" },
+            ]}
+            className="flex-shrink-0"
+          />
+          <div className="flex-1 overflow-y-auto pb-6">
             <Card>
-              <CardContent className="p-6">
+              <CardContent className="p-4">
                 <div className="text-center">
                   <div className="p-4 rounded-lg bg-red-50 border border-red-200">
                     <p className="text-red-800 font-medium">Aerografia não encontrada</p>
@@ -144,38 +142,38 @@ export const AirbrushingEdit = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}>
-      <div className="h-full flex flex-col space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Editar Aerografia"
-            icon={IconBrush}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Produção", href: routes.production.root },
-              { label: "Aerografia", href: routes.production.airbrushings.root },
-              { label: `Aerografia #${airbrushing.id.slice(-8)}`, href: routes.production.airbrushings.details(airbrushing.id) },
-              { label: "Editar" },
-            ]}
-            actions={[
-              {
-                key: "cancel",
-                label: "Cancelar",
-                icon: IconArrowLeft,
-                onClick: handleCancel,
-                variant: "outline",
-              },
-              {
-                key: "submit",
-                label: "Salvar",
-                icon: IconCheck,
-                onClick: () => formRef.current?.handleSubmit(),
-                variant: "default",
-                disabled: !formRef.current?.canSubmit(),
-              },
-            ]}
-          />
-        </div>
-        <div className="flex-1 min-h-0 overflow-hidden pt-6">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="form"
+          title="Editar Aerografia"
+          icon={IconBrush}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Produção", href: routes.production.root },
+            { label: "Aerografia", href: routes.production.airbrushings.root },
+            { label: `Aerografia #${airbrushing.id.slice(-8)}`, href: routes.production.airbrushings.details(airbrushing.id) },
+            { label: "Editar" },
+          ]}
+          actions={[
+            {
+              key: "cancel",
+              label: "Cancelar",
+              icon: IconArrowLeft,
+              onClick: handleCancel,
+              variant: "outline",
+            },
+            {
+              key: "submit",
+              label: "Salvar",
+              icon: IconCheck,
+              onClick: () => formRef.current?.handleSubmit(),
+              variant: "default",
+              disabled: !formRef.current?.canSubmit(),
+            },
+          ]}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
           <AirbrushingForm
             className="h-full"
             ref={formRef}

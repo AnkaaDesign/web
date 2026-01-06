@@ -42,21 +42,25 @@ export function validateEnv(): EnvConfig {
     const result = envSchema.parse(envVars);
 
     // Additional custom validations
-    if (result.DEV) {
-    }
+    // Validations performed here
+
     return result;
   } catch (error) {
     if (error instanceof z.ZodError) {
       const missingVars = error.errors.map((err) => `${err.path.join(".")}: ${err.message}`);
-      console.error("❌ Web environment validation failed:");
-      missingVars.forEach((err) => console.error(`  - ${err}`));
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("❌ Web environment validation failed:");
+        missingVars.forEach((err) => console.error(`  - ${err}`));
 
-      console.error("\n📋 Please check your .env file and ensure all required VITE_ variables are set.");
-      console.error("📋 You can copy from apps/web/.env.example and fill in the values.");
+        console.error("\n📋 Please check your .env file and ensure all required VITE_ variables are set.");
+        console.error("📋 You can copy from apps/web/.env.example and fill in the values.");
+      }
 
       // In development, we can continue but show warnings
       if (import.meta.env.DEV) {
-        console.warn("⚠️  Continuing in development mode with missing variables");
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn("⚠️  Continuing in development mode with missing variables");
+        }
         return {} as EnvConfig;
       } else {
         throw new Error("Environment validation failed in production mode");

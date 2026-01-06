@@ -55,8 +55,28 @@ export function createFormDataWithContext(
       if (value instanceof Date) {
         formData.append(key, value.toISOString());
       } else if (Array.isArray(value)) {
-        // For arrays, append as JSON string
-        formData.append(key, JSON.stringify(value));
+        // For arrays, use indexed keys instead of JSON.stringify
+        // This ensures the backend parses them as arrays, not objects
+        if (value.length === 0) {
+          // For empty arrays, send a marker to indicate it's an empty array
+          formData.append(`${key}[]`, '');
+        } else {
+          value.forEach((item, index) => {
+            if (item !== null && item !== undefined) {
+              if (typeof item === 'object' && !(item instanceof File)) {
+                // For array of objects, append the whole object as JSON with indexed key
+                formData.append(`${key}[${index}]`, JSON.stringify(item));
+              } else if (item instanceof File) {
+                // Files should be in the files parameter, not data
+                console.warn(`File found in data.${key}[${index}], should be in files parameter`);
+                formData.append(`${key}[${index}]`, item);
+              } else {
+                // For primitive values
+                formData.append(`${key}[${index}]`, String(item));
+              }
+            }
+          });
+        }
       } else if (typeof value === 'object') {
         formData.append(key, JSON.stringify(value));
       } else {

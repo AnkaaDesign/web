@@ -405,7 +405,7 @@ export function ServerMetricsPage() {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="h-full flex flex-col px-4 pt-4">
       {/* Fixed Header */}
       <div className="flex-shrink-0">
         <PageHeader
@@ -431,42 +431,43 @@ export function ServerMetricsPage() {
         />
       </div>
 
-      {/* Critical RAID Alerts */}
-      {hasRaidAlerts() && (
-        <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20">
-          <CardContent className="px-8 py-4">
-            <div className="flex items-center gap-3">
-              <IconAlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
-              <div>
-                <div className="text-sm font-semibold text-red-800 dark:text-red-200">Problemas detectados no sistema RAID</div>
-                <div className="text-xs text-red-700 dark:text-red-300 mt-1">
-                  {(() => {
-                    const data = getRaidData();
-                    const issues = [];
-                    if (data.overall.failedArrays > 0) {
-                      issues.push(`${data.overall.failedArrays} array(s) com falha`);
-                    }
-                    if (data.overall.degradedArrays > 0) {
-                      issues.push(`${data.overall.degradedArrays} array(s) degradado(s)`);
-                    }
-                    const faultyDevices = data.arrays.reduce((count, array) => count + (array.devices?.filter((device) => device.role === "faulty").length || 0), 0);
-                    if (faultyDevices > 0) {
-                      issues.push(`${faultyDevices} dispositivo(s) com falha`);
-                    }
-                    return issues.join(", ");
-                  })()}
+      <div className="flex-1 overflow-y-auto pb-6">
+        {/* Critical RAID Alerts */}
+        {hasRaidAlerts() && (
+          <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20 mt-4">
+            <CardContent className="px-8 py-4">
+              <div className="flex items-center gap-3">
+                <IconAlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                <div>
+                  <div className="text-sm font-semibold text-red-800 dark:text-red-200">Problemas detectados no sistema RAID</div>
+                  <div className="text-xs text-red-700 dark:text-red-300 mt-1">
+                    {(() => {
+                      const data = getRaidData();
+                      const issues = [];
+                      if (data.overall.failedArrays > 0) {
+                        issues.push(`${data.overall.failedArrays} array(s) com falha`);
+                      }
+                      if (data.overall.degradedArrays > 0) {
+                        issues.push(`${data.overall.degradedArrays} array(s) degradado(s)`);
+                      }
+                      const faultyDevices = data.arrays.reduce((count, array) => count + (array.devices?.filter((device) => device.role === "faulty").length || 0), 0);
+                      if (faultyDevices > 0) {
+                        issues.push(`${faultyDevices} dispositivo(s) com falha`);
+                      }
+                      return issues.join(", ");
+                    })()}
+                  </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Content Card */}
-      <Card className="flex-1 flex flex-col min-h-0" level={1}>
-        <CardContent className="flex-1 overflow-auto px-8 py-6 space-y-6">
+        {/* Content Card */}
+        <Card className="flex-1 flex flex-col min-h-0 mt-4">
+          <CardContent className="flex-1 overflow-auto px-8 py-6 space-y-6">
           {/* System Overview */}
-          <Card className="flex-shrink-0" level={2}>
+          <Card className="flex-shrink-0">
             <CardHeader>
               <CardTitle className="text-xl flex items-center gap-3">
                 <div className="p-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg">
@@ -511,7 +512,7 @@ export function ServerMetricsPage() {
           {/* Resource Usage */}
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 flex-shrink-0">
             {/* CPU Usage */}
-            <Card level={2}>
+            <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-3">
                   <div className="p-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg">
@@ -583,7 +584,7 @@ export function ServerMetricsPage() {
             </Card>
 
             {/* Memory Usage */}
-            <Card level={2}>
+            <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-3">
                   <div className="p-2 bg-green-500/10 text-green-600 dark:text-green-400 rounded-lg">
@@ -650,7 +651,7 @@ export function ServerMetricsPage() {
             </Card>
 
             {/* Disk Usage */}
-            <Card level={2}>
+            <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-3">
                   <div className="p-2 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-lg">
@@ -705,7 +706,7 @@ export function ServerMetricsPage() {
             </Card>
 
             {/* CPU Temperature */}
-            <Card level={2}>
+            <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-3">
                   <div className="p-2 bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg">
@@ -763,7 +764,7 @@ export function ServerMetricsPage() {
           </div>
 
           {/* SSD Health */}
-          <Card className="flex-shrink-0" level={2}>
+          <Card className="flex-shrink-0">
             <CardHeader>
               <CardTitle className="text-xl flex items-center gap-3">
                 <div className="p-2 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-lg">
@@ -903,7 +904,7 @@ export function ServerMetricsPage() {
           </Card>
 
           {/* Network Interfaces */}
-          <Card className="flex-shrink-0" level={2}>
+          <Card className="flex-shrink-0">
             <CardHeader>
               <CardTitle className="text-xl flex items-center gap-3">
                 <div className="p-2 bg-orange-500/10 text-orange-600 dark:text-orange-400 rounded-lg">
@@ -967,7 +968,7 @@ export function ServerMetricsPage() {
           </Card>
 
           {/* RAID Status */}
-          <Card className="flex-shrink-0" level={2}>
+          <Card className="flex-shrink-0">
             <CardHeader className="px-8 py-6 pb-4">
               <CardTitle className="text-xl flex items-center gap-3">
                 <div className="p-2 bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg">
@@ -1156,6 +1157,7 @@ export function ServerMetricsPage() {
           </Card>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

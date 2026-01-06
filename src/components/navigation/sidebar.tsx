@@ -13,6 +13,7 @@ import { fixNavigationPath } from "@/utils/route-validation";
 import { useAuth } from "@/contexts/auth-context";
 import { IconLogout, IconUser, IconSettings, IconChevronRight, IconMenu2, IconStarFilled, IconServer, IconExternalLink } from "@tabler/icons-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { NotificationCenter } from "@/components/notification-center";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 
@@ -813,7 +814,7 @@ export const Sidebar = memo(() => {
     };
 
     return (
-      <div key={item.id} style={{ paddingLeft: level > 0 ? `${Math.min(level * 12, 36)}px` : "0" }}>
+      <div key={item.id} style={{ paddingLeft: level > 0 ? `${Math.min(level * 32, 96)}px` : "0" }}>
         <div
           className={cn(
             "group relative flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all duration-200 min-h-[40px]",
@@ -879,7 +880,7 @@ export const Sidebar = memo(() => {
           handleMouseLeave();
         }}
       >
-        <div className={cn("bg-card border border-border rounded-lg shadow-lg p-2", hasChildren || item.id === "favorites" ? "min-w-[200px]" : "px-3 py-2")}>
+        <div className={cn("bg-card border border-border rounded-lg shadow-sm p-2", hasChildren || item.id === "favorites" ? "min-w-[200px]" : "px-3 py-2")}>
           {item.id === "favorites" ? (
             <div className="space-y-1">
               <button
@@ -973,7 +974,7 @@ export const Sidebar = memo(() => {
 
   return (
     <>
-      <aside className={cn("flex flex-col bg-card border-r border-border transition-all duration-300 relative", isOpen ? "w-64" : "w-16")}>
+      <aside className={cn("flex flex-col bg-card border-r border-border transition-all duration-300 relative", isOpen ? "w-72" : "w-16")}>
         {/* Header Section - User Profile & Theme Toggle */}
         <div className={cn("border-b relative h-16 flex items-center", isDark ? "border-neutral-800" : "border-neutral-200")}>
           {isOpen ? (
@@ -997,8 +998,9 @@ export const Sidebar = memo(() => {
                 </div>
               </div>
 
-              {/* Theme Toggle */}
-              <div className="flex-shrink-0 px-2">
+              {/* Notification Center and Theme Toggle */}
+              <div className="flex-shrink-0 flex items-center gap-1 px-2">
+                <NotificationCenter />
                 <ThemeToggle />
               </div>
             </>
@@ -1008,7 +1010,7 @@ export const Sidebar = memo(() => {
               <div
                 className={cn(
                   "w-8 h-8 bg-primary rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 relative",
-                  showUserMenu && "scale-110 shadow-lg",
+                  showUserMenu && "scale-110 shadow-sm",
                 )}
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 onMouseEnter={() => setHoveredItemId("user-menu")}
@@ -1023,7 +1025,7 @@ export const Sidebar = memo(() => {
           {showUserMenu && (
             <div
               className={cn(
-                "absolute z-50 bg-card border border-border rounded-lg shadow-lg p-1 animate-in fade-in-0 zoom-in-95",
+                "absolute z-50 bg-card border border-border rounded-lg shadow-sm p-1 animate-in fade-in-0 zoom-in-95",
                 isOpen ? "top-full left-3 right-3 mt-2" : "left-full top-0 ml-2 min-w-[200px]",
               )}
             >
@@ -1036,6 +1038,16 @@ export const Sidebar = memo(() => {
               >
                 <IconUser size={16} />
                 <span>Perfil</span>
+              </button>
+              <button
+                onClick={() => {
+                  navigate(routes.profileNotifications);
+                  setShowUserMenu(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors"
+              >
+                <IconSettings size={16} />
+                <span>Notificações</span>
               </button>
               <button onClick={() => logout()} className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors text-destructive">
                 <IconLogout size={16} />
@@ -1095,7 +1107,7 @@ export const Sidebar = memo(() => {
                 </div>
 
                 {showFavorites && isOpen && (
-                  <div className="mt-1 space-y-1 pl-4">
+                  <div className="mt-1 space-y-1 pl-12">
                     {favorites.map((fav) => (
                       <div
                         key={fav.id}

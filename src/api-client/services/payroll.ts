@@ -207,7 +207,9 @@ export const payrollService = {
    * @deprecated Not available in new controller
    */
   finalizeMonth: (_year: number, _month: number) => {
-    console.warn('finalizeMonth is deprecated - payrolls are finalized by cronjob');
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('finalizeMonth is deprecated - payrolls are finalized by cronjob');
+    }
     return Promise.resolve({ data: { success: false, message: 'Deprecated' } });
   },
 

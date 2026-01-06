@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
-import { Loader2, Camera, Trash2, User as UserIcon, Mail, Phone, MapPin, Briefcase, Save, RefreshCw, Ruler } from "lucide-react";
+import { Loader2, Camera, Trash2, User as UserIcon, Mail, Phone, MapPin, Briefcase, Save, RefreshCw, Ruler, Bell } from "lucide-react";
 import { getProfile, updateProfile, uploadPhoto, deletePhoto } from "@/api-client";
 import type { User } from "@/types";
 import type { UserUpdateFormData } from "@/schemas";
@@ -16,6 +16,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { routes } from "@/constants";
 import { useAuth } from "@/contexts/auth-context";
 import { useCepLookup } from "@/hooks/use-cep-lookup";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -140,7 +142,9 @@ export function ProfilePage() {
         setUser(response.data);
       }
     } catch (error: any) {
-      console.error("Error updating profile:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating profile:", error);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -188,7 +192,9 @@ export function ProfilePage() {
         }
       }
     } catch (error: any) {
-      console.error("Error uploading photo:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error uploading photo:", error);
+      }
       // Restore previous photo on error
       if (user?.avatar) {
         setPhotoPreview(user.avatar.url || null);
@@ -210,7 +216,9 @@ export function ProfilePage() {
         setPhotoPreview(null);
       }
     } catch (error: any) {
-      console.error("Error deleting photo:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting photo:", error);
+      }
     } finally {
       setIsUploadingPhoto(false);
       setShowDeletePhotoDialog(false);
@@ -243,7 +251,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className={cn("flex flex-col h-full", DETAIL_PAGE_SPACING.CONTAINER)}>
       <div className="flex-shrink-0">
         <PageHeader
           title="Meu Perfil"
@@ -253,6 +261,13 @@ export function ProfilePage() {
             { label: "Meu Perfil" }
           ]}
           actions={[
+            {
+              key: "notifications",
+              label: "Notificações",
+              icon: Bell,
+              onClick: () => window.location.href = routes.profileNotifications,
+              variant: "outline",
+            },
             {
               key: "refresh",
               label: "Atualizar Dados",

@@ -51,7 +51,7 @@ export function QuickAccessCard({ title, icon: Icon, count, color = "blue", onCl
   const colors = colorMap[color];
 
   return (
-    <Card className={cn("hover:shadow-md transition-all hover:scale-105 cursor-pointer", className)} onClick={onClick}>
+    <Card className={cn("hover:shadow-sm transition-all hover:scale-105 cursor-pointer", className)} onClick={onClick}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

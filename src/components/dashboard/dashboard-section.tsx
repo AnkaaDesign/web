@@ -13,7 +13,7 @@ interface DashboardSectionProps {
 export function DashboardSection({ title, children, className, action, scrollable = false, maxHeight = "max-h-[400px]" }: DashboardSectionProps) {
   return (
     <div className={cn("bg-card dark:bg-card rounded-lg shadow-sm", className)}>
-      <div className="flex items-center justify-between p-6 pb-4">
+      <div className="flex items-center justify-between p-4 pb-4">
         <h3 className="text-lg font-semibold text-foreground">{title}</h3>
         {action}
       </div>

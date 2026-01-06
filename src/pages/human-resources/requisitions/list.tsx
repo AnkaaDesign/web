@@ -4,6 +4,8 @@ import { TimeAdjustmentRequests } from "@/components/integrations/secullum/reque
 import { IconClockEdit, IconRefresh, IconCircleCheck, IconCircleX } from "@tabler/icons-react";
 import { routes } from "../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 function RequisicosList() {
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
@@ -70,11 +72,10 @@ function RequisicosList() {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-6">
+    <div className="h-full flex flex-col px-4 pt-4">
       <div className="flex-shrink-0">
         <PageHeader
           title="Ajustes de Ponto"
-          icon={IconClockEdit}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Recursos Humanos", href: routes.humanResources.root },
@@ -83,11 +84,15 @@ function RequisicosList() {
           actions={getHeaderActions()}
         />
       </div>
-      <TimeAdjustmentRequests
-        className="flex-1 min-h-0"
-        onSelectedRequestChange={setSelectedRequest}
-        onActionsChange={handleActionsChange}
-      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="mt-4">
+          <TimeAdjustmentRequests
+            className="h-full"
+            onSelectedRequestChange={setSelectedRequest}
+            onActionsChange={handleActionsChange}
+          />
+        </div>
+      </div>
     </div>
   );
 }

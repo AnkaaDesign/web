@@ -89,7 +89,7 @@ export function PaintTypeRelatedPaintsCard({ paintType }: PaintTypeRelatedPaints
   }
 
   return (
-    <Card className="shadow-sm border border-border" level={1}>
+    <Card className="shadow-sm border border-border">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">

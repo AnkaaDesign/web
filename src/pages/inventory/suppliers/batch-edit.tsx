@@ -6,7 +6,7 @@ import { routes, FAVORITE_PAGES } from "../../../constants";
 import { SupplierBatchEditTable } from "@/components/inventory/supplier/batch-edit/supplier-batch-edit-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { toast } from "sonner";
 import { IconTruck, IconAlertTriangle, IconLoader, IconDeviceFloppy, IconX, IconArrowLeft } from "@tabler/icons-react";
 import { usePageTracker } from "@/hooks/use-page-tracker";
@@ -58,7 +58,7 @@ export default function SupplierBatchEditPage() {
 
   if (supplierIds.length === 0) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -82,7 +82,7 @@ export default function SupplierBatchEditPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <div>
@@ -101,7 +101,7 @@ export default function SupplierBatchEditPage() {
 
   if (error || !hasValidSuppliers) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -162,22 +162,21 @@ export default function SupplierBatchEditPage() {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      <div className="flex-shrink-0">
-        <PageHeaderWithFavorite
-          title="Editar Fornecedores em Lote"
-          icon={IconTruck}
-          favoritePage={FAVORITE_PAGES.ESTOQUE_FORNECEDORES_LISTAR}
-          breadcrumbs={[
-            { label: "Início", href: "/" },
-            { label: "Estoque", href: routes.inventory.root },
-            { label: "Fornecedores", href: routes.inventory.suppliers.root },
-            { label: "Editar em Lote" },
-          ]}
-          actions={actions}
-        />
-      </div>
-      <div className="flex-1 overflow-hidden">
+    <div className="h-full flex flex-col bg-background px-4 pt-4">
+      <PageHeader
+        title="Editar Fornecedores em Lote"
+        icon={IconTruck}
+        favoritePage={FAVORITE_PAGES.ESTOQUE_FORNECEDORES_LISTAR}
+        breadcrumbs={[
+          { label: "Início", href: "/" },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Fornecedores", href: routes.inventory.suppliers.root },
+          { label: "Editar em Lote" },
+        ]}
+        actions={actions}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-hidden pt-4 pb-6">
         <SupplierBatchEditTable
           suppliers={suppliers}
           onCancel={handleCancel}

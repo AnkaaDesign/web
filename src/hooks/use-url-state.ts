@@ -19,7 +19,9 @@ export function useUrlState<T = Record<string, any>>() {
         try {
           return transformer(value);
         } catch (error) {
-          console.warn(`Failed to parse URL param "${key}":`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn(`Failed to parse URL param "${key}":`, error);
+          }
           return defaultValue;
         }
       }
@@ -198,7 +200,9 @@ export function useTypedUrlState<T extends Record<string, any>>(config: {
 
       // Validate if validator is provided
       if (value !== undefined && fieldConfig?.validate && !fieldConfig.validate(value)) {
-        console.warn(`Invalid value for URL param "${String(key)}":`, value);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`Invalid value for URL param "${String(key)}":`, value);
+        }
         return;
       }
 
@@ -215,7 +219,9 @@ export function useTypedUrlState<T extends Record<string, any>>(config: {
         const fieldConfig = config[key as keyof T];
 
         if (value !== undefined && fieldConfig?.validate && !fieldConfig.validate(value)) {
-          console.warn(`Invalid value for URL param "${key}":`, value);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn(`Invalid value for URL param "${key}":`, value);
+          }
           return;
         }
 

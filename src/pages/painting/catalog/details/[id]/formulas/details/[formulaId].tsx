@@ -10,6 +10,7 @@ import { LoadingPage } from "@/components/navigation/loading-page";
 import { ErrorCard } from "@/components/ui/error-card";
 import { FormulaCalculator } from "@/components/painting/formula/formula-calculator";
 import { PageHeader } from "@/components/ui/page-header";
+import { PAGE_SPACING } from "@/lib/layout-constants";
 
 export default function FormulaDetailsPage() {
   const { id: paintId, formulaId } = useParams<{ id: string; formulaId: string }>();
@@ -89,30 +90,31 @@ export default function FormulaDetailsPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="h-full flex flex-col px-4 pt-4">
       <PageHeader
         variant="detail"
         title={`${paint?.name || "Tinta"} - ${formula.description}`}
-        icon={IconFlask}
         breadcrumbs={breadcrumbItems}
         actions={[
-          {
-            key: "refresh",
-            label: "Atualizar",
-            icon: IconRefresh,
-            onClick: refetch,
-          },
+        {
+          key: "refresh",
+          label: "Atualizar",
+          icon: IconRefresh,
+          onClick: refetch,
+        },
         ]}
       />
-
-      {/* Main content */}
-      {/* Formula calculator */}
-      <Card className="shadow-sm border border-border animate-in fade-in-50 duration-500" level={1}>
-        <CardContent className="pt-6">
-          <FormulaCalculator formula={formula} onStartProduction={handleStartProduction} />
-        </CardContent>
-      </Card>
+      <div className="flex-1 overflow-y-auto pb-6">
+        {/* Main content */}
+        {/* Formula calculator */}
+        <div className="mt-4">
+          <Card className="shadow-sm border border-border animate-in fade-in-50 duration-500">
+            <CardContent className="pt-6">
+              <FormulaCalculator formula={formula} onStartProduction={handleStartProduction} />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

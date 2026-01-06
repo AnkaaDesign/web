@@ -1,9 +1,11 @@
 import { PaintCatalogueList } from "@/components/painting/catalogue/list/paint-catalogue-list";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { IconPaint } from "@tabler/icons-react";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 /**
  * View-only Catalog List Page for Designers
@@ -26,20 +28,23 @@ export default function CatalogListPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.DESIGNER]}>
-      <div className="flex flex-col h-full space-y-4">
+      <div className="h-full flex flex-col px-4 pt-4">
         <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
+          <PageHeader
             title="Catálogo de Tintas"
-            icon={IconPaint}
             favoritePage={FAVORITE_PAGES.PINTURA_CATALOGO_LISTAR}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Catálogo" }]}
             actions={actions}
           />
         </div>
-        <PaintCatalogueList
-          className="flex-1 min-h-0"
-          viewOnly={true}
-        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="mt-4">
+            <PaintCatalogueList
+              className="h-full"
+              viewOnly={true}
+            />
+          </div>
+        </div>
       </div>
     </PrivilegeRoute>
   );

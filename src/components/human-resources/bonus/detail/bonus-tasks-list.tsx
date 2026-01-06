@@ -89,7 +89,7 @@ export function BonusTasksList({
   const commissionStats = useMemo(() => getCommissionStats(tasks), [tasks]);
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border w-full", className)}>
+    <Card className={cn("flex flex-col shadow-sm border border-border w-full", className)}>
       <CardHeader className="pb-4">
         <CardTitle className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-2">

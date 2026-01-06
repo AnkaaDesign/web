@@ -334,13 +334,15 @@ export function CategoryList({ className }: CategoryListProps) {
       setDeleteDialog(null);
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error(`Error deleting categor${deleteDialog.categories.length > 1 ? "ies" : "y"}:`, error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`Error deleting categor${deleteDialog.categories.length > 1 ? "ies" : "y"}:`, error);
+      }
     }
   };
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex-1 relative">
@@ -363,7 +365,7 @@ export function CategoryList({ className }: CategoryListProps) {
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={handleClearAllFilters} className="px-1 py-1" />}
 
         {/* Paginated table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <CategoryTable
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}

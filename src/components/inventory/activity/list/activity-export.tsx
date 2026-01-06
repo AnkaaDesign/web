@@ -74,7 +74,9 @@ export function ActivityExport({ className, filters, currentActivities = [], tot
 
       return allActivities;
     } catch (error) {
-      console.error("Error fetching all activities:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching all activities:", error);
+      }
       toast.error("Erro ao buscar atividades para exportação");
       throw error;
     }
@@ -97,7 +99,9 @@ export function ActivityExport({ className, filters, currentActivities = [], tot
 
       toast.success(`Exportação ${format.toUpperCase()} concluída com sucesso!`);
     } catch (error) {
-      console.error("Export error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Export error:", error);
+      }
       toast.error("Erro ao exportar dados");
       throw error;
     }

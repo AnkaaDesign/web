@@ -1031,7 +1031,9 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
       // Refresh changelog data
       await refetch();
     } catch (error: any) {
-      console.error("Rollback error:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Rollback error:", error);
+      }
 
       // Error toast is also handled by axios interceptor
       // Only log the error for debugging
@@ -1281,7 +1283,7 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)} level={1} style={maxHeight ? { maxHeight, height: maxHeight } : undefined}>
+    <Card className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)} style={maxHeight ? { maxHeight, height: maxHeight } : undefined}>
       <CardHeader className="pb-4 flex-shrink-0">
         <CardTitle className="flex items-center gap-2">
           <IconHistory className="h-5 w-5 text-muted-foreground" />

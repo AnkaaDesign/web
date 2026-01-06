@@ -114,7 +114,9 @@ export function useBackupProgress(
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log('Connected to backup progress WebSocket');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Connected to backup progress WebSocket');
+      }
       setIsConnected(true);
       setError(null);
 
@@ -123,12 +125,16 @@ export function useBackupProgress(
     });
 
     socket.on('disconnect', () => {
-      console.log('Disconnected from backup progress WebSocket');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Disconnected from backup progress WebSocket');
+      }
       setIsConnected(false);
     });
 
     socket.on('progress', (data: BackupProgressData) => {
-      console.log('Progress update:', data);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Progress update:', data);
+      }
 
       // Update state
       setProgressData(data);
@@ -149,7 +155,9 @@ export function useBackupProgress(
     });
 
     socket.on('error', (err: any) => {
-      console.error('WebSocket error:', err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('WebSocket error:', err);
+      }
       const error = new Error(err.message || 'WebSocket connection error');
       setError(error);
       onError?.(error);

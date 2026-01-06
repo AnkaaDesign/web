@@ -106,7 +106,9 @@ const trackDownload = (file: AnkaaFile, config: DownloadConfig) => {
     const recentDownloads = downloads.slice(-100);
     localStorage.setItem("file_downloads", JSON.stringify(recentDownloads));
   } catch (error) {
-    console.warn("Failed to track download:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to track download:", error);
+    }
   }
 };
 
@@ -203,7 +205,9 @@ const downloadWithProgress = async (file: AnkaaFile, config: DownloadConfig): Pr
       fileName: file.filename,
     };
   } catch (error) {
-    console.error("Download error:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Download error:", error);
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : "Erro desconhecido durante o download",

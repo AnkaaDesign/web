@@ -32,12 +32,6 @@ export const TaskSetSectorModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
   const batchMutations = useTaskBatchMutations();
   const { batchUpdateAsync: batchUpdate } = batchMutations;
 
-  // Debug log to verify hook returns correctly
-  console.log('[TaskSetSectorModal] Hook result:', {
-    hasBatchMutations: !!batchMutations,
-    hasBatchUpdateAsync: !!batchMutations?.batchUpdateAsync,
-    batchUpdateType: typeof batchUpdate,
-  });
 
   // Load production sectors only
   const { data: sectorsData, isLoading: sectorsLoading } = useSectors({

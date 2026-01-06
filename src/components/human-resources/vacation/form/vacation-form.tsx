@@ -133,15 +133,6 @@ export function VacationForm(props: VacationFormProps) {
     return () => subscription.unsubscribe();
   }, [form]);
 
-  // Debug validation errors in development
-  useEffect(() => {
-    if (process.env.NODE_ENV === "development" && Object.keys(errors).length > 0) {
-      console.log("Vacation form validation errors:", {
-        errors,
-        currentValues: form.getValues(),
-      });
-    }
-  }, [errors, form]);
 
   // Track dirty state without triggering validation
   useEffect(() => {
@@ -233,7 +224,9 @@ export function VacationForm(props: VacationFormProps) {
       }
     } catch (error) {
       // Error is handled by the parent component or API client
-      console.error("Error submitting vacation form:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error submitting vacation form:", error);
+      }
     }
   };
 

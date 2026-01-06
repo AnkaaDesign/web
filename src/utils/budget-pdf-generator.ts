@@ -38,7 +38,9 @@ export async function generateBudgetPDF(data: BudgetPDFData): Promise<void> {
   const { task } = data;
 
   if (!task.budget || !task.budget.items || task.budget.items.length === 0) {
-    console.warn('No budget data available to generate PDF');
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('No budget data available to generate PDF');
+    }
     return;
   }
 
@@ -60,7 +62,9 @@ export async function generateBudgetPDF(data: BudgetPDFData): Promise<void> {
     const logoHeight = 15; // Maintain proper aspect ratio
     doc.addImage(logoBase64, 'PNG', margin, 12, logoWidth, logoHeight);
   } catch (error) {
-    console.warn('Could not load company logo:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('Could not load company logo:', error);
+    }
     // Fallback to text logo
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
@@ -77,7 +81,9 @@ export async function generateBudgetPDF(data: BudgetPDFData): Promise<void> {
       const customerLogoHeight = 15;
       doc.addImage(customerLogoBase64, 'PNG', pageWidth - margin - customerLogoWidth, 12, customerLogoWidth, customerLogoHeight);
     } catch (error) {
-      console.warn('Could not load customer logo:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Could not load customer logo:', error);
+      }
     }
   }
 

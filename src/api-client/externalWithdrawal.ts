@@ -279,19 +279,25 @@ export class ExternalWithdrawalItemService {
     data: ExternalWithdrawalItemBatchUpdateFormData,
     queryParams?: ExternalWithdrawalItemQueryFormData,
   ): Promise<ExternalWithdrawalItemBatchUpdateResponse<ExternalWithdrawalItem>> {
-    console.log("[ExternalWithdrawalItemService] Batch update data received:", JSON.stringify(data, null, 2));
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[ExternalWithdrawalItemService] Batch update data received:", JSON.stringify(data, null, 2));
+    }
 
     // Fix array serialization issue directly here
     let fixedData = data;
     if (data.externalWithdrawalItems && typeof data.externalWithdrawalItems === "object" && !Array.isArray(data.externalWithdrawalItems)) {
-      console.log("[ExternalWithdrawalItemService] Converting externalWithdrawalItems from object to array");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("[ExternalWithdrawalItemService] Converting externalWithdrawalItems from object to array");
+      }
       fixedData = {
         ...data,
         externalWithdrawalItems: Object.values(data.externalWithdrawalItems),
       };
     }
 
-    console.log("[ExternalWithdrawalItemService] Batch update data being sent:", JSON.stringify(fixedData, null, 2));
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[ExternalWithdrawalItemService] Batch update data being sent:", JSON.stringify(fixedData, null, 2));
+    }
     const response = await apiClient.put<ExternalWithdrawalItemBatchUpdateResponse<ExternalWithdrawalItem>>(`${this.basePath}/batch`, fixedData, {
       params: queryParams,
     });

@@ -309,7 +309,9 @@ export const debugUtils = {
 
       const hasModifiedClass = classes.includes("bg-yellow");
       if (isModified !== hasModifiedClass) {
-        console.warn(`[Tracking Warning] Class mismatch for ${entryId}.${fieldName}: isModified=${isModified}, hasModifiedClass=${hasModifiedClass}`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`[Tracking Warning] Class mismatch for ${entryId}.${fieldName}: isModified=${isModified}, hasModifiedClass=${hasModifiedClass}`);
+        }
       }
     }
   },

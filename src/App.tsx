@@ -10,6 +10,9 @@ import { MainLayout } from "@/layouts/main-layout";
 import { AuthLayout } from "@/layouts/auth-layout";
 import { Toaster } from "@/components/ui/sonner";
 import { setupWebNotifications } from "@/lib/setup-notifications";
+import { PushNotificationSetup } from "@/components/common/push-notification-setup";
+import { SocketNotificationsListener } from "@/components/common/socket-notifications-listener";
+import { SocketReconnectHandler } from "@/components/common/socket-reconnect-handler";
 
 // Loading component for lazy loading
 const PageLoader = () => (
@@ -36,6 +39,7 @@ const FavoritesPage = lazy(() => import("@/pages/favorites").then((module) => ({
 
 // Profile
 const ProfilePage = lazy(() => import("@/pages/profile").then((module) => ({ default: module.ProfilePage })));
+const NotificationPreferencesPage = lazy(() => import("@/pages/profile/notification-preferences").then((module) => ({ default: module.NotificationPreferencesPage })));
 
 // Administration
 const Administration = lazy(() => import("@/pages/administration/root").then((module) => ({ default: module.AdministrationRootPage })));
@@ -225,7 +229,7 @@ const ProductionTasksBatchEdit = lazy(() => import("@/pages/production/schedule/
 const ProductionTasksCreate = lazy(() => import("@/pages/production/schedule/create"));
 const ProductionTasksEdit = lazy(() => import("@/pages/production/schedule/edit/[id]").then((module) => ({ default: module.TaskEditPage })));
 const ProductionTasksDetails = lazy(() => import("@/pages/production/schedule/details/[id]").then((module) => ({ default: module.TaskDetailsPage })));
-const ProductionScheduleOnHold = lazy(() => import("@/pages/production/schedule-on-hold").then((module) => ({ default: module.ScheduleOnHoldPage })));
+const ProductionPreparation = lazy(() => import("@/pages/production/em-preparacao").then((module) => ({ default: module.PreparationPage })));
 const ProductionGarages = lazy(() => import("@/pages/production/barracoes").then((module) => ({ default: module.GaragesPage })));
 
 // Human Resources
@@ -303,9 +307,12 @@ function App() {
     <Router>
       <ThemeProvider defaultTheme="light" storageKey="ankaa-ui-theme">
         <AuthProvider>
+          <SocketNotificationsListener />
+          <SocketReconnectHandler />
           <FavoritesProvider>
             <FileViewerProvider>
               <Toaster />
+              <PushNotificationSetup />
               <Routes>
               {/* Auth routes */}
               <Route element={<AuthLayout />}>
@@ -354,6 +361,16 @@ function App() {
                   }
                 />
 
+                {/* Notifications route */}
+                <Route
+                  path={routes.profileNotifications}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <NotificationPreferencesPage />
+                    </Suspense>
+                  }
+                />
+
                 {/* Production routes */}
                 <Route
                   path={routes.production.root}
@@ -379,6 +396,7 @@ function App() {
                     </Suspense>
                   }
                 />
+                {/* Task creation removed - tasks are now created in the "in preparation" page
                 <Route
                   path={routes.production.schedule.create}
                   element={
@@ -387,8 +405,25 @@ function App() {
                     </Suspense>
                   }
                 />
+                */}
                 <Route
                   path={routes.production.schedule.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProductionTasksEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.production.preparation.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <ProductionTasksEdit />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.production.history.edit(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ProductionTasksEdit />
@@ -405,15 +440,15 @@ function App() {
                 />
 
                 <Route
-                  path={routes.production.scheduleOnHold.root}
+                  path={routes.production.preparation.root}
                   element={
                     <Suspense fallback={<PageLoader />}>
-                      <ProductionScheduleOnHold />
+                      <ProductionPreparation />
                     </Suspense>
                   }
                 />
                 <Route
-                  path={routes.production.scheduleOnHold.details(":id")}
+                  path={routes.production.preparation.details(":id")}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ProductionTasksDetails />

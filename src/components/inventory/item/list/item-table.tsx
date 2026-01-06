@@ -139,7 +139,6 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
     // Only update the ref if the content actually changed
     const currentParamsString = JSON.stringify(params);
     if (currentParamsString !== queryParamsStringRef.current) {
-      console.log("[ItemTable] QueryParams content changed, updating ref");
       queryParamsStringRef.current = currentParamsString;
       queryParamsRef.current = params;
     }

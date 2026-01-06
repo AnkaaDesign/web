@@ -10,7 +10,9 @@ function htmlEnvReplace(apiUrl: string): Plugin {
   return {
     name: "html-env-replace",
     transformIndexHtml(html) {
-      console.log(`[htmlEnvReplace] Using API URL: ${apiUrl}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[htmlEnvReplace] Using API URL: ${apiUrl}`);
+      }
       return html.replace(/%VITE_API_URL%/g, apiUrl);
     },
   };
@@ -69,6 +71,8 @@ export default defineConfig(({ mode }) => {
       minify: mode === "production" ? "esbuild" : false,
       // Increase chunk size warning limit to reduce noise for intentionally large chunks
       chunkSizeWarningLimit: 1000,
+      // Copy service worker to output directory
+      copyPublicDir: true,
       commonjsOptions: {
         transformMixedEsModules: true,
         strictRequires: false,

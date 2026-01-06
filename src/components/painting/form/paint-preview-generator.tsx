@@ -215,7 +215,9 @@ async function loadAllTextures(): Promise<LoadedTextures> {
     results.metallicNormal = metallicNormal;
     results.pearlNormal = pearlNormal;
   } catch (e) {
-    console.warn("Failed to load some textures:", e);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to load some textures:", e);
+    }
   }
 
   return results;

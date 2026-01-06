@@ -92,7 +92,7 @@ export const MetricCards = ({ metrics, columns = 4, className }: MetricCardsProp
 
         return (
           <Card key={index} className="overflow-hidden">
-            <CardContent className="p-6">
+            <CardContent className="p-4">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   {MetricIcon && (

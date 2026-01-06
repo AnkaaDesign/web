@@ -85,16 +85,20 @@ export const HolidayForm = forwardRef<{ submit: () => void; isSubmitting: boolea
         await props.onSubmit(data);
       } else {
         // Fallback if no onSubmit provided
-        console.warn("No onSubmit handler provided to HolidayForm");
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn("No onSubmit handler provided to HolidayForm");
+        }
       }
     } catch (error) {
-      console.error("Error submitting form:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error submitting form:", error);
+      }
     }
   };
 
   return (
     <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden min-h-0">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-y-auto space-y-6">
             <Card>

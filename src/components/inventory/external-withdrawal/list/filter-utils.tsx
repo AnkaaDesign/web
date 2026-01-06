@@ -146,7 +146,9 @@ export const createFilterRemover = (filters: Partial<ExternalWithdrawalGetManyFo
         delete newFilters.returnedAt;
         break;
       default:
-        console.warn(`Unknown filter key: ${filterKey}`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`Unknown filter key: ${filterKey}`);
+        }
     }
 
     onFilterChange(newFilters);

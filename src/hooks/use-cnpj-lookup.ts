@@ -193,7 +193,9 @@ export function useCnpjLookup(options?: UseCnpjLookupOptions) {
         options?.onSuccess?.(data);
         return data;
       } catch (error) {
-        console.error("Error looking up CNPJ:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error looking up CNPJ:", error);
+        }
         options?.onError?.(error as Error);
         return null;
       } finally {

@@ -29,7 +29,7 @@ export function GroundPaintsCard({ paint, className }: GroundPaintsCardProps) {
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6 flex-shrink-0">
         <CardTitle className="flex items-center gap-2">
           <IconLayersIntersect className="h-5 w-5 text-muted-foreground" />

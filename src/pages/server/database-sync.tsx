@@ -43,7 +43,9 @@ export function DatabaseSyncPage() {
         setSyncStatus(response.data.data);
       }
     } catch (error: any) {
-      console.error("Failed to fetch sync status:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Failed to fetch sync status:", error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +98,7 @@ export function DatabaseSyncPage() {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="h-full flex flex-col px-4 pt-4">
       {/* Fixed Header */}
       <div className="flex-shrink-0">
         <PageHeader
@@ -120,10 +122,10 @@ export function DatabaseSyncPage() {
       </div>
 
       {/* Content Card */}
-      <Card className="flex-1 flex flex-col min-h-0" level={1}>
-        <CardContent className="flex-1 overflow-auto px-8 py-6 space-y-6">
+      <Card className="flex-1 flex flex-col min-h-0 mt-4">
+        <CardContent className="flex-1 overflow-auto px-8 py-6 space-y-6 pb-6">
           {/* Sync Overview */}
-          <Card level={2}>
+          <Card>
             <CardHeader className="px-8 py-6 pb-4">
               <CardTitle className="text-xl flex items-center gap-3">
                 <div className="p-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg">
@@ -152,7 +154,7 @@ export function DatabaseSyncPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Last Sync */}
-                <Card level={3}>
+                <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <IconClock className="h-4 w-4" />
@@ -191,7 +193,7 @@ export function DatabaseSyncPage() {
                 </Card>
 
                 {/* Sync Status */}
-                <Card level={3}>
+                <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <IconLoader className="h-4 w-4" />
@@ -218,7 +220,7 @@ export function DatabaseSyncPage() {
                 </Card>
 
                 {/* Next Scheduled Sync */}
-                <Card level={3}>
+                <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <IconClock className="h-4 w-4" />
@@ -243,7 +245,7 @@ export function DatabaseSyncPage() {
                 </Card>
 
                 {/* Manual Sync */}
-                <Card level={3}>
+                <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Sincronização Manual</CardTitle>
                   </CardHeader>
@@ -277,7 +279,7 @@ export function DatabaseSyncPage() {
 
           {/* Recent Logs */}
           {syncStatus?.recentLogs && (
-            <Card level={2}>
+            <Card>
               <CardHeader className="px-8 py-6 pb-4">
                 <CardTitle className="text-xl flex items-center gap-3">
                   <div className="p-2 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-lg">

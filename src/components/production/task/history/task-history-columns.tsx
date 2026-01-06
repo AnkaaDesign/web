@@ -12,10 +12,15 @@ import {
   COMMISSION_STATUS_LABELS,
   TASK_STATUS,
   TASK_STATUS_LABELS,
+  SERVICE_ORDER_STATUS,
+  SERVICE_ORDER_TYPE,
+  SERVICE_ORDER_TYPE_LABELS,
+  SERVICE_ORDER_TYPE_COLUMN_LABELS,
   getBadgeVariant
 } from "../../../../constants";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
+import { ServiceOrderCell } from "./service-order-cell";
 
 // Helper function to render date without icon
 const renderDate = (date: Date | null) => {
@@ -75,8 +80,13 @@ const getCompletedByUser = (task: Task) => {
 };
 
 // Define columns specific to history view
-export const createTaskHistoryColumns = (options?: { canViewPrice?: boolean }): TaskColumn[] => {
-  const { canViewPrice = true } = options || {};
+export const createTaskHistoryColumns = (options?: {
+  canViewPrice?: boolean;
+  currentUserId?: string;
+  includeFinancialColumns?: boolean; // Show FINANCIAL, NEGOTIATION, ARTWORK columns (only for agenda)
+  isAdmin?: boolean; // Admin users see all columns regardless of page
+}): TaskColumn[] => {
+  const { canViewPrice = true, currentUserId, includeFinancialColumns = false, isAdmin = false } = options || {};
 
   const allColumns: TaskColumn[] = [
   {
@@ -99,6 +109,32 @@ export const createTaskHistoryColumns = (options?: { canViewPrice?: boolean }): 
     minWidth: "150px",
     formatter: (value: string, row: Task) => {
       if (!row.customer) return <span className="text-muted-foreground">-</span>;
+      return <TruncatedTextWithTooltip text={value} className="truncate" />;
+    },
+  },
+  {
+    id: "negotiatingWith.name",
+    header: "NEGOCIANDO COM",
+    accessorFn: (row) => row.negotiatingWith?.name || "",
+    sortable: true,
+    filterable: true,
+    defaultVisible: false,
+    width: "150px",
+    formatter: (value: string, row: Task) => {
+      if (!row.negotiatingWith) return <span className="text-muted-foreground">-</span>;
+      return <TruncatedTextWithTooltip text={value} className="truncate" />;
+    },
+  },
+  {
+    id: "invoiceTo.fantasyName",
+    header: "FATURAR PARA",
+    accessorFn: (row) => row.invoiceTo?.fantasyName || "",
+    sortable: true,
+    filterable: true,
+    defaultVisible: false,
+    width: "150px",
+    formatter: (value: string, row: Task) => {
+      if (!row.invoiceTo) return <span className="text-muted-foreground">-</span>;
       return <TruncatedTextWithTooltip text={value} className="truncate" />;
     },
   },
@@ -206,6 +242,19 @@ export const createTaskHistoryColumns = (options?: { canViewPrice?: boolean }): 
     },
   },
   {
+    id: "identificador",
+    header: "IDENTIFICADOR",
+    accessorFn: (row) => row.serialNumber || row.truck?.plate || "",
+    sortable: true,
+    filterable: true,
+    defaultVisible: true,
+    width: "140px",
+    formatter: (value: string) => {
+      if (!value) return <span className="text-muted-foreground">-</span>;
+      return <span className="font-mono truncate">{value}</span>;
+    },
+  },
+  {
     id: "serialNumber",
     header: "Nº SÉRIE",
     accessorKey: "serialNumber",
@@ -285,6 +334,16 @@ export const createTaskHistoryColumns = (options?: { canViewPrice?: boolean }): 
     formatter: (value: Date | null) => renderDate(value),
   },
   {
+    id: "forecastDate",
+    header: "PREVISÃO",
+    accessorKey: "forecastDate",
+    sortable: true,
+    filterable: true,
+    defaultVisible: true,
+    width: "120px",
+    formatter: (value: Date | null) => renderDate(value),
+  },
+  {
     id: "duration",
     header: "DURAÇÃO",
     accessorFn: (row) => {
@@ -306,6 +365,98 @@ export const createTaskHistoryColumns = (options?: { canViewPrice?: boolean }): 
     defaultVisible: false,
     minWidth: "200px",
     formatter: (_: any, row: Task) => renderServices(row),
+  },
+  {
+    id: "serviceOrders.production",
+    header: (
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.PRODUCTION]}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.PRODUCTION].toLowerCase()}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.PRODUCTION).length || 0,
+    sortable: true,
+    filterable: false,
+    defaultVisible: false,
+    width: "120px",
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} />,
+  },
+  {
+    id: "serviceOrders.financial",
+    header: (
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.FINANCIAL]}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.FINANCIAL].toLowerCase()}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.FINANCIAL).length || 0,
+    sortable: true,
+    filterable: false,
+    defaultVisible: false,
+    width: "120px",
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.FINANCIAL} />,
+  },
+  {
+    id: "serviceOrders.negotiation",
+    header: (
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.NEGOTIATION]}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.NEGOTIATION].toLowerCase()}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.NEGOTIATION).length || 0,
+    sortable: true,
+    filterable: false,
+    defaultVisible: false,
+    width: "140px",
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.NEGOTIATION} />,
+  },
+  {
+    id: "serviceOrders.artwork",
+    header: (
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.ARTWORK]}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.ARTWORK].toLowerCase()}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.ARTWORK).length || 0,
+    sortable: true,
+    filterable: false,
+    defaultVisible: false,
+    width: "100px",
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.ARTWORK} />,
   },
   {
     id: "price",
@@ -422,8 +573,30 @@ export const createTaskHistoryColumns = (options?: { canViewPrice?: boolean }): 
   },
   ];
 
+  // Filter columns based on permissions and page context
+  let filteredColumns = allColumns;
+
+  // Always remove the old "SERVIÇOS" column (replaced by individual service order type columns)
+  filteredColumns = filteredColumns.filter(col => col.id !== 'services');
+
+  // Admin users see all service order columns regardless of page
+  // For non-admin users:
+  // - Filter out FINANCIAL, NEGOTIATION, ARTWORK columns unless includeFinancialColumns is true
+  // - PRODUCTION column is always included
+  if (!isAdmin && !includeFinancialColumns) {
+    filteredColumns = filteredColumns.filter(col =>
+      col.id !== 'serviceOrders.financial' &&
+      col.id !== 'serviceOrders.negotiation' &&
+      col.id !== 'serviceOrders.artwork'
+    );
+  }
+
   // Filter out price column if user doesn't have permission
-  return canViewPrice ? allColumns : allColumns.filter(col => col.id !== 'price');
+  if (!canViewPrice) {
+    filteredColumns = filteredColumns.filter(col => col.id !== 'price');
+  }
+
+  return filteredColumns;
 };
 
 // Helper to get visible columns based on user preferences

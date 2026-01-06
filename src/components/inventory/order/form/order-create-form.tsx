@@ -17,7 +17,7 @@ import { Form, FormMessage } from "@/components/ui/form";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { FormSteps } from "@/components/ui/form-steps";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -143,7 +143,8 @@ export const OrderCreateForm = () => {
       shouldValidate: isTouched,
       shouldDirty: true
     });
-  }, [description, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [description]);
 
   useEffect(() => {
     const isTouched = form.formState.touchedFields.supplierId;
@@ -151,7 +152,8 @@ export const OrderCreateForm = () => {
       shouldValidate: isTouched,
       shouldDirty: true
     });
-  }, [supplierId, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplierId]);
 
   useEffect(() => {
     const isTouched = form.formState.touchedFields.forecast;
@@ -159,7 +161,8 @@ export const OrderCreateForm = () => {
       shouldValidate: isTouched,
       shouldDirty: true
     });
-  }, [forecast, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [forecast]);
 
   useEffect(() => {
     const isTouched = form.formState.touchedFields.notes;
@@ -167,7 +170,8 @@ export const OrderCreateForm = () => {
       shouldValidate: isTouched,
       shouldDirty: true
     });
-  }, [notes, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notes]);
 
 
   // Sync selected items to form (validate only if items field was already touched)
@@ -184,7 +188,8 @@ export const OrderCreateForm = () => {
       shouldValidate: isTouched,
       shouldDirty: true
     });
-  }, [selectedItems, quantities, prices, icmses, ipis, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedItems, quantities, prices, icmses, ipis]);
 
   // Auto-add first temporary item when switching to temporary mode
   useEffect(() => {
@@ -204,7 +209,8 @@ export const OrderCreateForm = () => {
         });
       }
     }
-  }, [orderItemMode, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderItemMode]);
 
   // Mutations
   const { createAsync, isLoading: isSubmitting } = useOrderMutations();
@@ -423,6 +429,32 @@ export const OrderCreateForm = () => {
     [toggleItemSelection],
   );
 
+  // Handle batch selection for shift-click range selection
+  const handleBatchSelectItems = useCallback(
+    (itemIds: string[], itemData: Record<string, { quantity?: number; price?: number; icms?: number; ipi?: number }>) => {
+      // Build the new selection state
+      const newSelected = new Set(selectedItems);
+      const newQuantities = { ...quantities };
+      const newPrices = { ...prices };
+      const newIcmses = { ...icmses };
+      const newIpis = { ...ipis };
+
+      itemIds.forEach((itemId) => {
+        if (!newSelected.has(itemId)) {
+          newSelected.add(itemId);
+          newQuantities[itemId] = itemData[itemId]?.quantity || 1;
+          newPrices[itemId] = itemData[itemId]?.price || 0;
+          newIcmses[itemId] = itemData[itemId]?.icms || 0;
+          newIpis[itemId] = itemData[itemId]?.ipi || 0;
+        }
+      });
+
+      // Batch update using the batch update function from URL state
+      batchUpdateSelection(newSelected, newQuantities, newPrices, newIcmses, newIpis);
+    },
+    [selectedItems, quantities, prices, icmses, ipis, batchUpdateSelection],
+  );
+
   const handleQuantityChange = useCallback(
     (itemId: string, quantity: number) => {
       const validQuantity = Math.max(0.01, quantity);
@@ -507,7 +539,9 @@ export const OrderCreateForm = () => {
       const isValid = await form.trigger();
       if (!isValid) {
         const errors = form.formState.errors;
-        console.error("Form validation errors:", errors);
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Form validation errors:", errors);
+        }
         if (errors.description) {
           toast.error(errors.description.message || "Erro na descrição");
         } else {
@@ -529,11 +563,6 @@ export const OrderCreateForm = () => {
 
       const hasFiles = newBudgetFiles.length > 0 || newReceiptFiles.length > 0 || newNfeFiles.length > 0;
 
-      console.log('[SUBMIT] Has files:', hasFiles);
-      console.log('[SUBMIT] Budget files:', newBudgetFiles.length);
-      console.log('[SUBMIT] Receipt files:', newReceiptFiles.length);
-      console.log('[SUBMIT] NFE files:', newNfeFiles.length);
-
       let result;
       if (hasFiles) {
         // Use FormData when there are files to upload
@@ -551,11 +580,9 @@ export const OrderCreateForm = () => {
           } : undefined
         );
 
-        console.log('[SUBMIT] Using FormData with files');
         result = await createAsync(formDataWithFiles as any);
       } else {
         // Use regular JSON payload when no files
-        console.log('[SUBMIT] Using JSON payload (no files)');
         result = await createAsync(orderData);
       }
 
@@ -578,7 +605,9 @@ export const OrderCreateForm = () => {
         }, 1500);
       }
     } catch (error) {
-      console.error("Submission error:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Submission error:", error);
+      }
       // Error is handled by the mutation hook, but let's log it
     }
   }, [validateCurrentStep, description, supplierId, forecast, notes, selectedItems, quantities, prices, icmses, ipis, orderItemMode, budgetFiles, receiptFiles, nfeFiles, suppliers, createAsync, form, clearAllSelections, navigate]);
@@ -608,41 +637,20 @@ export const OrderCreateForm = () => {
     const tempItems = watchedTemporaryItems || [];
     const hasDescription = watchedDescription?.trim().length > 0;
 
-    console.log('[VALIDATION] Mode:', orderItemMode);
-    console.log('[VALIDATION] Description:', watchedDescription, 'Valid:', hasDescription);
-    console.log('[VALIDATION] Form Temporary Items:', JSON.stringify(tempItems, null, 2));
-
     // Check based on order mode
     if (orderItemMode === "temporary") {
       // Temporary mode: check for valid temporary items
       const hasTemporaryItems = tempItems.length > 0;
-
-      console.log('[VALIDATION] Temp Items Count:', tempItems.length);
-      console.log('[VALIDATION] Has Temporary Items:', hasTemporaryItems);
 
       const allTemporaryItemsValid = tempItems.every((item: any, index: number) => {
         const hasDescription = item.temporaryItemDescription && item.temporaryItemDescription.trim() !== "";
         const hasValidQuantity = item.orderedQuantity && item.orderedQuantity > 0;
         const hasValidPrice = item.price !== undefined && item.price !== null && Number(item.price) > 0;
 
-        console.log(`[VALIDATION] Item ${index}:`, {
-          description: item.temporaryItemDescription,
-          hasDescription,
-          quantity: item.orderedQuantity,
-          hasValidQuantity,
-          price: item.price,
-          priceType: typeof item.price,
-          priceAsNumber: Number(item.price),
-          hasValidPrice,
-          isValid: hasDescription && hasValidQuantity && hasValidPrice
-        });
-
         return hasDescription && hasValidQuantity && hasValidPrice;
       });
 
-      console.log('[VALIDATION] All Items Valid:', allTemporaryItemsValid);
       const finalResult = hasDescription && hasTemporaryItems && allTemporaryItemsValid;
-      console.log('[VALIDATION] Final Result:', finalResult);
 
       return finalResult;
     } else {
@@ -1005,24 +1013,23 @@ export const OrderCreateForm = () => {
   }
 
   return (
-    <div className="flex flex-col h-full w-full">
-      <div className="flex-shrink-0 pb-4">
-        <PageHeaderWithFavorite
-          title="Cadastrar Pedido de Compra"
-          icon={IconShoppingCart}
-          favoritePage={FAVORITE_PAGES.ESTOQUE_PEDIDOS_CADASTRAR}
-          breadcrumbs={[
-            { label: "Início", href: "/" },
-            { label: "Estoque", href: "/estoque" },
-            { label: "Pedidos", href: routes.inventory.orders?.root || "/inventory/orders" },
-            { label: "Cadastrar" },
-          ]}
-          actions={navigationActions}
-        />
-      </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
+      <PageHeader
+        className="flex-shrink-0"
+        title="Cadastrar Pedido de Compra"
+        icon={IconShoppingCart}
+        favoritePage={FAVORITE_PAGES.ESTOQUE_PEDIDOS_CADASTRAR}
+        breadcrumbs={[
+          { label: "Início", href: "/" },
+          { label: "Estoque", href: "/estoque" },
+          { label: "Pedidos", href: routes.inventory.orders?.root || "/inventory/orders" },
+          { label: "Cadastrar" },
+        ]}
+        actions={navigationActions}
+      />
 
-      <Card className="flex-1 min-h-0 flex flex-col w-full shadow-sm border border-border">
-        <CardContent className="flex-1 flex flex-col p-6 overflow-hidden min-h-0">
+      <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
+            <CardContent className="flex-1 flex flex-col p-4 overflow-hidden min-h-0">
           <Form {...form}>
             <form
               className="flex flex-col h-full"
@@ -1057,9 +1064,8 @@ export const OrderCreateForm = () => {
                               <Input
                                 placeholder="Nome do pedido (ex: Pedido de materiais de escritório)"
                                 value={form.watch("description") || ""}
-                                onChange={(value) => {
-                                  // The custom Input component passes the cleaned value directly
-                                  const stringValue = value !== null && value !== undefined ? String(value) : "";
+                                onChange={(e) => {
+                                  const stringValue = e.target.value || "";
                                   // Update form state (validation will happen onBlur or when touched)
                                   form.setValue("description", stringValue, {
                                     shouldDirty: true,
@@ -1297,6 +1303,7 @@ export const OrderCreateForm = () => {
                     selectedItems={selectedItems}
                     onSelectItem={handleSelectItem}
                     onSelectAll={() => {}}
+                    onBatchSelectItems={handleBatchSelectItems}
                     quantities={quantities}
                     prices={prices}
                     icmses={icmses}
@@ -1600,8 +1607,8 @@ export const OrderCreateForm = () => {
               </div>
             </form>
           </Form>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
     </div>
   );
 };

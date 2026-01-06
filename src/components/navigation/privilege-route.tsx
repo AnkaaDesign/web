@@ -41,7 +41,7 @@ function checkUserPrivileges(user: any, requiredPrivilege: PrivilegeRequirement,
 function UnauthorizedAccess({ onGoBack }: { onGoBack: () => void }) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-lg">
+      <Card className="w-full max-w-md shadow-sm">
         <CardContent className="p-8 text-center space-y-6">
           <div className="flex justify-center">
             <IconShield className="h-16 w-16 text-red-500" />

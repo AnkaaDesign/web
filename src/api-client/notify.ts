@@ -25,9 +25,6 @@ export const notify = {
   show(type: MessageType, title: string, message?: string, options?: NotifyOptions) {
     if (this._handler) {
       this._handler(type, title, message, options);
-    } else {
-      // Default fallback - just log to console
-      console.log(`${type.toUpperCase()}: ${title}${message ? ` - ${message}` : ""}`);
     }
   },
 

@@ -133,7 +133,7 @@ function PaintSquare({ paint, index, onClick, onDragStart, onDragOver, onDragEnd
       onDragEnd={onDragEnd}
       className={cn(
         "rounded-lg transition-all duration-200",
-        "hover:scale-110 hover:z-20 hover:shadow-lg",
+        "hover:scale-110 hover:z-20 hover:shadow-sm",
         "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
         "group cursor-move overflow-hidden relative block",
         isDragging && "opacity-50 scale-95",

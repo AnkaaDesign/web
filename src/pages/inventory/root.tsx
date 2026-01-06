@@ -1,4 +1,4 @@
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, ORDER_STATUS_LABELS, STOCK_LEVEL } from "../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
@@ -46,6 +46,9 @@ import {
 } from "@/components/dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 export const InventoryRootPage = () => {
   const navigate = useNavigate();
@@ -404,27 +407,36 @@ export const InventoryRootPage = () => {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-        <div className="flex flex-col h-full space-y-4">
-          <div className="flex-shrink-0">
-            <PageHeaderWithFavorite
-              title="Estoque"
-              icon={IconPackage}
-              favoritePage={FAVORITE_PAGES.ESTOQUE}
-              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
-              actions={[
-                {
-                  key: "time-period",
-                  label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                  variant: "ghost",
-                  className: "p-0 hover:bg-transparent",
-                },
-              ]}
-            />
+        <div className="h-full flex flex-col bg-background">
+          {/* Fixed Header */}
+          <div className="flex-shrink-0 bg-background">
+            <div className="px-4 py-4">
+              <PageHeader
+                title="Estoque"
+                icon={IconPackage}
+                favoritePage={FAVORITE_PAGES.ESTOQUE}
+                breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
+                actions={[
+                  {
+                    key: "time-period",
+                    label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
+                    variant: "ghost",
+                    className: "p-0 hover:bg-transparent",
+                  },
+                ]}
+              />
+            </div>
           </div>
-          <div className="space-y-6">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-48 w-full" />
+
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto px-4 pb-6">
+            <Card>
+              <CardContent className="p-6 space-y-6">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-64 w-full" />
+                <Skeleton className="h-48 w-full" />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </PrivilegeRoute>
@@ -434,9 +446,51 @@ export const InventoryRootPage = () => {
   if (error) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-        <div className="flex flex-col h-full space-y-4">
-          <div className="flex-shrink-0">
-            <PageHeaderWithFavorite
+        <div className="h-full flex flex-col bg-background">
+          {/* Fixed Header */}
+          <div className="flex-shrink-0 bg-background">
+            <div className="px-4 py-4">
+              <PageHeader
+                title="Estoque"
+                icon={IconPackage}
+                favoritePage={FAVORITE_PAGES.ESTOQUE}
+                breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
+                actions={[
+                  {
+                    key: "time-period",
+                    label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
+                    variant: "ghost",
+                    className: "p-0 hover:bg-transparent",
+                  },
+                ]}
+              />
+            </div>
+          </div>
+
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto px-4 pb-6">
+            <Card>
+              <CardContent className="p-6">
+                <Alert variant="destructive">
+                  <AlertDescription>Erro ao carregar dashboard: {error.message}</AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </PrivilegeRoute>
+    );
+  }
+
+  const data = dashboard?.data;
+
+  return (
+    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
+      <div className="h-full flex flex-col bg-background">
+        {/* Fixed Header */}
+        <div className="flex-shrink-0 bg-background">
+          <div className="px-4 py-4">
+            <PageHeader
               title="Estoque"
               icon={IconPackage}
               favoritePage={FAVORITE_PAGES.ESTOQUE}
@@ -448,49 +502,22 @@ export const InventoryRootPage = () => {
                   variant: "ghost",
                   className: "p-0 hover:bg-transparent",
                 },
+                {
+                  key: "create",
+                  label: "Novo Produto",
+                  icon: IconPlus,
+                  onClick: () => navigate(routes.inventory.products.create),
+                  variant: "default",
+                },
               ]}
             />
           </div>
-          <Alert variant="destructive">
-            <AlertDescription>Erro ao carregar dashboard: {error.message}</AlertDescription>
-          </Alert>
-        </div>
-      </PrivilegeRoute>
-    );
-  }
-
-  const data = dashboard?.data;
-
-  return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Estoque"
-            icon={IconPackage}
-            favoritePage={FAVORITE_PAGES.ESTOQUE}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Estoque" }]}
-            actions={[
-              {
-                key: "time-period",
-                label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                variant: "ghost",
-                className: "p-0 hover:bg-transparent",
-              },
-              {
-                key: "create",
-                label: "Novo Produto",
-                icon: IconPlus,
-                onClick: () => navigate(routes.inventory.products.create),
-                variant: "default",
-              },
-            ]}
-          />
         </div>
 
-        {/* Main Content Card - All sections in a single scrollable container */}
-        <div className="flex-1 bg-card dark:bg-card rounded-lg shadow-sm border border-border overflow-hidden">
-          <div className="h-full overflow-y-auto p-6 space-y-6">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-4 pb-6">
+          <Card>
+            <CardContent className="p-6 space-y-6">
             {/* Quick Access Section */}
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-4">Acesso Rápido</h3>
@@ -686,7 +713,8 @@ export const InventoryRootPage = () => {
                 />
               </div>
             </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </PrivilegeRoute>

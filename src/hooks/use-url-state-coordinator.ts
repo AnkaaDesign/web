@@ -520,7 +520,9 @@ export function useUrlStateCoordinator<T extends UrlStateBase>(options: UseUrlSt
                 }
               }
             } catch (error) {
-              console.warn(`Failed to apply URL update for action ${update.action}:`, error);
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn(`Failed to apply URL update for action ${update.action}:`, error);
+              }
             }
           });
 
@@ -569,7 +571,9 @@ export function useUrlStateCoordinator<T extends UrlStateBase>(options: UseUrlSt
         processedActions.add(update.action);
       } else {
         // Handle conflict by merging or skipping
-        console.warn(`URL update conflict detected for action ${update.action}, skipping...`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`URL update conflict detected for action ${update.action}, skipping...`);
+        }
       }
     }
 
@@ -622,7 +626,9 @@ export function useUrlStateCoordinator<T extends UrlStateBase>(options: UseUrlSt
 
       // Prevent queue overflow
       if (updateQueueRef.current.length >= maxQueueSize) {
-        console.warn(`URL update queue is full (${maxQueueSize} items), clearing old updates`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`URL update queue is full (${maxQueueSize} items), clearing old updates`);
+        }
         updateQueueRef.current = updateQueueRef.current.slice(-maxQueueSize / 2);
       }
 

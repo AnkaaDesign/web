@@ -90,7 +90,9 @@ export function PpeFilters({ open, onOpenChange, filters, onFilterChange }: PpeF
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error("Error fetching brands:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching brands:", error);
+      }
       return {
         data: [],
         hasMore: false,

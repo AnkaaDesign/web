@@ -42,8 +42,6 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
     data: Paint[];
     hasMore: boolean;
   }> => {
-    console.log('[GeneralPaintingSelector] searchPaints called:', { search, page });
-
     const params: any = {
       orderBy: { name: "asc" },
       page: page,
@@ -65,15 +63,8 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
       params.searchingFor = search.trim();
     }
 
-    console.log('[GeneralPaintingSelector] API params:', params);
-
     try {
       const response = await getPaints(params);
-      console.log('[GeneralPaintingSelector] API response:', {
-        dataLength: response.data?.length,
-        hasMore: response.meta?.hasNextPage,
-        firstItem: response.data?.[0],
-      });
 
       const paints = response.data || [];
       const hasMore = response.meta?.hasNextPage || false;
@@ -88,7 +79,9 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error('[GeneralPaintingSelector] Error fetching paints:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[GeneralPaintingSelector] Error fetching paints:', error);
+      }
       return { data: [], hasMore: false };
     }
   };

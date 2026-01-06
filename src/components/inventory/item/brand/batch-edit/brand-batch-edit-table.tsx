@@ -130,7 +130,9 @@ export function BrandBatchEditTable({ brands, onCancel }: BrandBatchEditTablePro
       }
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error("Error updating brands in batch:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating brands in batch:", error);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -168,7 +170,7 @@ export function BrandBatchEditTable({ brands, onCancel }: BrandBatchEditTablePro
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-6 flex-1 overflow-hidden flex flex-col">
+        <CardContent className="p-4 flex-1 overflow-hidden flex flex-col">
           <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>

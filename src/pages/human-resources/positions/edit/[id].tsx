@@ -48,30 +48,22 @@ export const PositionEditPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="h-full flex flex-col">
-        {/* Fixed Header */}
-        <div className="flex-shrink-0">
-          <div className="max-w-3xl mx-auto">
-            <PageHeader
-              variant="form"
-              title="Editar Cargo"
-              icon={IconBriefcase}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Recursos Humanos" },
-                { label: "Cargos", href: routes.humanResources.positions.root },
-                { label: position?.data?.name || "Cargo", href: routes.humanResources.positions.details(id) },
-                { label: "Editar" },
-              ]}
-            />
-          </div>
-        </div>
-
-        {/* Scrollable Form Container */}
-        <div className="flex-1 overflow-y-auto mt-6">
-          <div className="max-w-3xl mx-auto h-full">
-            <PositionForm mode="update" position={position?.data as any} />
-          </div>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="form"
+          title="Editar Cargo"
+          icon={IconBriefcase}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Recursos Humanos" },
+            { label: "Cargos", href: routes.humanResources.positions.root },
+            { label: position?.data?.name || "Cargo", href: routes.humanResources.positions.details(id) },
+            { label: "Editar" },
+          ]}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <PositionForm mode="update" position={position?.data as any} />
         </div>
       </div>
     </PrivilegeRoute>

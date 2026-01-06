@@ -73,7 +73,9 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error("Error fetching users:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching users:", error);
+      }
       return {
         data: [],
         hasMore: false,
@@ -96,7 +98,9 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
         return result.data.id;
       }
     } catch (error) {
-      console.error("Error creating user:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating user:", error);
+      }
       throw error;
     } finally {
       setIsCreating(false);

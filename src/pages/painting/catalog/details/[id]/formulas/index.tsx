@@ -156,9 +156,9 @@ export default function PaintFormulasPage() {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-6">
+    <div className="h-full flex flex-col px-4 pt-4">
       {/* Page Header - Fixed */}
-      <div className="animate-in fade-in-50 duration-500">
+      <div className="flex-shrink-0 animate-in fade-in-50 duration-500">
         <PageHeader
           variant="default"
           title={`Fórmulas de ${paint.name}`}
@@ -174,10 +174,10 @@ export default function PaintFormulasPage() {
       </div>
 
       {/* Scrollable Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="space-y-4 animate-in fade-in-50 duration-700">
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="space-y-4 mt-4 animate-in fade-in-50 duration-700">
             {formulas.length === 0 ? (
-              <Card className="shadow-sm border border-border" level={1}>
+              <Card className="shadow-sm border border-border">
                 <CardContent className="pt-4 sm:pt-6">
                   <div className="text-center py-6 sm:py-8">
                     <IconFlask className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-muted-foreground/50 mb-3" />
@@ -188,10 +188,10 @@ export default function PaintFormulasPage() {
             ) : (
               formulas.map((formula) => (
                 <Collapsible key={formula.id} open={openFormulas.has(formula.id)} onOpenChange={() => toggleFormula(formula.id)}>
-                  <Card className="shadow-sm border border-border overflow-hidden" level={1}>
+                  <Card className="shadow-sm border border-border overflow-hidden">
                     <CollapsibleTrigger asChild>
                       <Button variant="ghost" className="w-full p-0 h-auto justify-start hover:bg-transparent">
-                        <div className="w-full p-4 sm:p-6">
+                        <div className="w-full p-4 sm:p-4">
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                               <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">

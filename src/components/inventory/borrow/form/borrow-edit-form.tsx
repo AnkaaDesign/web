@@ -14,7 +14,7 @@ import type { Borrow } from "../../../../types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
@@ -125,7 +125,9 @@ export function BorrowEditForm({ borrow }: BorrowEditFormProps) {
       await updateAsync({ id: borrow.id, data });
     } catch (error) {
       // Error is handled by the mutation hook
-      console.error("Error updating borrow:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error updating borrow:", error);
+      }
     }
   };
 
@@ -139,7 +141,7 @@ export function BorrowEditForm({ borrow }: BorrowEditFormProps) {
   return (
     <div className="flex flex-col h-full space-y-4">
       <div className="flex-shrink-0">
-        <PageHeaderWithFavorite
+        <PageHeader
           title="Editar Empréstimo"
           icon={IconPackage}
           favoritePage={FAVORITE_PAGES.ESTOQUE_EMPRESTIMOS_CADASTRAR}

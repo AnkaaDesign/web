@@ -79,7 +79,9 @@ export function CategorySelector({ disabled, required, onCategoryChange, initial
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error("Error fetching categories:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching categories:", error);
+      }
       return {
         data: [],
         hasMore: false,
@@ -103,7 +105,9 @@ export function CategorySelector({ disabled, required, onCategoryChange, initial
         return newCategoryId;
       }
     } catch (error) {
-      console.error("Error creating category:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating category:", error);
+      }
       throw error;
     } finally {
       setIsCreating(false);

@@ -67,7 +67,7 @@ export function PaintProductionCard({ production }: PaintProductionCardProps) {
   }
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer h-full flex flex-col" onClick={handleClick}>
+    <Card className="overflow-hidden hover:shadow-sm transition-shadow cursor-pointer h-full flex flex-col" onClick={handleClick}>
       {/* Header with paint color preview */}
       <div className="flex items-center gap-3 p-4 border-b border-neutral-200 dark:border-neutral-700">
         {/* Color preview - prefer colorPreview image */}

@@ -26,17 +26,19 @@ interface TaskHistoryListProps {
   statusFilter?: TASK_STATUS[];
   storageKey?: string;
   searchPlaceholder?: string;
-  navigationRoute?: 'history' | 'onHold' | 'schedule';
+  navigationRoute?: 'history' | 'preparation' | 'schedule';
+  hideStatusFilter?: boolean;
 }
 
 const DEFAULT_PAGE_SIZE = 40;
 
 export function TaskHistoryList({
   className,
-  statusFilter = [TASK_STATUS.COMPLETED, TASK_STATUS.INVOICED, TASK_STATUS.SETTLED],
+  statusFilter = [TASK_STATUS.COMPLETED],
   storageKey = "task-history-visible-columns",
   searchPlaceholder = "Buscar por nome, cliente, setor...",
   navigationRoute = 'history',
+  hideStatusFilter = false,
 }: TaskHistoryListProps) {
   // Load entity data for filter labels
   const { data: sectorsData } = useSectors({ orderBy: { name: "asc" } });
@@ -50,8 +52,11 @@ export function TaskHistoryList({
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)
   );
 
-  // Check if user can view/change status filter (Admin or Financial only)
-  const canViewStatusFilter = currentUser && (
+  // Check if user is admin
+  const isAdmin = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN);
+
+  // Check if user can view/change status filter (Admin or Financial only, and not explicitly hidden)
+  const canViewStatusFilter = !hideStatusFilter && currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)
   );
@@ -61,8 +66,6 @@ export function TaskHistoryList({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
   });
-
-
 
   // Custom deserializer for task filters
   const deserializeTaskFilters = React.useCallback(
@@ -214,16 +217,19 @@ export function TaskHistoryList({
 
   // Default visible columns
   const defaultVisibleColumns = React.useMemo(
-    () =>
-      new Set([
+    () => {
+      // Default columns as specified: name, customer fantasy name, identificador, previsao, negotiation, artworks, financial
+      return new Set([
         "name",
         "customer.fantasyName",
-        "generalPainting",
-        "sector.name",
-        "serialNumber",
-        "finishedAt",
-      ]),
-    []
+        "identificador",
+        "forecastDate",
+        "serviceOrders.negotiation",
+        "serviceOrders.artwork",
+        "serviceOrders.financial",
+      ]);
+    },
+    [statusFilter]
   );
 
   // Column visibility state with localStorage persistence
@@ -239,7 +245,17 @@ export function TaskHistoryList({
   });
 
   // Get all columns for visibility manager
-  const allColumns = React.useMemo(() => createTaskHistoryColumns({ canViewPrice }), [canViewPrice]);
+  // includeFinancialColumns=true for agenda/preparation page (show all 4 service order columns)
+  // includeFinancialColumns=false for histórico/schedule pages (only PRODUCTION column shown for non-admin)
+  const allColumns = React.useMemo(
+    () => createTaskHistoryColumns({
+      canViewPrice,
+      currentUserId: currentUser?.id,
+      includeFinancialColumns: navigationRoute === 'preparation', // Show all columns on agenda page
+      isAdmin: !!isAdmin
+    }),
+    [canViewPrice, currentUser?.id, isAdmin, navigationRoute]
+  );
 
   // Prepare final query filters
   const queryFilters = React.useMemo(() => {
@@ -248,17 +264,6 @@ export function TaskHistoryList({
       ...filterWithoutOrderBy,
       status: filterWithoutOrderBy.status || statusFilter,
     };
-
-    console.log("[TaskHistoryList] Query filters prepared:", {
-      searchingFor: searchingFor,
-      baseSearchingFor: baseQueryFilters.searchingFor,
-      resultSearchingFor: result.searchingFor,
-      baseQueryFilters,
-      filterWithoutOrderBy,
-      result,
-      hasFinishedDateRange: !!result.finishedDateRange,
-      finishedDateRange: result.finishedDateRange,
-    });
 
     return result;
   }, [baseQueryFilters, statusFilter]);
@@ -298,9 +303,9 @@ export function TaskHistoryList({
       sectors: sectorsData?.data || [],
       customers: customersData?.data || [],
       users: usersData?.data || [],
-      hideStatusTags: !canViewStatusFilter, // Hide status tags for non-admin/financial users
+      hideStatusTags: hideStatusFilter || !canViewStatusFilter, // Hide status tags if explicitly requested or for non-admin/financial users
     });
-  }, [filters, searchingFor, sectorsData?.data, customersData?.data, usersData?.data, onRemoveFilter, canViewStatusFilter]);
+  }, [filters, searchingFor, sectorsData?.data, customersData?.data, usersData?.data, onRemoveFilter, canViewStatusFilter, hideStatusFilter]);
 
   // Handle table data changes
   const handleTableDataChange = React.useCallback((data: { items: Task[]; totalRecords: number }) => {
@@ -308,10 +313,10 @@ export function TaskHistoryList({
   }, []);
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden pb-6">
         {/* Search and controls */}
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-3 sm:flex-row flex-shrink-0">
           <TableSearchInput
             value={displaySearchText}
             onChange={setSearch}
@@ -336,7 +341,7 @@ export function TaskHistoryList({
         </div>
 
         {/* Active Filter Indicators */}
-        {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />}
+        {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1 flex-shrink-0" />}
 
         {/* Table */}
         <div className="flex-1 min-h-0">

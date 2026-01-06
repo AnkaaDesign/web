@@ -10,6 +10,7 @@ import { IconAlertCircle, IconEdit, IconPaint } from "@tabler/icons-react";
 import { PaintTypeSpecificationsCard, PaintTypeComponentsCard, PaintTypeRelatedPaintsCard } from "@/components/painting/paint-type/detail";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditPaintTypes } from "@/utils/permissions/entity-permissions";
+import { PAGE_SPACING } from "@/lib/layout-constants";
 
 export function PaintTypeDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -133,18 +134,16 @@ export function PaintTypeDetailsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <PageHeader
         variant="detail"
         title={paintType.name}
-        icon={IconPaint}
         breadcrumbs={[
-          { label: "Início", href: routes.home },
-          { label: "Pintura", href: routes.painting.root },
-          { label: "Tipos de Tinta", href: routes.painting.paintTypes.root },
-          { label: paintType.name },
-        ]}
+        { label: "Início", href: routes.home },
+        { label: "Pintura", href: routes.painting.root },
+        { label: "Tipos de Tinta", href: routes.painting.paintTypes.root },
+        { label: paintType.name },
+      ]}
         actions={
           canEdit ? [
             {
@@ -155,24 +154,26 @@ export function PaintTypeDetailsPage() {
             },
           ] : []
         }
+        className="flex-shrink-0"
       />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="space-y-4">
+          {/* Top section - Specifications and Related Paints */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Left column - Specifications */}
+            <div className="lg:col-span-1">
+              <PaintTypeSpecificationsCard paintType={paintType} />
+            </div>
 
-      {/* Top section - Specifications and Related Paints */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column - Specifications */}
-        <div className="lg:col-span-1">
-          <PaintTypeSpecificationsCard paintType={paintType} />
+            {/* Right column - Related paints */}
+            <div className="lg:col-span-2">
+              <PaintTypeRelatedPaintsCard paintType={paintType} />
+            </div>
+          </div>
+
+          {/* Bottom section - Components (Full Width) */}
+          <PaintTypeComponentsCard paintType={paintType} />
         </div>
-
-        {/* Right column - Related paints */}
-        <div className="lg:col-span-2">
-          <PaintTypeRelatedPaintsCard paintType={paintType} />
-        </div>
-      </div>
-
-      {/* Bottom section - Components (Full Width) */}
-      <div>
-        <PaintTypeComponentsCard paintType={paintType} />
       </div>
     </div>
   );

@@ -51,7 +51,9 @@ const EditCategoryPage = () => {
       navigate(routes.inventory.products.categories.root);
     } catch (error) {
       // Error handled by mutation hook
-      console.error("Error updating category:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating category:", error);
+      }
     }
   };
 
@@ -101,32 +103,23 @@ const EditCategoryPage = () => {
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="px-4 pt-4">
-          <div className="max-w-5xl mx-auto">
-            <PageHeader
-              variant="form"
-              title={`Editar ${category.name}`}
-              icon={IconCategory}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Estoque", href: routes.inventory.root },
-                { label: "Produtos", href: routes.inventory.products.root },
-                { label: "Categorias", href: routes.inventory.products.categories.root },
-                { label: category.name, href: routes.inventory.products.categories.details(id!) },
-                { label: "Editar" },
-              ]}
-              actions={actions}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Scrollable Form Container */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-5xl mx-auto h-full">
+    <div className="h-full flex flex-col px-4 pt-4">
+      <PageHeader
+        variant="form"
+        title={`Editar ${category.name}`}
+        icon={IconCategory}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Produtos", href: routes.inventory.products.root },
+          { label: "Categorias", href: routes.inventory.products.categories.root },
+          { label: category.name, href: routes.inventory.products.categories.details(id!) },
+          { label: "Editar" },
+        ]}
+        actions={actions}
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="mt-4 space-y-4">
           <CategoryForm
             mode="update"
             defaultValues={{

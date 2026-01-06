@@ -330,7 +330,9 @@ export function TaskTable({
 
       setContextMenu(null);
     } catch (error) {
-      console.error("Error updating task status:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating task status:", error);
+      }
     }
   };
 
@@ -371,7 +373,9 @@ export function TaskTable({
       }
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error("Error deleting task(s):", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting task(s):", error);
+      }
     } finally {
       setDeleteDialog(null);
     }
@@ -398,11 +402,6 @@ export function TaskTable({
     return () => document.removeEventListener("click", handleClick);
   }, []);
 
-  // Debug: Log component render and filters
-  console.log('TaskTable rendering with items:', items.length);
-  console.log('TaskTable filters:', filters);
-  console.log('TaskTable queryParams:', queryParams);
-
   if (isLoading) {
     return <TaskListSkeleton />;
   }
@@ -421,11 +420,9 @@ export function TaskTable({
 
   return (
     <div className={cn("rounded-lg flex flex-col overflow-hidden", className)}>
-      {/* DEBUG: Simple test button */}
       <button
         onClick={() => {
-          console.log('TEST BUTTON CLICKED - React events work!');
-          console.log('First item:', items[0]?.id);
+          // Event handler placeholder
         }}
         style={{
           position: 'fixed',
@@ -559,21 +556,18 @@ export function TaskTable({
                       itemIsSelected && "bg-muted/30 hover:bg-muted/40",
                     )}
                     onClick={(e) => {
-                      console.log('TR ONCLICK TRIGGERED!', item.id);
                       // Don't navigate if clicking checkbox
                       if ((e.target as HTMLElement).closest("[data-checkbox]")) {
-                        console.log('Skipping - checkbox clicked');
                         return;
                       }
 
-                      console.log('Row clicked, navigating to:', routes.production.schedule.details(item.id));
                       navigate(routes.production.schedule.details(item.id));
                     }}
-                    onMouseDown={(e) => {
-                      console.log('TR MOUSEDOWN TRIGGERED!', item.id);
+                    onMouseDown={() => {
+                      // Mouse down handler
                     }}
-                    onMouseUp={(e) => {
-                      console.log('TR MOUSEUP TRIGGERED!', item.id);
+                    onMouseUp={() => {
+                      // Mouse up handler
                     }}
                     onContextMenu={(e) => handleContextMenu(e, item)}
                   >
@@ -607,7 +601,7 @@ export function TaskTable({
                         <div
                           className="px-4 py-2"
                           onClick={(e) => {
-                            console.log('CELL DIV CLICKED!', column.id, item.id);
+                            // Cell click handler
                           }}
                         >
                           {column.formatter

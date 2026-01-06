@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PpeInfoCard } from "@/components/inventory/item/detail/ppe-info-card";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditItems } from "@/utils/permissions/entity-permissions";
+import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 const ProductDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -175,13 +176,11 @@ const ProductDetailsPage = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section - Enhanced Header with Actions */}
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <PageHeader
         variant="detail"
         entity={item}
         title={item.name}
-        icon={IconPackage}
         actions={[
           {
             key: "refresh",
@@ -202,46 +201,29 @@ const ProductDetailsPage = () => {
           { label: "Produtos", href: routes.inventory.products.root },
           { label: item.name },
         ]}
-        className="shadow-lg"
+        className="flex-shrink-0"
       />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Core Information Grid - Specifications and Metrics */}
+            <SpecificationsCard item={item} />
+            <MetricsCard item={item} />
 
-      {/* Core Information Grid - Specifications and Metrics */}
-      {/* Mobile: Single column stacked */}
-      <div className="block lg:hidden space-y-4 animate-in fade-in-50 duration-700">
-        <SpecificationsCard item={item} className="h-full" />
-        <MetricsCard item={item} className="h-full" />
-      </div>
+            {/* PPE Information - Show only if item is a PPE */}
+            {item.ppeType && (
+              <PpeInfoCard item={item} />
+            )}
 
-      {/* Desktop/Tablet: 2 columns grid */}
-      <div className="hidden lg:grid grid-cols-2 gap-6 animate-in fade-in-50 duration-700">
-        <SpecificationsCard item={item} className="h-full" />
-        <MetricsCard item={item} className="h-full" />
-      </div>
+            {/* History Cards - Activity and Changelog */}
+            <ActivityHistoryCard item={item} />
+            <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.ITEM} entityId={item.id} entityName={item.name} entityCreatedAt={item.createdAt} />
+          </div>
 
-      {/* PPE Information - Show only if item is a PPE - Half width on desktop */}
-      {item.ppeType && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in-50 duration-800">
-          <PpeInfoCard item={item} className="shadow-lg" />
-          {/* Empty space for half-width layout */}
-          <div className="hidden lg:block" />
+          {/* Related Items - Full Width Section */}
+          <RelatedItemsCard item={item} />
         </div>
-      )}
-
-      {/* History Cards - Activity and Changelog */}
-      {/* Mobile: Single column stacked */}
-      <div className="block lg:hidden space-y-4 animate-in fade-in-50 duration-900">
-        <ActivityHistoryCard item={item} className="h-full" />
-        <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.ITEM} entityId={item.id} entityName={item.name} entityCreatedAt={item.createdAt} className="h-full" />
       </div>
-
-      {/* Desktop/Tablet: 2 columns grid */}
-      <div className="hidden lg:grid grid-cols-2 gap-6 animate-in fade-in-50 duration-900">
-        <ActivityHistoryCard item={item} className="h-full" />
-        <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.ITEM} entityId={item.id} entityName={item.name} entityCreatedAt={item.createdAt} className="h-full" />
-      </div>
-
-      {/* Related Items - Full Width Section */}
-      <RelatedItemsCard item={item} className="animate-in fade-in-50 duration-1000" />
     </div>
   );
 };

@@ -53,7 +53,7 @@ interface BasicInfoSummaryCardProps {
 
 export const BasicInfoSummaryCard: React.FC<BasicInfoSummaryCardProps> = ({ withdrawerName, type, notes, className }) => {
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6">
         <CardTitle className="flex items-center gap-2">
           <IconUser className="h-5 w-5 text-muted-foreground" />
@@ -112,7 +112,7 @@ export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItem
 
   if (items.length === 0) {
     return (
-      <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+      <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
         <CardHeader className="pb-6">
           <CardTitle className="flex items-center gap-2">
           <IconPackage className="h-5 w-5 text-muted-foreground" />
@@ -130,7 +130,7 @@ export const ItemsSummaryCard: React.FC<ItemsSummaryCardProps> = ({ selectedItem
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -266,7 +266,7 @@ export const TotalCalculationCard: React.FC<TotalCalculationCardProps> = ({ sele
   const hasItemsWithoutPrice = itemsWithoutPrice.length > 0;
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6">
         <CardTitle className="flex items-center gap-2">
           <IconCurrencyReal className="h-5 w-5 text-muted-foreground" />

@@ -17,26 +17,26 @@ export function PaintBrandsListPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeader
-            variant="default"
-            title="Marcas de Tinta"
-            icon={IconTag}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura", href: routes.painting.root }, { label: "Marcas de Tinta" }]}
-            favoritePage={FAVORITE_PAGES.PINTURA_MARCAS_TINTA_LISTAR}
-            actions={[
-              {
-                key: "create",
-                label: "Cadastrar",
-                icon: IconPlus,
-                onClick: () => navigate(routes.painting.paintBrands.create),
-                variant: "default",
-              },
-            ]}
-          />
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="list"
+          title="Marcas de Tinta"
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pintura", href: routes.painting.root }, { label: "Marcas de Tinta" }]}
+          favoritePage={FAVORITE_PAGES.PINTURA_MARCAS_TINTA_LISTAR}
+          actions={[
+            {
+              key: "create",
+              label: "Cadastrar",
+              icon: IconPlus,
+              onClick: () => navigate(routes.painting.paintBrands.create),
+              variant: "default",
+            },
+          ]}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 min-h-0 pb-6 flex flex-col">
+          <PaintBrandList className="h-full" />
         </div>
-        <PaintBrandList className="flex-1 min-h-0" />
       </div>
     </PrivilegeRoute>
   );

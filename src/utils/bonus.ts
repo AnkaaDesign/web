@@ -404,7 +404,9 @@ export function calculateBonusForPosition(
 
     return Math.round(finalValue * 100) / 100;
   } catch (error) {
-    console.error('Error calculating bonus:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Error calculating bonus:', error);
+    }
     return 0;
   }
 }

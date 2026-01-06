@@ -5,7 +5,7 @@ import { routes, FAVORITE_PAGES } from "../../../constants";
 import { ActivityBatchEditTable } from "@/components/inventory/activity/batch-edit/activity-batch-edit-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { IconPackage, IconAlertTriangle, IconLoader, IconDeviceFloppy, IconArrowLeft } from "@tabler/icons-react";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 
@@ -62,7 +62,7 @@ export default function BatchEditMovementsPage() {
 
   if (activityIds.length === 0) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -86,7 +86,7 @@ export default function BatchEditMovementsPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <div>
@@ -105,7 +105,7 @@ export default function BatchEditMovementsPage() {
 
   if (error || !hasValidActivities) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -169,7 +169,7 @@ export default function BatchEditMovementsPage() {
     <div className="h-full flex flex-col space-y-4">
       {/* Fixed Header */}
       <div className="flex-shrink-0">
-        <PageHeaderWithFavorite
+        <PageHeader
           title="Editar Movimentações em Lote"
           icon={IconPackage}
           favoritePage={FAVORITE_PAGES.ESTOQUE_MOVIMENTACOES_LISTAR}

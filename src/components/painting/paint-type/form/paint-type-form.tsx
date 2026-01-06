@@ -1,9 +1,8 @@
-import { useForm } from "react-hook-form";
+import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { IconInfoCircle, IconPackage, IconPaintFilled } from "@tabler/icons-react";
-import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { paintTypeCreateSchema, paintTypeUpdateSchema, type PaintTypeCreateFormData, type PaintTypeUpdateFormData } from "../../../../schemas";
 import { serializePaintTypeFormToUrlParams, getDefaultPaintTypeFormValues, debounce } from "@/utils/url-form-state";
@@ -145,16 +144,24 @@ export function PaintTypeForm(props: PaintTypeFormProps) {
       }
     } catch (error) {
       // Error is handled by the parent component
-      console.error("Form submission error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Form submission error:", error);
+      }
     }
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+    <FormProvider {...form}>
+      <form id="paint-type-form" onSubmit={form.handleSubmit(handleSubmit)}>
+        {/* Hidden submit button */}
+        <button id="paint-type-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
+          Submit
+        </button>
+
+        {/* Wrapper div with space-y-4 */}
+        <div className="space-y-4">
           {/* Basic Information */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
@@ -170,7 +177,7 @@ export function PaintTypeForm(props: PaintTypeFormProps) {
           </Card>
 
           {/* Component Items Section */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconPackage className="h-5 w-5 text-muted-foreground" />
@@ -186,7 +193,7 @@ export function PaintTypeForm(props: PaintTypeFormProps) {
           </Card>
 
           {/* Ground Paint Configuration */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconPaintFilled className="h-5 w-5 text-muted-foreground" />
@@ -203,18 +210,8 @@ export function PaintTypeForm(props: PaintTypeFormProps) {
               )}
             </CardContent>
           </Card>
-
-          {/* Hidden submit button that can be triggered by the header button */}
-          <button
-            id="paint-type-form-submit"
-            type="submit"
-            className="hidden"
-            disabled={isSubmitting}
-          >
-            Submit
-          </button>
-        </form>
-      </Form>
-    </div>
+        </div>
+      </form>
+    </FormProvider>
   );
 }

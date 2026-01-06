@@ -1,4 +1,4 @@
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD } from "../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
@@ -7,9 +7,10 @@ import { useNavigate } from "react-router-dom";
 import { formatCurrency, formatNumber } from "../../utils";
 import { useAuth } from "@/contexts/auth-context";
 import { useState, useEffect } from "react";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 import {
   IconTool,
-  IconPlus,
   IconCalendarStats,
   IconScissors,
   IconSpray,
@@ -58,6 +59,7 @@ import {
 } from "@/components/dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
 
 export const ProductionRootPage = () => {
   const navigate = useNavigate();
@@ -146,7 +148,7 @@ export const ProductionRootPage = () => {
     const totalTasks = data.totalTasks?.value || 0;
     const completedTasks = data.tasksCompleted?.value || 0;
     const inProgressTasks = data.tasksInProduction?.value || 0;
-    const onHoldTasks = data.tasksOnHold?.value || 0;
+    const preparationTasks = data.tasksInPreparation?.value || 0;
     const cancelledTasks = data.tasksCancelled?.value || 0;
 
     return [
@@ -165,10 +167,10 @@ export const ProductionRootPage = () => {
         color: "blue" as const,
       },
       {
-        status: "Em Espera",
-        quantity: onHoldTasks,
+        status: "Em Preparação",
+        quantity: preparationTasks,
         total: totalTasks,
-        icon: IconPlayerPause,
+        icon: IconClipboardList,
         color: "orange" as const,
       },
       {
@@ -273,8 +275,8 @@ export const ProductionRootPage = () => {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="flex flex-col h-full space-y-6">
-          <PageHeaderWithFavorite
+        <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+          <PageHeader
             title="Produção"
             icon={IconTool}
             favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
@@ -286,65 +288,63 @@ export const ProductionRootPage = () => {
                 variant: "ghost",
                 className: "p-0 hover:bg-transparent",
               },
-              {
-                key: "create-task",
-                label: "Nova Tarefa",
-                icon: IconPlus,
-                onClick: () => navigate(routes.production.schedule.create),
-                variant: "default",
-              },
             ]}
+            className="flex-shrink-0"
           />
 
-          {/* Loading state with skeleton components */}
-          <div className="space-y-6">
-            {/* Quick Access Loading */}
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-foreground mb-4">Acesso Rápido</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="bg-card dark:bg-card rounded-lg border border-border p-4 space-y-2">
-                    <Skeleton className="h-6 w-6 rounded" />
-                    <Skeleton className="h-4 w-16" />
-                    <Skeleton className="h-6 w-8" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recent Activities Loading */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-foreground">Atividades Recentes</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="bg-card dark:bg-card rounded-lg border border-border p-4">
-                    <Skeleton className="h-4 w-24 mb-3" />
-                    <div className="space-y-2">
-                      {Array.from({ length: 3 }).map((_, j) => (
-                        <div key={j} className="flex justify-between">
-                          <Skeleton className="h-3 w-16" />
-                          <Skeleton className="h-3 w-12" />
-                        </div>
-                      ))}
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto px-4 pb-6">
+            <Card>
+              <CardContent className="p-6 space-y-6">
+              {/* Quick Access Loading */}
+              <div>
+                <h3 className="text-lg font-semibold text-foreground mb-4">Acesso Rápido</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="bg-card dark:bg-card rounded-lg border border-border p-4 space-y-2">
+                      <Skeleton className="h-6 w-6 rounded" />
+                      <Skeleton className="h-4 w-16" />
+                      <Skeleton className="h-6 w-8" />
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Metrics Loading */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-foreground">Métricas de Produção</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="bg-card dark:bg-card rounded-lg border border-border p-4 space-y-2">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-6 w-12" />
-                    <Skeleton className="h-3 w-16" />
-                  </div>
-                ))}
+              {/* Recent Activities Loading */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground">Atividades Recentes</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="bg-card dark:bg-card rounded-lg border border-border p-4">
+                      <Skeleton className="h-4 w-24 mb-3" />
+                      <div className="space-y-2">
+                        {Array.from({ length: 3 }).map((_, j) => (
+                          <div key={j} className="flex justify-between">
+                            <Skeleton className="h-3 w-16" />
+                            <Skeleton className="h-3 w-12" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+
+              {/* Metrics Loading */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-foreground">Métricas de Produção</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="bg-card dark:bg-card rounded-lg border border-border p-4 space-y-2">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-6 w-12" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </PrivilegeRoute>
@@ -354,8 +354,8 @@ export const ProductionRootPage = () => {
   if (error) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="flex flex-col h-full space-y-4">
-          <PageHeaderWithFavorite
+        <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+          <PageHeader
             title="Produção"
             icon={IconTool}
             favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
@@ -367,22 +367,24 @@ export const ProductionRootPage = () => {
                 variant: "ghost",
                 className: "p-0 hover:bg-transparent",
               },
-              {
-                key: "create-task",
-                label: "Nova Tarefa",
-                icon: IconPlus,
-                onClick: () => navigate(routes.production.schedule.create),
-                variant: "default",
-              },
             ]}
+            className="flex-shrink-0"
           />
-          <Alert>
-            <IconExclamationCircle className="h-4 w-4" />
-            <AlertDescription>
-              Erro ao carregar o dashboard de produção. Por favor, tente novamente mais tarde.
-              {error && (error as Error).message && <div className="mt-2 text-sm text-muted-foreground">Detalhes: {(error as Error).message}</div>}
-            </AlertDescription>
-          </Alert>
+
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto px-4 pb-6">
+            <Card>
+              <CardContent className="p-6">
+                <Alert>
+                  <IconExclamationCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Erro ao carregar o dashboard de produção. Por favor, tente novamente mais tarde.
+                    {error && (error as Error).message && <div className="mt-2 text-sm text-muted-foreground">Detalhes: {(error as Error).message}</div>}
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </PrivilegeRoute>
     );
@@ -393,34 +395,27 @@ export const ProductionRootPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Produção"
-            icon={IconTool}
-            favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Produção" }]}
-            actions={[
-              {
-                key: "time-period",
-                label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                variant: "ghost",
-                className: "p-0 hover:bg-transparent",
-              },
-              {
-                key: "create-task",
-                label: "Nova Tarefa",
-                icon: IconPlus,
-                onClick: () => navigate(routes.production.schedule.create),
-                variant: "default",
-              },
-            ]}
-          />
-        </div>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          title="Produção"
+          icon={IconTool}
+          favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Produção" }]}
+          actions={[
+            {
+              key: "time-period",
+              label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
+              variant: "ghost",
+              className: "p-0 hover:bg-transparent",
+            },
+          ]}
+          className="flex-shrink-0"
+        />
 
-        {/* Main Content Card - All sections in a single scrollable container */}
-        <div className="flex-1 bg-card dark:bg-card rounded-lg shadow-sm border border-border overflow-hidden">
-          <div className="h-full overflow-y-auto p-6 space-y-8">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-4 pb-6">
+          <Card>
+            <CardContent className="p-6 space-y-6">
             {/* Quick Access Section */}
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-4">Acesso Rápido</h3>
@@ -604,7 +599,8 @@ export const ProductionRootPage = () => {
                 />
               </div>
             </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </PrivilegeRoute>

@@ -23,6 +23,8 @@ import { hasPrivilege } from "../../../../../utils";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 export function PPEScheduleDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -79,7 +81,9 @@ export function PPEScheduleDetailsPage() {
       await deleteMutation.mutateAsync(ppeSchedule.data.id);
       navigate(routes.humanResources.ppe.schedules.root);
     } catch (error) {
-      console.error("Error deleting schedule:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting schedule:", error);
+      }
     } finally {
       setShowDeleteDialog(false);
     }
@@ -89,7 +93,7 @@ export function PPEScheduleDetailsPage() {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-        <div className="flex flex-col h-full space-y-6">
+        <div className={cn("flex flex-col h-full", DETAIL_PAGE_SPACING.CONTAINER)}>
           <div className="animate-pulse space-y-4">
             <div className="flex items-center space-x-2">
               <div className="h-4 w-16 bg-muted rounded"></div>
@@ -117,7 +121,7 @@ export function PPEScheduleDetailsPage() {
   if (error || !ppeSchedule?.data) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-        <div className="flex flex-col h-full space-y-6">
+        <div className={cn("flex flex-col h-full", DETAIL_PAGE_SPACING.CONTAINER)}>
           <PageHeader
             variant="detail"
             title="Agendamento não encontrado"
@@ -159,13 +163,12 @@ export function PPEScheduleDetailsPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="animate-in fade-in-50 duration-500">
-          <PageHeader
+      <div className="h-full flex flex-col px-4 pt-4">
+        <div className="flex-shrink-0">
+          <div className="animate-in fade-in-50 duration-500">
+            <PageHeader
             variant="detail"
             title={`Agendamento #${ppeSchedule.data.id.slice(-8)}`}
-            icon={IconCalendar}
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "RH", href: routes.humanResources.root },
@@ -201,12 +204,14 @@ export function PPEScheduleDetailsPage() {
                   ]
                 : []),
             ]}
-          />
+            />
+          </div>
         </div>
 
-        {/* Content Grid */}
-        <div className="animate-in fade-in-50 duration-700 space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="flex-1 overflow-y-auto pb-6">
+          {/* Content Grid */}
+          <div className="mt-4 animate-in fade-in-50 duration-700">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Basic Information Card */}
             <Card>
               <CardHeader>
@@ -322,6 +327,7 @@ export function PPEScheduleDetailsPage() {
                 </CardContent>
               </Card>
             )}
+            </div>
           </div>
         </div>
 

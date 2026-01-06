@@ -50,7 +50,6 @@ export const TableSearchInput = forwardRef<HTMLInputElement, TableSearchInputPro
           type="text"
           value={value}
           onChange={(newValue) => {
-            console.log("[TableSearchInput] onChange value:", newValue);
             // The Input component already gives us the cleaned value
             onChange(typeof newValue === "string" ? newValue : "");
           }}

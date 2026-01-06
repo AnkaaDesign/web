@@ -125,13 +125,15 @@ export function UserBatchEditTable({ users, onCancel }: UserBatchEditTableProps)
         navigate(routes.administration.collaborators.root);
       }
     } catch (error) {
-      console.error("Step 6 - Error during batch update:", error);
-      console.error("Error details:", {
-        message: error instanceof Error ? error.message : "Unknown error",
-        response: error && typeof error === "object" && "response" in error ? (error as any).response?.data : undefined,
-        status: error && typeof error === "object" && "response" in error ? (error as any).response?.status : undefined,
-        stack: error instanceof Error ? error.stack : undefined,
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Step 6 - Error during batch update:", error);
+        console.error("Error details:", {
+          message: error instanceof Error ? error.message : "Unknown error",
+          response: error && typeof error === "object" && "response" in error ? (error as any).response?.data : undefined,
+          status: error && typeof error === "object" && "response" in error ? (error as any).response?.status : undefined,
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -153,7 +155,7 @@ export function UserBatchEditTable({ users, onCancel }: UserBatchEditTableProps)
       <Card className="h-full flex flex-col">
         {/* Hidden submit button for page header to trigger */}
         <button id="user-batch-form-submit" type="button" onClick={form.handleSubmit(handleSubmit)} style={{ display: "none" }} disabled={isSubmitting} />
-        <CardContent className="p-6 flex-1 overflow-hidden flex flex-col">
+        <CardContent className="p-4 flex-1 overflow-hidden flex flex-col">
           <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>

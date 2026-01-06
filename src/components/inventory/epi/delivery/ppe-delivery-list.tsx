@@ -60,12 +60,6 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
     resetSelectionOnPageChange: false,
   });
 
-  console.log("[PpeDeliveryList] State:", {
-    selectedIds,
-    selectionCount,
-    showSelectedOnly,
-  });
-
   // State to hold current page items from the table component
   const [tableData, setTableData] = useState<{
     items: PpeDelivery[];
@@ -78,11 +72,6 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   // Stable callback for table data updates
   const handleTableDataChange = useCallback(
     (data: { items: PpeDelivery[]; totalRecords: number }) => {
-      console.log("[PpeDeliveryList] handleTableDataChange called with:", {
-        itemCount: data.items.length,
-        totalRecords: data.totalRecords,
-        itemIds: data.items.map(i => i.id),
-      });
       setTableData(data);
     },
     [],
@@ -340,13 +329,8 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
   }, [navigate]);
 
   const handleBulkApprove = useCallback(async (deliveries: PpeDelivery[]) => {
-    console.log("[handleBulkApprove] Called with deliveries:", deliveries);
-    console.log("[handleBulkApprove] currentUser:", currentUser);
-    console.log("[handleBulkApprove] hasAdminPrivilege:", currentUser ? hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) : false);
-
     // Check permissions - only ADMIN can approve/reject deliveries
     if (!currentUser || !hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN)) {
-      console.warn("[handleBulkApprove] Permission denied - user does not have ADMIN privilege");
       return;
     }
 
@@ -356,14 +340,7 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
       (d) => d.status === PPE_DELIVERY_STATUS.PENDING
     );
 
-    console.log("[handleBulkApprove] Filtered deliveries:", {
-      total: deliveries.length,
-      toApprove: deliveriesToApprove.length,
-      filtered: deliveriesToApprove.map(d => ({ id: d.id, status: d.status })),
-    });
-
     if (deliveriesToApprove.length === 0) {
-      console.warn("[handleBulkApprove] No deliveries eligible for approval");
       return;
     }
 
@@ -388,7 +365,9 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
         });
       }
     } catch (error) {
-      console.error("[handleBulkApprove] Error approving deliveries:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[handleBulkApprove] Error approving deliveries:", error);
+      }
     }
   }, [currentUser, updateAsync, batchApproveMutation]);
 
@@ -417,7 +396,9 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
       );
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error("Error marking deliveries as delivered:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error marking deliveries as delivered:", error);
+      }
     }
   }, [currentUser, markAsDeliveredMutation]);
 
@@ -435,14 +416,7 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
         d.status === PPE_DELIVERY_STATUS.APPROVED
     );
 
-    console.log("[handleBulkReject] Filtered deliveries:", {
-      total: deliveries.length,
-      toReject: deliveriesToReject.length,
-      filtered: deliveriesToReject.map(d => ({ id: d.id, status: d.status })),
-    });
-
     if (deliveriesToReject.length === 0) {
-      console.warn("[handleBulkReject] No deliveries eligible for rejection");
       return;
     }
 
@@ -467,7 +441,9 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
         });
       }
     } catch (error) {
-      console.error("[handleBulkReject] Error rejecting deliveries:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[handleBulkReject] Error rejecting deliveries:", error);
+      }
     }
   }, [currentUser, updateAsync, batchRejectMutation]);
 
@@ -486,15 +462,17 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
       await batchDeleteMutation.mutateAsync({ ppeDeliveryIds: ids });
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error("Error deleting delivery(ies):", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting delivery(ies):", error);
+      }
     } finally {
       setDeleteDialog(null);
     }
   };
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex-1 relative">
@@ -525,7 +503,7 @@ export function PpeDeliveryList({ className }: PpeDeliveryListProps) {
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={handleClearAllFilters} className="px-1 py-1" />}
 
         {/* Paginated table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <PpeDeliveryTable
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}

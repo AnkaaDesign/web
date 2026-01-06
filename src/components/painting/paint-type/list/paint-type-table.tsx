@@ -295,7 +295,9 @@ export function PaintTypeTable({ visibleColumns, className, onEdit, onDelete, fi
         }
       } catch (error) {
         // Error is handled by the API client with detailed message
-        console.error("Error deleting paint type(s):", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error deleting paint type(s):", error);
+        }
       }
       setDeleteDialog(null);
     }

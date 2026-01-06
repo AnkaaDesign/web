@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from "sonner";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { generateFileUrls } from "@/utils/file-viewer";
+import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 export const ObservationDetailsPage = () => {
   usePageTracker({ title: "observation-detail" });
@@ -83,7 +84,9 @@ export const ObservationDetailsPage = () => {
       await deleteAsync(id);
       navigate(routes.production.observations.root);
     } catch (error) {
-      console.error("Error deleting observation:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting observation:", error);
+      }
     }
     setIsDeleteDialogOpen(false);
   };
@@ -94,11 +97,10 @@ export const ObservationDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.PRODUCTION}>
-      <div className="space-y-6">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
           title={observation.task ? `Observação - ${observation.task.name}` : "Observação"}
-          icon={IconAlertCircle}
           breadcrumbs={[
             { label: "Início", href: "/" },
             { label: "Produção" },
@@ -126,22 +128,28 @@ export const ObservationDetailsPage = () => {
               onClick: () => setIsDeleteDialogOpen(true),
             }] : []),
           ]}
+          className="flex-shrink-0"
         />
-
-        <ObservationInfoCard
-          observation={{
-            ...observation,
-            files: observation.files?.map((file) => {
-              const urls = generateFileUrls(file);
-              return {
-                ...file,
-                fileUrl: urls.serve,
-                thumbnailUrl: file.thumbnailUrl || urls.thumbnail || undefined,
-                mimeType: file.mimetype, // Map mimetype to mimeType
-              };
-            }),
-          }}
-        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ObservationInfoCard
+                observation={{
+                  ...observation,
+                  files: observation.files?.map((file) => {
+                    const urls = generateFileUrls(file);
+                    return {
+                      ...file,
+                      fileUrl: urls.serve,
+                      thumbnailUrl: file.thumbnailUrl || urls.thumbnail || undefined,
+                      mimeType: file.mimetype, // Map mimetype to mimeType
+                    };
+                  }),
+                }}
+              />
+            </div>
+          </div>
+        </div>
 
         {/* Delete Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

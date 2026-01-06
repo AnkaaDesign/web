@@ -89,10 +89,15 @@ import {
   IconCoin,
   IconMapPin,
   IconLayersIntersect,
+  IconPhone,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
+import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
+import { useSectionVisibility } from "@/hooks/use-section-visibility";
+import type { SectionConfig } from "@/hooks/use-section-visibility";
+import { SectionVisibilityManager } from "@/components/ui/section-visibility-manager";
 
 // Paint badge style - unified neutral, more subtle (no icons)
 const PAINT_BADGE_STYLE = "bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0";
@@ -436,6 +441,126 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
   );
 };
 
+// Section configuration for visibility management
+const TASK_SECTIONS: SectionConfig[] = [
+  {
+    id: "overview",
+    label: "Visão Geral",
+    defaultVisible: true,
+    fields: [
+      { id: "customer", label: "Cliente", sectionId: "overview", required: true },
+      { id: "invoiceTo", label: "Faturar Para", sectionId: "overview" },
+      { id: "negotiatingWithName", label: "Responsável pela Negociação", sectionId: "overview" },
+      { id: "negotiatingWithPhone", label: "Telefone do Responsável", sectionId: "overview" },
+      { id: "sector", label: "Setor", sectionId: "overview" },
+      { id: "commission", label: "Comissão", sectionId: "overview" },
+      { id: "serialNumber", label: "Número de Série", sectionId: "overview" },
+      { id: "plate", label: "Placa", sectionId: "overview" },
+      { id: "chassisNumber", label: "Chassi", sectionId: "overview" },
+      { id: "truckSpot", label: "Localização", sectionId: "overview" },
+      { id: "vehicle", label: "Veículo", sectionId: "overview" },
+      { id: "details", label: "Detalhes", sectionId: "overview" },
+    ],
+  },
+  {
+    id: "dates",
+    label: "Datas",
+    defaultVisible: true,
+    fields: [
+      { id: "created", label: "Criado", sectionId: "dates" },
+      { id: "entry", label: "Entrada", sectionId: "dates" },
+      { id: "term", label: "Prazo", sectionId: "dates" },
+      { id: "started", label: "Iniciado", sectionId: "dates" },
+      { id: "finished", label: "Finalizado", sectionId: "dates" },
+    ],
+  },
+  {
+    id: "budget",
+    label: "Orçamento",
+    defaultVisible: true,
+    fields: [
+      { id: "budgetItems", label: "Itens do Orçamento", sectionId: "budget" },
+      { id: "totalValue", label: "Valor Total", sectionId: "budget" },
+    ],
+  },
+  {
+    id: "layout",
+    label: "Layout do Caminhão",
+    defaultVisible: true,
+    fields: [
+      { id: "layoutPreview", label: "Visualização", sectionId: "layout" },
+    ],
+  },
+  {
+    id: "serviceOrders",
+    label: "Ordens de Serviço",
+    defaultVisible: true,
+    fields: [
+      { id: "ordersList", label: "Lista de Ordens", sectionId: "serviceOrders" },
+    ],
+  },
+  {
+    id: "cuts",
+    label: "Recortes",
+    defaultVisible: true,
+    fields: [
+      { id: "cutFiles", label: "Arquivos de Recorte", sectionId: "cuts" },
+    ],
+  },
+  {
+    id: "artworks",
+    label: "Artes",
+    defaultVisible: true,
+    fields: [
+      { id: "artworkFiles", label: "Arquivos de Arte", sectionId: "artworks" },
+    ],
+  },
+  {
+    id: "documents",
+    label: "Documentos",
+    defaultVisible: true,
+    fields: [
+      { id: "budgetDocs", label: "Orçamentos", sectionId: "documents" },
+      { id: "invoices", label: "Notas Fiscais", sectionId: "documents" },
+      { id: "receipts", label: "Recibos", sectionId: "documents" },
+    ],
+  },
+  {
+    id: "paints",
+    label: "Tintas",
+    defaultVisible: true,
+    fields: [
+      { id: "generalPainting", label: "Pintura Geral", sectionId: "paints" },
+      { id: "logoPaints", label: "Tintas da Logomarca", sectionId: "paints" },
+    ],
+  },
+  {
+    id: "observation",
+    label: "Observação",
+    defaultVisible: true,
+    fields: [
+      { id: "observationText", label: "Texto da Observação", sectionId: "observation" },
+      { id: "observationFiles", label: "Arquivos Anexados", sectionId: "observation" },
+    ],
+  },
+  {
+    id: "airbrushings",
+    label: "Aerografias",
+    defaultVisible: true,
+    fields: [
+      { id: "airbrushingList", label: "Lista de Aerografias", sectionId: "airbrushings" },
+    ],
+  },
+  {
+    id: "changelog",
+    label: "Histórico de Alterações",
+    defaultVisible: false,
+    fields: [
+      { id: "changelogHistory", label: "Histórico", sectionId: "changelog" },
+    ],
+  },
+];
+
 export const TaskDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -475,6 +600,12 @@ export const TaskDetailsPage = () => {
 
   // Check if user can edit tasks (PRODUCTION, LEADER, ADMIN)
   const canEdit = canEditTasks(currentUser);
+
+  // Initialize section visibility hook
+  const sectionVisibility = useSectionVisibility(
+    "task-detail-visibility",
+    TASK_SECTIONS
+  );
 
   // Try to get file viewer context (optional)
   let fileViewerContext: ReturnType<typeof useFileViewer> | null = null;
@@ -531,6 +662,11 @@ export const TaskDetailsPage = () => {
     include: {
       sector: true,
       customer: true,
+      invoiceTo: {
+        include: {
+          logo: true,
+        },
+      },
       createdBy: true,
       services: true,
       artworks: true,
@@ -642,14 +778,25 @@ export const TaskDetailsPage = () => {
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [task?.services]);
 
-  // Determine if we came from history, on-hold, or schedule
+  // Determine if we came from history, preparation, or schedule
   const isFromHistory = location.pathname.includes('/historico/');
-  const isFromOnHold = location.pathname.includes('/em-espera/');
+  const isFromPreparation = location.pathname.includes('/em-preparacao/');
+
+  // Get display name with fallbacks
+  const getTaskDisplayName = (task: any) => {
+    if (task.name) return task.name;
+    if (task.customer?.fantasyName) return task.customer.fantasyName;
+    if (task.serialNumber) return `Série ${task.serialNumber}`;
+    if (task.truck?.plate) return task.truck.plate;
+    return "Sem nome";
+  };
+
+  const taskDisplayName = task ? getTaskDisplayName(task) : "Carregando...";
 
   // Track page access
   usePageTracker({
-    title: task ? `Tarefa: ${task.name}` : "Detalhes da Tarefa",
-    icon: isFromHistory ? "history" : isFromOnHold ? "player-pause" : "clipboard-list",
+    title: task ? `Tarefa: ${taskDisplayName}` : "Detalhes da Tarefa",
+    icon: isFromHistory ? "history" : isFromPreparation ? "clipboard-list" : "clipboard-list",
   });
 
   // Status change handlers
@@ -761,40 +908,52 @@ export const TaskDetailsPage = () => {
   // Loading state
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-24 w-full rounded-lg" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-96 rounded-lg" />
-          <Skeleton className="h-96 rounded-lg" />
-          <Skeleton className="h-64 rounded-lg" />
-          <Skeleton className="h-64 rounded-lg" />
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
+        <div className="h-full flex flex-col px-4 pt-4">
+          <div className="flex-1 overflow-y-auto pb-6">
+            <div className="space-y-6">
+              <Skeleton className="h-24 w-full rounded-lg" />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Skeleton className="h-96 rounded-lg" />
+                <Skeleton className="h-96 rounded-lg" />
+                <Skeleton className="h-64 rounded-lg" />
+                <Skeleton className="h-64 rounded-lg" />
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </PrivilegeRoute>
     );
   }
 
   // Error or not found state
   if (error || !task) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in-50 duration-500">
-        <div className="text-center px-4 max-w-md mx-auto space-y-4">
-          <div className="inline-flex p-4 bg-red-100 dark:bg-red-900/20 rounded-full mb-4">
-            <IconAlertCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
-          </div>
-          <h2 className="text-2xl font-semibold">Tarefa não encontrada</h2>
-          <p className="text-muted-foreground">A tarefa que você está procurando não existe ou foi removida.</p>
-          <div className="flex gap-2 justify-center">
-            <Button onClick={() => navigate(routes.production.schedule.list)} variant="outline">
-              <IconClipboardList className="h-4 w-4 mr-2" />
-              Voltar para lista
-            </Button>
-            <Button onClick={() => navigate(routes.production.root)}>
-              <IconHome className="h-4 w-4 mr-2" />
-              Ir para produção
-            </Button>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
+        <div className="h-full flex flex-col px-4 pt-4">
+          <div className="flex-1 overflow-y-auto pb-6">
+            <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in-50 duration-500">
+              <div className="text-center px-4 max-w-md mx-auto space-y-4">
+                <div className="inline-flex p-4 bg-red-100 dark:bg-red-900/20 rounded-full mb-4">
+                  <IconAlertCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
+                </div>
+                <h2 className="text-2xl font-semibold">Tarefa não encontrada</h2>
+                <p className="text-muted-foreground">A tarefa que você está procurando não existe ou foi removida.</p>
+                <div className="flex gap-2 justify-center">
+                  <Button onClick={() => navigate(routes.production.schedule.list)} variant="outline">
+                    <IconClipboardList className="h-4 w-4 mr-2" />
+                    Voltar para lista
+                  </Button>
+                  <Button onClick={() => navigate(routes.production.root)}>
+                    <IconHome className="h-4 w-4 mr-2" />
+                    Ir para produção
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </PrivilegeRoute>
     );
   }
 
@@ -802,28 +961,20 @@ export const TaskDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="space-y-6">
-        <div className="animate-in fade-in-50 duration-500">
-          <PageHeader
-            variant="detail"
-            title={task.name}
-            icon={isFromHistory ? IconHistory : isFromOnHold ? IconPlayerPause : IconClipboardList}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Produção", href: routes.production.root },
-              {
-                label: isFromHistory ? "Histórico" : isFromOnHold ? "Em Espera" : "Cronograma",
-                href: isFromHistory ? routes.production.history.root : isFromOnHold ? routes.production.scheduleOnHold.root : routes.production.schedule.list
-              },
-              { label: task.name },
-            ]}
-            actions={[
-              {
-                key: "refresh",
-                label: "Atualizar",
-                icon: IconRefresh,
-                onClick: () => refetch(),
-              },
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="detail"
+          title={taskDisplayName}
+          breadcrumbs={[
+                { label: "Início", href: routes.home },
+                { label: "Produção", href: routes.production.root },
+                {
+                  label: isFromHistory ? "Histórico" : isFromPreparation ? "Em Preparação" : "Cronograma",
+                  href: isFromHistory ? routes.production.history.root : isFromPreparation ? routes.production.preparation.root : routes.production.schedule.list
+                },
+                { label: taskDisplayName },
+              ]}
+              actions={[
               ...(canEdit && task.status === TASK_STATUS.PENDING
                 ? [
                     {
@@ -857,6 +1008,20 @@ export const TaskDetailsPage = () => {
                     },
                   ]
                 : []),
+              {
+                key: "section-visibility",
+                label: (
+                  <SectionVisibilityManager
+                    sections={TASK_SECTIONS}
+                    visibilityState={sectionVisibility.visibilityState}
+                    onToggleSection={sectionVisibility.toggleSection}
+                    onToggleField={sectionVisibility.toggleField}
+                    onReset={sectionVisibility.resetToDefaults}
+                  />
+                ) as any,
+                onClick: () => {},
+                hideOnMobile: false,
+              },
               ...(canEdit ? [{
                 key: "edit",
                 label: "Editar",
@@ -864,13 +1029,14 @@ export const TaskDetailsPage = () => {
                 onClick: () => navigate(routes.production.schedule.edit(task.id)),
               }] : []),
             ]}
-          />
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Overview Card */}
-          <Card className="border flex flex-col animate-in fade-in-50 duration-700" level={1}>
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Overview Card */}
+              {sectionVisibility.isSectionVisible("overview") && (
+                <Card className="border flex flex-col animate-in-50 duration-700">
             <CardHeader className="pb-6">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -883,7 +1049,7 @@ export const TaskDetailsPage = () => {
             <CardContent className="pt-0 flex-1">
               <div className="space-y-4">
                 {/* Customer */}
-                {task.customer && (
+                {sectionVisibility.isFieldVisible("customer") && task.customer && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-1.5">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconBuilding className="h-4 w-4" />
@@ -902,7 +1068,50 @@ export const TaskDetailsPage = () => {
                   </div>
                 )}
 
+                {/* Invoice To */}
+                {sectionVisibility.isFieldVisible("invoiceTo") && task.invoiceTo && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-1.5">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconFileInvoice className="h-4 w-4" />
+                      Faturar Para
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <CustomerLogoDisplay
+                        logo={task.invoiceTo.logo}
+                        customerName={task.invoiceTo.fantasyName}
+                        size="sm"
+                        shape="rounded"
+                        className="flex-shrink-0"
+                      />
+                      <span className="text-sm font-semibold text-foreground text-right">{task.invoiceTo.fantasyName}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Negotiating With - Name */}
+                {sectionVisibility.isFieldVisible("negotiatingWithName") && task.negotiatingWith?.name && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconUser className="h-4 w-4" />
+                      Responsável pela Negociação
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{task.negotiatingWith.name}</span>
+                  </div>
+                )}
+
+                {/* Negotiating With - Phone */}
+                {sectionVisibility.isFieldVisible("negotiatingWithPhone") && task.negotiatingWith?.phone && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconPhone className="h-4 w-4" />
+                      Telefone do Responsável
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{task.negotiatingWith.phone}</span>
+                  </div>
+                )}
+
                 {/* Sector */}
+                {sectionVisibility.isFieldVisible("sector") && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconBuildingFactory className="h-4 w-4" />
@@ -912,9 +1121,10 @@ export const TaskDetailsPage = () => {
                     {task.sector ? task.sector.name : "Indefinido"}
                   </span>
                 </div>
+                )}
 
                 {/* Commission Status */}
-                {task.commission && (
+                {sectionVisibility.isFieldVisible("commission") && task.commission && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconCoin className="h-4 w-4" />
@@ -927,29 +1137,29 @@ export const TaskDetailsPage = () => {
                 )}
 
                 {/* Serial Number */}
-                {task.serialNumber && (
+                {sectionVisibility.isFieldVisible("serialNumber") && task.serialNumber && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconHash className="h-4 w-4" />
                   Número de Série
                     </span>
-                    <span className="text-sm font-semibold text-foreground font-mono">{task.serialNumber}</span>
+                    <span className="text-sm font-semibold text-foreground">{task.serialNumber}</span>
                   </div>
                 )}
 
                 {/* Plate */}
-                {task.truck?.plate && (
+                {sectionVisibility.isFieldVisible("plate") && task.truck?.plate && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconCar className="h-4 w-4" />
                   Placa
                     </span>
-                    <span className="text-sm font-semibold text-foreground font-mono uppercase">{task.truck.plate}</span>
+                    <span className="text-sm font-semibold text-foreground uppercase">{task.truck.plate}</span>
                   </div>
                 )}
 
                 {/* Chassis Number */}
-                {task.truck?.chassisNumber && (
+                {sectionVisibility.isFieldVisible("chassisNumber") && task.truck?.chassisNumber && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconBarcode className="h-4 w-4" />
@@ -960,7 +1170,7 @@ export const TaskDetailsPage = () => {
                 )}
 
                 {/* Truck Location/Spot */}
-                {task.truck?.spot && (
+                {sectionVisibility.isFieldVisible("truckSpot") && task.truck?.spot && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <IconMapPin className="h-4 w-4" />
@@ -973,7 +1183,7 @@ export const TaskDetailsPage = () => {
                 )}
 
                 {/* Truck */}
-                {task.truck && truckDimensions && (
+                {sectionVisibility.isFieldVisible("vehicle") && task.truck && truckDimensions && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <IconTruck className="h-4 w-4" />
@@ -987,7 +1197,7 @@ export const TaskDetailsPage = () => {
               </div>
 
               {/* Details */}
-              {task.details && (
+              {sectionVisibility.isFieldVisible("details") && task.details && (
                 <div className="mt-6">
                   <div className="flex items-center gap-2 mb-3">
                 <IconFileText className="h-5 w-5 text-muted-foreground" />
@@ -998,9 +1208,11 @@ export const TaskDetailsPage = () => {
               )}
                 </CardContent>
               </Card>
+          )}
 
               {/* Dates Card */}
-              <Card className="border flex flex-col animate-in fade-in-50 duration-800" level={1}>
+              {sectionVisibility.isSectionVisible("dates") && (
+              <Card className="border flex flex-col animate-in fade-in-50 duration-800">
                 <CardHeader className="pb-6">
                   <CardTitle className="flex items-center gap-2">
           <IconCalendarWeek className="h-5 w-5 text-muted-foreground" />
@@ -1070,10 +1282,11 @@ export const TaskDetailsPage = () => {
               </div>
                 </CardContent>
               </Card>
+              )}
 
               {/* Budget Card - Hidden for Warehouse sector users */}
-              {!isWarehouseSector && task.budget && task.budget.items && task.budget.items.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-825" level={1}>
+              {sectionVisibility.isSectionVisible("budget") && !isWarehouseSector && task.budget && task.budget.items && task.budget.items.length > 0 && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-825">
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -1144,8 +1357,8 @@ export const TaskDetailsPage = () => {
               )}
 
               {/* Truck Layout Card */}
-              {task.truck && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-850" level={1}>
+              {sectionVisibility.isSectionVisible("layout") && task.truck && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-850">
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
           <IconLayoutGrid className="h-5 w-5 text-muted-foreground" />
@@ -1170,14 +1383,14 @@ export const TaskDetailsPage = () => {
                     })()}
                   </CardHeader>
               <CardContent className="pt-0">
-                <TruckLayoutPreview truckId={task.truck.id} taskName={task.name} />
+                <TruckLayoutPreview truckId={task.truck.id} taskName={taskDisplayName} />
               </CardContent>
                 </Card>
               )}
 
               {/* Service Orders Card - Hidden for Financial, Designer, Logistic sectors */}
-              {!shouldHideServiceOrdersAndArtworks && filteredServiceOrders.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-900" level={1}>
+              {sectionVisibility.isSectionVisible("serviceOrders") && !shouldHideServiceOrdersAndArtworks && filteredServiceOrders.length > 0 && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-900">
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
                       <IconClipboardList className="h-5 w-5 text-muted-foreground" />
@@ -1246,8 +1459,8 @@ export const TaskDetailsPage = () => {
               )}
 
               {/* Cuts Card - Hidden for Financial sector users */}
-              {!isFinancialSector && cuts.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-950 lg:col-span-1" level={1}>
+              {sectionVisibility.isSectionVisible("cuts") && !isFinancialSector && cuts.length > 0 && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-950 lg:col-span-1">
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -1263,7 +1476,7 @@ export const TaskDetailsPage = () => {
                           size="sm"
                           onClick={async () => {
                             const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
-                            const zipFileName = `${task.name}${task.serialNumber ? `-${task.serialNumber}` : ''}-recortes.zip`;
+                            const zipFileName = `${taskDisplayName}${task.serialNumber ? `-${task.serialNumber}` : ''}-recortes.zip`;
 
                             // Download files and create zip
                             const JSZip = (await import('jszip')).default;
@@ -1321,8 +1534,8 @@ export const TaskDetailsPage = () => {
               )}
 
               {/* Artworks Card - 1/2 width - Hidden for Financial, Designer, Logistic sectors */}
-              {!shouldHideServiceOrdersAndArtworks && task.artworks && task.artworks.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1" level={1}>
+              {sectionVisibility.isSectionVisible("artworks") && !shouldHideServiceOrdersAndArtworks && task.artworks && task.artworks.length > 0 && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1">
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -1395,8 +1608,8 @@ export const TaskDetailsPage = () => {
               )}
 
               {/* Documents Card - Budget, NFE, Receipt - Hidden for Warehouse sector users */}
-              {!isWarehouseSector && ((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0)) && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1050" level={1}>
+              {sectionVisibility.isSectionVisible("documents") && !isWarehouseSector && ((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0)) && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-1050">
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -1497,8 +1710,8 @@ export const TaskDetailsPage = () => {
 
 
               {/* Paints Card - Show only if task has general painting or logo paints */}
-              {(task.generalPainting || (task.logoPaints && task.logoPaints.length > 0)) && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1150" level={1}>
+              {sectionVisibility.isSectionVisible("paints") && (task.generalPainting || (task.logoPaints && task.logoPaints.length > 0)) && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-1150">
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
           <IconPaint className="h-5 w-5 text-muted-foreground" />
@@ -1713,8 +1926,8 @@ export const TaskDetailsPage = () => {
               )}
 
               {/* Observation Card */}
-              {task.observation && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1200" level={1}>
+              {sectionVisibility.isSectionVisible("observation") && task.observation && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-1200">
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
                       <div className="p-2 rounded-lg bg-yellow-500/10">
@@ -1767,8 +1980,8 @@ export const TaskDetailsPage = () => {
               )}
 
               {/* Airbrushings Card - Only show if task has airbrushings */}
-              {airbrushings.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-1250 lg:col-span-1" level={1}>
+              {sectionVisibility.isSectionVisible("airbrushings") && airbrushings.length > 0 && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-1250 lg:col-span-1">
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
                       <IconSpray className="h-5 w-5 text-muted-foreground" />
@@ -1927,16 +2140,19 @@ export const TaskDetailsPage = () => {
               </CardContent>
                 </Card>
               )}
+            </div>
 
-          {/* Changelog History - Hidden for Financial and Warehouse sector users */}
-          {!isFinancialSector && !isWarehouseSector && (
-            <Card className="border flex flex-col animate-in fade-in-50 duration-1300" level={1}>
-              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.TASK} entityId={task.id} entityName={task.name} entityCreatedAt={task.createdAt} className="h-full" />
-            </Card>
-          )}
+            {/* Changelog History - Hidden for Financial and Warehouse sector users */}
+            {sectionVisibility.isSectionVisible("changelog") && !isFinancialSector && !isWarehouseSector && (
+              <Card className="border flex flex-col animate-in fade-in-50 duration-1300">
+                <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.TASK} entityId={task.id} entityName={taskDisplayName} entityCreatedAt={task.createdAt} className="h-full" />
+              </Card>
+            )}
+          </div>
         </div>
+      </div>
 
-        {/* Status Change Dialog */}
+      {/* Status Change Dialog */}
         <AlertDialog open={statusChangeDialogOpen} onOpenChange={setStatusChangeDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -1950,7 +2166,7 @@ export const TaskDetailsPage = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Tarefa:</span>
-                    <span className="font-medium">{task.name}</span>
+                    <span className="font-medium">{taskDisplayName}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Status atual:</span>
@@ -2001,7 +2217,6 @@ export const TaskDetailsPage = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
     </PrivilegeRoute>
   );
 };

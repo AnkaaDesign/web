@@ -32,9 +32,11 @@ export const CreateEpiPage = () => {
       try {
         validatedData = itemCreateSchema.parse(sanitizedData);
       } catch (schemaError) {
-        console.error("3. Schema validation failed:", schemaError);
-        if (schemaError instanceof Error) {
-          console.error("Schema error details:", schemaError.message);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("3. Schema validation failed:", schemaError);
+          if (schemaError instanceof Error) {
+            console.error("Schema error details:", schemaError.message);
+          }
         }
         throw schemaError;
       }
@@ -42,22 +44,23 @@ export const CreateEpiPage = () => {
       if (result?.success && result?.data) {
         // Clear URL parameters after successful submission
         navigate(routes.humanResources.ppe.root, { replace: true });
-      } else {
       }
     } catch (error) {
-      console.error("=== ERROR IN EPI CREATION ===");
-      console.error("Error type:", error?.constructor?.name);
-      console.error("Error message:", error instanceof Error ? error.message : "Unknown error");
-      console.error("Full error object:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("=== ERROR IN EPI CREATION ===");
+        console.error("Error type:", error?.constructor?.name);
+        console.error("Error message:", error instanceof Error ? error.message : "Unknown error");
+        console.error("Full error object:", error);
 
-      // Check if it's a validation error
-      if (error && typeof error === "object" && "errors" in error) {
-        console.error("Validation errors:", (error as any).errors);
-      }
+        // Check if it's a validation error
+        if (error && typeof error === "object" && "errors" in error) {
+          console.error("Validation errors:", (error as any).errors);
+        }
 
-      // Check if it's an API error
-      if (error && typeof error === "object" && "response" in error) {
-        console.error("API response error:", (error as any).response);
+        // Check if it's an API error
+        if (error && typeof error === "object" && "response" in error) {
+          console.error("API response error:", (error as any).response);
+        }
       }
 
       // Re-throw to let React Query handle it
@@ -111,24 +114,17 @@ export const CreateEpiPage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-5xl mx-auto">
-          <PageHeader
-            variant="form"
-            title="Cadastrar EPI"
-            icon={IconShield}
-            breadcrumbs={[{ label: "RH", href: routes.humanResources.root }, { label: "EPIs", href: routes.humanResources.ppe.root }, { label: "Cadastrar" }]}
-            actions={actions}
-            favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_CADASTRAR}
-          />
-        </div>
-      </div>
-
-      {/* Scrollable Form Container */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto h-full">
+    <div className="h-full flex flex-col px-4 pt-4">
+      <PageHeader
+        variant="form"
+        title="Cadastrar EPI"
+        icon={IconShield}
+        breadcrumbs={[{ label: "RH", href: routes.humanResources.root }, { label: "EPIs", href: routes.humanResources.ppe.root }, { label: "Cadastrar" }]}
+        actions={actions}
+        favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_EPI_CADASTRAR}
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="mt-4 space-y-4">
           <EpiForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} defaultValues={defaultValues} />
         </div>
       </div>

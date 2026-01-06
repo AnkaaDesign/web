@@ -24,7 +24,7 @@ interface TaskHistoryTableProps {
   className?: string;
   filters?: Partial<TaskGetManyFormData>;
   onDataChange?: (data: { items: Task[]; totalRecords: number }) => void;
-  navigationRoute?: 'history' | 'onHold' | 'schedule';
+  navigationRoute?: 'history' | 'preparation' | 'schedule';
 }
 
 export function TaskHistoryTable({
@@ -70,17 +70,6 @@ export function TaskHistoryTable({
     handleRowClick: handleRowClickSelection,
   } = tableState;
 
-  // Log table state
-  React.useEffect(() => {
-    console.log("[TaskHistoryTable] Table state updated:", {
-      page,
-      pageSize,
-      selectedIds: selectedIds.length,
-      sortConfigs,
-      showSelectedOnly,
-      currentURL: window.location.search
-    });
-  }, [page, pageSize, selectedIds, sortConfigs, showSelectedOnly]);
 
   // Memoize include configuration to prevent re-renders
   const includeConfig = React.useMemo(
@@ -90,6 +79,7 @@ export function TaskHistoryTable({
       services: {
         include: {
           service: true,
+          assignedTo: true,
         },
       },
       observation: true,
@@ -127,16 +117,6 @@ export function TaskHistoryTable({
 
   // Build query parameters
   const queryParams = React.useMemo(() => {
-    console.log("[TaskHistoryTable] Building query params:", {
-      filters,
-      filtersSearchingFor: filters.searchingFor,
-      page,
-      pageSize,
-      showSelectedOnly,
-      selectedIdsCount: selectedIds.length,
-      sortConfigs
-    });
-
     // Determine status to use
     const statusToUse = (!filters.status || (Array.isArray(filters.status) && filters.status.length === 0))
       ? [TASK_STATUS.COMPLETED]
@@ -161,18 +141,6 @@ export function TaskHistoryTable({
         }),
     };
 
-    console.log("[TaskHistoryTable] Query params built:", {
-      searchingFor: params.searchingFor,
-      page: params.page,
-      limit: params.limit,
-      status: params.status,
-      hasOrderBy: !!params.orderBy,
-      hasWhere: !!params.where,
-      hasFinishedDateRange: !!params.finishedDateRange,
-      finishedDateRange: params.finishedDateRange,
-      allParamKeys: Object.keys(params),
-    });
-
     return params;
   }, [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds]);
 
@@ -183,25 +151,10 @@ export function TaskHistoryTable({
   const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;
   const totalRecords = response?.meta?.totalRecords || 0;
 
-  // Log response data
-  React.useEffect(() => {
-    console.log("[TaskHistoryTable] Data response:", {
-      isLoading,
-      error: error?.message,
-      tasksCount: tasks.length,
-      totalRecords,
-      totalPages,
-      currentPage: page,
-      metaPage: response?.meta?.page,
-      hasNextPage: response?.meta?.hasNextPage,
-      firstTaskName: tasks[0]?.name,
-      lastTaskName: tasks[tasks.length - 1]?.name
-    });
-  }, [isLoading, error, tasks, totalRecords, totalPages, page, response]);
 
 
   // Define all available columns
-  const allColumns = React.useMemo(() => createTaskHistoryColumns(), []);
+  const allColumns = React.useMemo(() => createTaskHistoryColumns({ currentUserId: user?.id }), [user?.id]);
 
   // Filter visible columns
   const columns = React.useMemo(
@@ -263,14 +216,16 @@ export function TaskHistoryTable({
     isBulk: boolean;
   } | null>(null);
 
-  // Log context menu state changes
+  // Context menu state changed
   React.useEffect(() => {
-    console.log('[TaskHistoryTable] Context menu state changed:', contextMenu ? {
-      x: contextMenu.x,
-      y: contextMenu.y,
-      tasksCount: contextMenu.tasks.length,
-      isBulk: contextMenu.isBulk
-    } : null);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskHistoryTable] Context menu state changed:', contextMenu ? {
+        x: contextMenu.x,
+        y: contextMenu.y,
+        tasksCount: contextMenu.tasks.length,
+        isBulk: contextMenu.isBulk
+      } : null);
+    }
   }, [contextMenu]);
 
   // Context menu handlers
@@ -312,10 +267,8 @@ export function TaskHistoryTable({
         target.closest('[role="dialog"]') ||
         target.closest('[data-radix-popper-content-wrapper]')
       ) {
-        console.log('[TaskHistoryTable] Click inside menu/modal, not closing context menu');
         return;
       }
-      console.log('[TaskHistoryTable] Click outside, closing context menu');
       setContextMenu(null);
     };
     document.addEventListener("click", handleClick);
@@ -432,11 +385,13 @@ export function TaskHistoryTable({
                       }
 
                       const detailRoute =
-                        navigationRoute === 'onHold' ? routes.production.scheduleOnHold.details(task.id) :
+                        navigationRoute === 'preparation' ? routes.production.preparation.details(task.id) :
                         navigationRoute === 'schedule' ? routes.production.schedule.details(task.id) :
                         routes.production.history.details(task.id);
 
-                      console.log('Task history row clicked, navigating to:', detailRoute);
+                      if (process.env.NODE_ENV !== 'production') {
+                        console.log('Task history row clicked, navigating to:', detailRoute);
+                      }
                       navigate(detailRoute);
                     }}
                     onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
@@ -487,23 +442,12 @@ export function TaskHistoryTable({
           currentPage={page}
           totalPages={totalPages}
           onPageChange={(newPage) => {
-            console.log("[TaskHistoryTable] Page change requested:", {
-              from: page,
-              to: newPage,
-              totalPages,
-              totalRecords,
-              currentURL: window.location.search
-            });
             setPage(newPage);
           }}
           pageSize={pageSize}
           totalItems={totalRecords}
           pageSizeOptions={[20, 40, 60, 100]}
           onPageSizeChange={(newPageSize) => {
-            console.log("[TaskHistoryTable] Page size change:", {
-              from: pageSize,
-              to: newPageSize
-            });
             setPageSize(newPageSize);
           }}
           showPageSizeSelector={true}
@@ -519,6 +463,7 @@ export function TaskHistoryTable({
           position={{ x: contextMenu.x, y: contextMenu.y }}
           onClose={handleContextMenuClose}
           selectedIds={contextMenu.isBulk ? selectedIds : [contextMenu.tasks[0]?.id].filter(Boolean)}
+          navigationRoute={navigationRoute}
         />
       )}
     </div>

@@ -106,7 +106,7 @@ export function PaintPreview({ name = "Amostra de Tinta", hex, finish, brand, ma
   const renderPreview = () => {
     if (viewMode === "css") {
       return (
-        <div className="relative rounded-lg overflow-hidden shadow-xl">
+        <div className="relative rounded-lg overflow-hidden shadow-sm">
           <div className="transition-all duration-500" style={getCssEffectStyles()} />
         </div>
       );

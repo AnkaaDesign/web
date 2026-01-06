@@ -1,4 +1,4 @@
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, DASHBOARD_TIME_PERIOD, TASK_STATUS_LABELS } from "../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
@@ -45,6 +45,9 @@ import {
 } from "@/components/dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent } from "@/components/ui/card";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 export const AdministrationRootPage = () => {
   const navigate = useNavigate();
@@ -190,25 +193,36 @@ export const AdministrationRootPage = () => {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-        <div className="flex flex-col h-full space-y-4">
-          <PageHeaderWithFavorite
-            title="Administração"
-            icon={IconSettings}
-            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
-            actions={[
-              {
-                key: "time-period",
-                label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                variant: "ghost",
-                className: "p-0 hover:bg-transparent",
-              },
-            ]}
-          />
-          <div className="space-y-6">
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-48 w-full" />
+        <div className="h-full flex flex-col bg-background">
+          {/* Fixed Header */}
+          <div className="flex-shrink-0 bg-background">
+            <div className="px-4 py-4">
+              <PageHeader
+                title="Administração"
+                icon={IconSettings}
+                favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
+                breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
+                actions={[
+                  {
+                    key: "time-period",
+                    label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
+                    variant: "ghost",
+                    className: "p-0 hover:bg-transparent",
+                  },
+                ]}
+              />
+            </div>
+          </div>
+
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto px-4 pb-6">
+            <Card>
+              <CardContent className="p-6 space-y-6">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-64 w-full" />
+                <Skeleton className="h-48 w-full" />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </PrivilegeRoute>
@@ -218,24 +232,37 @@ export const AdministrationRootPage = () => {
   if (error) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-        <div className="flex flex-col h-full space-y-4">
-          <PageHeaderWithFavorite
-            title="Administração"
-            icon={IconSettings}
-            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
-            actions={[
-              {
-                key: "time-period",
-                label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                variant: "ghost",
-                className: "p-0 hover:bg-transparent",
-              },
-            ]}
-          />
-          <Alert variant="destructive">
-            <AlertDescription>Erro ao carregar dashboard: {error.message}</AlertDescription>
-          </Alert>
+        <div className="h-full flex flex-col bg-background">
+          {/* Fixed Header */}
+          <div className="flex-shrink-0 bg-background">
+            <div className="px-4 py-4">
+              <PageHeader
+                title="Administração"
+                icon={IconSettings}
+                favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
+                breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
+                actions={[
+                  {
+                    key: "time-period",
+                    label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
+                    variant: "ghost",
+                    className: "p-0 hover:bg-transparent",
+                  },
+                ]}
+              />
+            </div>
+          </div>
+
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto px-4 pb-6">
+            <Card>
+              <CardContent className="p-6">
+                <Alert variant="destructive">
+                  <AlertDescription>Erro ao carregar dashboard: {error.message}</AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </PrivilegeRoute>
     );
@@ -245,34 +272,38 @@ export const AdministrationRootPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Administração"
-            icon={IconSettings}
-            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
-            actions={[
-              {
-                key: "time-period",
-                label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
-                variant: "ghost",
-                className: "p-0 hover:bg-transparent",
-              },
-              {
-                key: "create-user",
-                label: "Novo Colaborador",
-                icon: IconUserPlus,
-                onClick: () => navigate(routes.administration.collaborators.create),
-                variant: "default",
-              },
-            ]}
-          />
+      <div className="h-full flex flex-col bg-background">
+        {/* Fixed Header */}
+        <div className="flex-shrink-0 bg-background">
+          <div className="px-4 py-4">
+            <PageHeader
+              title="Administração"
+              icon={IconSettings}
+              favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_LISTAR}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }]}
+              actions={[
+                {
+                  key: "time-period",
+                  label: <TimePeriodSelector value={timePeriod} onChange={setTimePeriod} className="mr-2" />,
+                  variant: "ghost",
+                  className: "p-0 hover:bg-transparent",
+                },
+                {
+                  key: "create-user",
+                  label: "Novo Colaborador",
+                  icon: IconUserPlus,
+                  onClick: () => navigate(routes.administration.collaborators.create),
+                  variant: "default",
+                },
+              ]}
+            />
+          </div>
         </div>
 
-        {/* Main Content Card - All sections in a single scrollable container */}
-        <div className="flex-1 bg-card dark:bg-card rounded-lg shadow-sm border border-border overflow-hidden">
-          <div className="h-full overflow-y-auto p-6 space-y-8">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-4 pb-6">
+          <Card>
+            <CardContent className="p-6 space-y-6">
             {/* Quick Access Section */}
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-4">Acesso Rápido</h3>
@@ -517,7 +548,8 @@ export const AdministrationRootPage = () => {
                 />
               </div>
             </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </PrivilegeRoute>

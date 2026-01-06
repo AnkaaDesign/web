@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { routes, FAVORITE_PAGES } from "../../../../constants";
 import { PaintBrandForm } from "@/components/painting/paint-brand/form";
 import { usePaintBrand, usePaintBrandMutations } from "../../../../hooks";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { IconAlertCircle, IconCheck, IconLoader2, IconTag } from "@tabler/icons-react";
@@ -56,7 +56,7 @@ export function PaintBrandEditPage() {
         {/* Fixed Header */}
         <div className="flex-shrink-0">
           <div className="max-w-4xl mx-auto">
-            <PageHeaderWithFavorite
+            <PageHeader
               title="Carregando..."
               icon={IconTag}
               favoritePage={FAVORITE_PAGES.PINTURA_MARCAS_TINTA_EDITAR}
@@ -73,7 +73,7 @@ export function PaintBrandEditPage() {
 
         {/* Main Content Card - Dashboard style scrolling */}
         <div className="flex-1 overflow-hidden max-w-4xl mx-auto w-full">
-          <div className="h-full bg-card rounded-lg shadow-md border-muted overflow-hidden p-6">
+          <div className="h-full bg-card rounded-lg shadow-sm border-muted overflow-hidden p-4">
             <div className="space-y-6">
               <div className="space-y-4">
                 <Skeleton className="h-4 w-32" />
@@ -103,7 +103,7 @@ export function PaintBrandEditPage() {
         {/* Fixed Header */}
         <div className="flex-shrink-0">
           <div className="max-w-4xl mx-auto">
-            <PageHeaderWithFavorite
+            <PageHeader
               title="Editar Marca de Tinta"
               icon={IconTag}
               favoritePage={FAVORITE_PAGES.PINTURA_MARCAS_TINTA_EDITAR}
@@ -119,7 +119,7 @@ export function PaintBrandEditPage() {
 
         {/* Main Content Card - Dashboard style scrolling */}
         <div className="flex-1 overflow-hidden max-w-4xl mx-auto w-full">
-          <div className="h-full bg-card rounded-lg shadow-md border-muted overflow-hidden p-6">
+          <div className="h-full bg-card rounded-lg shadow-sm border-muted overflow-hidden p-4">
             <Alert variant="destructive">
               <IconAlertCircle className="h-4 w-4" />
               <AlertDescription>{error ? "Erro ao carregar marca de tinta" : "Marca de tinta não encontrada"}</AlertDescription>
@@ -156,40 +156,33 @@ export function PaintBrandEditPage() {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-4xl mx-auto">
-          <PageHeaderWithFavorite
-            title={`Editar ${paintBrand.name}`}
-            icon={IconTag}
-            favoritePage={FAVORITE_PAGES.PINTURA_MARCAS_TINTA_EDITAR}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Pintura", href: routes.painting.root },
-              { label: "Marcas de Tinta", href: routes.painting.paintBrands.root },
-              { label: paintBrand.name, href: routes.painting.paintBrands.details(id!) },
-              { label: "Editar" },
-            ]}
-            actions={actions}
-          />
-        </div>
-      </div>
-
-      {/* Main Content Card - Dashboard style scrolling */}
-      <div className="flex-1 overflow-hidden max-w-4xl mx-auto w-full">
-        <div className="h-full bg-card rounded-lg shadow-md border-muted overflow-hidden">
-          <PaintBrandForm
-            mode="update"
-            paintBrandId={id!}
-            defaultValues={defaultValues}
-            initialComponentItems={paintBrand.componentItems || []}
-            onSubmit={handleSubmit}
-            onCancel={handleCancel}
-            isSubmitting={updateMutation.isPending}
-            onFormStateChange={setFormState}
-          />
-        </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        variant="form"
+        title={`Editar ${paintBrand.name}`}
+        icon={IconTag}
+        favoritePage={FAVORITE_PAGES.PINTURA_MARCAS_TINTA_EDITAR}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Pintura", href: routes.painting.root },
+          { label: "Marcas de Tinta", href: routes.painting.paintBrands.root },
+          { label: paintBrand.name, href: routes.painting.paintBrands.details(id!) },
+          { label: "Editar" },
+        ]}
+        actions={actions}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <PaintBrandForm
+          mode="update"
+          paintBrandId={id!}
+          defaultValues={defaultValues}
+          initialComponentItems={paintBrand.componentItems || []}
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+          isSubmitting={updateMutation.isPending}
+          onFormStateChange={setFormState}
+        />
       </div>
     </div>
   );

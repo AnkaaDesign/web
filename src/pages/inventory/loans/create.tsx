@@ -11,9 +11,7 @@ export const LoanCreate = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="h-full flex flex-col">
-        <BorrowBatchCreateForm />
-      </div>
+      <BorrowBatchCreateForm />
     </PrivilegeRoute>
   );
 };

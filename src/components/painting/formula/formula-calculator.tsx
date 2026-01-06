@@ -627,7 +627,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Production Button - 2/3 width */}
         <Card className="lg:col-span-2">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="space-y-4">
               <div className="text-center">
                 <h3 className="font-medium text-sm mb-3">Produção</h3>
@@ -663,7 +663,7 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
 
         {/* Specifications - 1/3 width */}
         <Card className="lg:col-span-1">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <h3 className="font-medium text-sm mb-3">Especificações</h3>
 
             <div className="space-y-3">

@@ -68,7 +68,9 @@ export const throttlerService = {
    * Get throttler statistics
    */
   getStats: () => {
-    console.log("[Throttler API] Getting stats");
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Throttler API] Getting stats");
+    }
     return apiClient.get<ThrottlerStatsResponse>("/system/throttler/stats");
   },
 
@@ -76,7 +78,9 @@ export const throttlerService = {
    * Get throttler keys with optional filtering
    */
   getKeys: (pattern?: string, limit?: number) => {
-    console.log("[Throttler API] Getting keys:", { pattern, limit });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Throttler API] Getting keys:", { pattern, limit });
+    }
     return apiClient.get<ThrottlerKeysResponse>("/system/throttler/keys", {
       params: { pattern, limit },
     });
@@ -86,7 +90,9 @@ export const throttlerService = {
    * Get all blocked keys
    */
   getBlockedKeys: () => {
-    console.log("[Throttler API] Getting blocked keys");
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Throttler API] Getting blocked keys");
+    }
     return apiClient.get<BlockedKeysResponse>("/system/throttler/blocked-keys");
   },
 
@@ -94,14 +100,20 @@ export const throttlerService = {
    * Clear all throttler keys (with optional pattern filter)
    */
   clearKeys: (pattern?: string) => {
-    console.log("[Throttler API] Clearing all keys, pattern:", pattern);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Throttler API] Clearing all keys, pattern:", pattern);
+    }
     return apiClient.delete<DeleteResponse>("/system/throttler/keys", {
       params: { pattern },
     }).then((response) => {
-      console.log("[Throttler API] Clear all keys response:", response);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("[Throttler API] Clear all keys response:", response);
+      }
       return response;
     }).catch((error) => {
-      console.error("[Throttler API] Clear all keys error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[Throttler API] Clear all keys error:", error);
+      }
       throw error;
     });
   },
@@ -110,14 +122,20 @@ export const throttlerService = {
    * Clear a specific key
    */
   clearSpecificKey: (key: string) => {
-    console.log("[Throttler API] Clearing specific key:", key);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Throttler API] Clearing specific key:", key);
+    }
     return apiClient.delete<DeleteResponse>("/system/throttler/key", {
       params: { key },
     }).then((response) => {
-      console.log("[Throttler API] Clear specific key response:", response);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("[Throttler API] Clear specific key response:", response);
+      }
       return response;
     }).catch((error) => {
-      console.error("[Throttler API] Clear specific key error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[Throttler API] Clear specific key error:", error);
+      }
       throw error;
     });
   },
@@ -126,7 +144,9 @@ export const throttlerService = {
    * Clear all keys for a specific user
    */
   clearUserKeys: (userId?: string) => {
-    console.log("[Throttler API] Clearing user keys:", userId);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Throttler API] Clearing user keys:", userId);
+    }
     return apiClient.delete<DeleteResponse>("/system/throttler/user-keys", {
       params: { userId },
     });
@@ -136,7 +156,9 @@ export const throttlerService = {
    * Clear all keys for a specific IP address
    */
   clearIpKeys: (ip: string) => {
-    console.log("[Throttler API] Clearing IP keys:", ip);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Throttler API] Clearing IP keys:", ip);
+    }
     return apiClient.delete<DeleteResponse>("/system/throttler/ip-keys", {
       params: { ip },
     });
@@ -146,12 +168,18 @@ export const throttlerService = {
    * Clear all blocked keys
    */
   clearBlockedKeys: () => {
-    console.log("[Throttler API] Clearing blocked keys");
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[Throttler API] Clearing blocked keys");
+    }
     return apiClient.delete<DeleteResponse>("/system/throttler/blocked-keys").then((response) => {
-      console.log("[Throttler API] Clear blocked keys response:", response);
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("[Throttler API] Clear blocked keys response:", response);
+      }
       return response;
     }).catch((error) => {
-      console.error("[Throttler API] Clear blocked keys error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("[Throttler API] Clear blocked keys error:", error);
+      }
       throw error;
     });
   },

@@ -28,7 +28,6 @@ export const PDFViewerDemo: React.FC = () => {
   const samplePDFUrl = "https://example.com/api/files/serve/sample-pdf-id";
 
   const handleDownload = (file: AnkaaFile) => {
-    console.log("Downloading:", file.filename);
     // Implement actual download logic
   };
 

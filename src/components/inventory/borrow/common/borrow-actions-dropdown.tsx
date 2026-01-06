@@ -40,7 +40,9 @@ export function BorrowActionsDropdown({ borrow, onEdit, onDelete, className }: B
     } else {
       // Since single edit page is removed, this should trigger batch edit
       // The parent component should handle this by opening the batch edit modal
-      console.warn("Single edit clicked but no onEdit callback provided. Consider implementing batch edit.");
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("Single edit clicked but no onEdit callback provided. Consider implementing batch edit.");
+      }
     }
   };
 
@@ -51,7 +53,9 @@ export function BorrowActionsDropdown({ borrow, onEdit, onDelete, className }: B
       try {
         await deleteMutation.mutateAsync(borrow.id);
       } catch (error) {
-        console.error("Error deleting borrow:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error deleting borrow:", error);
+        }
       }
     }
   };

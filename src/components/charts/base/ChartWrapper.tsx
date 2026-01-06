@@ -188,7 +188,9 @@ export const ChartWrapper = React.memo<ChartWrapperProps>(({
       }, 'image/png');
     } catch (err) {
       toast.error('Erro ao exportar imagem');
-      console.error(err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(err);
+      }
     }
   }, [elementId, exportFilename]);
 
@@ -220,7 +222,9 @@ export const ChartWrapper = React.memo<ChartWrapperProps>(({
       toast.success('PDF exportado com sucesso');
     } catch (err) {
       toast.error('Erro ao exportar PDF');
-      console.error(err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(err);
+      }
     }
   }, [elementId, exportFilename]);
 
@@ -248,7 +252,9 @@ export const ChartWrapper = React.memo<ChartWrapperProps>(({
       toast.success('CSV exportado com sucesso');
     } catch (err) {
       toast.error('Erro ao exportar CSV');
-      console.error(err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(err);
+      }
     }
   }, [exportData, exportFilename]);
 
@@ -268,7 +274,9 @@ export const ChartWrapper = React.memo<ChartWrapperProps>(({
       toast.success('Excel exportado com sucesso');
     } catch (err) {
       toast.error('Erro ao exportar Excel');
-      console.error(err);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(err);
+      }
     }
   }, [exportData, exportFilename]);
 
@@ -555,7 +563,7 @@ export const ChartWrapper = React.memo<ChartWrapperProps>(({
       <>
         {chartContent}
         <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
-          <DialogContent className="max-w-[95vw] max-h-[95vh] p-6">
+          <DialogContent className="max-w-[95vw] max-h-[95vh] p-4">
             <DialogHeader>
               <DialogTitle>{title}</DialogTitle>
             </DialogHeader>

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useTasks } from "../../../hooks";
 import { routes, FAVORITE_PAGES } from "../../../constants";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { TaskBatchEditTable } from "@/components/production/task/batch-edit/task-batch-edit-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,7 +73,7 @@ export const TaskBatchEditPage = () => {
 
   if (taskIds.length === 0) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -97,7 +97,7 @@ export const TaskBatchEditPage = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <div>
@@ -116,7 +116,7 @@ export const TaskBatchEditPage = () => {
 
   if (error || !hasValidTasks) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -177,36 +177,32 @@ export const TaskBatchEditPage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <PageHeaderWithFavorite
-          title="Editar Tarefas em Lote"
-          icon={IconClipboardList}
-          favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
-          breadcrumbs={[
-            { label: "Início", href: "/" },
-            { label: "Produção", href: routes.production.root },
-            { label: "Cronograma", href: routes.production.schedule.root },
-            { label: "Editar em Lote" },
-          ]}
-          actions={actions}
-        />
-      </div>
-
-      {/* Scrollable Content Container */}
-      <div className="flex-1 overflow-hidden">
+    <div className="h-full flex flex-col bg-background px-4 pt-4">
+      <PageHeader
+        title="Editar Tarefas em Lote"
+        icon={IconClipboardList}
+        favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
+        breadcrumbs={[
+          { label: "Início", href: "/" },
+          { label: "Produção", href: routes.production.root },
+          { label: "Cronograma", href: routes.production.schedule.root },
+          { label: "Editar em Lote" },
+        ]}
+        actions={actions}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-hidden pt-4 pb-6">
         <TaskBatchEditTable
-            tasks={tasks}
-            onCancel={handleCancel}
-            onSubmit={() => {
-              // This will be triggered from the page header save button
-              const submitButton = document.getElementById("task-batch-form-submit");
-              if (submitButton) {
-                submitButton.click();
-              }
-            }}
-          />
+          tasks={tasks}
+          onCancel={handleCancel}
+          onSubmit={() => {
+            // This will be triggered from the page header save button
+            const submitButton = document.getElementById("task-batch-form-submit");
+            if (submitButton) {
+              submitButton.click();
+            }
+          }}
+        />
       </div>
     </div>
   );

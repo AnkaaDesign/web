@@ -89,7 +89,7 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Basic Info Card */}
-        <Card className="border flex flex-col animate-in fade-in-50 duration-700" level={1}>
+        <Card className="border flex flex-col animate-in fade-in-50 duration-700">
           <CardHeader className="pb-6">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -170,7 +170,7 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
         </Card>
 
         {/* Task Information Card */}
-        <Card className="border flex flex-col animate-in fade-in-50 duration-800" level={1}>
+        <Card className="border flex flex-col animate-in fade-in-50 duration-800">
           <CardHeader className="pb-6">
             <CardTitle className="flex items-center gap-2">
               <IconClipboardList className="h-5 w-5 text-muted-foreground" />
@@ -265,7 +265,7 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Documents Card - Receipts and Invoices */}
         {((airbrushing.receipts && airbrushing.receipts.length > 0) || (airbrushing.invoices && airbrushing.invoices.length > 0)) && (
-          <Card className="border flex flex-col animate-in fade-in-50 duration-900" level={1}>
+          <Card className="border flex flex-col animate-in fade-in-50 duration-900">
             <CardHeader className="pb-6">
               <CardTitle className="flex items-center gap-2">
                 <IconFileText className="h-5 w-5 text-muted-foreground" />
@@ -320,7 +320,7 @@ export function AirbrushingInfoCard({ airbrushing, className }: AirbrushingInfoC
 
         {/* Artworks Card */}
         {airbrushing.artworks && airbrushing.artworks.length > 0 && (
-          <Card className="border flex flex-col animate-in fade-in-50 duration-900" level={1}>
+          <Card className="border flex flex-col animate-in fade-in-50 duration-900">
             <CardHeader className="pb-6">
               <CardTitle className="flex items-center gap-2">
                 <IconPhoto className="h-5 w-5 text-muted-foreground" />

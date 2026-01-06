@@ -155,7 +155,7 @@ export function ServerLogsPage() {
   const activeFilterCount = [selectedService && selectedService !== "", displaySearchText && displaySearchText !== "", logLines !== "50"].filter(Boolean).length;
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="h-full flex flex-col px-4 pt-4">
       {/* Fixed Header */}
       <div className="flex-shrink-0">
         <PageHeader
@@ -166,8 +166,8 @@ export function ServerLogsPage() {
       </div>
 
       {/* Content Card */}
-      <Card className="flex-1 flex flex-col min-h-0" level={1}>
-        <CardContent className="flex-1 overflow-auto space-y-4">
+      <Card className="flex-1 flex flex-col min-h-0 mt-4">
+        <CardContent className="flex-1 overflow-auto space-y-4 pb-6">
           {/* Search and Filter Controls */}
           <div className="flex flex-col gap-3 sm:flex-row">
             {/* Search Input */}
@@ -227,7 +227,7 @@ export function ServerLogsPage() {
           )}
 
           {/* Log Content */}
-          <Card className="flex-1 flex flex-col min-h-0" level={2}>
+          <Card className="flex-1 flex flex-col min-h-0">
             <CardHeader className="flex-shrink-0">
               <div className="flex justify-between items-center">
                 <CardTitle className="text-xl flex items-center gap-3">

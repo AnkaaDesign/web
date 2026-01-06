@@ -7,7 +7,7 @@ import { useObservation, useObservationMutations, useTasks } from "../../../../h
 import type { ObservationCreateFormData, ObservationUpdateFormData } from "../../../../schemas";
 import { observationCreateSchema, observationUpdateSchema } from "../../../../schemas";
 import { routes, FAVORITE_PAGES } from "../../../../constants";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
@@ -26,6 +26,7 @@ import { cn, backendFileToFileWithPreview } from "@/lib/utils";
 import { toast } from "sonner";
 import { createObservationFormData } from "@/utils/form-data-helper";
 import { formatDate } from "../../../../utils";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 // Helper function for file size formatting
 const formatFileSize = (bytes: number): string => {
@@ -276,14 +277,6 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
   // Handle file changes
   const handleFilesChange = (files: FileWithPreview[]) => {
-    console.log('[ObservationForm] handleFilesChange called with', files.length, 'files');
-    console.log('[ObservationForm] Files details:', files.map(f => ({
-      name: f.name,
-      id: f.id,
-      uploaded: f.uploaded,
-      uploadedFileId: f.uploadedFileId
-    })));
-
     setUploadedFiles(files);
 
     // Filter out files without IDs (newly uploaded files might not have IDs yet)
@@ -291,7 +284,6 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       .map((f) => f.uploadedFileId || f.id)
       .filter((id): id is string => Boolean(id));
 
-    console.log('[ObservationForm] Setting fileIds:', fileIds);
     setUploadedFileIds(fileIds);
 
     // Update form with file IDs and trigger validation
@@ -310,13 +302,6 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
       // Separate existing files from new files using the 'uploaded' flag
       // Existing files have uploaded=true, new files have uploaded=false
-      console.log('[ObservationForm] SUBMIT - uploadedFiles:', uploadedFiles.map(f => ({
-        name: f.name,
-        uploaded: f.uploaded,
-        uploadedFileId: f.uploadedFileId,
-        id: f.id
-      })));
-
       const existingFileIds = uploadedFiles
         .filter(f => f.uploaded)
         .map(f => f.uploadedFileId || f.id)
@@ -325,9 +310,6 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       const newFiles = uploadedFiles
         .filter(f => !f.uploaded && f instanceof File)
         .filter((f): f is File => f instanceof File);
-
-      console.log('[ObservationForm] SUBMIT - existingFileIds:', existingFileIds);
-      console.log('[ObservationForm] SUBMIT - newFiles:', newFiles.map(f => f.name));
 
       // Prepare submission data
       const submitData = {
@@ -380,7 +362,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
         navigate(routes.production.observations.details(result.data.id));
       }
     } catch (error) {
-      console.error("Error submitting form:", error);
+      // Error handled by API client
     }
   };
 
@@ -511,7 +493,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
             <div className="space-y-4">
               {/* File Upload Area */}
-              <div className="border-2 border-dashed rounded-lg p-6 bg-muted/10 hover:bg-muted/20 transition-colors">
+              <div className="border-2 border-dashed rounded-lg p-4 bg-muted/10 hover:bg-muted/20 transition-colors">
                 <FormItem>
                   <FormControl>
                     <FileUploadField
@@ -637,7 +619,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
                   <div className="space-y-4">
                     {/* File Upload Area */}
-                    <div className="border-2 border-dashed rounded-lg p-6 bg-muted/10 hover:bg-muted/20 transition-colors">
+                    <div className="border-2 border-dashed rounded-lg p-4 bg-muted/10 hover:bg-muted/20 transition-colors">
                       <FormItem>
                         <FormControl>
                           <FileUploadField
@@ -805,78 +787,87 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-shrink-0">
-        <PageHeaderWithFavorite
-          title={mode === "create" ? "Nova Observação" : "Editar Observação"}
-          icon={IconAlertCircle}
-          favoritePage={mode === "create" ? FAVORITE_PAGES.PRODUCAO_OBSERVACOES_CADASTRAR : undefined}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Produção", href: routes.production.root },
-            { label: "Observações", href: routes.production.observations.root },
-            { label: mode === "create" ? "Criar" : "Editar" },
-          ]}
-          actions={[
-            {
-              key: "cancel",
-              label: "Cancelar",
-              onClick: onCancel || (() => navigate(routes.production.observations.root)),
-              variant: "outline",
-            },
-            // Show different actions based on mode and step
-            ...(mode === "create"
-              ? [
-                  // Next/Submit button
-                  {
-                    key: isLastStep ? "submit" : "next",
-                    label: isLastStep ? "Cadastrar" : "Próximo",
-                    icon: isLastStep ? IconCheck : undefined,
-                    onClick: isLastStep ? form.handleSubmit(handleSubmit) : handleNext,
-                    variant: "default" as const,
-                    disabled: form.formState.isSubmitting,
-                  },
-                ]
-              : [
-                  // Edit mode: just show submit button
-                  {
-                    key: "submit",
-                    label: "Salvar",
-                    icon: IconCheck,
-                    onClick: form.handleSubmit(handleSubmit),
-                    variant: "default" as const,
-                    disabled: form.formState.isSubmitting || !form.watch("description"),
-                  },
-                ]),
-          ]}
-        />
-      </div>
-
-      <div className={cn(
-        "flex-1 min-h-0 pt-6",
-        mode === "create" && currentStep === 2 ? "flex flex-col overflow-hidden" : mode === "create" ? "overflow-y-auto" : "",
-        mode === "edit" ? "flex flex-col overflow-hidden" : ""
-      )}>
-        <Card className={cn("shadow-sm border border-border", mode === "create" && currentStep === 2 ? "h-full flex flex-col" : "", mode === "edit" ? "h-full flex flex-col" : "", className)}>
-
-          <CardContent className={cn("flex-1 flex flex-col overflow-y-auto", mode === "create" && currentStep === 2 ? "overflow-hidden" : "")}>
-            {/* Form Steps Indicator (only show in create mode) */}
-            {mode === "create" && (
-              <div className="flex-shrink-0 mb-6">
-                <FormSteps steps={steps} currentStep={currentStep} />
-              </div>
+    <>
+      <PageHeader
+        title={mode === "create" ? "Nova Observação" : "Editar Observação"}
+        icon={IconAlertCircle}
+        favoritePage={mode === "create" ? FAVORITE_PAGES.PRODUCAO_OBSERVACOES_CADASTRAR : undefined}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Produção", href: routes.production.root },
+          { label: "Observações", href: routes.production.observations.root },
+          { label: mode === "create" ? "Criar" : "Editar" },
+        ]}
+        actions={[
+          {
+            key: "cancel",
+            label: "Cancelar",
+            onClick: onCancel || (() => navigate(routes.production.observations.root)),
+            variant: "outline",
+          },
+          // Show different actions based on mode and step
+          ...(mode === "create"
+            ? [
+                // Next/Submit button
+                {
+                  key: isLastStep ? "submit" : "next",
+                  label: isLastStep ? "Cadastrar" : "Próximo",
+                  icon: isLastStep ? IconCheck : undefined,
+                  onClick: isLastStep ? form.handleSubmit(handleSubmit) : handleNext,
+                  variant: "default" as const,
+                  disabled: form.formState.isSubmitting,
+                },
+              ]
+            : [
+                // Edit mode: just show submit button
+                {
+                  key: "submit",
+                  label: "Salvar",
+                  icon: IconCheck,
+                  onClick: form.handleSubmit(handleSubmit),
+                  variant: "default" as const,
+                  disabled: form.formState.isSubmitting || !form.watch("description"),
+                },
+              ]),
+        ]}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <Form {...form}>
+          <form
+            id="observation-form"
+            onSubmit={form.handleSubmit(handleSubmit)}
+            className={cn(
+              mode === "create" && currentStep === 2 ? "h-full flex flex-col" : ""
             )}
+          >
+            {/* Hidden submit button */}
+            <button id="observation-form-submit" type="submit" className="hidden" disabled={form.formState.isSubmitting}>
+              Submit
+            </button>
 
-            <Form {...form}>
-              <form id="observation-form" onSubmit={form.handleSubmit(handleSubmit)} className={cn("flex-1 flex flex-col", mode === "edit" ? "" : "overflow-hidden")}>
-                <div className={cn("flex-1 min-h-0", mode === "create" && currentStep === 2 ? "flex flex-col overflow-hidden" : mode === "create" ? "overflow-y-auto" : "")}>
-                  {renderStepContent()}
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
+            <div className="space-y-4">
+              {/* Form Steps Indicator (only show in create mode) */}
+              {mode === "create" && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <FormSteps steps={steps} currentStep={currentStep} />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Step Content */}
+              <div
+                className={cn(
+                  mode === "create" && currentStep === 2 ? "flex-1 flex flex-col min-h-0" : ""
+                )}
+              >
+                {renderStepContent()}
+              </div>
+            </div>
+          </form>
+        </Form>
       </div>
-    </div>
+    </>
   );
 }

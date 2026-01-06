@@ -101,7 +101,9 @@ export function findSimilarColors(paints: Paint[], hex: string, threshold: numbe
 
     return { data, total };
   } catch (error) {
-    console.error("Error finding similar colors:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Error finding similar colors:", error);
+    }
     return { data: [], total: 0 };
   }
 }
@@ -531,7 +533,9 @@ export const calculateFormulaCost = (
     const latestPrice = item.price?.[0]?.value || 0;
 
     if (latestPrice === 0) {
-      console.warn(`No price found for item: ${item.name}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`No price found for item: ${item.name}`);
+      }
     }
 
     const componentCost = scaledComp.requiredQuantity * latestPrice;

@@ -23,9 +23,11 @@ export class ErrorBoundary extends Component<Props, State> {
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log the error safely
     try {
-      console.error("ErrorBoundary caught an error:", error.message);
-      if (errorInfo && errorInfo.componentStack) {
-        console.error("Component stack:", errorInfo.componentStack);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("ErrorBoundary caught an error:", error.message);
+        if (errorInfo && errorInfo.componentStack) {
+          console.error("Component stack:", errorInfo.componentStack);
+        }
       }
     } catch (e) {
       // Ignore logging errors
@@ -33,7 +35,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
     // Check if it's a hook call error
     if (error.message.includes("Invalid hook call")) {
-      console.warn("Detected React hook call error. This might be due to authentication state changes.");
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("Detected React hook call error. This might be due to authentication state changes.");
+      }
 
       // Auto-refresh the page after a short delay to recover from hook errors
       setTimeout(() => {
@@ -55,7 +59,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="max-w-md w-full bg-card shadow-lg rounded-lg p-6">
+          <div className="max-w-md w-full bg-card shadow-sm rounded-lg p-4">
             <div className="flex items-center justify-center w-12 h-12 mx-auto bg-destructive/10 rounded-full mb-4">
               <svg className="w-6 h-6 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

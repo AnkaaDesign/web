@@ -52,7 +52,9 @@ export function UserSelectorDropdown({ value, onChange, placeholder = "Selecione
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error("Error fetching users:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching users:", error);
+      }
       return {
         data: [],
         hasMore: false,

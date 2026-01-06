@@ -223,7 +223,9 @@ class BackupApiClient {
 
       // Validate time format
       if (!timeString.includes(":")) {
-        console.error("Invalid time format:", time);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Invalid time format:", time);
+        }
         return "0 23 * * *"; // Default to 23:00 daily
       }
 
@@ -234,7 +236,9 @@ class BackupApiClient {
 
     // Validate hours and minutes
     if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-      console.error("Invalid time values:", { hours, minutes });
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Invalid time values:", { hours, minutes });
+      }
       return "0 23 * * *"; // Default to 23:00 daily
     }
 

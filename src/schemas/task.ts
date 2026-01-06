@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, createNameSchema, createDescriptionSchema, nullableDate, moneySchema } from "./common";
 import type { Task } from "../types";
-import { TASK_STATUS, SERVICE_ORDER_STATUS } from "../constants";
+import { TASK_STATUS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../constants";
 import { cutCreateNestedSchema } from "./cut";
 import { airbrushingCreateNestedSchema } from "./airbrushing";
 import { budgetCreateNestedSchema } from "./budget";
@@ -267,6 +267,7 @@ export const taskOrderBySchema = z
       term: orderByDirectionSchema.optional(),
       startedAt: orderByDirectionSchema.optional(),
       finishedAt: orderByDirectionSchema.optional(),
+      forecastDate: orderByDirectionSchema.optional(),
       createdAt: orderByDirectionSchema.optional(),
       updatedAt: orderByDirectionSchema.optional(),
     }),
@@ -281,6 +282,7 @@ export const taskOrderBySchema = z
         term: orderByDirectionSchema.optional(),
         startedAt: orderByDirectionSchema.optional(),
         finishedAt: orderByDirectionSchema.optional(),
+        forecastDate: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
       }),
@@ -602,10 +604,10 @@ const taskTransform = (data: any): any => {
   }
 
   if (data.isPending === true) {
-    andConditions.push({ status: TASK_STATUS.PENDING });
+    andConditions.push({ status: TASK_STATUS.WAITING_PRODUCTION });
     delete data.isPending;
   } else if (data.isPending === false) {
-    andConditions.push({ status: { not: TASK_STATUS.PENDING } });
+    andConditions.push({ status: { not: TASK_STATUS.WAITING_PRODUCTION } });
     delete data.isPending;
   }
 
@@ -1070,12 +1072,23 @@ const taskObservationCreateSchema = z.object({
 // ServiceOrder schema without taskId (will be auto-linked)
 const taskServiceOrderCreateSchema = z.object({
   status: z
-    .enum(Object.values(SERVICE_ORDER_STATUS) as [string, ...string[]], {
+    .enum([
+      SERVICE_ORDER_STATUS.PENDING,
+      SERVICE_ORDER_STATUS.IN_PROGRESS,
+      SERVICE_ORDER_STATUS.COMPLETED,
+      SERVICE_ORDER_STATUS.CANCELLED,
+    ] as [string, ...string[]], {
       errorMap: () => ({ message: "status inválido" }),
     })
     .default(SERVICE_ORDER_STATUS.PENDING),
   statusOrder: z.number().int().min(1).max(4).default(1).optional(),
-  description: z.string().min(3, { message: "Mínimo de 3 caracteres" }).max(400, { message: "Máximo de 40 caracteres atingido" }),
+  description: z.string().min(3, { message: "Mínimo de 3 caracteres" }).max(400, { message: "Máximo de 400 caracteres atingido" }),
+  type: z
+    .enum(Object.values(SERVICE_ORDER_TYPE) as [string, ...string[]], {
+      errorMap: () => ({ message: "tipo inválido" }),
+    })
+    .default(SERVICE_ORDER_TYPE.PRODUCTION),
+  assignedToId: z.string().uuid("Usuário inválido").nullable().optional(),
   startedAt: nullableDate.optional(),
   finishedAt: nullableDate.optional(),
 });
@@ -1134,12 +1147,12 @@ const taskTruckCreateSchema = z.object({
 export const taskCreateSchema = z
   .object({
     // Basic fields
-    name: createNameSchema(3, 200, "nome da tarefa"),
+    name: createNameSchema(3, 200, "nome da tarefa").nullable().optional(),
     status: z
       .enum(Object.values(TASK_STATUS) as [string, ...string[]], {
         errorMap: () => ({ message: "status inválido" }),
       })
-      .default(TASK_STATUS.PENDING),
+      .default(TASK_STATUS.PREPARATION),
     serialNumber: z
       .string()
       .optional()
@@ -1148,14 +1161,25 @@ export const taskCreateSchema = z
       .refine((val) => !val || /^[A-Z0-9-]+$/.test(val), {
         message: "Número de série deve conter apenas letras maiúsculas, números e hífens",
       }),
+    serialNumberFrom: z.number().int().positive("Número de série inicial deve ser positivo").optional(),
+    serialNumberTo: z.number().int().positive("Número de série final deve ser positivo").optional(),
     details: createDescriptionSchema(1, 1000, false).nullable().optional(),
     entryDate: nullableDate.optional(),
     term: nullableDate.optional(),
     startedAt: nullableDate.optional(),
     finishedAt: nullableDate.optional(),
+    forecastDate: nullableDate.optional(),
     paintId: z.string().uuid("Tinta inválida").nullable().optional(),
     customerId: z.string().uuid("Cliente inválido").nullable().optional(),
+    invoiceToId: z.string().uuid('Cliente para faturamento inválido').nullable().optional(),
     sectorId: z.string().uuid("Setor inválido").nullable().optional(),
+    negotiatingWith: z
+      .object({
+        name: z.string().optional(),
+        phone: z.string().optional(),
+      })
+      .nullable()
+      .optional(),
 
     // Relations - Many-to-many file relations (arrays)
     budgetIds: z.array(z.string().uuid("Budget inválido")).optional(),
@@ -1168,7 +1192,7 @@ export const taskCreateSchema = z
     // Legacy field names for backwards compatibility
     artworkIds: z.array(z.string().uuid("Artwork inválido")).optional(), // @deprecated Use fileIds instead
     observation: taskObservationCreateSchema.nullable().optional(),
-    services: z.array(taskServiceOrderCreateSchema).optional(),
+    serviceOrders: z.array(taskServiceOrderCreateSchema).optional(),
     truck: taskTruckCreateSchema.nullable().optional(),
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
@@ -1176,6 +1200,20 @@ export const taskCreateSchema = z
     budget: budgetCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
   })
   .superRefine((data, ctx) => {
+    // Require at least one of: customer, serialNumber, plate, or name
+    const hasCustomer = !!data.customerId;
+    const hasSerialNumber = !!data.serialNumber;
+    const hasPlate = !!data.truck?.plate;
+    const hasName = !!data.name;
+
+    if (!hasCustomer && !hasSerialNumber && !hasPlate && !hasName) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Pelo menos um dos seguintes campos deve ser preenchido: Cliente, Número de série, Placa ou Nome",
+        path: ["name"],
+      });
+    }
+
     if (data.entryDate && data.term && data.term <= data.entryDate) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -1216,6 +1254,36 @@ export const taskCreateSchema = z
         path: ["finishedAt"],
       });
     }
+
+    // Validate serial number range fields
+    const hasSerialNumberFrom = data.serialNumberFrom !== undefined;
+    const hasSerialNumberTo = data.serialNumberTo !== undefined;
+
+    // Both must be provided together or both omitted
+    if (hasSerialNumberFrom && !hasSerialNumberTo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Número de série final é obrigatório quando o número inicial é fornecido",
+        path: ["serialNumberTo"],
+      });
+    }
+
+    if (!hasSerialNumberFrom && hasSerialNumberTo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Número de série inicial é obrigatório quando o número final é fornecido",
+        path: ["serialNumberFrom"],
+      });
+    }
+
+    // serialNumberTo must be >= serialNumberFrom
+    if (hasSerialNumberFrom && hasSerialNumberTo && data.serialNumberTo! < data.serialNumberFrom!) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Número de série final deve ser maior ou igual ao número inicial",
+        path: ["serialNumberTo"],
+      });
+    }
   })
   .transform((data) => {
     // Map artworkIds to fileIds for backend compatibility
@@ -1230,8 +1298,8 @@ export const taskCreateSchema = z
 // Base task update schema with all relations
 export const taskUpdateSchema = z
   .object({
-    // Basic fields
-    name: createNameSchema(3, 200, "nome da tarefa").optional(),
+    // Basic fields - ALL OPTIONAL for updates
+    name: z.string().max(200, "Nome muito longo (máximo 200 caracteres)").nullable().optional(),
     status: z
       .enum(Object.values(TASK_STATUS) as [string, ...string[]], {
         errorMap: () => ({ message: "status inválido" }),
@@ -1242,14 +1310,23 @@ export const taskUpdateSchema = z
       .regex(/^[A-Z0-9-]+$/, "Número de série deve conter apenas letras maiúsculas, números e hífens")
       .nullable()
       .optional(),
-    details: createDescriptionSchema(1, 1000, false).nullable().optional(),
+    details: z.string().max(1000, "Detalhes muito longos (máximo 1000 caracteres)").nullable().optional(),
     entryDate: nullableDate.optional(),
     term: nullableDate.optional(),
     startedAt: nullableDate.optional(),
     finishedAt: nullableDate.optional(),
+    forecastDate: nullableDate.optional(),
     paintId: z.string().uuid("Tinta inválida").nullable().optional(),
     customerId: z.string().uuid("Cliente inválido").nullable().optional(),
+    invoiceToId: z.string().uuid('Cliente para faturamento inválido').nullable().optional(),
     sectorId: z.string().uuid("Setor inválido").nullable().optional(),
+    negotiatingWith: z
+      .object({
+        name: z.string().nullable().optional(),
+        phone: z.string().nullable().optional(),
+      })
+      .nullable()
+      .optional(),
 
     // Relations - Many-to-many file relations (arrays)
     budgetIds: z.array(z.string().uuid("Budget inválido")).optional(),
@@ -1262,7 +1339,7 @@ export const taskUpdateSchema = z
     // Legacy field names for backwards compatibility
     artworkIds: z.array(z.string().uuid("Artwork inválido")).optional(), // @deprecated Use fileIds instead
     observation: taskObservationCreateSchema.nullable().optional(),
-    services: z.array(taskServiceOrderCreateSchema).optional(),
+    serviceOrders: z.array(taskServiceOrderCreateSchema).optional(),
     truck: taskTruckCreateSchema.nullable().optional(),
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts

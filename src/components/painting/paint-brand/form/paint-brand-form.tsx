@@ -140,16 +140,23 @@ export function PaintBrandForm(props: PaintBrandFormProps) {
       }
     } catch (error) {
       // Error is handled by the parent component
-      console.error("Form submission error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Form submission error:", error);
+      }
     }
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+    <Form {...form}>
+      <form id="paint-brand-form" onSubmit={form.handleSubmit(handleSubmit)}>
+        {/* Hidden submit button for programmatic form submission */}
+        <button id="paint-brand-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
+          Submit
+        </button>
+
+        <div className="space-y-4">
           {/* Basic Information */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
@@ -165,7 +172,7 @@ export function PaintBrandForm(props: PaintBrandFormProps) {
           </Card>
 
           {/* Component Items Section */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconPackage className="h-5 w-5 text-muted-foreground" />
@@ -183,18 +190,8 @@ export function PaintBrandForm(props: PaintBrandFormProps) {
               />
             </CardContent>
           </Card>
-
-          {/* Hidden submit button that can be triggered by the header button */}
-          <button
-            id="paint-brand-form-submit"
-            type="submit"
-            className="hidden"
-            disabled={isSubmitting}
-          >
-            Submit
-          </button>
-        </form>
-      </Form>
-    </div>
+        </div>
+      </form>
+    </Form>
   );
 }

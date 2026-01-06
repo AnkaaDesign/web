@@ -65,13 +65,6 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
     ],
   });
 
-  console.log("[PpeDeliveryTable] State:", {
-    selectedIds,
-    selectionCount,
-    showSelectedOnly,
-    page,
-    pageSize,
-  });
 
   // Memoize include configuration to prevent re-renders
   const includeConfig = React.useMemo(
@@ -131,19 +124,9 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
       // Create a unique key for the current data to detect real changes
       const dataKey = deliveries.length > 0 ? `${totalRecords}-${deliveries.map((d) => d.id).join(",")}` : `empty-${totalRecords}`;
 
-      console.log("[PpeDeliveryTable] onDataChange effect triggered:", {
-        dataKey,
-        lastKey: lastNotifiedDataRef.current,
-        willNotify: dataKey !== lastNotifiedDataRef.current,
-      });
-
       // Only notify if this exact data hasn't been notified yet
       if (dataKey !== lastNotifiedDataRef.current) {
         lastNotifiedDataRef.current = dataKey;
-        console.log("[PpeDeliveryTable] Notifying parent with data:", {
-          itemCount: deliveries.length,
-          totalRecords,
-        });
         onDataChange({
           items: deliveries,
           totalRecords,
@@ -171,12 +154,10 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
   const partiallySelected = isPartiallySelected(currentPageDeliveryIds);
 
   const handleSelectAll = React.useCallback(() => {
-    console.log("[PpeDeliveryTable] handleSelectAll called with IDs:", currentPageDeliveryIds);
     toggleSelectAll(currentPageDeliveryIds);
   }, [toggleSelectAll, currentPageDeliveryIds]);
 
   const handleSelectDelivery = React.useCallback((deliveryId: string, event?: React.MouseEvent) => {
-    console.log("[PpeDeliveryTable] handleSelectDelivery called with ID:", deliveryId);
     handleRowClickSelection(deliveryId, currentPageDeliveryIds, event?.shiftKey || false);
   }, [handleRowClickSelection, currentPageDeliveryIds]);
 
@@ -222,13 +203,9 @@ export function PpeDeliveryTable({ visibleColumns, className, onEdit, onApprove,
   };
 
   const handleApprove = () => {
-    console.log("[handleApprove] Called", { contextMenu, hasOnApprove: !!onApprove });
     if (contextMenu && onApprove) {
-      console.log("[handleApprove] Calling onApprove with deliveries:", contextMenu.deliveries);
       onApprove(contextMenu.deliveries);
       setContextMenu(null);
-    } else {
-      console.warn("[handleApprove] Missing contextMenu or onApprove", { contextMenu, onApprove });
     }
   };
 

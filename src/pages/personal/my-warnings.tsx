@@ -87,19 +87,18 @@ export const MyWarningsPage = () => {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <div className="flex-shrink-0">
-        <PageHeader
-          variant="default"
-          title="Minhas Advertências"
-          icon={IconAlertTriangle}
-          favoritePage={FAVORITE_PAGES.PESSOAL_MINHAS_ADVERTENCIAS_LISTAR}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal", href: routes.personal.root }, { label: "Minhas Advertências" }]}
-        />
-      </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        className="flex-shrink-0"
+        variant="default"
+        title="Minhas Advertências"
+        icon={IconAlertTriangle}
+        favoritePage={FAVORITE_PAGES.PESSOAL_MINHAS_ADVERTENCIAS_LISTAR}
+        breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal", href: routes.personal.root }, { label: "Minhas Advertências" }]}
+      />
 
-      <Card className="h-full flex flex-col shadow-sm border border-border">
-        <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+      <Card className="flex-1 flex flex-col shadow-sm border border-border">
+        <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden pb-6">
           {/* Search and controls */}
           <div className="flex flex-col gap-3 sm:flex-row">
             <TableSearchInput value={displaySearchText} onChange={(value) => setSearch(value)} placeholder="Buscar advertências..." isPending={displaySearchText !== searchingFor} />
@@ -118,26 +117,26 @@ export const MyWarningsPage = () => {
           </div>
         </CardContent>
 
-        {/* Filter Modal */}
-        <WarningFilters
-          open={showFilterModal}
-          onOpenChange={setShowFilterModal}
-          onApply={(newFilters) => {
-            handleFilterChange({
-              ...filters,
-              where: {
-                ...filters.where,
-                ...(newFilters.severity && { severity: newFilters.severity }),
-                ...(newFilters.category && { category: newFilters.category }),
-                ...(typeof newFilters.isActive === "boolean" && { isActive: newFilters.isActive }),
-              },
-            });
-            setShowFilterModal(false);
-          }}
-          currentSeverity={filters.where?.severity}
-          currentCategory={filters.where?.category}
-          currentIsActive={filters.where?.isActive}
-        />
+            {/* Filter Modal */}
+            <WarningFilters
+              open={showFilterModal}
+              onOpenChange={setShowFilterModal}
+              onApply={(newFilters) => {
+                handleFilterChange({
+                  ...filters,
+                  where: {
+                    ...filters.where,
+                    ...(newFilters.severity && { severity: newFilters.severity }),
+                    ...(newFilters.category && { category: newFilters.category }),
+                    ...(typeof newFilters.isActive === "boolean" && { isActive: newFilters.isActive }),
+                  },
+                });
+                setShowFilterModal(false);
+              }}
+              currentSeverity={filters.where?.severity}
+              currentCategory={filters.where?.category}
+              currentIsActive={filters.where?.isActive}
+            />
       </Card>
     </div>
   );

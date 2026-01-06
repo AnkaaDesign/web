@@ -113,14 +113,18 @@ export const getPDFMetadata = async (
     const response = await fetch(`${apiUrl}/files/${file.id}/metadata`);
 
     if (!response.ok) {
-      console.warn("Failed to fetch PDF metadata:", response.statusText);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("Failed to fetch PDF metadata:", response.statusText);
+      }
       return null;
     }
 
     const metadata = await response.json();
     return metadata;
   } catch (error) {
-    console.warn("Error fetching PDF metadata:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Error fetching PDF metadata:", error);
+    }
     return null;
   }
 };
@@ -176,7 +180,9 @@ export const generatePDFThumbnailBlob = async (
 
     return await response.blob();
   } catch (error) {
-    console.error("Error generating PDF thumbnail blob:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Error generating PDF thumbnail blob:", error);
+    }
     return null;
   }
 };
@@ -197,9 +203,11 @@ export const generateClientSidePDFThumbnail = async (
 ): Promise<string | null> => {
   // This is a placeholder for client-side thumbnail generation
   // You would need to install and import pdfjs-dist to implement this
-  console.warn(
-    "Client-side PDF thumbnail generation requires pdfjs-dist package"
-  );
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn(
+      "Client-side PDF thumbnail generation requires pdfjs-dist package"
+    );
+  }
   return null;
 
   /*

@@ -12,7 +12,7 @@ export const TaskCreatePage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="h-full">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <TaskCreateForm />
       </div>
     </PrivilegeRoute>

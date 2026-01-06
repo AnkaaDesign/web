@@ -213,15 +213,15 @@ export function ActivityList({ className }: ActivityListProps) {
   }, [baseQueryFilters, searchingFor]);
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-3 sm:flex-row flex-shrink-0">
           <TableSearchInput
             ref={searchInputRef}
             value={displaySearchText}
             onChange={(value) => {
-              console.log("[ActivityList] Search input changed to:", value);
+              
               setSearch(value);
             }}
             placeholder="Buscar por item, usuário, descrição..."
@@ -245,7 +245,7 @@ export function ActivityList({ className }: ActivityListProps) {
         </div>
 
         {/* Active Filter Indicators */}
-        {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />}
+        {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1 flex-shrink-0" />}
 
         {/* Paginated table */}
         <div className="flex-1 min-h-0">

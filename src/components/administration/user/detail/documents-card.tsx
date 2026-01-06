@@ -13,7 +13,7 @@ export function DocumentsCard({ user, className }: DocumentsCardProps) {
   const hasDocuments = user.cpf || user.pis;
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6">
         <CardTitle className="flex items-center gap-2">
           <IconFileText className="h-5 w-5 text-muted-foreground" />

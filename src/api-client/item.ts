@@ -118,16 +118,13 @@ export class ItemService {
   // =====================
 
   async createItem(data: ItemCreateFormData, query?: ItemQueryFormData): Promise<ItemCreateResponse> {
-    console.log("=== ITEM SERVICE CREATE DEBUG ===");
-    console.log("Creating item with data:", JSON.stringify(data, null, 2));
-    console.log("Query params:", JSON.stringify(query, null, 2));
-
     try {
       const response = await apiClient.post<ItemCreateResponse>(this.itemBasePath, data, { params: query });
-      console.log("Item created successfully:", response.data);
       return response.data;
     } catch (error) {
-      console.error("Error creating item in service:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating item in service:", error);
+      }
       throw error;
     }
   }
@@ -152,20 +149,7 @@ export class ItemService {
   }
 
   async batchUpdateItems(data: ItemBatchUpdateFormData, query?: ItemQueryFormData): Promise<ItemBatchUpdateResponse<Item>> {
-    console.log("=== API CLIENT LAYER DEBUGGING ===");
-    console.log("Step 15 - API Client received data:", JSON.stringify(data, null, 2));
-    console.log("Step 16 - API Client received query:", JSON.stringify(query, null, 2));
-    console.log("Step 17 - Making PUT request to:", `${this.itemBasePath}/batch`);
-    console.log("Step 18 - Request payload:", JSON.stringify(data, null, 2));
-
     const response = await apiClient.put<ItemBatchUpdateResponse<Item>>(`${this.itemBasePath}/batch`, data, { params: query });
-
-    console.log("Step 19 - API Client received response:", {
-      status: response.status,
-      statusText: response.statusText,
-      data: JSON.stringify(response.data, null, 2),
-    });
-
     return response.data;
   }
 

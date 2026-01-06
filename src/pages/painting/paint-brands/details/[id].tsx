@@ -10,6 +10,7 @@ import { IconAlertCircle, IconEdit, IconTag } from "@tabler/icons-react";
 import { PaintBrandSpecificationsCard, PaintBrandComponentsCard, PaintBrandRelatedPaintsCard } from "@/components/painting/paint-brand/detail";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditPaintBrands } from "@/utils/permissions/entity-permissions";
+import { PAGE_SPACING } from "@/lib/layout-constants";
 
 export function PaintBrandDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -134,12 +135,10 @@ export function PaintBrandDetailsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <PageHeader
         variant="detail"
         title={paintBrand.name}
-        icon={IconTag}
         breadcrumbs={[
           { label: "Início", href: routes.home },
           { label: "Pintura", href: routes.painting.root },
@@ -156,24 +155,26 @@ export function PaintBrandDetailsPage() {
             },
           ] : []
         }
+        className="flex-shrink-0"
       />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="space-y-4">
+          {/* Top section - Specifications and Related Paints */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Left column - Specifications */}
+            <div className="lg:col-span-1">
+              <PaintBrandSpecificationsCard paintBrand={paintBrand} />
+            </div>
 
-      {/* Top section - Specifications and Related Paints */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column - Specifications */}
-        <div className="lg:col-span-1">
-          <PaintBrandSpecificationsCard paintBrand={paintBrand} />
+            {/* Right column - Related paints */}
+            <div className="lg:col-span-2">
+              <PaintBrandRelatedPaintsCard paintBrand={paintBrand} />
+            </div>
+          </div>
+
+          {/* Bottom section - Components (Full Width) */}
+          <PaintBrandComponentsCard paintBrand={paintBrand} />
         </div>
-
-        {/* Right column - Related paints */}
-        <div className="lg:col-span-2">
-          <PaintBrandRelatedPaintsCard paintBrand={paintBrand} />
-        </div>
-      </div>
-
-      {/* Bottom section - Components (Full Width) */}
-      <div>
-        <PaintBrandComponentsCard paintBrand={paintBrand} />
       </div>
     </div>
   );

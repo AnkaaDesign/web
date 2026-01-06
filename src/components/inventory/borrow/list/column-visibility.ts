@@ -90,7 +90,9 @@ export const loadBorrowColumnVisibility = (): Set<string> => {
       }
     }
   } catch (e) {
-    console.error("Failed to load borrow column visibility:", e);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Failed to load borrow column visibility:", e);
+    }
   }
   // Return defaults if loading fails or configuration is invalid
   return getDefaultVisibleBorrowColumns();
@@ -103,6 +105,8 @@ export const saveBorrowColumnVisibility = (columns: Set<string>): void => {
       localStorage.setItem(BORROW_COLUMNS_STORAGE_KEY, JSON.stringify(Array.from(columns)));
     }
   } catch (e) {
-    console.error("Failed to save borrow column visibility:", e);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Failed to save borrow column visibility:", e);
+    }
   }
 };

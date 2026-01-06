@@ -88,6 +88,8 @@ export interface ItemSelectorTableProps {
   onSelectItem: (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => void;
   /** Handler for select all */
   onSelectAll: () => void;
+  /** Handler for batch selection (shift-click range selection) */
+  onBatchSelectItems?: (itemIds: string[], itemData: Record<string, { quantity?: number; price?: number; icms?: number; ipi?: number }>) => void;
   /** Optional className for styling */
   className?: string;
 

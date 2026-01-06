@@ -17,6 +17,7 @@ import { IconFilter, IconDownload } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { USER_STATUS } from "../../../constants";
 import type { UserGetManyFormData } from "../../../schemas";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 const DEFAULT_PAGE_SIZE = 40;
 
@@ -255,8 +256,8 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
   }, [setFilters]);
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and Controls Row */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <TableSearchInput
@@ -315,7 +316,7 @@ export const PerformanceLevelList = forwardRef<PerformanceLevelListRef, Performa
         )}
 
         {/* Table Content */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <PerformanceLevelTable
             ref={tableRef}
             users={displayUsers}

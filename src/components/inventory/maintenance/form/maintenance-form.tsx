@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +13,6 @@ import { DateTimeInput } from "@/components/ui/date-time-input";
 import { maintenanceCreateSchema, maintenanceUpdateSchema, type MaintenanceCreateFormData, type MaintenanceUpdateFormData } from "../../../../schemas";
 import { MAINTENANCE_STATUS } from "../../../../constants";
 import type { Maintenance, Item } from "../../../../types";
-
 // Import form components
 import { MaintenanceStatusSelector } from "./status-selector";
 import { MaintenanceItemSelector } from "./item-selector";
@@ -162,15 +162,16 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
   const isRequired = mode === "create";
 
   return (
-    <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-y-auto space-y-6">
-            {/* Hidden submit button for programmatic form submission */}
-            <button type="submit" id="maintenance-form-submit" className="hidden" aria-hidden="true" />
+    <Form {...form}>
+      <form id="maintenance-form" onSubmit={form.handleSubmit(handleSubmit)}>
+        {/* Hidden submit button for programmatic form submission */}
+        <button id="maintenance-form-submit" type="submit" className="hidden">
+          Submit
+        </button>
 
-            {/* Basic Information & Item Selection */}
-            <Card>
+        <div className="space-y-4">
+          {/* Basic Information & Item Selection */}
+          <Card>
               <CardHeader>
                 <CardTitle>Informações Básicas</CardTitle>
                 <CardDescription>Identificação, item e agendamento da manutenção</CardDescription>
@@ -313,9 +314,8 @@ export function MaintenanceForm(props: MaintenanceFormProps) {
                 </Button>
               </CardContent>
             </Card>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+        </div>
+      </form>
+    </Form>
   );
 }

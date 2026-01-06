@@ -212,7 +212,9 @@ export async function searchMultipleEntities(
           .sort((a, b) => (b.relevance || 0) - (a.relevance || 0))
           .slice(0, maxPerEntity);
       } catch (error) {
-        console.warn(`Error searching ${entityType}:`, error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`Error searching ${entityType}:`, error);
+        }
         return [];
       }
     });

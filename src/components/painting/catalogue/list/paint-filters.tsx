@@ -81,13 +81,6 @@ export function PaintFilters({ open, onOpenChange, filters, onFilterChange }: Pa
       }
     });
 
-    // Debug logging (remove after fixing)
-    if (cleanedFilters.similarColor || localFilters.similarColor) {
-      console.log("[Filter Modal] Applying filters:", {
-        before: { similarColor: localFilters.similarColor, threshold: localFilters.similarColorThreshold },
-        after: { similarColor: cleanedFilters.similarColor, threshold: cleanedFilters.similarColorThreshold }
-      });
-    }
 
     onFilterChange(cleanedFilters);
     onOpenChange(false);

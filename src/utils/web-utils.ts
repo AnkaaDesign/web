@@ -66,7 +66,9 @@ export const downloadFile = async (
 
     URL.revokeObjectURL(downloadUrl);
   } catch (error) {
-    console.error("Erro no download do arquivo:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Erro no download do arquivo:", error);
+    }
     throw new Error("Falha no download do arquivo");
   }
 };

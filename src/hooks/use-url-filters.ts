@@ -132,35 +132,30 @@ export function useUrlFilters<T extends Record<string, any>>(filterConfigs: { [K
   const setFilter = useCallback(
     <K extends keyof T>(key: K, value: T[K] | undefined) => {
       const config = filterConfigs[key];
-      console.log('[setFilter] key:', String(key), 'value:', value, 'type:', typeof value);
 
       // Validate the value first
       if (value !== undefined) {
         const result = config.schema.safeParse(value);
-        console.log('[setFilter] validation result:', result);
         if (!result.success) {
-          console.warn(`Invalid filter value for "${String(key)}":`, result.error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn(`Invalid filter value for "${String(key)}":`, result.error);
+          }
           return;
         }
       }
 
       // Determine debounce time - use filter-specific or none (immediate)
       const debounceMs = config.debounceMs;
-      console.log('[setFilter] debounceMs:', debounceMs);
 
       updateUrl((params) => {
         const serialized = serializeFilterValue(value);
-        console.log('[setFilter] serialized value:', serialized);
 
         if (serialized === null) {
-          console.log('[setFilter] Deleting param:', String(key));
           params.delete(String(key));
         } else {
-          console.log('[setFilter] Setting param:', String(key), '=', serialized);
           params.set(String(key), serialized);
         }
       }, debounceMs);
-      console.log('[setFilter] updateUrl called');
     },
     [filterConfigs, updateUrl],
   );
@@ -178,7 +173,9 @@ export function useUrlFilters<T extends Record<string, any>>(filterConfigs: { [K
           if (value !== undefined) {
             const result = config.schema.safeParse(value);
             if (!result.success) {
-              console.warn(`Invalid filter value for "${String(key)}":`, result.error);
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn(`Invalid filter value for "${String(key)}":`, result.error);
+              }
               continue;
             }
           }

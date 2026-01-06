@@ -9,7 +9,7 @@ interface PaintProductionSkeletonProps {
 export function PaintProductionSkeleton({ className }: PaintProductionSkeletonProps) {
   return (
     <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and Filter Controls Skeleton */}
         <div className="flex items-center gap-3">
           {/* Search Skeleton */}

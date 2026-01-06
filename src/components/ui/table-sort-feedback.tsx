@@ -128,7 +128,7 @@ export function TableSortFeedback({ config, sortConfigs, columnLabels = {}, onDi
           className,
         )}
       >
-        <div className={cn("flex items-center gap-3 p-4 rounded-lg border shadow-lg", getColorClasses())}>
+        <div className={cn("flex items-center gap-3 p-4 rounded-lg border shadow-sm", getColorClasses())}>
           {getIcon()}
           <div className="flex-1">
             <p className="text-sm font-medium">{getDefaultMessage()}</p>

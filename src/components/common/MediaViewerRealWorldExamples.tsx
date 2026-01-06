@@ -29,7 +29,9 @@ export const FileUploadWithPreview: React.FC = () => {
       toast.success(`${files.length} file(s) added`);
     } catch (error) {
       toast.error('Failed to process files');
-      console.error(error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(error);
+      }
     } finally {
       setIsUploading(false);
     }
@@ -281,7 +283,7 @@ export const VideoTutorialLibrary: React.FC<{ tutorials: Tutorial[] }> = ({
         {filteredTutorials.map((tutorial, index) => (
           <div
             key={tutorial.id}
-            className="bg-white rounded-lg shadow overflow-hidden hover:shadow-lg transition-shadow"
+            className="bg-white rounded-lg shadow overflow-hidden hover:shadow-sm transition-shadow"
           >
             <button
               onClick={() => viewer.openViewer(index)}
@@ -571,9 +573,7 @@ export const EventPhotoAlbum: React.FC<{ events: Event[] }> = ({ events }) => {
           }}
           onDownload={handleDownload}
           onShare={handleShare}
-          onItemChange={(index, item) => {
-            console.log(`Viewing photo ${index + 1} of ${selectedEvent.photos.length}`);
-          }}
+          onItemChange={(index, item) => {}}
         />
       )}
     </div>

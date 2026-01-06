@@ -3,6 +3,7 @@ import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { IconUser, IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
+import { PAGE_SPACING } from "@/lib/layout-constants";
 import { useUser, useUserMutations } from "../../../../hooks";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -77,18 +78,19 @@ const CollaboratorDetailsPage = () => {
       await mutations.delete(id);
       navigate(routes.administration.collaborators.root);
     } catch (error) {
-      console.error("Error deleting collaborator:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting collaborator:", error);
+      }
     }
     setIsDeleteDialogOpen(false);
   };
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="space-y-6">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
           title={user.name}
-          icon={IconUser}
           breadcrumbs={[
             { label: "Início", href: "/" },
             { label: "Administração" },
@@ -115,28 +117,32 @@ const CollaboratorDetailsPage = () => {
               onClick: () => setIsDeleteDialogOpen(true),
             },
           ]}
+          className="flex-shrink-0"
         />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4">
+            {/* Core Information Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <BasicInfoCard user={user} />
+              <AddressCard user={user} />
+            </div>
 
-        {/* Core Information Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <BasicInfoCard user={user} />
-          <AddressCard user={user} />
+            {/* Professional and Login Info Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ProfessionalInfoCard user={user} />
+              <LoginInfoCard user={user} />
+            </div>
+
+            {/* PPE Sizes and Changelog History - Side by Side */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <PpeSizesCard user={user} className="h-[700px]" />
+              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.USER} entityId={id} maxHeight="700px" className="h-[700px]" />
+            </div>
+
+            {/* Related Activities */}
+            <RelatedActivitiesCard user={user} />
+          </div>
         </div>
-
-        {/* Professional and Login Info Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ProfessionalInfoCard user={user} />
-          <LoginInfoCard user={user} />
-        </div>
-
-        {/* PPE Sizes and Changelog History - Side by Side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <PpeSizesCard user={user} className="h-[700px]" />
-          <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.USER} entityId={id} maxHeight="700px" className="h-[700px]" />
-        </div>
-
-        {/* Related Activities */}
-        <RelatedActivitiesCard user={user} />
 
         {/* Delete Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

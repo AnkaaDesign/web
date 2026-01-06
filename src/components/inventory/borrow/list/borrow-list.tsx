@@ -171,9 +171,6 @@ export function BorrowList({ className }: BorrowListProps) {
   const queryFilters = useMemo(() => {
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
 
-    console.log("[BorrowList] baseQueryFilters:", baseQueryFilters);
-    console.log("[BorrowList] filterWithoutOrderBy:", filterWithoutOrderBy);
-
     // Build where clause
     const where = filterWithoutOrderBy.where || {};
 
@@ -183,7 +180,6 @@ export function BorrowList({ className }: BorrowListProps) {
       limit: DEFAULT_PAGE_SIZE,
     };
 
-    console.log("[BorrowList] queryFilters result:", result);
     return result;
   }, [baseQueryFilters]);
 
@@ -270,7 +266,9 @@ export function BorrowList({ className }: BorrowListProps) {
       }
     } catch (error: any) {
       // Error is handled by the API client with detailed message
-      console.error(`Error returning borrow${items.length > 1 ? "s" : ""}:`, error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`Error returning borrow${items.length > 1 ? "s" : ""}:`, error);
+      }
     }
   };
 
@@ -287,20 +285,21 @@ export function BorrowList({ className }: BorrowListProps) {
       setDeleteDialog(null);
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error(`Error deleting borrow${deleteDialog.items.length > 1 ? "s" : ""}:`, error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`Error deleting borrow${deleteDialog.items.length > 1 ? "s" : ""}:`, error);
+      }
     }
   };
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 min-h-0">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 min-h-0">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row flex-shrink-0">
           <TableSearchInput
             ref={searchInputRef}
             value={displaySearchText}
             onChange={(value) => {
-              console.log("[BorrowList] Search input changed to:", value);
               setSearch(value);
             }}
             placeholder="Buscar por item, usuário..."
@@ -321,7 +320,7 @@ export function BorrowList({ className }: BorrowListProps) {
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1 flex-shrink-0" />}
 
         {/* Paginated table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <BorrowTable
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}

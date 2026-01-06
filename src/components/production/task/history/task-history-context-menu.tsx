@@ -26,13 +26,15 @@ interface TaskHistoryContextMenuProps {
   position: { x: number; y: number };
   onClose: () => void;
   selectedIds: string[];
+  navigationRoute?: 'history' | 'preparation' | 'schedule';
 }
 
 export function TaskHistoryContextMenu({
   tasks,
   position,
   onClose,
-  selectedIds
+  selectedIds,
+  navigationRoute = 'schedule'
 }: TaskHistoryContextMenuProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -64,7 +66,9 @@ export function TaskHistoryContextMenu({
 
   // Reset justOpened flag whenever position changes (new right-click)
   React.useEffect(() => {
-    console.log('[TaskHistoryContextMenu] Position changed, resetting justOpenedRef');
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskHistoryContextMenu] Position changed, resetting justOpenedRef');
+    }
     justOpenedRef.current = true;
     setDropdownOpen(true);
 
@@ -77,7 +81,9 @@ export function TaskHistoryContextMenu({
   // When a modal or dialog opens, close the dropdown
   React.useEffect(() => {
     if (setStatusModalOpen || setSectorModalOpen || restoreDialog.open || deleteDialog.open) {
-      console.log('[TaskHistoryContextMenu] Modal/Dialog opened, closing dropdown');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[TaskHistoryContextMenu] Modal/Dialog opened, closing dropdown');
+      }
       openingModalRef.current = false;
       setDropdownOpen(false);
     }
@@ -85,19 +91,23 @@ export function TaskHistoryContextMenu({
 
   // Close the entire component when dropdown closes and no modals/dialogs are open
   React.useEffect(() => {
-    console.log('[TaskHistoryContextMenu] Effect running:', {
-      dropdownOpen,
-      setStatusModalOpen,
-      setSectorModalOpen,
-      restoreDialogOpen: restoreDialog.open,
-      deleteDialogOpen: deleteDialog.open,
-      openingModal: openingModalRef.current,
-      shouldClose: !dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !restoreDialog.open && !deleteDialog.open && !openingModalRef.current
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskHistoryContextMenu] Effect running:', {
+        dropdownOpen,
+        setStatusModalOpen,
+        setSectorModalOpen,
+        restoreDialogOpen: restoreDialog.open,
+        deleteDialogOpen: deleteDialog.open,
+        openingModal: openingModalRef.current,
+        shouldClose: !dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !restoreDialog.open && !deleteDialog.open && !openingModalRef.current
+      });
+    }
 
     // Don't close if we're in the process of opening a modal or if any dialog is open
     if (!dropdownOpen && !setStatusModalOpen && !setSectorModalOpen && !restoreDialog.open && !deleteDialog.open && !openingModalRef.current) {
-      console.log('[TaskHistoryContextMenu] Calling onClose()');
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[TaskHistoryContextMenu] Calling onClose()');
+      }
       onClose();
     }
   }, [dropdownOpen, setStatusModalOpen, setSectorModalOpen, restoreDialog.open, deleteDialog.open, onClose]);
@@ -111,7 +121,11 @@ export function TaskHistoryContextMenu({
 
   const handleEdit = () => {
     if (taskIds.length === 1) {
-      navigate(routes.production.schedule.edit(taskIds[0]));
+      const editRoute =
+        navigationRoute === 'preparation' ? routes.production.preparation.edit(taskIds[0]) :
+        navigationRoute === 'history' ? routes.production.history.edit(taskIds[0]) :
+        routes.production.schedule.edit(taskIds[0]);
+      navigate(editRoute);
     } else if (taskIds.length > 1) {
       // Navigate to batch edit page if available
       const ids = taskIds.join(",");
@@ -121,7 +135,9 @@ export function TaskHistoryContextMenu({
   };
 
   const handleSetSector = () => {
-    console.log('[TaskHistoryContextMenu] handleSetSector called');
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskHistoryContextMenu] handleSetSector called');
+    }
     openingModalRef.current = true;
     setSetSectorModalOpen(true);
   };
@@ -141,18 +157,24 @@ export function TaskHistoryContextMenu({
         await batchUpdate({ items: updates });
       }
     } catch (error) {
-      console.error("Error updating task sector:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating task sector:", error);
+      }
     }
   };
 
   const handleSetStatus = () => {
-    console.log('[TaskHistoryContextMenu] handleSetStatus called');
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskHistoryContextMenu] handleSetStatus called');
+    }
     openingModalRef.current = true;
     setSetStatusModalOpen(true);
   };
 
   const handleSetStatusConfirm = async (status: typeof TASK_STATUS.IN_PRODUCTION | typeof TASK_STATUS.COMPLETED | typeof TASK_STATUS.INVOICED | typeof TASK_STATUS.SETTLED) => {
-    console.log('[TaskHistoryContextMenu] handleSetStatusConfirm called with status:', status);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskHistoryContextMenu] handleSetStatusConfirm called with status:', status);
+    }
     try {
       if (taskIds.length === 1) {
         const updateData: any = { status };
@@ -219,7 +241,9 @@ export function TaskHistoryContextMenu({
 
             if (onHoldChange && onHoldChange.oldValue) {
               const previousStatus = onHoldChange.oldValue;
-              console.log(`[TaskHistoryContextMenu] Restoring task ${task.id} to previous status:`, previousStatus);
+              if (process.env.NODE_ENV !== 'production') {
+                console.log(`[TaskHistoryContextMenu] Restoring task ${task.id} to previous status:`, previousStatus);
+              }
 
               const updateData: any = { status: previousStatus };
 
@@ -234,11 +258,15 @@ export function TaskHistoryContextMenu({
 
               return { id: task.id, data: updateData };
             } else {
-              console.warn(`[TaskHistoryContextMenu] No previous status found for task ${task.id}, defaulting to PENDING`);
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn(`[TaskHistoryContextMenu] No previous status found for task ${task.id}, defaulting to PENDING`);
+              }
               return { id: task.id, data: { status: TASK_STATUS.PENDING } };
             }
           } catch (error) {
-            console.error(`Error fetching changelog for task ${task.id}:`, error);
+            if (process.env.NODE_ENV !== 'production') {
+              console.error(`Error fetching changelog for task ${task.id}:`, error);
+            }
             // Default to PENDING if we can't fetch the changelog
             return { id: task.id, data: { status: TASK_STATUS.PENDING } };
           }
@@ -251,7 +279,9 @@ export function TaskHistoryContextMenu({
         await batchUpdate({ items: updates });
       }
     } catch (error) {
-      console.error("Error restoring task(s):", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error restoring task(s):", error);
+      }
     } finally {
       setRestoreDialog({ open: false, tasks: [] });
     }
@@ -271,7 +301,9 @@ export function TaskHistoryContextMenu({
         await batchDelete({ taskIds: tasksToDelete.map(t => t.id) });
       }
     } catch (error) {
-      console.error("Error deleting task(s):", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting task(s):", error);
+      }
     } finally {
       setDeleteDialog({ open: false, tasks: [] });
     }
@@ -284,12 +316,14 @@ export function TaskHistoryContextMenu({
     return null;
   }
 
-  console.log('[TaskHistoryContextMenu] Rendering with states:', {
-    dropdownOpen,
-    setStatusModalOpen,
-    setSectorModalOpen,
-    taskIds: taskIds.length
-  });
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[TaskHistoryContextMenu] Rendering with states:', {
+      dropdownOpen,
+      setStatusModalOpen,
+      setSectorModalOpen,
+      taskIds: taskIds.length
+    });
+  }
 
   return (
     <>
@@ -302,14 +336,18 @@ export function TaskHistoryContextMenu({
           onPointerDownOutside={(e) => {
             // Prevent menu from closing on the initial pointer event that opened it
             if (justOpenedRef.current) {
-              console.log('[TaskHistoryContextMenu] Preventing close on initial pointer down');
+              if (process.env.NODE_ENV !== 'production') {
+                console.log('[TaskHistoryContextMenu] Preventing close on initial pointer down');
+              }
               e.preventDefault();
             }
           }}
           onInteractOutside={(e) => {
             // Prevent menu from closing on the initial interaction that opened it
             if (justOpenedRef.current) {
-              console.log('[TaskHistoryContextMenu] Preventing close on initial interact');
+              if (process.env.NODE_ENV !== 'production') {
+                console.log('[TaskHistoryContextMenu] Preventing close on initial interact');
+              }
               e.preventDefault();
             }
           }}
@@ -382,7 +420,9 @@ export function TaskHistoryContextMenu({
       <SetSectorModal
         open={setSectorModalOpen}
         onOpenChange={(open) => {
-          console.log('[TaskHistoryContextMenu] SetSectorModal onOpenChange:', open);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[TaskHistoryContextMenu] SetSectorModal onOpenChange:', open);
+          }
           setSetSectorModalOpen(open);
         }}
         tasks={tasks}
@@ -393,7 +433,9 @@ export function TaskHistoryContextMenu({
       <SetStatusModal
         open={setStatusModalOpen}
         onOpenChange={(open) => {
-          console.log('[TaskHistoryContextMenu] SetStatusModal onOpenChange:', open);
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('[TaskHistoryContextMenu] SetStatusModal onOpenChange:', open);
+          }
           setSetStatusModalOpen(open);
         }}
         tasks={tasks}

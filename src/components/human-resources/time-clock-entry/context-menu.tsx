@@ -275,7 +275,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     <div
       ref={menuRef}
       className={cn(
-        "fixed z-50 min-w-56 bg-popover text-popover-foreground border border-border/40 rounded-md shadow-md py-1",
+        "fixed z-50 min-w-56 bg-popover text-popover-foreground border border-border/40 rounded-md shadow-sm py-1",
         "animate-in fade-in-0 zoom-in-95 duration-100",
         className,
       )}

@@ -71,7 +71,9 @@ export function PayrollExportButton({ users, isLoading, className }: PayrollExpo
 
       toast.success("Arquivo CSV exportado com sucesso!");
     } catch (error) {
-      console.error("Error exporting CSV:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error exporting CSV:", error);
+      }
       toast.error("Erro ao exportar arquivo CSV");
     } finally {
       setExporting(null);
@@ -123,7 +125,9 @@ export function PayrollExportButton({ users, isLoading, className }: PayrollExpo
 
       toast.success("Arquivo Excel exportado com sucesso!");
     } catch (error) {
-      console.error("Error exporting Excel:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error exporting Excel:", error);
+      }
       toast.error("Erro ao exportar arquivo Excel");
     } finally {
       setExporting(null);
@@ -138,7 +142,9 @@ export function PayrollExportButton({ users, isLoading, className }: PayrollExpo
       // In a real application, you'd want to use a proper PDF library like jsPDF or generate on the backend
       toast.info("Export de PDF será implementado em breve");
     } catch (error) {
-      console.error("Error exporting PDF:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error exporting PDF:", error);
+      }
       toast.error("Erro ao exportar arquivo PDF");
     } finally {
       setExporting(null);

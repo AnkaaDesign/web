@@ -74,7 +74,7 @@ export const FileTypeIconDemo: React.FC = () => {
   const categoryGroups = getCategoryGroups();
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4">
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold">File Type Icon System</h1>
         <p className="text-muted-foreground">Comprehensive file type icons with color coding and processing states</p>

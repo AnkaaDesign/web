@@ -38,7 +38,9 @@ export function useColumnVisibility(storageKey: string, defaultColumns: Set<stri
         }
       }
     } catch (error) {
-      console.error(`Failed to parse stored column visibility for key "${storageKey}":`, error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`Failed to parse stored column visibility for key "${storageKey}":`, error);
+      }
     }
     // Return default columns if localStorage is empty or invalid
     return defaultColumns;
@@ -51,7 +53,9 @@ export function useColumnVisibility(storageKey: string, defaultColumns: Set<stri
       try {
         localStorage.setItem(storageKey, JSON.stringify(Array.from(newColumns)));
       } catch (error) {
-        console.error(`Failed to save column visibility to localStorage for key "${storageKey}":`, error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error(`Failed to save column visibility to localStorage for key "${storageKey}":`, error);
+        }
       }
     },
     [storageKey]

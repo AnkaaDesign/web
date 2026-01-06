@@ -5,7 +5,7 @@ import { routes, FAVORITE_PAGES } from "../../../constants";
 import { ItemStockBalanceTable } from "@/components/inventory/item/stock-balance/item-stock-balance-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { IconClipboardCheck, IconAlertTriangle, IconLoader, IconDeviceFloppy, IconArrowLeft } from "@tabler/icons-react";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 
@@ -57,7 +57,7 @@ export default function ItemStockBalancePage() {
 
   if (itemIds.length === 0) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -81,7 +81,7 @@ export default function ItemStockBalancePage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <div>
@@ -100,7 +100,7 @@ export default function ItemStockBalancePage() {
 
   if (error || !hasValidItems) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -158,7 +158,7 @@ export default function ItemStockBalancePage() {
     <div className="h-full flex flex-col space-y-4">
       {/* Fixed Header */}
       <div className="flex-shrink-0">
-        <PageHeaderWithFavorite
+        <PageHeader
           title={`Balanço de Estoque - ${items.length} ${items.length === 1 ? "Item" : "Itens"}`}
           icon={IconClipboardCheck}
           favoritePage={FAVORITE_PAGES.ESTOQUE_PRODUTOS_LISTAR}

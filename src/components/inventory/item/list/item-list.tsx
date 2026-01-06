@@ -93,9 +93,6 @@ export function ItemList({ className }: ItemListProps) {
     const isActive = params.get("isActive");
     if (isActive !== null) {
       filters.isActive = isActive === "true";
-      console.log("[ItemList] Deserializing isActive from URL:", filters.isActive);
-    } else {
-      console.log("[ItemList] No isActive in URL, not setting filter");
     }
 
     const shouldAssignToUser = params.get("shouldAssignToUser");
@@ -276,9 +273,6 @@ export function ItemList({ className }: ItemListProps) {
   const queryFilters = useMemo(() => {
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
 
-    console.log("[ItemList] baseQueryFilters:", baseQueryFilters);
-    console.log("[ItemList] filterWithoutOrderBy:", filterWithoutOrderBy);
-
     // Build where clause - don't add default isActive filter, use what's in filters
     const where = filterWithoutOrderBy.where || {};
 
@@ -287,8 +281,6 @@ export function ItemList({ className }: ItemListProps) {
       where: Object.keys(where).length > 0 ? where : undefined,
       limit: DEFAULT_PAGE_SIZE,
     };
-
-    console.log("[ItemList] queryFilters result:", result);
 
     // Only update the ref if the content actually changed
     const currentFiltersString = JSON.stringify(result);
@@ -373,7 +365,6 @@ export function ItemList({ className }: ItemListProps) {
       }
     } catch (error: any) {
       // Error is handled by the API client with detailed message
-      console.error("Error activating item(s):", error);
     }
   };
 
@@ -396,7 +387,6 @@ export function ItemList({ className }: ItemListProps) {
       }
     } catch (error: any) {
       // Error is handled by the API client with detailed message
-      console.error("Error deactivating item(s):", error);
     }
   };
 
@@ -413,7 +403,6 @@ export function ItemList({ className }: ItemListProps) {
       setDeleteDialog(null);
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error("Error deleting item(s):", error);
     }
   };
 
@@ -452,22 +441,20 @@ export function ItemList({ className }: ItemListProps) {
         setMergeDialog({ open: false, items: [] });
       } catch (error) {
         // Error is handled by the API client
-        console.error("Error merging items:", error);
       }
     },
     [mergeItems, mergeDialog.items]
   );
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <TableSearchInput
             ref={searchInputRef}
             value={displaySearchText}
             onChange={(value) => {
-              console.log("[ItemList] Search input changed to:", value);
               setSearch(value);
             }}
             placeholder="Buscar por nome, código, código de barras..."
@@ -495,7 +482,7 @@ export function ItemList({ className }: ItemListProps) {
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />}
 
         {/* Paginated table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <ItemTable
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}

@@ -7,7 +7,7 @@ import { useActivityBatchMutations } from "../../../hooks";
 import { routes, FAVORITE_PAGES } from "../../../constants";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import { useStockBalanceFormUrlState } from "@/hooks/use-stock-balance-form-url-state";
 import { StockBalanceBatchResultDialog } from "@/components/inventory/stock-balance/stock-balance-batch-result-dialog";
@@ -146,91 +146,92 @@ export const StockBalanceCreatePage = () => {
 
   return (
     <>
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Balanco de Estoque"
-            icon={IconClipboardCheck}
-            favoritePage={FAVORITE_PAGES.ESTOQUE_PRODUTOS_LISTAR}
-            breadcrumbs={[
-              { label: "Home", href: "/" },
-              { label: "Estoque", href: "/estoque" },
-              { label: "Produtos", href: routes.inventory.products.list },
-              { label: "Balanco" },
-            ]}
-            actions={[
-              {
-                key: "cancel",
-                label: "Cancelar",
-                onClick: handleCancel,
-                variant: "outline",
-                disabled: isSubmitting,
-              },
-              {
-                key: "submit",
-                label: itemsWithDifferencesCount > 0
-                  ? `Confirmar ${itemsWithDifferencesCount} Ajuste${itemsWithDifferencesCount === 1 ? "" : "s"}`
-                  : `Confirmar Balanco (${selectionCount} selecionado${selectionCount === 1 ? "" : "s"})`,
-                icon: isSubmitting ? IconLoader2 : IconCheck,
-                onClick: handleSubmit,
-                variant: "default",
-                disabled: isSubmitting || selectionCount === 0,
-                loading: isSubmitting,
-              },
-            ]}
-          />
-        </div>
-
-        <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-          <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
-            {/* Instructions */}
-            <div className="space-y-3 flex-shrink-0">
-              <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                  <span className="font-semibold text-sm">Balanco de Estoque</span>
+      <div className="h-full flex flex-col px-4 pt-4">
+        <PageHeader
+          title="Balanco de Estoque"
+          icon={IconClipboardCheck}
+          favoritePage={FAVORITE_PAGES.ESTOQUE_PRODUTOS_LISTAR}
+          breadcrumbs={[
+            { label: "Home", href: "/" },
+            { label: "Estoque", href: "/estoque" },
+            { label: "Produtos", href: routes.inventory.products.list },
+            { label: "Balanco" },
+          ]}
+          actions={[
+            {
+              key: "cancel",
+              label: "Cancelar",
+              onClick: handleCancel,
+              variant: "outline",
+              disabled: isSubmitting,
+            },
+            {
+              key: "submit",
+              label: itemsWithDifferencesCount > 0
+                ? `Confirmar ${itemsWithDifferencesCount} Ajuste${itemsWithDifferencesCount === 1 ? "" : "s"}`
+                : `Confirmar Balanco (${selectionCount} selecionado${selectionCount === 1 ? "" : "s"})`,
+              icon: isSubmitting ? IconLoader2 : IconCheck,
+              onClick: handleSubmit,
+              variant: "default",
+              disabled: isSubmitting || selectionCount === 0,
+              loading: isSubmitting,
+            },
+          ]}
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="mt-4 space-y-4">
+            <Card className="flex flex-col shadow-sm border border-border">
+              <CardContent className="flex-1 flex flex-col p-4 space-y-4 min-h-0">
+                {/* Instructions */}
+                <div className="space-y-3 flex-shrink-0">
+                  <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+                      <span className="font-semibold text-sm">Balanco de Estoque</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Selecione os itens que deseja contabilizar e ajuste a quantidade contada. O sistema criara movimentacoes automaticas para corrigir as diferencas.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Selecione os itens que deseja contabilizar e ajuste a quantidade contada. O sistema criara movimentacoes automaticas para corrigir as diferencas.
-                </p>
-              </div>
-            </div>
 
-            {/* Paginated Item Selector */}
-            <div className="flex-1 min-h-0">
-              <ItemSelectorTable
-                selectedItems={selectedItems}
-                onSelectItem={handleSelectItem}
-                onSelectAll={handleSelectAll}
-                quantities={countedQuantities}
-                onQuantityChange={handleQuantityChange}
-                editableColumns={{
-                  showQuantityInput: true,
-                }}
-                fixedColumnsConfig={{
-                  fixedColumns: ['name', 'quantity'],
-                  fixedReasons: {
-                    name: 'Essencial para identificar o item',
-                    quantity: 'Referencia para o estoque atual',
-                  },
-                }}
-                defaultColumns={['uniCode', 'name', 'category.name', 'brand.name', 'measures', 'quantity']}
-                storageKey="stock-balance-item-selector"
-                page={page}
-                pageSize={pageSize}
-                showSelectedOnly={showSelectedOnly}
-                searchTerm={searchTerm}
-                filters={filters}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-                onShowSelectedOnlyChange={setShowSelectedOnly}
-                onSearchTermChange={setSearchTerm}
-                onFiltersChange={handleFiltersChange}
-                className="h-full"
-              />
-            </div>
-          </CardContent>
-        </Card>
+                {/* Paginated Item Selector */}
+                <div className="flex-1 min-h-0">
+                  <ItemSelectorTable
+                    selectedItems={selectedItems}
+                    onSelectItem={handleSelectItem}
+                    onSelectAll={handleSelectAll}
+                    quantities={countedQuantities}
+                    onQuantityChange={handleQuantityChange}
+                    editableColumns={{
+                      showQuantityInput: true,
+                    }}
+                    fixedColumnsConfig={{
+                      fixedColumns: ['name', 'quantity'],
+                      fixedReasons: {
+                        name: 'Essencial para identificar o item',
+                        quantity: 'Referencia para o estoque atual',
+                      },
+                    }}
+                    defaultColumns={['uniCode', 'name', 'category.name', 'brand.name', 'measures', 'quantity']}
+                    storageKey="stock-balance-item-selector"
+                    page={page}
+                    pageSize={pageSize}
+                    showSelectedOnly={showSelectedOnly}
+                    searchTerm={searchTerm}
+                    filters={filters}
+                    onPageChange={setPage}
+                    onPageSizeChange={setPageSize}
+                    onShowSelectedOnlyChange={setShowSelectedOnly}
+                    onSearchTermChange={setSearchTerm}
+                    onFiltersChange={handleFiltersChange}
+                    className="h-full"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
 
       {/* Batch Result Dialog */}

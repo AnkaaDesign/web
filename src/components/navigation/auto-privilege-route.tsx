@@ -82,7 +82,7 @@ function UnauthorizedAccess({ currentRoute, requiredPrivilege }: { currentRoute:
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-lg">
+      <Card className="w-full max-w-md shadow-sm">
         <CardContent className="p-8 text-center space-y-6">
           <div className="flex justify-center">
             <IconShield className="h-16 w-16 text-destructive" />

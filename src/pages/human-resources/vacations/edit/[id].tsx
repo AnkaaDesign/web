@@ -10,6 +10,8 @@ import { PageHeader } from "@/components/page-header";
 import { VacationForm } from "@/components/human-resources/vacation";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import type { VacationUpdateFormData } from "../../../../schemas";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 export const EditVacationPage = () => {
   const navigate = useNavigate();
@@ -58,7 +60,9 @@ export const EditVacationPage = () => {
       navigate(routes.humanResources.vacations.details(id));
     } catch (error) {
       // Error is handled by the API client
-      console.error("Error updating vacation:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating vacation:", error);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -91,56 +95,48 @@ export const EditVacationPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="flex flex-col h-full">
-        {/* Fixed Header */}
-        <div className="flex-shrink-0">
-          <div className="max-w-3xl mx-auto px-4">
-            <PageHeader
-              variant="form"
-              title="Editar Férias"
-              icon={IconBeach}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Recursos Humanos" },
-                { label: "Férias", href: routes.humanResources.vacations.root },
-                { label: vacation.data.user?.name || "Férias", href: routes.humanResources.vacations.details(id) },
-                { label: "Editar" },
-              ]}
-              actions={[
-                {
-                  key: "cancel",
-                  label: "Cancelar",
-                  icon: IconX,
-                  onClick: handleCancel,
-                  variant: "outline",
-                  disabled: isSubmitting,
-                },
-                {
-                  key: "save",
-                  label: "Salvar",
-                  icon: isSubmitting ? IconLoader2 : IconCheck,
-                  onClick: handleSubmit,
-                  variant: "default",
-                  disabled: isSubmitting || !formState.isValid || !formState.isDirty,
-                  loading: isSubmitting,
-                },
-              ]}
-            />
-          </div>
-        </div>
-
-        {/* Scrollable Form Container */}
-        <div className="flex-1 overflow-y-auto mt-6">
-          <div className="max-w-3xl mx-auto px-4 pb-6">
-            <VacationForm
-              mode="update"
-              vacation={vacation.data}
-              onFormStateChange={handleFormStateChange}
-              onCancel={handleCancel}
-              onFormSubmit={handleFormSubmit}
-              isSubmitting={isSubmitting}
-            />
-          </div>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="form"
+          title="Editar Férias"
+          icon={IconBeach}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Recursos Humanos" },
+            { label: "Férias", href: routes.humanResources.vacations.root },
+            { label: vacation.data.user?.name || "Férias", href: routes.humanResources.vacations.details(id) },
+            { label: "Editar" },
+          ]}
+          actions={[
+            {
+              key: "cancel",
+              label: "Cancelar",
+              icon: IconX,
+              onClick: handleCancel,
+              variant: "outline",
+              disabled: isSubmitting,
+            },
+            {
+              key: "save",
+              label: "Salvar",
+              icon: isSubmitting ? IconLoader2 : IconCheck,
+              onClick: handleSubmit,
+              variant: "default",
+              disabled: isSubmitting || !formState.isValid || !formState.isDirty,
+              loading: isSubmitting,
+            },
+          ]}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <VacationForm
+            mode="update"
+            vacation={vacation.data}
+            onFormStateChange={handleFormStateChange}
+            onCancel={handleCancel}
+            onFormSubmit={handleFormSubmit}
+            isSubmitting={isSubmitting}
+          />
         </div>
       </div>
     </PrivilegeRoute>

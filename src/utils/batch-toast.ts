@@ -16,17 +16,6 @@ export interface DetailedBatchResult<T, U = unknown> extends BatchOperationResul
 export function showBatchOperationToast<T, U = unknown>(result: DetailedBatchResult<T, U>, options: BatchToastOptions) {
   const { entityName, entityNamePlural, showDetails = true, maxDetailsToShow = 10 } = options;
 
-  // Debug logging
-  console.log("🔍 Batch Toast Debug:", {
-    result,
-    hasSuccessDetails: "successDetails" in result,
-    hasFailedDetails: "failedDetails" in result,
-    successDetailsLength: result.successDetails?.length || 0,
-    failedDetailsLength: result.failedDetails?.length || 0,
-    successLength: result.success?.length || 0,
-    failedLength: result.failed?.length || 0,
-  });
-
   const { totalSuccess, totalFailed, successDetails = [], failedDetails = [] } = result;
 
   // Determine toast type and color based on results

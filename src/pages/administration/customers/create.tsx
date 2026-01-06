@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { routes, FAVORITE_PAGES } from "../../../constants";
 import { useCreateCustomer } from "../../../hooks";
 import { CustomerForm } from "@/components/administration/customer/form";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { IconUsers, IconCheck, IconLoader2 } from "@tabler/icons-react";
 import type { CustomerCreateFormData } from "../../../schemas";
 
@@ -21,7 +21,9 @@ export const CreateCustomerPage = () => {
       }
     } catch (error: any) {
       // Error is already handled by the API client and mutation
-      console.error("Error creating customer:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating customer:", error);
+      }
     }
   };
 
@@ -49,30 +51,22 @@ export const CreateCustomerPage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-4xl mx-auto">
-          <PageHeaderWithFavorite
-            title="Cadastrar Cliente"
-            icon={IconUsers}
-            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_CADASTRAR}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Administração", href: routes.administration.root },
-              { label: "Clientes", href: routes.administration.customers.root },
-              { label: "Cadastrar" },
-            ]}
-            actions={actions}
-          />
-        </div>
-      </div>
-
-      {/* Main Content Card - Dashboard style scrolling */}
-      <div className="flex-1 overflow-hidden max-w-4xl mx-auto w-full">
-        <div className="h-full bg-card rounded-lg shadow-md border-muted overflow-hidden">
-          <CustomerForm mode="create" onSubmit={handleSubmit} isSubmitting={createCustomer.isPending} onFormStateChange={setFormState} />
-        </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        title="Cadastrar Cliente"
+        icon={IconUsers}
+        favoritePage={FAVORITE_PAGES.ADMINISTRACAO_CLIENTES_CADASTRAR}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Administração", href: routes.administration.root },
+          { label: "Clientes", href: routes.administration.customers.root },
+          { label: "Cadastrar" },
+        ]}
+        actions={actions}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <CustomerForm mode="create" onSubmit={handleSubmit} isSubmitting={createCustomer.isPending} onFormStateChange={setFormState} />
       </div>
     </div>
   );

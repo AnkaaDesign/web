@@ -160,15 +160,17 @@ export function PaintBrandList({ className }: PaintBrandListProps) {
         // Selection is now managed by URL state and will be cleared automatically
       } catch (error) {
         // Error is handled by the API client with detailed message
-        console.error("Error deleting paint brand(s):", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error deleting paint brand(s):", error);
+        }
       }
       setDeleteDialog(null);
     }
   };
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <TableSearchInput
@@ -189,7 +191,7 @@ export function PaintBrandList({ className }: PaintBrandListProps) {
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />}
 
         {/* Paginated table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <PaintBrandTable
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}

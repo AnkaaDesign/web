@@ -20,10 +20,11 @@ import type { ChangeLog } from "../../../../types";
 
 // Define props interface directly to avoid import issues
 interface ChangelogListProps {
+  className?: string;
   onDataChange?: (data: { items: ChangeLog[]; totalRecords: number }) => void;
 }
 
-export function ChangelogList({ onDataChange }: ChangelogListProps) {
+export function ChangelogList({ className, onDataChange }: ChangelogListProps) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // State management
@@ -217,8 +218,8 @@ export function ChangelogList({ onDataChange }: ChangelogListProps) {
   const columns = useMemo(() => createChangelogColumns(), []);
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border")}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden pb-6">
         {/* Search and Controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex-1 relative">
@@ -254,7 +255,7 @@ export function ChangelogList({ onDataChange }: ChangelogListProps) {
         {activeFilterCount > 0 && <FilterIndicators filters={filters} onRemoveFilter={handleRemoveFilter} onClearAll={resetFilters} />}
 
         {/* Table with integrated pagination */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <ChangelogTable
             visibleColumns={visibleColumns}
             className="h-full"

@@ -187,9 +187,6 @@ export function OrderList({ className }: OrderListProps) {
   const queryFilters = useMemo(() => {
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
 
-    console.log("[OrderList] baseQueryFilters:", baseQueryFilters);
-    console.log("[OrderList] filterWithoutOrderBy:", filterWithoutOrderBy);
-
     // Build where clause
     const where = filterWithoutOrderBy.where || {};
 
@@ -199,7 +196,6 @@ export function OrderList({ className }: OrderListProps) {
       limit: DEFAULT_PAGE_SIZE,
     };
 
-    console.log("[OrderList] queryFilters result:", result);
     return result;
   }, [baseQueryFilters]);
 
@@ -267,22 +263,23 @@ export function OrderList({ className }: OrderListProps) {
       await batchDelete({ orderIds: ids });
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error(`Error deleting order${deleteDialog.items.length > 1 ? "s" : ""}:`, error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`Error deleting order${deleteDialog.items.length > 1 ? "s" : ""}:`, error);
+      }
     } finally {
       setDeleteDialog(null);
     }
   };
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <TableSearchInput
             ref={searchInputRef}
             value={displaySearchText}
             onChange={(value) => {
-              console.log("[OrderList] Search input changed to:", value);
               setSearch(value);
             }}
             placeholder="Buscar por código, fornecedor..."
@@ -309,7 +306,7 @@ export function OrderList({ className }: OrderListProps) {
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />}
 
         {/* Paginated table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <OrderTable
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}

@@ -236,7 +236,9 @@ export function getFileOrganizationPath(context: FileContext): string {
   );
 
   if (!config) {
-    console.warn(`No file organization config found for entity: ${context.entityType}, fileType: ${context.fileType}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(`No file organization config found for entity: ${context.entityType}, fileType: ${context.fileType}`);
+    }
     return 'Uploads/'; // Default fallback directory
   }
 

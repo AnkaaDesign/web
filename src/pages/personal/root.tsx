@@ -1,4 +1,4 @@
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,8 @@ import {
   IconHourglass,
 } from "@tabler/icons-react";
 import { QuickAccessCard, StatusCard, RecentActivitiesCard, type Activity } from "@/components/dashboard";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 export function Personal() {
   const navigate = useNavigate();
@@ -224,19 +226,26 @@ export function Personal() {
 
   if (isLoadingUser) {
     return (
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Área Pessoal"
-            icon={IconUserCircle}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal" }]}
-          />
+      <div className="h-full flex flex-col bg-background">
+        {/* Fixed Header */}
+        <div className="flex-shrink-0 bg-background border-b border-border">
+          <div className="px-4 py-4">
+            <PageHeader
+              title="Área Pessoal"
+              icon={IconUserCircle}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal" }]}
+            />
+          </div>
         </div>
-        <div className="flex-1 bg-card rounded-lg shadow-sm border border-border overflow-hidden">
-          <div className="h-full overflow-y-auto p-6 space-y-6">
-            <Skeleton className="h-40 w-full" />
-            <Skeleton className="h-32 w-full" />
-            <Skeleton className="h-48 w-full" />
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-4 py-6">
+            <div className="space-y-6 pb-6">
+              <Skeleton className="h-40 w-full" />
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-48 w-full" />
+            </div>
           </div>
         </div>
       </div>
@@ -245,50 +254,65 @@ export function Personal() {
 
   if (userError) {
     return (
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Área Pessoal"
-            icon={IconUserCircle}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal" }]}
-          />
+      <div className="h-full flex flex-col bg-background">
+        {/* Fixed Header */}
+        <div className="flex-shrink-0 bg-background border-b border-border">
+          <div className="px-4 py-4">
+            <PageHeader
+              title="Área Pessoal"
+              icon={IconUserCircle}
+              breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal" }]}
+            />
+          </div>
         </div>
-        <Alert variant="destructive">
-          <AlertDescription>Erro ao carregar dados do usuário: {userError.message}</AlertDescription>
-        </Alert>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-4 py-6">
+            <div className="space-y-6 pb-6">
+              <Alert variant="destructive">
+                <AlertDescription>Erro ao carregar dados do usuário: {userError.message}</AlertDescription>
+              </Alert>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <div className="flex-shrink-0">
-        <PageHeaderWithFavorite
-          title="Área Pessoal"
-          icon={IconUserCircle}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal" }]}
-          actions={[
-            {
-              key: "request-ppe",
-              label: "Solicitar EPI",
-              icon: IconShieldCheck,
-              onClick: () => navigate(routes.personal.myPpes.request),
-              variant: "default",
-            },
-          ]}
-        />
+    <div className="h-full flex flex-col bg-background">
+      {/* Fixed Header */}
+      <div className="flex-shrink-0 bg-background border-b border-border">
+        <div className="px-4 py-4">
+          <PageHeader
+            title="Área Pessoal"
+            icon={IconUserCircle}
+            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal" }]}
+            actions={[
+              {
+                key: "request-ppe",
+                label: "Solicitar EPI",
+                icon: IconShieldCheck,
+                onClick: () => navigate(routes.personal.myPpes.request),
+                variant: "default",
+              },
+            ]}
+          />
+        </div>
       </div>
 
-      {/* Main Content Card */}
-      <div className="flex-1 bg-card dark:bg-card rounded-lg shadow-sm border border-border overflow-hidden">
-        <div className="h-full overflow-y-auto p-6 space-y-6">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-4 py-6">
+          <div className="space-y-6 pb-6">
           {/* Profile Card */}
           <Card className="overflow-hidden">
             <CardContent className="p-0">
               <div className="flex flex-col md:flex-row">
                 {/* Left section - Avatar and basic info */}
-                <div className="flex items-center gap-4 p-6 bg-gradient-to-r from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20">
-                  <Avatar className="h-20 w-20 border-4 border-background shadow-md">
+                <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20">
+                  <Avatar className="h-20 w-20 border-4 border-background shadow-sm">
                     <AvatarImage
                       src={user?.avatar ? getFileUrl(user.avatar) : undefined}
                       alt={user?.name}
@@ -309,7 +333,7 @@ export function Personal() {
                 </div>
 
                 {/* Right section - Contact and work info */}
-                <div className="flex-1 p-6">
+                <div className="flex-1 p-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {user?.email && (
                       <div className="flex items-center gap-2 text-sm">
@@ -474,7 +498,7 @@ export function Personal() {
                 {vacationsData.data.slice(0, 3).map((vacation) => (
                   <Card
                     key={vacation.id}
-                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    className="hover:shadow-sm transition-shadow cursor-pointer"
                     onClick={() => navigate(routes.personal.myVacations.details(vacation.id))}
                   >
                     <CardContent className="p-4">
@@ -500,6 +524,7 @@ export function Personal() {
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>

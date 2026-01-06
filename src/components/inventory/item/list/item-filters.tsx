@@ -65,10 +65,8 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
     let showInactive: boolean | undefined;
     if (typeof filters.isActive === "boolean") {
       showInactive = !filters.isActive;
-      console.log("[ItemFilters] Initializing from isActive:", filters.isActive, "-> showInactive:", showInactive);
     } else {
       showInactive = undefined;
-      console.log("[ItemFilters] No isActive filter, setting showInactive to undefined");
     }
 
     setLocalState({
@@ -113,7 +111,9 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
 
       return { data: options, hasMore };
     } catch (error) {
-      console.error("Error fetching categories:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching categories:", error);
+      }
       return { data: [], hasMore: false };
     }
   }, []);
@@ -145,7 +145,9 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
 
       return { data: options, hasMore };
     } catch (error) {
-      console.error("Error fetching brands:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching brands:", error);
+      }
       return { data: [], hasMore: false };
     }
   }, []);
@@ -185,14 +187,14 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
 
       return { data: options, hasMore };
     } catch (error) {
-      console.error("Error fetching suppliers:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching suppliers:", error);
+      }
       return { data: [], hasMore: false };
     }
   }, []);
 
   const handleApply = () => {
-    console.log("[ItemFilters] handleApply - localState.showInactive:", localState.showInactive);
-
     // Start with existing filters but REMOVE isActive to ensure clean state
     const baseFilters = { ...filters };
     delete baseFilters.isActive;
@@ -215,9 +217,7 @@ export function ItemFilters({ open, onOpenChange, filters, onFilterChange }: Ite
     // - showInactive: undefined → no isActive filter (both active and inactive)
     if (typeof localState.showInactive === "boolean") {
       newFilters.isActive = !localState.showInactive;
-      console.log("[ItemFilters] Setting isActive:", newFilters.isActive);
     } else {
-      console.log("[ItemFilters] showInactive is undefined, NOT setting isActive filter");
       // Explicitly ensure isActive is not set
       delete newFilters.isActive;
     }

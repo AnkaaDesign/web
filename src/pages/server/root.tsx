@@ -7,6 +7,8 @@ import { SkeletonCard, LoadingSpinner } from "@/components/ui/loading";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { PageHeader } from "@/components/ui/page-header";
 import { useServerMetrics, useServerStatus } from "../../hooks";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 export function ServerRootPage() {
   const navigate = useNavigate();
@@ -33,35 +35,38 @@ export function ServerRootPage() {
   ];
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="h-full flex flex-col bg-background">
       {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <PageHeader
-          title="Gerenciamento do Servidor"
-          icon={IconServer}
-          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Servidor" }]}
-          actions={[
-            {
-              key: "refresh",
-              label: "Atualizar",
-              icon: IconRefresh,
-              onClick: async () => {
-                setIsSpinning(true);
-                await Promise.all([refetchMetrics(), refetchStatus()]);
-                setTimeout(() => setIsSpinning(false), 500);
+      <div className="flex-shrink-0 bg-background border-b border-border">
+        <div className="px-4 py-4">
+          <PageHeader
+            title="Gerenciamento do Servidor"
+            icon={IconServer}
+            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Servidor" }]}
+            actions={[
+              {
+                key: "refresh",
+                label: "Atualizar",
+                icon: IconRefresh,
+                onClick: async () => {
+                  setIsSpinning(true);
+                  await Promise.all([refetchMetrics(), refetchStatus()]);
+                  setTimeout(() => setIsSpinning(false), 500);
+                },
+                variant: "ghost" as const,
+                className: isSpinning ? "animate-spin" : "",
               },
-              variant: "ghost" as const,
-              className: isSpinning ? "animate-spin" : "",
-            },
-          ]}
-        />
+            ]}
+          />
+        </div>
       </div>
 
-      {/* Content Card */}
-      <Card className="flex-1 flex flex-col min-h-0" level={1}>
-        <CardContent className="flex-1 overflow-auto px-8 py-6 space-y-6">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-4 py-6">
+          <div className="space-y-6 pb-6">
           {/* System Status Overview */}
-          <Card level={2}>
+          <Card>
             <CardHeader className="px-8 py-6 pb-4">
               <CardTitle className="text-xl flex items-center gap-3">
                 <div className="p-2 bg-green-500/10 text-green-600 dark:text-green-400 rounded-lg">
@@ -73,7 +78,7 @@ export function ServerRootPage() {
             <CardContent className="px-8 py-6 pt-2">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {/* System Health */}
-                <Card level={3}>
+                <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Status do Sistema</CardTitle>
                   </CardHeader>
@@ -103,7 +108,7 @@ export function ServerRootPage() {
                 </Card>
 
                 {/* CPU Usage */}
-                <Card level={3}>
+                <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-muted-foreground">CPU</CardTitle>
                   </CardHeader>
@@ -123,7 +128,7 @@ export function ServerRootPage() {
                 </Card>
 
                 {/* Memory Usage */}
-                <Card level={3}>
+                <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Memória</CardTitle>
                   </CardHeader>
@@ -146,7 +151,7 @@ export function ServerRootPage() {
                 </Card>
 
                 {/* Disk Usage */}
-                <Card level={3}>
+                <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-medium text-muted-foreground">Disco</CardTitle>
                   </CardHeader>
@@ -171,7 +176,7 @@ export function ServerRootPage() {
           </Card>
 
           {/* Management Tools */}
-          <Card level={2}>
+          <Card>
             <CardHeader className="px-8 py-6 pb-4">
               <CardTitle className="text-xl flex items-center gap-3">
                 <div className="p-2 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg">
@@ -183,7 +188,7 @@ export function ServerRootPage() {
             <CardContent className="px-8 py-6 pt-2">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {serverQuickAccess.map((item) => (
-                  <Card key={item.path} level={3} className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-[1.02]" onClick={() => navigate(item.path)}>
+                  <Card key={item.path} className="cursor-pointer hover:shadow-sm transition-all duration-200 hover:scale-[1.02]" onClick={() => navigate(item.path)}>
                     <CardContent className="p-4">
                       <div className={`${item.color} text-white p-3 rounded-lg inline-block mb-3`}>
                         <item.icon className="h-6 w-6" />
@@ -198,7 +203,7 @@ export function ServerRootPage() {
           </Card>
 
           {/* Services Summary */}
-          <Card level={2}>
+          <Card>
             <CardHeader className="px-8 py-6 pb-4">
               <CardTitle className="text-xl flex items-center gap-3">
                 <div className="p-2 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-lg">
@@ -244,8 +249,9 @@ export function ServerRootPage() {
               )}
             </CardContent>
           </Card>
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

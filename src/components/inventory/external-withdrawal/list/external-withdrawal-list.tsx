@@ -152,9 +152,6 @@ export function ExternalWithdrawalList({ className }: ExternalWithdrawalListProp
   const queryFilters = useMemo(() => {
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
 
-    console.log("[ExternalWithdrawalList] baseQueryFilters:", baseQueryFilters);
-    console.log("[ExternalWithdrawalList] filterWithoutOrderBy:", filterWithoutOrderBy);
-
     // Build where clause
     const where = filterWithoutOrderBy.where || {};
 
@@ -164,7 +161,6 @@ export function ExternalWithdrawalList({ className }: ExternalWithdrawalListProp
       limit: DEFAULT_PAGE_SIZE,
     };
 
-    console.log("[ExternalWithdrawalList] queryFilters result:", result);
     return result;
   }, [baseQueryFilters]);
 
@@ -232,20 +228,21 @@ export function ExternalWithdrawalList({ className }: ExternalWithdrawalListProp
       setDeleteDialog(null);
     } catch (error) {
       // Error is handled by the API client with detailed message
-      console.error(`Error deleting withdrawal${deleteDialog.items.length > 1 ? "s" : ""}:`, error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error(`Error deleting withdrawal${deleteDialog.items.length > 1 ? "s" : ""}:`, error);
+      }
     }
   };
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <TableSearchInput
             ref={searchInputRef}
             value={displaySearchText}
             onChange={(value) => {
-              console.log("[ExternalWithdrawalList] Search input changed to:", value);
               setSearch(value);
             }}
             placeholder="Buscar por nome do retirador, observações..."
@@ -279,7 +276,7 @@ export function ExternalWithdrawalList({ className }: ExternalWithdrawalListProp
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />}
 
         {/* Paginated table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <ExternalWithdrawalTable
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}

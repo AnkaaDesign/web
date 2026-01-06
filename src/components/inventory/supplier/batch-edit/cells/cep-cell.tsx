@@ -43,7 +43,9 @@ export function CepCell({ control, index, disabled, onAddressFound }: CepCellPro
           }
         }
       } catch (error) {
-        console.error("Error looking up CEP:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error looking up CEP:", error);
+        }
       } finally {
         setIsLoading(false);
       }

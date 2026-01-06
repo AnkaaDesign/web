@@ -4,6 +4,7 @@ import { IconBuildingSkyscraper, IconEdit, IconTrash, IconRefresh, IconLoader2, 
 import { toast } from "sonner";
 
 import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
+import { PAGE_SPACING } from "@/lib/layout-constants";
 import { useSector, useSectorMutations } from "../../../../hooks";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
@@ -102,19 +103,20 @@ export const SectorDetailPage = () => {
       await deleteAsync(id);
       navigate(routes.administration.sectors.root);
     } catch (error) {
-      console.error("Error deleting sector:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting sector:", error);
+      }
     }
     setIsDeleteDialogOpen(false);
   };
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="space-y-6">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
           entity={sector}
           title={sector.name}
-          icon={IconBuildingSkyscraper}
           breadcrumbs={[{ label: "Início", href: "/" }, { label: "Administração" }, { label: "Setores", href: routes.administration.sectors.root }, { label: sector.name }]}
           actions={[
             {
@@ -138,19 +140,23 @@ export const SectorDetailPage = () => {
               disabled: deleteMutation.isPending,
             },
           ]}
+          className="flex-shrink-0"
         />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4">
+            {/* Info Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <SpecificationsCard sector={sector} />
+              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.SECTOR} entityId={id} entityName={sector.name} entityCreatedAt={sector.createdAt} maxHeight="500px" />
+            </div>
 
-        {/* Info Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SpecificationsCard sector={sector} />
-          <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.SECTOR} entityId={id} entityName={sector.name} entityCreatedAt={sector.createdAt} maxHeight="500px" />
+            {/* Related Tasks */}
+            <SectorTasksTable sector={sector} />
+
+            {/* Related Users - Last Section */}
+            <SectorUsersTable sector={sector} />
+          </div>
         </div>
-
-        {/* Related Tasks */}
-        <SectorTasksTable sector={sector} />
-
-        {/* Related Users - Last Section */}
-        <SectorUsersTable sector={sector} />
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

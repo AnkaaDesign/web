@@ -116,7 +116,7 @@ function BorrowCard({ borrow, onEdit, onDelete }: BorrowCardProps) {
   const isOverdue = false;
 
   return (
-    <Card className={cn("transition-all hover:shadow-md", isOverdue && "border-destructive/50 bg-destructive/5")}>
+    <Card className={cn("transition-all hover:shadow-sm", isOverdue && "border-destructive/50 bg-destructive/5")}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 space-y-3">

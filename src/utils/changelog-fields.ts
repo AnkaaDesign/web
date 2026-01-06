@@ -255,10 +255,12 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     term: "Prazo",
     startedAt: "Iniciado em",
     finishedAt: "Finalizado em",
+    forecastDate: "Data de Previsão",
     paintId: "Tinta",
     commission: "Comissão",
     bonusDiscountId: "Desconto Bônus",
     customerId: "Cliente",
+    invoiceToId: "Faturar Para",
     sectorId: "Setor",
     createdById: "Criado por",
     budgetId: "Orçamento",
@@ -267,9 +269,11 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     generalPainting: "Pintura Geral",
     observationId: "Observação",
     truckId: "Caminhão",
+    negotiatingWith: "Negociando Com",
     // Relationship fields
     sector: "Setor",
     customer: "Cliente",
+    invoiceTo: "Faturar Para",
     budget: "Orçamento",
     nfe: "Nota Fiscal",
     receipt: "Recibo",
@@ -293,6 +297,11 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     "customer.fantasyName": "Nome Fantasia do Cliente",
     "customer.corporateName": "Razão Social do Cliente",
     "customer.cnpj": "CNPJ do Cliente",
+    "invoiceTo.fantasyName": "Nome Fantasia (Faturar Para)",
+    "invoiceTo.corporateName": "Razão Social (Faturar Para)",
+    "invoiceTo.cnpj": "CNPJ (Faturar Para)",
+    "negotiatingWith.name": "Responsável pela Negociação",
+    "negotiatingWith.phone": "Telefone do Responsável",
     "sector.name": "Nome do Setor",
     "createdBy.name": "Nome do Criador",
     "budget.filename": "Nome do Orçamento",
@@ -1016,9 +1025,9 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   // Handle task status
   if ((field === "status" || field === "status_transition") && entityType === CHANGE_LOG_ENTITY_TYPE.TASK && typeof value === "string") {
     const taskStatusLabels: Record<string, string> = {
-      PENDING: "Pendente",
+      PREPARATION: "Em Preparação",
+      WAITING_PRODUCTION: "Aguardando Produção",
       IN_PRODUCTION: "Em Produção",
-      ON_HOLD: "Pausado",
       COMPLETED: "Concluído",
       CANCELLED: "Cancelado",
     };

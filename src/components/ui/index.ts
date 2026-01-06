@@ -48,7 +48,6 @@ export * from "./measure-selector";
 export * from "./menubar";
 export * from "./navigation-menu";
 export * from "./page-header";
-export * from "./page-header-with-favorite";
 export * from "./pagination";
 export * from "./popover";
 export { Progress } from "./progress";

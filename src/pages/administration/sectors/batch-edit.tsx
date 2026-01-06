@@ -72,28 +72,25 @@ export const SectorBatchEditPage = () => {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-        <div className="h-full flex flex-col">
-          {/* Fixed Header */}
-          <div className="flex-shrink-0">
-            <PageHeader
-              variant="batch"
-              title="Edição em Lote de Setores"
-              icon={IconBuildingSkyscraper}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Administração" },
-                { label: "Setores", href: routes.administration.sectors.root },
-                { label: "Edição em Lote" },
-              ]}
-              selection={{
-                count: selectedIds.length,
-                entityName: "setores",
-                onClearSelection: () => navigate(routes.administration.sectors.root),
-              }}
-            />
-          </div>
-          {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto">
+        <div className="h-full flex flex-col bg-background px-4 pt-4">
+          <PageHeader
+            variant="batch"
+            title="Edição em Lote de Setores"
+            icon={IconBuildingSkyscraper}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Administração" },
+              { label: "Setores", href: routes.administration.sectors.root },
+              { label: "Edição em Lote" },
+            ]}
+            selection={{
+              count: selectedIds.length,
+              entityName: "setores",
+              onClearSelection: () => navigate(routes.administration.sectors.root),
+            }}
+            className="flex-shrink-0"
+          />
+          <div className="flex-1 overflow-hidden pt-4 pb-6">
             <div className="flex items-center justify-center min-h-[400px]">
               <IconLoader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
@@ -106,28 +103,25 @@ export const SectorBatchEditPage = () => {
   if (sectors.length === 0) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-        <div className="h-full flex flex-col">
-          {/* Fixed Header */}
-          <div className="flex-shrink-0">
-            <PageHeader
-              variant="batch"
-              title="Edição em Lote de Setores"
-              icon={IconBuildingSkyscraper}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Administração" },
-                { label: "Setores", href: routes.administration.sectors.root },
-                { label: "Edição em Lote" },
-              ]}
-              selection={{
-                count: 0,
-                entityName: "setores",
-                onClearSelection: () => navigate(routes.administration.sectors.root),
-              }}
-            />
-          </div>
-          {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-4">
+        <div className="h-full flex flex-col bg-background px-4 pt-4">
+          <PageHeader
+            variant="batch"
+            title="Edição em Lote de Setores"
+            icon={IconBuildingSkyscraper}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Administração" },
+              { label: "Setores", href: routes.administration.sectors.root },
+              { label: "Edição em Lote" },
+            ]}
+            selection={{
+              count: 0,
+              entityName: "setores",
+              onClearSelection: () => navigate(routes.administration.sectors.root),
+            }}
+            className="flex-shrink-0"
+          />
+          <div className="flex-1 overflow-hidden pt-4 pb-6">
             <div className="max-w-7xl mx-auto">
               <Card>
                 <CardContent className="p-8 text-center">
@@ -146,30 +140,29 @@ export const SectorBatchEditPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="h-full flex flex-col space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeader
-            variant="batch"
-            title="Edição em Lote de Setores"
-            icon={IconBuildingSkyscraper}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Administração" },
-              { label: "Setores", href: routes.administration.sectors.root },
-              { label: "Edição em Lote" },
-            ]}
-            selection={{
-              count: sectors.length,
-              entityName: "setores",
-              onClearSelection: () => navigate(routes.administration.sectors.root),
-            }}
-            backButton={{
-              onClick: () => navigate(routes.administration.sectors.root),
-              label: "Voltar para lista",
-            }}
-          />
-        </div>
-        <div className="flex-1 overflow-hidden">
+      <div className="h-full flex flex-col bg-background px-4 pt-4">
+        <PageHeader
+          variant="batch"
+          title="Edição em Lote de Setores"
+          icon={IconBuildingSkyscraper}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Administração" },
+            { label: "Setores", href: routes.administration.sectors.root },
+            { label: "Edição em Lote" },
+          ]}
+          selection={{
+            count: sectors.length,
+            entityName: "setores",
+            onClearSelection: () => navigate(routes.administration.sectors.root),
+          }}
+          backButton={{
+            onClick: () => navigate(routes.administration.sectors.root),
+            label: "Voltar para lista",
+          }}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-hidden pt-4 pb-6">
           <SectorBatchEditTable sectors={sectors} onSubmit={handleSubmit} isSubmitting={isSubmitting} />
         </div>
       </div>

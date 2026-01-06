@@ -46,14 +46,16 @@ export const safeWebOperation = <T>(
     try {
       return operation();
     } catch (error) {
-      console.error("Web operation failed:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Web operation failed:", error);
+      }
       if (fallback !== undefined) {
         return typeof fallback === "function" ? (fallback as () => T)() : fallback;
       }
       return undefined;
     }
   } else {
-    if (warningMessage) {
+    if (warningMessage && process.env.NODE_ENV !== 'production') {
       console.warn(warningMessage);
     }
     if (fallback !== undefined) {

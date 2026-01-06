@@ -102,13 +102,15 @@ export function PositionBatchEditTable({ positions, onCancel, onSubmit }: Positi
         navigate(routes.humanResources.positions.root);
       }
     } catch (error) {
-      console.error("Error during batch update:", error);
-      console.error("Error details:", {
-        message: (error as Error).message,
-        response: (error as any).response?.data,
-        status: (error as any).response?.status,
-        stack: (error as Error).stack,
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error during batch update:", error);
+        console.error("Error details:", {
+          message: (error as Error).message,
+          response: (error as any).response?.data,
+          status: (error as any).response?.status,
+          stack: (error as Error).stack,
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -130,7 +132,7 @@ export function PositionBatchEditTable({ positions, onCancel, onSubmit }: Positi
       <Card className="h-full flex flex-col">
         {/* Hidden submit button for page header to trigger */}
         <button id="position-batch-form-submit" type="button" onClick={form.handleSubmit(handleSubmit)} style={{ display: "none" }} disabled={isSubmitting} />
-        <CardContent className="p-6 flex-1 overflow-hidden flex flex-col">
+        <CardContent className="p-4 flex-1 overflow-hidden flex flex-col">
           <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>

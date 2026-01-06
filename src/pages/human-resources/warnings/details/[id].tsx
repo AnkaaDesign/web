@@ -84,18 +84,19 @@ export const WarningDetailPage = () => {
       await deleteMutation.mutateAsync(id);
       navigate(routes.humanResources.warnings.root);
     } catch (error) {
-      console.error("Error deleting warning:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting warning:", error);
+      }
     }
     setIsDeleteDialogOpen(false);
   };
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="space-y-6">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
           title="Detalhes da Advertência"
-          icon={IconAlertTriangle}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Recursos Humanos" },
@@ -122,21 +123,26 @@ export const WarningDetailPage = () => {
               onClick: () => setIsDeleteDialogOpen(true),
             },
           ]}
+          className="flex-shrink-0"
         />
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-6">
-            <SpecificationsCard warning={warning.data!} />
-            <AttachmentsCard warning={warning.data!} />
-          </div>
-          <div className="space-y-6">
-            <DescriptionCard warning={warning.data!} />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4">
+            {/* Main Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <SpecificationsCard warning={warning.data!} />
+                <AttachmentsCard warning={warning.data!} />
+              </div>
+              <div className="space-y-4">
+                <DescriptionCard warning={warning.data!} />
+              </div>
+            </div>
+
+            {/* Changelog */}
+            <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.WARNING} entityId={id} maxHeight="500px" />
           </div>
         </div>
-
-        {/* Changelog */}
-        <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.WARNING} entityId={id} maxHeight="500px" />
 
         {/* Delete Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

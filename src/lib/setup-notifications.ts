@@ -21,9 +21,6 @@ export function setupWebNotifications() {
         ...(title === "Muitas Tentativas" ? { force: true } : {}),
       };
 
-      // Debug logging for troubleshooting
-      if (process.env.NODE_ENV === "development") {
-      }
 
       switch (type) {
         case "success":

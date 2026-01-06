@@ -77,7 +77,9 @@ export function ItemBrandSelector({ disabled, required, initialBrand }: BrandSel
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error("Error fetching brands:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching brands:", error);
+      }
       return {
         data: [],
         hasMore: false,
@@ -98,7 +100,9 @@ export function ItemBrandSelector({ disabled, required, initialBrand }: BrandSel
         return result.data.id;
       }
     } catch (error) {
-      console.error("Error creating brand:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating brand:", error);
+      }
       throw error;
     } finally {
       setIsCreating(false);

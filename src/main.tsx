@@ -83,7 +83,9 @@ const queryClient = new QueryClient({
 if (typeof window !== "undefined") {
   (window as any).__REACT_QUERY_CLIENT__ = queryClient;
   (window as any).__QUERY_CLIENT_INITIALIZED__ = true;
-  console.log("[QueryClient] Initialized globally before React");
+  if (process.env.NODE_ENV !== 'production') {
+    console.log("[QueryClient] Initialized globally before React");
+  }
 }
 
 // Setup error monitoring for development
@@ -92,16 +94,28 @@ if (import.meta.env.DEV) {
   import("./hooks/query-error-monitor")
     .then(({ queryErrorMonitor }) => {
       queryErrorMonitor.setup(queryClient);
-      console.log("[QueryClient] Error monitoring setup complete");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("[QueryClient] Error monitoring setup complete");
+      }
     })
     .catch((error) => {
-      console.warn("[QueryClient] Failed to setup error monitoring:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("[QueryClient] Failed to setup error monitoring:", error);
+      }
       // Non-critical error - app can continue without error monitoring
     });
 }
 
 // Import App AFTER QueryClient is created
 import App from "./App";
+
+// Register service worker for push notifications
+import { registerServiceWorker } from "./lib/register-service-worker";
+registerServiceWorker().catch((error) => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn('Service worker registration failed:', error);
+  }
+});
 
 // Main app component with pre-created QueryClient
 const AppWrapper = () => {
@@ -117,5 +131,7 @@ const rootElement = document.getElementById("root");
 if (rootElement) {
   createRoot(rootElement).render(<AppWrapper />);
 } else {
-  console.error("Failed to find root element");
+  if (process.env.NODE_ENV !== 'production') {
+    console.error("Failed to find root element");
+  }
 }

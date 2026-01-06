@@ -6,7 +6,7 @@ import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../constants";
 import { PositionBatchEditTable } from "@/components/human-resources/position/batch-edit/position-batch-edit-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { toast } from "sonner";
 import { IconBriefcase, IconAlertTriangle, IconLoader, IconDeviceFloppy, IconX, IconArrowLeft } from "@tabler/icons-react";
@@ -62,7 +62,7 @@ export const PositionBatchEditPage = () => {
   if (positionIds.length === 0) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-        <div className="container mx-auto p-6">
+        <div className="container mx-auto p-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -88,7 +88,7 @@ export const PositionBatchEditPage = () => {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-        <div className="container mx-auto p-6">
+        <div className="container mx-auto p-4">
           <Card>
             <CardHeader>
               <div>
@@ -109,7 +109,7 @@ export const PositionBatchEditPage = () => {
   if (error || !hasValidPositions) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-        <div className="container mx-auto p-6">
+        <div className="container mx-auto p-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -172,25 +172,21 @@ export const PositionBatchEditPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="h-full flex flex-col space-y-4">
-        {/* Fixed Header */}
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Editar Cargos em Lote"
-            icon={IconBriefcase}
-            favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
-            breadcrumbs={[
-              { label: "Início", href: "/" },
-              { label: "Recursos Humanos", href: routes.humanResources.root },
-              { label: "Cargos", href: routes.humanResources.positions.root },
-              { label: "Editar em Lote" },
-            ]}
-            actions={actions}
-          />
-        </div>
-
-        {/* Scrollable Content Container */}
-        <div className="flex-1 overflow-hidden">
+      <div className="h-full flex flex-col bg-background px-4 pt-4">
+        <PageHeader
+          title="Editar Cargos em Lote"
+          icon={IconBriefcase}
+          favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_LISTAR}
+          breadcrumbs={[
+            { label: "Início", href: "/" },
+            { label: "Recursos Humanos", href: routes.humanResources.root },
+            { label: "Cargos", href: routes.humanResources.positions.root },
+            { label: "Editar em Lote" },
+          ]}
+          actions={actions}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-hidden pt-4 pb-6">
           <PositionBatchEditTable
             positions={positions}
             onCancel={handleCancel}

@@ -40,7 +40,7 @@ export function BorrowSummaryStats({ activeCount, returnedCount, totalCount, isL
   return (
     <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-4", className)}>
       {stats.map((stat) => (
-        <Card key={stat.title} className="hover:shadow-md transition-shadow">
+        <Card key={stat.title} className="hover:shadow-sm transition-shadow">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>

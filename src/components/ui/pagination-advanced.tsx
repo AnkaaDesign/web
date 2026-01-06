@@ -110,7 +110,9 @@ export function SimplePaginationAdvanced({
       const lastPage = Math.max(0, totalPages - 1);
       // Only attempt correction if we haven't tried yet AND the page is actually different
       if (currentPage !== lastPage && !correctionAttemptedRef.current) {
-        console.warn(`Page ${displayPage} is out of bounds. Auto-correcting to last page.`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`Page ${displayPage} is out of bounds. Auto-correcting to last page.`);
+        }
         correctionAttemptedRef.current = true;
         onPageChange(lastPage);
       }

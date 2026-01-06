@@ -27,7 +27,7 @@ export function RelatedInvoicesCard({ customer }: RelatedInvoicesCardProps) {
   const hasInvoices = invoices && invoices.length > 0;
 
   return (
-    <Card className="shadow-sm border border-border" level={1}>
+    <Card className="shadow-sm border border-border">
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2">
           <IconFileInvoice className="h-5 w-5 text-muted-foreground" />

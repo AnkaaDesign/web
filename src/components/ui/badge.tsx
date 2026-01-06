@@ -45,7 +45,7 @@ const badgeVariants = cva(
         expired: "border-transparent bg-amber-600 text-white hover:bg-amber-700",
 
         // Orange status variants (use orange-600)
-        onHold: "border-transparent bg-orange-600 text-white hover:bg-orange-700",
+        preparation: "border-transparent bg-orange-600 text-white hover:bg-orange-700",
 
         // ===== COLOR UTILITIES =====
         red: "border-transparent bg-red-700 text-white hover:bg-red-800",

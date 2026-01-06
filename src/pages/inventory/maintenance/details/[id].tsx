@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 const MaintenanceDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -89,7 +90,7 @@ const MaintenanceDetailsPage = () => {
   if (error || !maintenance) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
-        <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
+        <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
           <div className="flex flex-1 items-center justify-center min-h-[60vh]">
             <div className="text-center px-4 max-w-md mx-auto">
               <div className="animate-in fade-in-50 duration-500">
@@ -139,7 +140,9 @@ const MaintenanceDetailsPage = () => {
         refetch();
       }
     } catch (error) {
-      console.error("Error starting maintenance:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error starting maintenance:", error);
+      }
     }
   };
 
@@ -157,7 +160,9 @@ const MaintenanceDetailsPage = () => {
         refetch();
       }
     } catch (error) {
-      console.error("Error finishing maintenance:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error finishing maintenance:", error);
+      }
     }
   };
 
@@ -170,7 +175,9 @@ const MaintenanceDetailsPage = () => {
         navigate(routes.inventory.maintenance.root);
       }
     } catch (error) {
-      console.error("Error deleting maintenance:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting maintenance:", error);
+      }
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
@@ -233,60 +240,44 @@ const MaintenanceDetailsPage = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section */}
-      <div className="animate-in fade-in-50 duration-500">
-        <PageHeader
-          variant="detail"
-          title={maintenance.name}
-          icon={IconSettings}
-          className="shadow-lg"
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Estoque", href: routes.inventory.root },
-            { label: "Manutenções", href: routes.inventory.maintenance.root },
-            { label: maintenance.name },
-          ]}
-          actions={actions}
-        />
-      </div>
-
-      {/* Core Information Grid - Basic Info and Target Item */}
-      <div className="animate-in fade-in-50 duration-700">
-        {/* Mobile: Single column stacked */}
-        <div className="block lg:hidden space-y-4">
-          <MaintenanceInfoCard maintenance={maintenance} onMaintenanceUpdate={handleMaintenanceUpdate} className="h-full" />
-          <TargetItemCard item={maintenance.item} className="h-full" />
-        </div>
-
-        {/* Desktop/Tablet: 2 columns grid */}
-        <div className="hidden lg:block">
-          <div className="grid grid-cols-2 gap-6">
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        variant="detail"
+        title={maintenance.name}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Manutenções", href: routes.inventory.maintenance.root },
+          { label: maintenance.name },
+        ]}
+        actions={actions}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Core Information Grid - Basic Info and Target Item */}
             <MaintenanceInfoCard maintenance={maintenance as any} onMaintenanceUpdate={handleMaintenanceUpdate} className="h-full" />
             <TargetItemCard item={maintenance.item} className="h-full" />
           </div>
-        </div>
-      </div>
 
-      {/* Items Needed - Full Width */}
-      {maintenance.itemsNeeded && maintenance.itemsNeeded.length > 0 && (
-        <div className="animate-in fade-in-50 duration-800">
-          <ItemsNeededList itemsConfig={maintenance.itemsNeeded.map((mi: any) => ({
-            itemId: mi.item?.id || mi.itemId,
-            quantity: mi.quantity,
-          }))} />
-        </div>
-      )}
+          {/* Items Needed - Full Width */}
+          {maintenance.itemsNeeded && maintenance.itemsNeeded.length > 0 && (
+            <ItemsNeededList itemsConfig={maintenance.itemsNeeded.map((mi: any) => ({
+              itemId: mi.item?.id || mi.itemId,
+              quantity: mi.quantity,
+            }))} />
+          )}
 
-      {/* Changelog History - Full Width */}
-      <div className="animate-in fade-in-50 duration-900">
-        <ChangelogHistory
-          entityType={CHANGE_LOG_ENTITY_TYPE.MAINTENANCE}
-          entityId={maintenance.id}
-          entityName={maintenance.name}
-          entityCreatedAt={maintenance.createdAt}
-          maxHeight="500px"
-        />
+          {/* Changelog History - Full Width */}
+          <ChangelogHistory
+            entityType={CHANGE_LOG_ENTITY_TYPE.MAINTENANCE}
+            entityId={maintenance.id}
+            entityName={maintenance.name}
+            entityCreatedAt={maintenance.createdAt}
+            maxHeight="500px"
+          />
+        </div>
       </div>
 
       {/* Delete Confirmation Dialog */}

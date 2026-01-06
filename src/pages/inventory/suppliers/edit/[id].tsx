@@ -114,31 +114,23 @@ export const SupplierEditPage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-4xl mx-auto">
-          <PageHeader
-            variant="form"
-            title="Editar Fornecedor"
-            icon={IconBuilding}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Estoque", href: routes.inventory.root },
-              { label: "Fornecedores", href: routes.inventory.suppliers.root },
-              { label: supplier.fantasyName, href: routes.inventory.suppliers.details(id!) },
-              { label: "Editar" },
-            ]}
-            actions={actions}
-          />
-        </div>
-      </div>
-
-      {/* Main Content Card - Dashboard style scrolling */}
-      <div className="flex-1 overflow-hidden max-w-4xl mx-auto w-full">
-        <div className="h-full bg-white rounded-lg shadow-sm border overflow-hidden">
-          <SupplierEditForm supplier={supplier} onSubmit={handleSubmit} isSubmitting={updateSupplier.isPending} onFormStateChange={setFormState} />
-        </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        variant="form"
+        title="Editar Fornecedor"
+        icon={IconBuilding}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Fornecedores", href: routes.inventory.suppliers.root },
+          { label: supplier.fantasyName, href: routes.inventory.suppliers.details(id!) },
+          { label: "Editar" },
+        ]}
+        actions={actions}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <SupplierEditForm supplier={supplier} onSubmit={handleSubmit} isSubmitting={updateSupplier.isPending} onFormStateChange={setFormState} />
       </div>
     </div>
   );

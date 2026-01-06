@@ -29,7 +29,7 @@ export function CustomerDetailSkeleton() {
           {/* Core Information Cards Skeleton */}
           <div className="grid grid-cols-1 gap-6">
             {/* Basic Info Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Skeleton className="h-5 w-5" />
                 <Skeleton className="h-6 w-40" />
@@ -55,7 +55,7 @@ export function CustomerDetailSkeleton() {
             </div>
 
             {/* Contact Details Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Skeleton className="h-5 w-5" />
                 <Skeleton className="h-6 w-32" />
@@ -81,7 +81,7 @@ export function CustomerDetailSkeleton() {
             </div>
 
             {/* Address Info Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Skeleton className="h-5 w-5" />
                 <Skeleton className="h-6 w-28" />
@@ -107,7 +107,7 @@ export function CustomerDetailSkeleton() {
             </div>
 
             {/* Customer Activity Card */}
-            <div className="rounded-xl border bg-card p-6 space-y-4">
+            <div className="rounded-xl border bg-card p-4 space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Skeleton className="h-5 w-5" />
                 <Skeleton className="h-6 w-36" />
@@ -130,7 +130,7 @@ export function CustomerDetailSkeleton() {
           </div>
 
           {/* Related Tasks Section */}
-          <div className="rounded-xl border bg-card p-6 space-y-4">
+          <div className="rounded-xl border bg-card p-4 space-y-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Skeleton className="h-5 w-5" />
@@ -159,7 +159,7 @@ export function CustomerDetailSkeleton() {
           </div>
 
           {/* Related Invoices Section */}
-          <div className="rounded-xl border bg-card p-6 space-y-4">
+          <div className="rounded-xl border bg-card p-4 space-y-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Skeleton className="h-5 w-5" />
@@ -187,7 +187,7 @@ export function CustomerDetailSkeleton() {
           </div>
 
           {/* Changelog History Section */}
-          <div className="rounded-xl border bg-card p-6 space-y-4">
+          <div className="rounded-xl border bg-card p-4 space-y-4">
             <div className="flex items-center gap-2 mb-4">
               <Skeleton className="h-5 w-5" />
               <Skeleton className="h-6 w-48" />

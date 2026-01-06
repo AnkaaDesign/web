@@ -59,13 +59,13 @@ export const cardVariants = cva("rounded-xl border bg-card text-card-foreground 
   variants: {
     variant: {
       default: "border-border shadow-sm",
-      elevated: "border-transparent shadow-md hover:shadow-lg",
+      elevated: "border-transparent shadow-sm hover:shadow-sm",
       outline: "border-border bg-transparent shadow-none",
     },
     padding: {
       none: "p-0",
       sm: "p-4",
-      default: "p-6",
+      default: "p-4",
       lg: "p-8",
     },
   },
@@ -97,7 +97,7 @@ export const authCardVariants = cva("w-full mx-auto rounded-xl border bg-card sh
     },
     elevation: {
       default: "shadow-sm",
-      elevated: "shadow-lg border-transparent",
+      elevated: "shadow-sm border-transparent",
     },
   },
   defaultVariants: {

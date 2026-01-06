@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditSuppliers } from "@/utils/permissions/entity-permissions";
+import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 const SupplierDetailsPage = () => {
   usePageTracker({ title: "supplier-detail" });
@@ -83,7 +84,9 @@ const SupplierDetailsPage = () => {
       await deleteSupplier.mutateAsync(id);
       navigate(routes.inventory.suppliers.root);
     } catch (error) {
-      console.error("Error deleting supplier:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting supplier:", error);
+      }
     }
     setIsDeleteDialogOpen(false);
   };
@@ -91,11 +94,10 @@ const SupplierDetailsPage = () => {
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
       <FileViewerProvider>
-        <div className="space-y-6">
+        <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
           <PageHeader
             variant="detail"
             title={supplier.fantasyName}
-            icon={IconBuilding}
             breadcrumbs={[{ label: "Início", href: "/" }, { label: "Estoque" }, { label: "Fornecedores", href: routes.inventory.suppliers.root }, { label: supplier.fantasyName }]}
             actions={[
               {
@@ -118,61 +120,61 @@ const SupplierDetailsPage = () => {
                 onClick: () => setIsDeleteDialogOpen(true),
               }] : []),
             ]}
+            className="flex-shrink-0"
           />
+          <div className="flex-1 overflow-y-auto pb-6">
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Core Information Grid */}
+                <BasicInfoCard supplier={supplier} />
+                <ContactDetailsCard supplier={supplier} />
 
-          {/* Core Information Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <BasicInfoCard supplier={supplier} />
-            <ContactDetailsCard supplier={supplier} />
+                {/* Address and Changelog Grid */}
+                <AddressInfoCard supplier={supplier} />
+                <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.SUPPLIER} entityId={id} maxHeight="500px" />
+
+                {/* Documents */}
+                <DocumentsCard supplier={supplier} />
+              </div>
+
+              {/* Related Orders */}
+              <RelatedOrdersCard supplier={supplier} />
+
+              {/* Related Items - Full Width, Last Section */}
+              <RelatedItemsCard items={supplier.items} supplierId={supplier.id} />
+            </div>
           </div>
 
-          {/* Address and Changelog Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <AddressInfoCard supplier={supplier} />
-            <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.SUPPLIER} entityId={id} maxHeight="500px" />
+            {/* Delete Dialog */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <IconAlertTriangle className="h-5 w-5 text-destructive" />
+                    Confirmar Exclusão
+                  </DialogTitle>
+                  <DialogDescription>
+                    Tem certeza que deseja excluir o fornecedor "{supplier.fantasyName}"?
+                    {supplier._count?.items ? (
+                      <span className="block mt-2 font-medium text-destructive">
+                        Atenção: Este fornecedor possui {supplier._count.items} produto{supplier._count.items !== 1 ? "s" : ""} associado{supplier._count.items !== 1 ? "s" : ""}.
+                      </span>
+                    ) : null}
+                    Esta ação não poderá ser desfeita.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button variant="destructive" onClick={handleDelete} disabled={deleteSupplier.isPending}>
+                    {deleteSupplier.isPending ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconTrash className="h-4 w-4 mr-2" />}
+                    Excluir
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
-
-          {/* Documents and Empty Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <DocumentsCard supplier={supplier} />
-          </div>
-
-          {/* Related Orders */}
-          <RelatedOrdersCard supplier={supplier} />
-
-          {/* Related Items - Full Width, Last Section */}
-          <RelatedItemsCard items={supplier.items} supplierId={supplier.id} />
-
-          {/* Delete Dialog */}
-          <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <IconAlertTriangle className="h-5 w-5 text-destructive" />
-                  Confirmar Exclusão
-                </DialogTitle>
-                <DialogDescription>
-                  Tem certeza que deseja excluir o fornecedor "{supplier.fantasyName}"?
-                  {supplier._count?.items ? (
-                    <span className="block mt-2 font-medium text-destructive">
-                      Atenção: Este fornecedor possui {supplier._count.items} produto{supplier._count.items !== 1 ? "s" : ""} associado{supplier._count.items !== 1 ? "s" : ""}.
-                    </span>
-                  ) : null}
-                  Esta ação não poderá ser desfeita.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button variant="destructive" onClick={handleDelete} disabled={deleteSupplier.isPending}>
-                  {deleteSupplier.isPending ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconTrash className="h-4 w-4 mr-2" />}
-                  Excluir
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
       </FileViewerProvider>
     </PrivilegeRoute>
   );

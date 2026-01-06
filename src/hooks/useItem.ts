@@ -84,17 +84,10 @@ const itemService = {
     return batchCreateItems(data, { include: includeWithMeasures });
   },
   batchUpdate: (data: ItemBatchUpdateFormData, params?: { include?: ItemInclude }) => {
-    console.log("=== ITEM SERVICE ADAPTER DEBUGGING ===");
-    console.log("Step 20 - Service adapter received data:", JSON.stringify(data, null, 2));
-    console.log("Step 21 - Service adapter received params:", JSON.stringify(params, null, 2));
-
     const includeWithMeasures = {
       measures: true,
       ...params?.include,
     };
-
-    console.log("Step 22 - Service adapter final include:", JSON.stringify(includeWithMeasures, null, 2));
-    console.log("Step 23 - Calling batchUpdateItems...");
 
     return batchUpdateItems(data, { include: includeWithMeasures });
   },

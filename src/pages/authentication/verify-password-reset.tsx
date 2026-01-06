@@ -70,7 +70,9 @@ export function VerifyPasswordResetPage() {
 
       // API client will handle success notifications automatically
     } catch (error) {
-      console.error("Resend failed:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Resend failed:", error);
+      }
 
       // API client will handle error notifications automatically
 
@@ -98,7 +100,9 @@ export function VerifyPasswordResetPage() {
         navigate(routes.authentication.login);
       }, 2000);
     } catch (error: any) {
-      console.error("Password reset failed:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Password reset failed:", error);
+      }
 
       // API client will handle error notifications automatically
 

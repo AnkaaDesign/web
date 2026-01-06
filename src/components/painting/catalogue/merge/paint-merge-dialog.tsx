@@ -202,7 +202,9 @@ export function PaintMergeDialog({ open, onOpenChange, paints, onMerge }: PaintM
       await onMerge(targetPaintId, resolvedData);
       onOpenChange(false);
     } catch (error) {
-      console.error("Merge failed:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Merge failed:", error);
+      }
     } finally {
       setIsLoading(false);
     }

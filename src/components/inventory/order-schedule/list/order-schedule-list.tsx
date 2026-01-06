@@ -34,7 +34,7 @@ export function OrderScheduleList({ className }: OrderScheduleListProps) {
 
   return (
     <Card className={className}>
-      <CardContent className="p-6 space-y-4">
+      <CardContent className="p-4 space-y-4">
         {/* Header with Filter Button */}
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-semibold">Cronogramas de Pedidos</h2>

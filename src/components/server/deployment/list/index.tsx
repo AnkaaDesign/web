@@ -7,8 +7,8 @@ interface DeploymentListProps {
 
 export function DeploymentList({ className }: DeploymentListProps) {
   return (
-    <Card className={className} level={1}>
-      <CardContent className="p-6">
+    <Card className={className}>
+      <CardContent className="p-4">
         <DeploymentTable className="h-full" />
       </CardContent>
     </Card>

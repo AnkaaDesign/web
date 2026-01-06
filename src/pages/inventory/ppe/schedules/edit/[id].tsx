@@ -97,7 +97,7 @@ export const PPEScheduleEditPage = () => {
           />
 
           <Card>
-            <div className="p-6 space-y-4">
+            <div className="p-4 space-y-4">
               <Skeleton className="h-6 w-48" />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {Array.from({ length: 4 }).map((_, i) => (
@@ -137,7 +137,7 @@ export const PPEScheduleEditPage = () => {
           />
 
           <Card>
-            <CardContent className="p-6 text-center">
+            <CardContent className="p-4 text-center">
               <IconCalendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold">Agendamento não encontrado</h3>
               <p className="text-muted-foreground mb-4">O agendamento de EPI solicitado não foi encontrado ou não existe.</p>
@@ -151,31 +151,24 @@ export const PPEScheduleEditPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="h-full flex flex-col space-y-4">
-        {/* Fixed Header */}
-        <div className="flex-shrink-0">
-          <div className="max-w-5xl mx-auto">
-            <PageHeader
-              variant="form"
-              title={`Editar Agendamento #${ppeSchedule.data?.id.slice(-8)}`}
-              subtitle={`${ppeSchedule.data?.frequency} - ${ppeSchedule.data?.ppeItems?.map((item) => item.ppeType).join(", ") || "N/A"}`}
-              icon={IconCalendar}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Estoque", href: routes.inventory.root },
-                { label: "EPIs", href: routes.inventory.ppe.root },
-                { label: "Agendamentos", href: routes.inventory.ppe.schedules.root },
-                { label: `#${ppeSchedule.data?.id.slice(-8)}`, href: routes.inventory.ppe.schedules.details(ppeSchedule.data?.id!) },
-                { label: "Editar" },
-              ]}
-              actions={actions}
-            />
-          </div>
-        </div>
-
-        {/* Scrollable Form Container */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="max-w-5xl mx-auto h-full">
+      <div className="h-full flex flex-col px-4 pt-4">
+        <PageHeader
+          variant="form"
+          title={`Editar Agendamento #${ppeSchedule.data?.id.slice(-8)}`}
+          subtitle={`${ppeSchedule.data?.frequency} - ${ppeSchedule.data?.ppeItems?.map((item) => item.ppeType).join(", ") || "N/A"}`}
+          icon={IconCalendar}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Estoque", href: routes.inventory.root },
+            { label: "EPIs", href: routes.inventory.ppe.root },
+            { label: "Agendamentos", href: routes.inventory.ppe.schedules.root },
+            { label: `#${ppeSchedule.data?.id.slice(-8)}`, href: routes.inventory.ppe.schedules.details(ppeSchedule.data?.id!) },
+            { label: "Editar" },
+          ]}
+          actions={actions}
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="mt-4 space-y-4">
             <PpeScheduleForm
               mode="update"
               ppeSchedule={ppeSchedule.data!}

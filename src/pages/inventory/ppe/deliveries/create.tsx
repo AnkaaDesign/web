@@ -64,26 +64,25 @@ export const EPIDeliveryCreate = () => {
 
   return (
     <>
-      <div className="space-y-4">
-        <div className="max-w-6xl mx-auto">
-            <PageHeader
-              variant="form"
-              title="Nova Entrega de EPI"
-              icon={IconShield}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Estoque", href: routes.inventory.root },
-                { label: "EPI", href: routes.inventory.ppe.root },
-                { label: "Entregas", href: routes.inventory.ppe.deliveries.root },
-                { label: "Nova Entrega" },
-              ]}
-              actions={actions}
-              favoritePage={FAVORITE_PAGES.ESTOQUE_EPI_ENTREGAS_CADASTRAR}
-            />
-        </div>
-
-        <div className="max-w-6xl mx-auto">
-          <PpeDeliveryForm mode="create" onSubmit={handleSubmit} isSubmitting={batchCreateMutation.isPending} />
+      <div className="h-full flex flex-col px-4 pt-4">
+        <PageHeader
+          variant="form"
+          title="Nova Entrega de EPI"
+          icon={IconShield}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Estoque", href: routes.inventory.root },
+            { label: "EPI", href: routes.inventory.ppe.root },
+            { label: "Entregas", href: routes.inventory.ppe.deliveries.root },
+            { label: "Nova Entrega" },
+          ]}
+          actions={actions}
+          favoritePage={FAVORITE_PAGES.ESTOQUE_EPI_ENTREGAS_CADASTRAR}
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="mt-4 space-y-4">
+            <PpeDeliveryForm mode="create" onSubmit={handleSubmit} isSubmitting={batchCreateMutation.isPending} />
+          </div>
         </div>
       </div>
 

@@ -284,18 +284,12 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
   // Stage validation
   const validateCurrentStep = useCallback(async (): Promise<boolean> => {
-    console.log("[FORM validateCurrentStep] ENTERED");
-    console.log("[FORM validateCurrentStep] currentStep:", currentStep);
-    console.log("[FORM validateCurrentStep] selectedTasks.size:", selectedTasks.size);
-    console.log("[FORM validateCurrentStep] form errors before validation:", form.formState.errors);
-
     switch (currentStep) {
       case 1:
         // Basic info validation - dates and price are optional
         // Trigger validation for step 1 fields
         const step1Fields = ["startDate", "finishDate", "price"] as const;
         const step1Valid = await form.trigger(step1Fields);
-        console.log("[FORM validateCurrentStep] step 1 valid:", step1Valid);
         return step1Valid;
 
       case 2:
@@ -304,31 +298,23 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
           form.setError("taskId", { message: "Uma tarefa deve ser selecionada" });
           toast.error("Uma tarefa deve ser selecionada");
           setStepErrors((prev) => ({ ...prev, 2: true }));
-          console.log("[FORM validateCurrentStep] step 2 failed - no task selected");
           return false;
         }
         form.clearErrors("taskId");
         setStepErrors((prev) => ({ ...prev, 2: false }));
-        console.log("[FORM validateCurrentStep] step 2 valid");
         return true;
 
       case 3:
         // Final validation
-        console.log("[FORM validateCurrentStep] step 3 - checking task selection");
         if (selectedTasks.size === 0) {
           form.setError("taskId", { message: "Uma tarefa deve ser selecionada" });
           toast.error("Uma tarefa deve ser selecionada");
-          console.log("[FORM validateCurrentStep] step 3 failed - no task selected");
           return false;
         }
         // Only validate fields that matter, NOT file ID fields (receiptIds, invoiceIds, artworkIds)
         // File ID fields are handled separately during submission - new files don't have valid UUIDs yet
-        console.log("[FORM validateCurrentStep] step 3 - triggering form validation");
-        console.log("[FORM validateCurrentStep] form values before trigger:", form.getValues());
         const step3Fields = ["startDate", "finishDate", "price", "taskId", "status"] as const;
         const isValid = await form.trigger(step3Fields);
-        console.log("[FORM validateCurrentStep] step 3 form.trigger() returned:", isValid);
-        console.log("[FORM validateCurrentStep] form errors:", form.formState.errors);
         return isValid;
 
       default:
@@ -409,27 +395,15 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
   // Handle form submission
   // Returns true on success, false on validation failure, throws on error
   const handleSubmit = useCallback(async (): Promise<boolean> => {
-    console.log("[FORM] handleSubmit called");
-    console.log("[FORM] currentStep:", currentStep);
-    console.log("[FORM] selectedTasks:", selectedTasks);
-    console.log("[FORM] selectedTasks.size:", selectedTasks.size);
-    console.log("[FORM] form.getValues():", form.getValues());
-
     // Validate final form
-    console.log("[FORM] Validating current step...");
-    console.log("[FORM] validateCurrentStep function id:", (validateCurrentStep as any).__id || "no-id");
     const isValid = await validateCurrentStep();
-    console.log("[FORM] validateCurrentStep returned:", isValid);
 
     if (!isValid) {
-      console.log("[FORM] Validation failed, returning false");
       return false;
     }
 
     try {
-      console.log("[FORM] Validation passed, getting form values...");
       const data = form.getValues();
-      console.log("[FORM] Form values:", data);
 
       // Separate existing files from new files using the 'uploaded' flag
       // Existing files have uploaded=true, new files have uploaded=false
@@ -444,21 +418,9 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
       const hasNewFiles = newReceiptFiles.length > 0 || newNfeFiles.length > 0 || newArtworkFiles.length > 0;
 
-      console.log('[AIRBRUSHING FORM] Submission data:', {
-        mode,
-        hasNewFiles,
-        newReceiptFilesCount: newReceiptFiles.length,
-        newNfeFilesCount: newNfeFiles.length,
-        newArtworkFilesCount: newArtworkFiles.length,
-        existingReceiptIdsCount: existingReceiptIds.length,
-        existingNfeIdsCount: existingNfeIds.length,
-        existingArtworkIdsCount: existingArtworkIds.length,
-      });
-
       let result;
 
       if (hasNewFiles) {
-        console.log('[AIRBRUSHING FORM] Creating FormData with files');
         const customerInfo = selectedTask?.data?.customer ? {
           id: selectedTask.data.customer.id,
           name: selectedTask.data.customer.fantasyName || selectedTask.data.customer.name,
@@ -491,7 +453,6 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
           });
         }
       } else {
-        console.log('[AIRBRUSHING FORM] Submitting without new files');
         // Even without new files, we need to send the IDs of existing files to keep
         const submitData = {
           ...data,
@@ -520,7 +481,9 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
       return true;
     } catch (error) {
-      console.error("Error submitting airbrushing form:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error submitting airbrushing form:", error);
+      }
       throw error; // Rethrow so parent can handle
     }
   }, [validateCurrentStep, form, mode, create, update, airbrushingId, onSuccess, navigate, receiptFiles, nfeFiles, artworkFiles, selectedTask, selectedTasks, currentStep]);
@@ -574,9 +537,14 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
   return (
     <Card className={cn("flex flex-col h-full shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col overflow-hidden p-6">
+      <CardContent className="flex-1 flex flex-col overflow-hidden p-4">
         <Form {...form}>
           <form className="flex flex-col h-full">
+            {/* Hidden submit button FIRST */}
+            <button id="airbrushing-form-submit" type="submit" className="hidden">
+              Submit
+            </button>
+
             {/* Step Indicator - only show for create mode */}
             {mode === "create" && (
               <div className="flex-shrink-0 mb-6">
@@ -588,7 +556,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
             <div className={cn("flex-1 min-h-0", currentStep === 2 && mode === "create" ? "flex flex-col overflow-hidden" : "overflow-y-auto")}>
               {/* Step 1: Basic Information */}
               {(mode === "edit" || currentStep === 1) && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Task Display for Edit Mode */}
                   {mode === "edit" && airbrushing?.task && (
                     <div className="border rounded-lg p-4 bg-muted/30">
@@ -685,7 +653,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
               {/* Step 3: Review */}
               {currentStep === 3 && mode === "create" && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Summary Header */}
                   <div>
                     <h2 className="text-xl font-semibold text-foreground">Revisão da Aerografia</h2>

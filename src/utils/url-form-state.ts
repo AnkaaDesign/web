@@ -94,7 +94,9 @@ export function deserializeUrlParamsToForm(searchParams: URLSearchParams): {
       if (Array.isArray(tags)) formData.tags = tags;
     }
   } catch (error) {
-    console.warn("Failed to parse tags from URL:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to parse tags from URL:", error);
+    }
   }
 
   try {
@@ -104,7 +106,9 @@ export function deserializeUrlParamsToForm(searchParams: URLSearchParams): {
       if (Array.isArray(groundIds)) formData.groundIds = groundIds;
     }
   } catch (error) {
-    console.warn("Failed to parse groundIds from URL:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to parse groundIds from URL:", error);
+    }
   }
 
   // Parse formulas
@@ -115,7 +119,9 @@ export function deserializeUrlParamsToForm(searchParams: URLSearchParams): {
       if (Array.isArray(parsedFormulas)) formulas = parsedFormulas;
     }
   } catch (error) {
-    console.warn("Failed to parse formulas from URL:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to parse formulas from URL:", error);
+    }
   }
 
   return { formData, formulas, currentStep };
@@ -341,7 +347,9 @@ export function deserializeUrlParamsToItemForm(searchParams: URLSearchParams): P
       if (Array.isArray(barcodes)) formData.barcodes = barcodes;
     }
   } catch (error) {
-    console.warn("Failed to parse barcodes from URL:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to parse barcodes from URL:", error);
+    }
   }
 
   try {
@@ -351,7 +359,9 @@ export function deserializeUrlParamsToItemForm(searchParams: URLSearchParams): P
       if (Array.isArray(measures)) formData.measures = measures;
     }
   } catch (error) {
-    console.warn("Failed to parse measures from URL:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to parse measures from URL:", error);
+    }
   }
 
   return formData;
@@ -448,7 +458,9 @@ export function deserializeUrlParamsToItemCategoryForm(searchParams: URLSearchPa
       if (Array.isArray(itemIds)) formData.itemIds = itemIds;
     }
   } catch (error) {
-    console.warn("Failed to parse itemIds from URL:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to parse itemIds from URL:", error);
+    }
   }
 
   return formData;
@@ -510,7 +522,9 @@ export function deserializeUrlParamsToItemBrandForm(searchParams: URLSearchParam
       if (Array.isArray(itemIds)) formData.itemIds = itemIds;
     }
   } catch (error) {
-    console.warn("Failed to parse itemIds from URL:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to parse itemIds from URL:", error);
+    }
   }
 
   return formData;
@@ -639,7 +653,9 @@ export function deserializeUrlParamsToPaintBrandForm(searchParams: URLSearchPara
       const parsed = JSON.parse(componentItemIds);
       if (Array.isArray(parsed)) formData.componentItemIds = parsed;
     } catch (e) {
-      console.error("Failed to parse componentItemIds from URL:", e);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Failed to parse componentItemIds from URL:", e);
+      }
     }
   }
 
@@ -767,7 +783,9 @@ export function deserializeUrlParamsToCustomerForm(searchParams: URLSearchParams
       if (Array.isArray(phones)) formData.phones = phones;
     }
   } catch (error) {
-    console.warn("Failed to parse phones from URL:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to parse phones from URL:", error);
+    }
   }
 
   try {
@@ -777,7 +795,9 @@ export function deserializeUrlParamsToCustomerForm(searchParams: URLSearchParams
       if (Array.isArray(tags)) formData.tags = tags;
     }
   } catch (error) {
-    console.warn("Failed to parse tags from URL:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to parse tags from URL:", error);
+    }
   }
 
   return formData;
@@ -911,7 +931,9 @@ export function deserializeUrlParamsToSupplierForm(searchParams: URLSearchParams
       if (Array.isArray(phones)) formData.phones = phones;
     }
   } catch (error) {
-    console.warn("Failed to parse phones from URL:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to parse phones from URL:", error);
+    }
   }
 
   try {
@@ -921,7 +943,9 @@ export function deserializeUrlParamsToSupplierForm(searchParams: URLSearchParams
       if (Array.isArray(tags)) formData.tags = tags;
     }
   } catch (error) {
-    console.warn("Failed to parse tags from URL:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Failed to parse tags from URL:", error);
+    }
   }
 
   return formData;

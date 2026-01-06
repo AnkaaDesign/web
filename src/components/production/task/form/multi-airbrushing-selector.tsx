@@ -105,13 +105,8 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
 
     // Sync FROM form field TO local state when form resets (form → local)
     useEffect(() => {
-      console.log('[Form→Local Sync] ========== TRIGGERED ==========');
-      console.log('[Form→Local Sync] isSyncingToForm:', isSyncingToForm.current);
-      console.log('[Form→Local Sync] field.value:', field.value);
-
       // Skip if we're currently syncing to form
       if (isSyncingToForm.current) {
-        console.log('[Form→Local Sync] SKIPPED - currently syncing to form');
         return;
       }
 
@@ -119,19 +114,15 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
 
       // Skip if value hasn't changed
       if (fieldValueStr === lastFieldValueRef.current) {
-        console.log('[Form→Local Sync] SKIPPED - value unchanged');
         return;
       }
 
-      console.log('[Form→Local Sync] Processing field value:', field.value);
       lastFieldValueRef.current = fieldValueStr;
 
       if (field.value && Array.isArray(field.value) && field.value.length > 0) {
         const wasEmpty = airbrushings.length === 0;
-        console.log('[Form→Local Sync] Found', field.value.length, 'airbrushings, wasEmpty:', wasEmpty);
 
         const newAirbrushings = field.value.map((airbrushing: any, index: number) => {
-          console.log(`[Form→Local Sync] Processing airbrushing ${index}:`, airbrushing);
           return {
             id: airbrushing.id || `airbrushing-${Date.now()}-${index}`, // Preserve ID from form data
             status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
@@ -156,7 +147,6 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
             artworkIds: airbrushing.artworkIds || [],
           };
         });
-        console.log('[Form→Local Sync] Setting airbrushings:', newAirbrushings);
         setAirbrushings(newAirbrushings);
         // Only auto-expand all items on initial load (when transitioning from empty to populated)
         if (wasEmpty) {
@@ -164,7 +154,6 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         }
       } else if (!field.value || (Array.isArray(field.value) && field.value.length === 0)) {
         // Clear airbrushings if field value is empty
-        console.log('[Form→Local Sync] Clearing airbrushings');
         setAirbrushings([]);
         setExpandedItems([]);
       }
@@ -177,12 +166,6 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       isSyncingToForm.current = true;
 
       const formValue = airbrushings.map((airbrushing) => {
-        console.log('[MultiAirbrushingSelector] Syncing airbrushing to form:', {
-          id: airbrushing.id,
-          price: airbrushing.price,
-          priceType: typeof airbrushing.price,
-          status: airbrushing.status,
-        });
         return {
           id: airbrushing.id, // Preserve ID for sync back
           status: airbrushing.status,
@@ -198,7 +181,6 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           artworkFiles: airbrushing.artworkFiles,
         };
       });
-      console.log('[MultiAirbrushingSelector] Form value being set:', formValue);
       field.onChange(formValue);
 
       // Notify parent about count change
@@ -244,17 +226,14 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
     }, []);
 
     const updateAirbrushing = useCallback((id: string, updates: Partial<AirbrushingItem>) => {
-      console.log('[updateAirbrushing] Called with id:', id, 'updates:', updates);
       setAirbrushings((prev) => {
         const updated = prev.map((airbrushing) => {
           if (airbrushing.id === id) {
             const merged = { ...airbrushing, ...updates };
-            console.log('[updateAirbrushing] Merging airbrushing:', airbrushing, 'with updates:', updates, 'result:', merged);
             return merged;
           }
           return airbrushing;
         });
-        console.log('[updateAirbrushing] New airbrushings array:', updated);
         return updated;
       });
     }, []);
@@ -372,7 +351,6 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                           value={airbrushing.price || undefined}
                           onChange={(value) => {
                             // Currency Input passes value directly, not an event object
-                            console.log('[Price Input] Currency value received:', value, 'type:', typeof value);
                             updateAirbrushing(airbrushing.id, {
                               price: value,
                             });

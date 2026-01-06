@@ -94,7 +94,9 @@ export function ItemSupplierSelector({ disabled, initialSupplier }: SupplierSele
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error("Error fetching suppliers:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching suppliers:", error);
+      }
       return {
         data: [],
         hasMore: false,
@@ -117,7 +119,9 @@ export function ItemSupplierSelector({ disabled, initialSupplier }: SupplierSele
         return result.data.id;
       }
     } catch (error) {
-      console.error("Error creating supplier:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating supplier:", error);
+      }
       throw error;
     } finally {
       setIsCreating(false);

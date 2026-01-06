@@ -285,12 +285,13 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
     e.preventDefault(); // Prevent dialog from auto-closing
 
     if (!deleteDialog) {
-      console.error("No deleteDialog found");
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("No deleteDialog found");
+      }
       return;
     }
 
     if (isDeleting || isBatchDeleting) {
-      console.log("Already deleting, skipping...");
       return;
     }
 
@@ -299,20 +300,18 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
       if ("productions" in deleteDialog) {
         // Batch delete
         const productionIds = deleteDialog.productions.map((p) => p.id);
-        console.log("Calling batchDeletePaintProductions with IDs:", productionIds);
         const result = await batchDeletePaintProductions({ ids: productionIds });
-        console.log("Productions deleted successfully, result:", result);
         // Clear selection after successful batch delete
         selectedIds.forEach((id) => toggleSelection(id));
       } else {
         // Single delete
-        console.log("Calling deletePaintProduction with ID:", deleteDialog.production.id);
         const result = await deletePaintProduction(deleteDialog.production.id);
-        console.log("Production deleted successfully, result:", result);
       }
       setDeleteDialog(null);
     } catch (error: any) {
-      console.error("Error deleting production:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting production:", error);
+      }
       // Error toast is already handled by the API client
     }
   };
@@ -409,8 +408,8 @@ export function PaintProductionList({ className }: PaintProductionListProps) {
   }
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and Filter Controls */}
         <div className="flex items-center gap-3">
           <TableSearchInput

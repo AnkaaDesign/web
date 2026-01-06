@@ -57,6 +57,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 export function MaintenanceScheduleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -150,7 +151,7 @@ export function MaintenanceScheduleDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
-        <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
+        <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
           <div className="animate-pulse space-y-6">
             {/* Header Skeleton */}
             <div className="space-y-4">
@@ -196,7 +197,7 @@ export function MaintenanceScheduleDetailPage() {
   if (error || !schedule) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
-        <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
+        <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
           <div className="flex flex-1 items-center justify-center min-h-[60vh]">
             <div className="text-center px-4 max-w-md mx-auto">
               <div className="animate-in fade-in-50 duration-500">
@@ -234,7 +235,9 @@ export function MaintenanceScheduleDetailPage() {
       navigate(routes.inventory.maintenance.schedules.root);
     } catch (error) {
       toast.error("Erro ao excluir agendamento");
-      console.error("Error deleting schedule:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error deleting schedule:", error);
+      }
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
@@ -250,15 +253,14 @@ export function MaintenanceScheduleDetailPage() {
   const isOverdue = schedule?.nextRun ? new Date(schedule.nextRun) < new Date() : false;
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section */}
-      <div className="animate-in fade-in-50 duration-500">
-        <PageHeader
-          variant="detail"
-          title={schedule.name}
-          icon={IconCalendarEvent}
-          className="shadow-lg"
-          breadcrumbs={[
+    <div className="h-full flex flex-col px-4 pt-4">
+      <div className="flex-shrink-0">
+        <div className="animate-in fade-in-50 duration-500">
+          <PageHeader
+            variant="detail"
+            title={schedule.name}
+            className="shadow-sm"
+            breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Estoque", href: routes.inventory.root },
             { label: "Manutenções", href: routes.inventory.maintenance.root },
@@ -286,63 +288,67 @@ export function MaintenanceScheduleDetailPage() {
               loading: isDeleting,
             },
           ]}
-        />
-      </div>
-
-      {/* Core Information Grid - Configuration and Item */}
-      <div className="animate-in fade-in-50 duration-700">
-        {/* Mobile: Single column stacked */}
-        <div className="block lg:hidden space-y-4">
-          <ScheduleConfigurationCard schedule={schedule} isOverdue={isOverdue} totalCost={totalCost} className="h-full" />
-          <MaintenanceItemCard schedule={schedule} className="h-full" />
+          />
         </div>
-
-        {/* Desktop/Tablet: 2 columns grid */}
-        <div className="hidden lg:block">
-          <div className="grid grid-cols-2 gap-6">
+        </div>
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4 mt-4">
+            {/* Core Information Grid - Configuration and Item */}
+            <div className="animate-in fade-in-50 duration-700">
+          {/* Mobile: Single column stacked */}
+          <div className="block lg:hidden space-y-4">
             <ScheduleConfigurationCard schedule={schedule} isOverdue={isOverdue} totalCost={totalCost} className="h-full" />
             <MaintenanceItemCard schedule={schedule} className="h-full" />
           </div>
+
+          {/* Desktop/Tablet: 2 columns grid */}
+          <div className="hidden lg:block">
+            <div className="grid grid-cols-2 gap-4">
+              <ScheduleConfigurationCard schedule={schedule} isOverdue={isOverdue} totalCost={totalCost} className="h-full" />
+              <MaintenanceItemCard schedule={schedule} className="h-full" />
+            </div>
+            </div>
+
+            {/* Maintenance History - Full Width */}
+            <div className="animate-in fade-in-50 duration-800">
+              <MaintenanceHistoryCard schedule={schedule} nextMaintenance={nextMaintenance} />
+            </div>
+
+            {/* Items Needed - Full Width */}
+            {hasItemsNeeded && (
+              <div className="animate-in fade-in-50 duration-900">
+                <ItemsNeededList itemsConfig={itemsNeededConfig} />
+              </div>
+            )}
+
+            {/* Changelog History - Full Width */}
+            <div className="animate-in fade-in-50 duration-1000">
+              <ChangelogHistory
+                entityType={CHANGE_LOG_ENTITY_TYPE.MAINTENANCE_SCHEDULE}
+                entityId={schedule.id}
+                entityName={schedule.name}
+                entityCreatedAt={schedule.createdAt}
+                maxHeight="500px"
+              />
+            </div>
+          </div>
         </div>
+
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir Agendamento</AlertDialogTitle>
+              <AlertDialogDescription>Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
-
-      {/* Maintenance History - Full Width */}
-      <div className="animate-in fade-in-50 duration-800">
-        <MaintenanceHistoryCard schedule={schedule} nextMaintenance={nextMaintenance} />
-      </div>
-
-      {/* Items Needed - Full Width */}
-      {hasItemsNeeded && (
-        <div className="animate-in fade-in-50 duration-900">
-          <ItemsNeededList itemsConfig={itemsNeededConfig} />
-        </div>
-      )}
-
-      {/* Changelog History - Full Width */}
-      <div className="animate-in fade-in-50 duration-1000">
-        <ChangelogHistory
-          entityType={CHANGE_LOG_ENTITY_TYPE.MAINTENANCE_SCHEDULE}
-          entityId={schedule.id}
-          entityName={schedule.name}
-          entityCreatedAt={schedule.createdAt}
-          maxHeight="500px"
-        />
-      </div>
-
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Agendamento</AlertDialogTitle>
-            <AlertDialogDescription>Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
@@ -371,7 +377,7 @@ function ScheduleConfigurationCard({ schedule, isOverdue, totalCost, className }
   };
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2">
           <IconCalendarEvent className="h-5 w-5 text-muted-foreground" />
@@ -482,7 +488,7 @@ function MaintenanceItemCard({ schedule, className }: { schedule: any; className
 
   if (!item) {
     return (
-      <Card className={cn("shadow-sm border border-border", className)} level={1}>
+      <Card className={cn("shadow-sm border border-border", className)}>
         <CardHeader className="pb-6">
           <CardTitle className="flex items-center gap-2">
           <IconBox className="h-5 w-5 text-muted-foreground" />
@@ -541,7 +547,7 @@ function MaintenanceItemCard({ schedule, className }: { schedule: any; className
   };
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -565,7 +571,7 @@ function MaintenanceItemCard({ schedule, className }: { schedule: any; className
                 <p className="text-base font-semibold text-foreground">
                   {item.uniCode && (
                     <>
-                      <span className="font-mono text-sm text-muted-foreground">{item.uniCode}</span>
+                      <span className="text-sm text-muted-foreground">{item.uniCode}</span>
                       <span className="mx-2 text-muted-foreground">-</span>
                     </>
                   )}
@@ -666,7 +672,7 @@ function MaintenanceHistoryCard({ schedule, nextMaintenance, className }: { sche
   }, [maintenanceHistory]);
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">

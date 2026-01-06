@@ -49,7 +49,7 @@ export function ItemsNeededList({ itemsConfig, className }: ItemsNeededListProps
   const allColumns = useMemo(() => createItemsNeededColumns(), []);
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border w-full", className)}>
+    <Card className={cn("flex flex-col shadow-sm border border-border w-full", className)}>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2">
           <IconPackage className="h-5 w-5 text-muted-foreground" />

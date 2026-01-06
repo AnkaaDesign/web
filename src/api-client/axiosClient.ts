@@ -372,11 +372,6 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
     headers: finalConfig.defaultHeaders,
     paramsSerializer: {
       serialize: (params) => {
-        // TEMPORARY DEBUG: Log include params in production to debug measures issue
-        if (params?.include) {
-          console.log("[AxiosClient PROD DEBUG] include param:", JSON.stringify(params.include, null, 2));
-        }
-
         // Log params for debugging in development
         if (finalConfig.enableLogging && process.env.NODE_ENV === "development") {
           console.log("[AxiosClient] Serializing params:", JSON.stringify(params, null, 2));
@@ -396,11 +391,6 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
           indices: true,
         });
 
-        // TEMPORARY DEBUG: Log query string in production for include params
-        if (params?.include) {
-          console.log("[AxiosClient PROD DEBUG] Serialized query string:", queryString);
-        }
-
         // Log serialized query string for debugging
         if (finalConfig.enableLogging && process.env.NODE_ENV === "development") {
           console.log("[AxiosClient] Serialized query string:", queryString);
@@ -419,7 +409,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
 
   client.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
-      if (finalConfig.enableLogging) {
+      if (finalConfig.enableLogging && process.env.NODE_ENV !== 'production') {
         console.log(`[AXIOS INTERCEPTOR] Request starting for: ${config.method?.toUpperCase()} ${config.url}`);
         console.log(`[AXIOS INTERCEPTOR] Instance ID: ${(client as any).__instanceId || "unknown"}`);
         console.log(`[AXIOS INTERCEPTOR] Has token provider: ${!!((client as any).__tokenProvider || globalTokenProvider)}`);
@@ -444,7 +434,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       // Check for updated token provider first (set via setTokenProvider)
       const tokenProvider = (client as any).__tokenProvider || globalTokenProvider || finalConfig.tokenProvider;
 
-      if (finalConfig.enableLogging) {
+      if (finalConfig.enableLogging && process.env.NODE_ENV !== 'production') {
         console.log(`[API CLIENT DEBUG] Request interceptor - URL: ${config.url}, Has tokenProvider: ${!!tokenProvider}`);
         console.log(
           `[API CLIENT DEBUG] Token provider sources - __tokenProvider: ${!!(client as any).__tokenProvider}, globalTokenProvider: ${!!globalTokenProvider}, finalConfig.tokenProvider: ${!!finalConfig.tokenProvider}`,
@@ -454,45 +444,32 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       // Always check for fresh token, even if Authorization header exists
       if (tokenProvider) {
         try {
-          console.log(`[API CLIENT DEBUG] Calling tokenProvider to get token for ${config.url}`);
           const token = await tokenProvider();
-          console.log(`[API CLIENT DEBUG] Token provider result: ${token ? `exists (length: ${token.length})` : "null"}`);
-
-          // Also check localStorage directly to debug
-          const localStorageToken = safeLocalStorage.getItem("ankaa_token");
-          console.log(`[API CLIENT DEBUG] Direct localStorage check - ankaa_token: ${localStorageToken ? `exists (length: ${localStorageToken.length})` : "null"}`);
 
           // If we have a token, always use the fresh one
           if (token) {
             config.headers.Authorization = `Bearer ${token}`;
-            console.log(`[API CLIENT DEBUG] Fresh authorization header set for ${config.url}`);
           } else if (!config.url?.includes("/auth/")) {
             // FALLBACK: If no token from provider, check localStorage directly
             const fallbackToken = safeLocalStorage.getItem("ankaa_token");
             if (fallbackToken) {
-              console.warn(`[API CLIENT DEBUG] FALLBACK: Using token from localStorage directly for ${config.url}`);
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn(`[API CLIENT DEBUG] FALLBACK: Using token from localStorage directly for ${config.url}`);
+              }
               config.headers.Authorization = `Bearer ${fallbackToken}`;
             }
             // If no token and not an auth endpoint, check if we just logged in
             if ((client as any).__justLoggedIn) {
-              if (finalConfig.enableLogging) {
-                console.log("[API CLIENT DEBUG] No token found after login, waiting and retrying...");
-              }
               await delay(300);
               const retryToken = await tokenProvider();
               if (retryToken) {
                 config.headers.Authorization = `Bearer ${retryToken}`;
-              } else {
-              }
-            } else {
-              if (finalConfig.enableLogging) {
-                console.log(`[API CLIENT DEBUG] No token available for ${config.url}`);
               }
             }
           }
         } catch (error) {
           // Silently fail if token retrieval fails
-          if (finalConfig.enableLogging) {
+          if (process.env.NODE_ENV !== 'production') {
             console.error("[API CLIENT DEBUG] Failed to retrieve auth token:", error);
           }
         }
@@ -510,19 +487,16 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         for (const [key, value] of Object.entries(config.params)) {
           // Skip empty strings, null, undefined
           if (value === "" || value === null || value === undefined) {
-            console.log(`[AXIOS INTERCEPTOR] Removing empty param: ${key}="${value}"`);
             continue;
           }
 
           // SPECIAL: Skip similarColor if it's the default black or empty
           if (key === "similarColor" && (value === "#000000" || value === "")) {
-            console.log(`[AXIOS INTERCEPTOR] Removing invalid similarColor: "${value}"`);
             continue;
           }
 
           // SPECIAL: Skip similarColorThreshold if there's no similarColor
           if (key === "similarColorThreshold" && (!config.params.similarColor || config.params.similarColor === "#000000" || config.params.similarColor === "")) {
-            console.log(`[AXIOS INTERCEPTOR] Removing orphaned similarColorThreshold`);
             continue;
           }
 
@@ -531,10 +505,6 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
 
         // Replace params with cleaned version
         config.params = cleanedParams;
-
-        if (finalConfig.enableLogging && config.url?.includes("/paints")) {
-          console.log(`[AXIOS INTERCEPTOR] Final cleaned params for ${config.url}:`, config.params);
-        }
       }
 
       // Handle FormData - remove Content-Type to let browser set it with boundary
@@ -547,16 +517,10 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         if (config.headers.common && config.headers.common["Content-Type"]) {
           delete config.headers.common["Content-Type"];
         }
-        if (finalConfig.enableLogging) {
-          console.log(`[AXIOS] FormData detected, Content-Type header removed for ${config.url}`);
-        }
       }
 
       // Debug logging for batch operations
       if (config.url?.includes("/batch") && config.method?.toLowerCase() === "put") {
-        console.log("🔍 BATCH DEBUG: Request interceptor data:");
-        console.log("🔍 BATCH DEBUG: config.data type:", Array.isArray(config.data) ? "direct array" : config.data instanceof FormData ? "FormData" : typeof config.data);
-        console.log("🔍 BATCH DEBUG: config.data:", config.data);
         // Skip object transformation if data is FormData
         if (config.data && typeof config.data === "object" && !Array.isArray(config.data) && !(config.data instanceof FormData)) {
           // Generic fix for any array field that was serialized as an object
@@ -568,7 +532,6 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
               const keys = Object.keys(value);
               const isNumericKeys = keys.every((k) => /^\d+$/.test(k));
               if (isNumericKeys) {
-                console.log(`🔍 BATCH DEBUG: Converting ${key} from object to array`);
                 fixedData[key] = Object.values(value);
               } else {
                 fixedData[key] = value;
@@ -589,7 +552,6 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         if (config.data && typeof config.data === "object" && !Array.isArray(config.data)) {
           // Fix array serialization issue for items
           if (config.data.items && typeof config.data.items === "object" && !Array.isArray(config.data.items)) {
-            console.log("🔍 EXTERNAL WITHDRAWAL DEBUG: Converting items object to array");
             config.data = {
               ...config.data,
               items: Object.values(config.data.items),
@@ -615,10 +577,6 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         const cachedResponse = cache.get(cacheKey);
 
         if (cachedResponse) {
-          if (finalConfig.enableLogging) {
-            console.log(`🎯 Cache hit for ${config.method?.toUpperCase()} ${config.url}`);
-          }
-
           metadata.isCached = true;
 
           // Return cached response immediately
@@ -632,7 +590,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       cancelTokens.set(requestId, cancelToken);
 
       // Logging
-      if (finalConfig.enableLogging) {
+      if (finalConfig.enableLogging && process.env.NODE_ENV !== 'production') {
         console.log(`🚀 ${metadata.method} ${metadata.url} [${requestId}]`);
 
         // Additional debugging for customer requests
@@ -644,29 +602,12 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
           console.log("[AXIOS DEBUG] - Full URL:", config.baseURL + config.url);
         }
 
-        // Additional debugging for batch update requests
-        if (config.url?.includes("/batch") && config.method?.toLowerCase() === "put") {
-          console.log("=== AXIOS CLIENT LAYER DEBUGGING ===");
-          if (config.data instanceof FormData) {
-            console.log("Step 24 - Axios interceptor request body: FormData (see network tab for details)");
-          } else {
-            console.log("Step 24 - Axios interceptor request body:", JSON.stringify(config.data, null, 2));
-          }
-          console.log("Step 25 - Axios interceptor request params:", JSON.stringify(config.params, null, 2));
-          console.log("Step 26 - Full axios config:", {
-            method: config.method,
-            url: config.url,
-            baseURL: config.baseURL,
-            headers: config.headers,
-            timeout: config.timeout,
-          });
-        }
       }
 
       return config;
     },
     (error: AxiosError) => {
-      if (finalConfig.enableLogging) {
+      if (finalConfig.enableLogging && process.env.NODE_ENV !== 'production') {
         console.error("❌ Request setup error:", error.message);
       }
 
@@ -700,12 +641,12 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       }
 
       // Logging
-      if (finalConfig.enableLogging) {
+      if (finalConfig.enableLogging && process.env.NODE_ENV !== 'production') {
         const cacheLabel = metadata.isCached ? " (cached)" : "";
         console.log(`✅ ${metadata.method} ${metadata.url} [${requestId}] - ${duration}ms${cacheLabel}`);
 
         // Debug log for auth endpoints
-        if (finalConfig.enableLogging && metadata.url?.includes("/auth/")) {
+        if (metadata.url?.includes("/auth/")) {
           console.log("[DEBUG] Auth response data:", response.data);
         }
       }
@@ -746,7 +687,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       if (config && metadata && shouldRetry(error, metadata.retryCount, finalConfig.retryAttempts)) {
         metadata.retryCount++;
 
-        if (finalConfig.enableLogging) {
+        if (finalConfig.enableLogging && process.env.NODE_ENV !== 'production') {
           console.log(`🔄 Retrying ${metadata.method} ${metadata.url} [${requestId}] - Attempt ${metadata.retryCount}/${finalConfig.retryAttempts}`);
         }
 
@@ -773,7 +714,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
 
       // Handle 401 errors - try to refresh token first
       if (errorInfo._statusCode === 401 && !config.url?.includes("/auth/refresh") && !config.url?.includes("/auth/login")) {
-        if (finalConfig.enableLogging) {
+        if (process.env.NODE_ENV !== 'production') {
           console.log("[API CLIENT DEBUG] Got 401, attempting to refresh token");
         }
 
@@ -787,7 +728,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
             const refreshResponse = await authService.refreshToken();
 
             if (refreshResponse?.success && refreshResponse?.data?.token) {
-              if (finalConfig.enableLogging) {
+              if (process.env.NODE_ENV !== 'production') {
                 console.log("[API CLIENT DEBUG] Token refreshed successfully");
               }
 
@@ -808,7 +749,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
               return client.request(config);
             }
           } catch (refreshError: any) {
-            if (finalConfig.enableLogging) {
+            if (process.env.NODE_ENV !== 'production') {
               console.error("[API CLIENT DEBUG] Token refresh failed:", refreshError);
             }
 
@@ -816,7 +757,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
             // Don't try to refresh again, just proceed to logout
             const refreshStatus = refreshError?.originalError?.response?.status || refreshError?._statusCode;
             if (refreshStatus === 401) {
-              if (finalConfig.enableLogging) {
+              if (process.env.NODE_ENV !== 'production') {
                 console.log("[API CLIENT DEBUG] Refresh token is also invalid, proceeding to logout");
               }
             }
@@ -831,7 +772,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         globalAuthErrorHandler &&
         (errorInfo._statusCode === 401 || errorInfo._statusCode === 403)
       ) {
-        if (finalConfig.enableLogging) {
+        if (process.env.NODE_ENV !== 'production') {
           console.log(`[API CLIENT DEBUG] Authentication error detected (${errorInfo._statusCode}), calling auth error handler`);
         }
 
@@ -842,14 +783,14 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
             category: errorInfo.category,
           });
         } catch (handlerError) {
-          if (finalConfig.enableLogging) {
+          if (process.env.NODE_ENV !== 'production') {
             console.error("[API CLIENT DEBUG] Error in auth error handler:", handlerError);
           }
         }
       }
 
       // Logging
-      if (finalConfig.enableLogging) {
+      if (finalConfig.enableLogging && process.env.NODE_ENV !== 'production') {
         const duration = metadata ? Date.now() - metadata.startTime : 0;
         console.error(`❌ ${metadata?.method || "UNKNOWN"} ${metadata?.url || "UNKNOWN"} [${requestId || "unknown"}] - ${duration}ms`, errorInfo);
       }
@@ -984,12 +925,6 @@ const handleApiError = (error: unknown): ErrorInfo => {
   let detailedError = "";
 
   if (errorData) {
-    // Debug logging to see what we're working with
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔍 ERROR EXTRACTION DEBUG:");
-      console.log("🔍 Full errorData:", JSON.stringify(errorData, null, 2));
-    }
-
     // Primary extraction - try to get the most detailed error first
     const extractionSources = [
       // Try exception stack first line (most detailed)
@@ -1012,10 +947,6 @@ const handleApiError = (error: unknown): ErrorInfo => {
       errorData.message,
     ].filter(Boolean);
 
-    if (process.env.NODE_ENV === "development") {
-      console.log("🔍 Extraction sources:", extractionSources);
-    }
-
     // Find the most detailed error message
     for (const source of extractionSources) {
       if (typeof source === "string") {
@@ -1036,10 +967,6 @@ const handleApiError = (error: unknown): ErrorInfo => {
     if (detailedError) {
       mainMessage = detailedError;
       errorMessages = [detailedError];
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("🔍 Selected detailed error:", detailedError);
-      }
     }
 
     // Handle main message if no detailed error found
@@ -1050,10 +977,6 @@ const handleApiError = (error: unknown): ErrorInfo => {
       } else if (typeof errorData.message === "string") {
         mainMessage = errorData.message;
         errorMessages = [errorData.message];
-      }
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("🔍 Using fallback message:", mainMessage);
       }
     }
 
@@ -1193,7 +1116,9 @@ const getSingletonInstance = (): ExtendedAxiosInstance => {
     throw new Error("[AXIOS SINGLETON] Cannot create API client in non-browser environment");
   }
 
-  console.log("[AXIOS SINGLETON] Creating THE ONLY instance (lazy initialization)");
+  if (process.env.NODE_ENV !== 'production') {
+    console.log("[AXIOS SINGLETON] Creating THE ONLY instance (lazy initialization)");
+  }
   singletonInstance = createApiClient({
     tokenProvider: async () => {
       // Try all possible token sources in order of preference
@@ -1229,7 +1154,9 @@ const getSingletonInstance = (): ExtendedAxiosInstance => {
 
   // Store globally for debugging
   (globalThis as any).window.__ANKAA_API_CLIENT__ = singletonInstance;
-  console.log("[AXIOS SINGLETON] THE singleton created with ID:", (singletonInstance as any).__instanceId);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log("[AXIOS SINGLETON] THE singleton created with ID:", (singletonInstance as any).__instanceId);
+  }
 
   return singletonInstance;
 };
@@ -1259,11 +1186,13 @@ export { axios };
 
 // Add a verification function to ensure the singleton is properly initialized
 export const verifyApiClient = (): void => {
-  console.log("[API CLIENT] Verifying apiClient...");
-  console.log("[API CLIENT] apiClient exists:", !!apiClient);
-  console.log("[API CLIENT] apiClient instance ID:", (apiClient as any)?.__instanceId);
-  console.log("[API CLIENT] apiClient baseURL:", apiClient?.defaults?.baseURL);
-  console.log("[API CLIENT] apiClient Authorization header:", apiClient?.defaults?.headers?.common?.Authorization);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log("[API CLIENT] Verifying apiClient...");
+    console.log("[API CLIENT] apiClient exists:", !!apiClient);
+    console.log("[API CLIENT] apiClient instance ID:", (apiClient as any)?.__instanceId);
+    console.log("[API CLIENT] apiClient baseURL:", apiClient?.defaults?.baseURL);
+    console.log("[API CLIENT] apiClient Authorization header:", apiClient?.defaults?.headers?.common?.Authorization);
+  }
 };
 
 // =====================
@@ -1299,7 +1228,9 @@ export const setAuthToken = (token: string | null): void => {
   } else {
     if (instance.defaults.headers?.common) {
       delete instance.defaults.headers.common["Authorization"];
-      console.log("[API CLIENT] Token cleared from THE singleton headers");
+      if (process.env.NODE_ENV !== 'production') {
+        console.log("[API CLIENT] Token cleared from THE singleton headers");
+      }
     }
 
     // ALSO clear from localStorage and global
@@ -1312,13 +1243,17 @@ export const setAuthToken = (token: string | null): void => {
 
 // Set a token provider function that will be called for each request
 export const setTokenProvider = (provider: () => string | null | Promise<string | null>): void => {
-  console.log("[API CLIENT] Setting token provider globally");
+  if (process.env.NODE_ENV !== 'production') {
+    console.log("[API CLIENT] Setting token provider globally");
+  }
   globalTokenProvider = provider;
 
   // Only set on instance if it's already created (don't force creation)
   if (singletonInstance) {
     (singletonInstance as any).__tokenProvider = provider;
-    console.log("[API CLIENT] Token provider set on THE singleton");
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[API CLIENT] Token provider set on THE singleton");
+    }
   }
 };
 
@@ -1354,6 +1289,9 @@ export const updateApiUrl = (url: string): void => {
   // Only update instance if it's already created (don't force creation)
   if (singletonInstance) {
     singletonInstance.defaults.baseURL = newBaseUrl;
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[API CLIENT] API URL updated");
+    }
   }
 };
 
@@ -1378,7 +1316,9 @@ export const forceTokenRefresh = (token: string): void => {
 
   if (instance && instance.defaults && instance.defaults.headers) {
     instance.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    console.log("[API CLIENT] Forced token refresh on THE singleton");
+    if (process.env.NODE_ENV !== 'production') {
+      console.log("[API CLIENT] Forced token refresh on THE singleton");
+    }
 
     // ALSO update localStorage and global
     safeLocalStorage.setItem("ankaa_token", token);

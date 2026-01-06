@@ -21,8 +21,8 @@ export function RelatedItemsCard({ item, className }: RelatedItemsCardProps) {
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border", className)} level={1}>
-      <CardContent className="p-6">
+    <Card className={cn("shadow-sm border border-border", className)}>
+      <CardContent className="p-4">
         {/* Section Header */}
         <div className="flex items-center gap-2 mb-4">
           <IconLink className="h-5 w-5 text-muted-foreground" />
@@ -38,7 +38,7 @@ export function RelatedItemsCard({ item, className }: RelatedItemsCardProps) {
             <div className="flex gap-4 w-max">
               {allRelated.map((relatedItem) => (
                 <Link key={relatedItem.id} to={routes.inventory.products.details(relatedItem.id)} className="block">
-                  <Card className="w-64 h-32 hover:shadow-lg transition-all duration-300 cursor-pointer border-border" level={2}>
+                  <Card className="w-64 h-32 hover:shadow-sm transition-all duration-300 cursor-pointer border-border">
                     <CardContent className="p-4 h-full flex flex-col justify-between">
                       {/* Top Section */}
                       <div className="space-y-1">

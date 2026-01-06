@@ -12,7 +12,7 @@ import { routes, FAVORITE_PAGES } from "../../../../constants";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { Separator } from "@/components/ui/separator";
 
 import { BorrowItemSelector } from "./item-selector";
@@ -21,8 +21,6 @@ import { QuantityInput } from "./quantity-input";
 
 export function BorrowCreateForm() {
   const navigate = useNavigate();
-
-  console.log("=== BorrowCreateForm component rendered ===");
 
   const form = useForm<BorrowCreateFormData>({
     resolver: zodResolver(borrowCreateSchema),
@@ -34,20 +32,10 @@ export function BorrowCreateForm() {
 
   const borrowMutations = useBorrowMutations({
     onCreateSuccess: (data, variables) => {
-      console.log("=== CREATE SUCCESS ===");
-      console.log("Response:", data);
-      console.log("Variables:", variables);
       // Success toast is handled automatically by API client
       navigate(routes.inventory.loans.list);
     },
   });
-
-  console.log("=== BORROW MUTATIONS HOOK RESULT ===");
-  console.log("borrowMutations:", borrowMutations);
-  console.log("Has createAsync?", "createAsync" in borrowMutations);
-  console.log("Has create?", "create" in borrowMutations);
-  console.log("Has createMutation?", "createMutation" in borrowMutations);
-  console.log("Available methods:", Object.keys(borrowMutations));
 
   const { createAsync, createMutation } = borrowMutations;
 
@@ -59,21 +47,15 @@ export function BorrowCreateForm() {
   const selectedItem = itemResponse?.data;
 
   const onSubmit = async (data: BorrowCreateFormData) => {
-    console.log("=== BORROW FORM SUBMISSION ===");
-    console.log("Form data:", data);
-    console.log("Selected item:", selectedItem);
-
     try {
       // Additional validation before submission
       if (!selectedItem) {
-        console.error("No selected item found");
         toast.error("Item selecionado não encontrado");
         return;
       }
 
       // Validate available stock
       if (data.quantity > selectedItem.quantity) {
-        console.error(`Insufficient stock. Available: ${selectedItem.quantity}, Requested: ${data.quantity}`);
         toast.error(`Quantidade disponível insuficiente. Máximo: ${selectedItem.quantity}`);
         form.setError("quantity", {
           type: "manual",
@@ -84,7 +66,6 @@ export function BorrowCreateForm() {
 
       // Validate minimum quantity
       if (data.quantity <= 0) {
-        console.error("Quantity must be greater than zero");
         toast.error("Quantidade deve ser maior que zero");
         form.setError("quantity", {
           type: "manual",
@@ -95,7 +76,6 @@ export function BorrowCreateForm() {
 
       // Validate if item is a tool (can be borrowed)
       if (selectedItem.itemCategory?.type !== "TOOL") {
-        console.error("Item is not a tool:", selectedItem.itemCategory?.type);
         toast.error("Apenas ferramentas podem ser emprestadas");
         form.setError("itemId", {
           type: "manual",
@@ -106,7 +86,6 @@ export function BorrowCreateForm() {
 
       // Validate if item is active
       if (!selectedItem.isActive) {
-        console.error("Item is inactive");
         toast.error("Item inativo não pode ser emprestado");
         form.setError("itemId", {
           type: "manual",
@@ -117,41 +96,31 @@ export function BorrowCreateForm() {
 
       // Check if all required fields are present
       if (!data.itemId) {
-        console.error("Missing itemId");
         toast.error("Selecione um item");
         return;
       }
 
       if (!data.userId) {
-        console.error("Missing userId");
         toast.error("Selecione um usuário");
         return;
       }
 
-      console.log("All validations passed, calling create function with:", data);
-
       // Use createAsync if available, otherwise try create
       if (createAsync) {
-        console.log("Using createAsync");
         const result = await createAsync(data);
-        console.log("Create result:", result);
       } else if (borrowMutations.create) {
-        console.log("Using create (no createAsync available)");
         borrowMutations.create(data);
       } else if (createMutation?.mutateAsync) {
-        console.log("Using createMutation.mutateAsync directly");
         const result = await createMutation.mutateAsync(data);
-        console.log("Create result:", result);
       } else {
-        console.error("No create method available!");
         toast.error("Erro interno: método de criação não disponível");
       }
     } catch (error) {
-      // Log the full error details
-      console.error("=== BORROW CREATE ERROR ===");
-      console.error("Full error object:", error);
-      console.error("Error message:", (error as any)?.message);
-      console.error("Error response:", (error as any)?.response);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Borrow create error:", error);
+        console.error("Error message:", (error as any)?.message);
+        console.error("Error response:", (error as any)?.response);
+      }
 
       // Show a more detailed error message
       const errorMessage = (error as any)?.response?.data?.message || (error as any)?.message || "Erro ao criar empréstimo";
@@ -168,7 +137,7 @@ export function BorrowCreateForm() {
   return (
     <div className="flex flex-col h-full space-y-4">
       <div className="flex-shrink-0">
-        <PageHeaderWithFavorite
+        <PageHeader
           title="Criar Empréstimo"
           icon={IconPackage}
           favoritePage={FAVORITE_PAGES.ESTOQUE_EMPRESTIMOS_CADASTRAR}
@@ -187,12 +156,7 @@ export function BorrowCreateForm() {
               label: "Criar Empréstimo",
               icon: isSubmitting ? IconLoader2 : IconCheck,
               onClick: () => {
-                console.log("=== SUBMIT BUTTON CLICKED ===");
-                console.log("Form values:", form.getValues());
-                console.log("Form errors:", form.formState.errors);
-                console.log("Form is valid:", form.formState.isValid);
                 const handleSubmitFn = form.handleSubmit(onSubmit);
-                console.log("handleSubmit function created");
                 handleSubmitFn();
               },
               variant: "default",
@@ -203,12 +167,12 @@ export function BorrowCreateForm() {
         />
       </div>
 
-      <Card className="flex-1 min-h-0">
-        <CardHeader>
+      <Card className="flex-1 min-h-0 flex flex-col">
+        <CardHeader className="flex-shrink-0">
           <CardTitle>Novo Empréstimo</CardTitle>
           <CardDescription>Registre um novo empréstimo de ferramenta para um usuário</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="flex-1 flex flex-col space-y-6 overflow-y-auto min-h-0">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               {/* Item Selection */}

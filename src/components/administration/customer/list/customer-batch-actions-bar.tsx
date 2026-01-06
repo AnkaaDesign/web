@@ -59,7 +59,9 @@ export function CustomerBatchActionsBar({ selectedCustomers, onSelectionClear, o
       onSuccess?.();
     } catch (error) {
       // Error is handled by the API client
-      console.error("Error deleting customers:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting customers:", error);
+      }
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
@@ -70,7 +72,7 @@ export function CustomerBatchActionsBar({ selectedCustomers, onSelectionClear, o
     <>
       {/* Floating Actions Bar */}
       <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-        <Card className="shadow-lg border-border/40 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <Card className="shadow-sm border-border/40 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex items-center gap-4 px-4 py-3">
             {/* Selection Info */}
             <div className="flex items-center gap-2">

@@ -25,6 +25,8 @@ import {
   IconNotes,
   IconStatusChange,
   IconMapPin,
+  IconUser,
+  IconPhone,
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
@@ -39,13 +41,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PageHeader } from "@/components/ui/page-header";
 import { SizeInput } from "@/components/ui/size-input";
 import { Combobox } from "@/components/ui/combobox";
 import { DateTimeInput } from "@/components/ui/date-time-input";
+import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
+import { BasePhoneInput } from "@/components/ui/phone-input";
 import { CustomerSelector } from "./customer-selector";
 import { SectorSelector } from "./sector-selector";
-import { ServiceSelectorFixed } from "./service-selector";
+import { ServiceSelectorAutoGrouped } from "./service-selector-auto-grouped";
 import { BudgetSelector, type BudgetSelectorRef } from "./budget-selector";
 import { MultiCutSelector, type MultiCutSelectorRef } from "./multi-cut-selector";
 import { GeneralPaintingSelector } from "./general-painting-selector";
@@ -55,6 +58,7 @@ import { FileUploadField, type FileWithPreview } from "@/components/common/file"
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { formatCNPJ, formatCPF } from "../../../../utils";
 import { LayoutForm } from "@/components/production/layout/layout-form";
 import { SpotSelector } from "./spot-selector";
 import { useLayoutsByTruck, useLayoutMutations } from "../../../../hooks";
@@ -63,6 +67,7 @@ import { TRUCK_SPOT } from "../../../../constants";
 
 interface TaskEditFormProps {
   task: Task;
+  onFormStateChange?: (state: { isValid: boolean; isDirty: boolean }) => void;
 }
 
 // Helper function to convert File entity or array of File entities to FileWithPreview
@@ -98,11 +103,19 @@ const convertToFileWithPreview = (file: any | any[] | undefined | null): FileWit
   } as FileWithPreview];
 };
 
-export const TaskEditForm = ({ task }: TaskEditFormProps) => {
+export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => {
   const { user } = useAuth();
-  const { updateAsync } = useTaskMutations();
+  const taskMutations = useTaskMutations();
   const { createAsync: createCutAsync } = useCutMutations();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // TEMPORARY: Wrap updateAsync to prevent auto-invalidation during debugging
+  const updateAsync = async (params: any) => {
+    
+    const result = await taskMutations.updateAsync(params);
+    
+    return result;
+  };
 
   // Check if the current user is from the Financial, Warehouse, Designer, or Logistic sector
   const isFinancialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
@@ -204,7 +217,9 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   // This shouldn't happen because backend auto-creates it, but it's a safety net
   useEffect(() => {
     if (!truckId && task.id) {
-      console.warn('[TaskEditForm] Task loaded without truck - backend should have created it. Task ID:', task.id);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[TaskEditForm] Task loaded without truck - backend should have created it. Task ID:', task.id);
+      }
       // The useTaskDetail query will handle refetching automatically
       // since the backend ensures truck exists in findById
     }
@@ -231,15 +246,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
   // Debug logging for layouts
   useEffect(() => {
-    console.log('[TaskEditForm] Layout data changed:', {
-      truckId,
-      hasLayoutsData: !!layoutsData,
-      leftSideLayout: layoutsData?.leftSideLayout,
-      rightSideLayout: layoutsData?.rightSideLayout,
-      leftSections: layoutsData?.leftSideLayout?.layoutSections,
-      rightSections: layoutsData?.rightSideLayout?.layoutSections,
-      calculatedTruckLength: truckLength,
-    });
+    
   }, [layoutsData, truckId, truckLength]);
   const { createOrUpdateTruckLayout, delete: deleteLayout } = useLayoutMutations();
   const [shouldDeleteLayouts, setShouldDeleteLayouts] = useState(false);
@@ -247,7 +254,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   // Check if any layout exists and open the section automatically
   useEffect(() => {
     if (layoutsData && (layoutsData.leftSideLayout || layoutsData.rightSideLayout || layoutsData.backSideLayout)) {
-      console.log('[TaskEditForm] Auto-opening layout section because saved layouts exist');
+      
       setIsLayoutOpen(true);
     }
   }, [layoutsData]);
@@ -259,7 +266,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     // AND we don't have pending layout changes flag set
     // This prevents overwriting user changes that haven't been saved yet
     if (modifiedLayoutSides.size === 0 && !hasLayoutChanges && layoutsData) {
-      console.log('[TaskEditForm] ========== SYNCING LAYOUT STATES WITH BACKEND ==========');
 
       const newStates: Record<'left' | 'right' | 'back', any> = {
         left: currentLayoutStates.left,
@@ -279,10 +285,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           })),
           photoId: layoutsData.leftSideLayout.photoId,
         };
-        console.log('[TaskEditForm] Synced left side from backend:', {
-          layoutSectionsCount: newStates.left.layoutSections.length,
-          height: newStates.left.height,
-        });
+        
       }
 
       // Sync right side
@@ -297,10 +300,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           })),
           photoId: layoutsData.rightSideLayout.photoId,
         };
-        console.log('[TaskEditForm] Synced right side from backend:', {
-          layoutSectionsCount: newStates.right.layoutSections.length,
-          height: newStates.right.height,
-        });
+        
       }
 
       // Sync back side
@@ -315,18 +315,13 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           })),
           photoId: layoutsData.backSideLayout.photoId,
         };
-        console.log('[TaskEditForm] Synced back side from backend:', {
-          layoutSectionsCount: newStates.back.layoutSections.length,
-          height: newStates.back.height,
-          photoId: newStates.back.photoId,
-        });
+        
       }
 
       setCurrentLayoutStates(newStates);
-      console.log('[TaskEditForm] ✅ Layout states synced with backend');
-      console.log('[TaskEditForm] ════════════════════════════════════════════════════════');
+
     } else if (modifiedLayoutSides.size > 0) {
-      console.log('[TaskEditForm] Skipping layout sync - user has pending modifications:', Array.from(modifiedLayoutSides));
+      
     }
   }, [layoutsData, modifiedLayoutSides.size, hasLayoutChanges]);
 
@@ -339,17 +334,12 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
       if (!hasExistingLayouts) {
         // Only mark as having changes when creating NEW layouts (not editing existing ones)
-        console.log('');
-        console.log('🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢');
-        console.log('[TaskEditForm] Layout section opened with NO existing layouts!');
-        console.log('[TaskEditForm] Setting hasLayoutChanges = TRUE');
-        console.log('[TaskEditForm] Marking ALL sides as modified for creation');
+
         setModifiedLayoutSides(new Set(['left', 'right', 'back']));
         setHasLayoutChanges(true);
-        console.log('🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢');
-        console.log('');
+
       } else {
-        console.log('[TaskEditForm] Layout section opened with EXISTING layouts - no changes yet');
+        
       }
     }
   }, [isLayoutOpen, hasLayoutChanges, layoutsData]);
@@ -386,22 +376,18 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     }
   }, [layoutsData, currentLayoutStates, isLayoutOpen]);
 
-
   // Map task data to form values
   const mapDataToForm = useCallback((taskData: Task): TaskUpdateFormData => {
-    console.log('[TaskEditForm] mapDataToForm called with task:', taskData);
-    console.log('[TaskEditForm] Fetched cuts data:', cutsData);
 
     // Group cuts by fileId and type to get proper quantities
     // Use cutsData from separate query instead of taskData.cuts
     const cuts = cutsData?.data || [];
     const groupedCuts = (() => {
       if (cuts.length === 0) {
-        console.log('[TaskEditForm] No cuts found in fetched data');
+        
         return [];
       }
 
-      console.log('[TaskEditForm] Processing', cuts.length, 'cuts from separate query');
       const cutMap = new Map<string, { id: string; fileId: string; type: string; quantity: number; file?: any; origin: string }>();
 
       for (const cut of cuts) {
@@ -431,11 +417,9 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       }
 
       const grouped = Array.from(cutMap.values());
-      console.log('[TaskEditForm] Grouped cuts:', grouped);
+      
       return grouped;
     })();
-
-    console.log('[TaskEditForm] Returning form data with cuts:', groupedCuts);
 
     return {
       name: taskData.name || "",
@@ -446,7 +430,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       term: taskData.term ? new Date(taskData.term) : null,
       startedAt: taskData.startedAt ? new Date(taskData.startedAt) : null,
       finishedAt: taskData.finishedAt ? new Date(taskData.finishedAt) : null,
+      forecastDate: taskData.forecastDate ? new Date(taskData.forecastDate) : null,
       customerId: taskData.customerId || null,
+      invoiceToId: taskData.invoiceToId || null,
+      negotiatingWith: taskData.negotiatingWith || null,
       sectorId: taskData.sectorId || null,
       paintId: taskData.paintId || null,
       budgetId: taskData.budgetId || null,
@@ -460,11 +447,13 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       } : undefined,  // Schema expects optional (undefined), not null
       nfeId: taskData.nfeId || null,
       receiptId: taskData.receiptId || null,
-      services:
+      serviceOrders:
         taskData.services?.map((so) => ({
           description: so.description || "",
+          type: so.type,
           status: so.status,
           statusOrder: so.statusOrder,
+          assignedToId: so.assignedToId || null,
           startedAt: so.startedAt ? new Date(so.startedAt) : null,
           finishedAt: so.finishedAt ? new Date(so.finishedAt) : null,
         })) || [],
@@ -512,48 +501,57 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           changedData.entryDate = entryDate;
         }
 
+        // Set forecast date to 7:30 if provided (since the date picker only allows date selection)
+        if (changedData.forecastDate) {
+          const forecastDate = new Date(changedData.forecastDate);
+          forecastDate.setHours(7, 30, 0, 0);
+          changedData.forecastDate = forecastDate;
+        }
+
+        // Set term date to 18:00 (end of work day) if provided
+        if (changedData.term) {
+          const termDate = new Date(changedData.term);
+          termDate.setHours(18, 0, 0, 0);
+          changedData.term = termDate;
+
+        }
+
+        // Filter out empty services (services with no description)
+        if (changedData.services && Array.isArray(changedData.services)) {
+          changedData.services = changedData.services.filter(
+            (service) => service.description && service.description.trim().length >= 3
+          );
+          // If no valid services remain, remove the services array entirely
+          if (changedData.services.length === 0) {
+            delete (changedData as any).services;
+          }
+        }
+
         // DEBUG: Log what fields are in changedData
-        console.log('[TaskEditForm] ========== FORM SUBMISSION ==========');
-        console.log('[TaskEditForm] Task ID:', task.id);
-        console.log('[TaskEditForm] changedData keys:', Object.keys(changedData));
-        console.log('[TaskEditForm] changedData:', JSON.stringify(changedData, null, 2).substring(0, 500));
-        console.log('[TaskEditForm] hasLayoutChanges:', hasLayoutChanges);
-        console.log('[TaskEditForm] hasFileChanges:', hasFileChanges);
 
         // Check if there are cuts to create (counts as changes)
         const cuts = form.getValues('cuts') as any[] || [];
         const hasCutsToCreate = cuts.length > 0 && cuts.some((cut) => cut.file && cut.file instanceof File);
-        console.log('[TaskEditForm] hasCutsToCreate:', hasCutsToCreate, 'cuts:', cuts.length);
 
         // Validate that we have changes (form, layout, file changes, or cuts to create)
         if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasCutsToCreate) {
-          console.log('[TaskEditForm] ❌ NO CHANGES DETECTED - aborting submission');
+          
           toast.info("Nenhuma alteração detectada");
           return;
         }
 
-        console.log('[TaskEditForm] ✅ CHANGES DETECTED - proceeding with submission');
-
         // Validate that all cuts have files attached
-        console.log('[TaskEditForm] ========== VALIDATING CUTS BEFORE SUBMISSION ==========');
-        console.log('[TaskEditForm] Total cuts:', cuts.length);
-        console.log('[TaskEditForm] Cuts validation data:', cuts.map((cut, index) => ({
-          index: index + 1,
-          type: cut.type,
-          hasFile: !!cut.file,
-          hasFileId: !!cut.fileId,
-          fileName: cut.file?.name,
-          fileIsInstance: cut.file instanceof File,
-        })));
 
         if (cuts.length > 0 && cuts.some((cut) => !cut.file && !cut.fileId)) {
-          console.error('[TaskEditForm] ❌ VALIDATION FAILED: Some cuts missing files');
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('[TaskEditForm] ❌ VALIDATION FAILED: Some cuts missing files');
+          }
           toast.error("Alguns cortes não possuem arquivos anexados. Adicione os arquivos antes de enviar o formulário.");
           return;
         }
 
         if (cuts.length > 0) {
-          console.log('[TaskEditForm] ✅ All cuts have files - validation passed');
+          
         }
 
         // Validate that budget is complete (if it exists)
@@ -586,73 +584,58 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
         // Validate observation is complete if section is open
         if (isObservationOpen) {
-          console.log('[Submit] ========== OBSERVATION VALIDATION ==========');
-          console.log('[Submit] isObservationOpen:', isObservationOpen);
+
           const observation = form.getValues('observation');
-          console.log('[Submit] Observation from form:', observation);
-          console.log('[Submit] observationFiles state:', observationFiles.length, observationFiles.map(f => ({ name: f.name, id: f.id, uploadedFileId: f.uploadedFileId, uploaded: f.uploaded })));
+
           const hasDescription = observation?.description && observation.description.trim() !== "";
-          console.log('[Submit] hasDescription:', hasDescription, 'description:', observation?.description);
+          
           const hasFiles = (observation?.fileIds && observation.fileIds.length > 0) || observationFiles.length > 0;
-          console.log('[Submit] hasFiles:', hasFiles, 'fileIds:', observation?.fileIds, 'observationFiles.length:', observationFiles.length);
 
           if (!hasDescription) {
-            console.log('[Submit] ❌ Validation failed: Missing description');
+            
             toast.error("A observação está incompleta. Preencha a descrição antes de enviar o formulário.");
             return;
           }
 
           if (!hasFiles) {
-            console.log('[Submit] ❌ Validation failed: Missing files');
+            
             toast.error("A observação está incompleta. Adicione pelo menos um arquivo antes de enviar o formulário.");
             return;
           }
 
-          console.log('[Submit] ✅ Observation validation passed');
         }
-
-        console.log('[Submit] ========== CHANGED DATA ==========');
-        console.log('[Submit] changedData keys:', Object.keys(changedData));
-        console.log('[Submit] changedData.observation:', changedData.observation);
 
         // Track layout photo files
         let layoutPhotoFiles: { side: string; file: File }[] = [];
 
         // If layout changes exist, add layout data to changedData
-        console.log('[TaskEditForm SUBMIT] ========== LAYOUT CHANGES CHECK ==========');
-        console.log('[TaskEditForm SUBMIT] hasLayoutChanges:', hasLayoutChanges);
-        console.log('[TaskEditForm SUBMIT] modifiedLayoutSides (READING FROM STATE):', modifiedLayoutSides);
-        console.log('[TaskEditForm SUBMIT] modifiedLayoutSides type:', modifiedLayoutSides.constructor.name);
-        console.log('[TaskEditForm SUBMIT] modifiedLayoutSides as Array:', Array.from(modifiedLayoutSides));
-        console.log('[TaskEditForm SUBMIT] modifiedLayoutSides.size:', modifiedLayoutSides.size);
-        console.log('[TaskEditForm SUBMIT] Is Set?:', modifiedLayoutSides instanceof Set);
 
         // Handle layout deletion if user clicked the remove button
         if (shouldDeleteLayouts && layoutsData) {
-          console.log('[TaskEditForm SUBMIT] ========== LAYOUT DELETION ==========');
-          console.log('[TaskEditForm SUBMIT] shouldDeleteLayouts is TRUE - deleting all layouts');
 
           const deletePromises: Promise<any>[] = [];
 
           if (layoutsData.leftSideLayout?.id) {
-            console.log('[TaskEditForm SUBMIT] Queuing deletion of left layout:', layoutsData.leftSideLayout.id);
+            
             deletePromises.push(deleteLayout(layoutsData.leftSideLayout.id));
           }
           if (layoutsData.rightSideLayout?.id) {
-            console.log('[TaskEditForm SUBMIT] Queuing deletion of right layout:', layoutsData.rightSideLayout.id);
+            
             deletePromises.push(deleteLayout(layoutsData.rightSideLayout.id));
           }
           if (layoutsData.backSideLayout?.id) {
-            console.log('[TaskEditForm SUBMIT] Queuing deletion of back layout:', layoutsData.backSideLayout.id);
+            
             deletePromises.push(deleteLayout(layoutsData.backSideLayout.id));
           }
 
           if (deletePromises.length > 0) {
             try {
               await Promise.all(deletePromises);
-              console.log('[TaskEditForm SUBMIT] ✅ Successfully deleted', deletePromises.length, 'layout(s)');
+              
             } catch (error) {
-              console.error('[TaskEditForm SUBMIT] ❌ Error deleting layouts:', error);
+              if (process.env.NODE_ENV !== 'production') {
+                console.error('[TaskEditForm SUBMIT] ❌ Error deleting layouts:', error);
+              }
             }
           }
 
@@ -662,17 +645,13 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
         // Consolidate truck data with layouts into single truck object
         if (hasLayoutChanges && !shouldDeleteLayouts) {
-          console.log('');
-          console.log('═══════════════════════════════════════════════════════════════');
-          console.log('[TaskEditForm SUBMIT] Layout changes detected - building consolidated truck payload');
-          console.log('[TaskEditForm SUBMIT] Modified sides:', Array.from(modifiedLayoutSides));
 
           // Start with existing truck data from form
           const consolidatedTruck: any = changedData.truck || {};
 
           // Add ONLY the sides that were actually modified by the user
           for (const side of modifiedLayoutSides) {
-            console.log(`[TaskEditForm SUBMIT] Processing modified side: ${side}`);
+            
             const sideData = currentLayoutStates[side];
 
             if (sideData && sideData.layoutSections && sideData.layoutSections.length > 0) {
@@ -682,7 +661,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
               // Extract photo file if present
               if (sideData.photoFile && sideData.photoFile instanceof File) {
-                console.log(`[TaskEditForm SUBMIT] 📷 Found photo file for ${sideName}:`, sideData.photoFile.name);
+                
                 layoutPhotoFiles.push({ side: sideName, file: sideData.photoFile });
               }
 
@@ -691,39 +670,30 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                 layoutSections: sideData.layoutSections,
                 photoId: sideData.photoId || null,
               };
-              console.log(`[TaskEditForm SUBMIT] ✅ Added ${layoutFieldName} to consolidated truck:`, {
-                height: consolidatedTruck[layoutFieldName].height,
-                layoutSectionsCount: consolidatedTruck[layoutFieldName].layoutSections.length,
-                photoId: consolidatedTruck[layoutFieldName].photoId,
-              });
+              
             } else {
-              console.log(`[TaskEditForm SUBMIT] ⚠️ Side ${side} has no layoutSections or invalid data!`);
+              
             }
           }
 
-          console.log(`[TaskEditForm SUBMIT] 📷 Total photo files to upload:`, layoutPhotoFiles.length);
-
           // Merge consolidated truck back into changedData
           changedData.truck = consolidatedTruck;
-          console.log('[TaskEditForm SUBMIT] ✅ Final consolidated truck:', JSON.stringify(changedData.truck, null, 2));
-          console.log('═══════════════════════════════════════════════════════════════');
-          console.log('');
+
         }
 
         // If only cuts exist (no other changes), we still need to update the task to trigger cut creation
         if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && hasCutsToCreate) {
-          console.log('[TaskEditForm] Only cuts to create - adding marker field to changedData');
+          
           changedData._onlyCuts = true; // Marker field to prevent empty body
         }
 
         // Check if we have new files that need to be uploaded
-        console.log('[Submit] ========== FILE CHECK ==========');
+        
         const newBudgetFiles = budgetFile.filter(f => !f.uploaded);
         const newNnvoiceFiles = nfeFile.filter(f => !f.uploaded);
         const newReceiptFiles = receiptFile.filter(f => !f.uploaded);
         const newArtworkFiles = uploadedFiles.filter(f => !f.uploaded);
         const newObservationFiles = observationFiles.filter(f => !f.uploaded);
-        console.log('[Submit] newObservationFiles:', newObservationFiles.length, newObservationFiles.map(f => ({ name: f.name, uploaded: f.uploaded })));
 
         // Check for cut files
         const changedCuts = changedData.cuts as any[] || [];
@@ -741,14 +711,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                            newReceiptFiles.length > 0 || newArtworkFiles.length > 0 ||
                            hasCutFiles || hasAirbrushingFiles || newObservationFiles.length > 0 ||
                            layoutPhotoFiles.length > 0;
-        console.log('[Submit] hasNewFiles:', hasNewFiles, {
-          budgets: newBudgetFiles.length,
-          invoices: newNnvoiceFiles.length,
-          receipts: newReceiptFiles.length,
-          artworks: newArtworkFiles.length,
-          observations: newObservationFiles.length,
-          layoutPhotos: layoutPhotoFiles.length,
-        });
 
         let result;
 
@@ -772,25 +734,25 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
             files.artworks = newArtworkFiles.filter(f => f instanceof File) as File[];
           }
           if (newObservationFiles.length > 0) {
-            console.log('[Submit] Adding observation files to FormData:', newObservationFiles.length);
+            
             files.observationFiles = newObservationFiles.filter(f => f instanceof File) as File[];
-            console.log('[Submit] observationFiles files:', files.observationFiles.length);
+            
           }
 
           // Add layout photo files if any (sent WITH task update, backend handles them)
           if (layoutPhotoFiles.length > 0) {
-            console.log('[Submit] Adding layout photo files to FormData:', layoutPhotoFiles.length);
+            
             layoutPhotoFiles.forEach(({ side, file }) => {
               // Backend expects: layoutPhotos.leftSide, layoutPhotos.rightSide, layoutPhotos.backSide
               files[`layoutPhotos.${side}`] = [file];
-              console.log(`[Submit] Added layout photo for ${side}:`, file.name);
+              
             });
           }
 
           // DON'T send cuts with task update - they'll be created separately
           // Remove cuts from changedData to avoid sending them with the task
           if (changedData.cuts) {
-            console.log('[TaskEditForm] Removing cuts from task update - will create separately');
+            
             delete changedData.cuts;
           }
 
@@ -833,7 +795,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           // NOTE: 'airbrushings' are NOT excluded - they can be sent with task
           const excludedFields = new Set([
             'cuts',
-            'services',
+            'serviceOrders',
             'paintIds',
             'artworkIds',
             'budgetIds',
@@ -843,9 +805,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
             'reimbursementInvoiceIds'
           ]);
 
-          console.log('[TaskEditForm] ========== PREPARING FORMDATA ==========');
-          console.log('[TaskEditForm] Excluded fields:', Array.from(excludedFields));
-
           // Prepare data object with only changed fields (excluding large arrays unless they changed)
           const dataForFormData: Record<string, any> = {};
           let fieldCount = 0;
@@ -853,7 +812,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           Object.entries(changedData).forEach(([key, value]) => {
             // Skip excluded fields (large arrays) - they should only be sent if explicitly updated
             if (excludedFields.has(key)) {
-              console.log(`[TaskEditForm] ⏭️  Excluding field from FormData: ${key} (will be handled separately)`);
+              
               excludedCount++;
               return;
             }
@@ -865,21 +824,13 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           });
 
           // Log summary
-          console.log('[TaskEditForm] FormData field processing:', {
-            totalChangedFields: Object.keys(changedData).length,
-            excludedFields: excludedCount,
-            includedFields: fieldCount,
-            fileTypes: Object.keys(files).length
-          });
 
           // CRITICAL: If no form fields were added but we have files, add a marker field
           // This prevents the body from being undefined, which causes multer to hang
           if (fieldCount === 0) {
             dataForFormData._hasFiles = true;
-            console.log('[TaskEditForm] No changed fields - added marker field to prevent empty body');
+            
           }
-
-          console.log('[TaskEditForm] FormData prepared with', fieldCount, 'changed fields and', Object.keys(files).length, 'file types');
 
           // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
           // Extract IDs of uploaded (existing) files
@@ -899,27 +850,20 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           // These were excluded to optimize payload size but need to be sent if modified
           if ('paintIds' in changedData) {
             dataForFormData.paintIds = changedData.paintIds;
-            console.log('[TaskEditForm] Including changed paintIds:', changedData.paintIds);
+            
           }
-          if ('services' in changedData) {
-            dataForFormData.services = changedData.services;
-            console.log('[TaskEditForm] Including changed services:', changedData.services?.length);
+          if ('serviceOrders' in changedData) {
+            dataForFormData.serviceOrders = changedData.serviceOrders;
+
           }
           if ('reimbursementIds' in changedData) {
             dataForFormData.reimbursementIds = changedData.reimbursementIds;
-            console.log('[TaskEditForm] Including changed reimbursementIds:', changedData.reimbursementIds);
+            
           }
           if ('reimbursementInvoiceIds' in changedData) {
             dataForFormData.reimbursementInvoiceIds = changedData.reimbursementInvoiceIds;
-            console.log('[TaskEditForm] Including changed reimbursementInvoiceIds:', changedData.reimbursementInvoiceIds);
+            
           }
-
-          console.log('[TaskEditForm] Setting file IDs to keep:', {
-            artworks: currentArtworkIds.length,
-            budgets: currentBudgetIds.length,
-            invoices: currentInvoiceIds.length,
-            receipts: currentReceiptIds.length,
-          });
 
           // Use the helper to create FormData with proper context
           const formData = createFormDataWithContext(
@@ -936,19 +880,13 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
             }
           );
 
-          console.log('[TaskEditForm] ========== FINAL FORMDATA BEFORE NETWORK REQUEST ==========');
-          console.log('[TaskEditForm] dataForFormData keys:', Object.keys(dataForFormData));
-          console.log('[TaskEditForm] dataForFormData.truck:', dataForFormData.truck ? JSON.stringify(dataForFormData.truck, null, 2) : 'MISSING');
-          console.log('[TaskEditForm] files keys:', Object.keys(files));
-          console.log('[TaskEditForm] FormData entries:');
           for (const [key, value] of (formData as any).entries()) {
             if (value instanceof File) {
-              console.log(`  ${key}: [File: ${value.name}]`);
+              
             } else {
-              console.log(`  ${key}:`, value);
+              
             }
           }
-          console.log('[TaskEditForm] ═══════════════════════════════════════════════════════════');
 
           result = await updateAsync({
             id: task.id,
@@ -984,20 +922,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           // CRITICAL: paintIds is already in changedData (not excluded in JSON path)
           // No need to add it separately like in FormData path
 
-          console.log('[TaskEditForm] Setting file IDs to keep (JSON):', {
-            artworks: currentArtworkIds.length,
-            budgets: currentBudgetIds.length,
-            invoices: currentInvoiceIds.length,
-            receipts: currentReceiptIds.length,
-          });
-
-          console.log('[TaskEditForm] ========== FINAL JSON BEFORE NETWORK REQUEST ==========');
-          console.log('[TaskEditForm] Using JSON submission (no files)');
-          console.log('[TaskEditForm] submitData keys:', Object.keys(submitData));
-          console.log('[TaskEditForm] submitData.truck:', submitData.truck ? JSON.stringify(submitData.truck, null, 2) : 'MISSING');
-          console.log('[TaskEditForm] Full submitData:', JSON.stringify(submitData, null, 2));
-          console.log('[TaskEditForm] ═══════════════════════════════════════════════════════════');
-
           result = await updateAsync({
             id: task.id,
             data: submitData,
@@ -1013,9 +937,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
         }
 
         if (result.success) {
-          console.log('[TaskEditForm] ========== TASK UPDATE SUCCESSFUL ==========');
-          console.log('[TaskEditForm] Task update result:', result);
-          console.log('[TaskEditForm] Layouts were created/updated by backend during task transaction');
 
           // CRITICAL: Clear flags BEFORE clearing modifiedLayoutSides
           // This order matters because the sync effect depends on these flags
@@ -1027,40 +948,20 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
           // We need both conditions to be true for the sync to happen
           setModifiedLayoutSides(new Set());
 
-          console.log('[TaskEditForm] ✅ Cleared layout change flags and modified sides');
-          console.log('[TaskEditForm] Backend data will sync on next render');
-
           // Create cuts separately via POST /cuts with FormData
-          console.log('[TaskEditForm] ========== CREATING CUTS SEPARATELY ==========');
+          
           const cuts = form.getValues('cuts') as any[] || [];
-          console.log('[TaskEditForm] Cuts to create:', cuts.length);
-          console.log('[TaskEditForm] Cuts data:', cuts.map((c, i) => ({
-            index: i,
-            type: c?.type,
-            hasFile: !!c?.file,
-            fileType: typeof c?.file,
-            fileName: c?.file?.name,
-            fileConstructor: c?.file?.constructor?.name,
-            isFileInstance: c?.file instanceof File,
-          })));
 
           if (cuts.length > 0) {
             const cutCreationPromises = cuts.map(async (cut, index) => {
-              console.log(`[TaskEditForm] Cut ${index}: checking...`, {
-                hasFile: !!cut.file,
-                fileType: typeof cut.file,
-                fileName: cut.file?.name,
-                isFileInstance: cut.file instanceof File,
-              });
 
               // Only create cuts with new files
               if (!cut.file || !(cut.file instanceof File)) {
-                console.log(`[TaskEditForm] Cut ${index}: skipping (no new file)`);
+                
                 return { success: false, skipped: true, index };
               }
 
               try {
-                console.log(`[TaskEditForm] Cut ${index}: creating with file ${cut.file.name}, quantity: ${cut.quantity || 1}`);
 
                 // Create FormData with cut metadata + file
                 const formData = new FormData();
@@ -1080,24 +981,22 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                 formData.append('_context', JSON.stringify(context));
 
                 // Log FormData contents
-                console.log(`[TaskEditForm] Cut ${index}: FormData entries:`);
+                
                 for (const [key, value] of (formData as any).entries()) {
-                  console.log(`  ${key}:`, value instanceof File ? `[File: ${value.name}]` : value);
+                  
                 }
-
-                console.log(`[TaskEditForm] Cut ${index}: sending FormData to POST /cuts`);
-                console.log(`[TaskEditForm] Cut ${index}: FormData type:`, formData.constructor.name);
-                console.log(`[TaskEditForm] Cut ${index}: FormData instanceof FormData:`, formData instanceof FormData);
 
                 // Call the cut service directly, bypassing the mutation hooks
                 // The hooks wrap FormData in a way that loses the actual data
                 const result = await cutService.createCut(formData as any);
 
                 const createdCount = cut.quantity || 1;
-                console.log(`[TaskEditForm] Cut ${index}: ✅ created ${createdCount} cut(s) successfully`);
+                
                 return { success: true, index, result, createdCount };
               } catch (error: any) {
-                console.error(`[TaskEditForm] Cut ${index}: ❌ creation failed:`, error);
+                if (process.env.NODE_ENV !== 'production') {
+                  console.error(`[TaskEditForm] Cut ${index}: ❌ creation failed:`, error);
+                }
                 const failedCount = cut.quantity || 1;
                 return { success: false, index, error: error?.message, failedCount };
               }
@@ -1111,19 +1010,21 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
               .filter(r => !r.success && !r.skipped)
               .reduce((sum, r) => sum + (r.failedCount || 1), 0);
 
-            console.log(`[TaskEditForm] Cut creation summary: ${totalCreated} created, ${totalFailed} failed`);
           }
 
           // Layout photos are uploaded WITH the task update (not separately like cuts)
           // The backend handles them in the transaction at lines 683-728 of task.service.ts
-          console.log('[TaskEditForm] Layout photos were uploaded with task update');
 
           // Navigate to the task detail page
-          console.log('[TaskEditForm] ========== NAVIGATING TO TASK DETAILS ==========');
+
+          // Small delay to ensure state updates, then redirect
+          await new Promise(resolve => setTimeout(resolve, 100));
           window.location.href = `/producao/cronograma/detalhes/${task.id}`;
         }
       } catch (error) {
-        console.error("🔴 Error updating task:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("🔴 Error updating task:", error);
+        }
       } finally {
         setIsSubmitting(false);
       }
@@ -1147,7 +1048,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     // NOTE: 'cuts' are omitted - created separately via POST /cuts
     fieldsToOmitIfUnchanged: [
       "cuts",
-      "services",
+      "serviceOrders",
       "paintIds",
       "artworkIds",
       "budgetIds",
@@ -1157,7 +1058,6 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
       "reimbursementInvoiceIds",
     ],
   });
-
 
   // Helper to update file in list
   const updateFileInList = (files: FileWithPreview[], fileId: string, updates: Partial<FileWithPreview>) => {
@@ -1201,20 +1101,19 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
   // Handle observation files change
   const handleObservationFilesChange = (files: FileWithPreview[]) => {
-    console.log('[ObservationFiles] Files changed:', files.length);
-    console.log('[ObservationFiles] Files:', files.map(f => ({ name: f.name, id: f.id, uploadedFileId: f.uploadedFileId, uploaded: f.uploaded })));
+
     setObservationFiles(files);
     setHasFileChanges(true);
     // Update form value with file IDs
     const fileIds = files.map((f) => f.uploadedFileId || f.id).filter(Boolean);
-    console.log('[ObservationFiles] File IDs:', fileIds);
+    
     const currentObservation = form.getValues("observation");
-    console.log('[ObservationFiles] Current observation before update:', currentObservation);
+    
     form.setValue("observation", {
       ...currentObservation,
       fileIds: fileIds,
     }, { shouldDirty: true, shouldTouch: true, shouldValidate: false });
-    console.log('[ObservationFiles] Observation after update:', form.getValues("observation"));
+    
     // Note: Form validation happens automatically via useWatch, no need to manually trigger
   };
 
@@ -1237,18 +1136,63 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     name: 'cuts',
   });
 
+  const servicesValues = useWatch({
+    control: form.control,
+    name: 'serviceOrders',
+  });
+
   const observationValue = useWatch({
     control: form.control,
     name: 'observation',
   });
 
+  // Watch date fields to trigger re-renders when they change
+  const entryDateValue = useWatch({
+    control: form.control,
+    name: 'entryDate',
+  });
+
+  const termValue = useWatch({
+    control: form.control,
+    name: 'term',
+  });
+
+  const startedAtValue = useWatch({
+    control: form.control,
+    name: 'startedAt',
+  });
+
+  const finishedAtValue = useWatch({
+    control: form.control,
+    name: 'finishedAt',
+  });
+
+  const forecastDateValue = useWatch({
+    control: form.control,
+    name: 'forecastDate',
+  });
 
   // Get form state
   const { formState } = form;
 
+  // Refs to track previous state for onFormStateChange callback
+  // Declared here but useEffect is below after all validation variables are defined
+  const prevIsDirtyRef = useRef<boolean>(false);
+  const prevIsValidRef = useRef<boolean>(false);
+
   // Check if there are changes (form fields, layout, files, or cuts to create)
   // This will be recalculated on every form value change thanks to form.watch() above
   const formFieldChanges = getChangedFields();
+
+  // Debug: Log when formFieldChanges updates
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskEditForm] formFieldChanges updated:', Object.keys(formFieldChanges));
+      if ('serviceOrders' in formFieldChanges) {
+        console.log('[TaskEditForm] Service Orders changed:', formFieldChanges.serviceOrders);
+      }
+    }
+  }, [formFieldChanges]);
 
   // Check if there are new cuts with files to create
   // Only count cuts with NEW files (not already uploaded)
@@ -1265,23 +1209,17 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
   // Compute hasChanges including cuts to create
   const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasCutsToCreate;
 
-  // Log whenever hasChanges evaluation happens
+  // Debug: Log hasChanges calculation
   useEffect(() => {
-    console.log('');
-    console.log('▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼');
-    console.log('[TaskEditForm SUBMIT BUTTON] Checking if changes exist');
-    console.log('[TaskEditForm SUBMIT BUTTON] Form field changes:', {
-      count: Object.keys(formFieldChanges).length,
-      fields: Object.keys(formFieldChanges),
-    });
-    console.log('[TaskEditForm SUBMIT BUTTON] hasLayoutChanges:', hasLayoutChanges);
-    console.log('[TaskEditForm SUBMIT BUTTON] hasFileChanges:', hasFileChanges);
-    console.log('[TaskEditForm SUBMIT BUTTON] hasCutsToCreate:', hasCutsToCreate);
-    console.log('[TaskEditForm SUBMIT BUTTON] ➡️  hasChanges (FINAL):', hasChanges);
-    console.log('[TaskEditForm SUBMIT BUTTON] Submit button will be:', hasChanges ? '✅ ENABLED' : '❌ DISABLED');
-    console.log('▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲');
-    console.log('');
-  }, [hasChanges, hasLayoutChanges, hasFileChanges, hasCutsToCreate, formFieldChanges]);
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskEditForm] hasChanges calculation:');
+      console.log('  formFieldChanges keys:', Object.keys(formFieldChanges).length);
+      console.log('  hasLayoutChanges:', hasLayoutChanges);
+      console.log('  hasFileChanges:', hasFileChanges);
+      console.log('  hasCutsToCreate:', hasCutsToCreate);
+      console.log('  => hasChanges:', hasChanges);
+    }
+  }, [hasChanges, formFieldChanges, hasLayoutChanges, hasFileChanges, hasCutsToCreate]);
 
   // Check for validation errors that should prevent submission
   const hasCutsWithoutFiles = useMemo(() => {
@@ -1311,6 +1249,46 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     return hasIncompleteItems || missingExpiryDate;
   }, [budgetValues, formFieldChanges]);
 
+  const hasIncompleteServices = useMemo(() => {
+    const services = servicesValues as any[] || [];
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskEditForm] hasIncompleteServices useMemo running');
+      console.log('  services count:', services.length);
+      console.log('  formFieldChanges has serviceOrders:', 'serviceOrders' in formFieldChanges);
+    }
+
+    if (services.length === 0) return false;
+
+    // Only validate services if they're being changed (in formFieldChanges)
+    const areServicesBeingChanged = 'serviceOrders' in formFieldChanges;
+    if (!areServicesBeingChanged) return false;
+
+    // Check if any service is incomplete
+    // A service is incomplete if it has no description or description is too short
+    // Assignment (assignedToId) is optional, so we don't check it
+    const hasIncompleteItems = services.some((service: any) => {
+      // Skip empty services (they will be filtered out on submit)
+      if (!service.description || service.description.trim() === "") return false;
+
+      // If service has a description, it must be at least 3 characters
+      const hasValidDescription = service.description.trim().length >= 3;
+      return !hasValidDescription;
+    });
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskEditForm] hasIncompleteServices check:');
+      console.log('  areServicesBeingChanged:', areServicesBeingChanged);
+      console.log('  hasIncompleteItems:', hasIncompleteItems);
+      services.forEach((s: any, i: number) => {
+        console.log(`  service[${i}]:`, s.description, '(length:', s.description?.length || 0, ')');
+      });
+      console.log('  => returning:', hasIncompleteItems);
+    }
+
+    return hasIncompleteItems;
+  }, [servicesValues, formFieldChanges]);
+
   const hasIncompleteObservation = useMemo(() => {
     // Only validate if observation section is open
     if (!isObservationOpen) return false;
@@ -1323,63 +1301,153 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
     return !hasDescription || !hasFiles;
   }, [observationValue, observationFiles, isObservationOpen]);
 
-  // Navigation actions
-  const navigationActions = [
-    {
-      key: "cancel",
-      label: "Cancelar",
-      onClick: handleCancel,
-      variant: "outline" as const,
-      icon: IconArrowLeft,
-      disabled: isSubmitting,
-    },
-    {
-      key: "submit",
-      label: "Salvar Alterações",
-      icon: isSubmitting ? IconLoader2 : IconCheck,
-      onClick: handleSubmitChanges(
-        undefined,
-        (errors) => {
-          console.error('[TaskEditForm] ❌ FORM VALIDATION FAILED');
-          console.error('[TaskEditForm] Validation errors:', errors);
-          console.error('[TaskEditForm] Detailed errors:', JSON.stringify(errors, null, 2));
+  // Notify parent of form state changes
+  // MUST come AFTER all validation variables are defined to avoid reference errors
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskEditForm] onFormStateChange useEffect running');
+      console.log('  onFormStateChange exists?', !!onFormStateChange);
+    }
+
+    if (onFormStateChange) {
+      const changedFields = getChangedFields();
+      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges;
+
+      // Check if form is valid (no blocking validation errors)
+      // This matches the form's internal validation but WITHOUT the hasChanges check
+      // (isDirty will handle whether there are changes)
+      const isValid = !isSubmitting && !hasCutsWithoutFiles && !hasIncompleteBudgets && !hasIncompleteServices && !hasIncompleteObservation && !layoutWidthError;
+
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('[TaskEditForm] State check:', {
+          isDirty,
+          isValid,
+          'form.formState.isValid': form.formState.isValid,
+          prevIsDirty: prevIsDirtyRef.current,
+          prevIsValid: prevIsValidRef.current,
+          willNotify: prevIsDirtyRef.current !== isDirty || prevIsValidRef.current !== isValid,
+          validationErrors: form.formState.errors,
+        });
+      }
+
+      // Only notify parent if isDirty OR isValid changed to avoid infinite loops
+      if (prevIsDirtyRef.current !== isDirty || prevIsValidRef.current !== isValid) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[TaskEditForm] ✅ Calling onFormStateChange:', {
+            isValid,
+            isDirty,
+            changedFieldsCount: Object.keys(changedFields).length,
+            isValidChanged: prevIsValidRef.current !== isValid,
+            isDirtyChanged: prevIsDirtyRef.current !== isDirty,
+          });
         }
-      ),
-      variant: "default" as const,
-      disabled: isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompleteBudgets || hasIncompleteObservation || !!layoutWidthError,
-      loading: isSubmitting,
-    },
-  ];
+
+        prevIsDirtyRef.current = isDirty;
+        prevIsValidRef.current = isValid;
+
+        onFormStateChange({
+          isValid,
+          isDirty,
+        });
+      }
+    }
+  }, [
+    form.formState.isValid,
+    hasLayoutChanges,
+    hasFileChanges,
+    isSubmitting,
+    hasCutsWithoutFiles,
+    hasIncompleteBudgets,
+    hasIncompleteServices,
+    hasIncompleteObservation,
+    layoutWidthError,
+    onFormStateChange,
+    formValues, // CRITICAL: Ensures useEffect runs when ANY form field changes
+    // Date fields are still included for clarity, but formValues covers them too
+    entryDateValue,
+    termValue,
+    startedAtValue,
+    finishedAtValue,
+    forecastDateValue,
+    // DO NOT add getChangedFields to dependencies - it would cause infinite loop
+  ]);
+
+  // Log whenever hasChanges evaluation happens
+  useEffect(() => {
+
+    const isDisabled = isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompleteBudgets || hasIncompleteServices || hasIncompleteObservation || !!layoutWidthError;
+
+  }, [hasChanges, hasLayoutChanges, hasFileChanges, hasCutsToCreate, formFieldChanges, isSubmitting, hasCutsWithoutFiles, hasIncompleteBudgets, hasIncompleteServices, hasIncompleteObservation, layoutWidthError]);
+
+  // Navigation actions - wrapped in useMemo to ensure re-renders when dependencies change
+  const navigationActions = useMemo(() => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskEditForm] 🔄 navigationActions useMemo recalculating...');
+    }
+
+    const isSubmitDisabled = isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompleteBudgets || hasIncompleteServices || hasIncompleteObservation || !!layoutWidthError;
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[TaskEditForm] Submit button disabled calculation:');
+      console.log('  isSubmitting:', isSubmitting);
+      console.log('  hasChanges:', hasChanges);
+      console.log('  hasCutsWithoutFiles:', hasCutsWithoutFiles);
+      console.log('  hasIncompleteBudgets:', hasIncompleteBudgets);
+      console.log('  hasIncompleteServices:', hasIncompleteServices);
+      console.log('  hasIncompleteObservation:', hasIncompleteObservation);
+      console.log('  layoutWidthError:', layoutWidthError);
+      console.log('  => isSubmitDisabled:', isSubmitDisabled);
+    }
+
+    return [
+      {
+        key: "cancel",
+        label: "Cancelar",
+        onClick: handleCancel,
+        variant: "outline" as const,
+        icon: IconArrowLeft,
+        disabled: isSubmitting,
+      },
+      {
+        key: "submit",
+        label: "Salvar Alterações",
+        icon: isSubmitting ? IconLoader2 : IconCheck,
+        onClick: handleSubmitChanges(
+          undefined,
+          (errors) => {
+            if (process.env.NODE_ENV !== 'production') {
+              console.error('[TaskEditForm] ❌ FORM VALIDATION FAILED');
+            }
+            if (process.env.NODE_ENV !== 'production') {
+              console.error('[TaskEditForm] Validation errors:', errors);
+            }
+            if (process.env.NODE_ENV !== 'production') {
+              console.error('[TaskEditForm] Detailed errors:', JSON.stringify(errors, null, 2));
+            }
+          }
+        ),
+        variant: "default" as const,
+        disabled: isSubmitDisabled,
+        loading: isSubmitting,
+      },
+    ];
+  }, [isSubmitting, hasChanges, hasCutsWithoutFiles, hasIncompleteBudgets, hasIncompleteServices, hasIncompleteObservation, layoutWidthError, handleCancel, handleSubmitChanges]);
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-5xl mx-auto px-4">
-          <PageHeader
-            title="Editar Tarefa"
-            icon={IconClipboardList}
-            variant="form"
-            breadcrumbs={[
-              { label: "Início", href: "/" },
-              { label: "Produção", href: "/producao" },
-              { label: "Cronograma", href: "/producao/cronograma" },
-              { label: task.name, href: `/producao/cronograma/detalhes/${task.id}` },
-              { label: "Editar" },
-            ]}
-            actions={navigationActions}
-          />
-        </div>
-      </div>
+    <Form {...form}>
+      <form
+        id="task-form"
+        className="container mx-auto max-w-4xl"
+        onSubmit={handleSubmitChanges()}
+      >
+        {/* Hidden submit button for programmatic form submission */}
+        <button id="task-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
+          Submit
+        </button>
 
-      {/* Main Content Card - Dashboard style scrolling */}
-      <div className="flex-1 overflow-hidden max-w-5xl mx-auto px-4 w-full">
-        <div className="h-full bg-card rounded-lg shadow-md border-muted overflow-hidden">
-          <div className="h-full overflow-y-auto p-6">
-            <Form {...form}>
-              <form className="space-y-8">
-                {/* Basic Information Card */}
-                <Card className="bg-transparent">
+        <div className="space-y-4">
+          {/* Basic Information Card */}
+          <Card className="bg-white dark:bg-neutral-850">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <IconClipboardList className="h-5 w-5" />
@@ -1397,7 +1465,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                           <FormItem>
                             <FormLabel className="flex items-center gap-2">
                               <IconFileText className="h-4 w-4" />
-                              Nome da Tarefa <span className="text-destructive">*</span>
+                              Nome da Tarefa
                             </FormLabel>
                             <FormControl>
                               <Input
@@ -1420,6 +1488,150 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
                       {/* Customer */}
                       <CustomerSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} initialCustomer={task.customer} />
+                    </div>
+
+                    {/* Invoice To - Custom Customer Selector */}
+                    <FormField
+                      control={form.control}
+                      name="invoiceToId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <IconUser className="h-4 w-4" />
+                            Faturar Para
+                          </FormLabel>
+                          <FormControl>
+                            <Combobox
+                              value={field.value || ""}
+                              onValueChange={(value) => {
+                                field.onChange(value);
+                              }}
+                              placeholder="Selecione o cliente para faturamento"
+                              emptyText="Nenhum cliente encontrado"
+                              searchPlaceholder="Pesquisar clientes..."
+                              disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser}
+                              async={true}
+                              queryKey={["customers", "search", "invoiceTo"]}
+                              queryFn={async (search: string, page: number = 1) => {
+                                const params: any = {
+                                  orderBy: { fantasyName: "asc" },
+                                  page: page,
+                                  take: 50,
+                                  include: { logo: true },
+                                };
+                                if (search && search.trim()) {
+                                  params.searchingFor = search.trim();
+                                }
+                                try {
+                                  const { getCustomers } = await import("../../../../api-client");
+                                  const response = await getCustomers(params);
+                                  const customers = response.data || [];
+
+                                  // Format customers with logo icons
+                                  const formattedOptions = customers.map((customer: any) => {
+                                    let description = "";
+                                    if (customer.cnpj) {
+                                      description = `CNPJ: ${formatCNPJ(customer.cnpj)}`;
+                                    } else if (customer.cpf) {
+                                      description = `CPF: ${formatCPF(customer.cpf)}`;
+                                    }
+
+                                    return {
+                                      value: customer.id,
+                                      label: customer.fantasyName,
+                                      description,
+                                      icon: (
+                                        <CustomerLogoDisplay
+                                          logo={customer.logo}
+                                          customerName={customer.fantasyName}
+                                          size="xs"
+                                          shape="rounded"
+                                        />
+                                      ),
+                                    };
+                                  });
+
+                                  return {
+                                    data: formattedOptions,
+                                    hasMore: response.meta?.hasNextPage || false,
+                                  };
+                                } catch (error) {
+                                  return { data: [], hasMore: false };
+                                }
+                              }}
+                              initialOptions={task.invoiceTo ? [{
+                                value: task.invoiceTo.id,
+                                label: task.invoiceTo.fantasyName,
+                                description: task.invoiceTo.cnpj ? `CNPJ: ${task.invoiceTo.cnpj}` : (task.invoiceTo.cpf ? `CPF: ${task.invoiceTo.cpf}` : ""),
+                                icon: (
+                                  <CustomerLogoDisplay
+                                    logo={task.invoiceTo.logo}
+                                    customerName={task.invoiceTo.fantasyName}
+                                    size="xs"
+                                    shape="rounded"
+                                  />
+                                ),
+                              }] : []}
+                              minSearchLength={0}
+                              pageSize={50}
+                              debounceMs={300}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Negotiating With - Name and Phone */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Contact Name */}
+                      <FormField
+                        control={form.control}
+                        name="negotiatingWith.name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconUser className="h-4 w-4" />
+                              Responsável pela Negociação
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                value={field.value || ""}
+                                placeholder="Ex: João Silva"
+                                disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser}
+                                className="bg-transparent"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Contact Phone */}
+                      <FormField
+                        control={form.control}
+                        name="negotiatingWith.phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconPhone className="h-4 w-4" />
+                              Telefone do Responsável
+                            </FormLabel>
+                            <FormControl>
+                              <BasePhoneInput
+                                value={field.value || ""}
+                                onChange={(value) => field.onChange(value || null)}
+                                onBlur={field.onBlur}
+                                placeholder="(00) 00000-0000"
+                                disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser}
+                                className="bg-transparent"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
 
                     {/* Serial Number, Plate, Chassis - in same row with 1/4, 1/4, 2/4 ratio */}
@@ -1524,7 +1736,13 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                                 value={field.value}
                                 onValueChange={field.onChange}
                                 disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isLogisticUser}
-                                options={Object.values(TASK_STATUS).map((status) => ({
+                                options={[
+                                  TASK_STATUS.PENDING,
+                                  TASK_STATUS.PREPARATION,
+                                  TASK_STATUS.IN_PRODUCTION,
+                                  TASK_STATUS.COMPLETED,
+                                  TASK_STATUS.CANCELLED,
+                                ].map((status) => ({
                                   value: status,
                                   label: TASK_STATUS_LABELS[status],
                                 }))}
@@ -1588,7 +1806,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
                 {/* Dates Card - Hidden for Warehouse and Logistic users, Disabled for Financial and Designer users */}
                 {!isWarehouseUser && !isLogisticUser && (
-                <Card className="bg-transparent">
+                <Card className="bg-white dark:bg-neutral-850">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <IconCalendar className="h-5 w-5" />
@@ -1656,13 +1874,29 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                         )}
                       />
                     </div>
+
+                    {/* Third Row: Forecast Date */}
+                    <FormField
+                      control={form.control}
+                      name="forecastDate"
+                      render={({ field }) => (
+                        <DateTimeInput
+                          field={field}
+                          mode="date"
+                          context="start"
+                          label="Data de Previsão"
+                          disabled={isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser}
+                          allowManualInput={true}
+                        />
+                      )}
+                    />
                   </CardContent>
                 </Card>
                 )}
 
                 {/* Services Card - Hidden for Warehouse, Financial, Designer, and Logistic users */}
                 {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && (
-                <Card className="bg-transparent">
+                <Card className="bg-white dark:bg-neutral-850">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <IconClipboardList className="h-5 w-5" />
@@ -1675,7 +1909,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                       name="services"
                       render={() => (
                         <FormItem>
-                          <ServiceSelectorFixed control={form.control} disabled={isSubmitting || isWarehouseUser} />
+                          <ServiceSelectorAutoGrouped control={form.control} disabled={isSubmitting || isWarehouseUser} />
                           <FormMessage />
                         </FormItem>
                       )}
@@ -1686,7 +1920,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
                 {/* Paint Selection (Tintas) - Hidden for Warehouse, Financial, and Logistic users, Disabled for Designer */}
                 {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
-                <Card className="bg-transparent">
+                <Card className="bg-white dark:bg-neutral-850">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <IconPalette className="h-5 w-5" />
@@ -1713,7 +1947,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
                 {/* Layout Section - Hidden for Warehouse and Financial users, Read-only for Designer users, EDITABLE for Logistic users */}
                 {!isWarehouseUser && !isFinancialUser && (
-                <Card className="bg-transparent">
+                <Card className="bg-white dark:bg-neutral-850">
                   <CardHeader className={`transition-all duration-200 ${!isLayoutOpen ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -1828,54 +2062,20 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                           }
                           validationError={layoutWidthError}
                           onChange={(side, layoutData) => {
-                            console.log('');
-                            console.log('████████████████████████████████████████████████████████████████');
-                            console.log('█ [TaskEditForm] onChange RECEIVED FROM LayoutForm            █');
-                            console.log('████████████████████████████████████████████████████████████████');
-                            console.log('[TaskEditForm] onChange Input:', {
-                              side,
-                              layoutData: {
-                                height: layoutData.height,
-                                layoutSectionsCount: layoutData.layoutSections?.length,
-                                layoutSections: layoutData.layoutSections?.map((s: any) => ({
-                                  width: s.width,
-                                  isDoor: s.isDoor,
-                                  doorHeight: s.doorHeight,
-                                })),
-                                totalWidth: layoutData.layoutSections?.reduce((sum: number, s: any) => sum + s.width, 0),
-                              },
-                            });
-
-                            console.log('[TaskEditForm] Current state BEFORE update:', {
-                              left: currentLayoutStates.left ? {
-                                totalWidth: currentLayoutStates.left.layoutSections?.reduce((sum: number, s: any) => sum + s.width, 0),
-                                layoutSectionsCount: currentLayoutStates.left.layoutSections?.length,
-                              } : 'default/null',
-                              right: currentLayoutStates.right ? {
-                                totalWidth: currentLayoutStates.right.layoutSections?.reduce((sum: number, s: any) => sum + s.width, 0),
-                                layoutSectionsCount: currentLayoutStates.right.layoutSections?.length,
-                              } : 'default/null',
-                              back: currentLayoutStates.back ? {
-                                totalWidth: currentLayoutStates.back.layoutSections?.reduce((sum: number, s: any) => sum + s.width, 0),
-                                layoutSectionsCount: currentLayoutStates.back.layoutSections?.length,
-                              } : 'default/null',
-                            });
 
                             // Mark this side as modified
                             setModifiedLayoutSides(prev => {
-                              console.log('[TaskEditForm] setModifiedLayoutSides CALLED');
-                              console.log('[TaskEditForm] Previous modifiedLayoutSides:', Array.from(prev));
+
                               const newSet = new Set(prev);
                               newSet.add(side);
-                              console.log('[TaskEditForm] NEW modifiedLayoutSides (adding ' + side + '):', Array.from(newSet));
-                              console.log('[TaskEditForm] Returning new Set with size:', newSet.size);
+
                               return newSet;
                             });
 
                             // CRITICAL FIX: Mark as having layout changes to enable submit button
                             // This was missing - onChange was not setting hasLayoutChanges!
                             // Without this, door removal and photo uploads don't enable the submit button
-                            console.log('[TaskEditForm] onChange triggered - setting hasLayoutChanges = TRUE');
+                            
                             setHasLayoutChanges(true);
 
                             // Track current editing state for real-time updates
@@ -1885,28 +2085,11 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                                 [side]: layoutData,
                               };
 
-                              console.log('[TaskEditForm] State AFTER update:', {
-                                [side]: {
-                                  totalWidth: layoutData.layoutSections?.reduce((sum: number, s: any) => sum + s.width, 0),
-                                  layoutSectionsCount: layoutData.layoutSections?.length,
-                                  hasPhotoFile: !!layoutData.photoFile,
-                                  photoFileName: layoutData.photoFile?.name,
-                                },
-                              });
-                              console.log('[TaskEditForm] ✅ State updated successfully');
-                              console.log('████████████████████████████████████████████████████████████████');
-                              console.log('');
-
                               return newState;
                             });
                           }}
                           onSave={async (layoutData) => {
                             if (layoutData) {
-                              console.log('[TaskEditForm] LayoutForm onSave called - layouts will be saved with task submission', {
-                                side: selectedLayoutSide,
-                                layoutData,
-                                layoutSectionsCount: layoutData.layoutSections?.length,
-                              });
 
                               // Mark layout changes to enable submit button
                               // Layout will be saved when user submits the task form
@@ -1924,7 +2107,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
                 {/* Truck Spot Selector - Available when truck layout is filled */}
                 {truckId && (
-                  <Card className="bg-transparent">
+                  <Card className="bg-white dark:bg-neutral-850">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <IconMapPin className="h-5 w-5" />
@@ -1947,7 +2130,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
                 {/* Budget Card - Only visible to ADMIN and FINANCIAL users */}
                 {canViewFinancialSections && (
-                <Card className="bg-transparent">
+                <Card className="bg-white dark:bg-neutral-850">
                   <CardHeader className={`transition-all duration-200 ${budgetCount === 0 ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -1996,7 +2179,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
                 {/* Cut Plans Section - Multiple Cuts Support - EDITABLE for Designer, Hidden for Financial and Logistic users */}
                 {!isFinancialUser && !isLogisticUser && (
-                <Card className="bg-transparent">
+                <Card className="bg-white dark:bg-neutral-850">
                   <CardHeader className={`transition-all duration-200 ${cutsCount === 0 ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -2045,7 +2228,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
                 {/* Airbrushing Section - Multiple Airbrushings Support - Hidden for Warehouse, Financial, Designer, and Logistic users */}
                 {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && (
-                <Card className="bg-transparent">
+                <Card className="bg-white dark:bg-neutral-850">
                   <CardHeader className={`transition-all duration-200 ${airbrushingsCount === 0 ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -2094,7 +2277,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
                 {/* Financial Information Card - Only visible to ADMIN and FINANCIAL users */}
                 {canViewFinancialSections && (
-                <Card className="bg-transparent">
+                <Card className="bg-white dark:bg-neutral-850">
                   <CardHeader className={`transition-all duration-200 ${!isFinancialInfoOpen ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -2198,7 +2381,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
                 {/* Observation Section - Hidden for Warehouse, Financial, Designer, and Logistic users */}
                 {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && (
-                <Card className="bg-transparent">
+                <Card className="bg-white dark:bg-neutral-850">
                   <CardHeader className={`transition-all duration-200 ${!isObservationOpen ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -2300,7 +2483,7 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
 
                 {/* Artworks Card (optional) - EDITABLE for Designer, Hidden for Warehouse, Financial, and Logistic users */}
                 {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
-                <Card className="bg-transparent">
+                <Card className="bg-white dark:bg-neutral-850">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <IconFile className="h-5 w-5" />
@@ -2333,13 +2516,10 @@ export const TaskEditForm = ({ task }: TaskEditFormProps) => {
                       label="Artes anexadas"
                     />
                   </CardContent>
-                </Card>
-                )}
-              </form>
-            </Form>
-          </div>
+          </Card>
+          )}
         </div>
-      </div>
-    </div>
+      </form>
+    </Form>
   );
 };

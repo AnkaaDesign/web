@@ -3,7 +3,7 @@ import { IconRocket } from "@tabler/icons-react";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { DeploymentManager } from "@/components/server/deployment/deployment-manager";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 
@@ -15,18 +15,21 @@ export const DeploymentListPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="flex flex-col h-full space-y-4">
-        <PageHeaderWithFavorite
-          title="Implantações"
-          icon={IconRocket}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Servidor", href: routes.server.root },
-            { label: "Implantações" },
-          ]}
-        />
+      <div className="h-full flex flex-col px-4 pt-4">
+        <div className="flex-shrink-0">
+          <PageHeader
+            title="Implantações"
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Servidor", href: routes.server.root },
+              { label: "Implantações" },
+            ]}
+          />
+        </div>
 
-        <DeploymentManager className="flex-1 min-h-0" />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <DeploymentManager className="flex-1 min-h-0 mt-4" />
+        </div>
       </div>
     </PrivilegeRoute>
   );

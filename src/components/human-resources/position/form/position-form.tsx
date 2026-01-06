@@ -125,7 +125,9 @@ export function PositionForm(props: PositionFormProps) {
         }
       }
     } catch (error) {
-      console.error("Error submitting form:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error submitting form:", error);
+      }
     }
   };
 
@@ -138,52 +140,55 @@ export function PositionForm(props: PositionFormProps) {
   };
 
   return (
-    <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 flex flex-col overflow-y-auto space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconBriefcase className="h-5 w-5 text-muted-foreground" />
-                  Informações do Cargo
-                </CardTitle>
-                <CardDescription>Preencha as informações básicas do cargo</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                  <div className="lg:col-span-3">
-                    <NameInput control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
-                  </div>
+    <Form {...form}>
+      <form id="position-form" onSubmit={form.handleSubmit(handleSubmit)}>
+        {/* Hidden submit button for programmatic form submission */}
+        <button id="position-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
+          Submit
+        </button>
 
-                  <div className="lg:col-span-1">
-                    <RemunerationInput disabled={isSubmitting} required={props.mode === "create"} />
-                  </div>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconBriefcase className="h-5 w-5 text-muted-foreground" />
+                Informações do Cargo
+              </CardTitle>
+              <CardDescription>Preencha as informações básicas do cargo</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <div className="lg:col-span-3">
+                  <NameInput control={form.control} disabled={isSubmitting} required={props.mode === "create"} />
                 </div>
 
-                <BonifiableToggle control={form.control} disabled={isSubmitting} />
+                <div className="lg:col-span-1">
+                  <RemunerationInput disabled={isSubmitting} required={props.mode === "create"} />
+                </div>
+              </div>
 
-                {props.mode === "update" && (
-                  <p className="text-sm text-muted-foreground">
-                    Nota: Ao atualizar a remuneração, um novo registro será criado no histórico. Deixe em branco para manter a remuneração atual.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
+              <BonifiableToggle control={form.control} disabled={isSubmitting} />
 
-            <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={handleCancel} disabled={isSubmitting}>
-                <IconX className="h-4 w-4 mr-2" />
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting || !form.formState.isValid}>
-                {isSubmitting ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCheck className="h-4 w-4 mr-2" />}
-                {props.mode === "create" ? "Criar" : "Salvar"}
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+              {props.mode === "update" && (
+                <p className="text-sm text-muted-foreground">
+                  Nota: Ao atualizar a remuneração, um novo registro será criado no histórico. Deixe em branco para manter a remuneração atual.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex gap-2 justify-end">
+            <Button type="button" variant="outline" onClick={handleCancel} disabled={isSubmitting}>
+              <IconX className="h-4 w-4 mr-2" />
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting || !form.formState.isValid}>
+              {isSubmitting ? <IconLoader2 className="h-4 w-4 mr-2 animate-spin" /> : <IconCheck className="h-4 w-4 mr-2" />}
+              {props.mode === "create" ? "Criar" : "Salvar"}
+            </Button>
+          </div>
+        </div>
+      </form>
+    </Form>
   );
 }

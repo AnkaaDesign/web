@@ -298,7 +298,7 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
         )
       );
     } catch (error) {
-      console.error("Error activating schedules:", error);
+      // Error handled by mutation
     }
   };
 
@@ -318,7 +318,7 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
         )
       );
     } catch (error) {
-      console.error("Error deactivating schedules:", error);
+      // Error handled by mutation
     }
   };
 
@@ -332,7 +332,7 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
       setIsDeleting(true);
       await Promise.all(schedulesToDelete.map((schedule) => deleteMutation.mutateAsync(schedule.id)));
     } catch (error) {
-      console.error("Error deleting schedules:", error);
+      // Error handled by mutation
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
@@ -341,8 +341,8 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
   };
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="flex-1 relative">
@@ -386,7 +386,7 @@ export function MaintenanceScheduleList({ className }: MaintenanceScheduleListPr
         )}
 
         {/* Paginated table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <MaintenanceScheduleTable
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}

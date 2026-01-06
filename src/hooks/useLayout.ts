@@ -50,7 +50,9 @@ export const useLayoutsByTruck = (truckId: string, enabled = true) => {
           });
           return detailResponse.data.data;
         } catch (error) {
-          console.error('[useLayoutsByTruck] Error fetching layout details:', error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.error('[useLayoutsByTruck] Error fetching layout details:', error);
+          }
           return layout; // Return original if fetch fails
         }
       };

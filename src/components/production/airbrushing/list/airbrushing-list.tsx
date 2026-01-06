@@ -240,8 +240,8 @@ export function AirbrushingList({ className }: AirbrushingListProps) {
   };
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and Controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <TableSearchInput
@@ -267,7 +267,7 @@ export function AirbrushingList({ className }: AirbrushingListProps) {
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />}
 
         {/* Table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <AirbrushingTable
             className="h-full"
             onRowClick={handleRowClick}

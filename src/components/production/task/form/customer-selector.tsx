@@ -33,8 +33,6 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
     data: Customer[];
     hasMore: boolean;
   }> => {
-    console.log('[CustomerSelector] searchCustomers called:', { search, page });
-
     const params: any = {
       orderBy: { fantasyName: "asc" },
       page: page,
@@ -47,16 +45,8 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
       params.searchingFor = search.trim();
     }
 
-    console.log('[CustomerSelector] API params:', params);
-
     try {
       const response = await getCustomers(params);
-      console.log('[CustomerSelector] API response:', {
-        dataLength: response.data?.length,
-        hasMore: response.meta?.hasNextPage,
-        firstItem: response.data?.[0],
-      });
-
       const customers = response.data || [];
       const hasMore = response.meta?.hasNextPage || false;
 
@@ -65,7 +55,9 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error('[CustomerSelector] Error fetching customers:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[CustomerSelector] Error fetching customers:', error);
+      }
       return { data: [], hasMore: false };
     }
   };

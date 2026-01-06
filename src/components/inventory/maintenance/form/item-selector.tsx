@@ -74,7 +74,9 @@ export function MaintenanceItemSelector<TFieldValues extends FieldValues = Field
         hasMore,
       };
     } catch (error) {
-      console.error("Error fetching items:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching items:", error);
+      }
       return {
         data: [],
         hasMore: false,

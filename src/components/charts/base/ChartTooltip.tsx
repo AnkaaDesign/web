@@ -95,7 +95,7 @@ export const ChartTooltip = React.memo<ChartTooltipProps>(({
   return (
     <div
       className={cn(
-        'rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-lg p-3 min-w-[200px]',
+        'rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-sm p-3 min-w-[200px]',
         className
       )}
     >
@@ -179,7 +179,7 @@ export const SimpleTooltip = React.memo<SimpleTooltipProps>(({
   return (
     <div
       className={cn(
-        'rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-lg p-2',
+        'rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-sm p-2',
         className
       )}
     >
@@ -211,7 +211,7 @@ export const createCustomTooltip = (
     }
 
     return (
-      <div className="rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-lg p-3">
+      <div className="rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-sm p-3">
         {renderContent(payload, label)}
       </div>
     );

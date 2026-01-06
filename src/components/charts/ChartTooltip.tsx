@@ -37,7 +37,7 @@ export const ChartTooltip: React.FC<ChartTooltipProps> = ({
       return (
         <div
           className={cn(
-            'rounded-lg border border-border bg-popover p-3 shadow-lg',
+            'rounded-lg border border-border bg-popover p-3 shadow-sm',
             className
           )}
           dangerouslySetInnerHTML={{ __html: customContent }}
@@ -53,7 +53,7 @@ export const ChartTooltip: React.FC<ChartTooltipProps> = ({
   return (
     <div
       className={cn(
-        'rounded-lg border border-border bg-popover p-3 shadow-lg',
+        'rounded-lg border border-border bg-popover p-3 shadow-sm',
         className
       )}
     >

@@ -239,7 +239,9 @@ export function TablePagination({
   // Auto-correct out of bounds page
   React.useEffect(() => {
     if (autoCorrectOutOfBounds && isPageOutOfBounds && !isLoading && meta.totalRecords > 0) {
-      console.warn(`Page ${currentPageDisplay} is out of bounds. Auto-correcting to last page.`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`Page ${currentPageDisplay} is out of bounds. Auto-correcting to last page.`);
+      }
       handleLastPage();
     }
   }, [isPageOutOfBounds, autoCorrectOutOfBounds, isLoading, meta.totalRecords, currentPageDisplay, handleLastPage]);

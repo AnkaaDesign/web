@@ -69,7 +69,9 @@ export function AsyncMultiCombobox({
           setOptions(results);
         }
       } catch (error) {
-        console.error("Search error:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Search error:", error);
+        }
         setOptions([]);
       } finally {
         setIsLoading(false);

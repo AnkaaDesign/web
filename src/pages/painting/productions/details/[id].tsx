@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { PAINT_FINISH } from "@/constants";
+import { PAGE_SPACING } from "@/lib/layout-constants";
 
 export function ProductionDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -80,18 +81,16 @@ export function ProductionDetailsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
       <PageHeader
         variant="detail"
         title={productionEntity.name}
-        icon={IconFlask}
         breadcrumbs={[
-          { label: "Início", href: routes.home },
-          { label: "Pintura", href: routes.painting.root },
-          { label: "Produções", href: routes.painting.productions.root },
-          { label: productionEntity.name },
-        ]}
+        { label: "Início", href: routes.home },
+        { label: "Pintura", href: routes.painting.root },
+        { label: "Produções", href: routes.painting.productions.root },
+        { label: productionEntity.name },
+      ]}
         actions={[
           {
             key: "refresh",
@@ -100,19 +99,21 @@ export function ProductionDetailsPage() {
             onClick: handleRefresh,
           },
         ]}
+        className="flex-shrink-0"
       />
-
-      {/* Production Information Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="space-y-4">
+          {/* Production Information Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Left column - Production Details */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconFlask className="h-5 w-5 text-muted-foreground" />
-                  Informações da Produção
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconFlask className="h-5 w-5 text-muted-foreground" />
+                Informações da Produção
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
                 {/* Volume */}
                 <div className="flex items-start gap-3">
                   <IconDroplet className="h-5 w-5 text-muted-foreground mt-0.5" />
@@ -141,18 +142,18 @@ export function ProductionDetailsPage() {
                     <p className="text-sm text-muted-foreground mt-1">{formatDateTime(production.createdAt)}</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+            </CardContent>
+          </Card>
 
-            {/* Right column - Paint and Formula */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconPaint className="h-5 w-5 text-muted-foreground" />
-                  Tinta e Fórmula
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+          {/* Right column - Paint and Formula */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconPaint className="h-5 w-5 text-muted-foreground" />
+                Tinta e Fórmula
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
                 {paint && (
                   <div className="flex items-center gap-3">
                     <div className="h-16 w-16 rounded-md ring-1 ring-border shadow-sm flex-shrink-0 overflow-hidden">
@@ -193,22 +194,22 @@ export function ProductionDetailsPage() {
                     <Button variant="outline" size="sm" className="w-full" onClick={() => navigate(routes.painting.catalog.formulaDetails(paint?.id || "", formula.id))}>
                       Ver detalhes da fórmula
                     </Button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+                </>
+              )}
+          </CardContent>
+        </Card>
           </div>
 
           {/* Components Used */}
           {formula?.components && formula.components.length > 0 && (
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconComponents className="h-5 w-5 text-muted-foreground" />
-                  Componentes Utilizados
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconComponents className="h-5 w-5 text-muted-foreground" />
+                Componentes Utilizados
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
                 <div className="rounded-md border border-border/50">
                   <Table className="w-full [&>div]:border-0 [&>div]:rounded-none">
                     <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
@@ -237,7 +238,7 @@ export function ProductionDetailsPage() {
                             <TableRow key={component.id}>
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  {component.item?.uniCode && <span className="text-sm font-mono text-muted-foreground">{component.item.uniCode}</span>}
+                                  {component.item?.uniCode && <span className="text-sm text-muted-foreground">{component.item.uniCode}</span>}
                                   <p className="font-medium">
                                     {component.item?.uniCode && component.item?.name
                                       ? `${component.item.uniCode} - ${component.item.name}`
@@ -277,29 +278,31 @@ export function ProductionDetailsPage() {
                           })()}
                         </TableCell>
                       </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
+                  </TableBody>
+                </Table>
+              </div>
+          </CardContent>
             </Card>
           )}
 
-      {/* Changelog Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Histórico de Alterações</CardTitle>
-          <CardDescription>Acompanhe todas as modificações realizadas nesta produção</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ChangelogHistory
-            entityType={CHANGE_LOG_ENTITY_TYPE.PAINT_PRODUCTION}
-            entityId={production.id}
-            entityName={productionEntity.name}
-            entityCreatedAt={production.createdAt}
-            className="h-[400px]"
-          />
-        </CardContent>
-      </Card>
+          {/* Changelog Section */}
+          <Card>
+          <CardHeader>
+            <CardTitle>Histórico de Alterações</CardTitle>
+            <CardDescription>Acompanhe todas as modificações realizadas nesta produção</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChangelogHistory
+              entityType={CHANGE_LOG_ENTITY_TYPE.PAINT_PRODUCTION}
+              entityId={production.id}
+              entityName={productionEntity.name}
+              entityCreatedAt={production.createdAt}
+              className="h-[400px]"
+            />
+          </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

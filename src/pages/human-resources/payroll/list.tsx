@@ -16,7 +16,7 @@ import {
 } from "@tabler/icons-react";
 import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { PayrollFilters } from "@/components/human-resources/payroll/list/payroll-filters";
 import { PayrollSummary } from "@/components/human-resources/payroll/list/payroll-summary";
 import { PayrollExport } from "@/components/human-resources/payroll/export/payroll-export";
@@ -30,6 +30,8 @@ import { usePayrolls, useSectors, usePositions, useUsers } from "../../../hooks"
 import { isUserEligibleForBonus, getCurrentPayrollPeriod } from "../../../utils";
 import { StandardizedTable } from "@/components/ui/standardized-table";
 import type { StandardizedColumn } from "@/components/ui/standardized-table";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 // Extended filters interface with payroll-specific fields
 interface PayrollFiltersData {
@@ -60,7 +62,6 @@ function parseFiltersFromUrl(searchParams: URLSearchParams): PayrollFiltersData 
       // Ignore parsing errors
     }
   }
-
 
   const sectorIdsParam = searchParams.get('sectorIds');
   if (sectorIdsParam) {
@@ -130,7 +131,6 @@ function updateFiltersInUrl(
   } else {
     searchParams.delete('months');
   }
-
 
   // Sector IDs
   if (filters.sectorIds && filters.sectorIds.length > 0) {
@@ -656,17 +656,10 @@ export default function PayrollListPage() {
     const columns = new Set(baseVisibleColumns);
     const isMultiMonth = filters.months && filters.months.length > 1;
 
-    console.log('Column visibility update:', {
-      isMultiMonth,
-      monthsCount: filters.months?.length,
-      baseColumns: Array.from(baseVisibleColumns),
-      hasMonth: baseVisibleColumns.has('month')
-    });
-
     if (isMultiMonth) {
       // Always show month column when multiple months are selected
       columns.add('month');
-      console.log('Added month column, final columns:', Array.from(columns));
+      
     } else {
       // Hide month column in single-month view
       columns.delete('month');
@@ -765,8 +758,6 @@ export default function PayrollListPage() {
           ? query.data.data
           : []);
 
-      console.log(`Processing payrolls for ${month}/${year}:`, payrollsArray);
-
       // Calculate period-wide statistics like the old implementation
       // All users show the SAME task count (total tasks for the period)
       // All users show the SAME average (total tasks divided by eligible users)
@@ -804,23 +795,20 @@ export default function PayrollListPage() {
       // Calculate the average tasks per eligible user (same for all users in old implementation)
       const averageTasksPerUser = eligibleUsersCount > 0 ? totalTasksForPeriod / eligibleUsersCount : 0;
 
-      console.log(`Period ${month}/${year} stats:`, {
-        totalTasksForPeriod,
-        eligibleUsersCount,
-        averageTasksPerUser,
-        hasValidBonusData
-      });
-
       // Second pass: create payroll rows with period-wide statistics
       payrollsArray.forEach((payroll: any) => {
         // Enhanced data validation - handle all edge cases
         if (!payroll) {
-          console.warn('Null/undefined payroll data detected, skipping');
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('Null/undefined payroll data detected, skipping');
+          }
           return;
         }
 
         if (!payroll.user) {
-          console.warn('Payroll missing user data:', payroll);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('Payroll missing user data:', payroll);
+          }
           return;
         }
 
@@ -829,7 +817,9 @@ export default function PayrollListPage() {
 
         // Ensure user has required basic fields
         if (!user.id) {
-          console.warn('User missing ID field:', user);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn('User missing ID field:', user);
+          }
           return;
         }
 
@@ -857,7 +847,6 @@ export default function PayrollListPage() {
         if (filters.excludeUserIds && filters.excludeUserIds.length > 0 && filters.excludeUserIds.includes(user?.id)) {
           return;
         }
-
 
         // Determine bonus eligibility using proper business logic
         const isEligibleForBonus = isUserEligibleForBonus(user);
@@ -1178,33 +1167,29 @@ export default function PayrollListPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="flex flex-col h-full space-y-4">
-        {/* Page Header */}
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Folha de Pagamento"
-            icon={IconReceipt}
-            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_FOLHA_DE_PAGAMENTO}
-            breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }, { label: "Folha de Pagamento" }]}
-            description={(() => {
-              if (filters.year && filters.months && filters.months.length > 0) {
-                if (filters.months.length === 1) {
-                  const monthName = new Date(filters.year, parseInt(filters.months[0]) - 1).toLocaleDateString("pt-BR", { month: "long" });
-                  return `Período: ${monthName} de ${filters.year}`;
-                } else {
-                  return `Período: ${filters.months.length} meses de ${filters.year}`;
-                }
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
+        <PageHeader
+          className="flex-shrink-0"
+          title="Folha de Pagamento"
+          favoritePage={FAVORITE_PAGES.ADMINISTRACAO_FOLHA_DE_PAGAMENTO}
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Administração" }, { label: "Folha de Pagamento" }]}
+          description={(() => {
+            if (filters.year && filters.months && filters.months.length > 0) {
+              if (filters.months.length === 1) {
+                const monthName = new Date(filters.year, parseInt(filters.months[0]) - 1).toLocaleDateString("pt-BR", { month: "long" });
+                return `Período: ${monthName} de ${filters.year}`;
+              } else {
+                return `Período: ${filters.months.length} meses de ${filters.year}`;
               }
-              return "Visualização da folha de pagamento com cálculos de comissões e bonificações";
-            })()}
-            actions={[]}
-          />
-        </div>
-
+            }
+            return "Visualização da folha de pagamento com cálculos de comissões e bonificações";
+          })()}
+          actions={[]}
+        />
 
         {/* Error Alert */}
         {hasError && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="flex-shrink-0">
             <IconAlertCircle className="h-4 w-4" />
             <AlertDescription>
               Erro ao carregar dados da folha de pagamento. Verifique a conexão e tente novamente.
@@ -1212,88 +1197,85 @@ export default function PayrollListPage() {
           </Alert>
         )}
 
-        {/* Table and Controls Card */}
-        <div className="flex-1 overflow-hidden">
-          <Card className="h-full flex flex-col shadow-sm border border-border">
-            {/* Actions Bar */}
-            <CardContent className="px-6 pt-6 pb-4">
-              <div className="flex items-center justify-between gap-4">
-                {/* Left side - Filters and Columns */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => setShowFilters(!showFilters)}
-                    variant={hasActiveFilters ? "default" : "outline"}
-                    size="default"
-                  >
-                    <IconFilter className="h-4 w-4 mr-2" />
-                    {hasActiveFilters ? `Filtros (${activeFiltersCount})` : "Filtros"}
-                  </Button>
+        <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
+          {/* Actions Bar */}
+          <CardContent className="px-6 pt-6 pb-4 flex-shrink-0">
+            <div className="flex items-center justify-between gap-4">
+              {/* Left side - Filters and Columns */}
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setShowFilters(!showFilters)}
+                  variant={hasActiveFilters ? "default" : "outline"}
+                  size="default"
+                >
+                  <IconFilter className="h-4 w-4 mr-2" />
+                  {hasActiveFilters ? `Filtros (${activeFiltersCount})` : "Filtros"}
+                </Button>
 
-                  <PayrollColumnVisibilityManager
-                    visibleColumns={visibleColumns}
-                    onVisibilityChange={setVisibleColumns}
-                  />
-                </div>
-
-                {/* Right side - Export */}
-                <div className="flex items-center gap-2">
-                  <PayrollExport
-                    filters={filters}
-                    currentPageData={processedPayrolls}
-                    totalRecords={processedPayrolls.length}
-                    visibleColumns={visibleColumns}
-                  />
-                </div>
-              </div>
-
-              {/* Active Filter Badges */}
-              {activeFilterBadges.length > 0 && (
-                <FilterIndicators
-                  filters={activeFilterBadges}
-                  onClearAll={clearAllFilters}
-                  className="mt-4"
-                />
-              )}
-            </CardContent>
-
-            {/* Table Content */}
-            <CardContent className="flex-1 overflow-hidden p-6 pt-0 relative">
-              <div className="h-full flex flex-col overflow-hidden rounded-lg border border-border">
-                <PayrollTableComponent
-                  data={processedPayrolls}
+                <PayrollColumnVisibilityManager
                   visibleColumns={visibleColumns}
-                  onRowClick={handleRowClick}
-                  isLoading={isLoading}
-                  error={hasError ? errors[0] : null}
-                  multiMonth={filters.months ? filters.months.length > 1 : false}
-                  onSort={toggleSort}
-                  getSortDirection={getSortDirection}
-                  getSortOrder={getSortOrder}
-                  sortConfigs={sortConfigs}
+                  onVisibilityChange={setVisibleColumns}
                 />
-
-                {/* Loading overlay */}
-                {(isRefreshing || isLoading) && (
-                  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <IconRefresh className="h-4 w-4 animate-spin" />
-                      <span className="text-sm font-medium">
-                        {isRefreshing ? "Aplicando filtros..." : "Carregando dados..."}
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
-            </CardContent>
 
-            {/* Summary - At bottom, no spacing between table */}
-            {processedPayrolls.length > 0 && (
-              <div className="px-6 pb-6">
-                <PayrollSummary users={processedPayrolls} />
+              {/* Right side - Export */}
+              <div className="flex items-center gap-2">
+                <PayrollExport
+                  filters={filters}
+                  currentPageData={processedPayrolls}
+                  totalRecords={processedPayrolls.length}
+                  visibleColumns={visibleColumns}
+                />
+              </div>
+            </div>
+
+            {/* Active Filter Badges */}
+            {activeFilterBadges.length > 0 && (
+              <FilterIndicators
+                filters={activeFilterBadges}
+                onClearAll={clearAllFilters}
+                className="mt-4"
+              />
+            )}
+          </CardContent>
+
+          {/* Table Content */}
+          <CardContent className="flex-1 flex flex-col p-4 pt-0 relative min-h-0">
+            <div className="flex-1 min-h-0 rounded-lg border border-border">
+              <PayrollTableComponent
+                data={processedPayrolls}
+                visibleColumns={visibleColumns}
+                onRowClick={handleRowClick}
+                isLoading={isLoading}
+                error={hasError ? errors[0] : null}
+                multiMonth={filters.months ? filters.months.length > 1 : false}
+                onSort={toggleSort}
+                getSortDirection={getSortDirection}
+                getSortOrder={getSortOrder}
+                sortConfigs={sortConfigs}
+              />
+            </div>
+
+            {/* Loading overlay */}
+            {(isRefreshing || isLoading) && (
+              <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <IconRefresh className="h-4 w-4 animate-spin" />
+                  <span className="text-sm font-medium">
+                    {isRefreshing ? "Aplicando filtros..." : "Carregando dados..."}
+                  </span>
+                </div>
               </div>
             )}
-          </Card>
-        </div>
+          </CardContent>
+
+          {/* Summary - At bottom, no spacing between table */}
+          {processedPayrolls.length > 0 && (
+            <div className="px-6 pb-6 flex-shrink-0">
+              <PayrollSummary users={processedPayrolls} />
+            </div>
+          )}
+        </Card>
 
         {/* Filters Modal */}
         <PayrollFilters

@@ -6,6 +6,7 @@ import { usePaint, usePaintMutations } from "../../../../hooks";
 import { routes } from "../../../../constants";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditPaints } from "@/utils/permissions/entity-permissions";
+import { PAGE_SPACING } from "@/lib/layout-constants";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -142,96 +143,94 @@ export default function PaintDetailsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section */}
-      <div className="animate-in fade-in-50 duration-500">
-        <PageHeader
-          variant="detail"
-          entity={paint}
-          title={paint.name}
-          icon={IconPaint}
-          actions={[
-            {
-              key: "refresh",
-              label: "Atualizar",
-              icon: IconRefresh,
-              onClick: handleRefresh,
-              loading: isRefetching,
-            },
-            ...(canEdit ? [{
-              key: "edit",
-              label: "Editar",
-              icon: IconEdit,
-              onClick: handleEdit,
-            }] : []),
-            ...(canEdit ? [{
-              key: "delete",
-              label: "Excluir",
-              icon: IconTrash,
-              onClick: () => setShowDeleteDialog(true),
-            }] : []),
-          ]}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Pintura", href: routes.painting.root },
-            { label: "Catálogo", href: routes.painting.catalog.root },
-            { label: paint.name },
-          ]}
-        />
-      </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        variant="detail"
+        entity={paint}
+        title={paint.name}
+        actions={[
+        {
+          key: "refresh",
+          label: "Atualizar",
+          icon: IconRefresh,
+          onClick: handleRefresh,
+          loading: isRefetching,
+        },
+        ...(canEdit ? [{
+          key: "edit",
+          label: "Editar",
+          icon: IconEdit,
+          onClick: handleEdit,
+        }] : []),
+        ...(canEdit ? [{
+          key: "delete",
+          label: "Excluir",
+          icon: IconTrash,
+          onClick: () => setShowDeleteDialog(true),
+        }] : []),
+      ]}
+      breadcrumbs={[
+        { label: "Início", href: routes.home },
+        { label: "Pintura", href: routes.painting.root },
+        { label: "Catálogo", href: routes.painting.catalog.root },
+        { label: paint.name },
+      ]}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        {/* Row 1: Specifications + (Formulas + Fundos Recomendados) */}
+        <div className="animate-in fade-in-50 duration-500 transition-all">
+          {/* Mobile: Single column */}
+          <div className="block lg:hidden space-y-4">
+            <PaintSpecificationsCard paint={paint} className="h-auto" />
+            <PaintFormulasCard paint={paint} className="h-auto" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
+            {paint.paintGrounds && paint.paintGrounds.length > 0 && (
+              <GroundPaintsCard paint={paint} className="h-auto" />
+            )}
+          </div>
 
-      {/* Row 1: Specifications + (Formulas + Fundos Recomendados) */}
-      <div className="animate-in fade-in-50 duration-500 transition-all">
-            {/* Mobile: Single column */}
-            <div className="block lg:hidden space-y-4">
-              <PaintSpecificationsCard paint={paint} className="h-auto" />
-              <PaintFormulasCard paint={paint} className="h-auto" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
-              {paint.paintGrounds && paint.paintGrounds.length > 0 && (
-                <GroundPaintsCard paint={paint} className="h-auto" />
-              )}
-            </div>
+          {/* Desktop: 2 columns - Specifications + (Formulas + Fundos) */}
+          <div className="hidden lg:block">
+            <div className="grid grid-cols-2 items-start gap-4">
+              {/* Column 1: Specifications */}
+              <PaintSpecificationsCard paint={paint} className="h-full" />
 
-            {/* Desktop: 2 columns - Specifications + (Formulas + Fundos) */}
-            <div className="hidden lg:block">
-              <div className="grid grid-cols-2 gap-6 items-start">
-                {/* Column 1: Specifications */}
-                <PaintSpecificationsCard paint={paint} className="h-full" />
-
-                {/* Column 2: Formulas + Fundos Recomendados */}
-                <div className="flex flex-col gap-4 h-full">
-                  <PaintFormulasCard paint={paint} className="flex-1 min-h-0" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
-                  {paint.paintGrounds && paint.paintGrounds.length > 0 && (
-                    <GroundPaintsCard paint={paint} className="h-[200px] flex-shrink-0" />
-                  )}
-                </div>
+              {/* Column 2: Formulas + Fundos Recomendados */}
+              <div className="flex flex-col h-full gap-4">
+                <PaintFormulasCard paint={paint} className="flex-1 min-h-0" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
+                {paint.paintGrounds && paint.paintGrounds.length > 0 && (
+                  <GroundPaintsCard paint={paint} className="h-[200px] flex-shrink-0" />
+                )}
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Row 3: Related Paints Section */}
-          {((paint.relatedPaints && paint.relatedPaints.length > 0) || (paint.relatedTo && paint.relatedTo.length > 0)) && (
-            <div className="animate-in fade-in-50 duration-700 transition-all">
-              <RelatedPaintsCard paint={paint} />
-            </div>
-          )}
-
-          {/* Row 3: Task History - Full Width */}
+        {/* Row 3: Related Paints Section */}
+        {((paint.relatedPaints && paint.relatedPaints.length > 0) || (paint.relatedTo && paint.relatedTo.length > 0)) && (
           <div className="animate-in fade-in-50 duration-700 transition-all">
-            <PaintTasksTable paint={paint} />
+            <RelatedPaintsCard paint={paint} />
           </div>
+        )}
 
-          {/* Row 4: Production History - Full Width */}
-          <div className="animate-in fade-in-50 duration-900 transition-all">
-            <PaintProductionHistoryCard paint={paint} className="h-auto lg:h-[550px]" />
-          </div>
+        {/* Row 3: Task History - Full Width */}
+        <div className="animate-in fade-in-50 duration-700 transition-all">
+          <PaintTasksTable paint={paint} />
+        </div>
 
-      {/* Row 5: Changelog - Full Width */}
-      <div className="animate-in fade-in-50 duration-1000 transition-all">
-        <PaintWithFormulasChangelogHistory paint={paint} className="h-auto lg:h-[600px]" />
+        {/* Row 4: Production History - Full Width */}
+        <div className="animate-in fade-in-50 duration-900 transition-all">
+          <PaintProductionHistoryCard paint={paint} className="h-auto lg:h-[550px]" />
+        </div>
+
+        {/* Row 5: Changelog - Full Width */}
+        <div className="animate-in fade-in-50 duration-1000 transition-all">
+          <PaintWithFormulasChangelogHistory paint={paint} className="h-auto lg:h-[600px]" />
+        </div>
       </div>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Tem certeza?</AlertDialogTitle>

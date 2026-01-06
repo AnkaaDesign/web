@@ -271,7 +271,6 @@ export function useBatchUpdateExternalWithdrawalItems() {
       // Fix array serialization issue at the hook level
       let fixedData = data;
       if (data.externalWithdrawalItems && typeof data.externalWithdrawalItems === "object" && !Array.isArray(data.externalWithdrawalItems)) {
-        console.log("[Hook] Converting externalWithdrawalItems from object to array");
         fixedData = {
           ...data,
           externalWithdrawalItems: Object.values(data.externalWithdrawalItems),

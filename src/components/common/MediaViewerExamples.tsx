@@ -79,7 +79,7 @@ export const MediaViewerExamples: React.FC = () => {
 
           {/* Basic Gallery Example */}
           <TabsContent value="basic" className="space-y-6">
-            <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <h2 className="text-2xl font-semibold mb-4">Basic Image Gallery</h2>
               <p className="text-gray-600 mb-6">
                 Simple image gallery with default settings
@@ -90,7 +90,7 @@ export const MediaViewerExamples: React.FC = () => {
                   <button
                     key={item.id}
                     onClick={() => basicGallery.openViewer(index)}
-                    className="aspect-square rounded-lg overflow-hidden hover:shadow-xl transition-shadow"
+                    className="aspect-square rounded-lg overflow-hidden hover:shadow-sm transition-shadow"
                   >
                     <img
                       src={item.thumbnail || item.url}
@@ -130,7 +130,7 @@ export const MediaViewerExamples: React.FC = () => {
 
           {/* Mixed Media Example */}
           <TabsContent value="mixed" className="space-y-6">
-            <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <h2 className="text-2xl font-semibold mb-4">Mixed Media Gallery</h2>
               <p className="text-gray-600 mb-6">
                 Gallery with both images and videos
@@ -158,7 +158,7 @@ export const MediaViewerExamples: React.FC = () => {
 
           {/* Enhanced Features Example */}
           <TabsContent value="enhanced" className="space-y-6">
-            <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <h2 className="text-2xl font-semibold mb-4">Enhanced Media Viewer</h2>
               <p className="text-gray-600 mb-6">
                 Advanced features including playback speed, info panel, and more
@@ -169,7 +169,7 @@ export const MediaViewerExamples: React.FC = () => {
                   <button
                     key={item.id}
                     onClick={() => mixedGallery.openViewer(index)}
-                    className="aspect-square rounded-lg overflow-hidden hover:shadow-xl transition-shadow relative group"
+                    className="aspect-square rounded-lg overflow-hidden hover:shadow-sm transition-shadow relative group"
                   >
                     <img
                       src={item.thumbnail || item.url}
@@ -230,9 +230,9 @@ export const MediaViewerExamples: React.FC = () => {
     maxZoom: 4,
     minZoom: 0.5,
   }}
-  onItemChange={(index, item) => console.log('Changed to:', item)}
-  onDownload={(item) => console.log('Download:', item)}
-  onShare={(item) => console.log('Share:', item)}
+  onItemChange={(index, item) => {}}
+  onDownload={(item) => {}}
+  onShare={(item) => {}}
 />`}</code>
                 </pre>
               </div>
@@ -251,16 +251,14 @@ export const MediaViewerExamples: React.FC = () => {
                   autoPlay: false,
                   loop: true,
                 }}
-                onItemChange={(index, item) => {
-                  console.log('Viewing item:', index, item);
-                }}
+                onItemChange={(index, item) => {}}
               />
             </div>
           </TabsContent>
 
           {/* Custom Layouts Example */}
           <TabsContent value="custom" className="space-y-6">
-            <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="bg-white rounded-lg shadow-sm p-4">
               <h2 className="text-2xl font-semibold mb-4">Custom Layouts</h2>
               <p className="text-gray-600 mb-6">
                 Different grid layouts and aspect ratios
@@ -328,11 +326,11 @@ export const MediaViewerExamples: React.FC = () => {
         </Tabs>
 
         {/* Integration Guide */}
-        <div className="mt-12 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg shadow-lg p-8">
+        <div className="mt-12 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg shadow-sm p-8">
           <h2 className="text-3xl font-bold mb-6">Integration Guide</h2>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg p-6">
+            <div className="bg-white rounded-lg p-4">
               <h3 className="text-xl font-semibold mb-4">Quick Start</h3>
               <ol className="space-y-3 text-sm">
                 <li>
@@ -364,7 +362,7 @@ import { useMediaViewer } from '@/hooks/useMediaViewer';`}</code>
               </ol>
             </div>
 
-            <div className="bg-white rounded-lg p-6">
+            <div className="bg-white rounded-lg p-4">
               <h3 className="text-xl font-semibold mb-4">Advanced Usage</h3>
               <ul className="space-y-3 text-sm">
                 <li>

@@ -1,6 +1,6 @@
 import { IconBriefcase } from "@tabler/icons-react";
 import { routes, FAVORITE_PAGES } from "../../../constants";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { PositionForm } from "@/components/human-resources/position/form";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 
@@ -11,29 +11,21 @@ export const PositionCreatePage = () => {
   });
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-3xl mx-auto">
-          <PageHeaderWithFavorite
-            title="Novo Cargo"
-            icon={IconBriefcase}
-            favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_CADASTRAR}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Recursos Humanos", href: routes.humanResources.root },
-              { label: "Cargos", href: routes.humanResources.positions.root },
-              { label: "Novo" },
-            ]}
-          />
-        </div>
-      </div>
-
-      {/* Scrollable Form Container */}
-      <div className="flex-1 overflow-y-auto mt-6">
-        <div className="max-w-3xl mx-auto h-full">
-          <PositionForm mode="create" />
-        </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        title="Novo Cargo"
+        icon={IconBriefcase}
+        favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_CARGOS_CADASTRAR}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Recursos Humanos", href: routes.humanResources.root },
+          { label: "Cargos", href: routes.humanResources.positions.root },
+          { label: "Novo" },
+        ]}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <PositionForm mode="create" />
       </div>
     </div>
   );

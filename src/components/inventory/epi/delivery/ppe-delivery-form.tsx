@@ -106,12 +106,16 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
         navigate(routes.inventory.ppe.deliveries.root);
       }
     } catch (error) {
-      console.error("Error submitting form:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error submitting form:", error);
+      }
     }
   };
 
   const handleError = (errors: Record<string, any>) => {
-    console.error("PPE delivery form validation errors:", errors);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("PPE delivery form validation errors:", errors);
+    }
     // Scroll to first error field if exists
     const firstErrorField = Object.keys(errors)[0];
     if (firstErrorField) {
@@ -130,7 +134,7 @@ export function PpeDeliveryForm(props: PpeDeliveryFormProps) {
 
   return (
     <Card className="shadow-sm border border-border">
-      <CardContent className="p-6">
+      <CardContent className="p-4">
         <Form {...form}>
           <form id="ppe-delivery-form" onSubmit={form.handleSubmit(handleSubmit, handleError)} className="space-y-8">
             {/* Hidden submit button for programmatic form submission */}

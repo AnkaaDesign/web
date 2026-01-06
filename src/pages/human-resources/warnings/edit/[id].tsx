@@ -53,30 +53,22 @@ export const WarningEditPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="h-full flex flex-col space-y-4">
-        {/* Fixed Header */}
-        <div className="flex-shrink-0">
-          <div className="max-w-5xl mx-auto">
-            <PageHeader
-              variant="form"
-              title="Editar Advertência"
-              icon={IconAlertTriangle}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Recursos Humanos" },
-                { label: "Advertências", href: routes.humanResources.warnings.root },
-                { label: warning.data.collaborator?.name || "Advertência", href: routes.humanResources.warnings.details(id) },
-                { label: "Editar" },
-              ]}
-            />
-          </div>
-        </div>
-
-        {/* Scrollable Form Container */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto h-full">
-            <WarningForm mode="update" warning={warning.data} />
-          </div>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="form"
+          title="Editar Advertência"
+          icon={IconAlertTriangle}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Recursos Humanos" },
+            { label: "Advertências", href: routes.humanResources.warnings.root },
+            { label: warning.data.collaborator?.name || "Advertência", href: routes.humanResources.warnings.details(id) },
+            { label: "Editar" },
+          ]}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <WarningForm mode="update" warning={warning.data} />
         </div>
       </div>
     </PrivilegeRoute>

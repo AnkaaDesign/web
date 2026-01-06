@@ -1,7 +1,7 @@
 // web/src/pages/inventory/statistics/consumption.tsx
 
 import { useState, useMemo, useCallback, Suspense, lazy } from 'react';
-import { PageHeaderWithFavorite } from '@/components/ui/page-header-with-favorite';
+import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -182,14 +182,12 @@ const ConsumptionPage = () => {
 
   // Handle filter apply (ensure operation is always OUTBOUND)
   const handleFilterApply = useCallback((newFilters: ConsumptionAnalyticsFilters) => {
-    console.log('Applying filters:', newFilters); // Debug log
     const updatedFilters = {
       ...newFilters,
       operation: ACTIVITY_OPERATION.OUTBOUND, // Always enforce OUTBOUND for consumption
       // Ensure limit is preserved as a number
       limit: newFilters.limit || 50,
     };
-    console.log('Updated filters being set:', updatedFilters); // Debug log
     setFilters(updatedFilters);
   }, []);
 
@@ -634,20 +632,24 @@ const ConsumptionPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <PageHeaderWithFavorite
-        title="Análise de Consumo"
-        icon={IconChartBar}
-        favoriteKey={FAVORITE_PAGES.STATISTICS_CONSUMPTION}
-        breadcrumbs={[
-          { label: 'Início', href: routes.home },
-          { label: 'Estatísticas', href: routes.statistics.root },
-          { label: 'Estoque', href: routes.statistics.inventory.root },
-          { label: 'Consumo' },
-        ]}
-      />
+    <div className="h-full flex flex-col px-4 pt-4">
+      <div className="flex-shrink-0">
+        <PageHeader
+          title="Análise de Consumo"
+          icon={IconChartBar}
+          favoriteKey={FAVORITE_PAGES.STATISTICS_CONSUMPTION}
+          breadcrumbs={[
+            { label: 'Início', href: routes.home },
+            { label: 'Estatísticas', href: routes.statistics.root },
+            { label: 'Estoque', href: routes.statistics.inventory.root },
+            { label: 'Consumo' },
+          ]}
+        />
+      </div>
 
-      <Card className="flex-1 flex flex-col">
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="mt-4">
+          <Card className="flex-1 flex flex-col">
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -762,7 +764,7 @@ const ConsumptionPage = () => {
           </div>
         </CardHeader>
 
-        <CardContent className="flex-1 flex flex-col p-6 space-y-6">
+        <CardContent className="flex-1 flex flex-col p-4 space-y-6">
           {/* Summary Cards */}
           {summary && (
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -927,6 +929,8 @@ const ConsumptionPage = () => {
         yAxisMode={yAxisMode}
         onYAxisModeChange={setYAxisMode}
       />
+        </div>
+      </div>
     </div>
   );
 };

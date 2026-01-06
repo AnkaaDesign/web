@@ -272,7 +272,9 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
         setContextMenu(null);
       } catch (error) {
         // Error is handled by the API client with detailed message
-        console.error("Error deleting customer(s):", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error deleting customer(s):", error);
+        }
       }
     }
   };

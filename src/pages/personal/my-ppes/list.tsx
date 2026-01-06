@@ -7,12 +7,12 @@ import type { PpeDelivery } from "@/types";
 import type { PpeDeliveryGetManyFormData } from "@/schemas";
 import { PPE_DELIVERY_STATUS, PPE_DELIVERY_STATUS_LABELS, PPE_TYPE_LABELS, routes } from "@/constants";
 import { formatDateTime } from "@/utils";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { PageHeader } from "@/components/ui/page-header";
 import { IconSearch, IconPlus, IconPackage } from "@tabler/icons-react";
 import { useAuth } from "@/contexts/auth-context";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -103,21 +103,26 @@ export const MyPpesPage = () => {
   }
 
   return (
-    <Card className="h-full flex flex-col rounded-md">
-      <CardHeader className="px-8 py-3 flex-shrink-0 border-b border-neutral-200 dark:border-neutral-700">
-        <div className="flex items-start justify-between">
-          <div className="flex flex-col gap-2">
-            <CardTitle className="text-xl font-bold">Meus EPIs</CardTitle>
-            <Breadcrumb />
-          </div>
-          <Button onClick={() => navigate(routes.personal.myPpes.request)} className="gap-2">
-            <IconPlus className="h-4 w-4" />
-            Solicitar EPI
-          </Button>
-        </div>
-      </CardHeader>
+    <div className="h-full flex flex-col px-4 pt-4">
+      <div className="flex-shrink-0">
+        <PageHeader
+          variant="default"
+          title="Meus EPIs"
+          breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Pessoal", href: routes.personal.root }, { label: "Meus EPIs" }]}
+          actions={[
+            {
+              key: "request",
+              label: "Solicitar EPI",
+              icon: IconPlus,
+              onClick: () => navigate(routes.personal.myPpes.request),
+              variant: "default",
+            },
+          ]}
+        />
+      </div>
 
-      <CardContent className="flex-1 flex flex-col px-8 py-4 space-y-4 overflow-hidden">
+      <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border mt-4">
+        <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden pb-6">
         {/* Search bar */}
         <div className="relative">
           <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -214,7 +219,8 @@ export const MyPpesPage = () => {
             </div>
           </TabsContent>
         </Tabs>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

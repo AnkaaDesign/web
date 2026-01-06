@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -181,7 +181,6 @@ export const TopItemsStatisticsPage = () => {
 
   const handleExport = () => {
     // Export functionality to be implemented
-    console.log("Exporting top items analysis...");
   };
 
   const getActiveFiltersCount = () => {
@@ -221,10 +220,10 @@ export const TopItemsStatisticsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="flex flex-col h-full space-y-6">
+      <div className="h-full flex flex-col px-4 pt-4">
         {/* Page Header */}
         <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
+          <PageHeader
             title="Top Itens"
             icon={IconTrophy}
             favoritePage={FAVORITE_PAGES.ESTOQUE_TOP_ITENS}
@@ -254,8 +253,10 @@ export const TopItemsStatisticsPage = () => {
           />
         </div>
 
-        {/* Filters Section */}
-        <Card>
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="mt-4 space-y-6">
+            {/* Filters Section */}
+            <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -342,18 +343,17 @@ export const TopItemsStatisticsPage = () => {
           </CardContent>
         </Card>
 
-        {/* Top Items Analysis Tabs */}
-        <div className="flex-1 min-h-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="most-consumed">Mais Consumidos</TabsTrigger>
-              <TabsTrigger value="highest-cost">Maior Custo</TabsTrigger>
-              <TabsTrigger value="most-frequent">Mais Frequentes</TabsTrigger>
-              <TabsTrigger value="least-consumed">Menos Consumidos</TabsTrigger>
-              <TabsTrigger value="trends">Tendências</TabsTrigger>
-            </TabsList>
+            {/* Top Items Analysis Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="most-consumed">Mais Consumidos</TabsTrigger>
+                <TabsTrigger value="highest-cost">Maior Custo</TabsTrigger>
+                <TabsTrigger value="most-frequent">Mais Frequentes</TabsTrigger>
+                <TabsTrigger value="least-consumed">Menos Consumidos</TabsTrigger>
+                <TabsTrigger value="trends">Tendências</TabsTrigger>
+              </TabsList>
 
-            <div className="flex-1 mt-6">
+              <div className="mt-6">
               {/* Most Consumed Tab */}
               <TabsContent value="most-consumed" className="h-full space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
@@ -707,8 +707,9 @@ export const TopItemsStatisticsPage = () => {
                   </div>
                 </div>
               </TabsContent>
-            </div>
-          </Tabs>
+              </div>
+            </Tabs>
+          </div>
         </div>
       </div>
     </PrivilegeRoute>

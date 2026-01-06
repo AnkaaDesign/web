@@ -22,11 +22,13 @@ import { CSS } from "@dnd-kit/utilities";
 
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeaderWithFavorite } from "@/components/page-header";
+import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { usePositions, usePositionBatchMutations } from "@/hooks";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 interface Position {
   id: string;
@@ -148,7 +150,9 @@ export const PositionHierarchyPage = () => {
         navigate(routes.humanResources.positions.root);
       }, 1000);
     } catch (error) {
-      console.error("Error updating hierarchy:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error updating hierarchy:", error);
+      }
       toast.error("Erro ao atualizar hierarquia. Por favor, tente novamente.");
     } finally {
       setIsSaving(false);
@@ -167,38 +171,41 @@ export const PositionHierarchyPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="flex flex-col h-full space-y-4">
-        <PageHeaderWithFavorite
-          title="Hierarquia de Cargos"
-          icon={IconBriefcase}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Recursos Humanos", href: routes.humanResources.root },
-            { label: "Cargos", href: routes.humanResources.positions.root },
-            { label: "Hierarquia" },
-          ]}
-          actions={[
-            {
-              key: "cancel",
-              label: "Cancelar",
-              icon: IconX,
-              onClick: handleCancel,
-              variant: "outline" as const,
-              disabled: isSaving,
-            },
-            {
-              key: "save",
-              label: isSaving ? "Salvando..." : "Salvar Hierarquia",
-              icon: IconCheck,
-              onClick: handleSave,
-              variant: "default" as const,
-              disabled: !hasChanges || isSaving,
-            },
-          ]}
-        />
+      <div className="h-full flex flex-col px-4 pt-4">
+        <div className="flex-shrink-0">
+          <PageHeader
+            title="Hierarquia de Cargos"
+            icon={IconBriefcase}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Recursos Humanos", href: routes.humanResources.root },
+              { label: "Cargos", href: routes.humanResources.positions.root },
+              { label: "Hierarquia" },
+            ]}
+            actions={[
+              {
+                key: "cancel",
+                label: "Cancelar",
+                icon: IconX,
+                onClick: handleCancel,
+                variant: "outline" as const,
+                disabled: isSaving,
+              },
+              {
+                key: "save",
+                label: isSaving ? "Salvando..." : "Salvar Hierarquia",
+                icon: IconCheck,
+                onClick: handleSave,
+                variant: "default" as const,
+                disabled: !hasChanges || isSaving,
+              },
+            ]}
+          />
+        </div>
 
-        <Card className="flex-1 min-h-0 flex flex-col">
-          <CardContent className="flex-1 flex flex-col overflow-hidden p-4">
+        <div className="flex-1 overflow-y-auto pb-6">
+          <Card className="flex-1 min-h-0 flex flex-col mt-4">
+            <CardContent className="flex-1 flex flex-col overflow-hidden p-4">
             {isLoading ? (
               <div className="flex items-center justify-center flex-1">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -213,9 +220,10 @@ export const PositionHierarchyPage = () => {
                   </SortableContext>
                 </DndContext>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </PrivilegeRoute>
   );

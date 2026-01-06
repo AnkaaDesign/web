@@ -177,13 +177,6 @@ export class PaintService {
       return acc;
     }, {} as Partial<PaintGetManyFormData>);
 
-    // Debug logging (remove after fixing)
-    if (cleanedParams.similarColor || params.similarColor) {
-      console.log("[API Client] Color similarity params:", {
-        original: { similarColor: params.similarColor, threshold: params.similarColorThreshold },
-        cleaned: { similarColor: cleanedParams.similarColor, threshold: cleanedParams.similarColorThreshold }
-      });
-    }
 
     const response = await apiClient.get<PaintGetManyResponse>(this.basePath, { params: cleanedParams });
     return response.data;

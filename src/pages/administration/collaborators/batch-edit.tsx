@@ -6,7 +6,7 @@ import { UserBatchEditTable } from "@/components/administration/user/batch-edit"
 import { LoadingSpinner } from "@/components/ui/loading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { IconAlertTriangle, IconArrowLeft, IconUsers, IconDeviceFloppy } from "@tabler/icons-react";
 import { routes, FAVORITE_PAGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
@@ -83,7 +83,7 @@ const CollaboratorBatchEditPage = () => {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
         <Card className="max-w-md">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex flex-col items-center text-center space-y-4">
               <IconAlertTriangle className="h-12 w-12 text-destructive" />
               <h2 className="text-lg font-semibold">Erro ao carregar usuários</h2>
@@ -103,7 +103,7 @@ const CollaboratorBatchEditPage = () => {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
         <Card className="max-w-md">
-          <CardContent className="p-6">
+          <CardContent className="p-4">
             <div className="flex flex-col items-center text-center space-y-4">
               <IconAlertTriangle className="h-12 w-12 text-warning" />
               <h2 className="text-lg font-semibold">Nenhum usuário selecionado</h2>
@@ -120,26 +120,22 @@ const CollaboratorBatchEditPage = () => {
   }
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <PageHeaderWithFavorite
-            title="Editar Colaboradores em Lote"
-            icon={IconUsers}
-            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_COLABORADORES_LISTAR}
-            breadcrumbs={[
-              { label: "Início", href: "/" },
-              { label: "Administração", href: routes.administration.root },
-              { label: "Colaboradores", href: routes.administration.collaborators.root },
-              { label: "Editar em Lote" },
-            ]}
-            actions={actions}
-          />
-      </div>
-
-      {/* Scrollable Content Container */}
-      <div className="flex-1 overflow-hidden">
-          <UserBatchEditTable users={users} onCancel={handleCancel} />
+    <div className="h-full flex flex-col bg-background px-4 pt-4">
+      <PageHeader
+        title="Editar Colaboradores em Lote"
+        icon={IconUsers}
+        favoritePage={FAVORITE_PAGES.ADMINISTRACAO_COLABORADORES_LISTAR}
+        breadcrumbs={[
+          { label: "Início", href: "/" },
+          { label: "Administração", href: routes.administration.root },
+          { label: "Colaboradores", href: routes.administration.collaborators.root },
+          { label: "Editar em Lote" },
+        ]}
+        actions={actions}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-hidden pt-4 pb-6">
+        <UserBatchEditTable users={users} onCancel={handleCancel} />
       </div>
     </div>
   );

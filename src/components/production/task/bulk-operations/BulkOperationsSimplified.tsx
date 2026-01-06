@@ -168,7 +168,9 @@ export const AdvancedBulkActionsHandler = forwardRef<
       handleClose();
       onClearSelection();
     } catch (error) {
-      console.error("Bulk operation error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Bulk operation error:", error);
+      }
       toast.error("Erro ao executar operação em lote");
     } finally {
       setIsSubmitting(false);

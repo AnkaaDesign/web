@@ -42,7 +42,9 @@ export function SinglePaintSelector({ control, disabled, initialPaint }: SingleP
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error("Error fetching paints:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching paints:", error);
+      }
       return {
         data: [],
         hasMore: false,

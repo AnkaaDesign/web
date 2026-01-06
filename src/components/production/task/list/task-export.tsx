@@ -88,7 +88,9 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
         description: `${currentItems.length} tarefas exportadas com sucesso.`,
       });
     } catch (error) {
-      console.error("Export error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Export error:", error);
+      }
       toast({
         title: "Erro na exportação",
         description: "Não foi possível exportar os dados.",
@@ -198,7 +200,9 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
         description: `${allItems.length} tarefas exportadas com sucesso.`,
       });
     } catch (error) {
-      console.error("Export error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Export error:", error);
+      }
       toast({
         title: "Erro na exportação",
         description: "Não foi possível exportar os dados.",
@@ -253,7 +257,9 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
 
       XLSX.writeFile(wb, `${filename}_${formatDate(new Date()).replace(/\//g, "-")}.xlsx`);
     } catch (error) {
-      console.error("Excel export error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Excel export error:", error);
+      }
       // Fallback to CSV
       exportToCSV(data, filename);
       toast({

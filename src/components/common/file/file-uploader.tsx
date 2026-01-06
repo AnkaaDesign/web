@@ -220,7 +220,9 @@ export function FileUploader({
 
       if (updatedFiles.length > maxFiles) {
         // Show warning that some files were not added
-        console.warn(`Limite de ${maxFiles} arquivos excedido. Alguns arquivos não foram adicionados.`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`Limite de ${maxFiles} arquivos excedido. Alguns arquivos não foram adicionados.`);
+        }
       }
 
       setFiles(finalFiles);

@@ -96,7 +96,9 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
           navigate(routes.inventory.movements.root);
         }
       } catch (error) {
-        console.error("Error updating activity:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error updating activity:", error);
+        }
         // Error is handled by the mutation hook
       }
     },
@@ -120,7 +122,9 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
         navigate(routes.inventory.movements.root);
       }
     } catch (error) {
-      console.error("Error updating activity:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating activity:", error);
+      }
       toast.error("Erro ao atualizar atividade");
     }
   });
@@ -147,7 +151,7 @@ export function ActivityEditForm({ activity, onFormStateChange }: ActivityEditFo
 
   return (
     <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden min-h-0">
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden min-h-0">
         <Form {...form}>
           <form onSubmit={useStandardSubmit ? handleDirectSubmit : form.handleSubmitChanges()} className="flex-1 flex flex-col overflow-y-auto space-y-6">
             {/* Hidden submit button for programmatic form submission */}

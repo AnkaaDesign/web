@@ -396,7 +396,9 @@ export const executeFileViewAction = (
       break;
 
     case "not-supported":
-      console.warn("File type not supported for viewing");
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("File type not supported for viewing");
+      }
       break;
   }
 };

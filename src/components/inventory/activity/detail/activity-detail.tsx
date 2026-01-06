@@ -143,7 +143,7 @@ const ActivityDetail = () => {
               variant: "default",
             },
           ]}
-          className="shadow-lg"
+          className="shadow-sm"
         />
       </div>
 
@@ -174,7 +174,7 @@ const ActivityDetail = () => {
                 entityId={activity.id}
                 entityName={`Movimentação #${activity.id.slice(0, 8)}`}
                 entityCreatedAt={activity.createdAt}
-                className="h-full shadow-lg"
+                className="h-full shadow-sm"
               />
               {/* Empty space for half-width layout */}
               <div className="hidden lg:block" />

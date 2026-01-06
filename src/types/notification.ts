@@ -134,3 +134,56 @@ export interface NotificationBatchDeleteResponse extends BaseBatchResponse<{ id:
 export interface SeenNotificationBatchCreateResponse<T> extends BaseBatchResponse<SeenNotification, T> {}
 export interface SeenNotificationBatchUpdateResponse<T> extends BaseBatchResponse<SeenNotification, T & { id: string }> {}
 export interface SeenNotificationBatchDeleteResponse extends BaseBatchResponse<{ id: string; deleted: boolean }, { id: string }> {}
+
+// =====================
+// User Notification Preference Interface
+// =====================
+
+export interface UserNotificationPreference extends BaseEntity {
+  userId: string;
+  notificationType: NOTIFICATION_TYPE;
+  eventType: string | null;
+  enabled: boolean;
+  channels: NOTIFICATION_CHANNEL[];
+  isMandatory: boolean;
+
+  // Relations
+  user?: User;
+}
+
+// =====================
+// User Notification Preference Include Types
+// =====================
+
+export interface UserNotificationPreferenceIncludes {
+  user?:
+    | boolean
+    | {
+        include?: UserIncludes;
+      };
+}
+
+// =====================
+// User Notification Preference Order By
+// =====================
+
+export interface UserNotificationPreferenceOrderBy {
+  id?: ORDER_BY_DIRECTION;
+  notificationType?: ORDER_BY_DIRECTION;
+  eventType?: ORDER_BY_DIRECTION;
+  enabled?: ORDER_BY_DIRECTION;
+  isMandatory?: ORDER_BY_DIRECTION;
+  createdAt?: ORDER_BY_DIRECTION;
+  updatedAt?: ORDER_BY_DIRECTION;
+  user?: UserOrderBy;
+}
+
+// =====================
+// User Notification Preference Response Interfaces
+// =====================
+
+export interface UserNotificationPreferenceGetUniqueResponse extends BaseGetUniqueResponse<UserNotificationPreference> {}
+export interface UserNotificationPreferenceGetManyResponse extends BaseGetManyResponse<UserNotificationPreference> {}
+export interface UserNotificationPreferenceCreateResponse extends BaseCreateResponse<UserNotificationPreference> {}
+export interface UserNotificationPreferenceUpdateResponse extends BaseUpdateResponse<UserNotificationPreference> {}
+export interface UserNotificationPreferenceDeleteResponse extends BaseDeleteResponse {}

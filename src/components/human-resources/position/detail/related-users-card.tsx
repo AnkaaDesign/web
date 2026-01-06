@@ -59,7 +59,7 @@ export function RelatedUsersCard({ position }: RelatedUsersCardProps) {
           Funcionários com este Cargo
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex-1 flex flex-col p-6 pt-0 space-y-4 overflow-hidden">
+      <CardContent className="flex-1 flex flex-col p-4 pt-0 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <TableSearchInput

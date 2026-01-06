@@ -33,7 +33,9 @@ export const CreateMaintenanceSchedulePage = () => {
       navigate(routes.inventory.maintenance.schedules.root);
     } catch (error: any) {
       // Error is already handled by the API client and mutation
-      console.error("Error creating maintenance schedule:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating maintenance schedule:", error);
+      }
     }
   };
 
@@ -65,30 +67,23 @@ export const CreateMaintenanceSchedulePage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-5xl mx-auto">
-          <PageHeader
-            variant="form"
-            title="Criar Agendamento de Manutenção"
-            icon={IconCalendar}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Estoque", href: routes.inventory.root },
-              { label: "Manutenção", href: routes.inventory.maintenance.root },
-              { label: "Agendamentos", href: routes.inventory.maintenance.schedules.root },
-              { label: "Criar" },
-            ]}
-            actions={actions}
-            favoritePage={FAVORITE_PAGES.ESTOQUE_MANUTENCAO_AGENDAMENTOS_CADASTRAR}
-          />
-        </div>
-      </div>
-
-      {/* Scrollable Form Container */}
-      <div className="flex-1 min-h-0 overflow-y-auto mt-6">
-        <div className="max-w-5xl mx-auto h-full">
+    <div className="h-full flex flex-col px-4 pt-4">
+      <PageHeader
+        variant="form"
+        title="Criar Agendamento de Manutenção"
+        icon={IconCalendar}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Manutenção", href: routes.inventory.maintenance.root },
+          { label: "Agendamentos", href: routes.inventory.maintenance.schedules.root },
+          { label: "Criar" },
+        ]}
+        actions={actions}
+        favoritePage={FAVORITE_PAGES.ESTOQUE_MANUTENCAO_AGENDAMENTOS_CADASTRAR}
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="mt-4 space-y-4">
           <MaintenanceScheduleForm mode="create" onSubmit={handleSubmit} onCancel={handleCancel} isSubmitting={createMutation.isPending} onFormStateChange={setFormState} />
         </div>
       </div>

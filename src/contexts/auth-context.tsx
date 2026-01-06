@@ -10,7 +10,9 @@ const clearInvalidStoredRoutes = () => {
     keys.forEach((key) => {
       const value = localStorage.getItem(key);
       if (value && typeof value === "string" && value.includes("dashboard/unified")) {
-        console.warn(`Removing invalid stored route from ${key}:`, value);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`Removing invalid stored route from ${key}:`, value);
+        }
         localStorage.removeItem(key);
       }
     });
@@ -20,12 +22,16 @@ const clearInvalidStoredRoutes = () => {
     sessionKeys.forEach((key) => {
       const value = sessionStorage.getItem(key);
       if (value && typeof value === "string" && value.includes("dashboard/unified")) {
-        console.warn(`Removing invalid stored route from session ${key}:`, value);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`Removing invalid stored route from session ${key}:`, value);
+        }
         sessionStorage.removeItem(key);
       }
     });
   } catch (error) {
-    console.warn("Error clearing invalid stored routes:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn("Error clearing invalid stored routes:", error);
+    }
   }
 };
 import * as apiClientModule from "../api-client";
@@ -182,7 +188,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           try {
             navigate(routes.authentication.login);
           } catch (navError) {
-            console.error("Navigation error during auth error logout:", navError);
+            if (process.env.NODE_ENV !== 'production') {
+              console.error("Navigation error during auth error logout:", navError);
+            }
           }
         }, 100);
       }
@@ -246,11 +254,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Return success to let the Login component know login succeeded
         return { success: true } as const;
       } else {
-        console.error("Invalid response structure:", response);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Invalid response structure:", response);
+        }
         throw new Error("Invalid response from server");
       }
     } catch (error) {
-      console.error("Login error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Login error:", error);
+      }
       // Handle specific unverified account error from server
       if (error instanceof Error && (error.message.includes("Conta ainda não verificada") || error.message.includes("ainda não verificada"))) {
         // Redirect to verification page
@@ -359,7 +371,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         navigate(routes.authentication.login);
       } catch (navError) {
-        console.error("Navigation error during logout:", navError);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Navigation error during logout:", navError);
+        }
       }
     }, 100);
   };
@@ -381,7 +395,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUserData(userData); // Update cache
       }
     } catch (error) {
-      console.error("Error refreshing user data:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error refreshing user data:", error);
+      }
     }
   };
 

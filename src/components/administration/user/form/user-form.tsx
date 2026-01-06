@@ -212,28 +212,32 @@ export function UserForm(props: UserFormProps) {
 
   // Debug validation errors in development - only log on user interaction
   useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      console.log("[UserForm] Form state:", {
-        isValid,
-        isDirty,
-        hasErrors: Object.keys(errors).length > 0,
-        errors: Object.keys(errors).length > 0 ? errors : undefined,
-        errorFields: Object.keys(errors),
-        dirtyFields: Object.keys(form.formState.dirtyFields),
-        touchedFields: Object.keys(form.formState.touchedFields),
-      });
+    if (process.env.NODE_ENV !== 'production') {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[UserForm] Form state:", {
+          isValid,
+          isDirty,
+          hasErrors: Object.keys(errors).length > 0,
+          errors: Object.keys(errors).length > 0 ? errors : undefined,
+          errorFields: Object.keys(errors),
+          dirtyFields: Object.keys(form.formState.dirtyFields),
+          touchedFields: Object.keys(form.formState.touchedFields),
+        });
+      }
     }
   }, [errors, isValid, isDirty, form.formState.dirtyFields, form.formState.touchedFields]);
 
   // One-time validation check on mount
   useEffect(() => {
-    if (process.env.NODE_ENV === "development" && mode === "update") {
-      const timer = setTimeout(() => {
-        form.trigger().then((result) => {
-          console.log("[UserForm] Initial validation result:", result, "errors:", form.formState.errors);
-        });
-      }, 1000);
-      return () => clearTimeout(timer);
+    if (process.env.NODE_ENV !== 'production' && mode === "update") {
+      if (process.env.NODE_ENV === "development") {
+        const timer = setTimeout(() => {
+          form.trigger().then((result) => {
+            console.warn("[UserForm] Initial validation result:", result, "errors:", form.formState.errors);
+          });
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
     }
   }, []);
 
@@ -259,25 +263,8 @@ export function UserForm(props: UserFormProps) {
       // Check if we have an avatar file to upload
       const avatarFile = (data as any).avatarFile || form.getValues('avatarFile' as any);
 
-      console.log('[UserForm] onSubmit - avatarFile check:', {
-        hasAvatarFile: !!avatarFile,
-        isFile: avatarFile instanceof File,
-        avatarFileType: avatarFile?.constructor?.name,
-        fileName: avatarFile?.name,
-        fileSize: avatarFile?.size,
-        mode: mode,
-        userName: data.name,
-      });
-
       // If we have a file, create FormData with proper context
       if (avatarFile && avatarFile instanceof File) {
-        console.log('[UserForm] Creating FormData with avatarFile:', {
-          fileName: avatarFile.name,
-          fileSize: avatarFile.size,
-          fileType: avatarFile.type,
-          userId: mode === "update" ? defaultValues?.id : undefined,
-          userName: data.name,
-        });
         // Extract avatarFile from data and prepare clean data object
         const { avatarFile: _, ...dataWithoutFile } = data as any;
 
@@ -296,10 +283,7 @@ export function UserForm(props: UserFormProps) {
         } else {
           await (props as UpdateUserFormProps).onSubmit(formData as any);
         }
-
-        console.log('[UserForm] FormData submission completed successfully');
       } else {
-        console.log('[UserForm] No avatar file, sending as JSON');
         // No file, send as regular JSON (remove avatarFile field if present)
         const { avatarFile: _, ...dataWithoutFile } = data as any;
 
@@ -315,11 +299,17 @@ export function UserForm(props: UserFormProps) {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+    <Form {...form}>
+      <form id="user-form" onSubmit={form.handleSubmit(onSubmit)}>
+        {/* Hidden submit button for programmatic form submission */}
+        <button id="user-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
+          Submit
+        </button>
+
+        {/* Wrapper div with space-y-4 for card spacing */}
+        <div className="space-y-4">
           {/* Avatar Upload */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconUser className="h-5 w-5 text-muted-foreground" />
@@ -336,154 +326,149 @@ export function UserForm(props: UserFormProps) {
           </Card>
 
           {/* Basic Information */}
-          <Card className="bg-transparent">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
-                  Informações Básicas
-                </CardTitle>
-                <CardDescription>Dados fundamentais do colaborador</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <NameInput disabled={isSubmitting} />
-                  <FormInput<UserCreateFormData | UserUpdateFormData>
-                    name="email"
-                    type="email"
-                    label="E-mail"
-                    placeholder="Digite o e-mail do colaborador"
-                    disabled={isSubmitting}
-                    required={!form.watch("phone")}
-                  />
-                </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
+                Informações Básicas
+              </CardTitle>
+              <CardDescription>Dados fundamentais do colaborador</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <NameInput disabled={isSubmitting} />
+                <FormInput<UserCreateFormData | UserUpdateFormData>
+                  name="email"
+                  type="email"
+                  label="E-mail"
+                  placeholder="Digite o e-mail do colaborador"
+                  disabled={isSubmitting}
+                  required={!form.watch("phone")}
+                />
+              </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <FormInput<UserCreateFormData | UserUpdateFormData>
-                    name="phone"
-                    type="phone"
-                    label="Telefone"
-                    placeholder="Digite o telefone do colaborador"
-                    disabled={isSubmitting}
-                    required={false}
-                  />
-                  <BirthDateInput disabled={isSubmitting} required={mode === "create"} />
-                  <PayrollNumberInput disabled={isSubmitting} />
-                </div>
-              </CardContent>
-            </Card>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <FormInput<UserCreateFormData | UserUpdateFormData>
+                  name="phone"
+                  type="phone"
+                  label="Telefone"
+                  placeholder="Digite o telefone do colaborador"
+                  disabled={isSubmitting}
+                  required={false}
+                />
+                <BirthDateInput disabled={isSubmitting} required={mode === "create"} />
+                <PayrollNumberInput disabled={isSubmitting} />
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Documents */}
-          <Card className="bg-transparent">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconFileText className="h-5 w-5 text-muted-foreground" />
-                  Documentos
-                </CardTitle>
-                <CardDescription>Documentação do colaborador</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormInput<UserCreateFormData | UserUpdateFormData> type="cpf" name="cpf" label="CPF" placeholder="Digite o CPF do colaborador" disabled={isSubmitting} />
-                  <FormInput<UserCreateFormData | UserUpdateFormData> type="pis" name="pis" label="PIS" disabled={isSubmitting} />
-                </div>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconFileText className="h-5 w-5 text-muted-foreground" />
+                Documentos
+              </CardTitle>
+              <CardDescription>Documentação do colaborador</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormInput<UserCreateFormData | UserUpdateFormData> type="cpf" name="cpf" label="CPF" placeholder="Digite o CPF do colaborador" disabled={isSubmitting} />
+                <FormInput<UserCreateFormData | UserUpdateFormData> type="pis" name="pis" label="PIS" disabled={isSubmitting} />
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Address Information */}
-          <Card className="bg-transparent">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconMapPin className="h-5 w-5 text-muted-foreground" />
-                  Endereço
-                </CardTitle>
-                <CardDescription>Informações de endereço do colaborador</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <FormInput<UserCreateFormData | UserUpdateFormData>
-                    type="cep"
-                    name="zipCode"
-                    label="CEP"
-                    disabled={isSubmitting}
-                    addressFieldName="address"
-                    neighborhoodFieldName="neighborhood"
-                    cityFieldName="city"
-                    stateFieldName="state"
-                  />
-                  <AddressInput disabled={isSubmitting} required={false} />
-                  <AddressNumberInput disabled={isSubmitting} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <AddressComplementInput disabled={isSubmitting} />
-                  <NeighborhoodInput disabled={isSubmitting} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <CityInput disabled={isSubmitting} required={false} />
-                  <StateSelector disabled={isSubmitting} />
-                </div>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconMapPin className="h-5 w-5 text-muted-foreground" />
+                Endereço
+              </CardTitle>
+              <CardDescription>Informações de endereço do colaborador</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <FormInput<UserCreateFormData | UserUpdateFormData>
+                  type="cep"
+                  name="zipCode"
+                  label="CEP"
+                  disabled={isSubmitting}
+                  addressFieldName="address"
+                  neighborhoodFieldName="neighborhood"
+                  cityFieldName="city"
+                  stateFieldName="state"
+                />
+                <AddressInput disabled={isSubmitting} required={false} />
+                <AddressNumberInput disabled={isSubmitting} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <AddressComplementInput disabled={isSubmitting} />
+                <NeighborhoodInput disabled={isSubmitting} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <CityInput disabled={isSubmitting} required={false} />
+                <StateSelector disabled={isSubmitting} />
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Professional Information */}
-          <Card className="bg-transparent">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconBriefcase className="h-5 w-5 text-muted-foreground" />
-                  Informações Profissionais
-                </CardTitle>
-                <CardDescription>Dados relacionados ao trabalho</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <PositionSelector control={form.control} disabled={isSubmitting} />
-                  <SectorSelector disabled={isSubmitting} required={false} />
-                </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconBriefcase className="h-5 w-5 text-muted-foreground" />
+                Informações Profissionais
+              </CardTitle>
+              <CardDescription>Dados relacionados ao trabalho</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <PositionSelector control={form.control} disabled={isSubmitting} />
+                <SectorSelector disabled={isSubmitting} required={false} />
+              </div>
 
-                <SectorLeaderSwitch disabled={isSubmitting} />
-              </CardContent>
-            </Card>
+              <SectorLeaderSwitch disabled={isSubmitting} />
+            </CardContent>
+          </Card>
 
           {/* Employment Status */}
-          <Card className="bg-transparent">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
-                  Status do Colaborador
-                </CardTitle>
-                <CardDescription>Defina o status atual do colaborador e as datas relacionadas</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <UserStatusSelector disabled={isSubmitting} required />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
+                Status do Colaborador
+              </CardTitle>
+              <CardDescription>Defina o status atual do colaborador e as datas relacionadas</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <UserStatusSelector disabled={isSubmitting} required />
 
-                {/* Status-Specific Dates - Inline */}
-                <StatusDatesSection disabled={isSubmitting} />
-              </CardContent>
-            </Card>
+              {/* Status-Specific Dates - Inline */}
+              <StatusDatesSection disabled={isSubmitting} />
+            </CardContent>
+          </Card>
 
           {/* Access Control */}
-          <Card className="bg-transparent">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <IconShieldCheck className="h-5 w-5 text-muted-foreground" />
-                  Controle de Acesso
-                </CardTitle>
-                <CardDescription>Configurações de acesso e verificação do usuário</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <ActiveSwitch disabled={isSubmitting} />
-                <VerifiedSwitch disabled={isSubmitting} />
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconShieldCheck className="h-5 w-5 text-muted-foreground" />
+                Controle de Acesso
+              </CardTitle>
+              <CardDescription>Configurações de acesso e verificação do usuário</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ActiveSwitch disabled={isSubmitting} />
+              <VerifiedSwitch disabled={isSubmitting} />
+            </CardContent>
+          </Card>
 
           {/* PPE Sizes */}
           <PpeSizesSection disabled={isSubmitting} />
-
-          {/* Hidden submit button that can be triggered by the header button */}
-          <button id="user-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
-            Submit
-          </button>
-        </form>
-      </Form>
-    </div>
+        </div>
+      </form>
+    </Form>
   );
 }

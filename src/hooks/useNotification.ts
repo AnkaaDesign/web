@@ -177,6 +177,11 @@ export const useMarkAsRead = () => {
         queryKey: notificationKeys.byUser(userId),
       });
 
+      // Invalidate the notification center query (for real-time UI updates)
+      queryClient.invalidateQueries({
+        queryKey: ["notifications"],
+      });
+
       // Invalidate seen notification queries
       queryClient.invalidateQueries({
         queryKey: seenNotificationKeys.all,
@@ -206,6 +211,11 @@ export const useMarkAllAsRead = () => {
       });
       queryClient.invalidateQueries({
         queryKey: notificationKeys.byUser(userId),
+      });
+
+      // Invalidate the notification center query (for real-time UI updates)
+      queryClient.invalidateQueries({
+        queryKey: ["notifications"],
       });
 
       // Invalidate seen notification queries

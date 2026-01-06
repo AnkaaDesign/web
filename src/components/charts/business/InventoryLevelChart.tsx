@@ -185,7 +185,7 @@ export const InventoryLevelChart = React.memo<InventoryLevelChartProps>(({
               const data = props.payload[0].payload;
 
               return (
-                <div className="rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-lg p-3">
+                <div className="rounded-lg border border-border bg-background/95 backdrop-blur-sm shadow-sm p-3">
                   <div className="font-medium text-foreground mb-2">{data.name}</div>
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between gap-4">

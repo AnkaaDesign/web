@@ -119,7 +119,9 @@ export function PriceAdjustmentModal({ open, onOpenChange, selectedItems, onSucc
         }
       }
     } catch (error: any) {
-      console.error("Error adjusting prices:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error adjusting prices:", error);
+      }
       const errorMessage = error.response?.data?.message || error.message || "Erro ao ajustar preços";
       toast.error(errorMessage);
     } finally {

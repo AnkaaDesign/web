@@ -95,7 +95,7 @@ export function SearchDemo() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

@@ -21,7 +21,6 @@ export const SimpleBulkActionsTest = forwardRef<
   // Expose the openModal method to parent component
   useImperativeHandle(ref, () => ({
     openModal: (type: BulkOperationType, taskIds: string[]) => {
-      console.log("Opening modal for", type, "with", taskIds.length, "tasks");
       setOperationType(type);
       setCurrentTaskIds(taskIds);
       setIsOpen(true);

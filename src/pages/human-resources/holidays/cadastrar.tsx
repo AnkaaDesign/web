@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { IconCalendar, IconCheck, IconLoader2 } from "@tabler/icons-react";
 import { routes, SECTOR_PRIVILEGES, FAVORITE_PAGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { HolidayForm } from "@/components/integrations/secullum/holidays/form";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { useSecullumCreateHoliday } from "../../../hooks";
@@ -33,7 +33,9 @@ export const HolidayCreatePage = () => {
         },
       });
     } catch (error) {
-      console.error("Error creating holiday:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error creating holiday:", error);
+      }
     }
   };
 
@@ -66,7 +68,7 @@ export const HolidayCreatePage = () => {
         {/* Fixed Header */}
         <div className="flex-shrink-0">
           <div className="max-w-3xl mx-auto">
-            <PageHeaderWithFavorite
+            <PageHeader
               title="Novo Feriado"
               icon={IconCalendar}
               favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_CADASTRAR}

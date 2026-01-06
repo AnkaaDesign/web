@@ -51,7 +51,7 @@ export const WarningBatchEditPage = () => {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-        <div className="container mx-auto max-w-7xl p-4 sm:p-6 space-y-6">
+        <div className="container mx-auto max-w-7xl p-4 sm:p-4 space-y-6">
           <PageHeader
             variant="batch"
             title="Edição em Lote de Advertências"
@@ -79,7 +79,7 @@ export const WarningBatchEditPage = () => {
   if (warnings.length === 0) {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-        <div className="container mx-auto max-w-7xl p-4 sm:p-6 space-y-6">
+        <div className="container mx-auto max-w-7xl p-4 sm:p-4 space-y-6">
           <PageHeader
             variant="batch"
             title="Edição em Lote de Advertências"
@@ -133,30 +133,29 @@ export const WarningBatchEditPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="h-full flex flex-col space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeader
-            variant="batch"
-            title="Edição em Lote de Advertências"
-            icon={IconAlertTriangle}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Recursos Humanos" },
-              { label: "Advertências", href: routes.humanResources.warnings.root },
-              { label: "Edição em Lote" },
-            ]}
-            selection={{
-              count: warnings.length,
-              entityName: "advertências",
-              onClearSelection: () => navigate(routes.humanResources.warnings.root),
-            }}
-            backButton={{
-              onClick: () => navigate(routes.humanResources.warnings.root),
-              label: "Voltar para lista",
-            }}
-          />
-        </div>
-        <div className="flex-1 overflow-hidden">
+      <div className="h-full flex flex-col bg-background px-4 pt-4">
+        <PageHeader
+          variant="batch"
+          title="Edição em Lote de Advertências"
+          icon={IconAlertTriangle}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Recursos Humanos" },
+            { label: "Advertências", href: routes.humanResources.warnings.root },
+            { label: "Edição em Lote" },
+          ]}
+          selection={{
+            count: warnings.length,
+            entityName: "advertências",
+            onClearSelection: () => navigate(routes.humanResources.warnings.root),
+          }}
+          backButton={{
+            onClick: () => navigate(routes.humanResources.warnings.root),
+            label: "Voltar para lista",
+          }}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-hidden pt-4 pb-6">
           <WarningBatchEditTable warnings={warnings} onSubmit={handleSubmit} isSubmitting={isSubmitting} />
         </div>
       </div>

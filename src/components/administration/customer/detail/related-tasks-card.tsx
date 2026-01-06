@@ -108,7 +108,7 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
 
   if (tasks.length === 0) {
     return (
-      <Card className={cn("shadow-sm border border-border", className)} level={1}>
+      <Card className={cn("shadow-sm border border-border", className)}>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -133,7 +133,7 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border", className)}>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">

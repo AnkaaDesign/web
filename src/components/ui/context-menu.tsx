@@ -105,7 +105,7 @@ export function ContextMenuProvider({ children }: ContextMenuProviderProps) {
       {isOpen && (
         <div
           ref={menuRef}
-          className="fixed z-50 min-w-32 rounded-md border bg-white dark:bg-gray-800 shadow-lg"
+          className="fixed z-50 min-w-32 rounded-md border bg-white dark:bg-gray-800 shadow-sm"
           style={{
             left: adjustedPosition.x,
             top: adjustedPosition.y,

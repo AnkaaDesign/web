@@ -101,7 +101,7 @@ export const ChartContainer: React.FC<ChartContainerProps> = ({
                       className="fixed inset-0 z-40"
                       onClick={() => setExportMenuOpen(false)}
                     />
-                    <div className="absolute right-0 top-full mt-2 w-40 rounded-lg border border-border bg-popover shadow-lg z-50">
+                    <div className="absolute right-0 top-full mt-2 w-40 rounded-lg border border-border bg-popover shadow-sm z-50">
                       <div className="p-1">
                         {config.export.formats.map((format) => (
                           <button

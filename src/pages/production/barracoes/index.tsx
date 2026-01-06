@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { PageHeaderWithFavorite } from '@/components/ui/page-header-with-favorite';
+import { PageHeader } from '@/components/ui/page-header';
 import { PrivilegeRoute } from '@/components/navigation/privilege-route';
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES, TASK_STATUS } from '@/constants';
 import { usePageTracker } from '@/hooks/use-page-tracker';
@@ -9,7 +9,7 @@ import { useTasks } from '@/hooks/useTask';
 import { truckService } from '@/api-client';
 import { GarageView } from '@/components/production/garage';
 import type { GarageTruck } from '@/components/production/garage';
-import { IconBuildingWarehouse, IconRefresh, IconDeviceFloppy, IconRestore } from '@tabler/icons-react';
+import { IconRefresh, IconDeviceFloppy, IconRestore } from '@tabler/icons-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -24,7 +24,45 @@ interface PendingChange {
 export function GaragesPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<Map<string, PendingChange>>(new Map());
+  const [viewMode, setViewMode] = useState<'all' | 'week'>('all');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const datePickerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const queryClient = useQueryClient();
+
+  // Generate next 5 days for date picker
+  const next5Days = useMemo(() => {
+    const days: Date[] = [];
+    const today = new Date();
+    for (let i = 0; i < 5; i++) {
+      const day = new Date(today);
+      day.setDate(today.getDate() + i);
+      days.push(day);
+    }
+    return days;
+  }, []);
+
+  // Format date for display
+  const formatDate = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    date.setHours(0, 0, 0, 0);
+
+    if (date.getTime() === today.getTime()) return 'Hoje';
+
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    return `${day}/${month}`;
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (datePickerTimeoutRef.current) {
+        clearTimeout(datePickerTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Track page access
   usePageTracker({
@@ -126,6 +164,10 @@ export function GaragesPage() {
           paintHex: (task.generalPainting as any)?.hex || null,
           length: truckLength,
           originalLength: sectionsSum > 0 ? sectionsSum : undefined, // Original length without cabin
+          entryDate: (task as any).entryDate || null,
+          term: (task as any).term || null,
+          layoutInfo: layoutSections.length > 0 ? `${layoutSections.length} seções` : null,
+          artworkInfo: null, // Can be enhanced later with artwork file count
         };
       });
   }, [tasksResponse, pendingChanges]);
@@ -237,20 +279,22 @@ export function GaragesPage() {
   if (isLoading) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="flex flex-col h-full space-y-6">
-          <PageHeaderWithFavorite
+        <div className="h-full flex flex-col px-4 pt-4">
+          <PageHeader
             title="Barracões"
-            icon={IconBuildingWarehouse}
-            favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
             breadcrumbs={[
               { label: 'Inicio', href: routes.home },
               { label: 'Producao', href: routes.production.root },
               { label: 'Barracões' },
             ]}
+            favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
           />
-
-          <div className="flex-1 flex items-center justify-center">
-            <Skeleton className="h-[550px] w-[600px] rounded-lg" />
+          <div className="flex-1 overflow-y-auto pb-6">
+            <div className="mt-4 space-y-4">
+              <div className="bg-card rounded-lg shadow-sm border border-border p-2 flex items-center justify-center" style={{ height: '700px' }}>
+                <Skeleton className="h-[550px] w-full rounded-lg" />
+              </div>
+            </div>
           </div>
         </div>
       </PrivilegeRoute>
@@ -260,25 +304,30 @@ export function GaragesPage() {
   if (error) {
     return (
       <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-        <div className="flex flex-col h-full space-y-4">
-          <PageHeaderWithFavorite
+        <div className="h-full flex flex-col px-4 pt-4">
+          <PageHeader
             title="Barracões"
-            icon={IconBuildingWarehouse}
-            favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
             breadcrumbs={[
               { label: 'Inicio', href: routes.home },
               { label: 'Producao', href: routes.production.root },
               { label: 'Barracões' },
             ]}
+            favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
           />
-          <Alert variant="destructive">
-            <AlertDescription>
-              Erro ao carregar barracões. Por favor, tente novamente mais tarde.
-              {error && (error as Error).message && (
-                <div className="mt-2 text-sm">Detalhes: {(error as Error).message}</div>
-              )}
-            </AlertDescription>
-          </Alert>
+          <div className="flex-1 overflow-y-auto pb-6">
+            <div className="mt-4 space-y-4">
+              <div className="bg-card rounded-lg shadow-sm border border-border p-2" style={{ height: '700px' }}>
+                <Alert variant="destructive">
+                  <AlertDescription>
+                    Erro ao carregar barracões. Por favor, tente novamente mais tarde.
+                    {error && (error as Error).message && (
+                      <div className="mt-2 text-sm">Detalhes: {(error as Error).message}</div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              </div>
+            </div>
+          </div>
         </div>
       </PrivilegeRoute>
     );
@@ -286,59 +335,136 @@ export function GaragesPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Barracões"
-            icon={IconBuildingWarehouse}
-            favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
-            breadcrumbs={[
-              { label: 'Inicio', href: routes.home },
-              { label: 'Producao', href: routes.production.root },
-              { label: 'Barracões' },
-            ]}
-            actions={[
-              ...(hasPendingChanges
-                ? [
-                    {
-                      key: 'restore',
-                      label: 'Restaurar',
-                      icon: IconRestore,
-                      onClick: handleRestoreChanges,
-                      variant: 'outline' as const,
-                      disabled: isUpdating,
-                    },
-                    {
-                      key: 'save',
-                      label: `Salvar (${pendingChanges.size})`,
-                      icon: IconDeviceFloppy,
-                      onClick: handleSaveChanges,
-                      variant: 'default' as const,
-                      disabled: isUpdating,
-                    },
-                  ]
-                : []),
-              {
-                key: 'refresh',
-                label: 'Atualizar',
-                icon: IconRefresh,
-                onClick: handleRefresh,
-                variant: 'outline' as const,
-                disabled: isRefreshing || isUpdating,
-              },
-            ]}
-          />
-        </div>
+      <div className="h-full flex flex-col px-4 pt-4">
+        <PageHeader
+          title="Barracões"
+          breadcrumbs={[
+            { label: 'Inicio', href: routes.home },
+            { label: 'Producao', href: routes.production.root },
+            { label: 'Barracões' },
+          ]}
+          favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
+          actions={[
+            // View mode selector as custom action with React element label
+            {
+              key: 'view-mode',
+              label: (
+                <div className="flex gap-1.5 items-center relative">
+                  <div className="flex rounded-lg border border-border overflow-visible">
+                    <button
+                      onClick={() => setViewMode('all')}
+                      className={`h-9 px-4 text-xs font-medium transition-opacity duration-200 ${
+                        viewMode === 'all'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-transparent text-foreground hover:bg-muted/30'
+                      }`}
+                    >
+                      Grade
+                    </button>
+                    <div
+                      className="relative"
+                      onMouseEnter={() => {
+                        // Clear any pending close timeout
+                        if (datePickerTimeoutRef.current) {
+                          clearTimeout(datePickerTimeoutRef.current);
+                          datePickerTimeoutRef.current = null;
+                        }
+                        setShowDatePicker(true);
+                      }}
+                      onMouseLeave={() => {
+                        // Delay closing to prevent flicker
+                        datePickerTimeoutRef.current = setTimeout(() => {
+                          setShowDatePicker(false);
+                        }, 150);
+                      }}
+                    >
+                      <button
+                        className={`h-9 px-4 text-xs font-medium transition-opacity duration-200 border-l border-border ${
+                          viewMode === 'week'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-transparent text-foreground hover:bg-muted/30'
+                        }`}
+                      >
+                        Calendário
+                      </button>
 
-        {/* Main Content - fills available space with minimal padding */}
-        <div className="flex-1 min-h-0 bg-card rounded-lg shadow-sm border border-border p-2">
-          <GarageView
-            trucks={garageTrucks}
-            onTruckMove={canEditGaragePositions ? handleTruckMove : undefined}
-            onTruckSwap={canEditGaragePositions ? handleTruckSwap : undefined}
-            className={isUpdating ? 'opacity-50 pointer-events-none' : ''}
-            readOnly={!canEditGaragePositions}
-          />
+                      {/* Date picker dropdown */}
+                      {showDatePicker && (
+                        <div
+                          className="absolute top-full right-0 bg-white border border-border rounded-lg shadow-lg py-1 min-w-[120px]"
+                          style={{ zIndex: 9999 }}
+                        >
+                          {next5Days.map((day, index) => (
+                            <button
+                              key={index}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDate(day);
+                                setViewMode('week');
+                                setShowDatePicker(false);
+                                if (datePickerTimeoutRef.current) {
+                                  clearTimeout(datePickerTimeoutRef.current);
+                                  datePickerTimeoutRef.current = null;
+                                }
+                              }}
+                              className="w-full px-4 py-2 text-left text-xs text-foreground hover:bg-muted/30 transition-colors block"
+                            >
+                              {formatDate(day)}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) as any,
+            },
+            ...(hasPendingChanges
+              ? [
+                  {
+                    key: 'restore',
+                    label: 'Restaurar',
+                    icon: IconRestore,
+                    onClick: handleRestoreChanges,
+                    variant: 'outline' as const,
+                    disabled: isUpdating,
+                  },
+                  {
+                    key: 'save',
+                    label: `Salvar (${pendingChanges.size})`,
+                    icon: IconDeviceFloppy,
+                    onClick: handleSaveChanges,
+                    variant: 'default' as const,
+                    disabled: isUpdating,
+                  },
+                ]
+              : []),
+            {
+              key: 'refresh',
+              label: 'Atualizar',
+              icon: IconRefresh,
+              onClick: handleRefresh,
+              variant: 'outline' as const,
+              disabled: isRefreshing || isUpdating,
+            },
+          ]}
+        />
+
+        {/* Scrollable Content - flex container to fill remaining space */}
+        <div className="flex-1 flex flex-col overflow-hidden pb-6">
+          <div className="flex-1 mt-4">
+            <div className="bg-card rounded-lg shadow-sm border border-border p-2 h-full">
+              <GarageView
+                trucks={garageTrucks}
+                onTruckMove={canEditGaragePositions ? handleTruckMove : undefined}
+                onTruckSwap={canEditGaragePositions ? handleTruckSwap : undefined}
+                className={isUpdating ? 'opacity-50 pointer-events-none' : ''}
+                readOnly={!canEditGaragePositions}
+                viewMode={viewMode}
+                selectedDate={selectedDate}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </PrivilegeRoute>

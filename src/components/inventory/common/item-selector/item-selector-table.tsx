@@ -1,4 +1,8 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef, MouseEvent } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import type { MouseEvent } from "react";
+
+// Stable no-op function to prevent ref composition loops in Radix Checkbox
+const NOOP = () => {};
 import { IconFilter, IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
 import { useItems, useItemCategories, useItemBrands, useSuppliers } from "../../../../hooks";
 import { Button } from "@/components/ui/button";
@@ -43,6 +47,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   selectedItems,
   onSelectItem,
   onSelectAll,
+  onBatchSelectItems,
   className,
   quantities = {},
   prices = {},
@@ -345,7 +350,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
 
   // Handle row click (selection) with shift+click support
   const handleRowClick = useCallback(
-    (item: Item, event?: MouseEvent) => {
+    (item: Item, event?: MouseEvent<HTMLElement>) => {
       // Pass item data (quantity/stock, price, icms, ipi) when selecting via row click
       const quantity = item.quantity; // Current stock
       const price = item.prices?.[0]?.value;
@@ -354,6 +359,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
 
       // Shift+click: select range of items
       if (event?.shiftKey && lastClickedIdRef.current) {
+        event.preventDefault(); // Prevent text selection
         const lastIndex = currentPageItemIds.indexOf(lastClickedIdRef.current);
         const currentIndex = currentPageItemIds.indexOf(item.id);
 
@@ -362,29 +368,53 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
           const end = Math.max(lastIndex, currentIndex);
           const rangeIds = currentPageItemIds.slice(start, end + 1);
 
-          // Select all items in range that are not already selected
-          rangeIds.forEach((id) => {
-            if (!selectedItems.has(id)) {
-              const rangeItem = items.find((i) => i.id === id);
-              if (rangeItem) {
-                const rangeQuantity = rangeItem.quantity;
-                const rangePrice = rangeItem.prices?.[0]?.value;
-                const rangeIcms = rangeItem.icms;
-                const rangeIpi = rangeItem.ipi;
-                onSelectItem(id, rangeQuantity, rangePrice, rangeIcms, rangeIpi);
-              }
+          // Filter out already selected items
+          const idsToSelect = rangeIds.filter((id) => !selectedItems.has(id));
+
+          if (idsToSelect.length > 0) {
+            // If batch handler is provided, use it for better performance
+            if (onBatchSelectItems) {
+              const itemData: Record<string, { quantity?: number; price?: number; icms?: number; ipi?: number }> = {};
+              idsToSelect.forEach((id) => {
+                const rangeItem = items.find((i) => i.id === id);
+                if (rangeItem) {
+                  itemData[id] = {
+                    quantity: rangeItem.quantity,
+                    price: rangeItem.prices?.[0]?.value,
+                    icms: rangeItem.icms,
+                    ipi: rangeItem.ipi,
+                  };
+                }
+              });
+              onBatchSelectItems(idsToSelect, itemData);
+            } else {
+              // Fallback: call onSelectItem for each (may have stale closure issues)
+              idsToSelect.forEach((id) => {
+                const rangeItem = items.find((i) => i.id === id);
+                if (rangeItem) {
+                  onSelectItem(
+                    id,
+                    rangeItem.quantity,
+                    rangeItem.prices?.[0]?.value,
+                    rangeItem.icms,
+                    rangeItem.ipi
+                  );
+                }
+              });
             }
-          });
+          }
+
+          // Update last clicked to the current item (end of range)
+          lastClickedIdRef.current = item.id;
         }
       } else {
         // Regular click: toggle single item
         onSelectItem(item.id, quantity, price, icms, ipi);
+        // Update last clicked ID for future shift-clicks
+        lastClickedIdRef.current = item.id;
       }
-
-      // Always update last clicked ID
-      lastClickedIdRef.current = item.id;
     },
-    [onSelectItem, currentPageItemIds, items, selectedItems]
+    [onSelectItem, onBatchSelectItems, currentPageItemIds, items, selectedItems, quantities, prices, icmses, ipis]
   );
 
   // Handle select all on current page
@@ -584,7 +614,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
                         key={item.id}
                         data-state={itemIsSelected ? "selected" : undefined}
                         className={cn(
-                          "cursor-pointer transition-colors border-b border-border",
+                          "cursor-pointer transition-colors border-b border-border select-none",
                           // Alternating row colors
                           index % 2 === 1 && "bg-muted/10",
                           // Hover state that works with alternating colors
@@ -597,17 +627,42 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
                         {/* Checkbox cell */}
                         <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
                           <div
-                            className="flex items-center justify-start h-full w-full px-4 py-2"
+                            className="flex items-center justify-start h-full w-full px-4 py-2 cursor-pointer"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleRowClick(item, e as unknown as MouseEvent<HTMLTableRowElement>);
+                              handleRowClick(item, e);
                             }}
                           >
-                            <Checkbox
-                              checked={itemIsSelected}
+                            {/* Simple visual checkbox to avoid Radix ref composition issues */}
+                            <div
+                              className={cn(
+                                "h-4 w-4 shrink-0 rounded-sm border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                itemIsSelected
+                                  ? "bg-primary border-primary text-primary-foreground"
+                                  : "border-neutral-400 dark:border-neutral-600 bg-transparent hover:border-primary/50"
+                              )}
                               aria-label={`Select ${item.name}`}
-                              data-checkbox
-                            />
+                              role="checkbox"
+                              aria-checked={itemIsSelected}
+                              tabIndex={0}
+                            >
+                              {itemIsSelected && (
+                                <svg
+                                  className="h-full w-full"
+                                  viewBox="0 0 15 15"
+                                  fill="none"
+                                  xmlns="http://www.w3.org/2000/svg"
+                                >
+                                  <path
+                                    d="M11.4669 3.72684C11.7558 3.91574 11.8369 4.30308 11.648 4.59198L7.39799 11.092C7.29783 11.2452 7.13556 11.3467 6.95402 11.3699C6.77247 11.3931 6.58989 11.3355 6.45446 11.2124L3.70446 8.71241C3.44905 8.48022 3.43023 8.08494 3.66242 7.82953C3.89461 7.57412 4.28989 7.55529 4.5453 7.78749L6.75292 9.79441L10.6018 3.90792C10.7907 3.61902 11.178 3.53795 11.4669 3.72684Z"
+                                    fill="currentColor"
+                                    fillRule="evenodd"
+                                    clipRule="evenodd"
+                                    strokeWidth={3}
+                                  />
+                                </svg>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
 

@@ -103,19 +103,20 @@ export const PositionDetailPage = () => {
       await deleteAsync(id);
       navigate(routes.humanResources.positions.root);
     } catch (error) {
-      console.error("Error deleting position:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting position:", error);
+      }
     }
     setIsDeleteDialogOpen(false);
   };
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="space-y-6">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
           entity={position}
           title={position.name}
-          icon={IconBriefcase}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Recursos Humanos" },
@@ -143,22 +144,22 @@ export const PositionDetailPage = () => {
               disabled: deleteMutation.isPending,
             },
           ]}
+          className="flex-shrink-0"
         />
 
-        {/* Info Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <SpecificationsCard position={position} />
-          <RemunerationHistoryCard position={position} />
-        </div>
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <SpecificationsCard position={position} />
+              <RemunerationHistoryCard position={position} />
+            </div>
 
-        {/* Changelog - Single column */}
-        <div className="grid grid-cols-1 gap-6">
-          <ChangelogHistory entityType={"POSITION" as any} entityId={id} entityName={position.name} entityCreatedAt={position.createdAt} maxHeight="500px" />
-        </div>
+            {/* Changelog - Single column */}
+            <ChangelogHistory entityType={"POSITION" as any} entityId={id} entityName={position.name} entityCreatedAt={position.createdAt} maxHeight="500px" />
 
-        {/* Related Users - Full width, last section */}
-        <div className="grid grid-cols-1 gap-6">
-          <RelatedUsersCard position={position} />
+            {/* Related Users - Full width, last section */}
+            <RelatedUsersCard position={position} />
+          </div>
         </div>
 
         {/* Delete Confirmation Dialog */}

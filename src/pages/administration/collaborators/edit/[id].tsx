@@ -203,31 +203,23 @@ const EditCollaboratorPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="h-full flex flex-col space-y-4">
-        {/* Fixed Header */}
-        <div className="flex-shrink-0">
-          <div className="max-w-4xl mx-auto">
-            <PageHeader
-              variant="form"
-              title="Editar Colaborador"
-              icon={IconUsers}
-              breadcrumbs={[
-                { label: "Início", href: routes.home },
-                { label: "Administração", href: routes.administration.root },
-                { label: "Colaboradores", href: routes.administration.collaborators.root },
-                { label: truncateName(user.name), href: routes.administration.collaborators.details(id!) },
-                { label: "Editar" },
-              ]}
-              actions={actions}
-            />
-          </div>
-        </div>
-
-        {/* Main Content Card - Dashboard style scrolling */}
-        <div className="flex-1 overflow-hidden max-w-4xl mx-auto w-full">
-          <div className="h-full bg-card rounded-lg shadow-md border-muted overflow-hidden">
-            <UserForm mode="update" defaultValues={defaultValues} onSubmit={handleSubmit} isSubmitting={isUpdating} onFormStateChange={setFormState} />
-          </div>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="form"
+          title="Editar Colaborador"
+          icon={IconUsers}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Administração", href: routes.administration.root },
+            { label: "Colaboradores", href: routes.administration.collaborators.root },
+            { label: truncateName(user.name), href: routes.administration.collaborators.details(id!) },
+            { label: "Editar" },
+          ]}
+          actions={actions}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <UserForm mode="update" defaultValues={defaultValues} onSubmit={handleSubmit} isSubmitting={isUpdating} onFormStateChange={setFormState} />
         </div>
       </div>
     </PrivilegeRoute>

@@ -1,8 +1,9 @@
 // packages/interfaces/src/serviceOrder.ts
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
-import type { ORDER_BY_DIRECTION, SERVICE_ORDER_STATUS } from "../constants";
+import type { ORDER_BY_DIRECTION, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../constants";
 import type { Task, TaskIncludes, TaskOrderBy } from "./task";
+import type { User, UserIncludes, UserOrderBy } from "./user";
 
 // =====================
 // ServiceOrder Interface
@@ -11,13 +12,16 @@ import type { Task, TaskIncludes, TaskOrderBy } from "./task";
 export interface ServiceOrder extends BaseEntity {
   status: SERVICE_ORDER_STATUS | null;
   statusOrder: number; // 1=Pendente, 2=Em Andamento, 3=Finalizado, 4=Cancelado
+  type: SERVICE_ORDER_TYPE;
   description: string;
   taskId: string;
+  assignedToId: string | null;
   startedAt: Date | null;
   finishedAt: Date | null;
 
   // Relations
   task?: Task;
+  assignedTo?: User;
   service?: {
     name: string;
   };
@@ -33,6 +37,11 @@ export interface ServiceOrderIncludes {
     | {
         include?: TaskIncludes;
       };
+  assignedTo?:
+    | boolean
+    | {
+        include?: UserIncludes;
+      };
 }
 
 // =====================
@@ -43,13 +52,16 @@ export interface ServiceOrderOrderBy {
   id?: ORDER_BY_DIRECTION;
   status?: ORDER_BY_DIRECTION;
   statusOrder?: ORDER_BY_DIRECTION;
+  type?: ORDER_BY_DIRECTION;
   description?: ORDER_BY_DIRECTION;
   taskId?: ORDER_BY_DIRECTION;
+  assignedToId?: ORDER_BY_DIRECTION;
   startedAt?: ORDER_BY_DIRECTION;
   finishedAt?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
   task?: TaskOrderBy;
+  assignedTo?: UserOrderBy;
 }
 
 // =====================

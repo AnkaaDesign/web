@@ -58,7 +58,7 @@ export default function FormulaEdit() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="container mx-auto p-4 space-y-6">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-96 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -68,7 +68,7 @@ export default function FormulaEdit() {
 
   if (formulaError || !formulaResponse?.data) {
     return (
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-4">
         <Alert variant="destructive">
           <IconAlertCircle className="h-4 w-4" />
           <AlertDescription>{formulaError?.message || "Erro ao carregar fórmula"}</AlertDescription>
@@ -104,7 +104,7 @@ export default function FormulaEdit() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-4 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">

@@ -85,7 +85,7 @@ export const MediaViewerDemo: React.FC = () => {
               key={item.id}
               onClick={() => openViewer(index)}
               className={cn(
-                'group relative aspect-square rounded-xl overflow-hidden shadow-lg',
+                'group relative aspect-square rounded-xl overflow-hidden shadow-sm',
                 'hover:shadow-2xl hover:scale-105 transition-all duration-300',
                 'focus:outline-none focus:ring-4 focus:ring-blue-500/50'
               )}
@@ -123,7 +123,7 @@ export const MediaViewerDemo: React.FC = () => {
         </div>
 
         {/* Additional demo controls */}
-        <div className="mt-12 bg-white rounded-xl shadow-lg p-6">
+        <div className="mt-12 bg-white rounded-xl shadow-sm p-4">
           <h2 className="text-2xl font-semibold mb-4">Quick Access</h2>
           <div className="flex flex-wrap gap-3">
             <button
@@ -149,7 +149,7 @@ export const MediaViewerDemo: React.FC = () => {
 
         {/* Feature highlights */}
         <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="bg-white rounded-xl shadow-sm p-4">
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
               <ImageIcon className="w-6 h-6 text-blue-600" />
             </div>
@@ -162,7 +162,7 @@ export const MediaViewerDemo: React.FC = () => {
             </ul>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="bg-white rounded-xl shadow-sm p-4">
             <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
               <Video className="w-6 h-6 text-purple-600" />
             </div>
@@ -175,7 +175,7 @@ export const MediaViewerDemo: React.FC = () => {
             </ul>
           </div>
 
-          <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="bg-white rounded-xl shadow-sm p-4">
             <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
               <Play className="w-6 h-6 text-green-600" />
             </div>

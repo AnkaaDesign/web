@@ -128,7 +128,7 @@ export function FileGallery({ files, onDelete, onDownload }: FileGalleryProps) {
         return (
           <div
             key={file.id}
-            className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+            className="border rounded-lg overflow-hidden hover:shadow-sm transition-shadow"
           >
             {/* Thumbnail or Icon */}
             <div className="aspect-square bg-gray-100 flex items-center justify-center p-4">
@@ -201,7 +201,7 @@ export function FilePreviewModal({ fileId, filename, mimeType, onClose }: FilePr
   if (!preview.canPreview) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 max-w-md">
+        <div className="bg-white rounded-lg p-4 max-w-md">
           <h3 className="text-lg font-semibold mb-4">Visualização não disponível</h3>
           <p className="text-gray-600 mb-4">
             Este tipo de arquivo não pode ser visualizado no navegador.
@@ -285,7 +285,7 @@ export function FilePreviewModal({ fileId, filename, mimeType, onClose }: FilePr
         </div>
 
         {/* Preview */}
-        <div className="p-6 flex items-center justify-center">
+        <div className="p-4 flex items-center justify-center">
           {renderPreview()}
         </div>
       </div>

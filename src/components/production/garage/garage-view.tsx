@@ -21,33 +21,35 @@ import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 // =====================
 
 // Individual garage configurations with real measurements
+// All garages standardized to 20m × 35m for consistency with minimal waste
+// Lane lengths are preserved to maintain truck positioning accuracy
 const GARAGE_CONFIGS = {
   B1: {
-    width: 20, // meters
-    length: 30, // meters
-    paddingTop: 2.2, // meters - back margin from top
-    paddingBottom: 3.2, // meters - front margin from bottom
-    laneLength: 24.6, // meters
+    width: 20, // meters (standardized)
+    length: 35, // meters (standardized from 30m)
+    paddingTop: 3, // meters - back margin from top
+    paddingBottom: 7.4, // meters - front margin from bottom (adjusted)
+    laneLength: 24.6, // meters (preserved: 35 - 3 - 7.4)
     laneWidth: 3, // meters
     laneSpacing: (20 - 9) / 4, // 2.75m - equal spacing between and around lanes
     lanePaddingX: (20 - 9) / 4, // 2.75m - padding on left/right
   },
   B2: {
-    width: 18.5, // meters
-    length: 30.5, // meters
-    paddingTop: 3.5, // meters - back margin from top
-    paddingBottom: 2.5, // meters - front margin from bottom
-    laneLength: 24.5, // meters
+    width: 20, // meters (standardized from 18.5m)
+    length: 35, // meters (standardized from 30.5m)
+    paddingTop: 3, // meters - back margin from top
+    paddingBottom: 7.5, // meters - front margin from bottom (adjusted)
+    laneLength: 24.5, // meters (preserved: 35 - 3 - 7.5)
     laneWidth: 3, // meters
-    laneSpacing: (18.5 - 9) / 4, // 2.375m - equal spacing between and around lanes
-    lanePaddingX: (18.5 - 9) / 4, // 2.375m - padding on left/right
+    laneSpacing: (20 - 9) / 4, // 2.75m - equal spacing between and around lanes (standardized)
+    lanePaddingX: (20 - 9) / 4, // 2.75m - padding on left/right (standardized)
   },
   B3: {
-    width: 20, // meters
-    length: 40, // meters
+    width: 20, // meters (standardized)
+    length: 35, // meters (standardized from 40m)
     paddingTop: 3, // meters - back margin from top
-    paddingBottom: 7, // meters - front margin from bottom
-    laneLength: 30, // meters
+    paddingBottom: 2, // meters - front margin from bottom (reduced from 7m)
+    laneLength: 30, // meters (preserved: 35 - 3 - 2)
     laneWidth: 3, // meters
     laneSpacing: (20 - 9) / 4, // 2.75m - equal spacing between and around lanes
     lanePaddingX: (20 - 9) / 4, // 2.75m - padding on left/right
@@ -104,6 +106,10 @@ export interface GarageTruck {
   paintHex?: string | null;
   length: number; // Total length (with cabin if applicable)
   originalLength?: number; // Original length without cabin (for display)
+  entryDate?: string | null; // Task entry date
+  term?: string | null; // Task deadline
+  layoutInfo?: string | null; // Layout description
+  artworkInfo?: string | null; // Artwork description
 }
 
 interface PositionedTruck extends GarageTruck {
@@ -147,6 +153,82 @@ function calculateLaneXPosition(laneIndex: number, garageId: GarageId): number {
 function calculateGarageWidth(garageId: GarageId): number {
   const config = GARAGE_CONFIGS[garageId];
   return config.width;
+}
+
+// Calculate available space in a lane and whether a truck can fit
+function calculateLaneAvailability(
+  garageId: GarageId,
+  laneId: LaneId,
+  trucks: GarageTruck[],
+  truckLength: number,
+  excludeTruckId?: string
+): { canFit: boolean; availableSpace: number; requiredSpace: number } {
+  const config = GARAGE_CONFIGS[garageId];
+  const laneLength = config.laneLength;
+
+  // Find all trucks in this lane (excluding the truck being dragged)
+  const trucksInLane = trucks.filter(t => {
+    if (t.id === excludeTruckId) return false;
+    if (!t.spot || t.spot === 'PATIO') return false;
+    const parsed = parseSpot(t.spot);
+    return parsed.garage === garageId && parsed.lane === laneId;
+  });
+
+  // Calculate what would be occupied if we add the new truck:
+  // IMPORTANT: The gap logic depends on how many trucks we'll have:
+  // - 0 trucks -> 1 truck: No gaps, just margins (top + bottom)
+  // - 1 truck -> 2 trucks: No mandatory gaps! V1 goes to top, V2 goes to bottom with just margins
+  // - 2 trucks -> 3 trucks: NOW we need gaps (V1 top, V2 middle, V3 bottom)
+  //   - V2 in middle requires: 1m gap from V1, 1m gap from V3
+
+  // CRITICAL: Use originalLength (without cabin) for garage space calculation!
+  // The cabin extends outside the garage, so we only count the trailer/body length
+  const currentTruckLengths = trucksInLane.reduce((sum, truck) => {
+    const garageLength = truck.originalLength ?? truck.length;
+    return sum + garageLength;
+  }, 0);
+  const newTotalTruckLengths = currentTruckLengths + truckLength;
+  const margins = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP; // 0.4m total (always constant)
+  const newTruckCount = trucksInLane.length + 1;
+
+  let gapsBetweenTrucks = 0;
+  if (newTruckCount === 3) {
+    // 3 trucks: V1-top, V2-middle, V3-bottom
+    // Need 2 gaps: V1->V2 and V2->V3
+    gapsBetweenTrucks = 2 * COMMON_CONFIG.TRUCK_MIN_SPACING; // 2m total
+  } else if (newTruckCount === 2) {
+    // 2 trucks: V1-top, V2-bottom
+    // NO mandatory gap - they just need to not overlap
+    gapsBetweenTrucks = 0;
+  } else {
+    // 1 truck: just margins
+    gapsBetweenTrucks = 0;
+  }
+
+  const totalRequiredSpace = margins + newTotalTruckLengths + gapsBetweenTrucks;
+
+  // Calculate how much space is currently available
+  // CRITICAL: Current gaps must match the positioning logic
+  // - 1 truck: 0 gaps (just V1 at top)
+  // - 2 trucks: 0 gaps (V1 at top, V2 at bottom, no mandatory gap between)
+  // - 3 trucks: 2m gaps (V1 top, V2 middle with 1m from V1 and 1m from V3, V3 bottom)
+  let currentGaps = 0;
+  if (trucksInLane.length === 3) {
+    currentGaps = 2 * COMMON_CONFIG.TRUCK_MIN_SPACING; // 3 trucks = need gaps for middle truck
+  } else {
+    currentGaps = 0; // 1 or 2 trucks = no gaps
+  }
+  const currentOccupied = margins + currentTruckLengths + currentGaps;
+  const availableSpace = Math.max(0, laneLength - currentOccupied);
+
+  // Can fit if total required space fits in lane AND not at max capacity (3 trucks)
+  const canFit = totalRequiredSpace <= laneLength && trucksInLane.length < 3;
+
+  const requiredSpace = truckLength;
+
+  // DETAILED DEBUG LOGGING
+
+  return { canFit, availableSpace, requiredSpace };
 }
 
 function calculateAreaLayout(areaId: AreaId, trucks: GarageTruck[], patioColumns: number): AreaLayout {
@@ -199,6 +281,13 @@ function calculateAreaLayout(areaId: AreaId, trucks: GarageTruck[], patioColumns
       // X position centered in lane
       const laneX = padding + col * (laneWidth + laneSpacing);
       const xPos = laneX + truckOffset;
+
+      const truckBottom = yPos + truck.length;
+      const truckRight = xPos + COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW;
+
+      if (index < 3 || index >= patioTrucksList.length - 3) {
+        
+      }
 
       return {
         ...truck,
@@ -334,7 +423,8 @@ function TruckElement({ truck, scale, isDragging }: TruckElementProps) {
   return (
     <g
       transform={`translate(${x}, ${y})`}
-      className={cn('cursor-grab', isDragging && 'opacity-50')}
+      className="cursor-grab"
+      style={{ opacity: isDragging ? 0 : 1 }}
     >
       {/* Truck body */}
       <rect
@@ -387,6 +477,88 @@ function TruckElement({ truck, scale, isDragging }: TruckElementProps) {
   );
 }
 
+interface TruckTooltipProps {
+  truck: PositionedTruck;
+  scale: number;
+}
+
+function TruckTooltip({ truck, scale }: TruckTooltipProps) {
+  const width = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW * scale;
+  const height = truck.length * scale;
+  const x = truck.xPosition * scale;
+  const y = truck.yPosition * scale;
+
+  // Position tooltip to the right of the truck, centered vertically
+  const tooltipWidth = 200;
+  const tooltipPadding = 8;
+
+  // Build tooltip lines
+  const lines: string[] = [];
+  if (truck.taskName) lines.push(`Tarefa: ${truck.taskName}`);
+  if (truck.serialNumber) lines.push(`Série: ${truck.serialNumber}`);
+  if (truck.entryDate) {
+    const date = new Date(truck.entryDate);
+    lines.push(`Entrada: ${date.toLocaleDateString('pt-BR')}`);
+  }
+  if (truck.term) {
+    const date = new Date(truck.term);
+    lines.push(`Prazo: ${date.toLocaleDateString('pt-BR')}`);
+  }
+  if (truck.layoutInfo) lines.push(`Layout: ${truck.layoutInfo}`);
+  if (truck.artworkInfo) lines.push(`Arte: ${truck.artworkInfo}`);
+
+  const lineHeight = 16;
+  const tooltipHeight = lines.length * lineHeight + tooltipPadding * 2;
+
+  // Position tooltip to the right of truck, centered vertically
+  const tooltipX = x + width + 10;
+  const tooltipY = y + (height / 2) - (tooltipHeight / 2);
+
+  return (
+    <g style={{ pointerEvents: 'none', zIndex: 1000 }}>
+      {/* Tooltip background with shadow */}
+      <rect
+        x={tooltipX}
+        y={tooltipY}
+        width={tooltipWidth}
+        height={tooltipHeight}
+        fill="white"
+        stroke="#d1d5db"
+        strokeWidth={1}
+        rx={4}
+        filter="url(#tooltip-shadow)"
+      />
+      {/* Tooltip content */}
+      {lines.map((line, index) => (
+        <text
+          key={index}
+          x={tooltipX + tooltipPadding}
+          y={tooltipY + tooltipPadding + (index + 1) * lineHeight - 4}
+          fontSize={12}
+          fill="#374151"
+          fontFamily="system-ui, -apple-system, sans-serif"
+        >
+          {line.length > 30 ? line.slice(0, 27) + '...' : line}
+        </text>
+      ))}
+      {/* Shadow filter definition */}
+      <defs>
+        <filter id="tooltip-shadow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
+          <feOffset dx="0" dy="2" result="offsetblur" />
+          <feComponentTransfer>
+            <feFuncA type="linear" slope="0.3" />
+          </feComponentTransfer>
+          <feMerge>
+            <feMergeNode />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+    </g>
+  );
+}
+
 interface DraggableTruckProps {
   truck: PositionedTruck;
   scale: number;
@@ -394,15 +566,44 @@ interface DraggableTruckProps {
 }
 
 function DraggableTruck({ truck, scale, disabled = false }: DraggableTruckProps) {
+  const [isHovering, setIsHovering] = useState(false);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: truck.id,
     data: { truck },
     disabled,
   });
 
+  // Store hover state globally so we can render tooltips in a separate layer
+  useEffect(() => {
+    if (isHovering && !isDragging) {
+      // Dispatch custom event with truck info for tooltip rendering
+      const event = new CustomEvent('truck-hover', { detail: { truck, scale } });
+      window.dispatchEvent(event);
+    } else {
+      const event = new CustomEvent('truck-hover', { detail: null });
+      window.dispatchEvent(event);
+    }
+  }, [isHovering, isDragging, truck, scale]);
+
   return (
-    <g ref={setNodeRef} {...(disabled ? {} : listeners)} {...attributes} style={{ cursor: disabled ? 'default' : 'grab' }}>
+    <g
+      ref={setNodeRef}
+      {...(disabled ? {} : listeners)}
+      {...attributes}
+      style={{ cursor: disabled ? 'default' : 'grab' }}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+    >
       <TruckElement truck={truck} scale={scale} isDragging={isDragging} />
+      {/* Invisible larger hitbox for better tooltip activation */}
+      <rect
+        x={truck.xPosition * scale - 5}
+        y={truck.yPosition * scale - 5}
+        width={COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW * scale + 10}
+        height={truck.length * scale + 10}
+        fill="transparent"
+        style={{ pointerEvents: 'all' }}
+      />
     </g>
   );
 }
@@ -414,10 +615,16 @@ interface DroppableLaneProps {
   scale: number;
   laneY: number;
   showLabel?: boolean;
+  canFit?: boolean;
+  availableSpace?: number;
+  requiredSpace?: number;
+  isDragging?: boolean;
+  draggedTruckLength?: number;
+  trucks?: GarageTruck[];
   children: React.ReactNode;
 }
 
-function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = true, children }: DroppableLaneProps) {
+function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = true, canFit, availableSpace, requiredSpace, isDragging = false, draggedTruckLength, trucks, children }: DroppableLaneProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `${garageId}_${laneId}`,
     data: { garageId, laneId },
@@ -429,19 +636,166 @@ function DroppableLane({ garageId, laneId, xPosition, scale, laneY, showLabel = 
   const width = config.laneWidth * scale;
   const height = config.laneLength * scale;
 
+  // Calculate where the dragged truck would be placed in this lane
+  // Support multiple previews for small trucks
+  let previews: Array<{ y: number; height: number; color: 'green' | 'red' }> = [];
+
+  if (isDragging && draggedTruckLength && trucks) {
+    // Get trucks currently in this lane
+    const trucksInLane = trucks.filter((t) => {
+      if (!t.spot || t.spot === 'PATIO') return false;
+      const parsed = parseSpot(t.spot);
+      return parsed.garage === garageId && parsed.lane === laneId;
+    });
+
+    const laneLength = config.laneLength;
+    const spotNumbers = trucksInLane.map(t => parseSpot(t.spot!).spotNumber!).filter(Boolean).sort();
+    const maxSpots = 3;
+    const isLargeTruck = draggedTruckLength > laneLength * 0.5;
+
+    // Determine color based on canFit (undefined means still calculating, show as green)
+    const previewColor: 'green' | 'red' = canFit === false ? 'red' : 'green';
+
+    // Case 1: Large truck (>50% lane) - show entire lane
+    if (isLargeTruck) {
+      if (canFit === false) {
+        // Red preview - show only available space to prevent overflow
+        const maxFitHeight = Math.min(draggedTruckLength, availableSpace || 0);
+        previews.push({
+          y: COMMON_CONFIG.TRUCK_MARGIN_TOP,
+          height: maxFitHeight,
+          color: 'red',
+        });
+      } else {
+        // Green preview - show entire lane
+        previews.push({
+          y: 0,
+          height: laneLength,
+          color: 'green',
+        });
+      }
+    }
+    // Case 2: Small truck (<= 50% lane)
+    else if (!isLargeTruck) {
+      // Empty lane - show TWO possible spots (V1 and V2)
+      if (spotNumbers.length === 0) {
+        // Show V1 (top) and V2 (bottom) previews
+        previews.push(
+          {
+            y: COMMON_CONFIG.TRUCK_MARGIN_TOP,
+            height: draggedTruckLength,
+            color: previewColor,
+          },
+          {
+            y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
+            height: draggedTruckLength,
+            color: previewColor,
+          }
+        );
+      } else if (spotNumbers.length === 1) {
+        // One truck exists - show available spot
+        if (spotNumbers[0] === 1) {
+          // V1 exists - show V2 at bottom
+          previews.push({
+            y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
+            height: draggedTruckLength,
+            color: previewColor,
+          });
+        } else {
+          // V2 or V3 exists - show V1 at top
+          previews.push({
+            y: COMMON_CONFIG.TRUCK_MARGIN_TOP,
+            height: draggedTruckLength,
+            color: previewColor,
+          });
+        }
+      } else if (spotNumbers.length === 2) {
+        // 2 trucks exist - show the empty spot
+        if (!spotNumbers.includes(1)) {
+          previews.push({
+            y: COMMON_CONFIG.TRUCK_MARGIN_TOP,
+            height: draggedTruckLength,
+            color: previewColor,
+          });
+        } else if (!spotNumbers.includes(2)) {
+          // V2 is free - calculate middle position between V1 and V3
+          const v1Truck = trucksInLane.find(t => parseSpot(t.spot!).spotNumber === 1);
+          const v3Truck = trucksInLane.find(t => parseSpot(t.spot!).spotNumber === 3);
+          if (v1Truck && v3Truck) {
+            const v1Bottom = COMMON_CONFIG.TRUCK_MARGIN_TOP + v1Truck.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
+            const v3Top = laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - v3Truck.length - COMMON_CONFIG.TRUCK_MIN_SPACING;
+            previews.push({
+              y: v1Bottom + (v3Top - v1Bottom - draggedTruckLength) / 2,
+              height: draggedTruckLength,
+              color: previewColor,
+            });
+          }
+        } else if (!spotNumbers.includes(3)) {
+          // V3 is free
+          previews.push({
+            y: laneLength - COMMON_CONFIG.TRUCK_MARGIN_TOP - draggedTruckLength,
+            height: draggedTruckLength,
+            color: previewColor,
+          });
+        }
+      }
+    }
+  }
+
   return (
     <g ref={setNodeRef}>
-      {/* Lane background with yellow colors */}
+      {/* Lane background - always neutral color */}
       <rect
         x={x}
         y={y}
         width={width}
         height={height}
-        fill={isOver ? COLORS.LANE_HOVER : COLORS.LANE_FILL}
+        fill={isOver && isDragging ? COLORS.LANE_HOVER : COLORS.LANE_FILL}
         stroke={COLORS.LANE_STROKE}
         strokeWidth={2}
         rx={3}
       />
+
+      {/* Preview rectangles - shows where truck will be placed */}
+      {previews.map((preview, index) => {
+        const isGreen = preview.color === 'green';
+        // If multiple previews, show truck length on each
+        // If single preview, show available space
+        const displayText = previews.length > 1
+          ? (draggedTruckLength ? draggedTruckLength.toFixed(1).replace('.', ',') + 'm' : '')
+          : (availableSpace !== undefined ? availableSpace.toFixed(1).replace('.', ',') + 'm' : '');
+
+        return (
+          <g key={index}>
+            <rect
+              x={x}
+              y={y + preview.y * scale}
+              width={width}
+              height={preview.height * scale}
+              fill={isGreen ? '#86efac' : '#fca5a5'} // green-300 : red-300
+              fillOpacity={isOver ? 0.7 : 0.4}
+              stroke={isGreen ? '#10b981' : '#ef4444'} // green-500 : red-500
+              strokeWidth={2}
+              rx={2}
+            />
+            {/* Show text */}
+            {displayText && (
+              <text
+                x={x + width / 2}
+                y={y + preview.y * scale + (preview.height * scale / 2)}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize={10}
+                fontWeight="600"
+                fill={isGreen ? '#15803d' : '#b91c1c'}
+              >
+                {displayText}
+              </text>
+            )}
+          </g>
+        );
+      })}
+
       {/* Lane label - only show if showLabel is true */}
       {showLabel && (
         <text
@@ -517,6 +871,778 @@ function DroppablePatio({ scale, width, height, columns, children }: DroppablePa
 }
 
 // =====================
+// Week View Component (Timeline/Gantt Style)
+// =====================
+
+interface WeekViewProps {
+  trucks: GarageTruck[];
+  containerWidth: number;
+  containerHeight: number;
+  selectedGarageId?: GarageId;
+}
+
+function WeekView({ trucks, containerWidth, containerHeight }: WeekViewProps) {
+  // Generate 21 days starting from today (3 weeks)
+  const timelineDays = useMemo(() => {
+    const days: Date[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < 21; i++) {
+      const day = new Date(today);
+      day.setDate(today.getDate() + i);
+      days.push(day);
+    }
+    return days;
+  }, []);
+
+  // Format day label for timeline header
+  const formatTimelineDay = (date: Date, index: number): string => {
+    if (index === 0) return 'Hoje';
+    const day = date.getDate().toString();
+    const month = (date.getMonth() + 1).toString();
+    return `${day}/${month}`;
+  };
+
+  // Filter trucks that have dates and are in garages
+  const trucksWithDates = useMemo(() => {
+    return trucks.filter(truck => {
+      if (!truck.entryDate || !truck.term || !truck.spot || truck.spot === 'PATIO') return false;
+      return true;
+    });
+  }, [trucks]);
+
+  // Group trucks by garage and lane
+  const trucksByGarageLane = useMemo(() => {
+    const grouped: Record<string, GarageTruck[]> = {};
+
+    // Initialize all garage-lane combinations
+    (['B1', 'B2', 'B3'] as GarageId[]).forEach(garageId => {
+      LANES.forEach(laneId => {
+        const key = `${garageId}-${laneId}`;
+        grouped[key] = [];
+      });
+    });
+
+    // Group trucks
+    trucksWithDates.forEach(truck => {
+      const parsed = parseSpot(truck.spot!);
+      if (parsed.garage && parsed.lane) {
+        const key = `${parsed.garage}-${parsed.lane}`;
+        grouped[key].push(truck);
+      }
+    });
+
+    return grouped;
+  }, [trucksWithDates]);
+
+  // Calculate day column width
+  const dayColumnWidth = Math.max(50, Math.min(80, (containerWidth - 150) / timelineDays.length));
+  const laneRowHeight = 40;
+
+  // Helper to calculate truck bar position and width on timeline
+  const getTruckTimelineBar = (truck: GarageTruck) => {
+    const entry = new Date(truck.entryDate!);
+    const term = new Date(truck.term!);
+    entry.setHours(0, 0, 0, 0);
+    term.setHours(0, 0, 0, 0);
+
+    const startDay = timelineDays[0];
+    const daysDiff = (date1: Date, date2: Date) =>
+      Math.floor((date1.getTime() - date2.getTime()) / (1000 * 60 * 60 * 24));
+
+    const startOffset = Math.max(0, daysDiff(entry, startDay));
+    const endOffset = daysDiff(term, startDay);
+    const duration = endOffset - startOffset + 1;
+
+    return {
+      startOffset,
+      duration: Math.max(1, duration),
+      startX: startOffset * dayColumnWidth,
+      width: duration * dayColumnWidth,
+    };
+  };
+
+  return (
+    <div className="flex flex-col h-full w-full overflow-auto">
+      {/* Timeline Header */}
+      <div className="flex-shrink-0 sticky top-0 bg-white z-10 border-b-2 border-stone-200">
+        <div className="flex">
+          {/* Lane labels column */}
+          <div className="w-36 flex-shrink-0 border-r-2 border-stone-200 bg-stone-50">
+            <div className="h-12 flex items-center justify-center font-semibold text-stone-700">
+              Barracão / Faixa
+            </div>
+          </div>
+
+          {/* Days columns */}
+          <div className="flex-1 flex overflow-x-auto">
+            {timelineDays.map((day, index) => {
+              const isToday = index === 0;
+              const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+
+              return (
+                <div
+                  key={index}
+                  className={cn(
+                    'flex-shrink-0 h-12 border-r border-stone-200 flex flex-col items-center justify-center',
+                    isToday && 'bg-amber-100 font-bold',
+                    !isToday && isWeekend && 'bg-sky-50'
+                  )}
+                  style={{ width: dayColumnWidth }}
+                >
+                  <div className="text-xs font-medium">{formatTimelineDay(day, index)}</div>
+                  <div className="text-[10px] text-stone-500">
+                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][day.getDay()]}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Timeline Body - Garage Lanes */}
+      <div className="flex-1">
+        {(['B1', 'B2', 'B3'] as GarageId[]).map((garageId) => (
+          <div key={garageId} className="border-b border-stone-200">
+            {/* Garage header */}
+            <div className="flex bg-stone-100">
+              <div className="w-36 flex-shrink-0 border-r border-stone-200 px-3 py-2 font-semibold text-stone-700 text-sm">
+                {getAreaTitle(garageId)}
+              </div>
+              <div className="flex-1"></div>
+            </div>
+
+            {/* Lanes for this garage */}
+            {LANES.map((laneId) => {
+              const key = `${garageId}-${laneId}`;
+              const laneTrucks = trucksByGarageLane[key];
+
+              return (
+                <div key={laneId} className="flex border-t border-stone-100" style={{ height: laneRowHeight }}>
+                  {/* Lane label */}
+                  <div className="w-36 flex-shrink-0 border-r border-stone-200 px-3 flex items-center text-xs text-stone-600">
+                    {laneId}
+                  </div>
+
+                  {/* Timeline track */}
+                  <div className="flex-1 relative">
+                    {/* Day grid background */}
+                    <div className="absolute inset-0 flex">
+                      {timelineDays.map((day, index) => {
+                        const isToday = index === 0;
+                        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+
+                        return (
+                          <div
+                            key={index}
+                            className={cn(
+                              'flex-shrink-0 h-full border-r border-stone-100',
+                              isToday && 'bg-amber-50',
+                              !isToday && isWeekend && 'bg-sky-50/30'
+                            )}
+                            style={{ width: dayColumnWidth }}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    {/* Truck bars */}
+                    <div className="absolute inset-0" style={{ padding: '4px 0' }}>
+                      {laneTrucks.map((truck, idx) => {
+                        const bar = getTruckTimelineBar(truck);
+
+                        return (
+                          <div
+                            key={truck.id}
+                            className="absolute rounded shadow-sm border border-stone-300 flex items-center px-2 text-xs font-medium overflow-hidden"
+                            style={{
+                              left: bar.startX,
+                              width: bar.width - 4,
+                              top: 4 + (idx * 12),
+                              height: 28,
+                              backgroundColor: truck.paintHex || '#FCD34D',
+                              color: '#fff',
+                              textShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                            }}
+                            title={`${truck.taskName || truck.serialNumber || truck.id}\nEntrada: ${new Date(truck.entryDate!).toLocaleDateString('pt-BR')}\nPrazo: ${new Date(truck.term!).toLocaleDateString('pt-BR')}`}
+                          >
+                            <span className="truncate">
+                              {truck.serialNumber || truck.taskName || truck.id.slice(0, 8)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// =====================
+// Tooltip Layer Component (renders on top)
+// =====================
+
+function TooltipLayer() {
+  const [hoveredTruck, setHoveredTruck] = useState<{ truck: PositionedTruck; scale: number } | null>(null);
+
+  useEffect(() => {
+    const handleHover = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      setHoveredTruck(customEvent.detail);
+    };
+
+    window.addEventListener('truck-hover', handleHover);
+    return () => window.removeEventListener('truck-hover', handleHover);
+  }, []);
+
+  if (!hoveredTruck?.truck) return null;
+
+  const { truck, scale } = hoveredTruck;
+
+  // Only show tooltip if there's relevant data
+  if (!truck.entryDate && !truck.term && !truck.layoutInfo && !truck.artworkInfo) {
+    return null;
+  }
+
+  // Build tooltip content
+  const lines: string[] = [];
+  if (truck.taskName) lines.push(`Tarefa: ${truck.taskName}`);
+  if (truck.serialNumber) lines.push(`Série: ${truck.serialNumber}`);
+  if (truck.entryDate) {
+    const date = new Date(truck.entryDate);
+    lines.push(`Entrada: ${date.toLocaleDateString('pt-BR')}`);
+  }
+  if (truck.term) {
+    const date = new Date(truck.term);
+    lines.push(`Prazo: ${date.toLocaleDateString('pt-BR')}`);
+  }
+  if (truck.layoutInfo) lines.push(`Layout: ${truck.layoutInfo}`);
+  if (truck.artworkInfo) lines.push(`Arte: ${truck.artworkInfo}`);
+
+  // Calculate position - to the right of the truck
+  const truckWidth = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW * scale;
+  const truckHeight = truck.length * scale;
+  const x = truck.xPosition * scale;
+  const y = truck.yPosition * scale;
+
+  // Account for SVG transform offset
+  const rulerOffset = 50;
+  const svgTransformX = 20 + rulerOffset;
+  const svgTransformY = 5;
+
+  // Position tooltip to the right and centered vertically
+  const tooltipLeft = x + truckWidth + svgTransformX + 15;
+  const tooltipTop = y + svgTransformY + (truckHeight / 2);
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: tooltipLeft,
+        top: tooltipTop,
+        transform: 'translateY(-50%)',
+        backgroundColor: 'white',
+        border: '1px solid #d1d5db',
+        borderRadius: '4px',
+        padding: '8px',
+        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        fontSize: '12px',
+        color: '#374151',
+        pointerEvents: 'none',
+        zIndex: 9999,
+        minWidth: '180px',
+        whiteSpace: 'nowrap'
+      }}
+    >
+      {lines.map((line, index) => (
+        <div key={index} style={{ marginBottom: index < lines.length - 1 ? '4px' : 0 }}>
+          {line}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// =====================
+// Utility Functions
+// =====================
+
+function getAreaTitle(areaId: AreaId) {
+  if (areaId === 'PATIO') return 'Pátio';
+  return `Barracão ${areaId.slice(1)}`;
+}
+
+// =====================
+// All Garages View Component
+// =====================
+
+interface AllGaragesViewProps {
+  trucks: GarageTruck[];
+  containerWidth: number;
+  containerHeight: number;
+  garageCounts: Record<AreaId, number>;
+  viewMode?: 'all' | 'week';
+  onTruckMove?: (truckId: string, newSpot: string) => void;
+  onTruckSwap?: (truck1Id: string, spot1: string, truck2Id: string, spot2: string) => void;
+  readOnly?: boolean;
+}
+
+function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts, viewMode = 'all', onTruckMove, onTruckSwap, readOnly = false }: AllGaragesViewProps) {
+  // Show all 4 areas in Grade view, only garages (no PATIO) in Calendar view
+  const areasToShow = viewMode === 'week' ? (['B1', 'B2', 'B3'] as const) : AREAS;
+
+  // Calculate patio columns dynamically based on truck count (same logic as dimensions calculation)
+  // Target: ~3-4 trucks per column for optimal layout
+  const patioTrucks = trucks.filter(t => !t.spot || t.spot === 'PATIO');
+  const patioColumns = Math.max(5, Math.ceil(patioTrucks.length / 3));
+
+  // Drag-and-drop state
+  const [activeTruck, setActiveTruck] = useState<PositionedTruck | null>(null);
+
+  // Enable drag-and-drop only when viewMode === 'all' and onTruckMove is provided
+  const enableDragDrop = viewMode === 'all' && !readOnly && !!onTruckMove;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    })
+  );
+
+  const allAreaLayouts = useMemo(() => {
+    return areasToShow.map(areaId => ({
+      areaId,
+      layout: calculateAreaLayout(areaId, trucks, patioColumns)
+    }));
+  }, [trucks, areasToShow]);
+
+  // Calculate dimensions for each area
+  const areaDimensions = useMemo(() => {
+    return allAreaLayouts.map(({ areaId, layout }) => {
+      if (layout.isPatio) {
+        const patioTrucks = trucks.filter(t => !t.spot || t.spot === 'PATIO');
+        const patioTrucksSorted = [...patioTrucks].sort((a, b) => b.length - a.length);
+        const columns = Math.max(5, Math.ceil(patioTrucks.length / 3));
+
+        // CORRECT PATIO WIDTH CALCULATION - must include lane spacing between columns!
+        const laneWidth = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW + 0.4;
+        const laneSpacing = PATIO_CONFIG.LANE_SPACING;
+        const padding = PATIO_CONFIG.PADDING;
+        const width = padding * 2 + columns * laneWidth + (columns - 1) * laneSpacing;
+
+        // CORRECT PATIO HEIGHT CALCULATION - calculate actual column heights!
+        // Trucks are distributed across columns and stacked vertically
+        const truckMargin = PATIO_CONFIG.TRUCK_MARGIN;
+        const minLaneLength = PATIO_CONFIG.MIN_LANE_LENGTH;
+
+        // Calculate content height for each column
+        const columnContentHeights: number[] = Array(columns).fill(truckMargin);
+        patioTrucksSorted.forEach((truck, index) => {
+          const col = index % columns;
+          columnContentHeights[col] += truck.length + COMMON_CONFIG.TRUCK_MIN_SPACING;
+        });
+
+        // Get max column height (replace last spacing with bottom margin)
+        const maxContentHeight = patioTrucks.length > 0
+          ? Math.max(...columnContentHeights) - COMMON_CONFIG.TRUCK_MIN_SPACING + truckMargin
+          : truckMargin * 2;
+
+        // Apply minimum lane length and add padding
+        const height = Math.max(maxContentHeight, minLaneLength) + padding * 2;
+
+        return { areaId, width, height };
+      } else {
+        const config = GARAGE_CONFIGS[areaId as GarageId];
+        return { areaId, width: config.width, height: config.length };
+      }
+    });
+  }, [allAreaLayouts, trucks]);
+
+  // Calculate uniform scale for all areas
+  // The AllGaragesView container has:
+  // - Outer div: p-6 (24px padding on all sides)
+  // - Inner div: gap-10 (40px gap between garages)
+  // - Each SVG: +10px extra space (+5px on each side from translate)
+
+  const SVG_EXTRA_SPACE = 10; // Extra 10px per SVG (5px padding on each side)
+  const CONTAINER_PADDING = 48; // p-6 = 24px on each side = 48px total horizontal
+  const GAP_BETWEEN_GARAGES = 40; // gap-10 = 40px
+
+  const totalGaps = (areasToShow.length - 1) * GAP_BETWEEN_GARAGES;
+  const totalSvgExtras = areasToShow.length * SVG_EXTRA_SPACE;
+
+  // Available space calculation
+  const availableWidth = Math.max(0, containerWidth - CONTAINER_PADDING - totalGaps - totalSvgExtras);
+  const availableHeight = Math.max(0, containerHeight - CONTAINER_PADDING - 80); // Extra vertical space for titles
+
+  // Calculate total natural width and max height
+  const totalNaturalWidth = areaDimensions.reduce((sum, dim) => sum + dim.width, 0);
+  const maxHeight = Math.max(...areaDimensions.map((dim) => dim.height));
+
+  // Calculate uniform scale - ensure it fits both width and height
+  // Remove restrictive cap to allow garages to use available space
+  const scaleX = totalNaturalWidth > 0 ? availableWidth / totalNaturalWidth : 1;
+  const scaleY = maxHeight > 0 ? availableHeight / maxHeight : 1;
+  const uniformScale = Math.max(1, Math.min(scaleX, scaleY)); // Minimum scale of 1, no upper cap
+
+  // Debug logging
+  if (containerWidth > 0 && containerHeight > 0) {
+    const dimensionsDetail = areaDimensions.map((dim, idx) => ({
+      area: areasToShow[idx],
+      width: dim.width.toFixed(2),
+      height: dim.height.toFixed(2),
+      scaledWidth: (dim.width * uniformScale).toFixed(2),
+      scaledHeight: (dim.height * uniformScale).toFixed(2),
+    }));
+
+  }
+
+  // Calculate lane availability for visual feedback during drag
+  const laneAvailabilityByGarage = useMemo(() => {
+    if (!activeTruck || !enableDragDrop) return null;
+
+    const availability: Record<string, { canFit: boolean; availableSpace: number; requiredSpace: number }> = {};
+    const truckGarageLength = activeTruck.originalLength ?? activeTruck.length;
+
+    (['B1', 'B2', 'B3'] as GarageId[]).forEach(garageId => {
+      LANES.forEach(laneId => {
+        const key = `${garageId}_${laneId}`;
+        availability[key] = calculateLaneAvailability(
+          garageId,
+          laneId,
+          trucks,
+          truckGarageLength,
+          activeTruck.id
+        );
+      });
+    });
+
+    return availability;
+  }, [activeTruck, enableDragDrop, trucks]);
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const { active } = event;
+    const truck = active.data.current?.truck as PositionedTruck;
+    setActiveTruck(truck);
+  }, []);
+
+  const handleDragCancel = useCallback(() => {
+    setActiveTruck(null);
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      setActiveTruck(null);
+
+      if (!over || !onTruckMove) return;
+
+      const truckId = active.id as string;
+      const draggedTruck = trucks.find((t) => t.id === truckId);
+      if (!draggedTruck) return;
+
+      const dropData = over.data.current as { garageId?: GarageId; laneId?: LaneId; isPatio?: boolean } | undefined;
+
+      // Drop on patio
+      if (dropData?.isPatio) {
+        onTruckMove(truckId, 'PATIO');
+        return;
+      }
+
+      // Drop on garage lane
+      if (!dropData?.garageId || !dropData?.laneId) return;
+
+      const targetGarageId = dropData.garageId;
+      const targetLaneId = dropData.laneId;
+      const config = GARAGE_CONFIGS[targetGarageId];
+
+      // Get dragged truck's current spot info
+      const draggedTruckParsed = draggedTruck.spot ? parseSpot(draggedTruck.spot) : null;
+      const draggedTruckCurrentSpot = draggedTruck.spot;
+
+      // Build map of spot -> truck for target lane (excluding dragged truck)
+      const spotToTruck = new Map<number, typeof trucks[0]>();
+      trucks.forEach((t) => {
+        if (!t.spot || t.id === truckId) return;
+        const parsed = parseSpot(t.spot);
+        if (parsed.garage === targetGarageId && parsed.lane === targetLaneId && parsed.spotNumber) {
+          spotToTruck.set(parsed.spotNumber, t);
+        }
+      });
+
+      // Determine preferred spot based on which spots are occupied
+      // If V1 is empty, prefer V1. Otherwise, prefer V2.
+      const v1Truck = spotToTruck.get(1);
+      const v2Truck = spotToTruck.get(2);
+      const v3Truck = spotToTruck.get(3);
+
+      let preferredSpotNum = 1;
+      if (v1Truck) {
+        preferredSpotNum = 2; // V1 occupied, try V2
+        if (v2Truck) {
+          preferredSpotNum = 3; // V1 and V2 occupied, try V3
+        }
+      }
+
+      // Check if dragged truck is already at the target lane
+      const isAlreadyInTargetLane =
+        draggedTruckParsed?.garage === targetGarageId &&
+        draggedTruckParsed?.lane === targetLaneId;
+
+      // If already in target lane at preferred spot, no action needed
+      if (isAlreadyInTargetLane && draggedTruckParsed?.spotNumber === preferredSpotNum) {
+        return;
+      }
+
+      // Check if preferred spot is occupied by another truck
+      const truckAtPreferredSpot = spotToTruck.get(preferredSpotNum);
+
+      if (truckAtPreferredSpot && truckAtPreferredSpot.id !== truckId) {
+        // SWAP: Preferred spot is occupied - validate if swap would work
+        const newSpotForDragged = `${targetGarageId}_${targetLaneId}_V${preferredSpotNum}`;
+        const swapTargetSpot = draggedTruckCurrentSpot && draggedTruckCurrentSpot !== 'PATIO'
+          ? draggedTruckCurrentSpot
+          : 'PATIO';
+
+        // Validate the swap: Check if dragged truck fits in target lane after swap
+        const trucksInTargetLane = trucks.filter(t => {
+          if (t.id === truckId || t.id === truckAtPreferredSpot.id) return false;
+          if (!t.spot || t.spot === 'PATIO') return false;
+          const parsed = parseSpot(t.spot);
+          return parsed.garage === targetGarageId && parsed.lane === targetLaneId;
+        });
+
+        const currentTruckLengths = trucksInTargetLane.reduce((sum, truck) => {
+          const garageLength = truck.originalLength ?? truck.length;
+          return sum + garageLength;
+        }, 0);
+        const draggedTruckGarageLength = draggedTruck.originalLength ?? draggedTruck.length;
+        const newTotalTruckLengths = currentTruckLengths + draggedTruckGarageLength;
+        const margins = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP;
+        const newTruckCount = trucksInTargetLane.length + 1;
+
+        let gapsBetweenTrucks = 0;
+        if (newTruckCount === 3) {
+          gapsBetweenTrucks = 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
+        }
+
+        const totalRequiredSpace = margins + newTotalTruckLengths + gapsBetweenTrucks;
+        const canFitInTargetLane = totalRequiredSpace <= config.laneLength && trucksInTargetLane.length < 3;
+
+        if (!canFitInTargetLane) {
+          
+          return;
+        }
+
+        // Swap is valid
+        if (onTruckSwap) {
+          onTruckSwap(truckId, newSpotForDragged, truckAtPreferredSpot.id, swapTargetSpot);
+        } else {
+          onTruckMove(truckId, newSpotForDragged);
+          onTruckMove(truckAtPreferredSpot.id, swapTargetSpot);
+        }
+        return;
+      }
+
+      // Preferred spot is empty - validate if truck fits
+      const draggedTruckGarageLength = draggedTruck.originalLength ?? draggedTruck.length;
+      const availability = calculateLaneAvailability(
+        targetGarageId,
+        targetLaneId,
+        trucks,
+        draggedTruckGarageLength,
+        truckId
+      );
+
+      if (!availability.canFit) {
+        
+        return;
+      }
+
+      // Move to preferred spot
+      const newSpot = `${targetGarageId}_${targetLaneId}_V${preferredSpotNum}`;
+      onTruckMove(truckId, newSpot);
+    },
+    [trucks, onTruckMove, onTruckSwap]
+  );
+
+  const content = (
+    <div className="w-full h-full overflow-auto p-6">
+      <div className="min-w-max min-h-max flex items-center justify-center gap-10">
+        {allAreaLayouts.map(({ areaId, layout }, index) => {
+        const dim = areaDimensions[index];
+        const count = garageCounts[areaId];
+        const isPatio = layout.isPatio;
+
+        return (
+          <div key={areaId} className="flex flex-col items-center gap-3">
+            {/* Area title with truck count */}
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-semibold text-stone-700">
+                {getAreaTitle(areaId)}
+              </span>
+              <span className={cn(
+                "text-sm font-bold px-3 py-1.5 rounded-full",
+                isPatio ? "bg-sky-100 text-sky-800" : "bg-amber-100 text-amber-800"
+              )}>
+                {count}
+              </span>
+            </div>
+
+            {/* SVG Rendering with uniform scale */}
+            <svg
+              width={dim.width * uniformScale + 10}
+              height={dim.height * uniformScale + 10}
+              className="drop-shadow-md border-2 border-stone-200 rounded-lg"
+            >
+              <g transform="translate(5, 5)">
+                {isPatio ? (
+                  // Patio rendering
+                  <DroppablePatio
+                    scale={uniformScale}
+                    width={dim.width}
+                    height={dim.height}
+                    columns={patioColumns}
+                  >
+                    {layout.patioTrucks?.map((truck) => (
+                      enableDragDrop ? (
+                        <DraggableTruck
+                          key={truck.id}
+                          truck={truck}
+                          scale={uniformScale}
+                          disabled={false}
+                        />
+                      ) : (
+                        <TruckElement
+                          key={truck.id}
+                          truck={truck}
+                          scale={uniformScale}
+                        />
+                      )
+                    ))}
+                  </DroppablePatio>
+                ) : (
+                  // Garage rendering
+                  <>
+                    <rect
+                      x={0}
+                      y={0}
+                      width={dim.width * uniformScale}
+                      height={dim.height * uniformScale}
+                      fill={COLORS.GARAGE_FILL}
+                      stroke={COLORS.GARAGE_STROKE}
+                      strokeWidth={2}
+                      rx={3}
+                    />
+                    {/* Lanes */}
+                    {layout.lanes.map((lane) => {
+                      const config = GARAGE_CONFIGS[areaId as GarageId];
+                      const laneY = config.paddingTop;
+                      const laneKey = `${areaId}_${lane.id}`;
+                      const availability = laneAvailabilityByGarage?.[laneKey];
+
+                      return (
+                        <g key={lane.id}>
+                          {enableDragDrop ? (
+                            <DroppableLane
+                              garageId={areaId as GarageId}
+                              laneId={lane.id}
+                              xPosition={lane.xPosition}
+                              scale={uniformScale}
+                              laneY={laneY}
+                              showLabel={false}
+                              canFit={availability?.canFit}
+                              availableSpace={availability?.availableSpace}
+                              requiredSpace={availability?.requiredSpace}
+                              isDragging={!!activeTruck}
+                              draggedTruckLength={activeTruck?.length}
+                              trucks={trucks}
+                            >
+                              {lane.trucks.map((truck) => (
+                                <DraggableTruck
+                                  key={truck.id}
+                                  truck={truck}
+                                  scale={uniformScale}
+                                  disabled={false}
+                                />
+                              ))}
+                            </DroppableLane>
+                          ) : (
+                            <>
+                              {/* Lane background */}
+                              <rect
+                                x={lane.xPosition * uniformScale}
+                                y={laneY * uniformScale}
+                                width={config.laneWidth * uniformScale}
+                                height={config.laneLength * uniformScale}
+                                fill={COLORS.LANE_FILL}
+                                stroke={COLORS.LANE_STROKE}
+                                strokeWidth={2}
+                                rx={2}
+                              />
+                              {/* Trucks in lane */}
+                              <g transform={`translate(0, ${laneY * uniformScale})`}>
+                                {lane.trucks.map((truck) => (
+                                  <TruckElement
+                                    key={truck.id}
+                                    truck={truck}
+                                    scale={uniformScale}
+                                  />
+                                ))}
+                              </g>
+                            </>
+                          )}
+                        </g>
+                      );
+                    })}
+                  </>
+                )}
+              </g>
+            </svg>
+          </div>
+        );
+      })}
+      </div>
+    </div>
+  );
+
+  // Wrap in DndContext only if drag-and-drop is enabled
+  if (enableDragDrop) {
+    return (
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        {content}
+        <DragOverlay>
+          {activeTruck ? (
+            <div style={{ opacity: 0.8, cursor: 'grabbing' }}>
+              <svg
+                width={COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW * uniformScale}
+                height={activeTruck.length * uniformScale}
+              >
+                <TruckElement truck={{ ...activeTruck, xPosition: 0, yPosition: 0 }} scale={uniformScale} />
+              </svg>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+    );
+  }
+
+  return content;
+}
+
+// =====================
 // Main Component
 // =====================
 
@@ -526,11 +1652,14 @@ interface GarageViewProps {
   onTruckSwap?: (truck1Id: string, spot1: string, truck2Id: string, spot2: string) => void;
   className?: string;
   readOnly?: boolean;
+  viewMode?: 'all' | 'week';
+  selectedDate?: Date; // For week view - filter trucks by this date
 }
 
-export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOnly = false }: GarageViewProps) {
+export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOnly = false, viewMode = 'all', selectedDate }: GarageViewProps) {
   const [currentAreaIndex, setCurrentAreaIndex] = useState(0);
   const [activeTruck, setActiveTruck] = useState<PositionedTruck | null>(null);
+  const [activeTruckSourceArea, setActiveTruckSourceArea] = useState<AreaId | null>(null);
   const [dragOverEdge, setDragOverEdge] = useState<'left' | 'right' | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 400, height: 500 });
   const [movedTruckIds, setMovedTruckIds] = useState<Set<string>>(new Set());
@@ -736,7 +1865,36 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
     const { active } = event;
     const truck = active.data.current?.truck as PositionedTruck;
     setActiveTruck(truck);
+    setActiveTruckSourceArea(currentAreaId);
+  }, [currentAreaId]);
+
+  const handleDragCancel = useCallback(() => {
+    setActiveTruck(null);
+    setActiveTruckSourceArea(null);
   }, []);
+
+  // Calculate lane availability for visual feedback during drag
+  const laneAvailability = useMemo(() => {
+    if (!activeTruck || isPatio) return null;
+
+    const garageId = currentAreaId as GarageId;
+    const availability: Record<LaneId, { canFit: boolean; availableSpace: number; requiredSpace: number }> = {} as any;
+
+    // Use originalLength (without cabin) for garage space calculation
+    const truckGarageLength = activeTruck.originalLength ?? activeTruck.length;
+
+    LANES.forEach(laneId => {
+      availability[laneId] = calculateLaneAvailability(
+        garageId,
+        laneId,
+        trucksWithLocalPositions,
+        truckGarageLength,
+        activeTruck.id
+      );
+    });
+
+    return availability;
+  }, [activeTruck, isPatio, currentAreaId, trucksWithLocalPositions]);
 
   // Handle navigation WITH truck - move truck to target garage
   const handleNavigateWithTruck = useCallback(
@@ -755,7 +1913,7 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
         setMovedTruckIds(prev => new Set(prev).add(truckId));
         onTruckMove(truckId, 'PATIO');
         setCurrentAreaIndex(newIndex);
-        console.log(`[GarageView] Navigated ${direction} to PATIO, moved truck ${truckId} to PATIO`);
+        
         return;
       }
 
@@ -791,9 +1949,9 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
       // If no spot found, move to PATIO instead
       if (!newSpot) {
         newSpot = 'PATIO';
-        console.log(`[GarageView] No available spot in ${targetGarageId}, moving truck ${truckId} to PATIO`);
+        
       } else {
-        console.log(`[GarageView] Navigated ${direction} to ${targetGarageId}, moved truck ${truckId} to ${newSpot}`);
+        
       }
 
       // Move the truck
@@ -851,6 +2009,7 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
       const { active, over } = event;
       const dropY = lastDragYRef.current;
       setActiveTruck(null);
+      setActiveTruckSourceArea(null); // Clear source area tracking
       setDragOverEdge(null);
       lastDragYRef.current = null;
       if (switchTimeoutRef.current) clearTimeout(switchTimeoutRef.current);
@@ -956,6 +2115,39 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
         // Don't swap if it's the same truck (shouldn't happen but safety check)
         if (directHitTruck.truck.id === truckId) return;
 
+        // Validate the swap: Check if dragged truck fits in target lane after swap
+        // Exclude both trucks from the lane and check if draggedTruck fits
+        const trucksInTargetLane = trucksWithLocalPositions.filter(t => {
+          if (t.id === truckId || t.id === directHitTruck!.truck.id) return false;
+          if (!t.spot || t.spot === 'PATIO') return false;
+          const parsed = parseSpot(t.spot);
+          return parsed.garage === targetGarageId && parsed.lane === targetLaneId;
+        });
+
+        const currentTruckLengths = trucksInTargetLane.reduce((sum, truck) => {
+          const garageLength = truck.originalLength ?? truck.length;
+          return sum + garageLength;
+        }, 0);
+        const draggedTruckGarageLength = draggedTruck.originalLength ?? draggedTruck.length;
+        const newTotalTruckLengths = currentTruckLengths + draggedTruckGarageLength;
+        const margins = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP;
+        const newTruckCount = trucksInTargetLane.length + 1;
+
+        // Use correct gap logic: 0 for 1-2 trucks, 2m for 3 trucks
+        let gapsBetweenTrucks = 0;
+        if (newTruckCount === 3) {
+          gapsBetweenTrucks = 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
+        }
+
+        const totalRequiredSpace = margins + newTotalTruckLengths + gapsBetweenTrucks;
+        const canFitInTargetLane = totalRequiredSpace <= config.laneLength && trucksInTargetLane.length < 3;
+
+        if (!canFitInTargetLane) {
+          
+          return;
+        }
+
+        // Swap is valid - proceed
         setMovedTruckIds(prev => {
           const next = new Set(prev);
           next.add(truckId);
@@ -1001,12 +2193,56 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
       const truckAtPreferredSpot = spotToTruck.get(preferredSpotNum);
 
       if (truckAtPreferredSpot) {
-        // SWAP: Preferred spot is occupied - swap the two trucks
+        // SWAP: Preferred spot is occupied - validate if swap would work
         const newSpotForDragged = `${targetGarageId}_${targetLaneId}_V${preferredSpotNum}`;
         const swapTargetSpot = draggedTruckCurrentSpot && draggedTruckCurrentSpot !== 'PATIO'
           ? draggedTruckCurrentSpot
           : 'PATIO';
 
+        // Validate the swap: Check if dragged truck fits in target lane after swap
+        // The swap removes truckAtPreferredSpot and adds draggedTruck
+        // We need to check if the lane can accommodate this
+        const availability = calculateLaneAvailability(
+          targetGarageId,
+          targetLaneId,
+          trucksWithLocalPositions,
+          draggedTruck.length,
+          truckId // Exclude dragged truck from current count
+        );
+
+        // For swap, we also need to exclude the truck being swapped out
+        // Recalculate considering both trucks are removed, then draggedTruck is added
+        const trucksInTargetLane = trucksWithLocalPositions.filter(t => {
+          if (t.id === truckId || t.id === truckAtPreferredSpot.id) return false;
+          if (!t.spot || t.spot === 'PATIO') return false;
+          const parsed = parseSpot(t.spot);
+          return parsed.garage === targetGarageId && parsed.lane === targetLaneId;
+        });
+
+        const currentTruckLengths = trucksInTargetLane.reduce((sum, truck) => {
+          const garageLength = truck.originalLength ?? truck.length;
+          return sum + garageLength;
+        }, 0);
+        const draggedTruckGarageLength = draggedTruck.originalLength ?? draggedTruck.length;
+        const newTotalTruckLengths = currentTruckLengths + draggedTruckGarageLength;
+        const margins = 2 * COMMON_CONFIG.TRUCK_MARGIN_TOP;
+        const newTruckCount = trucksInTargetLane.length + 1;
+
+        // Use correct gap logic: 0 for 1-2 trucks, 2m for 3 trucks
+        let gapsBetweenTrucks = 0;
+        if (newTruckCount === 3) {
+          gapsBetweenTrucks = 2 * COMMON_CONFIG.TRUCK_MIN_SPACING;
+        }
+
+        const totalRequiredSpace = margins + newTotalTruckLengths + gapsBetweenTrucks;
+        const canFitInTargetLane = totalRequiredSpace <= config.laneLength && trucksInTargetLane.length < 3;
+
+        if (!canFitInTargetLane) {
+          
+          return;
+        }
+
+        // Swap is valid - proceed
         setMovedTruckIds(prev => {
           const next = new Set(prev);
           next.add(truckId);
@@ -1031,7 +2267,24 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
         return;
       }
 
-      // Preferred spot is empty - move there
+      // Preferred spot is empty - check if truck fits before moving
+      // Calculate if the truck actually fits in this lane
+      const draggedTruckGarageLength = draggedTruck.originalLength ?? draggedTruck.length;
+      const availability = calculateLaneAvailability(
+        targetGarageId,
+        targetLaneId,
+        trucksWithLocalPositions,
+        draggedTruckGarageLength,
+        truckId
+      );
+
+      if (!availability.canFit) {
+        // Truck doesn't fit - reject the drop (do nothing, truck stays in original position)
+        
+        return;
+      }
+
+      // Truck fits - move there
       const newSpot = `${targetGarageId}_${targetLaneId}_V${preferredSpotNum}`;
       setMovedTruckIds(prev => new Set(prev).add(truckId));
       setLocalTruckPositions(prev => new Map(prev).set(truckId, newSpot));
@@ -1054,11 +2307,6 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
     setCurrentAreaIndex((prev) => (prev < AREAS.length - 1 ? prev + 1 : 0));
   }, []);
 
-  const getAreaTitle = (areaId: AreaId) => {
-    if (areaId === 'PATIO') return 'Pátio';
-    return `Barracão ${areaId.slice(1)}`;
-  };
-
   // Count trucks per garage
   const garageCounts = useMemo(() => {
     const counts: Record<string, number> = { B1: 0, B2: 0, B3: 0, PATIO: 0 };
@@ -1078,344 +2326,64 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
   const inGarages = garageCounts.B1 + garageCounts.B2 + garageCounts.B3;
   const inPatio = garageCounts.PATIO;
 
+  // Filter trucks by selected date if in week view
+  const filteredTrucks = useMemo(() => {
+    if (viewMode !== 'week' || !selectedDate) return trucksWithLocalPositions;
+
+    const checkDate = new Date(selectedDate);
+    checkDate.setHours(0, 0, 0, 0);
+
+    const filtered = trucksWithLocalPositions.filter(truck => {
+      // If truck doesn't have a spot, don't show it in calendar view
+      if (!truck.spot) return false;
+
+      // If truck doesn't have dates, show it by default (it's currently in production)
+      if (!truck.entryDate || !truck.term) {
+        
+        return true;
+      }
+
+      const entry = new Date(truck.entryDate);
+      const term = new Date(truck.term);
+
+      entry.setHours(0, 0, 0, 0);
+      term.setHours(0, 0, 0, 0);
+
+      // Show truck if selected date is within the production period (entry to term)
+      const shouldShow = checkDate >= entry && checkDate <= term;
+
+      if (!shouldShow) {
+        
+      }
+
+      return shouldShow;
+    });
+
+    return filtered;
+  }, [viewMode, selectedDate, trucksWithLocalPositions]);
+
+  const displayTrucks = viewMode === 'week' ? filteredTrucks : trucksWithLocalPositions;
+
   return (
     <div className={cn('flex flex-col h-full w-full', className)}>
-      {/* Header with title */}
-      <div className="flex flex-col items-center justify-center py-1">
-        <span className="text-lg font-semibold text-stone-700">
-          {getAreaTitle(currentAreaId)}
-        </span>
-        {/* Navigation dots below title */}
-        <div className="flex gap-1.5 mt-1">
-          {AREAS.map((area, index) => (
-            <button
-              key={area}
-              onClick={() => setCurrentAreaIndex(index)}
-              className={cn(
-                'w-2.5 h-2.5 rounded-full transition-colors',
-                index === currentAreaIndex
-                  ? area === 'PATIO' ? 'bg-sky-500' : 'bg-amber-500'
-                  : 'bg-gray-300 hover:bg-gray-400'
-              )}
-              title={getAreaTitle(area)}
-            />
-          ))}
-        </div>
-      </div>
 
       {/* Main container - fills available space */}
       <div
         ref={containerRef}
         className="flex-1 relative flex items-center justify-center min-h-0"
       >
-        {/* Left navigation button - centered with tall height */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handlePrevArea}
-          className={cn(
-            'absolute left-0 top-1/2 -translate-y-1/2 z-10 w-10 h-48 rounded hover:bg-amber-100/50 transition-colors',
-            dragOverEdge === 'left' && 'bg-amber-200/70'
-          )}
-        >
-          <IconChevronLeft className={cn('h-6 w-6', dragOverEdge === 'left' && 'animate-pulse')} />
-        </Button>
-
-        {/* Garage/Patio SVG */}
-        <DndContext
-          sensors={sensors}
-          onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="flex justify-center px-10">
-            <svg width={svgWidth} height={svgHeight} style={{ marginLeft: centeringOffset }}>
-              <g transform={`translate(${20 + rulerOffset}, 5)`}>
-                {areaLayout.isPatio ? (
-                  // Patio view with visual lanes and rulers
-                  <>
-                    {/* Left ruler (vertical - patio height) */}
-                    <g transform={`translate(-${rulerOffset}, 0)`}>
-                      {/* Main ruler line */}
-                      <line
-                        x1={rulerOffset - 5}
-                        y1={0}
-                        x2={rulerOffset - 5}
-                        y2={patioHeight * scale}
-                        stroke="#78716C"
-                        strokeWidth={1}
-                      />
-                      {/* Tick marks every 1m (small) and every 5m (large with label) */}
-                      {Array.from({ length: Math.ceil(patioHeight) + 1 }, (_, i) => {
-                        const y = i * scale;
-                        const is5m = i % 5 === 0;
-                        const tickSize = is5m ? 8 : 4;
-                        return (
-                          <g key={`patio-vtick-${i}`}>
-                            <line
-                              x1={rulerOffset - 5 - tickSize}
-                              y1={y}
-                              x2={rulerOffset - 5}
-                              y2={y}
-                              stroke="#78716C"
-                              strokeWidth={is5m ? 1.5 : 0.5}
-                            />
-                            {is5m && (
-                              <text
-                                x={rulerOffset - 5 - tickSize - 3}
-                                y={y + 3}
-                                textAnchor="end"
-                                fontSize={8}
-                                fill="#78716C"
-                              >
-                                {i}m
-                              </text>
-                            )}
-                          </g>
-                        );
-                      })}
-                    </g>
-
-                    <DroppablePatio scale={scale} width={patioWidth} height={patioHeight} columns={patioColumns}>
-                      {areaLayout.patioTrucks?.map((truck) => (
-                        <DraggableTruck key={truck.id} truck={truck} scale={scale} disabled={readOnly} />
-                      ))}
-                    </DroppablePatio>
-
-                    {/* Bottom ruler (horizontal - patio width) */}
-                    <g transform={`translate(0, ${patioHeight * scale + 5})`}>
-                      {/* Main ruler line */}
-                      <line
-                        x1={0}
-                        y1={0}
-                        x2={patioWidth * scale}
-                        y2={0}
-                        stroke="#78716C"
-                        strokeWidth={1}
-                      />
-                      {/* Tick marks every 1m (small) and every 5m (large with label) */}
-                      {Array.from({ length: Math.ceil(patioWidth) + 1 }, (_, i) => {
-                        const x = i * scale;
-                        const is5m = i % 5 === 0;
-                        const tickSize = is5m ? 8 : 4;
-                        return (
-                          <g key={`patio-htick-${i}`}>
-                            <line
-                              x1={x}
-                              y1={0}
-                              x2={x}
-                              y2={tickSize}
-                              stroke="#78716C"
-                              strokeWidth={is5m ? 1.5 : 0.5}
-                            />
-                            {is5m && (
-                              <text
-                                x={x}
-                                y={tickSize + 10}
-                                textAnchor="middle"
-                                fontSize={8}
-                                fill="#78716C"
-                              >
-                                {i}m
-                              </text>
-                            )}
-                          </g>
-                        );
-                      })}
-                    </g>
-                  </>
-                ) : (
-                  // Garage view with border and rulers
-                  <>
-                    {/* Left ruler (vertical - garage length) with tick marks */}
-                    <g transform={`translate(-${rulerOffset}, 0)`}>
-                      {/* Main ruler line */}
-                      <line
-                        x1={rulerOffset - 5}
-                        y1={0}
-                        x2={rulerOffset - 5}
-                        y2={garageHeight * scale}
-                        stroke="#78716C"
-                        strokeWidth={1}
-                      />
-                      {/* Tick marks every 1m (small) and every 5m (large with label) */}
-                      {Array.from({ length: garageHeight + 1 }, (_, i) => {
-                        const y = i * scale;
-                        const is5m = i % 5 === 0;
-                        const tickSize = is5m ? 8 : 4;
-                        return (
-                          <g key={`vtick-${i}`}>
-                            <line
-                              x1={rulerOffset - 5 - tickSize}
-                              y1={y}
-                              x2={rulerOffset - 5}
-                              y2={y}
-                              stroke="#78716C"
-                              strokeWidth={is5m ? 1.5 : 0.5}
-                            />
-                            {is5m && (
-                              <text
-                                x={rulerOffset - 5 - tickSize - 3}
-                                y={y + 3}
-                                textAnchor="end"
-                                fontSize={8}
-                                fill="#78716C"
-                              >
-                                {i}m
-                              </text>
-                            )}
-                          </g>
-                        );
-                      })}
-                    </g>
-
-                    {/* Garage border */}
-                    <rect
-                      x={0}
-                      y={0}
-                      width={garageWidth * scale}
-                      height={garageHeight * scale}
-                      fill={COLORS.GARAGE_FILL}
-                      stroke={COLORS.GARAGE_STROKE}
-                      strokeWidth={2}
-                      rx={4}
-                    />
-
-                    {/* Lanes with trucks - positioned with padding from garage top */}
-                    {areaLayout.lanes.map((lane, index) => {
-                      const config = GARAGE_CONFIGS[currentAreaId as GarageId];
-                      const laneX = config.lanePaddingX + index * (config.laneWidth + config.laneSpacing);
-                      const laneY = config.paddingTop;
-                      return (
-                        <g key={lane.id}>
-                          <DroppableLane
-                            garageId={currentAreaId as GarageId}
-                            laneId={lane.id}
-                            xPosition={lane.xPosition}
-                            laneY={laneY}
-                            scale={scale}
-                            showLabel={false}
-                          >
-                            {lane.trucks.map((truck) => (
-                              <DraggableTruck key={truck.id} truck={truck} scale={scale} disabled={readOnly} />
-                            ))}
-                          </DroppableLane>
-                          {/* Lane label just below the lane */}
-                          <text
-                            x={(laneX + config.laneWidth / 2) * scale}
-                            y={(laneY + config.laneLength + 1) * scale}
-                            textAnchor="middle"
-                            fontSize={10}
-                            fontWeight="bold"
-                            fill="#78716C"
-                          >
-                            {lane.id}
-                          </text>
-                        </g>
-                      );
-                    })}
-
-                    {/* Bottom ruler (horizontal - garage width) with tick marks and lane labels */}
-                    <g transform={`translate(0, ${garageHeight * scale + 5})`}>
-                      {/* Main ruler line */}
-                      <line
-                        x1={0}
-                        y1={0}
-                        x2={garageWidth * scale}
-                        y2={0}
-                        stroke="#78716C"
-                        strokeWidth={1}
-                      />
-                      {/* Tick marks every 1m (small) and every 5m (large with label) */}
-                      {Array.from({ length: Math.ceil(garageWidth) + 1 }, (_, i) => {
-                        const x = i * scale;
-                        const is5m = i % 5 === 0;
-                        const tickSize = is5m ? 8 : 4;
-                        return (
-                          <g key={`htick-${i}`}>
-                            <line
-                              x1={x}
-                              y1={0}
-                              x2={x}
-                              y2={tickSize}
-                              stroke="#78716C"
-                              strokeWidth={is5m ? 1.5 : 0.5}
-                            />
-                            {is5m && (
-                              <text
-                                x={x}
-                                y={tickSize + 10}
-                                textAnchor="middle"
-                                fontSize={8}
-                                fill="#78716C"
-                              >
-                                {i}m
-                              </text>
-                            )}
-                          </g>
-                        );
-                      })}
-                    </g>
-                  </>
-                )}
-              </g>
-            </svg>
-          </div>
-
-          {/* Drag overlay */}
-          <DragOverlay>
-            {activeTruck && (
-              <svg width={COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW * scale + 10} height={activeTruck.length * scale + 10}>
-                <g transform="translate(5, 5)">
-                  <TruckElement
-                    truck={{ ...activeTruck, xPosition: 0, yPosition: 0 }}
-                    scale={scale}
-                  />
-                </g>
-              </svg>
-            )}
-          </DragOverlay>
-        </DndContext>
-
-        {/* Right navigation button - centered with tall height */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleNextArea}
-          className={cn(
-            'absolute right-0 top-1/2 -translate-y-1/2 z-10 w-10 h-48 rounded hover:bg-amber-100/50 transition-colors',
-            dragOverEdge === 'right' && 'bg-amber-200/70'
-          )}
-        >
-          <IconChevronRight className={cn('h-6 w-6', dragOverEdge === 'right' && 'animate-pulse')} />
-        </Button>
+        <AllGaragesView
+          trucks={displayTrucks}
+          containerWidth={containerSize.width}
+          containerHeight={containerSize.height}
+          garageCounts={garageCounts}
+          viewMode={viewMode}
+          onTruckMove={onTruckMove}
+          onTruckSwap={onTruckSwap}
+          readOnly={readOnly}
+        />
       </div>
 
-      {/* Footer counts - per-garage breakdown with rounded squares */}
-      <div className="flex flex-col items-center gap-1 py-2 text-sm text-muted-foreground">
-        <div className="flex flex-wrap items-center justify-center gap-4">
-          <span className="flex items-center gap-1.5 font-semibold">
-            <span className="w-3 h-3 rounded-sm bg-amber-500" />
-            Barracão 1: {garageCounts.B1}
-          </span>
-          <span className="flex items-center gap-1.5 font-semibold">
-            <span className="w-3 h-3 rounded-sm bg-amber-500" />
-            Barracão 2: {garageCounts.B2}
-          </span>
-          <span className="flex items-center gap-1.5 font-semibold">
-            <span className="w-3 h-3 rounded-sm bg-amber-500" />
-            Barracão 3: {garageCounts.B3}
-          </span>
-          <span className="flex items-center gap-1.5 font-semibold">
-            <span className="w-3 h-3 rounded-sm bg-sky-500" />
-            Pátio: {inPatio}
-          </span>
-          <span className="flex items-center gap-1.5 font-semibold">
-            <span className="w-3 h-3 rounded-sm bg-gray-500" />
-            Total: {trucks.length}
-          </span>
-        </div>
-      </div>
     </div>
   );
 }

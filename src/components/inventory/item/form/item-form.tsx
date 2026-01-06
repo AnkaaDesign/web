@@ -202,11 +202,10 @@ export function ItemForm(props: ItemFormProps) {
 
   // Debug validation errors in development
   useEffect(() => {
-    if (process.env.NODE_ENV === "development" && Object.keys(errors).length > 0) {
-      console.log("Item form validation errors:", {
-        errors,
-        currentValues: form.getValues(),
-      });
+    if (process.env.NODE_ENV !== "production" && Object.keys(errors).length > 0) {
+      if (process.env.NODE_ENV !== "production") {
+        // Removed console.log - validation errors are tracked internally
+      }
     }
   }, [errors, form]);
 
@@ -239,9 +238,6 @@ export function ItemForm(props: ItemFormProps) {
   }, [categories]);
 
   const handleSubmit = async (data: any) => {
-    console.group("🎯 ItemForm handleSubmit");
-    console.groupEnd();
-
     try {
       // Convert measures object to array if needed
       let measuresArray = [];
@@ -266,7 +262,9 @@ export function ItemForm(props: ItemFormProps) {
         await (props as UpdateItemFormProps).onSubmit(processedData);
       }
     } catch (error) {
-      console.error("❌ Submit error:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Submit error:", error);
+      }
       // Re-throw so parent can handle
       throw error;
     }
@@ -275,15 +273,15 @@ export function ItemForm(props: ItemFormProps) {
   const isRequired = mode === "create";
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <FormProvider {...form}>
-        <form id="item-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+    <FormProvider {...form}>
+      <form id="item-form" onSubmit={form.handleSubmit(handleSubmit)}>
           {/* Hidden submit button for programmatic form submission */}
           <button id="item-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
             Submit
           </button>
+          <div className="space-y-4">
           {/* Basic Information & Classification */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconInfoCircle className="h-5 w-5 text-muted-foreground" />
@@ -307,7 +305,7 @@ export function ItemForm(props: ItemFormProps) {
           </Card>
 
           {/* Inventory */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconClipboardList className="h-5 w-5 text-muted-foreground" />
@@ -326,7 +324,7 @@ export function ItemForm(props: ItemFormProps) {
           </Card>
 
           {/* Pricing */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconCurrencyDollar className="h-5 w-5 text-muted-foreground" />
@@ -362,7 +360,7 @@ export function ItemForm(props: ItemFormProps) {
           {isPPE && <PpeConfigSection disabled={isSubmitting} required={isRequired} />}
 
           {/* Tracking */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconBarcode className="h-5 w-5 text-muted-foreground" />
@@ -376,7 +374,7 @@ export function ItemForm(props: ItemFormProps) {
           </Card>
 
           {/* Extra Configurations */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconSettings className="h-5 w-5 text-muted-foreground" />
@@ -391,8 +389,8 @@ export function ItemForm(props: ItemFormProps) {
               </div>
             </CardContent>
           </Card>
+          </div>
         </form>
       </FormProvider>
-    </div>
   );
 }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { ItemForm } from "@/components/inventory/item/form";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { useItemMutations } from "../../../hooks";
 import { itemCreateSchema } from "../../../schemas";
 import type { ItemCreateFormData } from "../../../schemas";
@@ -34,9 +34,11 @@ export const CreateProductPage = () => {
       try {
         validatedData = itemCreateSchema.parse(sanitizedData);
       } catch (schemaError) {
-        console.error("3. Schema validation failed:", schemaError);
-        if (schemaError instanceof Error) {
-          console.error("Schema error details:", schemaError.message);
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Schema validation failed:", schemaError);
+          if (schemaError instanceof Error) {
+            console.error("Schema error details:", schemaError.message);
+          }
         }
         throw schemaError;
       }
@@ -47,19 +49,21 @@ export const CreateProductPage = () => {
       } else {
       }
     } catch (error) {
-      console.error("=== ERROR IN ITEM CREATION ===");
-      console.error("Error type:", error?.constructor?.name);
-      console.error("Error message:", error instanceof Error ? error.message : "Unknown error");
-      console.error("Full error object:", error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Error in item creation");
+        console.error("Error type:", error?.constructor?.name);
+        console.error("Error message:", error instanceof Error ? error.message : "Unknown error");
+        console.error("Full error object:", error);
 
-      // Check if it's a validation error
-      if (error && typeof error === "object" && "errors" in error) {
-        console.error("Validation errors:", (error as any).errors);
-      }
+        // Check if it's a validation error
+        if (error && typeof error === "object" && "errors" in error) {
+          console.error("Validation errors:", (error as any).errors);
+        }
 
-      // Check if it's an API error
-      if (error && typeof error === "object" && "response" in error) {
-        console.error("API response error:", (error as any).response);
+        // Check if it's an API error
+        if (error && typeof error === "object" && "response" in error) {
+          console.error("API response error:", (error as any).response);
+        }
       }
 
       // Re-throw to let React Query handle it
@@ -90,7 +94,9 @@ export const CreateProductPage = () => {
         if (submitButton) {
           submitButton.click();
         } else {
-          console.error("Submit button not found!");
+          if (process.env.NODE_ENV !== "production") {
+            console.error("Submit button not found");
+          }
 
           // Try alternative: trigger form submit directly
           const form = document.getElementById("item-form") as HTMLFormElement;
@@ -102,7 +108,9 @@ export const CreateProductPage = () => {
               form.requestSubmit();
             }
           } else {
-            console.error("Form element not found!");
+            if (process.env.NODE_ENV !== "production") {
+              console.error("Form element not found");
+            }
           }
         }
       },
@@ -113,25 +121,17 @@ export const CreateProductPage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-4xl mx-auto">
-          <PageHeaderWithFavorite
-            title="Cadastrar Produto"
-            icon={IconPackage}
-            favoritePage={FAVORITE_PAGES.ESTOQUE_PRODUTOS_CADASTRAR}
-            breadcrumbs={[{ label: "Estoque", href: routes.inventory.root }, { label: "Produtos", href: routes.inventory.products.root }, { label: "Cadastrar" }]}
-            actions={actions}
-          />
-        </div>
-      </div>
-
-      {/* Main Content Card - Dashboard style scrolling */}
-      <div className="flex-1 overflow-hidden max-w-4xl mx-auto w-full">
-        <div className="h-full bg-card rounded-lg shadow-md border-muted overflow-hidden">
-          <ItemForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} defaultValues={defaultValues} onFormStateChange={setFormState} />
-        </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        title="Cadastrar Produto"
+        icon={IconPackage}
+        favoritePage={FAVORITE_PAGES.ESTOQUE_PRODUTOS_CADASTRAR}
+        breadcrumbs={[{ label: "Estoque", href: routes.inventory.root }, { label: "Produtos", href: routes.inventory.products.root }, { label: "Cadastrar" }]}
+        actions={actions}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <ItemForm mode="create" onSubmit={handleSubmit} isSubmitting={createMutation.isPending} defaultValues={defaultValues} onFormStateChange={setFormState} />
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ export const OrderScheduleEditPage = () => {
   // const {id } = useParams(); // Currently unused in this placeholder page
 
   return (
-    <div className="flex flex-col h-full space-y-4">
+    <div className="h-full flex flex-col px-4 pt-4">
       <div className="flex-shrink-0">
         <PageHeader
           title="Editar Agendamento de Pedido"
@@ -22,8 +22,8 @@ export const OrderScheduleEditPage = () => {
           ]}
         />
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="max-w-3xl mx-auto">
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="space-y-4 mt-4 max-w-3xl mx-auto">
           <UnderConstruction title="Edit Order Schedule" />
         </div>
       </div>

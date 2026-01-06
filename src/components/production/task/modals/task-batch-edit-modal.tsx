@@ -97,7 +97,9 @@ export const TaskBatchEditModal = ({ tasks, open, onOpenChange, onSuccess }: Tas
         onSuccess?.();
       }
     } catch (error) {
-      console.error("Error updating tasks:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating tasks:", error);
+      }
       // Error is handled by the mutation hook
     } finally {
       setIsSubmitting(false);

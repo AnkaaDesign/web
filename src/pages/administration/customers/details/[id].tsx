@@ -3,6 +3,7 @@ import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { IconUsers, IconEdit, IconTrash, IconRefresh, IconLoader2, IconAlertTriangle, IconChecklist } from "@tabler/icons-react";
 
 import { routes, SECTOR_PRIVILEGES, CHANGE_LOG_ENTITY_TYPE } from "../../../../constants";
+import { PAGE_SPACING } from "@/lib/layout-constants";
 import { useCustomer, useCustomerMutations } from "../../../../hooks";
 import { useAuth } from "@/contexts/auth-context";
 import { hasAnyPrivilege } from "@/utils";
@@ -91,18 +92,19 @@ export const CustomerDetailsPage = () => {
       await deleteAsync(id);
       navigate(routes.administration.customers.root);
     } catch (error) {
-      console.error("Error deleting customer:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting customer:", error);
+      }
     }
     setIsDeleteDialogOpen(false);
   };
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.BASIC}>
-      <div className="space-y-6">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
           title={customer.fantasyName}
-          icon={IconUsers}
           breadcrumbs={[
             { label: "Início", href: "/" },
             { label: "Administração" },
@@ -130,29 +132,33 @@ export const CustomerDetailsPage = () => {
               onClick: () => setIsDeleteDialogOpen(true),
             },
           ]}
+          className="flex-shrink-0"
         />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4">
+            {/* Core Information Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <BasicInfoCard customer={customer} />
+              <ContactDetailsCard customer={customer} />
+            </div>
 
-        {/* Core Information Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <BasicInfoCard customer={customer} />
-          <ContactDetailsCard customer={customer} />
+            {/* Address and Changelog Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+              <AddressInfoCard customer={customer} />
+              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.CUSTOMER} entityId={id} maxHeight="650px" />
+            </div>
+
+            {/* Documents (ADMIN and FINANCIAL only) */}
+            {canViewDocuments && <DocumentsCard customer={customer} />}
+
+            {/* Customer Tasks - Full Width at Bottom */}
+            <CustomerTasksList
+              customerId={customer.id}
+              customerName={customer.fantasyName}
+              navigationRoute="history"
+            />
+          </div>
         </div>
-
-        {/* Address and Changelog Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          <AddressInfoCard customer={customer} />
-          <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.CUSTOMER} entityId={id} maxHeight="650px" />
-        </div>
-
-        {/* Documents (ADMIN and FINANCIAL only) */}
-        {canViewDocuments && <DocumentsCard customer={customer} />}
-
-        {/* Customer Tasks - Full Width at Bottom */}
-        <CustomerTasksList
-          customerId={customer.id}
-          customerName={customer.fantasyName}
-          navigationRoute="history"
-        />
 
         {/* Delete Dialog */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

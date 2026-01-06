@@ -208,7 +208,6 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
           const img = previewGeneratorRef.current.exportImage();
           if (img) {
             setColorPreviewData(img);
-            console.log("[PaintForm] Initial preview captured on step 2");
           }
         }
       }, 500); // Wait for canvas to be fully rendered
@@ -242,19 +241,12 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     // Try to get fresh export if ref is available, otherwise use stored state
     let finalColorPreview = colorPreviewData;
 
-    console.log("[PaintForm] handleSubmit - colorPreviewData:", colorPreviewData ? `${colorPreviewData.substring(0, 50)}...` : null);
-    console.log("[PaintForm] handleSubmit - previewGeneratorRef.current:", !!previewGeneratorRef.current);
-
     if (previewGeneratorRef.current) {
       const freshExport = previewGeneratorRef.current.exportImage();
-      console.log("[PaintForm] handleSubmit - freshExport:", freshExport ? `${freshExport.substring(0, 50)}...` : null);
       if (freshExport) {
         finalColorPreview = freshExport;
       }
     }
-
-    console.log("[PaintForm] handleSubmit - finalColorPreview:", finalColorPreview ? `${finalColorPreview.substring(0, 50)}...` : null);
-    console.log("[PaintForm] handleSubmit - mode:", mode, "previewModified:", previewModified);
 
     // Convert data URL to File for upload
     let colorPreviewFile: File | undefined;
@@ -265,16 +257,12 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
       if (finalColorPreview) {
         const paintName = (data as PaintCreateFormData).name || "preview";
         colorPreviewFile = dataUrlToFile(finalColorPreview, `${paintName.replace(/\s+/g, "_")}_preview.webp`);
-        console.log("[PaintForm] handleSubmit - Created colorPreviewFile for create mode:", colorPreviewFile.name);
-      } else {
-        console.warn("[PaintForm] handleSubmit - WARNING: No colorPreview available in create mode!");
       }
     } else {
       // Update mode - only send colorPreview if it was modified
       if (previewModified && finalColorPreview) {
         const paintName = (data as PaintUpdateFormData).name || "preview";
         colorPreviewFile = dataUrlToFile(finalColorPreview, `${paintName.replace(/\s+/g, "_")}_preview.webp`);
-        console.log("[PaintForm] handleSubmit - Created colorPreviewFile for update mode:", colorPreviewFile.name);
       }
     }
 
@@ -286,12 +274,12 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
 
     if (mode === "create") {
       // Filter valid formulas to pass to the parent
-      const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && c.ratio > 0));
+      const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && c.weightInGrams && c.weightInGrams > 0));
 
       await (props as CreateFormProps).onSubmit(data as PaintCreateFormData, validFormulas, colorPreviewFile);
     } else {
       // In update mode, also handle new formulas if any
-      const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && c.ratio > 0));
+      const validFormulas = formulas.filter((f) => f.components && f.components.length > 0 && f.components.some((c) => c.itemId && c.weightInGrams && c.weightInGrams > 0));
 
       await (props as UpdateFormProps).onSubmit(data as PaintUpdateFormData, validFormulas, colorPreviewFile);
     }
@@ -363,13 +351,10 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
     }
 
     // Capture color preview when leaving step 2
-    console.log("[PaintForm] nextStep - currentStep:", currentStep, "previewGeneratorRef.current:", !!previewGeneratorRef.current);
     if (currentStep === 2 && previewGeneratorRef.current) {
       const imageDataUrl = previewGeneratorRef.current.exportImage();
-      console.log("[PaintForm] nextStep - exportImage result:", imageDataUrl ? `${imageDataUrl.substring(0, 50)}...` : null);
       if (imageDataUrl) {
         setColorPreviewData(imageDataUrl);
-        console.log("[PaintForm] nextStep - setColorPreviewData called");
         // Mark as modified in create mode, or if different from original in update mode
         if (mode === "create") {
           setPreviewModified(true);
@@ -425,11 +410,17 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
   );
 
   return (
-    <div className="h-full overflow-y-auto p-6">
+    <div className="h-full overflow-y-auto p-4">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-          {/* Step Indicator */}
-          <FormSteps steps={availableSteps} currentStep={currentStep} />
+        <form id="paint-form" onSubmit={form.handleSubmit(handleSubmit)}>
+          {/* Hidden submit button for programmatic form submission */}
+          <button id="paint-form-submit" data-paint-form-submit type="submit" className="hidden">
+            Submit
+          </button>
+
+          <div className="space-y-8">
+            {/* Step Indicator */}
+            <FormSteps steps={availableSteps} currentStep={currentStep} />
 
           {/* Step Content */}
           {currentStep === 1 && (
@@ -575,8 +566,7 @@ export const PaintForm = forwardRef<PaintFormRef, PaintFormProps>((props, ref) =
             </Card>
           )}
 
-          {/* Hidden submit button for external triggering */}
-          <button type="submit" data-paint-form-submit style={{ display: "none" }} />
+          </div>
         </form>
       </Form>
     </div>

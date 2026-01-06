@@ -198,7 +198,7 @@ export function PaintProductionHistoryCard({ paint, className }: PaintProduction
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col space-y-4 p-6">
+      <CardContent className="flex-1 flex flex-col space-y-4 p-4">
         {/* Search and Column Controls */}
         <div className="flex flex-col gap-3 sm:flex-row flex-shrink-0">
           <TableSearchInput

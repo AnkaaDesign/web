@@ -57,10 +57,11 @@ interface CepData {
   erro?: boolean;
 }
 
-export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange" | "maxLength"> {
+export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange" | "maxLength" | "onBlur" | "name"> {
   type?: InputType;
   value?: string | number | null;
-  onChange?: (value: string | number | null) => void;
+  // Support both custom onChange (value) and react-hook-form onChange (event)
+  onChange?: ((value: string | number | null) => void) | React.ChangeEventHandler<HTMLInputElement>;
   decimals?: number;
   documentType?: "cpf" | "cnpj";
   onCepLookup?: (data: CepData) => void;
@@ -102,6 +103,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       min,
       max,
       step,
+      onBlur: onBlurProp,
+      name: nameProp,
       ...props
     },
     ref,
@@ -843,7 +846,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         setCursorPosition(null);
 
         if (onChange) {
-          onChange(rawValue);
+          // Call onChange - it accepts either event (react-hook-form) or value (custom)
+          // We'll always pass the event, which works for react-hook-form
+          // For custom usage, users should extract the value from e.target.value if needed
+          (onChange as any)(e);
         }
         return;
       }
@@ -1266,6 +1272,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         setIsTyping(false);
       }
 
+      // Call external onBlur if provided (e.g., from react-hook-form register)
+      if (onBlurProp) {
+        onBlurProp(e);
+      }
+
       // Ensure proper formatting on blur for currency
       if (type === "currency" && internalValue) {
         const digitsOnly = internalValue.replace(/\D/g, "");
@@ -1517,6 +1528,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={inputRef}
           type={getHtmlType()}
+          name={nameProp}
           className={cn(
             "flex h-10 w-full rounded-md border border-border px-2 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-all duration-200 ease-in-out",
             transparent ? "!bg-transparent" : "bg-input",

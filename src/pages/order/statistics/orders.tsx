@@ -1,7 +1,7 @@
 // web/src/pages/order/statistics/orders.tsx
 
 import { useState, useMemo, useCallback } from 'react';
-import { PageHeaderWithFavorite } from '@/components/ui/page-header-with-favorite';
+import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +40,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OrderFilters } from '@/components/inventory/statistics/order-filters';
+import { DETAIL_PAGE_SPACING } from '@/lib/layout-constants';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -243,7 +245,9 @@ const OrderPage = () => {
 
       toast.success('Dados exportados com sucesso!');
     } catch (error) {
-      console.error('Erro ao exportar CSV:', error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error('Erro ao exportar CSV:', error);
+      }
       toast.error('Erro ao exportar dados');
     }
   }, [topItems]);
@@ -484,20 +488,24 @@ const OrderPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-full space-y-4">
-      <PageHeaderWithFavorite
-        title="Análise de Pedidos"
-        icon={IconClipboardList}
-        favoriteKey={FAVORITE_PAGES.STATISTICS_ORDERS}
-        breadcrumbs={[
-          { label: 'Início', href: routes.home },
-          { label: 'Estatísticas', href: routes.statistics.root },
-          { label: 'Estoque', href: routes.statistics.inventory.root },
-          { label: 'Pedidos' },
-        ]}
-      />
+    <div className="h-full flex flex-col px-4 pt-4">
+      <div className="flex-shrink-0">
+        <PageHeader
+          title="Análise de Pedidos"
+          icon={IconClipboardList}
+          favoriteKey={FAVORITE_PAGES.STATISTICS_ORDERS}
+          breadcrumbs={[
+            { label: 'Início', href: routes.home },
+            { label: 'Estatísticas', href: routes.statistics.root },
+            { label: 'Estoque', href: routes.statistics.inventory.root },
+            { label: 'Pedidos' },
+          ]}
+        />
+      </div>
 
-      <Card className="flex-1 flex flex-col">
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="mt-4">
+          <Card className="flex-1 flex flex-col">
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -612,7 +620,7 @@ const OrderPage = () => {
           </div>
         </CardHeader>
 
-        <CardContent className="flex-1 flex flex-col p-6 space-y-6">
+        <CardContent className="flex-1 flex flex-col p-4 space-y-6">
           {/* Summary Cards */}
           {summary && (
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -735,6 +743,8 @@ const OrderPage = () => {
         yAxisMode={yAxisMode}
         onYAxisModeChange={setYAxisMode}
       />
+        </div>
+      </div>
     </div>
   );
 };

@@ -174,7 +174,7 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
   };
 
   return (
-    <Card className="bg-transparent">
+    <Card>
       <CardHeader>
         <CardTitle>Medidas</CardTitle>
         <p className="text-sm text-muted-foreground">Configure as medidas do item (peso, volume, comprimento, etc.)</p>

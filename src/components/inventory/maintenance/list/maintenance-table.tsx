@@ -159,7 +159,9 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
       refetch();
     } catch (error: any) {
       // Error will be handled by API client
-      console.error("Error starting maintenance:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error starting maintenance:", error);
+      }
     }
   };
 
@@ -191,7 +193,9 @@ export function MaintenanceTable({ visibleColumns, className, onEdit, onMarkAsFi
       refetch();
     } catch (error: any) {
       // Error will be handled by API client
-      console.error("Error finishing maintenance:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error finishing maintenance:", error);
+      }
     }
   };
 

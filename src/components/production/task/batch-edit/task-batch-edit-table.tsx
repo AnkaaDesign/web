@@ -79,7 +79,9 @@ interface TaskBatchEditTableProps {
 export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditTableProps) {
   // Early validation to prevent rendering with invalid data
   if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
-    console.error("TaskBatchEditTable: Invalid tasks provided:", tasks);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("TaskBatchEditTable: Invalid tasks provided:", tasks);
+    }
     return (
       <div className="text-center py-8 text-muted-foreground">
         <div className="text-lg font-medium mb-2">Erro: Dados de tarefas inválidos</div>
@@ -206,7 +208,9 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
         setShowResultDialog(true);
       }
     } catch (error) {
-      console.error("Erro ao atualizar tarefas em lote:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Erro ao atualizar tarefas em lote:", error);
+      }
       alert("Erro ao atualizar tarefas. Por favor, tente novamente.");
     } finally {
       setIsSubmitting(false);
@@ -229,7 +233,7 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
       <Card className="h-full flex flex-col">
         {/* Hidden submit button for page header to trigger */}
         <button id="task-batch-form-submit" type="button" onClick={form.handleSubmit(handleSubmit)} style={{ display: "none" }} disabled={isSubmitting} />
-        <CardContent className="p-6 flex-1 overflow-hidden flex flex-col">
+        <CardContent className="p-4 flex-1 overflow-hidden flex flex-col">
           <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
@@ -289,7 +293,9 @@ export function TaskBatchEditTable({ tasks, onCancel, onSubmit }: TaskBatchEditT
                 {fields && fields.length > 0 ? (
                   fields.map((field, index) => {
                     if (!field || typeof index !== "number" || index < 0) {
-                      console.error("Invalid field or index in task batch edit table:", { field, index });
+                      if (process.env.NODE_ENV !== 'production') {
+                        console.error("Invalid field or index in task batch edit table:", { field, index });
+                      }
                       return null;
                     }
                     const originalTask = tasks[index];

@@ -56,7 +56,9 @@ export function SectorExport({ className, filters, currentSectors = [], totalRec
 
       return allSectors;
     } catch (error) {
-      console.error("Error fetching all sectors:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching all sectors:", error);
+      }
       toast.error("Erro ao buscar setores para exportação");
       throw error;
     }
@@ -68,7 +70,9 @@ export function SectorExport({ className, filters, currentSectors = [], totalRec
       // including CSV, Excel, and PDF generation// If you need custom export logic, you can implement it here
       // For now, we'll let the BaseExportPopover handle it
     } catch (error) {
-      console.error("Export error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Export error:", error);
+      }
       toast.error("Erro ao exportar dados");
       throw error;
     }

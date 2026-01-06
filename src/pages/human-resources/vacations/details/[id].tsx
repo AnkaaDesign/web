@@ -69,18 +69,19 @@ export const VacationDetailsPage = () => {
       await deleteAsync(id);
       navigate(routes.humanResources.vacations.root);
     } catch (error) {
-      console.error("Error deleting vacation:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting vacation:", error);
+      }
     }
     setIsDeleteDialogOpen(false);
   };
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="space-y-6">
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
           title={`Férias de ${vacation.data?.user?.name || "Colaborador"}`}
-          icon={IconBeach}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Recursos Humanos" },
@@ -107,12 +108,17 @@ export const VacationDetailsPage = () => {
               onClick: () => setIsDeleteDialogOpen(true),
             },
           ]}
+          className="flex-shrink-0"
         />
 
-        {/* Info Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {vacation.data && <SpecificationsCard vacation={vacation.data} />}
-          <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.VACATION} entityId={id} maxHeight="500px" />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4">
+            {/* Info Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {vacation.data && <SpecificationsCard vacation={vacation.data} />}
+              <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.VACATION} entityId={id} maxHeight="500px" />
+            </div>
+          </div>
         </div>
 
         {/* Delete Dialog */}

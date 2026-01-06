@@ -30,7 +30,7 @@ export function PaintFormulaListItem({ formula, className }: PaintFormulaListIte
   const hasValidPrice = formula.pricePerLiter && Number(formula.pricePerLiter) > 0;
 
   return (
-    <Card className={cn("hover:shadow-lg transition-all duration-200 cursor-pointer", "border hover:border-primary/50", className)} onClick={handleClick}>
+    <Card className={cn("hover:shadow-sm transition-all duration-200 cursor-pointer", "border hover:border-primary/50", className)} onClick={handleClick}>
       <CardHeader className="pb-2 sm:pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1 flex-1 min-w-0">

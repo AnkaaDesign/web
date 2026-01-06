@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { IconCalendar, IconPlus } from "@tabler/icons-react";
 import { MaintenanceScheduleList } from "@/components/inventory/maintenance/schedule/maintenance-schedule-list";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 export function MaintenanceSchedulePage() {
   const navigate = useNavigate();
@@ -17,7 +19,7 @@ export function MaintenanceSchedulePage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="flex flex-col h-full space-y-4">
+      <div className="h-full flex flex-col px-4 pt-4">
         <div className="flex-shrink-0">
           <PageHeader
             variant="default"
@@ -40,7 +42,11 @@ export function MaintenanceSchedulePage() {
             ]}
           />
         </div>
-        <MaintenanceScheduleList className="flex-1 min-h-0" />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="mt-4">
+            <MaintenanceScheduleList />
+          </div>
+        </div>
       </div>
     </PrivilegeRoute>
   );

@@ -140,7 +140,9 @@ export const phoneSchema = z
     } catch {
       // If cleanPhone fails, return the original value
       // This prevents losing data during updates
-      console.warn(`Phone validation: keeping original value "${val}" as cleanPhone failed`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`Phone validation: keeping original value "${val}" as cleanPhone failed`);
+      }
       return val;
     }
   })

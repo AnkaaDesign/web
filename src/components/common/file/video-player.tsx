@@ -66,7 +66,9 @@ export function VideoPlayer({ file, url, open = true, onOpenChange, mode = "moda
   const handlePause = () => setIsPlaying(false);
 
   const handleError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
-    console.error("Video playback error:", e);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Video playback error:", e);
+    }
     setError("Erro ao carregar o vídeo. Verifique se o formato é suportado.");
     setIsLoading(false);
   };

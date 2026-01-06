@@ -160,7 +160,7 @@ export function RelatedItemsCard({ items, supplierId, className }: RelatedItemsC
 
   if (safeItems.length === 0) {
     return (
-      <Card className={cn("shadow-sm border border-border w-full", className)} level={1}>
+      <Card className={cn("shadow-sm border border-border w-full", className)}>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -185,7 +185,7 @@ export function RelatedItemsCard({ items, supplierId, className }: RelatedItemsC
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border w-full", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border w-full", className)}>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">

@@ -272,7 +272,9 @@ export function useAdvancedTableSelection<T extends { id: string }>(options: Adv
             setSelectionMode(state.selectionMode || "page");
           }
         } catch (error) {
-          console.warn("Failed to restore selection state:", error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn("Failed to restore selection state:", error);
+          }
         }
       }
     }

@@ -170,7 +170,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       uploadedFileId: file.id,
       thumbnailUrl: file.thumbnailUrl,
     } as FileWithPreview));
-    console.log('[OrderEditForm] Initialized budget files:', files.length, files);
     return files;
   }, [order.budgets]);
 
@@ -186,7 +185,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       uploadedFileId: file.id,
       thumbnailUrl: file.thumbnailUrl,
     } as FileWithPreview));
-    console.log('[OrderEditForm] Initialized receipt files:', files.length, files);
     return files;
   }, [order.receipts]);
 
@@ -202,7 +200,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       uploadedFileId: file.id,
       thumbnailUrl: file.thumbnailUrl,
     } as FileWithPreview));
-    console.log('[OrderEditForm] Initialized invoice files:', files.length, files);
     return files;
   }, [order.invoices]);
 
@@ -311,8 +308,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     const newValue = description || "";
     // Only update if value has actually changed to prevent infinite loops
     if (currentValue !== newValue) {
-      console.log('[useEffect DESCRIPTION SYNC] URL state changed to:', description);
-      console.log('[useEffect DESCRIPTION SYNC] Setting form value to:', newValue);
       form.setValue("description", newValue, {
         shouldValidate: false, // Don't validate on sync to prevent loops
         shouldDirty: false,    // Don't mark as dirty on sync
@@ -373,8 +368,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     // Only update if value has actually changed
     // Deep comparison for array of objects
     if (JSON.stringify(currentValue) !== JSON.stringify(newValue)) {
-      console.log('[useEffect TEMPORARY ITEMS SYNC] URL state changed to:', newValue);
-      console.log('[useEffect TEMPORARY ITEMS SYNC] Setting form value to:', newValue);
       form.setValue("temporaryItems", newValue, {
         shouldValidate: false,
         shouldDirty: false,
@@ -395,7 +388,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
 
           // Only update URL state if form state has actually changed
           if (JSON.stringify(currentTemporaryItems) !== JSON.stringify(urlTemporaryItems)) {
-            console.log('[FORM WATCH] Temporary items changed in form, syncing to URL state:', currentTemporaryItems);
             setTemporaryItems(currentTemporaryItems as any);
           }
         }
@@ -545,17 +537,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     });
 
     const hasChanges = descriptionChanged || supplierChanged || forecastChanged || notesChanged || itemsChanged || quantitiesChanged || pricesChanged || hasFileChanges;
-    console.log('[hasFormChanges]', {
-      descriptionChanged,
-      supplierChanged,
-      forecastChanged,
-      notesChanged,
-      itemsChanged,
-      quantitiesChanged,
-      pricesChanged,
-      hasFileChanges,
-      hasChanges
-    });
     return hasChanges;
   }, [description, supplierId, forecast, notes, selectedItems, quantities, prices, order, hasFileChanges]);
 
@@ -683,13 +664,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
 
       const hasNewFiles = newBudgetFiles.length > 0 || newReceiptFiles.length > 0 || newNfeFiles.length > 0;
 
-      console.log('[SUBMIT] Order ID:', order.id);
-      console.log('[SUBMIT] Description:', description);
-      console.log('[SUBMIT] Items count:', items.length);
-      console.log('[SUBMIT] Has new files:', hasNewFiles);
-      console.log('[SUBMIT] New budget files:', newBudgetFiles.length);
-      console.log('[SUBMIT] New receipt files:', newReceiptFiles.length);
-      console.log('[SUBMIT] New NFE files:', newNfeFiles.length);
 
       if (hasNewFiles) {
         // Use FormData when there are files to upload
@@ -708,19 +682,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         (data as any).receiptIds = currentReceiptIds;
         (data as any).invoiceIds = currentInvoiceIds;
 
-        console.log('[SUBMIT] Setting file IDs to keep:', {
-          budgets: currentBudgetIds.length,
-          receipts: currentReceiptIds.length,
-          invoices: currentInvoiceIds.length,
-        });
-
-        console.log('[SUBMIT] Creating FormData with:');
-        console.log('[SUBMIT] - Data:', data);
-        console.log('[SUBMIT] - Budget files:', newBudgetFiles.length, newBudgetFiles);
-        console.log('[SUBMIT] - Receipt files:', newReceiptFiles.length, newReceiptFiles);
-        console.log('[SUBMIT] - NFE files:', newNfeFiles.length, newNfeFiles);
-        console.log('[SUBMIT] - Supplier info:', supplierInfo);
-
         const formData = createOrderFormData(
           data,
           {
@@ -731,11 +692,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
           supplierInfo
         );
 
-        console.log('[SUBMIT] FormData created, type:', formData.constructor.name);
-        console.log('[SUBMIT] FormData entries:');
-        for (const [key, value] of formData.entries()) {
-          console.log(`  - ${key}:`, value instanceof File ? `File(${value.name})` : value);
-        }
 
         await updateAsync({
           id: order.id,
@@ -754,14 +710,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         (data as any).receiptIds = currentReceiptIds;
         (data as any).invoiceIds = currentInvoiceIds;
 
-        console.log('[SUBMIT] Setting file IDs to keep (JSON):', {
-          budgets: currentBudgetIds.length,
-          receipts: currentReceiptIds.length,
-          invoices: currentInvoiceIds.length,
-        });
-
-        console.log('[SUBMIT] Using JSON payload (no files)');
-
         await updateAsync({
           id: order.id,
           data,
@@ -771,13 +719,15 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       // Success toast is handled automatically by API client
       navigate(routes.inventory.orders?.list || "/inventory/orders");
     } catch (error: any) {
-      console.error("Error updating order:", error);
-      console.error("Error details:", {
-        message: error?.message,
-        response: error?.response,
-        data: error?.response?.data,
-        status: error?.response?.status
-      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating order:", error);
+        console.error("Error details:", {
+          message: error?.message,
+          response: error?.response,
+          data: error?.response?.data,
+          status: error?.response?.status
+        });
+      }
       // Error is handled by the mutation hook
     }
   }, [validateCurrentStep, orderItemMode, selectedItems, quantities, prices, icmses, ipis, description, supplierId, forecast, notes, budgetFiles, receiptFiles, nfeFiles, updateAsync, order, navigate, form, temporaryItemsState]);
@@ -1180,16 +1130,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     // not form state, so the form might never be touched/validated
     const hasRequiredFields = !!description?.trim();
     const submitDisabled = isSubmitting || !hasFormChanges || !hasRequiredFields;
-    console.log('[Submit Button State]', {
-      isSubmitting,
-      hasFormChanges,
-      isValid: form.formState.isValid,
-      hasDescription: !!description?.trim(),
-      hasRequiredFields,
-      submitDisabled,
-      formErrors: form.formState.errors,
-      formValues: form.getValues(),
-    });
     navigationActions.push({
       key: "submit",
       label: "Salvar Alterações",
@@ -1202,24 +1142,24 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
   }
 
   return (
-    <div className="flex flex-col h-full w-full">
-      <div className="flex-shrink-0 pb-4">
-        <PageHeader
-          title="Editar Pedido"
-          icon={IconShoppingCart}
-          variant="form"
-          breadcrumbs={[
-            { label: "Início", href: "/" },
-            { label: "Estoque", href: "/estoque" },
-            { label: "Pedidos", href: routes.inventory.orders?.list || "/inventory/orders" },
-            { label: "Editar" },
-          ]}
-          actions={navigationActions}
-        />
-      </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
+      <PageHeader
+        className="flex-shrink-0"
+        variant="form"
+        title={`Editar Pedido: ${order.description}`}
+        icon={IconShoppingCart}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Pedidos", href: routes.inventory.orders.list },
+          { label: order.description, href: routes.inventory.orders.details(order.id) },
+          { label: "Editar" },
+        ]}
+        actions={navigationActions}
+      />
 
-      <Card className="flex-1 min-h-0 flex flex-col w-full shadow-sm border border-border">
-        <CardContent className="flex-1 flex flex-col p-6 overflow-hidden min-h-0">
+      <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
+            <CardContent className="flex-1 flex flex-col p-4 overflow-hidden min-h-0">
           <Form {...form}>
             <form className="flex flex-col h-full">
               {/* Step Indicator */}
@@ -1250,10 +1190,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                             <Input
                               placeholder="Digite a descrição do pedido"
                               value={description}
-                              onChange={(value) => {
-                                // Custom Input component passes value directly, not event object
-                                const newValue = value?.toString() || "";
-                                console.log('[DESCRIPTION CHANGE] User typed:', newValue);
+                              onChange={(e) => {
+                                const newValue = e.target.value || "";
                                 updateDescription(newValue);
                                 // Form will be synced by useEffect, no need to set it here
                                 // Trigger validation after state update
@@ -1710,8 +1648,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
               </div>
             </form>
           </Form>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
     </div>
   );
 };

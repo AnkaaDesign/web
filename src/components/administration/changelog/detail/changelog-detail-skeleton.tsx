@@ -17,7 +17,7 @@ export function ChangelogDetailSkeleton() {
         <div className="space-y-6">
           {/* Core Information Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="shadow-sm border border-border" level={1}>
+            <Card className="shadow-sm border border-border">
               <CardHeader className="pb-6">
                 <Skeleton className="h-6 w-48" />
               </CardHeader>
@@ -32,7 +32,7 @@ export function ChangelogDetailSkeleton() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm border border-border" level={1}>
+            <Card className="shadow-sm border border-border">
               <CardHeader className="pb-6">
                 <Skeleton className="h-6 w-36" />
               </CardHeader>
@@ -50,7 +50,7 @@ export function ChangelogDetailSkeleton() {
 
           {/* Metadata and Triggered By Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="shadow-sm border border-border" level={1}>
+            <Card className="shadow-sm border border-border">
               <CardHeader className="pb-6">
                 <Skeleton className="h-6 w-32" />
               </CardHeader>
@@ -65,7 +65,7 @@ export function ChangelogDetailSkeleton() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-sm border border-border" level={1}>
+            <Card className="shadow-sm border border-border">
               <CardHeader className="pb-6">
                 <Skeleton className="h-6 w-44" />
               </CardHeader>

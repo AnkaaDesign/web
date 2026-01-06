@@ -325,7 +325,7 @@ export function RelatedTasksCard({
 
   if (tasks.length === 0) {
     return (
-      <Card className={cn("shadow-sm border border-border", className)} level={1}>
+      <Card className={cn("shadow-sm border border-border", className)}>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -350,7 +350,7 @@ export function RelatedTasksCard({
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)}>
       <CardHeader className="pb-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -413,7 +413,7 @@ export function RelatedTasksCard({
                   <div
                     key={task.id}
                     onClick={() => navigate(routes.production.schedule.details(task.id))}
-                    className="relative group p-5 rounded-lg border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-md cursor-pointer"
+                    className="relative group p-5 rounded-lg border border-border hover:border-primary/30 transition-all duration-300 hover:shadow-sm cursor-pointer"
                   >
                     {/* Index Number */}
                     <div className="absolute top-4 left-4 w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center">

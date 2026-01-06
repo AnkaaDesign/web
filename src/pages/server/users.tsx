@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageTracker } from "@/hooks/use-page-tracker";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { cn } from "@/lib/utils";
 import { useSystemUsers, useCreateSystemUser, useDeleteSystemUser, useSetSystemUserPassword } from "../../hooks";
@@ -144,9 +144,9 @@ export function ServerUsersPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.ADMIN}>
-      <div className="flex flex-col h-full space-y-4">
+      <div className="h-full flex flex-col px-4 pt-4">
         <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
+          <PageHeader
             title="Usuários do Sistema"
             icon={IconUserCog}
             favoritePage={FAVORITE_PAGES.SERVIDOR_USUARIOS}
@@ -174,8 +174,8 @@ export function ServerUsersPage() {
         </div>
 
         {/* Content Card */}
-        <Card className={cn("flex-1 flex flex-col shadow-sm border border-border overflow-hidden")} level={1}>
-          <CardContent className="flex-1 flex flex-col overflow-auto">
+        <Card className={cn("flex-1 flex flex-col shadow-sm border border-border overflow-hidden mt-4")}>
+          <CardContent className="flex-1 flex flex-col overflow-auto pb-6">
             {/* Create User Dialog */}
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogContent>

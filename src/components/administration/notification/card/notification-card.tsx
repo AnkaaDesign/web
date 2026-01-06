@@ -37,7 +37,7 @@ export function NotificationCard({ notification, onView, onEdit, onDelete, onSen
 
   return (
     <Card
-      className={cn("hover:shadow-md transition-shadow cursor-pointer", !isSent && "border-l-4 border-l-orange-400", isRead && "bg-gray-50", className)}
+      className={cn("hover:shadow-sm transition-shadow cursor-pointer", !isSent && "border-l-4 border-l-orange-400", isRead && "bg-gray-50", className)}
       onClick={() => onView?.(notification.id)}
     >
       <CardHeader className="pb-3">

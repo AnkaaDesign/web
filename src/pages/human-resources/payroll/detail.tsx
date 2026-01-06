@@ -437,11 +437,10 @@ export default function PayrollDetailPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.HUMAN_RESOURCES, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="space-y-6">
+      <div className="p-4 space-y-4">
         <PageHeader
           variant="detail"
           title={title}
-          icon={IconReceipt}
           breadcrumbs={breadcrumbs}
           actions={[
             {
@@ -460,7 +459,7 @@ export default function PayrollDetailPage() {
         />
 
         {/* Info Cards - 1/3 and 2/3 columns */}
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-3">
           {/* General Info Card */}
           <Card>
             <CardHeader className="pb-4">

@@ -91,7 +91,9 @@ export function CustomerFormProvider({ children, initialValues, onSubmit, mode, 
       // Special handling for phones to ensure it's always an array
       if (field === "phones") {
         if (!Array.isArray(value)) {
-          console.warn("🚨 [FORM-CONTEXT] Phones field must be an array, received:", value);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn("🚨 [FORM-CONTEXT] Phones field must be an array, received:", value);
+          }
           (newValues as any).phones = [];
         }
       }
@@ -99,7 +101,9 @@ export function CustomerFormProvider({ children, initialValues, onSubmit, mode, 
       // Special handling for tags to ensure it's always an array
       if (field === "tags") {
         if (!Array.isArray(value)) {
-          console.warn("🚨 [FORM-CONTEXT] Tags field must be an array, received:", value);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn("🚨 [FORM-CONTEXT] Tags field must be an array, received:", value);
+          }
           (newValues as any).tags = [];
         }
       }
@@ -212,7 +216,9 @@ export function CustomerFormProvider({ children, initialValues, onSubmit, mode, 
             // Validate and submit
             await onSubmit(values);
           } catch (error) {
-            console.error("Form submission error:", error);
+            if (process.env.NODE_ENV !== 'production') {
+              console.error("Form submission error:", error);
+            }
           } finally {
             setIsSubmitting(false);
           }

@@ -42,7 +42,7 @@ export function TaskScheduleFilters({ open, onOpenChange, filters, onFilterChang
 
   const handleReset = () => {
     const resetFilters: Partial<TaskGetManyFormData> = {
-      status: [TASK_STATUS.PENDING, TASK_STATUS.IN_PRODUCTION],
+      status: [TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION],
       limit: 1000,
     };
     setLocalFilters(resetFilters);

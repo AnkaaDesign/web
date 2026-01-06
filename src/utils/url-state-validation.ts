@@ -428,7 +428,9 @@ export const urlStateRecoveryStrategies = {
         const items = selectedItems.split(",").filter(Boolean);
         recovered.selectedIds = items;
       } catch (error) {
-        console.warn("Failed to recover selected items:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn("Failed to recover selected items:", error);
+        }
       }
     }
 
@@ -441,7 +443,9 @@ export const urlStateRecoveryStrategies = {
           recovered.quantityAssignments = parsed;
         }
       } catch (error) {
-        console.warn("Failed to recover quantities:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn("Failed to recover quantities:", error);
+        }
       }
     }
 
@@ -482,7 +486,9 @@ export const urlStateRecoveryStrategies = {
           }
           (recovered.filters as any)[field] = items;
         } catch (error) {
-          console.warn(`Failed to recover ${field}:`, error);
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn(`Failed to recover ${field}:`, error);
+          }
         }
       }
     });

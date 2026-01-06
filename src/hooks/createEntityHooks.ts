@@ -209,8 +209,10 @@ export function createEntityHooks<
       queryFn: () => {
         // Wrap include in an object as the service expects { include: ... }
         const params = include ? { include } : undefined;
-        console.log('[createEntityHooks] useDetail - include:', JSON.stringify(include, null, 2));
-        console.log('[createEntityHooks] useDetail - params:', JSON.stringify(params, null, 2));
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[createEntityHooks] useDetail - include:', JSON.stringify(include, null, 2));
+          console.log('[createEntityHooks] useDetail - params:', JSON.stringify(params, null, 2));
+        }
         return service.getById(id, params);
       },
       enabled: enabled && !!id,
@@ -258,7 +260,7 @@ export function createEntityHooks<
     // CREATE
     const createMutation = useMutation({
       mutationFn: ({ data, include }: { data: TCreateData; include?: any }) => {
-        if (process.env.NODE_ENV === "development") {
+        if (process.env.NODE_ENV !== "production") {
           console.log("=== CREATE MUTATION DEBUG ===");
           console.log("Mutation data:", JSON.stringify(data, null, 2));
           console.log("Mutation include:", JSON.stringify(include, null, 2));
@@ -266,7 +268,7 @@ export function createEntityHooks<
         return service.create(data, include);
       },
       onSuccess: (data, variables) => {
-        if (process.env.NODE_ENV === "development") {
+        if (process.env.NODE_ENV !== "production") {
           console.log("=== CREATE MUTATION SUCCESS ===");
           console.log("Response data:", data);
         }
@@ -274,7 +276,7 @@ export function createEntityHooks<
         options?.onCreateSuccess?.(data, variables.data);
       },
       onError: (error) => {
-        if (process.env.NODE_ENV === "development") {
+        if (process.env.NODE_ENV !== "production") {
           console.error("=== CREATE MUTATION ERROR ===");
           console.error("Error in mutation:", error);
         }
@@ -364,7 +366,7 @@ export function createEntityHooks<
     // BATCH UPDATE
     const batchUpdateMutation = useMutation({
       mutationFn: ({ data, include }: { data: TBatchUpdateData; include?: any }) => {
-        if (process.env.NODE_ENV === "development") {
+        if (process.env.NODE_ENV !== "production") {
           console.log("=== HOOKS LAYER DEBUGGING ===");
           console.log("Step 8 - Hook mutationFn received data:", JSON.stringify(data, null, 2));
           console.log("Step 9 - Hook mutationFn received include:", JSON.stringify(include, null, 2));
@@ -373,7 +375,7 @@ export function createEntityHooks<
         return service.batchUpdate(data, include);
       },
       onSuccess: (data, variables) => {
-        if (process.env.NODE_ENV === "development") {
+        if (process.env.NODE_ENV !== "production") {
           console.log("Step 11 - Hook onSuccess received data:", JSON.stringify(data, null, 2));
           console.log("Step 12 - Hook onSuccess received variables:", JSON.stringify(variables, null, 2));
         }
@@ -381,7 +383,7 @@ export function createEntityHooks<
         options?.onBatchUpdateSuccess?.(data, variables.data);
       },
       onError: (error, variables) => {
-        if (process.env.NODE_ENV === "development") {
+        if (process.env.NODE_ENV !== "production") {
           console.error("Step 13 - Hook onError received error:", error);
           console.error("Step 14 - Hook onError received variables:", JSON.stringify(variables, null, 2));
         }

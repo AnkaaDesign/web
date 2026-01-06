@@ -12,7 +12,7 @@ export const MainLayout = () => {
           {/* Main content area */}
           <div className="flex-1 flex flex-col overflow-hidden">
             <Header />
-            <main className="bg-background flex-1 p-8 overflow-y-auto transition-colors">
+            <main className="bg-background flex-1 overflow-y-auto transition-colors">
               <Outlet />
             </main>
           </div>

@@ -17,7 +17,9 @@ const statusOptions = Object.values(TASK_STATUS).map((status) => ({
 export function StatusCell({ control, index }: StatusCellProps) {
   // Defensive check to prevent undefined field names
   if (typeof index !== "number" || index < 0) {
-    console.error("StatusCell: Invalid index provided:", index);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("StatusCell: Invalid index provided:", index);
+    }
     return <div className="text-red-500 text-xs">Error: Invalid index</div>;
   }
 

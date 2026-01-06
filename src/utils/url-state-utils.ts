@@ -59,7 +59,9 @@ export const createSafeParser = <T>(parser: (value: string) => T, defaultValue: 
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       onError?.(err, value);
-      console.warn(`Failed to parse URL parameter:`, value, err.message);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`Failed to parse URL parameter:`, value, err.message);
+      }
       return defaultValue;
     }
   };
@@ -72,7 +74,9 @@ export const createSafeSerializer = <T>(serializer: (value: T) => string, onErro
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
       onError?.(err, value);
-      console.warn(`Failed to serialize URL parameter:`, value, err.message);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`Failed to serialize URL parameter:`, value, err.message);
+      }
       return String(value);
     }
   };
@@ -339,7 +343,9 @@ export const urlUtils = {
         searchParams: parsed.searchParams,
       };
     } catch (error) {
-      console.warn("Failed to parse URL:", url, error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn("Failed to parse URL:", url, error);
+      }
       return {
         pathname: "",
         searchParams: new URLSearchParams(),
@@ -422,7 +428,9 @@ export const errorHandling = {
       if (onError) {
         onError(urlError);
       } else {
-        console.error(urlError);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error(urlError);
+        }
       }
     };
   },

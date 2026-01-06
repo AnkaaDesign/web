@@ -1,4 +1,4 @@
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../../constants";
@@ -18,18 +18,21 @@ export const InventoryStatisticsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="flex flex-col h-full">
-        <PageHeaderWithFavorite
-          title="Estatísticas do Estoque"
-          icon={IconChartBar}
-          favoritePage={FAVORITE_PAGES.ESTOQUE_ESTATISTICAS}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Estoque", href: routes.inventory.root },
-            { label: "Estatísticas" }
-          ]}
-        />
-        <div className="flex-1 flex items-center justify-center">
+      <div className="h-full flex flex-col px-4 pt-4">
+        <div className="flex-shrink-0">
+          <PageHeader
+            title="Estatísticas do Estoque"
+            icon={IconChartBar}
+            favoritePage={FAVORITE_PAGES.ESTOQUE_ESTATISTICAS}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Estoque", href: routes.inventory.root },
+              { label: "Estatísticas" }
+            ]}
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="mt-4 flex items-center justify-center">
           <Card className="max-w-md">
             <CardContent className="p-8 text-center">
               <IconTool className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
@@ -39,6 +42,7 @@ export const InventoryStatisticsPage = () => {
               </p>
             </CardContent>
           </Card>
+          </div>
         </div>
       </div>
     </PrivilegeRoute>

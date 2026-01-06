@@ -47,8 +47,6 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
     data: Paint[];
     hasMore: boolean;
   }> => {
-    console.log('[LogoPaintsSelector] searchPaints called:', { search, page });
-
     const params: any = {
       orderBy: { name: "asc" },
       page: page,
@@ -70,15 +68,8 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
       params.searchingFor = search.trim();
     }
 
-    console.log('[LogoPaintsSelector] API params:', params);
-
     try {
       const response = await getPaints(params);
-      console.log('[LogoPaintsSelector] API response:', {
-        dataLength: response.data?.length,
-        hasMore: response.meta?.hasNextPage,
-        firstItem: response.data?.[0],
-      });
 
       const paints = response.data || [];
       const hasMore = response.meta?.hasNextPage || false;
@@ -93,7 +84,9 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
         hasMore: hasMore,
       };
     } catch (error) {
-      console.error('[LogoPaintsSelector] Error fetching paints:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[LogoPaintsSelector] Error fetching paints:', error);
+      }
       return { data: [], hasMore: false };
     }
   };

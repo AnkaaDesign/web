@@ -9,7 +9,8 @@ import { itemCreateSchema, itemUpdateSchema, type ItemCreateFormData, type ItemU
 import { useItemCategories } from "../../../../hooks";
 import { ITEM_CATEGORY_TYPE } from "../../../../constants";
 import { serializeItemFormToUrlParams, debounce } from "@/utils/url-form-state";
-
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 // Import all form components
 import { NameInput } from "@/components/inventory/item/form/name-input";
 import { UnicodeInput } from "@/components/inventory/item/form/unicode-input";
@@ -188,7 +189,9 @@ export function EpiForm(props: EpiFormProps) {
         await (props as UpdateEpiFormProps).onSubmit(processedData as ItemUpdateFormData);
       }
     } catch (error) {
-      console.error("Error submitting EPI form:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error submitting EPI form:", error);
+      }
       // Re-throw so parent can handle
       throw error;
     }
@@ -198,12 +201,14 @@ export function EpiForm(props: EpiFormProps) {
 
   return (
     <Card className="h-full flex flex-col shadow-sm border border-border overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4">
         <Form {...form}>
           <form
             id="epi-form"
             onSubmit={form.handleSubmit(handleSubmit, (errors) => {
-              console.error("EPI form validation errors:", errors);
+              if (process.env.NODE_ENV !== 'production') {
+                console.error("EPI form validation errors:", errors);
+              }
             })}
             className="space-y-6"
           >

@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useFieldArray } from "react-hook-form";
+import { useFieldArray, useWatch } from "react-hook-form";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { Combobox } from "@/components/ui/combobox";
 import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
 import type { ServiceOrder, Service } from "../../../../types";
-import { SERVICE_ORDER_STATUS } from "../../../../constants";
+import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS_LABELS, SERVICE_ORDER_TYPE_LABELS } from "../../../../constants";
 import { useServiceMutations } from "../../../../hooks";
 import { serviceService } from "../../../../api-client";
+import { AdminUserSelector } from "@/components/administration/user/form/user-selector";
 
 interface ServiceSelectorProps {
   control: any;
@@ -20,73 +21,64 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
   const [isCreating, setIsCreating] = useState(false);
   const lastRowRef = useRef<HTMLDivElement>(null);
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, move } = useFieldArray({
     control,
-    name: "services",
+    name: "serviceOrders",
   });
 
   const { createAsync: createService } = useServiceMutations();
 
+  // Watch services to auto-sort by type
+  const servicesValues = useWatch({
+    control,
+    name: "serviceOrders",
+  }) as any[] || [];
+
+  // Auto-sort services by type whenever they change
+  useEffect(() => {
+    if (!initialized || fields.length === 0) return;
+
+    // Create a mapping of type to sort order
+    const typeOrder: Record<string, number> = {
+      [SERVICE_ORDER_TYPE.PRODUCTION]: 0,
+      [SERVICE_ORDER_TYPE.FINANCIAL]: 1,
+      [SERVICE_ORDER_TYPE.NEGOTIATION]: 2,
+      [SERVICE_ORDER_TYPE.ARTWORK]: 3,
+    };
+
+    // Create array of indices with their types
+    const indexedServices = fields.map((field, index) => ({
+      index,
+      type: servicesValues[index]?.type || SERVICE_ORDER_TYPE.PRODUCTION,
+      description: servicesValues[index]?.description || '',
+    }));
+
+    // Sort by type, then by description
+    const sortedIndices = indexedServices
+      .map((s, originalIndex) => ({ ...s, originalIndex }))
+      .sort((a, b) => {
+        const typeCompare = typeOrder[a.type] - typeOrder[b.type];
+        if (typeCompare !== 0) return typeCompare;
+        return a.description.localeCompare(b.description);
+      });
+
+    // Check if order changed
+    const needsReorder = sortedIndices.some((s, i) => s.originalIndex !== i);
+
+    if (needsReorder) {
+      // Reorder the fields array
+      sortedIndices.forEach((item, targetIndex) => {
+        const currentIndex = fields.findIndex((_, idx) => idx === item.originalIndex);
+        if (currentIndex !== targetIndex && currentIndex !== -1) {
+          move(currentIndex, targetIndex);
+        }
+      });
+    }
+  }, [servicesValues, fields, initialized, move]);
+
   // Memoize callbacks to prevent infinite loop
   const getOptionLabel = useCallback((service: Service) => service.description, []);
   const getOptionValue = useCallback((service: Service) => service.description, []);
-
-  // Extract existing service descriptions for initial display
-  const existingServiceDescriptions = fields
-    .map((field: any) => field.description)
-    .filter((desc: string) => desc && desc.trim().length > 0);
-
-  // Search function for Combobox - include existing services to ensure they display
-  const searchServices = async (
-    search: string,
-    page: number = 1,
-  ): Promise<{
-    data: Service[];
-    hasMore: boolean;
-  }> => {
-    const params: any = {
-      orderBy: { description: "asc" },
-      page: page,
-      take: 50,
-    };
-
-    // Only add search filter if there's a search term
-    if (search && search.trim()) {
-      params.searchingFor = search.trim();
-    }
-
-    try {
-      const response = await serviceService.getServices(params);
-      const services = response.data || [];
-      const hasMore = response.meta?.hasNextPage || false;
-
-      // If this is the first page and no search, prepend existing services to ensure they're available
-      if (page === 1 && (!search || !search.trim()) && existingServiceDescriptions.length > 0) {
-        // Create Service objects for existing descriptions if they're not already in the results
-        const existingServices: Service[] = existingServiceDescriptions
-          .filter((desc: string) => !services.some((s) => s.description === desc))
-          .map((desc: string) => ({
-            id: `temp-${desc}`, // Temporary ID for display purposes
-            description: desc,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }));
-
-        return {
-          data: [...existingServices, ...services],
-          hasMore: hasMore,
-        };
-      }
-
-      return {
-        data: services,
-        hasMore: hasMore,
-      };
-    } catch (error) {
-      console.error('Error fetching services:', error);
-      return { data: [], hasMore: false };
-    }
-  };
 
   // Initialize with one empty row if no services exist (create mode)
   useEffect(() => {
@@ -95,6 +87,8 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
         status: SERVICE_ORDER_STATUS.PENDING,
         statusOrder: 1,
         description: "",
+        type: SERVICE_ORDER_TYPE.PRODUCTION,
+        assignedToId: null,
       });
       setInitialized(true);
     } else if (!initialized && fields.length > 0) {
@@ -107,6 +101,8 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
       status: SERVICE_ORDER_STATUS.PENDING,
       statusOrder: 1,
       description: "",
+      type: SERVICE_ORDER_TYPE.PRODUCTION,
+      assignedToId: null,
     });
 
     // Focus on the new combobox after adding
@@ -116,16 +112,20 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
     }, 100);
   };
 
-  const handleCreateService = async (description: string) => {
+  const handleCreateService = async (description: string, type: SERVICE_ORDER_TYPE) => {
     try {
       setIsCreating(true);
       const result = await createService({
         description,
+        type,
       });
 
       if (result && result.success && result.data) {
-        return result.data.description;
+        // Return the full service object so Combobox can cache it
+        return result.data;
       }
+      // Return undefined if creation failed
+      return undefined;
     } catch (error) {
       // Error is handled by the mutation hook
       throw error;
@@ -142,77 +142,34 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
         Serviços
       </FormLabel>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {fields.map((field, index) => (
-          <div key={field.id} ref={index === fields.length - 1 ? lastRowRef : null} className="flex items-center gap-1">
-            {/* Service Combobox */}
-            <FormField
-              control={control}
-              name={`services.${index}.description`}
-              render={({ field }) => (
-                <FormItem className="flex-1">
-                  <FormControl>
-                    <Combobox<Service>
-                      value={field.value || ""}
-                      onValueChange={field.onChange}
-                      placeholder="Selecione ou crie um serviço"
-                      emptyText="Digite para criar um novo serviço"
-                      searchPlaceholder="Pesquisar serviços..."
-                      disabled={disabled || isCreating}
-                      async={true}
-                      allowCreate={true}
-                      createLabel={(value) => `Criar serviço "${value}"`}
-                      onCreate={async (value) => {
-                        const newDescription = await handleCreateService(value);
-                        if (newDescription) {
-                          field.onChange(newDescription);
-                        }
-                      }}
-                      isCreating={isCreating}
-                      queryKey={["services", "search", index]}
-                      queryFn={searchServices}
-                      getOptionLabel={getOptionLabel}
-                      getOptionValue={getOptionValue}
-                      renderOption={(service) => <span>{service.description}</span>}
-                      loadMoreText="Carregar mais serviços"
-                      loadingMoreText="Carregando..."
-                      minSearchLength={0}
-                      pageSize={50}
-                      debounceMs={300}
-                      className="w-full"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Remove Button */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                if (canRemove) {
-                  remove(index);
-                } else {
-                  // Clear the only row instead of removing it
-                  const fieldElement = document.querySelector(`[name="services.${index}.description"]`) as HTMLInputElement;
-                  if (fieldElement) {
-                    fieldElement.value = "";
-                    // Trigger change event
-                    const event = new Event("change", { bubbles: true });
-                    fieldElement.dispatchEvent(event);
-                  }
+          <ServiceRow
+            key={field.id}
+            control={control}
+            index={index}
+            disabled={disabled}
+            isCreating={isCreating}
+            canRemove={canRemove}
+            lastRowRef={index === fields.length - 1 ? lastRowRef : null}
+            onRemove={() => {
+              if (canRemove) {
+                remove(index);
+              } else {
+                // Clear the only row instead of removing it
+                const fieldElement = document.querySelector(`[name="services.${index}.description"]`) as HTMLInputElement;
+                if (fieldElement) {
+                  fieldElement.value = "";
+                  // Trigger change event
+                  const event = new Event("change", { bubbles: true });
+                  fieldElement.dispatchEvent(event);
                 }
-              }}
-              disabled={disabled}
-              className="text-destructive flex-shrink-0"
-              title="Remover serviço"
-            >
-              <IconTrash className="h-4 w-4" />
-            </Button>
-          </div>
+              }
+            }}
+            onCreateService={handleCreateService}
+            getOptionLabel={getOptionLabel}
+            getOptionValue={getOptionValue}
+          />
         ))}
       </div>
 
@@ -226,8 +183,212 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
         className="w-full"
       >
         <IconPlus className="h-4 w-4 mr-2" />
-        Adicionar
+        Adicionar Serviço
       </Button>
+    </div>
+  );
+}
+
+interface ServiceRowProps {
+  control: any;
+  index: number;
+  disabled?: boolean;
+  isCreating: boolean;
+  canRemove: boolean;
+  lastRowRef: React.RefObject<HTMLDivElement> | null;
+  onRemove: () => void;
+  onCreateService: (description: string, type: SERVICE_ORDER_TYPE) => Promise<Service | undefined>;
+  getOptionLabel: (service: Service) => string;
+  getOptionValue: (service: Service) => string;
+}
+
+function ServiceRow({
+  control,
+  index,
+  disabled,
+  isCreating,
+  canRemove,
+  lastRowRef,
+  onRemove,
+  onCreateService,
+  getOptionLabel,
+  getOptionValue,
+}: ServiceRowProps) {
+  // Watch the type field for this service to filter descriptions
+  const selectedType = useWatch({
+    control,
+    name: `serviceOrders.${index}.type`,
+    defaultValue: SERVICE_ORDER_TYPE.PRODUCTION,
+  });
+
+  // Extract existing service description for this row
+  const existingDescription = useWatch({
+    control,
+    name: `serviceOrders.${index}.description`,
+    defaultValue: "",
+  });
+
+  // Search function for Combobox - filtered by type
+  const searchServices = async (
+    search: string,
+    page: number = 1,
+  ): Promise<{
+    data: Service[];
+    hasMore: boolean;
+  }> => {
+    const params: any = {
+      orderBy: { description: "asc" },
+      page: page,
+      take: 50,
+      type: selectedType, // Filter by selected type
+    };
+
+    // Only add search filter if there's a search term
+    if (search && search.trim()) {
+      params.searchingFor = search.trim();
+    }
+
+    try {
+      const response = await serviceService.getServices(params);
+      const services = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      // If this is the first page and no search, ensure existing description is in the results
+      if (page === 1 && (!search || !search.trim()) && existingDescription && existingDescription.trim()) {
+        // Check if existing description is already in results
+        const existsInResults = services.some((s) => s.description === existingDescription);
+
+        if (!existsInResults) {
+          // Create a temporary Service object for the existing description
+          const existingService: Service = {
+            id: `temp-${existingDescription}`,
+            description: existingDescription,
+            type: selectedType,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+
+          return {
+            data: [existingService, ...services],
+            hasMore: hasMore,
+          };
+        }
+      }
+
+      return {
+        data: services,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Error fetching services:', error);
+      }
+      return { data: [], hasMore: false };
+    }
+  };
+
+  return (
+    <div ref={lastRowRef} className="border rounded-lg p-4 space-y-3">
+      {/* Row with 3 comboboxes: Type, Description, Assignment */}
+      <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_200px_auto] gap-3 items-start">
+        {/* Type Field - First */}
+        <FormField
+          control={control}
+          name={`serviceOrders.${index}.type`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Tipo</FormLabel>
+              <FormControl>
+                <Combobox
+                  value={field.value || SERVICE_ORDER_TYPE.PRODUCTION}
+                  onValueChange={field.onChange}
+                  disabled={disabled}
+                  options={[
+                    SERVICE_ORDER_TYPE.PRODUCTION,
+                    SERVICE_ORDER_TYPE.FINANCIAL,
+                    SERVICE_ORDER_TYPE.NEGOTIATION,
+                    SERVICE_ORDER_TYPE.ARTWORK,
+                  ].map((type) => ({
+                    value: type,
+                    label: SERVICE_ORDER_TYPE_LABELS[type],
+                  }))}
+                  placeholder="Tipo"
+                  searchable={false}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Description Field - Second (filtered by type) */}
+        <FormField
+          control={control}
+          name={`serviceOrders.${index}.description`}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Descrição</FormLabel>
+              <FormControl>
+                <Combobox<Service>
+                  value={field.value || ""}
+                  onValueChange={field.onChange}
+                  placeholder="Selecione ou crie um serviço"
+                  emptyText="Digite para criar um novo serviço"
+                  searchPlaceholder="Pesquisar serviços..."
+                  disabled={disabled || isCreating}
+                  async={true}
+                  allowCreate={true}
+                  createLabel={(value) => `Criar serviço "${value}"`}
+                  onCreate={async (value) => {
+                    const newService = await onCreateService(value, selectedType);
+                    if (newService) {
+                      // Return the full service object
+                      // The Combobox will handle setting the value after caching
+                      return newService;
+                    }
+                  }}
+                  isCreating={isCreating}
+                  queryKey={["serviceOrders", "search", index, selectedType]} // Add selectedType to invalidate query when type changes
+                  queryFn={searchServices}
+                  getOptionLabel={getOptionLabel}
+                  getOptionValue={getOptionValue}
+                  renderOption={(service) => <span>{service.description}</span>}
+                  loadMoreText="Carregar mais serviços"
+                  loadingMoreText="Carregando..."
+                  minSearchLength={0}
+                  pageSize={50}
+                  debounceMs={300}
+                  className="w-full"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Assigned User Field - Third */}
+        <AdminUserSelector
+          control={control}
+          name={`serviceOrders.${index}.assignedToId`}
+          label="Responsável"
+          placeholder="Responsável"
+          disabled={disabled}
+          required={false}
+        />
+
+        {/* Remove Button */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={onRemove}
+          disabled={disabled}
+          className="text-destructive flex-shrink-0 mt-8"
+          title="Remover serviço"
+        >
+          <IconTrash className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }

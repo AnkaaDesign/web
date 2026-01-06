@@ -145,7 +145,9 @@ export function OrderFilters({ open, onOpenChange, filters, onFilterChange }: Or
 
       return { data: options, hasMore };
     } catch (error) {
-      console.error("Error fetching suppliers:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error fetching suppliers:", error);
+      }
       return { data: [], hasMore: false };
     }
   }, []);

@@ -25,7 +25,7 @@ export function PpeScheduleInfoCard({ schedule, className }: PpeScheduleInfoCard
   const isOverdue = schedule.nextRun && new Date(schedule.nextRun) < new Date();
 
   return (
-    <Card className={cn("shadow-sm border border-border", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border", className)}>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2">
           <IconCalendar className="h-5 w-5 text-muted-foreground" />

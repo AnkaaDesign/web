@@ -265,7 +265,9 @@ export const createFilterRemover = (filters: Partial<SupplierGetManyFormData>, o
         delete newFilters.updatedAt;
         break;
       default:
-        console.warn(`Unknown filter key: ${filterKey}`);
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`Unknown filter key: ${filterKey}`);
+        }
     }
 
     onFilterChange(newFilters);

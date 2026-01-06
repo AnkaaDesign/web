@@ -107,7 +107,9 @@ export function BorrowReturnForm({ borrow, onCancel }: BorrowReturnFormProps) {
         setValidationErrors(["Erro ao processar devolução. Tente novamente."]);
       }
     } catch (error) {
-      console.error("Error returning borrow:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error returning borrow:", error);
+      }
       setValidationErrors(["Erro inesperado ao processar devolução"]);
     }
   };

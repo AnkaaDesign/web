@@ -245,7 +245,7 @@ function FileContentsBrowser({
           key={dir.name}
           className={
             fileDisplayMode === "grid"
-              ? "group relative overflow-hidden transition-all duration-300 rounded-lg hover:shadow-md cursor-pointer border border-border w-full max-w-[200px]"
+              ? "group relative overflow-hidden transition-all duration-300 rounded-lg hover:shadow-sm cursor-pointer border border-border w-full max-w-[200px]"
               : "flex items-center gap-3 p-3 border rounded hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors cursor-pointer"
           }
           onClick={() => handleDirectoryClick(dir)}
@@ -660,7 +660,7 @@ export function ServerSharedFoldersPage() {
   if (viewMode === "browse" && selectedFolder) {
     return (
       <FileViewerProvider baseUrl={apiClient.defaults.baseURL}>
-        <div className="flex flex-col h-full space-y-4">
+        <div className="h-full flex flex-col px-4 pt-4">
         {/* Fixed Header */}
         <div className="flex-shrink-0">
           <PageHeader
@@ -684,8 +684,8 @@ export function ServerSharedFoldersPage() {
         </div>
 
         {/* Browser Content */}
-        <Card className="flex-1 flex flex-col min-h-0">
-          <CardContent className="flex-1 overflow-auto p-6 space-y-4">
+        <Card className="flex-1 flex flex-col min-h-0 mt-4">
+          <CardContent className="flex-1 overflow-auto p-4 space-y-4 pb-6">
             {/* Navigation Controls - removed redundant section since breadcrumbs handle navigation */}
 
             {/* Folder Contents */}
@@ -742,7 +742,7 @@ export function ServerSharedFoldersPage() {
   // Main folder list view
   return (
     <FileViewerProvider baseUrl={apiClient.defaults.baseURL}>
-      <div className="flex flex-col h-full space-y-4">
+      <div className="h-full flex flex-col px-4 pt-4">
       {/* Fixed Header */}
       <div className="flex-shrink-0">
         <PageHeader
@@ -766,8 +766,8 @@ export function ServerSharedFoldersPage() {
       </div>
 
       {/* Content Card */}
-      <Card className="flex-1 flex flex-col min-h-0">
-        <CardContent className="flex-1 overflow-auto p-6 space-y-4">
+      <Card className="flex-1 flex flex-col min-h-0 mt-4">
+        <CardContent className="flex-1 overflow-auto p-4 space-y-4 pb-6">
               {isLoading ? (
                 <div className="space-y-4">
                   {Array.from({ length: 5 }).map((_, i) => (

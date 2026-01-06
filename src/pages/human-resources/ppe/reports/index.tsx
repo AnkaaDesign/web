@@ -47,7 +47,7 @@ export const PpeReportsPage = () => {
         {reportCards.map((report) => {
           const Icon = report.icon;
           return (
-            <Card key={report.path} className="hover:shadow-lg transition-shadow cursor-pointer border border-border" onClick={() => navigate(report.path)} level={1}>
+            <Card key={report.path} className="hover:shadow-sm transition-shadow cursor-pointer border border-border" onClick={() => navigate(report.path)}>
               <CardHeader className="pb-4">
                 <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-lg ${report.bgColor}`}>
@@ -74,7 +74,7 @@ export const PpeReportsPage = () => {
         })}
       </div>
 
-      <Card className="border border-border" level={1}>
+      <Card className="border border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <IconChartBar className="h-5 w-5" />

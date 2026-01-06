@@ -1,21 +1,16 @@
 import { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useForm } from "react-hook-form";
+import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconAlertTriangle, IconUsers, IconCalendar } from "@tabler/icons-react";
 import { debounce } from "../../../../utils";
 import { createWarningFormData } from "@/utils/form-data-helper";
-
 import type { Warning } from "../../../../types";
 import type { WarningCreateFormData, WarningUpdateFormData } from "../../../../schemas";
 import { warningCreateSchema, warningUpdateSchema } from "../../../../schemas";
 import { routes } from "../../../../constants";
-import { useWarningMutations, useUser } from "../../../../hooks";
-
-import { Form } from "@/components/ui/form";
+import { useWarningMutations } from "../../../../hooks";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
-
 import { SeveritySelect } from "./severity-select";
 import { CategorySelect } from "./category-select";
 import { ReasonInput } from "./reason-input";
@@ -181,11 +176,13 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
 
   // Debug validation errors in development
   useEffect(() => {
-    if (process.env.NODE_ENV === "development" && Object.keys(errors).length > 0) {
-      console.log("Warning form validation errors:", {
-        errors,
-        currentValues: form.getValues(),
-      });
+    if (process.env.NODE_ENV !== 'production' && Object.keys(errors).length > 0) {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("Warning form validation errors:", {
+          errors,
+          currentValues: form.getValues(),
+        });
+      }
     }
   }, [errors, form]);
 
@@ -305,17 +302,24 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
         }
       }
     } catch (error) {
-      console.error("Error submitting form:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error submitting form:", error);
+      }
     }
   };
 
   return (
-    <Card className="h-full flex flex-col shadow-sm border border-border overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-6">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-              {/* Basic Information Card */}
-              <Card className="bg-transparent">
+    <FormProvider {...form}>
+      <form id="warning-form" onSubmit={form.handleSubmit(handleSubmit)}>
+        {/* Hidden submit button for programmatic form submission */}
+        <button id="warning-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
+          Submit
+        </button>
+
+        {/* Wrapper div with space-y-4 for consistent card spacing */}
+        <div className="space-y-4">
+          {/* Basic Information Card */}
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconAlertTriangle className="h-5 w-5 text-muted-foreground" />
@@ -340,7 +344,7 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
           </Card>
 
           {/* People Involved Card */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconUsers className="h-5 w-5 text-muted-foreground" />
@@ -377,7 +381,7 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
           </Card>
 
           {/* Follow-up and Notes Card */}
-          <Card className="bg-transparent">
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <IconCalendar className="h-5 w-5 text-muted-foreground" />
@@ -414,10 +418,9 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
               </div>
             </CardContent>
           </Card>
-        </form>
-      </Form>
-    </div>
-    </Card>
+        </div>
+      </form>
+    </FormProvider>
   );
 });
 

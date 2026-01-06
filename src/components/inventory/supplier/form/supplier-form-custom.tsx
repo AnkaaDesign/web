@@ -12,7 +12,8 @@ import { Combobox } from "@/components/ui/combobox";
 import { BRAZILIAN_STATES } from "../../../../constants";
 import { cleanCNPJ, formatCNPJ } from "../../../../utils";
 import { toast } from "sonner";
-
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 interface BaseSupplierFormProps {
   isSubmitting?: boolean;
   onDirtyChange?: (isDirty: boolean) => void;
@@ -67,14 +68,16 @@ function SupplierFormContent({ isSubmitting }: { isSubmitting?: boolean }) {
         setValue("city", data.localidade || null);
         setValue("state", data.uf || null);
       } catch (error) {
-        console.error("Failed to fetch CEP:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Failed to fetch CEP:", error);
+        }
       }
     },
     [setValue],
   );
 
   return (
-    <div className="space-y-6 flex-1 overflow-y-auto p-6">
+    <div className="space-y-6 flex-1 overflow-y-auto p-4">
       {/* Basic Information */}
       <Card>
         <CardHeader>
@@ -259,7 +262,9 @@ export function SupplierForm(props: SupplierFormProps) {
       // Submit validated data
       await props.onSubmit(result.data as any);
     } catch (error) {
-      console.error("Form submission error:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Form submission error:", error);
+      }
       // Parent component handles the error
     }
   };

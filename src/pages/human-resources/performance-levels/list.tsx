@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
-import { PageHeaderWithFavorite } from "@/components/ui/page-header-with-favorite";
+import { PageHeader } from "@/components/ui/page-header";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { routes, FAVORITE_PAGES } from "../../../constants";
 import { SECTOR_PRIVILEGES } from "../../../constants/enums";
 import { PerformanceLevelList } from "@/components/human-resources/performance-levels/performance-level-list";
 import { IconTrendingUp, IconDeviceFloppy, IconRestore } from "@tabler/icons-react";
 import type { PerformanceLevelListRef } from "@/components/human-resources/performance-levels/performance-level-list";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 export default function PerformanceLevelsListPage() {
   const [pendingChanges, setPendingChanges] = useState<Map<string, number>>(new Map());
@@ -62,16 +64,15 @@ export default function PerformanceLevelsListPage() {
       requiredPrivileges={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.HUMAN_RESOURCES]}
       fallback={<div>Acesso negado</div>}
     >
-      <div className="flex flex-col h-full space-y-4">
-        <div className="flex-shrink-0">
-          <PageHeaderWithFavorite
-            title="Níveis de Desempenho"
-            icon={IconTrendingUp}
-            favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_NIVEIS_DESEMPENHO_LISTAR}
-            breadcrumbs={breadcrumbs}
-            actions={pageActions}
-          />
-        </div>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
+        <PageHeader
+          className="flex-shrink-0"
+          title="Níveis de Desempenho"
+          icon={IconTrendingUp}
+          favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_NIVEIS_DESEMPENHO_LISTAR}
+          breadcrumbs={breadcrumbs}
+          actions={pageActions}
+        />
         <PerformanceLevelList
           ref={tableRef}
           className="flex-1 min-h-0"

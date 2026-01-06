@@ -270,7 +270,9 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
         }
         setContextMenu(null);
       } catch (error) {
-        console.error("Error marking user(s) as effected:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error marking user(s) as effected:", error);
+        }
       }
     }
   };
@@ -299,7 +301,9 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
         }
         setContextMenu(null);
       } catch (error) {
-        console.error("Error marking user(s) as dismissed:", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error marking user(s) as dismissed:", error);
+        }
       }
     }
   };
@@ -336,7 +340,9 @@ export function UserTable({ visibleColumns, className, onEdit, onMarkAsContracte
         setContextMenu(null);
       } catch (error) {
         // Error is handled by the API client with detailed message
-        console.error("Error deleting user(s):", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error deleting user(s):", error);
+        }
       }
     }
   };

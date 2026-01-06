@@ -228,7 +228,7 @@ export function SelectableFileList({ files, onSelectionChange }: { files: AnkaaF
             file={file}
             showName={true}
             onClick={handleFileClick}
-            className={selected.has(file.id) ? "ring-2 ring-blue-500 shadow-lg" : ""}
+            className={selected.has(file.id) ? "ring-2 ring-blue-500 shadow-sm" : ""}
           />
         ))}
       </div>
@@ -408,7 +408,7 @@ export function CustomStyledFiles({ files }: { files: AnkaaFile[] }) {
               ${index % 4 === 1 ? "border-green-300 hover:border-green-500" : ""}
               ${index % 4 === 2 ? "border-purple-300 hover:border-purple-500" : ""}
               ${index % 4 === 3 ? "border-orange-300 hover:border-orange-500" : ""}
-              shadow-sm hover:shadow-xl
+              shadow-sm hover:shadow-sm
               transition-all duration-300
             `}
           />

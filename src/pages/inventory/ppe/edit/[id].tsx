@@ -58,7 +58,9 @@ export const EditEpiPage = () => {
       }
     } catch (error) {
       // Error handled by mutation hook
-      console.error("Error updating EPI:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating EPI:", error);
+      }
     }
   };
 
@@ -102,28 +104,21 @@ export const EditEpiPage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-5xl mx-auto">
-          <PageHeader
-            variant="form"
-            title={`Editar ${item.name}`}
-            icon={IconShield}
-            breadcrumbs={[
-              { label: "Estoque", href: routes.inventory.root },
-              { label: "EPIs", href: routes.inventory.ppe.root },
-              { label: item.name, href: routes.inventory.ppe.details(id!) },
-              { label: "Editar" },
-            ]}
-            actions={actions}
-          />
-        </div>
-      </div>
-
-      {/* Scrollable Form Container */}
-      <div className="flex-1 overflow-y-auto mt-6">
-        <div className="max-w-5xl mx-auto h-full">
+    <div className="h-full flex flex-col px-4 pt-4">
+      <PageHeader
+        variant="form"
+        title={`Editar ${item.name}`}
+        icon={IconShield}
+        breadcrumbs={[
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "EPIs", href: routes.inventory.ppe.root },
+          { label: item.name, href: routes.inventory.ppe.details(id!) },
+          { label: "Editar" },
+        ]}
+        actions={actions}
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="mt-4 space-y-4">
           <EpiEditForm item={item} onSubmit={handleFormSubmit} isSubmitting={updateMutation.isPending} />
         </div>
       </div>

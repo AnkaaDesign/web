@@ -62,6 +62,7 @@ import {
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 export const CuttingDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -170,7 +171,9 @@ export const CuttingDetailsPage = () => {
       await update({ id: cut.id, data: updateData });
       setStatusChangeDialogOpen(false);
     } catch (error) {
-      console.error("Error updating cut status:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error updating cut status:", error);
+      }
     } finally {
       setIsUpdating(false);
     }
@@ -198,13 +201,15 @@ export const CuttingDetailsPage = () => {
   // Loading state
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className={DETAIL_PAGE_SPACING.CONTAINER}>
         <Skeleton className="h-24 w-full rounded-lg" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-96 rounded-lg" />
-          <Skeleton className="h-96 rounded-lg" />
-          <Skeleton className="h-64 rounded-lg" />
-          <Skeleton className="h-64 rounded-lg" />
+        <div className={DETAIL_PAGE_SPACING.HEADER_TO_GRID}>
+          <div className={getDetailGridClasses()}>
+            <Skeleton className="h-96 rounded-lg" />
+            <Skeleton className="h-96 rounded-lg" />
+            <Skeleton className="h-64 rounded-lg" />
+            <Skeleton className="h-64 rounded-lg" />
+          </div>
         </div>
       </div>
     );
@@ -237,54 +242,53 @@ export const CuttingDetailsPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="space-y-6">
-        <div className="animate-in fade-in-50 duration-500">
-          <PageHeader
-            variant="detail"
-            title={cut.file?.filename || "Recorte"}
-            icon={IconCut}
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Produção", href: routes.production.root },
-              { label: "Recortes", href: routes.production.cutting.list },
-              { label: cut.file?.filename || "Recorte" },
-            ]}
-            actions={[
-              {
-                key: "refresh",
-                label: "Atualizar",
-                icon: IconRefresh,
-                onClick: () => refetch(),
-              },
-              ...(canEdit && cut.status === CUT_STATUS.PENDING
-                ? [
-                    {
-                      key: "start",
-                      label: "Iniciar Corte",
-                      icon: IconPlayerPlay,
-                      onClick: () => handleStatusChange(CUT_STATUS.CUTTING),
-                      variant: "default" as const,
-                    },
-                  ]
-                : []),
-              ...(canEdit && cut.status === CUT_STATUS.CUTTING
-                ? [
-                    {
-                      key: "complete",
-                      label: "Finalizar Corte",
-                      icon: IconCheck,
-                      onClick: () => handleStatusChange(CUT_STATUS.COMPLETED),
-                      variant: "default" as const,
-                    },
-                  ]
-                : []),
-            ]}
-          />
-        </div>
-        {/* Main Information Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Basic Info Card with File Preview */}
-          <Card className="border flex flex-col animate-in fade-in-50 duration-700" level={1}>
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <PageHeader
+          variant="detail"
+          title={cut.file?.filename || "Recorte"}
+          breadcrumbs={[
+            { label: "Início", href: routes.home },
+            { label: "Produção", href: routes.production.root },
+            { label: "Recortes", href: routes.production.cutting.list },
+            { label: cut.file?.filename || "Recorte" },
+          ]}
+          actions={[
+            {
+              key: "refresh",
+              label: "Atualizar",
+              icon: IconRefresh,
+              onClick: () => refetch(),
+            },
+            ...(canEdit && cut.status === CUT_STATUS.PENDING
+              ? [
+                  {
+                    key: "start",
+                    label: "Iniciar Corte",
+                    icon: IconPlayerPlay,
+                    onClick: () => handleStatusChange(CUT_STATUS.CUTTING),
+                    variant: "default" as const,
+                  },
+                ]
+              : []),
+            ...(canEdit && cut.status === CUT_STATUS.CUTTING
+              ? [
+                  {
+                    key: "complete",
+                    label: "Finalizar Corte",
+                    icon: IconCheck,
+                    onClick: () => handleStatusChange(CUT_STATUS.COMPLETED),
+                    variant: "default" as const,
+                  },
+                ]
+              : []),
+          ]}
+          className="flex-shrink-0"
+        />
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Basic Info Card with File Preview */}
+              <Card className="border flex flex-col animate-in fade-in-50 duration-700">
             <CardHeader className="pb-6">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -358,7 +362,7 @@ export const CuttingDetailsPage = () => {
           </Card>
 
           {/* Task Information Card */}
-          <Card className="border flex flex-col animate-in fade-in-50 duration-800" level={1}>
+          <Card className="border flex flex-col animate-in fade-in-50 duration-800">
             <CardHeader className="pb-6">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
@@ -392,7 +396,7 @@ export const CuttingDetailsPage = () => {
                         <IconHash className="h-4 w-4" />
                         Número de Série
                       </span>
-                      <span className="text-sm font-semibold text-foreground font-mono">{cut.task.serialNumber}</span>
+                      <span className="text-sm font-semibold text-foreground">{cut.task.serialNumber}</span>
                     </div>
                   )}
 
@@ -427,62 +431,64 @@ export const CuttingDetailsPage = () => {
             </CardContent>
           </Card>
 
-        </div>
+          </div>
 
-        {/* Child Cuts (Recuts) Section - Full width if exists */}
-        {cut.childCuts && cut.childCuts.length > 0 && (
-          <Card className="border flex flex-col animate-in fade-in-50 duration-900" level={1}>
-            <CardHeader className="pb-6">
-              <CardTitle className="flex items-center gap-2">
-                <IconReload className="h-5 w-5 text-muted-foreground" />
-                Retrabalhos Realizados
-                <Badge variant="secondary" className="ml-2">
-                  {cut.childCuts.length}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 flex-1">
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {cut.childCuts.map((childCut) => (
-                  <div
-                    key={childCut.id}
-                    className="bg-muted/50 rounded-lg px-4 py-3 hover:bg-muted/70 transition-colors cursor-pointer"
-                    onClick={() => navigate(routes.production.cutting.details(childCut.id))}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 flex-1">
-                        <IconScissors className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium truncate">{childCut.file?.filename || "Recorte"}</span>
+          {/* Child Cuts (Recuts) Section - Full width if exists */}
+          {cut.childCuts && cut.childCuts.length > 0 && (
+            <div>
+                <Card className="border flex flex-col animate-in fade-in-50 duration-900">
+              <CardHeader className="pb-6">
+                <CardTitle className="flex items-center gap-2">
+                  <IconReload className="h-5 w-5 text-muted-foreground" />
+                  Retrabalhos Realizados
+                  <Badge variant="secondary" className="ml-2">
+                    {cut.childCuts.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 flex-1">
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {cut.childCuts.map((childCut) => (
+                    <div
+                      key={childCut.id}
+                      className="bg-muted/50 rounded-lg px-4 py-3 hover:bg-muted/70 transition-colors cursor-pointer"
+                      onClick={() => navigate(routes.production.cutting.details(childCut.id))}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 flex-1">
+                          <IconScissors className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium truncate">{childCut.file?.filename || "Recorte"}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={getStatusBadgeVariant(childCut.status as CUT_STATUS)} className="text-xs">
+                            {CUT_STATUS_LABELS[childCut.status as CUT_STATUS]}
+                          </Badge>
+                          <IconChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={getStatusBadgeVariant(childCut.status as CUT_STATUS)} className="text-xs">
-                          {CUT_STATUS_LABELS[childCut.status as CUT_STATUS]}
-                        </Badge>
-                        <IconChevronRight className="h-4 w-4 text-muted-foreground" />
+
+                      {childCut.reason && (
+                        <div className="flex items-center gap-1 mt-2">
+                          <IconAlertCircle className="h-3 w-3 text-orange-500" />
+                          <span className="text-xs text-orange-600">{CUT_REQUEST_REASON_LABELS[childCut.reason as CUT_REQUEST_REASON]}</span>
+                        </div>
+                      )}
+
+                      <div className="text-xs text-muted-foreground mt-2">
+                        Criado {formatRelativeTime(childCut.createdAt)}
                       </div>
                     </div>
-
-                    {childCut.reason && (
-                      <div className="flex items-center gap-1 mt-2">
-                        <IconAlertCircle className="h-3 w-3 text-orange-500" />
-                        <span className="text-xs text-orange-600">{CUT_REQUEST_REASON_LABELS[childCut.reason as CUT_REQUEST_REASON]}</span>
-                      </div>
-                    )}
-
-                    <div className="text-xs text-muted-foreground mt-2">
-                      Criado {formatRelativeTime(childCut.createdAt)}
-                    </div>
+                  ))}
                   </div>
-                ))}
+                </CardContent>
+              </Card>
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
 
-        {/* Other Cuts and Changelog Row - 1/2 each */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Other Cuts from Same Task */}
-          <Card className={cn("border flex flex-col animate-in fade-in-50 duration-850", otherTaskCuts.length === 0 ? "lg:col-span-2" : "")} level={1}>
+            {/* Other Cuts and Changelog Row - 1/2 each */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Other Cuts from Same Task */}
+              <Card className={cn("border flex flex-col animate-in fade-in-50 duration-850", otherTaskCuts.length === 0 ? "lg:col-span-2" : "")}>
             {otherTaskCuts.length > 0 ? (
               <>
                 <CardHeader className="pb-6">
@@ -526,12 +532,12 @@ export const CuttingDetailsPage = () => {
                 maxHeight="400px"
                 className="h-full"
               />
-            )}
-          </Card>
+              )}
+              </Card>
 
-          {/* Changelog Section - Only show if there are other cuts */}
-          {otherTaskCuts.length > 0 && (
-            <Card className="border flex flex-col animate-in fade-in-50 duration-1000" level={1}>
+              {/* Changelog Section - Only show if there are other cuts */}
+              {otherTaskCuts.length > 0 && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-1000">
               <ChangelogHistory
                 entityType={CHANGE_LOG_ENTITY_TYPE.CUT}
                 entityId={cut.id}
@@ -539,65 +545,67 @@ export const CuttingDetailsPage = () => {
                 entityCreatedAt={cut.createdAt}
                 maxHeight="400px"
                 className="h-full"
-              />
-            </Card>
-          )}
+                />
+              </Card>
+              )}
+            </div>
+          </div>
         </div>
-
-        {/* Status Change Dialog */}
-        <AlertDialog open={statusChangeDialogOpen} onOpenChange={setStatusChangeDialogOpen}>
-          <AlertDialogContent className="max-w-lg">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-xl">Confirmar Mudança de Status</AlertDialogTitle>
-              <AlertDialogDescription className="text-base">Você está prestes a alterar o status do recorte.</AlertDialogDescription>
-            </AlertDialogHeader>
-            {pendingStatus && (
-              <div className="rounded-lg bg-muted p-4 my-4 space-y-3">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Arquivo:</span>
-                    <p className="font-medium mt-1">{cut.file?.filename || "Sem nome"}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Tipo:</span>
-                    <p className="font-medium mt-1">{CUT_TYPE_LABELS[cut.type as CUT_TYPE]}</p>
-                  </div>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Status Atual</p>
-                    <Badge variant={getStatusBadgeVariant(cut.status as CUT_STATUS)}>{CUT_STATUS_LABELS[cut.status as CUT_STATUS]}</Badge>
-                  </div>
-                  <IconArrowRight className="h-5 w-5 text-muted-foreground" />
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Novo Status</p>
-                    <Badge variant={getStatusBadgeVariant(pendingStatus)}>{CUT_STATUS_LABELS[pendingStatus]}</Badge>
-                  </div>
-                </div>
-                {pendingStatus === CUT_STATUS.COMPLETED && (
-                  <div className="text-sm text-muted-foreground bg-green-50 dark:bg-green-950 p-3 rounded-md">
-                    <IconInfoCircle className="h-4 w-4 inline mr-2 text-green-500" />O horário de conclusão será registrado automaticamente.
-                  </div>
-                )}
-              </div>
-            )}
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isUpdating}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmStatusChange} disabled={isUpdating}>
-                {isUpdating ? (
-                  <>
-                    <LoadingSpinner className="mr-2 h-4 w-4" />
-                    Processando...
-                  </>
-                ) : (
-                  "Confirmar Mudança"
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
+
+      {/* Status Change Dialog */}
+      <AlertDialog open={statusChangeDialogOpen} onOpenChange={setStatusChangeDialogOpen}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl">Confirmar Mudança de Status</AlertDialogTitle>
+            <AlertDialogDescription className="text-base">Você está prestes a alterar o status do recorte.</AlertDialogDescription>
+          </AlertDialogHeader>
+          {pendingStatus && (
+            <div className="rounded-lg bg-muted p-4 my-4 space-y-3">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Arquivo:</span>
+                  <p className="font-medium mt-1">{cut.file?.filename || "Sem nome"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Tipo:</span>
+                  <p className="font-medium mt-1">{CUT_TYPE_LABELS[cut.type as CUT_TYPE]}</p>
+                </div>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Status Atual</p>
+                  <Badge variant={getStatusBadgeVariant(cut.status as CUT_STATUS)}>{CUT_STATUS_LABELS[cut.status as CUT_STATUS]}</Badge>
+                </div>
+                <IconArrowRight className="h-5 w-5 text-muted-foreground" />
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Novo Status</p>
+                  <Badge variant={getStatusBadgeVariant(pendingStatus)}>{CUT_STATUS_LABELS[pendingStatus]}</Badge>
+                </div>
+              </div>
+              {pendingStatus === CUT_STATUS.COMPLETED && (
+                <div className="text-sm text-muted-foreground bg-green-50 dark:bg-green-950 p-3 rounded-md">
+                  <IconInfoCircle className="h-4 w-4 inline mr-2 text-green-500" />O horário de conclusão será registrado automaticamente.
+                </div>
+              )}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUpdating}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmStatusChange} disabled={isUpdating}>
+              {isUpdating ? (
+                <>
+                  <LoadingSpinner className="mr-2 h-4 w-4" />
+                  Processando...
+                </>
+              ) : (
+                "Confirmar Mudança"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PrivilegeRoute>
   );
 };

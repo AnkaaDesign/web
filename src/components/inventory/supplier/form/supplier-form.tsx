@@ -181,10 +181,7 @@ export function SupplierForm(props: SupplierFormProps) {
   // Debug validation errors in development
   useEffect(() => {
     if (process.env.NODE_ENV === "development" && Object.keys(errors).length > 0) {
-      console.log("Supplier form validation errors:", {
-        errors,
-        currentValues: form.getValues(),
-      });
+      
     }
   }, [errors, form]);
 
@@ -268,13 +265,6 @@ export function SupplierForm(props: SupplierFormProps) {
       const logoFile = (transformedData as any).logoFile || form.getValues('logoFile' as any);
 
       // Debug logging
-      console.log('[SupplierForm] onSubmit - logoFile check:', {
-        hasLogoFile: !!logoFile,
-        isFile: logoFile instanceof File,
-        logoFileType: logoFile?.constructor?.name,
-        fromData: !!(transformedData as any).logoFile,
-        fromFormState: !!form.getValues('logoFile' as any),
-      });
 
       // If we have a file, create FormData with proper context
       if (logoFile && logoFile instanceof File) {
@@ -313,9 +303,14 @@ export function SupplierForm(props: SupplierFormProps) {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-6">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+    <Form {...form}>
+      <form id="supplier-form" onSubmit={form.handleSubmit(onSubmit)}>
+        {/* Hidden submit button for programmatic form submission */}
+        <button id="supplier-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
+          Submit
+        </button>
+
+        <div className="space-y-4">
           {/* Basic Information */}
           <Card>
             <CardHeader>
@@ -426,13 +421,8 @@ export function SupplierForm(props: SupplierFormProps) {
               <TagsInput control={form.control} disabled={isSubmitting} />
             </CardContent>
           </Card>
-
-          {/* Hidden submit button that can be triggered by the header button */}
-          <button id="supplier-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
-            Submit
-          </button>
-        </form>
-      </Form>
-    </div>
+        </div>
+      </form>
+    </Form>
   );
 }

@@ -340,7 +340,9 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
       }
     } catch (error) {
       // API client already shows error toasts, but we can add context if needed
-      console.error("Failed to update performance levels:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Failed to update performance levels:", error);
+      }
     }
   }, [pendingChanges, batchUpdate, updateAsync, queryClient, onRefresh]);
 
@@ -383,7 +385,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
 
   if (isLoading) {
     return (
-      <div className="p-6">
+      <div className="p-4">
         <div className="space-y-4">
           {[...Array(10)].map((_, i) => (
             <Skeleton key={i} className="h-12 w-full" />
@@ -395,7 +397,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
 
   if (error) {
     return (
-      <div className="p-6 text-center">
+      <div className="p-4 text-center">
         <div className="flex items-center justify-center text-red-500 mb-2">
           <AlertCircle className="h-5 w-5 mr-2" />
           Erro ao carregar dados
@@ -409,7 +411,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
 
   if (!users || users.length === 0) {
     return (
-      <div className="p-6 text-center">
+      <div className="p-4 text-center">
         <p className="text-muted-foreground">Nenhum colaborador encontrado.</p>
       </div>
     );
@@ -419,7 +421,7 @@ export const PerformanceLevelTable = forwardRef<PerformanceLevelTableRef, Perfor
     <div className="rounded-lg flex flex-col overflow-hidden h-full">
       {isUpdating && (
         <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded-lg">
-          <div className="bg-card p-4 rounded-lg shadow-lg flex items-center space-x-2 border border-border">
+          <div className="bg-card p-4 rounded-lg shadow-sm flex items-center space-x-2 border border-border">
             <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
             <span className="text-sm">Salvando alterações...</span>
           </div>

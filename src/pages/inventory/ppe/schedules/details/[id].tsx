@@ -21,6 +21,7 @@ import { IconLoader } from "@tabler/icons-react";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { hasPrivilege } from "../../../../../utils";
 import { usePageTracker } from "@/hooks/use-page-tracker";
+import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 const EPIScheduleDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -89,7 +90,9 @@ const EPIScheduleDetails = () => {
       });
       refetch();
     } catch (error) {
-      console.error("Error activating schedule:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error activating schedule:", error);
+      }
     } finally {
       setIsProcessing(false);
       setShowActivateDialog(false);
@@ -109,7 +112,9 @@ const EPIScheduleDetails = () => {
       });
       refetch();
     } catch (error) {
-      console.error("Error deactivating schedule:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deactivating schedule:", error);
+      }
     } finally {
       setIsProcessing(false);
       setShowDeactivateDialog(false);
@@ -124,7 +129,9 @@ const EPIScheduleDetails = () => {
       await deleteAsync(ppeSchedule.id);
       navigate("/estoque/epi/agendamentos");
     } catch (error) {
-      console.error("Error deleting schedule:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error deleting schedule:", error);
+      }
       setIsProcessing(false);
     } finally {
       setShowDeleteDialog(false);
@@ -136,7 +143,7 @@ const EPIScheduleDetails = () => {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
-          <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
+          <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
             <div className="animate-pulse space-y-6">
               {/* Header Skeleton */}
               <div className="space-y-4">
@@ -175,7 +182,7 @@ const EPIScheduleDetails = () => {
     return (
       <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-neutral-900 dark:to-neutral-800">
-          <div className="container mx-auto p-4 sm:p-6 max-w-7xl">
+          <div className="container mx-auto p-4 sm:p-4 max-w-7xl">
             <div className="flex flex-1 items-center justify-center min-h-[60vh]">
               <div className="text-center px-4 max-w-md mx-auto">
                 <div className="animate-in fade-in-50 duration-500">
@@ -240,14 +247,12 @@ const EPIScheduleDetails = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.WAREHOUSE}>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="animate-in fade-in-50 duration-500">
+      <div className="h-full flex flex-col px-4 pt-4">
+        <div className="flex-shrink-0">
           <PageHeader
             variant="detail"
             title={ppeSchedule.name}
-            icon={IconCalendar}
-            className="shadow-lg"
+            className="shadow-sm"
             breadcrumbs={[
               { label: "Início", href: routes.home },
               { label: "Estoque", href: routes.inventory.root },
@@ -276,16 +281,19 @@ const EPIScheduleDetails = () => {
             ]}
           />
         </div>
+        <div className="flex-1 overflow-y-auto pb-6">
+          <div className="space-y-4 mt-4">
+            {/* First Row: Info and Items (1/2 each) */}
+            <div className={DETAIL_PAGE_SPACING.HEADER_TO_GRID}>
+            <div className={getDetailGridClasses()}>
+              <PpeScheduleInfoCard schedule={ppeSchedule} className="h-full" />
+              <PpeScheduleItemsCard schedule={ppeSchedule} className="h-full" />
+            </div>
+          </div>
 
-        {/* First Row: Info and Items (1/2 each) */}
-        <div className="animate-in fade-in-50 duration-700 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <PpeScheduleInfoCard schedule={ppeSchedule} className="h-full" />
-          <PpeScheduleItemsCard schedule={ppeSchedule} className="h-full" />
-        </div>
-
-        {/* Second Row: Deliveries (full width) */}
-        <div className="grid grid-cols-1 gap-6">
-          <PpeScheduleDeliveriesCard scheduleId={ppeSchedule.id} className="h-full" />
+            {/* Second Row: Deliveries (full width) */}
+            <PpeScheduleDeliveriesCard scheduleId={ppeSchedule.id} className="h-full" />
+          </div>
         </div>
 
         {/* Activate Dialog */}

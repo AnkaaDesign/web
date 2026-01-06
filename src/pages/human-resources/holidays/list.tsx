@@ -6,6 +6,8 @@ import { HolidaysList } from "@/components/integrations/secullum/holidays/list";
 import { routes, FAVORITE_PAGES, SECTOR_PRIVILEGES } from "../../../constants";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { usePageTracker } from "@/hooks/use-page-tracker";
+import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
+import { cn } from "@/lib/utils";
 
 export default function HolidayListPage() {
   const navigate = useNavigate();
@@ -13,12 +15,11 @@ export default function HolidayListPage() {
 
   return (
     <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.HUMAN_RESOURCES}>
-      <div className="flex flex-col h-full space-y-4">
+      <div className="h-full flex flex-col px-4 pt-4">
         <div className="flex-shrink-0">
           <PageHeader
             variant="default"
             title="Feriados"
-            icon={IconCalendar}
             breadcrumbs={[{ label: "Início", href: routes.home }, { label: "Recursos Humanos", href: routes.humanResources.root }, { label: "Feriados" }]}
             favoritePage={FAVORITE_PAGES.RECURSOS_HUMANOS_FERIADOS_LISTAR}
             actions={[
@@ -32,7 +33,7 @@ export default function HolidayListPage() {
             ]}
           />
         </div>
-        <HolidaysList className="flex-1 min-h-0" />
+        <HolidaysList className="flex-1 min-h-0 mt-4" />
       </div>
     </PrivilegeRoute>
   );

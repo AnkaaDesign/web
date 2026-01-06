@@ -22,7 +22,7 @@ interface CustomerTasksTableProps {
   className?: string;
   filters?: Partial<TaskGetManyFormData>;
   onDataChange?: (data: { items: Task[]; totalRecords: number }) => void;
-  navigationRoute?: 'history' | 'onHold' | 'schedule';
+  navigationRoute?: 'history' | 'preparation' | 'schedule';
 }
 
 export function CustomerTasksTable({
@@ -338,11 +338,10 @@ export function CustomerTasksTable({
                       }
 
                       const detailRoute =
-                        navigationRoute === 'onHold' ? routes.production.scheduleOnHold.details(task.id) :
+                        navigationRoute === 'preparation' ? routes.production.preparation.details(task.id) :
                         navigationRoute === 'schedule' ? routes.production.schedule.details(task.id) :
                         routes.production.history.details(task.id);
 
-                      console.log('Customer task row clicked, navigating to:', detailRoute);
                       navigate(detailRoute);
                     }}
                     onContextMenu={(e) => handleContextMenu(e, task)}
@@ -394,23 +393,12 @@ export function CustomerTasksTable({
           currentPage={page}
           totalPages={totalPages}
           onPageChange={(newPage) => {
-            console.log("[CustomerTasksTable] Page change requested:", {
-              from: page,
-              to: newPage,
-              totalPages,
-              totalRecords,
-              currentURL: window.location.search
-            });
             setPage(newPage);
           }}
           pageSize={pageSize}
           totalItems={totalRecords}
           pageSizeOptions={[20, 40, 60, 100]}
           onPageSizeChange={(newPageSize) => {
-            console.log("[CustomerTasksTable] Page size change:", {
-              from: pageSize,
-              to: newPageSize
-            });
             setPageSize(newPageSize);
           }}
           showPageSizeSelector={true}

@@ -20,7 +20,7 @@ interface CustomerTasksListProps {
   className?: string;
   customerId: string;
   customerName?: string;
-  navigationRoute?: 'history' | 'onHold' | 'schedule';
+  navigationRoute?: 'history' | 'preparation' | 'schedule';
 }
 
 const DEFAULT_PAGE_SIZE = 40;
@@ -102,7 +102,7 @@ export function CustomerTasksList({
   }, []);
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border w-full", className)}>
+    <Card className={cn("flex flex-col shadow-sm border border-border w-full", className)}>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">

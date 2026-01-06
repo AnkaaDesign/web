@@ -11,6 +11,7 @@ import { MetricsCard } from "@/components/inventory/item/detail/metrics-card";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { PageHeader } from "@/components/ui/page-header";
 import { PpeInfoCard } from "@/components/inventory/item/detail/ppe-info-card";
+import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
 
 const EpiDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -160,83 +161,47 @@ const EpiDetailsPage = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section - Enhanced Header with Actions */}
-      <div className="animate-in fade-in-50 duration-500">
-        <PageHeader
-          variant="detail"
-          entity={item}
-          title={item.name}
-          icon={IconShield}
-          actions={[
-            {
-              key: "refresh",
-              label: "Atualizar",
-              icon: IconRefresh,
-              onClick: handleRefresh,
-            },
-            {
-              key: "edit",
-              label: "Editar",
-              icon: IconEdit,
-              onClick: handleEdit,
-            },
-          ]}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Estoque", href: routes.inventory.root },
-            { label: "EPIs", href: routes.inventory.ppe.root },
-            { label: item.name },
-          ]}
-          className="shadow-lg"
-        />
-      </div>
-
-      {/* Core Information Grid - Specifications and Metrics */}
-      <div className="animate-in fade-in-50 duration-700">
-        {/* Mobile: Single column stacked */}
-        <div className="block lg:hidden space-y-4">
+    <div className="h-full flex flex-col px-4 pt-4">
+      <PageHeader
+        variant="detail"
+        entity={item}
+        title={item.name}
+        actions={[
+          {
+            key: "refresh",
+            label: "Atualizar",
+            icon: IconRefresh,
+            onClick: handleRefresh,
+          },
+          {
+            key: "edit",
+            label: "Editar",
+            icon: IconEdit,
+            onClick: handleEdit,
+          },
+        ]}
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "EPIs", href: routes.inventory.ppe.root },
+          { label: item.name },
+        ]}
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Core Information Grid - Specifications and Metrics */}
           <SpecificationsCard item={item} className="h-full" />
           <MetricsCard item={item} className="h-full" />
-        </div>
 
-        {/* Desktop/Tablet: 2 columns grid */}
-        <div className="hidden lg:block">
-          <div className="grid grid-cols-2 gap-6">
-            <SpecificationsCard item={item} className="h-full" />
-            <MetricsCard item={item} className="h-full" />
-          </div>
-        </div>
-      </div>
+          {/* PPE Information - Always show for EPIs */}
+          <PpeInfoCard item={item} />
 
-      {/* PPE Information - Always show for EPIs - Half width on desktop */}
-      <div className="animate-in fade-in-50 duration-800">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <PpeInfoCard item={item} className="shadow-lg" />
-          {/* Empty space for half-width layout */}
-          <div className="hidden lg:block" />
-        </div>
-      </div>
-
-      {/* History Cards - Activity and Changelog */}
-      <div className="animate-in fade-in-50 duration-900">
-        {/* Mobile: Single column stacked */}
-        <div className="block lg:hidden space-y-4">
+          {/* History Cards - Activity and Changelog */}
           <ActivityHistoryCard item={item} className="h-full" />
           <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.ITEM} entityId={item.id} entityName={item.name} entityCreatedAt={item.createdAt} className="h-full" />
         </div>
 
-        {/* Desktop/Tablet: 2 columns grid */}
-        <div className="hidden lg:block">
-          <div className="grid grid-cols-2 gap-6">
-            <ActivityHistoryCard item={item} className="h-full" />
-            <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.ITEM} entityId={item.id} entityName={item.name} entityCreatedAt={item.createdAt} className="h-full" />
-          </div>
-        </div>
-      </div>
-
-      {/* Related Items - Full Width Section */}
-      <div className="animate-in fade-in-50 duration-1000">
+        {/* Related Items - Full Width Section */}
         <RelatedItemsCard item={item} />
       </div>
     </div>

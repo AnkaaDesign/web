@@ -66,7 +66,9 @@ export function QuickActions({ selectedBorrows = [], className, size = "default"
       await Promise.all(returnPromises);
       setShowBatchReturnDialog(false);
     } catch (error) {
-      console.error("Error processing batch returns:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error processing batch returns:", error);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -217,7 +219,9 @@ export function BorrowQuickActions({ borrow, className, showLabels = true }: Bor
       });
       setShowReturnDialog(false);
     } catch (error) {
-      console.error("Error processing return:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error processing return:", error);
+      }
     }
   };
 

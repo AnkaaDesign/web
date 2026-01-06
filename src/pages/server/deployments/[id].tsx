@@ -54,7 +54,9 @@ const formatDuration = (milliseconds: number | null | undefined): string => {
     }
     return `${seconds}s`;
   } catch (error) {
-    console.error("[DeploymentDetail] Error formatting duration:", error, milliseconds);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("[DeploymentDetail] Error formatting duration:", error, milliseconds);
+    }
     return "N/A";
   }
 };

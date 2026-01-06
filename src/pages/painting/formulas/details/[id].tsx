@@ -12,6 +12,7 @@ import { formatCurrency } from "../../../../utils";
 import { useAuth } from "@/contexts/auth-context";
 import { canEditPaints } from "@/utils/permissions/entity-permissions";
 import { toast } from "sonner";
+import { PAGE_SPACING } from "@/lib/layout-constants";
 
 export default function FormulaDetails() {
   const { id } = useParams<{ id: string }>();
@@ -83,98 +84,97 @@ export default function FormulaDetails() {
       });
       navigate(routes.painting.productions.root);
     } catch (error) {
-      console.error("Error creating production:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error creating production:", error);
+      }
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Hero Section */}
-      <div className="animate-in fade-in-50 duration-500">
-        <PageHeader
-          variant="detail"
-          title={formula.description || (formula.paint?.name ? `Fórmula de ${formula.paint.name}` : "Fórmula de Tinta")}
-          icon={IconFlask}
-          actions={[
-            {
-              key: "refresh",
-              label: "Atualizar",
-              icon: IconRefresh,
-              onClick: handleRefresh,
-            },
-            ...(canEdit ? [{
-              key: "edit",
-              label: "Editar",
-              icon: IconEdit,
-              onClick: handleEdit,
-            }] : []),
-          ]}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Pintura", href: routes.painting.root },
-            { label: "Fórmulas", href: routes.painting.formulas.root },
-            { label: formula.description || "Fórmula" },
-          ]}
-        />
-      </div>
+    <div className="h-full flex flex-col px-4 pt-4">
+      <PageHeader
+        variant="detail"
+        title={formula.description || (formula.paint?.name ? `Fórmula de ${formula.paint.name}` : "Fórmula de Tinta")}
+        actions={[
+        {
+          key: "refresh",
+          label: "Atualizar",
+          icon: IconRefresh,
+          onClick: handleRefresh,
+        },
+        ...(canEdit ? [{
+          key: "edit",
+          label: "Editar",
+          icon: IconEdit,
+          onClick: handleEdit,
+        }] : []),
+      ]}
+      breadcrumbs={[
+        { label: "Início", href: routes.home },
+        { label: "Pintura", href: routes.painting.root },
+        { label: "Fórmulas", href: routes.painting.formulas.root },
+        { label: formula.description || "Fórmula" },
+      ]}
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        {/* Calculator and Formula Info Section */}
+        <div className="mt-4 animate-in fade-in-50 duration-700">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Calculator Section */}
+            <div className="lg:col-span-2">
+              <Card>
+                <CardContent className="pt-6">
+                  <FormulaCalculator formula={formula} onStartProduction={handleStartProduction} />
+                </CardContent>
+              </Card>
+            </div>
 
-      {/* Calculator and Formula Info Section */}
-      <div className="animate-in fade-in-50 duration-700">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Calculator Section */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardContent className="pt-6">
-                <FormulaCalculator formula={formula} onStartProduction={handleStartProduction} />
+            {/* Formula Details Card */}
+            <Card className="lg:col-span-1 bg-muted/30">
+              <CardHeader>
+                <CardTitle>Especificações</CardTitle>
+                <CardDescription>Propriedades da fórmula</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Densidade</p>
+                  <p className="text-lg font-semibold">{formula.density} g/ml</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Preço por Litro</p>
+                  <p className="text-lg font-semibold">
+                    {(() => {
+                      return formatCurrency(formula.pricePerLiter);
+                    })()}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Descrição</p>
+                  <p className="text-sm">{formula.description || "Sem descrição"}</p>
+                </div>
               </CardContent>
             </Card>
           </div>
+        </div>
 
-          {/* Formula Details Card */}
-          <Card className="lg:col-span-1 bg-muted/30">
+        {/* Changelog Section */}
+        <div className="mt-4 animate-in fade-in-50 duration-900">
+          <Card>
             <CardHeader>
-              <CardTitle>Especificações</CardTitle>
-              <CardDescription>Propriedades da fórmula</CardDescription>
+              <CardTitle>Histórico de Alterações</CardTitle>
+              <CardDescription>Acompanhe todas as modificações realizadas nesta fórmula</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground">Densidade</p>
-                <p className="text-lg font-semibold">{formula.density} g/ml</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground">Preço por Litro</p>
-                <p className="text-lg font-semibold">
-                  {(() => {
-                    return formatCurrency(formula.pricePerLiter);
-                  })()}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground">Descrição</p>
-                <p className="text-sm">{formula.description || "Sem descrição"}</p>
-              </div>
+            <CardContent>
+              <ChangelogHistory
+                entityType={CHANGE_LOG_ENTITY_TYPE.PAINT_FORMULA}
+                entityId={formula.id}
+                entityName={formula.paint?.name || "Fórmula"}
+                entityCreatedAt={formula.createdAt}
+                className="h-[400px]"
+              />
             </CardContent>
           </Card>
         </div>
-      </div>
-
-      {/* Changelog Section */}
-      <div className="animate-in fade-in-50 duration-900">
-        <Card>
-          <CardHeader>
-            <CardTitle>Histórico de Alterações</CardTitle>
-            <CardDescription>Acompanhe todas as modificações realizadas nesta fórmula</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChangelogHistory
-              entityType={CHANGE_LOG_ENTITY_TYPE.PAINT_FORMULA}
-              entityId={formula.id}
-              entityName={formula.paint?.name || "Fórmula"}
-              entityCreatedAt={formula.createdAt}
-              className="h-[400px]"
-            />
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

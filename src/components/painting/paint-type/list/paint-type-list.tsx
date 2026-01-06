@@ -143,7 +143,6 @@ export function PaintTypeList({ className }: PaintTypeListProps) {
       // Multiple paint types - navigate to batch edit page (when implemented)
       const ids = paintTypes.map((pt) => pt.id).join(",");
       // navigate(`${routes.painting.paintTypes.batchEdit}?ids=${ids}`);
-      console.log("Batch edit not implemented yet for paint types:", ids);
     }
   };
 
@@ -160,15 +159,17 @@ export function PaintTypeList({ className }: PaintTypeListProps) {
         // Selection is now managed by URL state and will be cleared automatically
       } catch (error) {
         // Error is handled by the API client with detailed message
-        console.error("Error deleting paint type(s):", error);
+        if (process.env.NODE_ENV !== 'production') {
+          console.error("Error deleting paint type(s):", error);
+        }
       }
       setDeleteDialog(null);
     }
   };
 
   return (
-    <Card className={cn("h-full flex flex-col shadow-sm border border-border", className)}>
-      <CardContent className="flex-1 flex flex-col p-6 space-y-4 overflow-hidden">
+    <Card className={cn("flex flex-col shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col p-4 space-y-4 overflow-hidden">
         {/* Search and controls */}
         <div className="flex flex-col gap-3 sm:flex-row">
           <TableSearchInput
@@ -189,7 +190,7 @@ export function PaintTypeList({ className }: PaintTypeListProps) {
         {activeFilters.length > 0 && <FilterIndicators filters={activeFilters} onClearAll={clearAllFilters} className="px-1 py-1" />}
 
         {/* Paginated table */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-auto">
           <PaintTypeTable
             visibleColumns={visibleColumns}
             onEdit={handleBulkEdit}

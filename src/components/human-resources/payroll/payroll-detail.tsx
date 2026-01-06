@@ -198,7 +198,6 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
 
     // Optimistically update UI and persist changes
     // This would require backend support for reordering
-    console.log("Reordered discounts:", updatedDiscounts);
     // TODO: Implement backend endpoint for reordering
   };
 
@@ -470,7 +469,7 @@ export function PayrollDetail({ className }: PayrollDetailProps) {
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               className={`flex items-center gap-4 p-4 border rounded-lg bg-card ${
-                                snapshot.isDragging ? "shadow-lg" : ""
+                                snapshot.isDragging ? "shadow-sm" : ""
                               }`}
                             >
                               <div

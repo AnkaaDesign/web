@@ -1039,9 +1039,7 @@ export function debugFormData(formData: OrderFormData, label?: string): void {
     return;
   }
 
-  console.group(`🔍 Order Form Data${label ? ` - ${label}` : ""}`);
   const totals = calculateOrderTotals(formData.selectedItems, formData.quantities, formData.prices, formData.icmses, formData.ipis);
-  console.groupEnd();
 }
 
 /**
@@ -1051,13 +1049,12 @@ export function debugValidation(formData: OrderFormData): ValidationResult {
   const result = validateOrderForm(formData);
 
   if (process.env.NODE_ENV === "development") {
-    console.group("🔍 Form Validation Results");if (result.errors.length > 0) {
+    if (result.errors.length > 0) {
       console.error("Errors:", result.errors);
     }
     if (result.warnings.length > 0) {
       console.warn("Warnings:", result.warnings);
     }
-    console.groupEnd();
   }
 
   return result;

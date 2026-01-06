@@ -103,7 +103,9 @@ export function CanvasNormalMapRenderer({
     };
 
     normalMap.onerror = () => {
-      console.warn(`Failed to load normal map for ${finish}`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`Failed to load normal map for ${finish}`);
+      }
       setIsTextureLoading(false);
     };
 
@@ -130,7 +132,9 @@ export function CanvasNormalMapRenderer({
     };
 
     flakeTexture.onerror = () => {
-      console.warn(`Failed to load flake texture`);
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`Failed to load flake texture`);
+      }
       setFlakeTextureLoaded(false);
     };
 
@@ -605,7 +609,7 @@ export function CanvasNormalMapRenderer({
         ref={canvasRef}
         width={width}
         height={height}
-        className={`relative rounded-lg shadow-lg ${className}`}
+        className={`relative rounded-lg shadow-sm ${className}`}
         style={{
           imageRendering: "auto",
           width: "100%",

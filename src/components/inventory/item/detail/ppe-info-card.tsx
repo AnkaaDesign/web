@@ -34,7 +34,7 @@ export function PpeInfoCard({ item, className }: PpeInfoCardProps) {
   const Icon = getPpeIcon(item.ppeType);
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)} level={1}>
+    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
       <CardHeader className="pb-6">
         <CardTitle className="flex items-center gap-2">
           <IconShieldCheck className="h-5 w-5 text-muted-foreground" />

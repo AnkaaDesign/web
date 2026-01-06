@@ -104,7 +104,7 @@ const FileItemGrid: React.FC<FileItemProps> = ({ file, onPreview, onDownload, on
   return (
     <div
       className={cn(
-        "group relative overflow-hidden transition-all duration-300 rounded-lg hover:shadow-md cursor-pointer border border-border",
+        "group relative overflow-hidden transition-all duration-300 rounded-lg hover:shadow-sm cursor-pointer border border-border",
         "w-full max-w-[200px]",
         className
       )}

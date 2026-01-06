@@ -37,7 +37,9 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
         }));
       }
     } catch (error) {
-      console.error("Error loading favorites:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error loading favorites:", error);
+      }
     }
     return [];
   });
@@ -47,7 +49,9 @@ export function FavoritesProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(favorites));
     } catch (error) {
-      console.error("Error saving favorites:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error saving favorites:", error);
+      }
     }
   }, [favorites]);
 

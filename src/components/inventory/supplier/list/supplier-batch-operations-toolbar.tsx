@@ -53,7 +53,9 @@ export function SupplierBatchOperationsToolbar({ selectedSuppliers, onClearSelec
       onRefresh?.();
     } catch (error) {
       // Error is handled by the API client
-      console.error("Error during batch delete:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error during batch delete:", error);
+      }
     } finally {
       setIsDeleting(false);
       setShowDeleteConfirm(false);

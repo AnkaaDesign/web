@@ -160,30 +160,22 @@ export const EditMaintenancePage = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Fixed Header */}
-      <div className="flex-shrink-0">
-        <div className="max-w-5xl mx-auto">
-          <PageHeader
-            title="Editar Manutenção"
-            icon={IconTool}
-            variant="form"
-            breadcrumbs={[
-              { label: "Início", href: routes.home },
-              { label: "Estoque", href: routes.inventory.root },
-              { label: "Manutenções", href: routes.inventory.maintenance.list },
-              { label: "Editar" },
-            ]}
-            actions={actions}
-          />
-        </div>
-      </div>
-
-      {/* Scrollable Form Container */}
-      <div className="flex-1 overflow-y-auto mt-6">
-        <div className="max-w-5xl mx-auto h-full">
-          <MaintenanceForm mode="update" onSubmit={handleSubmit} defaultValues={formData} initialMaintenance={maintenance.data} isSubmitting={updateMutation.isPending} onFormStateChange={setFormState} />
-        </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+      <PageHeader
+        title="Editar Manutenção"
+        icon={IconTool}
+        variant="form"
+        breadcrumbs={[
+          { label: "Início", href: routes.home },
+          { label: "Estoque", href: routes.inventory.root },
+          { label: "Manutenções", href: routes.inventory.maintenance.list },
+          { label: "Editar" },
+        ]}
+        actions={actions}
+        className="flex-shrink-0"
+      />
+      <div className="flex-1 overflow-y-auto pb-6">
+        <MaintenanceForm mode="update" onSubmit={handleSubmit} defaultValues={formData} initialMaintenance={maintenance.data} isSubmitting={updateMutation.isPending} onFormStateChange={setFormState} />
       </div>
     </div>
   );

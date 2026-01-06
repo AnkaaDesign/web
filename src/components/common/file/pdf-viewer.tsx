@@ -316,7 +316,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
         )}
 
         {loadState.status === "error" && (
-          <div className="absolute inset-0 flex items-center justify-center p-6">
+          <div className="absolute inset-0 flex items-center justify-center p-4">
             <div className="max-w-md text-center space-y-4">
               <IconAlertCircle className="h-12 w-12 text-destructive mx-auto" />
               <div>
@@ -359,7 +359,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({
         )}
 
         {loadState.supportsInlineViewing === false && loadState.status !== "error" && (
-          <div className="absolute inset-0 flex items-center justify-center p-6">
+          <div className="absolute inset-0 flex items-center justify-center p-4">
             <div className="max-w-md text-center space-y-4">
               <IconFileTypePdf className="h-12 w-12 text-red-500 mx-auto" />
               <div>
