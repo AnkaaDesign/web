@@ -19,7 +19,7 @@ export function MessageModalProvider({
     open,
     setOpen,
     unviewedMessages,
-    markAsRead,
+    dismissForToday,
     dontShowAgain,
   } = useMessageModal({
     autoShow,
@@ -34,7 +34,7 @@ export function MessageModalProvider({
         open={open}
         onOpenChange={setOpen}
         messages={unviewedMessages}
-        onMarkAsRead={markAsRead}
+        onClose={dismissForToday}
         onDontShowAgain={dontShowAgain}
       />
     </>

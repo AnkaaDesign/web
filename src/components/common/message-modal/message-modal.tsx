@@ -1,9 +1,7 @@
 import * as React from "react";
-import { X, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, EyeOff } from "lucide-react";
 import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types/message";
 import { MessageBlockRenderer } from "@/components/messaging/MessageBlockRenderer";
@@ -15,9 +13,10 @@ export interface MessageModalProps {
   onOpenChange: (open: boolean) => void;
   messages: Message[];
   currentIndex?: number;
-  onMarkAsRead?: (messageId: string) => void;
+  /** Called when user clicks close (X) - dismiss for today only */
+  onClose?: (messageId: string) => void;
+  /** Called when user clicks "Não mostrar novamente" - permanent dismiss */
   onDontShowAgain?: (messageId: string) => void;
-  onClose?: () => void;
 }
 
 export function MessageModal({
@@ -25,12 +24,10 @@ export function MessageModal({
   onOpenChange,
   messages = [],
   currentIndex: initialIndex = 0,
-  onMarkAsRead,
-  onDontShowAgain,
   onClose,
+  onDontShowAgain,
 }: MessageModalProps) {
   const [currentIndex, setCurrentIndex] = React.useState(initialIndex);
-  const [dontShowAgain, setDontShowAgain] = React.useState(false);
   const [isClosing, setIsClosing] = React.useState(false);
 
   const currentMessage = messages[currentIndex];
@@ -42,7 +39,6 @@ export function MessageModal({
   React.useEffect(() => {
     if (open) {
       setCurrentIndex(initialIndex);
-      setDontShowAgain(false);
       setIsClosing(false);
     }
   }, [open, initialIndex]);
@@ -78,89 +74,48 @@ export function MessageModal({
   const handlePrevious = () => {
     if (!isFirstMessage) {
       setCurrentIndex((prev) => prev - 1);
-      setDontShowAgain(false);
     }
   };
 
   const handleNext = () => {
     if (!isLastMessage) {
       setCurrentIndex((prev) => prev + 1);
-      setDontShowAgain(false);
     }
   };
 
-  const handleMarkAsRead = () => {
-    if (currentMessage && onMarkAsRead) {
+  // Close button - dismiss for today only
+  const handleClose = () => {
+    if (currentMessage) {
+      onClose?.(currentMessage.id);
+    }
+    onOpenChange(false);
+  };
+
+  // Don't show again - permanent dismiss
+  const handleDontShowAgain = () => {
+    if (currentMessage && onDontShowAgain) {
       setIsClosing(true);
-      onMarkAsRead(currentMessage.id);
+      onDontShowAgain(currentMessage.id);
 
       // If there are more messages, move to the next one
       if (hasMultipleMessages && !isLastMessage) {
         setTimeout(() => {
           setCurrentIndex((prev) => prev + 1);
-          setDontShowAgain(false);
+          setIsClosing(false);
+        }, 300);
+      } else if (hasMultipleMessages && isLastMessage) {
+        // If we're at the last message, go to previous
+        setTimeout(() => {
+          setCurrentIndex((prev) => Math.max(0, prev - 1));
           setIsClosing(false);
         }, 300);
       } else {
         // Close the modal after a short delay
         setTimeout(() => {
-          handleClose();
+          onOpenChange(false);
         }, 300);
       }
     }
-  };
-
-  const handleClose = () => {
-    if (dontShowAgain && currentMessage && onDontShowAgain) {
-      onDontShowAgain(currentMessage.id);
-    } else if (currentMessage && onMarkAsRead) {
-      // If user closes without "don't show again", mark as read so it doesn't reappear
-      onMarkAsRead(currentMessage.id);
-    }
-    onOpenChange(false);
-    onClose?.();
-  };
-
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case "URGENT":
-      case "HIGH":
-        return (
-          <Badge variant="destructive" className="text-xs">
-            Alta Prioridade
-          </Badge>
-        );
-      case "NORMAL":
-        return (
-          <Badge variant="secondary" className="text-xs bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/20">
-            Normal
-          </Badge>
-        );
-      case "LOW":
-        return (
-          <Badge variant="secondary" className="text-xs">
-            Baixa Prioridade
-          </Badge>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-      DRAFT: { label: "Rascunho", variant: "secondary" },
-      SCHEDULED: { label: "Agendada", variant: "outline" },
-      ACTIVE: { label: "Ativa", variant: "default" },
-      EXPIRED: { label: "Expirada", variant: "secondary" },
-      ARCHIVED: { label: "Arquivada", variant: "secondary" },
-    };
-    const statusInfo = statusLabels[status] || { label: status, variant: "outline" as const };
-    return (
-      <Badge variant={statusInfo.variant} className="text-xs">
-        {statusInfo.label}
-      </Badge>
-    );
   };
 
   const formatDate = (date: Date | string | null) => {
@@ -192,21 +147,26 @@ export function MessageModal({
         <div className="relative bg-gradient-to-r from-primary/10 via-primary/5 to-background border-b px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 space-y-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-semibold text-foreground leading-tight">
-                  {currentMessage.title}
-                </h2>
-                {getPriorityBadge(currentMessage.priority)}
-              </div>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                {getStatusBadge(currentMessage.status)}
-                {currentMessage.publishedAt && (
-                  <span className="text-xs">
-                    {formatDate(currentMessage.publishedAt)}
-                  </span>
-                )}
-              </div>
+              <h2 className="text-xl font-semibold text-foreground leading-tight">
+                {currentMessage.title}
+              </h2>
+              {currentMessage.publishedAt && (
+                <span className="text-xs text-muted-foreground">
+                  {formatDate(currentMessage.publishedAt)}
+                </span>
+              )}
             </div>
+
+            {/* Close button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              className="h-8 w-8 rounded-full"
+              title="Fechar (mostrará novamente amanhã)"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
 
           {/* Progress indicator for multiple messages */}
@@ -260,28 +220,7 @@ export function MessageModal({
         </div>
 
         {/* Footer */}
-        <div className="border-t bg-muted/20 px-6 py-4 space-y-4">
-          {/* Don't show again option */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="dont-show-again"
-              checked={dontShowAgain}
-              onCheckedChange={(checked) => setDontShowAgain(checked === true)}
-            />
-            <label
-              htmlFor="dont-show-again"
-              className="text-sm text-muted-foreground cursor-pointer select-none flex items-center gap-2"
-            >
-              {dontShowAgain ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
-              Não mostrar esta mensagem novamente
-            </label>
-          </div>
-
-          {/* Action buttons */}
+        <div className="border-t bg-muted/20 px-6 py-4">
           <div className="flex items-center justify-between gap-3">
             {/* Navigation buttons */}
             {hasMultipleMessages && (
@@ -311,20 +250,17 @@ export function MessageModal({
               </div>
             )}
 
-            {/* Mark as read button */}
+            {/* Action button */}
             <div className="flex items-center gap-2 ml-auto">
-              <Button variant="ghost" size="sm" onClick={handleClose}>
-                Fechar
-              </Button>
-              {onMarkAsRead && (
+              {onDontShowAgain && (
                 <Button
-                  variant="default"
+                  variant="outline"
                   size="sm"
-                  onClick={handleMarkAsRead}
+                  onClick={handleDontShowAgain}
                   className="gap-2"
                 >
-                  <Eye className="h-4 w-4" />
-                  Marcar como lida
+                  <EyeOff className="h-4 w-4" />
+                  Não mostrar novamente
                 </Button>
               )}
             </div>
@@ -334,7 +270,8 @@ export function MessageModal({
         {/* Screen reader description */}
         <div id="message-modal-description" className="sr-only">
           Modal de mensagem do sistema. Use as setas esquerda e direita para navegar entre
-          mensagens, ESC para fechar.
+          mensagens, ESC para fechar. A mensagem será exibida novamente amanhã ao fechar.
+          Clique em &quot;Não mostrar novamente&quot; para ocultar permanentemente.
         </div>
       </DialogContent>
     </Dialog>

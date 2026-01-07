@@ -10,8 +10,8 @@ export interface UseMessageModalOptions {
   autoShow?: boolean;
   showOnMount?: boolean;
   checkInterval?: number;
-  onMessageRead?: (messageId: string) => void;
-  onMessageDismissed?: (messageId: string) => void;
+  onMessageViewed?: (messageId: string) => void;
+  onMessageDismissedForToday?: (messageId: string) => void;
 }
 
 export interface UseMessageModalReturn {
@@ -21,59 +21,105 @@ export interface UseMessageModalReturn {
   unviewedMessages: Message[];
   isLoading: boolean;
   error: Error | null;
-  markAsRead: (messageId: string) => void;
-  markAllAsRead: () => void;
+  dismissForToday: (messageId: string) => void;
   dontShowAgain: (messageId: string) => void;
   refetch: () => void;
 }
 
-const DISMISSED_MESSAGES_KEY = "dismissedMessages";
+// Storage key for daily dismissed messages
+const DAILY_DISMISSED_KEY = "message_modal_daily_dismissed";
+
+// Get today's date as YYYY-MM-DD
+function getTodayDate(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+// Get daily dismissed messages from localStorage
+function getDailyDismissed(): Record<string, string> {
+  try {
+    const stored = localStorage.getItem(DAILY_DISMISSED_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error("[MessageModal] Failed to parse daily dismissed:", error);
+  }
+  return {};
+}
+
+// Save daily dismissed messages to localStorage
+function saveDailyDismissed(dismissed: Record<string, string>): void {
+  try {
+    localStorage.setItem(DAILY_DISMISSED_KEY, JSON.stringify(dismissed));
+  } catch (error) {
+    console.error("[MessageModal] Failed to save daily dismissed:", error);
+  }
+}
+
+// Check if a message was dismissed today
+function isDismissedToday(messageId: string, dismissed: Record<string, string>): boolean {
+  const dismissedDate = dismissed[messageId];
+  if (!dismissedDate) return false;
+  return dismissedDate === getTodayDate();
+}
+
+// Clean up old dismissed entries (from previous days)
+function cleanupOldDismissals(dismissed: Record<string, string>): Record<string, string> {
+  const today = getTodayDate();
+  const cleaned: Record<string, string> = {};
+
+  for (const [messageId, date] of Object.entries(dismissed)) {
+    if (date === today) {
+      cleaned[messageId] = date;
+    }
+  }
+
+  return cleaned;
+}
 
 export function useMessageModal(options: UseMessageModalOptions = {}): UseMessageModalReturn {
   const {
     autoShow = true,
     showOnMount = true,
     checkInterval = 60000, // Check every minute
-    onMessageRead,
-    onMessageDismissed,
+    onMessageViewed,
+    onMessageDismissedForToday,
   } = options;
 
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = React.useState(false);
-  const [dismissedMessages, setDismissedMessages] = React.useState<string[]>([]);
+  const [dailyDismissed, setDailyDismissed] = React.useState<Record<string, string>>({});
   const hasShownOnMount = React.useRef(false);
+  const lastMessageCount = React.useRef(0);
+
+  // Load and cleanup daily dismissed messages from localStorage on mount
+  React.useEffect(() => {
+    const stored = getDailyDismissed();
+    const cleaned = cleanupOldDismissals(stored);
+    setDailyDismissed(cleaned);
+
+    // Save cleaned version back
+    if (Object.keys(stored).length !== Object.keys(cleaned).length) {
+      saveDailyDismissed(cleaned);
+    }
+  }, []);
 
   // Debug: Log user state
   React.useEffect(() => {
     console.log('[MessageModal] User state changed:', { userId: user?.id, userEmail: user?.email });
   }, [user?.id]);
 
-  // Load dismissed messages from localStorage
-  React.useEffect(() => {
-    const stored = localStorage.getItem(DISMISSED_MESSAGES_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setDismissedMessages(Array.isArray(parsed) ? parsed : []);
-      } catch (error) {
-        console.error("Failed to parse dismissed messages:", error);
-      }
-    }
-  }, []);
-
-  // Fetch unviewed messages
+  // Fetch unviewed messages from API
   const {
     data: messagesData,
     isLoading,
     error,
     refetch,
-    isFetching,
     status,
   } = useQuery({
     queryKey: ["messages", "unviewed", user?.id],
     queryFn: async () => {
-      console.log('[MessageModal] ===== QUERY FN EXECUTING =====');
       console.log('[MessageModal] Fetching unviewed messages for user:', user?.id);
       if (!user?.id) {
         console.log('[MessageModal] No user ID, returning empty array');
@@ -81,7 +127,7 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
       }
       try {
         const messages = await messageService.getUnviewedMessages();
-        console.log('[MessageModal] Received messages:', messages);
+        console.log('[MessageModal] Received messages from API:', messages.length);
         return messages;
       } catch (error) {
         console.error('[MessageModal] Failed to fetch unviewed messages:', error);
@@ -97,89 +143,65 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
     retry: false,
   });
 
-  // Debug: Log query state changes
+  const messages = Array.isArray(messagesData) ? messagesData : [];
+
+  // Filter out messages dismissed today (but NOT permanently viewed - those are already filtered by API)
+  const unviewedMessages = React.useMemo(() => {
+    return messages.filter((msg) => !isDismissedToday(msg.id, dailyDismissed));
+  }, [messages, dailyDismissed]);
+
+  // Debug: Log query state
   React.useEffect(() => {
     console.log('[MessageModal] Query state:', {
       status,
       isLoading,
-      isFetching,
       hasUser: !!user?.id,
-      enabled: !!user?.id,
-      dataLength: Array.isArray(messagesData) ? messagesData.length : 'not-array'
+      apiMessagesCount: messages.length,
+      unviewedMessagesCount: unviewedMessages.length,
+      dailyDismissedCount: Object.keys(dailyDismissed).length,
     });
-  }, [status, isLoading, isFetching, user?.id, messagesData]);
+  }, [status, isLoading, user?.id, messages.length, unviewedMessages.length, dailyDismissed]);
 
-  // Force refetch when user becomes available
-  React.useEffect(() => {
-    if (user?.id) {
-      console.log('[MessageModal] User available, forcing refetch');
-      refetch();
-    }
-  }, [user?.id, refetch]);
-
-  const messages = Array.isArray(messagesData) ? messagesData : [];
-
-  // Filter out dismissed messages
-  const unviewedMessages = React.useMemo(() => {
-    return messages.filter((msg) => !dismissedMessages.includes(msg.id));
-  }, [messages, dismissedMessages]);
-
-  // Mark as viewed mutation
-  const markAsReadMutation = useMutation({
+  // Mark as viewed permanently (don't show again) - calls API
+  const markAsViewedMutation = useMutation({
     mutationFn: async (messageId: string) => {
       if (!user?.id) throw new Error("User not authenticated");
-      try {
-        return await messageService.markAsViewed(messageId);
-      } catch (error) {
-        console.error('Failed to mark message as viewed:', error);
-        throw error;
-      }
+      console.log('[MessageModal] Marking message as permanently viewed:', messageId);
+      return await messageService.markAsViewed(messageId);
     },
     onSuccess: (_, messageId) => {
       queryClient.invalidateQueries({ queryKey: ["messages"] });
-      onMessageRead?.(messageId);
+      onMessageViewed?.(messageId);
+    },
+    onError: (error) => {
+      console.error('[MessageModal] Failed to mark as viewed:', error);
     },
   });
 
-  // Mark all as read mutation (not implemented in MessageService yet)
-  const markAllAsReadMutation = useMutation({
-    mutationFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      // Mark all unviewed messages as viewed
-      const promises = unviewedMessages.map(msg => messageService.markAsViewed(msg.id));
-      return Promise.all(promises);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["messages"] });
-      setOpen(false);
-    },
-  });
-
-  // Mark as read handler
-  const markAsRead = React.useCallback(
+  // Dismiss for today only (store locally, will show again tomorrow)
+  const dismissForToday = React.useCallback(
     (messageId: string) => {
-      markAsReadMutation.mutate(messageId);
+      console.log('[MessageModal] Dismissing for today:', messageId);
+
+      const newDismissed = {
+        ...dailyDismissed,
+        [messageId]: getTodayDate(),
+      };
+
+      setDailyDismissed(newDismissed);
+      saveDailyDismissed(newDismissed);
+      onMessageDismissedForToday?.(messageId);
     },
-    [markAsReadMutation]
+    [dailyDismissed, onMessageDismissedForToday]
   );
 
-  // Mark all as read handler
-  const markAllAsRead = React.useCallback(() => {
-    markAllAsReadMutation.mutate();
-  }, [markAllAsReadMutation]);
-
-  // Don't show again handler
+  // Don't show again (permanent - marks as viewed in database)
   const dontShowAgain = React.useCallback(
     (messageId: string) => {
-      const updated = [...dismissedMessages, messageId];
-      setDismissedMessages(updated);
-      localStorage.setItem(DISMISSED_MESSAGES_KEY, JSON.stringify(updated));
-      onMessageDismissed?.(messageId);
-
-      // Also mark as read
-      markAsRead(messageId);
+      console.log('[MessageModal] Don\'t show again (permanent):', messageId);
+      markAsViewedMutation.mutate(messageId);
     },
-    [dismissedMessages, markAsRead, onMessageDismissed]
+    [markAsViewedMutation]
   );
 
   // Auto-show modal when unviewed messages are available
@@ -190,24 +212,31 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
       showOnMount,
       hasShownOnMount: hasShownOnMount.current,
       unviewedMessagesCount: unviewedMessages.length,
-      open
+      lastMessageCount: lastMessageCount.current,
     });
 
     if (!autoShow || isLoading) {
-      console.log('[MessageModal] Skipping auto-show: autoShow=', autoShow, 'isLoading=', isLoading);
       return;
     }
 
+    // Show on mount if there are unviewed messages
     if (showOnMount && !hasShownOnMount.current && unviewedMessages.length > 0) {
       console.log('[MessageModal] Opening modal on mount with', unviewedMessages.length, 'messages');
       hasShownOnMount.current = true;
-      setOpen(true);
-    } else if (unviewedMessages.length > 0 && !open && hasShownOnMount.current) {
-      // Show modal for new messages that arrive after mount
-      console.log('[MessageModal] Opening modal for new messages');
+      lastMessageCount.current = unviewedMessages.length;
       setOpen(true);
     }
-  }, [autoShow, showOnMount, unviewedMessages.length, open, isLoading]);
+    // Only auto-reopen if NEW messages arrived (count increased)
+    else if (unviewedMessages.length > lastMessageCount.current && hasShownOnMount.current) {
+      console.log('[MessageModal] Opening modal for new messages');
+      lastMessageCount.current = unviewedMessages.length;
+      setOpen(true);
+    }
+    // Update the count when messages decrease
+    else if (unviewedMessages.length < lastMessageCount.current) {
+      lastMessageCount.current = unviewedMessages.length;
+    }
+  }, [autoShow, showOnMount, unviewedMessages.length, isLoading]);
 
   return {
     open,
@@ -216,8 +245,7 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
     unviewedMessages,
     isLoading,
     error: error as Error | null,
-    markAsRead,
-    markAllAsRead,
+    dismissForToday,
     dontShowAgain,
     refetch,
   };

@@ -391,14 +391,11 @@ export function TaskQuickCreateDialog({ open, onOpenChange, onSuccess }: TaskQui
                       </FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          value={field.value || ""}
+                          type="natural"
+                          value={field.value ?? ""}
                           placeholder="Ex: 1"
                           className="bg-transparent"
-                          onChange={(value) => {
-                            // Input with type="number" passes value directly, not an event
-                            field.onChange(value);
-                          }}
+                          onChange={field.onChange}
                           disabled={isSubmitting}
                         />
                       </FormControl>
@@ -418,14 +415,11 @@ export function TaskQuickCreateDialog({ open, onOpenChange, onSuccess }: TaskQui
                       </FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          value={field.value || ""}
+                          type="natural"
+                          value={field.value ?? ""}
                           placeholder="Ex: 5"
                           className="bg-transparent"
-                          onChange={(value) => {
-                            // Input with type="number" passes value directly, not an event
-                            field.onChange(value);
-                          }}
+                          onChange={field.onChange}
                           disabled={isSubmitting}
                         />
                       </FormControl>
