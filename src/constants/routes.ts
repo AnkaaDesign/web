@@ -23,6 +23,12 @@ export const routes = {
       edit: (id: string) => `/administracao/notificacoes/editar/${id}`,
       root: "/administracao/notificacoes",
     },
+    messages: {
+      create: "/administracao/mensagens/criar",
+      details: (id: string) => `/administracao/mensagens/${id}`,
+      edit: (id: string) => `/administracao/mensagens/${id}/editar`,
+      root: "/administracao/mensagens",
+    },
     root: "/administracao",
     sectors: {
       batchEdit: "/administracao/setores/editar-em-lote",

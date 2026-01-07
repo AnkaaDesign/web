@@ -315,14 +315,11 @@ export function SimpleTaskCreateDialog({ open, onOpenChange, onSuccess }: Simple
                       </FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
+                          type="natural"
                           value={field.value ?? ""}
                           placeholder="Ex: 1"
                           className="bg-transparent"
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            field.onChange(value ? parseInt(value, 10) : null);
-                          }}
+                          onChange={field.onChange}
                           disabled={isSubmitting}
                         />
                       </FormControl>
@@ -342,14 +339,11 @@ export function SimpleTaskCreateDialog({ open, onOpenChange, onSuccess }: Simple
                       </FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
+                          type="natural"
                           value={field.value ?? ""}
                           placeholder="Ex: 5"
                           className="bg-transparent"
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            field.onChange(value ? parseInt(value, 10) : null);
-                          }}
+                          onChange={field.onChange}
                           disabled={isSubmitting}
                         />
                       </FormControl>

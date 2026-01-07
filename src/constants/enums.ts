@@ -1902,6 +1902,7 @@ export enum FAVORITE_PAGES {
   ADMINISTRACAO_ARQUIVOS_LISTAR = "/administracao/arquivos",
   ADMINISTRACAO_SETORES_LISTAR = "/administracao/setores",
   ADMINISTRACAO_NOTIFICACOES_LISTAR = "/administracao/notificacoes",
+  ADMINISTRACAO_MENSAGENS_LISTAR = "/administracao/mensagens",
   ADMINISTRACAO_FOLHA_DE_PAGAMENTO = "/recursos-humanos/folha-de-pagamento",
 
   // Administration - Create Pages
@@ -1912,6 +1913,7 @@ export enum FAVORITE_PAGES {
   ADMINISTRACAO_SETORES_CADASTRAR = "/administracao/setores/cadastrar",
   ADMINISTRACAO_NOTIFICACOES_CADASTRAR = "/administracao/notificacoes/cadastrar/enviar",
   ADMINISTRACAO_NOTIFICACOES_EDITAR = "/administracao/notificacoes/editar",
+  ADMINISTRACAO_MENSAGENS_CRIAR = "/administracao/mensagens/criar",
 
   // Financeiro - List Pages
   FINANCEIRO_CLIENTES_LISTAR = "/financeiro/clientes",

@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/contexts/theme-context";
 import { AuthProvider } from "@/contexts/auth-context";
 import { FavoritesProvider } from "@/contexts/favorites-context";
 import { FileViewerProvider } from "@/components/common/file/file-viewer";
+import { MessageModalProvider } from "@/components/common/message-modal";
 import { AutoPrivilegeRoute } from "@/components/navigation/auto-privilege-route";
 import { MainLayout } from "@/layouts/main-layout";
 import { AuthLayout } from "@/layouts/auth-layout";
@@ -78,6 +79,10 @@ const AdministrationNotifications = lazy(() => import("@/pages/administration/no
 const AdministrationNotificationsEdit = lazy(() => import("@/pages/administration/notifications/edit/[id]").then((module) => ({ default: module.EditNotificationPage })));
 const AdministrationNotificationsDetails = lazy(() => import("@/pages/administration/notifications/details/[id]").then((module) => ({ default: module.NotificationDetailsPage })));
 const AdministrationNotificationsSend = lazy(() => import("@/pages/administration/notifications/create").then((module) => ({ default: module.CreateNotificationPage })));
+
+const AdministrationMessages = lazy(() => import("@/pages/administration/messages/list").then((module) => ({ default: module.MessageListPage })));
+const AdministrationMessagesCreate = lazy(() => import("@/pages/administration/messages/create").then((module) => ({ default: module.CreateMessagePage })));
+const AdministrationMessagesEdit = lazy(() => import("@/pages/administration/messages/edit/[id]").then((module) => ({ default: module.EditMessagePage })));
 
 const AdministrationChangeLogs = lazy(() => import("@/pages/administration/change-logs/list").then((module) => ({ default: module.default })));
 const AdministrationChangeLogsDetails = lazy(() => import("@/pages/administration/change-logs/details/[id]").then((module) => ({ default: module.ChangeLogDetails })));
@@ -311,9 +316,10 @@ function App() {
           <SocketReconnectHandler />
           <FavoritesProvider>
             <FileViewerProvider>
-              <Toaster />
-              <PushNotificationSetup />
-              <Routes>
+              <MessageModalProvider>
+                <Toaster />
+                <PushNotificationSetup />
+                <Routes>
               {/* Auth routes */}
               <Route element={<AuthLayout />}>
                 <Route path={routes.authentication.login} element={<LoginPage />} />
@@ -783,6 +789,30 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <AdministrationNotificationsSend />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.messages.root}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AdministrationMessages />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.messages.create}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AdministrationMessagesCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.messages.edit(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AdministrationMessagesEdit />
                     </Suspense>
                   }
                 />
@@ -2177,6 +2207,7 @@ function App() {
               {/* 404 Not Found route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+              </MessageModalProvider>
             </FileViewerProvider>
           </FavoritesProvider>
         </AuthProvider>

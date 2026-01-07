@@ -513,6 +513,17 @@ export const NAVIGATION_MENU: MenuItem[] = [
         ],
       },
       {
+        id: "mensagens-admin",
+        title: "Mensagens",
+        icon: "message",
+        path: "/administracao/mensagens",
+        children: [
+          { id: "mensagens-admin-criar", title: "Criar", icon: "plus", path: "/administracao/mensagens/criar" },
+          { id: "mensagens-admin-detalhes", title: "Detalhes", icon: "eye", path: "/administracao/mensagens/:id", isDynamic: true },
+          { id: "mensagens-admin-editar", title: "Editar", icon: "edit", path: "/administracao/mensagens/:id/editar", isDynamic: true },
+        ],
+      },
+      {
         id: "setores",
         title: "Setores",
         icon: "building",
