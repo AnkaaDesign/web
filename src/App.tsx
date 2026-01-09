@@ -82,6 +82,7 @@ const AdministrationNotificationsSend = lazy(() => import("@/pages/administratio
 
 const AdministrationMessages = lazy(() => import("@/pages/administration/messages/list").then((module) => ({ default: module.MessageListPage })));
 const AdministrationMessagesCreate = lazy(() => import("@/pages/administration/messages/create").then((module) => ({ default: module.CreateMessagePage })));
+const AdministrationMessagesDetails = lazy(() => import("@/pages/administration/messages/details/[id]").then((module) => ({ default: module.MessageDetailsPage })));
 const AdministrationMessagesEdit = lazy(() => import("@/pages/administration/messages/edit/[id]").then((module) => ({ default: module.EditMessagePage })));
 
 const AdministrationChangeLogs = lazy(() => import("@/pages/administration/change-logs/list").then((module) => ({ default: module.default })));
@@ -402,16 +403,14 @@ function App() {
                     </Suspense>
                   }
                 />
-                {/* Task creation removed - tasks are now created in the "in preparation" page
                 <Route
-                  path={routes.production.schedule.create}
+                  path={routes.production.preparation.create}
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <ProductionTasksCreate />
                     </Suspense>
                   }
                 />
-                */}
                 <Route
                   path={routes.production.schedule.edit(":id")}
                   element={
@@ -805,6 +804,14 @@ function App() {
                   element={
                     <Suspense fallback={<PageLoader />}>
                       <AdministrationMessagesCreate />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path={routes.administration.messages.details(":id")}
+                  element={
+                    <Suspense fallback={<PageLoader />}>
+                      <AdministrationMessagesDetails />
                     </Suspense>
                   }
                 />

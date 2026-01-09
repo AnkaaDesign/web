@@ -1,4 +1,4 @@
-import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
+import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, DecimalValue } from "./common";
 import type { ORDER_BY_DIRECTION, BONUS_STATUS } from "../constants";
 import type { Bonus, BonusIncludes } from "./bonus";
 import type { User, UserIncludes } from "./user";
@@ -26,8 +26,8 @@ export type PayrollDiscountType =
   | 'CUSTOM';
 
 export interface Discount extends BaseEntity {
-  percentage: number | null;
-  value: number | null;
+  percentage: DecimalValue | null;
+  value: DecimalValue | null;
   calculationOrder: number;
   reference: string;
   payrollId: string;
@@ -42,7 +42,7 @@ export interface Discount extends BaseEntity {
 
 export interface Payroll extends BaseEntity {
   // Base information
-  baseRemuneration: number;
+  baseRemuneration: DecimalValue;
   year: number;
   month: number;
   userId: string;
@@ -51,32 +51,32 @@ export interface Payroll extends BaseEntity {
   // Working days
   workingDaysInMonth?: number;
   workedDaysInMonth?: number;
-  absenceHours?: number;
+  absenceHours?: DecimalValue;
 
   // Overtime earnings
-  overtime50Hours?: number;
-  overtime50Amount?: number;
-  overtime100Hours?: number;
-  overtime100Amount?: number;
-  nightHours?: number;
-  nightDifferentialAmount?: number;
+  overtime50Hours?: DecimalValue;
+  overtime50Amount?: DecimalValue;
+  overtime100Hours?: DecimalValue;
+  overtime100Amount?: DecimalValue;
+  nightHours?: DecimalValue;
+  nightDifferentialAmount?: DecimalValue;
 
   // DSR
-  dsrAmount?: number;
+  dsrAmount?: DecimalValue;
 
   // Calculated totals
-  grossSalary?: number;
-  totalDiscounts?: number;
-  netSalary?: number;
+  grossSalary?: DecimalValue;
+  totalDiscounts?: DecimalValue;
+  netSalary?: DecimalValue;
 
   // Tax details
-  inssBase?: number;
-  inssAmount?: number;
-  irrfBase?: number;
-  irrfAmount?: number;
+  inssBase?: DecimalValue;
+  inssAmount?: DecimalValue;
+  irrfBase?: DecimalValue;
+  irrfAmount?: DecimalValue;
 
   // FGTS (employer contribution, tracked but not deducted)
-  fgtsAmount?: number;
+  fgtsAmount?: DecimalValue;
 
   // Legacy/deprecated fields (for compatibility)
   performanceLevel?: number;

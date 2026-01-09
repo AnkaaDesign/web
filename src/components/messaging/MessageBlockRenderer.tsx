@@ -5,8 +5,11 @@ import { ParagraphBlock } from "./ParagraphBlock";
 import { ImageBlock } from "./ImageBlock";
 import { ButtonBlock } from "./ButtonBlock";
 import { DividerBlock } from "./DividerBlock";
+import { SpacerBlock } from "./SpacerBlock";
 import { ListBlock } from "./ListBlock";
 import { QuoteBlock } from "./QuoteBlock";
+import { IconBlock } from "./IconBlock";
+import { RowBlock } from "./RowBlock";
 import { cn } from "@/lib/utils";
 
 /**
@@ -38,6 +41,23 @@ export const MessageBlockRenderer = React.memo<MessageBlockRendererProps>(
     const renderBlock = (block: MessageBlock, index: number) => {
       const key = block.id || `block-${index}`;
 
+      // Helper to wrap blocks with alignment for standalone usage
+      const withAlignment = (content: React.ReactNode, alignment?: 'left' | 'center' | 'right') => {
+        if (!alignment) return content;
+
+        const alignmentClasses = {
+          left: 'justify-start',
+          center: 'justify-center',
+          right: 'justify-end',
+        };
+
+        return (
+          <div className={cn("flex my-4 first:mt-0 last:mb-0", alignmentClasses[alignment])}>
+            {content}
+          </div>
+        );
+      };
+
       switch (block.type) {
         case 'heading':
           return <HeadingBlock key={key} block={block} />;
@@ -54,11 +74,20 @@ export const MessageBlockRenderer = React.memo<MessageBlockRendererProps>(
         case 'divider':
           return <DividerBlock key={key} block={block} />;
 
+        case 'spacer':
+          return <SpacerBlock key={key} height={block.height} id={block.id} />;
+
         case 'list':
           return <ListBlock key={key} block={block} />;
 
         case 'quote':
           return <QuoteBlock key={key} block={block} />;
+
+        case 'icon':
+          return withAlignment(<IconBlock key={key} block={block} />, block.alignment);
+
+        case 'row':
+          return <RowBlock key={key} block={block} />;
 
         default:
           // Type-safe exhaustiveness check

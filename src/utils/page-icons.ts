@@ -167,7 +167,7 @@ export function getPageIconInfo(page: string): { icon: Icon; color: string } {
 
 // Check if a page is a cadastrar (create) page
 export function isPageCadastrar(page: string): boolean {
-  return page.includes("_CADASTRAR") || page.includes("/cadastrar") || page.includes("/enviar") || page.includes("/solicitar");
+  return page.includes("_CADASTRAR") || page.includes("/cadastrar") || page.includes("/enviar") || page.includes("/solicitar") || page.includes("/criar");
 }
 
 // Get icon name for sidebar - works with paths

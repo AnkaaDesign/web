@@ -21,7 +21,6 @@ const TASK_SCHEDULE_COLUMNS: TaskScheduleColumn[] = [
   { id: "customer.fantasyName", header: "CLIENTE", sortable: true, width: "w-[150px]" },
   { id: "measures", header: "MEDIDAS", sortable: true, width: "w-[110px]" },
   { id: "generalPainting", header: "PINTURA", sortable: true, width: "w-[100px]" },
-  { id: "serviceOrders.production", header: "PRODUÇÃO", sortable: true, width: "w-[120px]" },
   { id: "serialNumberOrPlate", header: "IDENTIFICADOR", sortable: true, width: "w-[140px]" },
   { id: "spot", header: "LOCAL", sortable: true, width: "w-[120px]" },
   { id: "chassisNumber", header: "Nº CHASSI", sortable: true, width: "w-[140px]" },
@@ -34,7 +33,7 @@ const TASK_SCHEDULE_COLUMNS: TaskScheduleColumn[] = [
 
 // Default visible columns
 export const getDefaultVisibleColumns = (): Set<string> => {
-  return new Set(["name", "customer.fantasyName", "serialNumberOrPlate", "term", "serviceOrders.production"]);
+  return new Set(["name", "customer.fantasyName", "generalPainting", "serialNumberOrPlate", "sector.name", "term", "measures", "remainingTime"]);
 };
 
 interface ColumnVisibilityManagerProps {

@@ -76,18 +76,14 @@ const getCreatedByUser = (task: Task) => {
   return task.createdBy?.name || "-";
 };
 
-// Helper to get user who completed the task
-const getCompletedByUser = (task: Task) => {
-  return task.updatedBy?.name || "-";
-};
-
 // Define columns specific to history view
 export const createTaskHistoryColumns = (options?: {
   canViewPrice?: boolean;
   currentUserId?: string;
   sectorPrivilege?: SECTOR_PRIVILEGES; // User's sector privilege for column filtering
+  navigationRoute?: 'history' | 'preparation' | 'schedule'; // Current navigation route
 }): TaskColumn[] => {
-  const { canViewPrice = true, currentUserId, sectorPrivilege } = options || {};
+  const { canViewPrice = true, currentUserId, sectorPrivilege, navigationRoute } = options || {};
 
   const allColumns: TaskColumn[] = [
   {
@@ -223,26 +219,6 @@ export const createTaskHistoryColumns = (options?: {
     },
   },
   {
-    id: "status",
-    header: "STATUS",
-    accessorKey: "status",
-    sortable: true,
-    filterable: true,
-    defaultVisible: false,
-    width: "140px",
-    formatter: (value: string | null) => {
-      if (!value) return <span className="text-muted-foreground">-</span>;
-      const status = value as TASK_STATUS;
-      const variant = getBadgeVariant(status, "TASK");
-      const label = TASK_STATUS_LABELS[status] || status;
-      return (
-        <Badge variant={variant as any}>
-          {label}
-        </Badge>
-      );
-    },
-  },
-  {
     id: "identificador",
     header: "IDENTIFICADOR",
     accessorFn: (row) => row.serialNumber || row.truck?.plate || "",
@@ -252,33 +228,7 @@ export const createTaskHistoryColumns = (options?: {
     width: "140px",
     formatter: (value: string) => {
       if (!value) return <span className="text-muted-foreground">-</span>;
-      return <span className="font-mono truncate">{value}</span>;
-    },
-  },
-  {
-    id: "serialNumber",
-    header: "Nº SÉRIE",
-    accessorKey: "serialNumber",
-    sortable: true,
-    filterable: true,
-    defaultVisible: false,
-    width: "140px",
-    formatter: (value: string | null) => {
-      if (!value) return <span className="text-muted-foreground">-</span>;
-      return <span className="font-mono truncate">{value}</span>;
-    },
-  },
-  {
-    id: "plate",
-    header: "PLACA",
-    accessorFn: (row) => row.truck?.plate || "",
-    sortable: true,
-    filterable: true,
-    defaultVisible: false,
-    width: "100px",
-    formatter: (value: string | null) => {
-      if (!value) return <span className="text-muted-foreground">-</span>;
-      return <span className="font-mono uppercase truncate">{value}</span>;
+      return <span className="truncate">{value}</span>;
     },
   },
   {
@@ -368,52 +318,6 @@ export const createTaskHistoryColumns = (options?: {
     formatter: (_: any, row: Task) => renderServices(row),
   },
   {
-    id: "serviceOrders.production",
-    header: (
-      <TooltipProvider delayDuration={0}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.PRODUCTION]}</span>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            <div className="text-sm">
-              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.PRODUCTION].toLowerCase()}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.PRODUCTION).length || 0,
-    sortable: true,
-    filterable: false,
-    defaultVisible: false,
-    width: "120px",
-    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} />,
-  },
-  {
-    id: "serviceOrders.financial",
-    header: (
-      <TooltipProvider delayDuration={0}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.FINANCIAL]}</span>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            <div className="text-sm">
-              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.FINANCIAL].toLowerCase()}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.FINANCIAL).length || 0,
-    sortable: true,
-    filterable: false,
-    defaultVisible: false,
-    width: "120px",
-    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.FINANCIAL} />,
-  },
-  {
     id: "serviceOrders.negotiation",
     header: (
       <TooltipProvider delayDuration={0}>
@@ -458,6 +362,52 @@ export const createTaskHistoryColumns = (options?: {
     defaultVisible: false,
     width: "100px",
     formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.ARTWORK} />,
+  },
+  {
+    id: "serviceOrders.production",
+    header: (
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.PRODUCTION]}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.PRODUCTION].toLowerCase()}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.PRODUCTION).length || 0,
+    sortable: true,
+    filterable: false,
+    defaultVisible: false,
+    width: "120px",
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} />,
+  },
+  {
+    id: "serviceOrders.financial",
+    header: (
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.FINANCIAL]}</span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.FINANCIAL].toLowerCase()}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    ),
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.FINANCIAL).length || 0,
+    sortable: true,
+    filterable: false,
+    defaultVisible: false,
+    width: "120px",
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.FINANCIAL} />,
   },
   {
     id: "price",
@@ -534,19 +484,6 @@ export const createTaskHistoryColumns = (options?: {
     },
   },
   {
-    id: "completedBy.name",
-    header: "FINALIZADO POR",
-    accessorFn: (row) => getCompletedByUser(row),
-    sortable: true,
-    filterable: true,
-    defaultVisible: false,
-    width: "150px",
-    formatter: (value: string) => {
-      if (!value || value === "-") return <span className="text-muted-foreground">-</span>;
-      return <TruncatedTextWithTooltip text={value} className="truncate" />;
-    },
-  },
-  {
     id: "details",
     header: "DETALHES",
     accessorKey: "details",
@@ -611,6 +548,11 @@ export const createTaskHistoryColumns = (options?: {
   // Filter out price column if user doesn't have permission
   if (!canViewPrice) {
     filteredColumns = filteredColumns.filter(col => col.id !== 'price');
+  }
+
+  // Filter out observation column from agenda (preparation) page
+  if (navigationRoute === 'preparation') {
+    filteredColumns = filteredColumns.filter(col => col.id !== 'observation');
   }
 
   return filteredColumns;

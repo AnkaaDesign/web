@@ -108,24 +108,24 @@ export const FinancialCustomersEditPage = () => {
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
-      <div className="h-full flex flex-col px-4 pt-4">
-        <PageHeader
-          variant="form"
-          title="Editar Cliente"
-          icon={IconUsers}
-          breadcrumbs={[
-            { label: "Início", href: routes.home },
-            { label: "Financeiro", href: routes.financial.root },
-            { label: "Clientes", href: routes.financial.customers.root },
-            { label: customer.fantasyName, href: routes.financial.customers.details(id!) },
-            { label: "Editar" },
-          ]}
-          actions={actions}
-        />
+      <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
+        <div className="container mx-auto max-w-4xl flex-shrink-0">
+          <PageHeader
+            variant="form"
+            title="Editar Cliente"
+            icon={IconUsers}
+            breadcrumbs={[
+              { label: "Início", href: routes.home },
+              { label: "Financeiro", href: routes.financial.root },
+              { label: "Clientes", href: routes.financial.customers.root },
+              { label: customer.fantasyName, href: routes.financial.customers.details(id!) },
+              { label: "Editar" },
+            ]}
+            actions={actions}
+          />
+        </div>
         <div className="flex-1 overflow-y-auto pb-6">
-          <div className="mt-4 space-y-4">
-            <CustomerEditForm customer={customer} onSubmit={handleSubmit} isSubmitting={isUpdating} onFormStateChange={setFormState} />
-          </div>
+          <CustomerEditForm customer={customer} onSubmit={handleSubmit} isSubmitting={isUpdating} onFormStateChange={setFormState} />
         </div>
       </div>
     </PrivilegeRoute>

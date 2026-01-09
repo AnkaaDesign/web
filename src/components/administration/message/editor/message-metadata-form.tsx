@@ -1,28 +1,27 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { IconCalendar, IconClock, IconUsers, IconUserCheck } from "@tabler/icons-react";
+import { Combobox } from "@/components/ui/combobox";
+import { IconCalendar, IconUsers } from "@tabler/icons-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { getUsers, getSectors, getPositions } from "@/api-client";
 
 interface MessageMetadata {
   title: string;
   targeting: {
-    type: 'all' | 'specific' | 'roles';
+    type: 'all' | 'specific' | 'sector' | 'position';
     userIds?: string[];
-    roleIds?: string[];
+    sectorIds?: string[];
+    positionIds?: string[];
   };
   scheduling: {
     startDate?: Date;
     endDate?: Date;
   };
-  priority: 'low' | 'normal' | 'high';
 }
 
 interface MessageMetadataFormProps {
@@ -35,6 +34,14 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
     onChange({ ...data, ...updates });
   };
 
+  // Targeting type options
+  const targetingTypeOptions = [
+    { value: 'all', label: 'Todos os Usuários' },
+    { value: 'specific', label: 'Usuários Específicos' },
+    { value: 'sector', label: 'Por Setor' },
+    { value: 'position', label: 'Por Cargo' },
+  ];
+
   return (
     <div className="space-y-4">
       {/* Basic Info */}
@@ -43,30 +50,20 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
           <CardTitle>Informações Básicas</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Label>Título da Mensagem</Label>
+          <div className="space-y-2">
+            <Label htmlFor="message-title">
+              Título da Mensagem <span className="text-destructive">*</span>
+            </Label>
             <Input
+              id="message-title"
               value={data.title}
-              onChange={(e) => handleChange({ title: e.target.value })}
+              onChange={(value) => handleChange({ title: value as string || '' })}
               placeholder="Digite o título da mensagem..."
+              required
             />
-          </div>
-
-          <div>
-            <Label>Prioridade</Label>
-            <Select
-              value={data.priority}
-              onValueChange={(value: any) => handleChange({ priority: value })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="low">Baixa</SelectItem>
-                <SelectItem value="normal">Normal</SelectItem>
-                <SelectItem value="high">Alta</SelectItem>
-              </SelectContent>
-            </Select>
+            <p className="text-xs text-muted-foreground">
+              Necessário para publicar ou salvar como rascunho
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -80,48 +77,190 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Tabs
-            value={data.targeting.type}
-            onValueChange={(value: any) =>
-              handleChange({
-                targeting: { ...data.targeting, type: value },
-              })
-            }
-          >
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="all">Todos</TabsTrigger>
-              <TabsTrigger value="specific">Específicos</TabsTrigger>
-              <TabsTrigger value="roles">Por Cargo</TabsTrigger>
-            </TabsList>
+          <div className="space-y-2">
+            <Label htmlFor="targeting-type">Tipo de Público</Label>
+            <Combobox
+              value={data.targeting.type}
+              onValueChange={(value) =>
+                handleChange({
+                  targeting: { type: value as 'all' | 'specific' | 'sector' | 'position', userIds: [], sectorIds: [], positionIds: [] },
+                })
+              }
+              options={targetingTypeOptions}
+              placeholder="Selecione o tipo de público..."
+              searchable={false}
+              clearable={false}
+            />
+          </div>
 
-            <TabsContent value="all">
-              <p className="text-sm text-muted-foreground">
-                Esta mensagem será exibida para todos os usuários.
-              </p>
-            </TabsContent>
+          {/* Show message when "all" is selected */}
+          {data.targeting.type === 'all' && (
+            <p className="text-sm text-muted-foreground">
+              Esta mensagem será exibida para todos os usuários.
+            </p>
+          )}
 
-            <TabsContent value="specific">
-              <div className="space-y-2">
-                <Label>Selecione os Usuários</Label>
-                <Input placeholder="Buscar usuários..." />
-                <div className="text-sm text-muted-foreground">
-                  {data.targeting.userIds?.length || 0} usuários selecionados
-                </div>
-                {/* TODO: Add user multi-select component */}
-              </div>
-            </TabsContent>
+          {/* Show user combobox when "specific" is selected */}
+          {data.targeting.type === 'specific' && (
+            <div className="space-y-2">
+              <Label htmlFor="targeting-users">Selecione os Usuários</Label>
+              <Combobox
+                mode="multiple"
+                async
+                value={data.targeting.userIds || []}
+                onValueChange={(value) =>
+                  handleChange({
+                    targeting: { ...data.targeting, userIds: value as string[] },
+                  })
+                }
+                queryKey={['users', 'message-targeting']}
+                queryFn={async (searchTerm: string, page: number = 1) => {
+                  const pageSize = 50;
+                  const result = await getUsers({
+                    take: pageSize,
+                    skip: (page - 1) * pageSize,
+                    where: {
+                      isActive: true,
+                      ...(searchTerm ? {
+                        OR: [
+                          { name: { contains: searchTerm, mode: 'insensitive' as const } },
+                          { email: { contains: searchTerm, mode: 'insensitive' as const } },
+                        ],
+                      } : {}),
+                    },
+                    orderBy: [
+                      { status: 'asc' as const },
+                      { name: 'asc' as const },
+                    ],
+                    include: {
+                      sector: true,
+                    },
+                  });
 
-            <TabsContent value="roles">
-              <div className="space-y-2">
-                <Label>Selecione os Cargos</Label>
-                <Input placeholder="Buscar cargos..." />
-                <div className="text-sm text-muted-foreground">
-                  {data.targeting.roleIds?.length || 0} cargos selecionados
-                </div>
-                {/* TODO: Add role multi-select component */}
-              </div>
-            </TabsContent>
-          </Tabs>
+                  const usersData = result.data || [];
+                  const total = result.total || 0;
+                  const hasMore = (page * pageSize) < total;
+
+                  return {
+                    data: usersData.map((user) => {
+                      const parts = [user.name];
+                      if (user.sector?.name) {
+                        parts.push(user.sector.name);
+                      }
+                      return {
+                        value: user.id,
+                        label: parts.join(' - '),
+                      };
+                    }),
+                    hasMore,
+                    total,
+                  };
+                }}
+                pageSize={50}
+                minSearchLength={0}
+                debounceMs={300}
+                placeholder="Selecione os usuários..."
+                searchPlaceholder="Buscar usuários..."
+                emptyText="Nenhum usuário encontrado"
+              />
+            </div>
+          )}
+
+          {/* Show sector combobox when "sector" is selected */}
+          {data.targeting.type === 'sector' && (
+            <div className="space-y-2">
+              <Label htmlFor="targeting-sectors">Selecione os Setores</Label>
+              <Combobox
+                mode="multiple"
+                async
+                value={data.targeting.sectorIds || []}
+                onValueChange={(value) =>
+                  handleChange({
+                    targeting: { ...data.targeting, sectorIds: value as string[] },
+                  })
+                }
+                queryKey={['sectors', 'message-targeting']}
+                queryFn={async (searchTerm: string, page: number = 1) => {
+                  const pageSize = 50;
+                  const result = await getSectors({
+                    take: pageSize,
+                    skip: (page - 1) * pageSize,
+                    where: searchTerm ? {
+                      name: { contains: searchTerm, mode: 'insensitive' as const }
+                    } : undefined,
+                    orderBy: { name: 'asc' as const },
+                  });
+
+                  const sectorsData = result.data || [];
+                  const total = result.total || 0;
+                  const hasMore = (page * pageSize) < total;
+
+                  return {
+                    data: sectorsData.map((sector) => ({
+                      value: sector.id,
+                      label: sector.name,
+                    })),
+                    hasMore,
+                    total,
+                  };
+                }}
+                pageSize={50}
+                minSearchLength={0}
+                debounceMs={300}
+                placeholder="Selecione os setores..."
+                searchPlaceholder="Buscar setores..."
+                emptyText="Nenhum setor encontrado"
+              />
+            </div>
+          )}
+
+          {/* Show position combobox when "position" is selected */}
+          {data.targeting.type === 'position' && (
+            <div className="space-y-2">
+              <Label htmlFor="targeting-positions">Selecione os Cargos</Label>
+              <Combobox
+                mode="multiple"
+                async
+                value={data.targeting.positionIds || []}
+                onValueChange={(value) =>
+                  handleChange({
+                    targeting: { ...data.targeting, positionIds: value as string[] },
+                  })
+                }
+                queryKey={['positions', 'message-targeting']}
+                queryFn={async (searchTerm: string, page: number = 1) => {
+                  const pageSize = 50;
+                  const result = await getPositions({
+                    take: pageSize,
+                    skip: (page - 1) * pageSize,
+                    where: searchTerm ? {
+                      name: { contains: searchTerm, mode: 'insensitive' as const }
+                    } : undefined,
+                    orderBy: { name: 'asc' as const },
+                  });
+
+                  const positionsData = result.data || [];
+                  const total = result.total || 0;
+                  const hasMore = (page * pageSize) < total;
+
+                  return {
+                    data: positionsData.map((position) => ({
+                      value: position.id,
+                      label: position.name,
+                    })),
+                    hasMore,
+                    total,
+                  };
+                }}
+                pageSize={50}
+                minSearchLength={0}
+                debounceMs={300}
+                placeholder="Selecione os cargos..."
+                searchPlaceholder="Buscar cargos..."
+                emptyText="Nenhum cargo encontrado"
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -135,8 +274,8 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Data de Início</Label>
+            <div className="space-y-2">
+              <Label htmlFor="start-date">Data de Início</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -166,8 +305,8 @@ export const MessageMetadataForm = ({ data, onChange }: MessageMetadataFormProps
               </Popover>
             </div>
 
-            <div>
-              <Label>Data de Término</Label>
+            <div className="space-y-2">
+              <Label htmlFor="end-date">Data de Término</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button

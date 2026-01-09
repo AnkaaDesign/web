@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FormSteps } from "@/components/ui/form-steps";
 import { BlockEditorCanvas } from "./block-editor-canvas";
 import { MessageMetadataForm } from "./message-metadata-form";
 import type { MessageFormData, ContentBlock } from "./types";
@@ -8,57 +8,123 @@ import type { MessageFormData, ContentBlock } from "./types";
 interface MessageEditorProps {
   initialData?: Partial<MessageFormData>;
   onSubmit: (data: MessageFormData, isDraft: boolean) => void;
-  onFormStateChange?: (state: { isValid: boolean; isDirty: boolean }) => void;
+  onFormStateChange?: (state: { isValid: boolean; isDirty: boolean; canPreview: boolean }) => void;
+  onStepChange?: (step: number, totalSteps: number, canGoNext: boolean, canGoPrev: boolean) => void;
 }
 
-export const MessageEditor = ({ initialData, onSubmit, onFormStateChange }: MessageEditorProps) => {
+const STEPS = [
+  { id: 1, name: "Informações Básicas", description: "Título e configurações" },
+  { id: 2, name: "Conteúdo", description: "Editor de blocos da mensagem" },
+];
+
+export const MessageEditor = ({ initialData, onSubmit, onFormStateChange, onStepChange }: MessageEditorProps) => {
+  const [currentStep, setCurrentStep] = useState(1);
   const [blocks, setBlocks] = useState<ContentBlock[]>(initialData?.blocks || []);
   const [metadata, setMetadata] = useState({
     title: initialData?.title || '',
     targeting: initialData?.targeting || { type: 'all' as const },
     scheduling: initialData?.scheduling || {},
-    priority: initialData?.priority || 'normal' as const,
   });
-  const [activeTab, setActiveTab] = useState('content');
 
-  const isValid = metadata.title.trim().length > 0 && blocks.length > 0;
+  // Update state when initialData changes (for edit mode)
+  useEffect(() => {
+    if (initialData) {
+      console.log('[MessageEditor] Received initialData:', initialData);
+
+      if (initialData.blocks !== undefined) {
+        console.log('[MessageEditor] Setting blocks:', initialData.blocks);
+        setBlocks(initialData.blocks);
+      }
+
+      if (initialData.title !== undefined || initialData.targeting !== undefined || initialData.scheduling !== undefined) {
+        console.log('[MessageEditor] Setting metadata:', {
+          title: initialData.title,
+          targeting: initialData.targeting,
+          scheduling: initialData.scheduling,
+        });
+        setMetadata({
+          title: initialData.title || '',
+          targeting: initialData.targeting || { type: 'all' as const },
+          scheduling: initialData.scheduling || {},
+        });
+      }
+    }
+  }, [initialData]);
+
+  // Preview only needs blocks, but publishing needs title + blocks
+  const canPreview = blocks.length > 0;
+  const canPublish = metadata.title.trim().length > 0 && blocks.length > 0;
+  const isValid = canPublish; // For draft/publish, require title
   const isDirty = blocks.length > 0 || metadata.title.length > 0;
 
+  // Validation for each step
+  const step1Valid = metadata.title.trim().length > 0;
+  const step2Valid = blocks.length > 0;
+
+  const stepErrors = {
+    1: !step1Valid && currentStep > 1,
+    2: !step2Valid && currentStep > 2,
+  };
+
   useEffect(() => {
-    onFormStateChange?.({ isValid, isDirty });
-  }, [isValid, isDirty, onFormStateChange]);
+    onFormStateChange?.({ isValid, isDirty, canPreview });
+  }, [isValid, isDirty, canPreview, onFormStateChange]);
+
+  useEffect(() => {
+    const canGoNext = currentStep < STEPS.length;
+    const canGoPrev = currentStep > 1;
+    onStepChange?.(currentStep, STEPS.length, canGoNext, canGoPrev);
+  }, [currentStep, onStepChange]);
 
   const handleSubmitDraft = () => {
-    if (!isValid) return;
+    if (!isValid) {
+      console.error('[MessageEditor] Cannot submit draft - form invalid', { step1Valid, step2Valid });
+      return;
+    }
 
     const formData: MessageFormData = {
       title: metadata.title,
       blocks,
       targeting: metadata.targeting,
       scheduling: metadata.scheduling,
-      priority: metadata.priority,
       isDraft: true,
     };
 
+    console.log('[MessageEditor] Submitting draft:', formData);
     onSubmit(formData, true);
   };
 
   const handleSubmitPublish = () => {
-    if (!isValid) return;
+    if (!isValid) {
+      console.error('[MessageEditor] Cannot publish - form invalid', { step1Valid, step2Valid });
+      return;
+    }
 
     const formData: MessageFormData = {
       title: metadata.title,
       blocks,
       targeting: metadata.targeting,
       scheduling: metadata.scheduling,
-      priority: metadata.priority,
       isDraft: false,
     };
 
+    console.log('[MessageEditor] Publishing:', formData);
     onSubmit(formData, false);
   };
 
-  // Expose getData method for preview
+  const handleNext = () => {
+    if (currentStep < STEPS.length) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  // Expose getData and navigation methods for parent component
   useEffect(() => {
     const editorElement = document.querySelector('[data-message-editor]') as any;
     if (editorElement) {
@@ -67,34 +133,36 @@ export const MessageEditor = ({ initialData, onSubmit, onFormStateChange }: Mess
         blocks,
         targeting: metadata.targeting,
         scheduling: metadata.scheduling,
-        priority: metadata.priority,
         isDraft: false,
       });
+      editorElement.goToNextStep = handleNext;
+      editorElement.goToPreviousStep = handlePrevious;
     }
-  }, [blocks, metadata]);
+  }, [blocks, metadata, currentStep]);
 
   return (
-    <div data-message-editor>
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="content">Conteúdo</TabsTrigger>
-          <TabsTrigger value="settings">Configurações</TabsTrigger>
-        </TabsList>
+    <div data-message-editor className="space-y-6">
+      {/* Step Indicator */}
+      <FormSteps steps={STEPS} currentStep={currentStep} stepErrors={stepErrors} />
 
-        <TabsContent value="content" className="mt-4">
-          <BlockEditorCanvas
-            blocks={blocks}
-            onBlocksChange={setBlocks}
-          />
-        </TabsContent>
+      {/* Step Content */}
+      <Card>
+        <CardContent className="pt-6">
+          {currentStep === 1 && (
+            <MessageMetadataForm
+              data={metadata}
+              onChange={setMetadata}
+            />
+          )}
 
-        <TabsContent value="settings" className="mt-4">
-          <MessageMetadataForm
-            data={metadata}
-            onChange={setMetadata}
-          />
-        </TabsContent>
-      </Tabs>
+          {currentStep === 2 && (
+            <BlockEditorCanvas
+              blocks={blocks}
+              onBlocksChange={setBlocks}
+            />
+          )}
+        </CardContent>
+      </Card>
 
       {/* Hidden submit buttons */}
       <button

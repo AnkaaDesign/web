@@ -35,16 +35,16 @@ export function getVisibleServiceOrderTypes(sectorPrivilege: SECTOR_PRIVILEGES |
 
   switch (sectorPrivilege) {
     case SECTOR_PRIVILEGES.ADMIN:
-      // Admin sees all columns
+      // Admin sees all columns in order: negotiation, artwork, production, financial
       return [
-        SERVICE_ORDER_TYPE.PRODUCTION,
         SERVICE_ORDER_TYPE.NEGOTIATION,
         SERVICE_ORDER_TYPE.ARTWORK,
+        SERVICE_ORDER_TYPE.PRODUCTION,
         SERVICE_ORDER_TYPE.FINANCIAL,
       ];
 
     case SECTOR_PRIVILEGES.DESIGNER:
-      // Designer sees artwork and production (view only)
+      // Designer sees artwork and production (view only) in order: artwork, production
       return [
         SERVICE_ORDER_TYPE.ARTWORK,
         SERVICE_ORDER_TYPE.PRODUCTION,
@@ -55,11 +55,11 @@ export function getVisibleServiceOrderTypes(sectorPrivilege: SECTOR_PRIVILEGES |
       return [SERVICE_ORDER_TYPE.FINANCIAL];
 
     case SECTOR_PRIVILEGES.LOGISTIC:
-      // Logistic sees negotiation, artwork, and production
+      // Logistic sees negotiation, artwork, and production in order: negotiation, artwork, production
       return [
-        SERVICE_ORDER_TYPE.PRODUCTION,
         SERVICE_ORDER_TYPE.NEGOTIATION,
         SERVICE_ORDER_TYPE.ARTWORK,
+        SERVICE_ORDER_TYPE.PRODUCTION,
       ];
 
     case SECTOR_PRIVILEGES.HUMAN_RESOURCES:

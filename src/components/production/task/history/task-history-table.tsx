@@ -10,8 +10,9 @@ import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { TaskHistoryContextMenu } from "./task-history-context-menu";
 import { createTaskHistoryColumns } from "./task-history-columns";
 import { cn } from "@/lib/utils";
-import { TASK_STATUS, routes } from "../../../../constants";
+import { TASK_STATUS, routes, SERVICE_ORDER_STATUS } from "../../../../constants";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { isDateInPast, getHoursBetween } from "../../../../utils";
 import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
@@ -29,6 +30,46 @@ interface TaskHistoryTableProps {
   onStartCopyFromTask?: (targetTasks: Task[]) => void;
   isSelectingSourceTask?: boolean;
   onSourceTaskSelect?: (task: Task) => void;
+}
+
+/**
+ * Get the appropriate color class for a task row based on its status and deadline
+ * Following the cronograma's proven color scheme:
+ * - Neutral gray: Non-production tasks or tasks without deadline
+ * - Green: IN_PRODUCTION with more than 4 hours remaining
+ * - Orange: IN_PRODUCTION with 0-4 hours remaining
+ * - Red: Overdue tasks (past deadline)
+ */
+function getRowColorClass(task: Task, navigationRoute?: string): string {
+  // Only apply color logic to preparation (agenda) route
+  if (navigationRoute !== 'preparation') {
+    return "";
+  }
+
+  // Non-production tasks (PREPARATION tasks in agenda) - check deadline
+  if (task.status === TASK_STATUS.PREPARATION) {
+    // Tasks with no deadline - neutral
+    if (!task.term) {
+      return "bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-700";
+    }
+
+    // Check if task is overdue
+    const isOverdue = isDateInPast(task.term);
+    if (isOverdue) {
+      return "bg-red-200 hover:bg-red-300 dark:bg-red-800 dark:hover:bg-red-700";
+    }
+
+    // Calculate hours remaining for preparation tasks
+    const hoursRemaining = getHoursBetween(new Date(), task.term);
+
+    if (hoursRemaining > 4) {
+      return "bg-green-200 hover:bg-green-300 dark:bg-green-800 dark:hover:bg-green-700";
+    } else {
+      return "bg-amber-200 hover:bg-amber-300 dark:bg-amber-700 dark:hover:bg-amber-600";
+    }
+  }
+
+  return "";
 }
 
 export function TaskHistoryTable({
@@ -162,7 +203,10 @@ export function TaskHistoryTable({
 
 
   // Define all available columns
-  const allColumns = React.useMemo(() => createTaskHistoryColumns({ currentUserId: user?.id }), [user?.id]);
+  const allColumns = React.useMemo(() => createTaskHistoryColumns({
+    currentUserId: user?.id,
+    navigationRoute
+  }), [user?.id, navigationRoute]);
 
   // Filter visible columns
   const columns = React.useMemo(
@@ -373,20 +417,31 @@ export function TaskHistoryTable({
               tasks.map((task, index) => {
                 const taskIsSelected = isSelected(task.id);
 
+                // Check if task has NO service orders (only for agenda)
+                const hasNoServiceOrders = !task.services || task.services.length === 0;
+                const shouldShowRedBorder = navigationRoute === 'preparation' && hasNoServiceOrders;
+
+                // Get row color based on deadline (only for agenda)
+                const rowColorClass = getRowColorClass(task, navigationRoute);
+
                 return (
                   <TableRow
                     key={task.id}
                     data-state={taskIsSelected ? "selected" : undefined}
                     className={cn(
                       "cursor-pointer transition-colors border-b border-border",
-                      // Alternating row colors
-                      index % 2 === 1 && "bg-muted/10",
+                      // Row color based on deadline (agenda only)
+                      rowColorClass,
+                      // Alternating row colors (only when no deadline color is applied)
+                      !rowColorClass && index % 2 === 1 && "bg-muted/10",
                       // Hover state that works with alternating colors
-                      "hover:bg-muted/20",
+                      !rowColorClass && "hover:bg-muted/20",
                       // Selected state overrides alternating colors
                       taskIsSelected && "bg-muted/30 hover:bg-muted/40",
                       // Source selection mode highlight
                       isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary",
+                      // Red border for tasks with NO service orders (agenda only)
+                      shouldShowRedBorder && "border-l-4 border-l-red-500",
                     )}
                     onClick={(e) => {
                       // Don't navigate if clicking checkbox

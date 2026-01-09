@@ -4,23 +4,6 @@
 
 import { VACATION_STATUS, VACATION_TYPE } from "../constants";
 import type { Vacation } from "../types";
-import type { VacationStatus, VacationType } from "@prisma/client";
-
-/**
- * Map VACATION_STATUS enum to Prisma VacationStatus enum
- * This is needed because TypeScript doesn't recognize that the string values are compatible
- */
-export function mapVacationStatusToPrisma(status: VACATION_STATUS | string): VacationStatus {
-  return status as VacationStatus;
-}
-
-/**
- * Map VACATION_TYPE enum to Prisma VacationType enum
- * This is needed because TypeScript doesn't recognize that the string values are compatible
- */
-export function mapVacationTypeToPrisma(type: VACATION_TYPE | string): VacationType {
-  return type as VacationType;
-}
 
 /**
  * Check if vacation status transition is valid

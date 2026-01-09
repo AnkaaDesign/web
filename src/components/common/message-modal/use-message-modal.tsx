@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MessageService } from "@/api-client/message";
 import type { Message } from "@/types/message";
 import { useAuth } from "@/contexts/auth-context";
+import { useMarkAsViewed, useDismissMessage } from "@/hooks/useMessage";
 
 const messageService = new MessageService();
 
@@ -92,6 +93,11 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
   const [dailyDismissed, setDailyDismissed] = React.useState<Record<string, string>>({});
   const hasShownOnMount = React.useRef(false);
   const lastMessageCount = React.useRef(0);
+  const trackedViews = React.useRef<Set<string>>(new Set());
+
+  // Hooks for tracking views and dismissals
+  const markAsViewedMutation = useMarkAsViewed();
+  const dismissMessageMutation = useDismissMessage();
 
   // Load and cleanup daily dismissed messages from localStorage on mount
   React.useEffect(() => {
@@ -145,10 +151,25 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
 
   const messages = Array.isArray(messagesData) ? messagesData : [];
 
-  // Filter out messages dismissed today (but NOT permanently viewed - those are already filtered by API)
+  // Filter out messages dismissed today (but NOT permanently dismissed - those are already filtered by API)
   const unviewedMessages = React.useMemo(() => {
     return messages.filter((msg) => !isDismissedToday(msg.id, dailyDismissed));
   }, [messages, dailyDismissed]);
+
+  // Automatically track views when messages are displayed
+  React.useEffect(() => {
+    if (open && unviewedMessages.length > 0) {
+      // Track view for the first message (currently displayed)
+      const currentMessage = unviewedMessages[0];
+
+      // Only track once per message per session
+      if (currentMessage && !trackedViews.current.has(currentMessage.id)) {
+        console.log('[MessageModal] Auto-tracking view for message:', currentMessage.id);
+        trackedViews.current.add(currentMessage.id);
+        markAsViewedMutation.mutate(currentMessage.id);
+      }
+    }
+  }, [open, unviewedMessages, markAsViewedMutation]);
 
   // Debug: Log query state
   React.useEffect(() => {
@@ -162,26 +183,17 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
     });
   }, [status, isLoading, user?.id, messages.length, unviewedMessages.length, dailyDismissed]);
 
-  // Mark as viewed permanently (don't show again) - calls API
-  const markAsViewedMutation = useMutation({
-    mutationFn: async (messageId: string) => {
-      if (!user?.id) throw new Error("User not authenticated");
-      console.log('[MessageModal] Marking message as permanently viewed:', messageId);
-      return await messageService.markAsViewed(messageId);
-    },
-    onSuccess: (_, messageId) => {
-      queryClient.invalidateQueries({ queryKey: ["messages"] });
-      onMessageViewed?.(messageId);
-    },
-    onError: (error) => {
-      console.error('[MessageModal] Failed to mark as viewed:', error);
-    },
-  });
-
-  // Dismiss for today only (store locally, will show again tomorrow)
+  // Dismiss for today only (mark as viewed in API + store locally, will show again tomorrow)
   const dismissForToday = React.useCallback(
     (messageId: string) => {
-      console.log('[MessageModal] Dismissing for today:', messageId);
+      console.log('[MessageModal] Dismissing for today (marking as viewed):', messageId);
+
+      // Mark as viewed in the API so it doesn't keep appearing on refresh
+      // This is different from permanent dismissal - the message is just "viewed"
+      if (!trackedViews.current.has(messageId)) {
+        trackedViews.current.add(messageId);
+        markAsViewedMutation.mutate(messageId);
+      }
 
       const newDismissed = {
         ...dailyDismissed,
@@ -192,16 +204,17 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
       saveDailyDismissed(newDismissed);
       onMessageDismissedForToday?.(messageId);
     },
-    [dailyDismissed, onMessageDismissedForToday]
+    [dailyDismissed, onMessageDismissedForToday, markAsViewedMutation]
   );
 
-  // Don't show again (permanent - marks as viewed in database)
+  // Don't show again (permanent - marks as dismissed in database)
   const dontShowAgain = React.useCallback(
     (messageId: string) => {
       console.log('[MessageModal] Don\'t show again (permanent):', messageId);
-      markAsViewedMutation.mutate(messageId);
+      dismissMessageMutation.mutate(messageId);
+      onMessageViewed?.(messageId); // Call callback for dismissed messages too
     },
-    [markAsViewedMutation]
+    [dismissMessageMutation, onMessageViewed]
   );
 
   // Auto-show modal when unviewed messages are available

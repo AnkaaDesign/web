@@ -73,7 +73,7 @@ export const AirbrushingEdit = () => {
   // Loading state
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL]}>
         <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
           <PageHeader
             variant="form"
@@ -109,7 +109,7 @@ export const AirbrushingEdit = () => {
   // Error or not found state
   if (isError || !airbrushing) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL]}>
         <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
           <PageHeader
             variant="form"
@@ -141,7 +141,7 @@ export const AirbrushingEdit = () => {
   }
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="form"

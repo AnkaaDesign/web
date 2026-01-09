@@ -119,7 +119,7 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
           <FormControl>
             <Combobox
               async={true}
-              queryKey={["users", "active"]}
+              queryKey={["users", "active", name]}
               queryFn={queryUsers}
               initialOptions={initialOptions}
               value={field.value || ""}

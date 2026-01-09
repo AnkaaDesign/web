@@ -5,13 +5,13 @@
  */
 
 export type MessageStatus = 'draft' | 'active' | 'archived';
-export type MessagePriority = 'low' | 'normal' | 'high';
-export type MessageTargetType = 'all' | 'specific' | 'roles';
+export type MessageTargetType = 'all' | 'specific' | 'sector' | 'position';
 
 export interface MessageTargeting {
   type: MessageTargetType;
   userIds?: string[];
-  roleIds?: string[];
+  sectorIds?: string[];
+  positionIds?: string[];
 }
 
 export interface MessageScheduling {
@@ -31,7 +31,6 @@ export interface Message {
   title: string;
   content: any; // JSON blocks from editor
   status: MessageStatus;
-  priority: MessagePriority;
   targeting: MessageTargeting;
   scheduling: MessageScheduling;
   stats?: MessageStats;
@@ -52,7 +51,119 @@ export interface MessageView {
   dismissedAt?: Date | string;
 }
 
+export interface ViewedMessage {
+  id: string;
+  messageId: string;
+  userId: string;
+  viewedAt: Date | string;
+  dismissed: boolean;
+  dismissedAt?: Date | string;
+}
+
+// =====================
+// Form Data Types
+// =====================
+
+export interface MessageGetManyFormData {
+  page?: number;
+  limit?: number;
+  take?: number;
+  skip?: number;
+  where?: any;
+  searchingFor?: string;
+  recipientIds?: string[];
+  senderIds?: string[];
+}
+
+export interface MessageGetByIdFormData {
+  id: string;
+  include?: any;
+}
+
+export interface MessageCreateFormData {
+  title: string;
+  content: any;
+  status?: MessageStatus;
+  targeting?: MessageTargeting;
+  scheduling?: MessageScheduling;
+}
+
+export interface MessageUpdateFormData {
+  title?: string;
+  content?: any;
+  status?: MessageStatus;
+  targeting?: MessageTargeting;
+  scheduling?: MessageScheduling;
+}
+
+export interface MessageQueryFormData {
+  include?: any;
+}
+
+export interface MessageBatchCreateFormData {
+  messages: MessageCreateFormData[];
+}
+
+export interface MessageBatchUpdateFormData {
+  messages: {
+    id: string;
+    data: MessageUpdateFormData;
+  }[];
+}
+
+export interface MessageBatchDeleteFormData {
+  messageIds: string[];
+}
+
+export interface ViewedMessageGetManyFormData {
+  page?: number;
+  limit?: number;
+  take?: number;
+  skip?: number;
+  where?: any;
+  userIds?: string[];
+  messageIds?: string[];
+}
+
+export interface ViewedMessageGetByIdFormData {
+  id: string;
+  include?: any;
+}
+
+export interface ViewedMessageCreateFormData {
+  messageId: string;
+  userId: string;
+  dismissed?: boolean;
+}
+
+export interface ViewedMessageUpdateFormData {
+  dismissed?: boolean;
+  dismissedAt?: Date | string;
+}
+
+export interface ViewedMessageQueryFormData {
+  include?: any;
+}
+
+export interface ViewedMessageBatchCreateFormData {
+  viewedMessages: ViewedMessageCreateFormData[];
+}
+
+export interface ViewedMessageBatchUpdateFormData {
+  viewedMessages: {
+    id: string;
+    data: ViewedMessageUpdateFormData;
+  }[];
+}
+
+export interface ViewedMessageBatchDeleteFormData {
+  viewedMessageIds: string[];
+}
+
+// =====================
 // API Response types
+// =====================
+
 export interface MessageGetManyResponse {
   data: Message[];
   meta: {
@@ -78,7 +189,67 @@ export interface MessageDeleteResponse {
   data: Message;
 }
 
+export interface MessageBatchCreateResponse<T> {
+  data: T[];
+  meta?: {
+    count: number;
+  };
+}
+
+export interface MessageBatchUpdateResponse<T> {
+  data: T[];
+  meta?: {
+    count: number;
+  };
+}
+
 export interface MessageBatchDeleteResponse {
+  data: {
+    count: number;
+    deleted: string[];
+  };
+}
+
+export interface ViewedMessageGetManyResponse {
+  data: ViewedMessage[];
+  meta: {
+    totalRecords: number;
+    page: number;
+    limit: number;
+  };
+}
+
+export interface ViewedMessageGetUniqueResponse {
+  data: ViewedMessage;
+}
+
+export interface ViewedMessageCreateResponse {
+  data: ViewedMessage;
+}
+
+export interface ViewedMessageUpdateResponse {
+  data: ViewedMessage;
+}
+
+export interface ViewedMessageDeleteResponse {
+  data: ViewedMessage;
+}
+
+export interface ViewedMessageBatchCreateResponse<T> {
+  data: T[];
+  meta?: {
+    count: number;
+  };
+}
+
+export interface ViewedMessageBatchUpdateResponse<T> {
+  data: T[];
+  meta?: {
+    count: number;
+  };
+}
+
+export interface ViewedMessageBatchDeleteResponse {
   data: {
     count: number;
     deleted: string[];

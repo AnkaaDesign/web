@@ -93,7 +93,6 @@ export const BlockEditorCanvas = ({ blocks, onBlocksChange }: BlockEditorCanvasP
                   block={block}
                   onUpdate={(updates) => handleUpdateBlock(block.id, updates)}
                   onDelete={() => handleDeleteBlock(block.id)}
-                  onInsertBelow={() => handleInsertBlock(index)}
                 />
               ))}
             </div>
@@ -144,8 +143,14 @@ function createEmptyBlock(type: BlockType): ContentBlock {
       return { id, type, text: '', url: '', variant: 'default', alignment: 'center' };
     case 'divider':
       return { id, type };
+    case 'spacer':
+      return { id, type, height: 'md' };
     case 'list':
       return { id, type, items: [''], ordered: false };
+    case 'icon':
+      return { id, type, icon: 'IconCheck', size: 'md', color: 'text-foreground', alignment: 'center' };
+    case 'row':
+      return { id, type, blocks: [], columns: 2, gap: 'md', verticalAlign: 'top' };
     default:
       return { id, type: 'paragraph', content: '' };
   }

@@ -2,23 +2,25 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { IconGripVertical, IconTrash, IconPlus } from "@tabler/icons-react";
+import { IconGripVertical, IconTrash } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { TextBlockEditor } from "./blocks/text-block-editor";
 import { ImageBlockEditor } from "./blocks/image-block-editor";
 import { ButtonBlockEditor } from "./blocks/button-block-editor";
 import { ListBlockEditor } from "./blocks/list-block-editor";
 import { DividerBlockEditor } from "./blocks/divider-block-editor";
+import { SpacerBlockEditor } from "./blocks/spacer-block-editor";
+import { IconBlockEditor } from "./blocks/icon-block-editor";
+import { RowBlockEditor } from "./blocks/row-block-editor";
 import type { ContentBlock } from "./types";
 
 interface BlockEditorProps {
   block: ContentBlock;
   onUpdate: (updates: Partial<ContentBlock>) => void;
   onDelete: () => void;
-  onInsertBelow: () => void;
 }
 
-export const BlockEditor = ({ block, onUpdate, onDelete, onInsertBelow }: BlockEditorProps) => {
+export const BlockEditor = ({ block, onUpdate, onDelete }: BlockEditorProps) => {
   const {
     attributes,
     listeners,
@@ -49,6 +51,12 @@ export const BlockEditor = ({ block, onUpdate, onDelete, onInsertBelow }: BlockE
         return <ListBlockEditor block={block} onUpdate={onUpdate} />;
       case 'divider':
         return <DividerBlockEditor />;
+      case 'spacer':
+        return <SpacerBlockEditor block={block} onUpdate={onUpdate} />;
+      case 'icon':
+        return <IconBlockEditor block={block} onUpdate={onUpdate} />;
+      case 'row':
+        return <RowBlockEditor block={block} onUpdate={onUpdate} />;
       default:
         return null;
     }
@@ -74,15 +82,6 @@ export const BlockEditor = ({ block, onUpdate, onDelete, onInsertBelow }: BlockE
 
           {/* Actions */}
           <div className="shrink-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={onInsertBelow}
-              title="Adicionar bloco abaixo"
-            >
-              <IconPlus className="h-4 w-4" />
-            </Button>
             <Button
               variant="ghost"
               size="icon"

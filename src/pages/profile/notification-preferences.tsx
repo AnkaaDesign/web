@@ -44,44 +44,34 @@ const ALL_CHANNELS: NotificationChannel[] = ["IN_APP", "EMAIL", "PUSH", "WHATSAP
 
 interface NotificationEventPreference {
   channels: NotificationChannel[];
-  mandatory: boolean;
+  mandatoryChannels: NotificationChannel[];
 }
 
 interface NotificationPreferences {
   task: {
-    // Basic fields
+    // Lifecycle
+    created: NotificationEventPreference;
     status: NotificationEventPreference;
-    name: NotificationEventPreference;
+    finishedAt: NotificationEventPreference;
+    overdue: NotificationEventPreference;
+    // Dates
+    term: NotificationEventPreference;
+    deadline: NotificationEventPreference;
+    forecastDate: NotificationEventPreference;
+    // Basic info
     details: NotificationEventPreference;
     serialNumber: NotificationEventPreference;
-    // Date fields
-    entryDate: NotificationEventPreference;
-    term: NotificationEventPreference;
-    forecastDate: NotificationEventPreference;
-    startedAt: NotificationEventPreference;
-    finishedAt: NotificationEventPreference;
-    deadline: NotificationEventPreference;
-    // Assignment fields
+    // Assignment
     sector: NotificationEventPreference;
-    customer: NotificationEventPreference;
-    // Financial fields (ADMIN/FINANCIAL only)
-    invoiceTo: NotificationEventPreference;
-    commission: NotificationEventPreference;
-    budgets: NotificationEventPreference;
-    invoices: NotificationEventPreference;
-    receipts: NotificationEventPreference;
-    reimbursements: NotificationEventPreference;
-    invoiceReimbursements: NotificationEventPreference;
-    // Artwork fields
+    // Artwork
     artworks: NotificationEventPreference;
-    // Negotiation fields
+    // Negotiation
     negotiatingWith: NotificationEventPreference;
-    // Production fields
+    // Production
     paint: NotificationEventPreference;
     observation: NotificationEventPreference;
-    // Task lifecycle
-    created: NotificationEventPreference;
-    overdue: NotificationEventPreference;
+    // Financial
+    commission: NotificationEventPreference;
   };
   order: {
     created: NotificationEventPreference;
@@ -110,44 +100,34 @@ interface NotificationPreferences {
 
 const channelSchema = z.object({
   channels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
-  mandatory: z.boolean(),
+  mandatoryChannels: z.array(z.enum(["IN_APP", "EMAIL", "PUSH", "WHATSAPP"])),
 });
 
 const notificationPreferencesSchema = z.object({
   task: z.object({
-    // Basic fields
+    // Lifecycle
+    created: channelSchema,
     status: channelSchema,
-    name: channelSchema,
+    finishedAt: channelSchema,
+    overdue: channelSchema,
+    // Dates
+    term: channelSchema,
+    deadline: channelSchema,
+    forecastDate: channelSchema,
+    // Basic info
     details: channelSchema,
     serialNumber: channelSchema,
-    // Date fields
-    entryDate: channelSchema,
-    term: channelSchema,
-    forecastDate: channelSchema,
-    startedAt: channelSchema,
-    finishedAt: channelSchema,
-    deadline: channelSchema,
-    // Assignment fields
+    // Assignment
     sector: channelSchema,
-    customer: channelSchema,
-    // Financial fields (ADMIN/FINANCIAL only)
-    invoiceTo: channelSchema,
-    commission: channelSchema,
-    budgets: channelSchema,
-    invoices: channelSchema,
-    receipts: channelSchema,
-    reimbursements: channelSchema,
-    invoiceReimbursements: channelSchema,
-    // Artwork fields
+    // Artwork
     artworks: channelSchema,
-    // Negotiation fields
+    // Negotiation
     negotiatingWith: channelSchema,
-    // Production fields
+    // Production
     paint: channelSchema,
     observation: channelSchema,
-    // Task lifecycle
-    created: channelSchema,
-    overdue: channelSchema,
+    // Financial
+    commission: channelSchema,
   }),
   order: z.object({
     created: channelSchema,
@@ -196,7 +176,7 @@ interface PreferenceRowProps {
   description: string;
   selectedChannels: NotificationChannel[];
   onChange: (channels: NotificationChannel[]) => void;
-  mandatory: boolean;
+  mandatoryChannels: NotificationChannel[];
   disabled?: boolean;
 }
 
@@ -205,11 +185,17 @@ function PreferenceRow({
   description,
   selectedChannels,
   onChange,
-  mandatory,
+  mandatoryChannels,
   disabled = false,
 }: PreferenceRowProps) {
   const handleChannelToggle = (channel: NotificationChannel) => {
     if (disabled) return;
+
+    // Check if channel is mandatory - cannot be disabled
+    if (mandatoryChannels.includes(channel)) {
+      toast.error("Este canal é obrigatório e não pode ser desativado");
+      return;
+    }
 
     const newChannels = selectedChannels.includes(channel)
       ? selectedChannels.filter((c) => c !== channel)
@@ -228,14 +214,16 @@ function PreferenceRow({
       <div className="flex-1 space-y-0.5">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">{label}</span>
-          {mandatory && (
+          {mandatoryChannels.length > 0 && (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Notificação obrigatória</p>
+                  <p>
+                    Canais obrigatórios: {mandatoryChannels.map(ch => channelMetadata[ch].label).join(", ")}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -248,6 +236,7 @@ function PreferenceRow({
           const metadata = channelMetadata[channel];
           const Icon = metadata.icon;
           const isSelected = selectedChannels.includes(channel);
+          const isMandatory = mandatoryChannels.includes(channel);
 
           return (
             <TooltipProvider key={channel}>
@@ -256,21 +245,21 @@ function PreferenceRow({
                   <button
                     type="button"
                     onClick={() => handleChannelToggle(channel)}
-                    disabled={disabled}
+                    disabled={disabled || isMandatory}
                     className={cn(
                       "p-2 rounded-md border transition-all",
                       isSelected
                         ? `border-primary ${metadata.bgColor}`
                         : "border-border bg-transparent hover:bg-muted",
-                      disabled && "opacity-50 cursor-not-allowed"
+                      (disabled || isMandatory) && "opacity-50 cursor-not-allowed"
                     )}
-                    aria-label={`${metadata.label} - ${isSelected ? "Ativado" : "Desativado"}`}
+                    aria-label={`${metadata.label} - ${isSelected ? "Ativado" : "Desativado"}${isMandatory ? " (Obrigatório)" : ""}`}
                   >
                     <Icon className={cn("h-4 w-4", isSelected ? metadata.color : "text-muted-foreground")} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{metadata.label}</p>
+                  <p>{metadata.label}{isMandatory ? " (Obrigatório)" : ""}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -289,7 +278,7 @@ interface NotificationEvent {
   key: string;
   label: string;
   description: string;
-  mandatory: boolean;
+  mandatoryChannels: NotificationChannel[];
 }
 
 interface NotificationSection {
@@ -305,39 +294,29 @@ const notificationSections: NotificationSection[] = [
     title: "Tarefas",
     icon: ClipboardList,
     events: [
-      // Lifecycle
-      { key: "created", label: "Nova Tarefa", description: "Quando uma nova tarefa é criada", mandatory: false },
-      { key: "status", label: "Mudança de Status", description: "Quando o status de uma tarefa é alterado", mandatory: true },
-      { key: "finishedAt", label: "Conclusão", description: "Quando uma tarefa é concluída", mandatory: false },
-      { key: "overdue", label: "Tarefa Atrasada", description: "Quando uma tarefa está atrasada", mandatory: true },
-      // Basic info
-      { key: "name", label: "Nome Alterado", description: "Quando o nome da tarefa é alterado", mandatory: false },
-      { key: "details", label: "Detalhes Alterados", description: "Quando os detalhes da tarefa são modificados", mandatory: false },
-      { key: "serialNumber", label: "Número de Série", description: "Quando o número de série é alterado", mandatory: false },
-      // Dates
-      { key: "entryDate", label: "Data de Entrada", description: "Quando a data de entrada é definida/alterada", mandatory: false },
-      { key: "term", label: "Prazo Alterado", description: "Quando o prazo da tarefa é alterado", mandatory: true },
-      { key: "forecastDate", label: "Data Prevista", description: "Quando a previsão de disponibilidade é alterada", mandatory: false },
-      { key: "startedAt", label: "Início da Produção", description: "Quando a produção é iniciada", mandatory: false },
-      { key: "deadline", label: "Prazo Próximo", description: "Quando uma tarefa está próxima do prazo", mandatory: true },
-      // Assignment
-      { key: "sector", label: "Setor Alterado", description: "Quando o setor responsável é alterado", mandatory: false },
-      { key: "customer", label: "Cliente Alterado", description: "Quando o cliente da tarefa é alterado", mandatory: false },
-      // Artwork
-      { key: "artworks", label: "Atualização de Arte", description: "Quando arquivos de arte são adicionados/removidos", mandatory: false },
-      // Negotiation
-      { key: "negotiatingWith", label: "Negociação", description: "Quando o contato de negociação é alterado", mandatory: false },
-      // Production
-      { key: "paint", label: "Pintura Geral", description: "Quando a pintura geral é definida/alterada", mandatory: false },
-      { key: "observation", label: "Observação", description: "Quando observações são adicionadas", mandatory: false },
-      // Financial (ADMIN/FINANCIAL only)
-      { key: "invoiceTo", label: "Faturar Para", description: "Quando o cliente de faturamento é alterado", mandatory: false },
-      { key: "commission", label: "Comissão", description: "Quando o status de comissão é alterado", mandatory: false },
-      { key: "budgets", label: "Orçamentos", description: "Quando orçamentos são adicionados/removidos", mandatory: false },
-      { key: "invoices", label: "Notas Fiscais", description: "Quando notas fiscais são adicionadas/removidas", mandatory: true },
-      { key: "receipts", label: "Comprovantes", description: "Quando comprovantes são adicionados/removidos", mandatory: false },
-      { key: "reimbursements", label: "Reembolsos", description: "Quando documentos de reembolso são alterados", mandatory: false },
-      { key: "invoiceReimbursements", label: "NF de Reembolso", description: "Quando NFs de reembolso são alteradas", mandatory: false },
+      // Lifecycle - with mandatory channels
+      { key: "created", label: "Nova Tarefa", description: "Quando uma nova tarefa é criada", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
+      { key: "status", label: "Mudança de Status", description: "Quando o status de uma tarefa é alterado", mandatoryChannels: ["IN_APP", "PUSH"] },
+      { key: "finishedAt", label: "Conclusão", description: "Quando uma tarefa é concluída", mandatoryChannels: ["IN_APP", "PUSH"] },
+      { key: "overdue", label: "Tarefa Atrasada", description: "Quando uma tarefa está atrasada", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
+      // Dates - with mandatory channels
+      { key: "term", label: "Prazo Alterado", description: "Quando o prazo da tarefa é alterado", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
+      { key: "deadline", label: "Prazo Próximo", description: "Quando uma tarefa está próxima do prazo", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
+      { key: "forecastDate", label: "Data Prevista", description: "Quando a previsão de disponibilidade é alterada", mandatoryChannels: [] },
+      // Basic info - optional
+      { key: "details", label: "Detalhes Alterados", description: "Quando os detalhes da tarefa são modificados", mandatoryChannels: [] },
+      { key: "serialNumber", label: "Número de Série", description: "Quando o número de série é alterado", mandatoryChannels: [] },
+      // Assignment - with mandatory channels
+      { key: "sector", label: "Setor Alterado", description: "Quando o setor responsável é alterado", mandatoryChannels: ["IN_APP", "PUSH"] },
+      // Artwork - with mandatory channels
+      { key: "artworks", label: "Atualização de Arte", description: "Quando arquivos de arte são adicionados/removidos", mandatoryChannels: ["IN_APP", "PUSH"] },
+      // Negotiation - optional
+      { key: "negotiatingWith", label: "Negociação", description: "Quando o contato de negociação é alterado", mandatoryChannels: [] },
+      // Production - optional
+      { key: "paint", label: "Pintura Geral", description: "Quando a pintura geral é definida/alterada", mandatoryChannels: [] },
+      { key: "observation", label: "Observação", description: "Quando observações são adicionadas", mandatoryChannels: [] },
+      // Financial - optional
+      { key: "commission", label: "Comissão", description: "Quando o status de comissão é alterado", mandatoryChannels: [] },
     ],
   },
   {
@@ -345,11 +324,11 @@ const notificationSections: NotificationSection[] = [
     title: "Pedidos",
     icon: ShoppingCart,
     events: [
-      { key: "created", label: "Novo Pedido", description: "Quando um novo pedido é criado", mandatory: false },
-      { key: "status", label: "Mudança de Status", description: "Quando o status de um pedido é alterado", mandatory: false },
-      { key: "fulfilled", label: "Pedido Finalizado", description: "Quando um pedido é finalizado/entregue", mandatory: false },
-      { key: "cancelled", label: "Pedido Cancelado", description: "Quando um pedido é cancelado", mandatory: false },
-      { key: "overdue", label: "Pedido Atrasado", description: "Quando um pedido está atrasado", mandatory: true },
+      { key: "created", label: "Novo Pedido", description: "Quando um novo pedido é criado", mandatoryChannels: [] },
+      { key: "status", label: "Mudança de Status", description: "Quando o status de um pedido é alterado", mandatoryChannels: [] },
+      { key: "fulfilled", label: "Pedido Finalizado", description: "Quando um pedido é finalizado/entregue", mandatoryChannels: [] },
+      { key: "cancelled", label: "Pedido Cancelado", description: "Quando um pedido é cancelado", mandatoryChannels: [] },
+      { key: "overdue", label: "Pedido Atrasado", description: "Quando um pedido está atrasado", mandatoryChannels: [] },
     ],
   },
   {
@@ -357,9 +336,9 @@ const notificationSections: NotificationSection[] = [
     title: "Estoque",
     icon: Package,
     events: [
-      { key: "low", label: "Estoque Baixo", description: "Quando um item está abaixo do mínimo", mandatory: false },
-      { key: "out", label: "Estoque Esgotado", description: "Quando um item fica sem estoque", mandatory: true },
-      { key: "restock", label: "Reabastecimento", description: "Quando é necessário reabastecer", mandatory: false },
+      { key: "low", label: "Estoque Baixo", description: "Quando um item está abaixo do mínimo", mandatoryChannels: [] },
+      { key: "out", label: "Estoque Esgotado", description: "Quando um item fica sem estoque", mandatoryChannels: [] },
+      { key: "restock", label: "Reabastecimento", description: "Quando é necessário reabastecer", mandatoryChannels: [] },
     ],
   },
   {
@@ -367,9 +346,9 @@ const notificationSections: NotificationSection[] = [
     title: "Sistema",
     icon: Shield,
     events: [
-      { key: "maintenance", label: "Manutenção", description: "Avisos de manutenção programada", mandatory: true },
-      { key: "update", label: "Atualizações", description: "Novidades e atualizações do sistema", mandatory: false },
-      { key: "security", label: "Segurança", description: "Alertas de segurança importantes", mandatory: true },
+      { key: "maintenance", label: "Manutenção", description: "Avisos de manutenção programada", mandatoryChannels: [] },
+      { key: "update", label: "Atualizações", description: "Novidades e atualizações do sistema", mandatoryChannels: [] },
+      { key: "security", label: "Segurança", description: "Alertas de segurança importantes", mandatoryChannels: [] },
     ],
   },
   {
@@ -377,10 +356,10 @@ const notificationSections: NotificationSection[] = [
     title: "Férias",
     icon: Calendar,
     events: [
-      { key: "requested", label: "Solicitação", description: "Quando férias são solicitadas", mandatory: false },
-      { key: "approved", label: "Aprovação", description: "Quando férias são aprovadas", mandatory: true },
-      { key: "rejected", label: "Rejeição", description: "Quando férias são rejeitadas", mandatory: true },
-      { key: "reminder", label: "Lembrete", description: "Lembretes sobre férias próximas", mandatory: false },
+      { key: "requested", label: "Solicitação", description: "Quando férias são solicitadas", mandatoryChannels: [] },
+      { key: "approved", label: "Aprovação", description: "Quando férias são aprovadas", mandatoryChannels: [] },
+      { key: "rejected", label: "Rejeição", description: "Quando férias são rejeitadas", mandatoryChannels: [] },
+      { key: "reminder", label: "Lembrete", description: "Lembretes sobre férias próximas", mandatoryChannels: [] },
     ],
   },
 ];
@@ -389,69 +368,62 @@ const notificationSections: NotificationSection[] = [
 // Default Preferences
 // =====================
 
-const createDefaultPreference = (mandatory: boolean): NotificationEventPreference => ({
-  channels: mandatory ? ["IN_APP", "EMAIL"] : ["IN_APP"],
-  mandatory,
+const createDefaultPreference = (
+  channels: NotificationChannel[],
+  mandatoryChannels: NotificationChannel[] = []
+): NotificationEventPreference => ({
+  channels,
+  mandatoryChannels,
 });
 
 const defaultPreferences: NotificationPreferencesFormData = {
   task: {
     // Lifecycle
-    created: createDefaultPreference(false),
-    status: createDefaultPreference(true),
-    finishedAt: createDefaultPreference(false),
-    overdue: createDefaultPreference(true),
-    // Basic info
-    name: createDefaultPreference(false),
-    details: createDefaultPreference(false),
-    serialNumber: createDefaultPreference(false),
+    created: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    status: createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
+    finishedAt: createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
+    overdue: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
     // Dates
-    entryDate: createDefaultPreference(false),
-    term: createDefaultPreference(true),
-    forecastDate: createDefaultPreference(false),
-    startedAt: createDefaultPreference(false),
-    deadline: createDefaultPreference(true),
+    term: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    deadline: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    forecastDate: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    // Basic info
+    details: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    serialNumber: createDefaultPreference(["IN_APP", "EMAIL"], []),
     // Assignment
-    sector: createDefaultPreference(false),
-    customer: createDefaultPreference(false),
+    sector: createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
     // Artwork
-    artworks: createDefaultPreference(false),
+    artworks: createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
     // Negotiation
-    negotiatingWith: createDefaultPreference(false),
+    negotiatingWith: createDefaultPreference(["IN_APP", "EMAIL"], []),
     // Production
-    paint: createDefaultPreference(false),
-    observation: createDefaultPreference(false),
-    // Financial (ADMIN/FINANCIAL only)
-    invoiceTo: createDefaultPreference(false),
-    commission: createDefaultPreference(false),
-    budgets: createDefaultPreference(false),
-    invoices: createDefaultPreference(true),
-    receipts: createDefaultPreference(false),
-    reimbursements: createDefaultPreference(false),
-    invoiceReimbursements: createDefaultPreference(false),
+    paint: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    observation: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    // Financial
+    commission: createDefaultPreference(["IN_APP", "EMAIL"], []),
   },
   order: {
-    created: createDefaultPreference(false),
-    status: createDefaultPreference(false),
-    fulfilled: createDefaultPreference(false),
-    cancelled: createDefaultPreference(false),
-    overdue: createDefaultPreference(true),
+    created: createDefaultPreference(["IN_APP"], []),
+    status: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    fulfilled: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    cancelled: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    overdue: createDefaultPreference(["IN_APP", "EMAIL", "PUSH"], []),
   },
   stock: {
-    low: createDefaultPreference(false),
-    out: createDefaultPreference(true),
-    restock: createDefaultPreference(false),
+    low: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    out: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    restock: createDefaultPreference(["IN_APP"], []),
   },
   system: {
-    maintenance: createDefaultPreference(true),
-    update: createDefaultPreference(false),
-    security: createDefaultPreference(true),
+    maintenance: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    update: createDefaultPreference(["IN_APP"], []),
+    security: createDefaultPreference(["IN_APP", "EMAIL"], []),
   },
   vacation: {
-    requested: createDefaultPreference(false),
-    approved: createDefaultPreference(true),
-    rejected: createDefaultPreference(true),
-    reminder: createDefaultPreference(false),
+    requested: createDefaultPreference(["IN_APP"], []),
+    approved: createDefaultPreference(["IN_APP", "EMAIL", "PUSH"], []),
+    rejected: createDefaultPreference(["IN_APP", "EMAIL", "PUSH"], []),
+    reminder: createDefaultPreference(["IN_APP", "EMAIL"], []),
   },
 };
 
@@ -489,7 +461,7 @@ export function NotificationPreferencesPage() {
       if (formData[section] && eventKey in (formData[section] as Record<string, NotificationEventPreference>)) {
         (formData[section] as Record<string, NotificationEventPreference>)[eventKey] = {
           channels: pref.channels as NotificationChannel[],
-          mandatory: pref.isMandatory,
+          mandatoryChannels: pref.mandatoryChannels as NotificationChannel[],
         };
       }
     }
@@ -699,7 +671,7 @@ export function NotificationPreferencesPage() {
                             onChange={(channels) =>
                               form.setValue(`${watchPath}.channels` as any, channels, { shouldDirty: true })
                             }
-                            mandatory={event.mandatory}
+                            mandatoryChannels={event.mandatoryChannels}
                           />
                         );
                       })}

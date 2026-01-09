@@ -1,6 +1,6 @@
 // packages/types/src/bonusDiscount.ts
 
-import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
+import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, DecimalValue } from "./common";
 import type { ORDER_BY_DIRECTION } from "../constants";
 import type { Bonus, BonusIncludes } from "./bonus";
 
@@ -10,8 +10,8 @@ import type { Bonus, BonusIncludes } from "./bonus";
 
 export interface BonusDiscount extends BaseEntity {
   bonusId: string;
-  percentage: number | null;
-  value: number | null;
+  percentage: DecimalValue | null;
+  value: DecimalValue | null;
   reference: string;
   calculationOrder: number;
 

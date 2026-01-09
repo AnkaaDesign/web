@@ -58,27 +58,19 @@ interface MessageColumn {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  draft: "Rascunho",
-  active: "Ativa",
-  archived: "Arquivada",
+  DRAFT: "Rascunho",
+  SCHEDULED: "Agendada",
+  ACTIVE: "Ativa",
+  EXPIRED: "Expirada",
+  ARCHIVED: "Arquivada",
 };
 
-const STATUS_VARIANTS: Record<string, "secondary" | "default" | "outline"> = {
-  draft: "secondary",
-  active: "default",
-  archived: "outline",
-};
-
-const PRIORITY_LABELS: Record<string, string> = {
-  low: "Baixa",
-  normal: "Normal",
-  high: "Alta",
-};
-
-const PRIORITY_VARIANTS: Record<string, "secondary" | "outline" | "destructive"> = {
-  low: "secondary",
-  normal: "outline",
-  high: "destructive",
+const STATUS_VARIANTS: Record<string, "secondary" | "default" | "outline" | "destructive"> = {
+  DRAFT: "secondary",
+  SCHEDULED: "outline",
+  ACTIVE: "default",
+  EXPIRED: "destructive",
+  ARCHIVED: "outline",
 };
 
 export function MessageTable({
@@ -153,8 +145,8 @@ export function MessageTable({
   const { data: response, isLoading, error } = useMessages(queryParams);
 
   const messages = response?.data || [];
-  const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;
   const totalRecords = response?.meta?.totalRecords || 0;
+  const totalPages = totalRecords > 0 ? Math.ceil(totalRecords / pageSize) : 1;
 
   // Notify parent component of data changes
   const lastNotifiedDataRef = React.useRef<string>("");
@@ -193,18 +185,6 @@ export function MessageTable({
       accessor: (message) => (
         <Badge variant={STATUS_VARIANTS[message.status] || "outline"}>
           {STATUS_LABELS[message.status] || message.status}
-        </Badge>
-      ),
-    },
-    {
-      key: "priority",
-      header: "Prioridade",
-      sortable: true,
-      className: "w-28",
-      align: "left",
-      accessor: (message) => (
-        <Badge variant={PRIORITY_VARIANTS[message.priority] || "outline"}>
-          {PRIORITY_LABELS[message.priority] || message.priority}
         </Badge>
       ),
     },

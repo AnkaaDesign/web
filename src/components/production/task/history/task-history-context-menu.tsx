@@ -4,8 +4,9 @@ import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub,
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
-import { routes, TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { routes, TASK_STATUS, SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
+import { toast } from "sonner";
 import { SetStatusModal } from "../schedule/set-status-modal";
 import { SetSectorModal } from "../schedule/set-sector-modal";
 import { DuplicateTaskModal, type DuplicateTaskCopyData } from "../schedule/duplicate-task-modal";
@@ -66,6 +67,7 @@ export function TaskHistoryContextMenu({
   const hasInProgressTasks = tasks.some((t) => t.status === TASK_STATUS.IN_PRODUCTION);
   const hasPendingTasks = tasks.some((t) => t.status === TASK_STATUS.PENDING);
   const hasPreparationTasks = tasks.some((t) => t.status === TASK_STATUS.PREPARATION);
+  const hasWaitingProductionTasks = tasks.some((t) => t.status === TASK_STATUS.WAITING_PRODUCTION);
   const hasCompletedTasks = tasks.some((t) => t.status === TASK_STATUS.COMPLETED);
 
   // Permission checks
@@ -257,11 +259,60 @@ export function TaskHistoryContextMenu({
   // Status action handlers
   const handleStart = async () => {
     try {
+      // First, validate ALL tasks before making any updates
       for (const t of tasks) {
-        if (t.status === TASK_STATUS.PENDING || t.status === TASK_STATUS.PREPARATION) {
+        if (t.status === TASK_STATUS.PREPARATION) {
+          const taskName = t.name || t.serialNumber || t.plate || 'Tarefa';
+
+          // Get all ARTWORK service orders for this task
+          const artworkServiceOrders = t.services?.filter(
+            (service) => service && service.type === SERVICE_ORDER_TYPE.ARTWORK
+          ) || [];
+
+          // REQUIREMENT 1: Task MUST have at least one artwork service order
+          if (artworkServiceOrders.length === 0) {
+            toast.error("Não é possível iniciar", {
+              description: `${taskName}: A tarefa deve ter pelo menos uma ordem de serviço de arte antes de mover para o cronograma.`,
+            });
+            setDropdownOpen(false);
+            return;
+          }
+
+          // REQUIREMENT 2: ALL artwork service orders must be COMPLETED
+          const hasIncompleteArtwork = artworkServiceOrders.some(
+            (service) => !service.status || service.status !== SERVICE_ORDER_STATUS.COMPLETED
+          );
+
+          if (hasIncompleteArtwork) {
+            toast.error("Não é possível iniciar", {
+              description: `${taskName}: Todas as ordens de serviço de arte devem estar concluídas antes de mover para o cronograma.`,
+            });
+            setDropdownOpen(false);
+            return;
+          }
+        }
+      }
+
+      // If validation passed for all tasks, proceed with updates
+      for (const t of tasks) {
+        // PREPARATION tasks go to WAITING_PRODUCTION (cronograma)
+        if (t.status === TASK_STATUS.PREPARATION) {
+          // Note: Only update status, preserve all other fields including sector
           await update({
             id: t.id,
-            data: { status: TASK_STATUS.IN_PRODUCTION, startedAt: new Date() },
+            data: {
+              status: TASK_STATUS.WAITING_PRODUCTION,
+            },
+          });
+        }
+        // WAITING_PRODUCTION and PENDING tasks go to IN_PRODUCTION
+        else if (t.status === TASK_STATUS.WAITING_PRODUCTION || t.status === TASK_STATUS.PENDING) {
+          await update({
+            id: t.id,
+            data: {
+              status: TASK_STATUS.IN_PRODUCTION,
+              startedAt: new Date(),
+            },
           });
         }
       }
@@ -275,6 +326,41 @@ export function TaskHistoryContextMenu({
 
   const handleFinish = async () => {
     try {
+      // First, validate ALL tasks before making any updates
+      for (const t of tasks) {
+        if (t.status === TASK_STATUS.IN_PRODUCTION) {
+          const taskName = t.name || t.serialNumber || t.plate || 'Tarefa';
+
+          // Get all PRODUCTION service orders for this task
+          const productionServiceOrders = t.services?.filter(
+            (service) => service && service.type === SERVICE_ORDER_TYPE.PRODUCTION
+          ) || [];
+
+          // REQUIREMENT 1: Task MUST have at least one production service order
+          if (productionServiceOrders.length === 0) {
+            toast.error("Não é possível finalizar", {
+              description: `${taskName}: A tarefa deve ter pelo menos uma ordem de serviço de produção antes de finalizar.`,
+            });
+            setDropdownOpen(false);
+            return;
+          }
+
+          // REQUIREMENT 2: ALL production service orders must be COMPLETED
+          const hasIncompleteProduction = productionServiceOrders.some(
+            (service) => !service.status || service.status !== SERVICE_ORDER_STATUS.COMPLETED
+          );
+
+          if (hasIncompleteProduction) {
+            toast.error("Não é possível finalizar", {
+              description: `${taskName}: Todas as ordens de serviço de produção devem estar concluídas antes de finalizar a tarefa.`,
+            });
+            setDropdownOpen(false);
+            return;
+          }
+        }
+      }
+
+      // If validation passed for all tasks, proceed with updates
       for (const t of tasks) {
         if (t.status === TASK_STATUS.IN_PRODUCTION) {
           await update({
@@ -453,7 +539,7 @@ export function TaskHistoryContextMenu({
           )}
 
           {/* Status actions - Team leaders (sector match) and ADMIN only */}
-          {canManageStatus && (hasPendingTasks || hasPreparationTasks) && (
+          {canManageStatus && (hasPendingTasks || hasPreparationTasks || hasWaitingProductionTasks) && (
             <DropdownMenuItem onClick={handleStart} className="text-green-700 hover:text-white">
               <IconPlayerPlay className="mr-2 h-4 w-4" />
               Iniciar
@@ -468,7 +554,7 @@ export function TaskHistoryContextMenu({
           )}
 
           {/* Separator if we have status actions */}
-          {canManageStatus && (hasPendingTasks || hasInProgressTasks || hasPreparationTasks) && <DropdownMenuSeparator />}
+          {canManageStatus && (hasPendingTasks || hasInProgressTasks || hasPreparationTasks || hasWaitingProductionTasks) && <DropdownMenuSeparator />}
 
           {/* View action - single selection only */}
           {!isBulk && task && (

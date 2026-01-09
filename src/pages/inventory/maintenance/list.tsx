@@ -16,7 +16,7 @@ const MaintenanceListPage = () => {
   });
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.MAINTENANCE}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.MAINTENANCE, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="list"

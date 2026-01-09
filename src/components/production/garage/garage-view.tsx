@@ -75,14 +75,15 @@ const PATIO_CONFIG = {
 } as const;
 
 // Colors for the garage visualization
+// Using semi-transparent colors that work in both light and dark modes
 const COLORS = {
-  LANE_FILL: '#FEF3C7', // Light yellow (amber-100)
-  LANE_STROKE: '#D97706', // Darker yellow/amber (amber-600)
-  LANE_HOVER: '#FDE68A', // Hover yellow (amber-200)
-  GARAGE_FILL: '#F5F5F4', // Light stone (stone-100)
-  GARAGE_STROKE: '#78716C', // Garage border (stone-500)
-  PATIO_FILL: '#E0F2FE', // Light blue for patio (sky-100)
-  PATIO_STROKE: '#0284C7', // Blue border for patio (sky-600)
+  LANE_FILL: 'rgba(251, 191, 36, 0.15)', // Amber with transparency
+  LANE_STROKE: 'rgba(217, 119, 6, 0.6)', // Darker amber with transparency
+  LANE_HOVER: 'rgba(251, 191, 36, 0.25)', // Hover amber with transparency
+  GARAGE_FILL: 'rgba(120, 113, 108, 0.08)', // Very light stone with transparency
+  GARAGE_STROKE: 'rgba(120, 113, 108, 0.3)', // Garage border with transparency
+  PATIO_FILL: 'rgba(56, 189, 248, 0.12)', // Light blue with transparency
+  PATIO_STROKE: 'rgba(2, 132, 199, 0.5)', // Blue border with transparency
 } as const;
 
 // All navigable areas: PATIO first, then B1, B2, B3
@@ -966,11 +967,11 @@ function WeekView({ trucks, containerWidth, containerHeight }: WeekViewProps) {
   return (
     <div className="flex flex-col h-full w-full overflow-auto">
       {/* Timeline Header */}
-      <div className="flex-shrink-0 sticky top-0 bg-white z-10 border-b-2 border-stone-200">
+      <div className="flex-shrink-0 sticky top-0 bg-background z-10 border-b-2 border-border">
         <div className="flex">
           {/* Lane labels column */}
-          <div className="w-36 flex-shrink-0 border-r-2 border-stone-200 bg-stone-50">
-            <div className="h-12 flex items-center justify-center font-semibold text-stone-700">
+          <div className="w-36 flex-shrink-0 border-r-2 border-border bg-muted/30">
+            <div className="h-12 flex items-center justify-center font-semibold text-foreground">
               Barracão / Faixa
             </div>
           </div>
@@ -985,14 +986,14 @@ function WeekView({ trucks, containerWidth, containerHeight }: WeekViewProps) {
                 <div
                   key={index}
                   className={cn(
-                    'flex-shrink-0 h-12 border-r border-stone-200 flex flex-col items-center justify-center',
-                    isToday && 'bg-amber-100 font-bold',
-                    !isToday && isWeekend && 'bg-sky-50'
+                    'flex-shrink-0 h-12 border-r border-border flex flex-col items-center justify-center text-foreground',
+                    isToday && 'bg-amber-100 dark:bg-amber-900 font-bold',
+                    !isToday && isWeekend && 'bg-sky-50 dark:bg-sky-950'
                   )}
                   style={{ width: dayColumnWidth }}
                 >
                   <div className="text-xs font-medium">{formatTimelineDay(day, index)}</div>
-                  <div className="text-[10px] text-stone-500">
+                  <div className="text-[10px] text-muted-foreground">
                     {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][day.getDay()]}
                   </div>
                 </div>
@@ -1005,10 +1006,10 @@ function WeekView({ trucks, containerWidth, containerHeight }: WeekViewProps) {
       {/* Timeline Body - Garage Lanes */}
       <div className="flex-1">
         {(['B1', 'B2', 'B3'] as GarageId[]).map((garageId) => (
-          <div key={garageId} className="border-b border-stone-200">
+          <div key={garageId} className="border-b border-border">
             {/* Garage header */}
-            <div className="flex bg-stone-100">
-              <div className="w-36 flex-shrink-0 border-r border-stone-200 px-3 py-2 font-semibold text-stone-700 text-sm">
+            <div className="flex bg-muted/30">
+              <div className="w-36 flex-shrink-0 border-r border-border px-3 py-2 font-semibold text-foreground text-sm">
                 {getAreaTitle(garageId)}
               </div>
               <div className="flex-1"></div>
@@ -1020,9 +1021,9 @@ function WeekView({ trucks, containerWidth, containerHeight }: WeekViewProps) {
               const laneTrucks = trucksByGarageLane[key];
 
               return (
-                <div key={laneId} className="flex border-t border-stone-100" style={{ height: laneRowHeight }}>
+                <div key={laneId} className="flex border-t border-border/50" style={{ height: laneRowHeight }}>
                   {/* Lane label */}
-                  <div className="w-36 flex-shrink-0 border-r border-stone-200 px-3 flex items-center text-xs text-stone-600">
+                  <div className="w-36 flex-shrink-0 border-r border-border px-3 flex items-center text-xs text-muted-foreground">
                     {laneId}
                   </div>
 
@@ -1038,9 +1039,9 @@ function WeekView({ trucks, containerWidth, containerHeight }: WeekViewProps) {
                           <div
                             key={index}
                             className={cn(
-                              'flex-shrink-0 h-full border-r border-stone-100',
-                              isToday && 'bg-amber-50',
-                              !isToday && isWeekend && 'bg-sky-50/30'
+                              'flex-shrink-0 h-full border-r border-border/50',
+                              isToday && 'bg-amber-50 dark:bg-amber-950/30',
+                              !isToday && isWeekend && 'bg-sky-50/30 dark:bg-sky-950/20'
                             )}
                             style={{ width: dayColumnWidth }}
                           />
@@ -1056,7 +1057,7 @@ function WeekView({ trucks, containerWidth, containerHeight }: WeekViewProps) {
                         return (
                           <div
                             key={truck.id}
-                            className="absolute rounded shadow-sm border border-stone-300 flex items-center px-2 text-xs font-medium overflow-hidden"
+                            className="absolute rounded shadow-sm border border-border flex items-center px-2 text-xs font-medium overflow-hidden"
                             style={{
                               left: bar.startX,
                               width: bar.width - 4,
@@ -1485,24 +1486,25 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
           <div key={areaId} className="flex flex-col items-center gap-3">
             {/* Area title with truck count */}
             <div className="flex items-center gap-2">
-              <span className="text-lg font-semibold text-stone-700">
+              <span className="text-lg font-semibold text-foreground">
                 {getAreaTitle(areaId)}
               </span>
               <span className={cn(
                 "text-sm font-bold px-3 py-1.5 rounded-full",
-                isPatio ? "bg-sky-100 text-sky-800" : "bg-amber-100 text-amber-800"
+                isPatio ? "bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-100" : "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100"
               )}>
                 {count}
               </span>
             </div>
 
             {/* SVG Rendering with uniform scale */}
-            <svg
-              width={dim.width * uniformScale + 10}
-              height={dim.height * uniformScale + 10}
-              className="drop-shadow-md border-2 border-stone-200 rounded-lg"
-            >
-              <g transform="translate(5, 5)">
+            <div className="drop-shadow-md border-2 border-border rounded-lg bg-card p-1.5">
+              <svg
+                width={dim.width * uniformScale}
+                height={dim.height * uniformScale}
+                className="rounded"
+              >
+                <g>
                 {isPatio ? (
                   // Patio rendering
                   <DroppablePatio
@@ -1606,6 +1608,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
                 )}
               </g>
             </svg>
+            </div>
           </div>
         );
       })}

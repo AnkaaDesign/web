@@ -14,7 +14,7 @@ const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   "/producao/historico": FAVORITE_PAGES.PRODUCAO_HISTORICO_LISTAR,
 
   // Production - Create Pages
-  "/producao/cronograma/cadastrar": FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_CADASTRAR,
+  "/producao/agenda/cadastrar": FAVORITE_PAGES.PRODUCAO_AGENDA_CADASTRAR,
   "/producao/recorte/cadastrar": FAVORITE_PAGES.PRODUCAO_RECORTE_CADASTRAR,
   "/producao/servicos/cadastrar": FAVORITE_PAGES.PRODUCAO_SERVICOS_CADASTRAR,
   "/producao/observacoes/cadastrar": FAVORITE_PAGES.PRODUCAO_OBSERVACOES_CADASTRAR,
@@ -156,6 +156,7 @@ export function getRouteDisplayName(routePath: string): string {
 export function getEntityDisplayName(entity: string): string {
   const entityMap: Record<string, string> = {
     // Production
+    agenda: "Tarefa",
     cronograma: "Cronograma",
     recorte: "Recorte",
     servicos: "Serviço",

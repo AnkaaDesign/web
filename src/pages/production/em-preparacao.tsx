@@ -1,16 +1,13 @@
-import { useState } from "react";
 import { TaskHistoryList } from "@/components/production/task/history/task-history-list";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
 import { SECTOR_PRIVILEGES, routes, TASK_STATUS } from "../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { IconClipboardList, IconPlus } from "@tabler/icons-react";
-import { TaskQuickCreateDialog } from "@/components/production/task/modals/task-quick-create-dialog";
 import { useAuth } from "@/contexts/auth-context";
 
 export const PreparationPage = () => {
   const { user } = useAuth();
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   // Track page access
   usePageTracker({
@@ -18,11 +15,11 @@ export const PreparationPage = () => {
     icon: "clipboard-list",
   });
 
-  // Only show create button for admin users
-  const canCreateTasks = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+  // ADMIN and COMMERCIAL can create tasks
+  const canCreateTasks = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN || user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
         <PageHeader
           className="flex-shrink-0"
@@ -41,7 +38,7 @@ export const PreparationPage = () => {
                     key: "create-task",
                     label: "Criar Tarefa",
                     icon: IconPlus,
-                    onClick: () => setCreateDialogOpen(true),
+                    onClick: () => window.location.href = routes.production.preparation.create,
                     variant: "default" as const,
                   },
                 ]
@@ -57,11 +54,6 @@ export const PreparationPage = () => {
           hideStatusFilter={true}
         />
       </div>
-
-      <TaskQuickCreateDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-      />
     </PrivilegeRoute>
   );
 };

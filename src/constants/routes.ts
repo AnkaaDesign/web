@@ -461,6 +461,7 @@ export const routes = {
     },
     preparation: {
       root: "/producao/agenda",
+      create: "/producao/agenda/cadastrar",
       details: (id: string) => `/producao/agenda/detalhes/${id}`,
       edit: (id: string) => `/producao/agenda/editar/${id}`,
     },

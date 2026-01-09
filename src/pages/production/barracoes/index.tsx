@@ -278,7 +278,7 @@ export function GaragesPage() {
 
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="h-full flex flex-col px-4 pt-4">
           <PageHeader
             title="Barracões"
@@ -303,7 +303,7 @@ export function GaragesPage() {
 
   if (error) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="h-full flex flex-col px-4 pt-4">
           <PageHeader
             title="Barracões"
@@ -334,7 +334,7 @@ export function GaragesPage() {
   }
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col px-4 pt-4">
         <PageHeader
           title="Barracões"
@@ -391,7 +391,7 @@ export function GaragesPage() {
                       {/* Date picker dropdown */}
                       {showDatePicker && (
                         <div
-                          className="absolute top-full right-0 bg-white border border-border rounded-lg shadow-lg py-1 min-w-[120px]"
+                          className="absolute top-full right-0 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[120px]"
                           style={{ zIndex: 9999 }}
                         >
                           {next5Days.map((day, index) => (

@@ -668,10 +668,12 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
       if (finalConfig.enableNotifications && isWriteMethod(config.method)) {
         // Skip notifications for batch operations - they'll be handled by the dialog
         const isBatchOperation = config.url?.includes("/batch");
+        // Skip notifications for mark-viewed - this is a background operation
+        const isMarkViewed = config.url?.includes("/mark-viewed");
         // Only show success if the response indicates success
         const isSuccess = (response.data?.success as boolean | undefined) !== false; // Show success unless explicitly false
 
-        if (!isBatchOperation && isSuccess) {
+        if (!isBatchOperation && !isMarkViewed && isSuccess) {
           const message = response.data?.message || getSuccessMessage(config.method);
           notify.success("Sucesso", message);
         }

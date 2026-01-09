@@ -3,15 +3,6 @@ import { TASK_OBSERVATION_TYPE_LABELS, TASK_STATUS_LABELS } from "../constants";
 import type { Task } from "../types";
 import { dateUtils } from "./date";
 import { numberUtils } from "./number";
-import type { TaskStatus } from "@prisma/client";
-
-/**
- * Map TASK_STATUS enum to Prisma TaskStatus enum
- * This is needed because TypeScript doesn't recognize that the string values are compatible
- */
-export function mapTaskStatusToPrisma(status: TASK_STATUS | string): TaskStatus {
-  return status as TaskStatus;
-}
 
 /**
  * Check if task status transition is valid

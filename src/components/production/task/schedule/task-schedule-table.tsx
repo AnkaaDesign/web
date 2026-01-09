@@ -765,7 +765,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
                           })()
                         : "-")}
                     {column.id === "serviceOrders.production" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} />}
-                    {column.id === "serialNumberOrPlate" && <span className="truncate block font-mono">{task.serialNumber || task.truck?.plate || "-"}</span>}
+                    {column.id === "serialNumberOrPlate" && <span className="truncate block">{task.serialNumber || task.truck?.plate || "-"}</span>}
                     {column.id === "spot" && (
                       task.truck?.spot ? (
                         task.truck.spot === "PATIO" ? (

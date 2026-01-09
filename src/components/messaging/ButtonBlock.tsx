@@ -25,44 +25,37 @@ export const ButtonBlock = React.memo<ButtonBlockProps>(({ block, className }) =
   // If URL is provided, render as a link
   if (url && !onClick) {
     return (
-      <div
+      <Button
         id={id}
-        className={cn("my-4 first:mt-0 last:mb-0", className)}
+        variant={variant}
+        disabled={disabled}
+        asChild
+        className={cn("my-2", className)}
       >
-        <Button
-          variant={variant}
-          disabled={disabled}
-          asChild
-          className="inline-flex"
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={text}
         >
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={text}
-          >
-            {text}
-          </a>
-        </Button>
-      </div>
+          {text}
+        </a>
+      </Button>
     );
   }
 
   // Otherwise render as a button
   return (
-    <div
+    <Button
       id={id}
-      className={cn("my-4 first:mt-0 last:mb-0", className)}
+      variant={variant}
+      disabled={disabled}
+      onClick={handleClick}
+      type="button"
+      className={cn("my-2", className)}
     >
-      <Button
-        variant={variant}
-        disabled={disabled}
-        onClick={handleClick}
-        type="button"
-      >
-        {text}
-      </Button>
-    </div>
+      {text}
+    </Button>
   );
 });
 

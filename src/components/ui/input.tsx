@@ -847,7 +847,6 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
         if (onChange) {
           // Pass the value directly (consistent with all other input types like cpf, phone, etc.)
-          // This matches the interface: onChange?: ((value: string | number | null) => void)
           (onChange as any)(rawValue);
         }
         return;

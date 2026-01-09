@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy } from "./common";
 import type { Truck } from "../types";
+import { TRUCK_CATEGORY, IMPLEMENT_TYPE, TRUCK_SPOT } from "../constants";
 
 // =====================
 // Include Schema Based on Prisma Schema (Second Level Only)
@@ -88,8 +89,9 @@ export const truckOrderBySchema = z.union([
       id: orderByDirectionSchema.optional(),
       plate: orderByDirectionSchema.optional(),
       chassisNumber: orderByDirectionSchema.optional(),
-      xPosition: orderByDirectionSchema.optional(),
-      yPosition: orderByDirectionSchema.optional(),
+      category: orderByDirectionSchema.optional(),
+      implementType: orderByDirectionSchema.optional(),
+      spot: orderByDirectionSchema.optional(),
       taskId: orderByDirectionSchema.optional(),
       createdAt: orderByDirectionSchema.optional(),
       updatedAt: orderByDirectionSchema.optional(),
@@ -120,8 +122,9 @@ export const truckOrderBySchema = z.union([
         id: orderByDirectionSchema.optional(),
         plate: orderByDirectionSchema.optional(),
         chassisNumber: orderByDirectionSchema.optional(),
-        xPosition: orderByDirectionSchema.optional(),
-        yPosition: orderByDirectionSchema.optional(),
+        category: orderByDirectionSchema.optional(),
+        implementType: orderByDirectionSchema.optional(),
+        spot: orderByDirectionSchema.optional(),
         taskId: orderByDirectionSchema.optional(),
         createdAt: orderByDirectionSchema.optional(),
         updatedAt: orderByDirectionSchema.optional(),
@@ -202,37 +205,43 @@ export const truckWhereSchema: z.ZodSchema = z.lazy(() =>
         ])
         .optional(),
 
-      // Numeric fields
-      xPosition: z
+      // Spot enum field
+      spot: z
         .union([
-          z.number(),
+          z.nativeEnum(TRUCK_SPOT),
           z.null(),
           z.object({
-            equals: z.union([z.number(), z.null()]).optional(),
-            not: z.union([z.number(), z.null()]).optional(),
-            in: z.array(z.number()).optional(),
-            notIn: z.array(z.number()).optional(),
-            lt: z.number().optional(),
-            lte: z.number().optional(),
-            gt: z.number().optional(),
-            gte: z.number().optional(),
+            equals: z.union([z.nativeEnum(TRUCK_SPOT), z.null()]).optional(),
+            not: z.union([z.nativeEnum(TRUCK_SPOT), z.null()]).optional(),
+            in: z.array(z.nativeEnum(TRUCK_SPOT)).optional(),
+            notIn: z.array(z.nativeEnum(TRUCK_SPOT)).optional(),
           }),
         ])
         .optional(),
 
-      yPosition: z
+      // Truck specification enum fields
+      category: z
         .union([
-          z.number(),
+          z.nativeEnum(TRUCK_CATEGORY),
           z.null(),
           z.object({
-            equals: z.union([z.number(), z.null()]).optional(),
-            not: z.union([z.number(), z.null()]).optional(),
-            in: z.array(z.number()).optional(),
-            notIn: z.array(z.number()).optional(),
-            lt: z.number().optional(),
-            lte: z.number().optional(),
-            gt: z.number().optional(),
-            gte: z.number().optional(),
+            equals: z.union([z.nativeEnum(TRUCK_CATEGORY), z.null()]).optional(),
+            not: z.union([z.nativeEnum(TRUCK_CATEGORY), z.null()]).optional(),
+            in: z.array(z.nativeEnum(TRUCK_CATEGORY)).optional(),
+            notIn: z.array(z.nativeEnum(TRUCK_CATEGORY)).optional(),
+          }),
+        ])
+        .optional(),
+
+      implementType: z
+        .union([
+          z.nativeEnum(IMPLEMENT_TYPE),
+          z.null(),
+          z.object({
+            equals: z.union([z.nativeEnum(IMPLEMENT_TYPE), z.null()]).optional(),
+            not: z.union([z.nativeEnum(IMPLEMENT_TYPE), z.null()]).optional(),
+            in: z.array(z.nativeEnum(IMPLEMENT_TYPE)).optional(),
+            notIn: z.array(z.nativeEnum(IMPLEMENT_TYPE)).optional(),
           }),
         ])
         .optional(),
@@ -290,21 +299,10 @@ const truckFilters = {
   searchingFor: z.string().optional(),
   taskIds: z.array(z.string()).optional(),
   plates: z.array(z.string()).optional(),
-  hasPosition: z.boolean().optional(),
-
-  // Position ranges
-  xPositionRange: z
-    .object({
-      min: z.number().optional(),
-      max: z.number().optional(),
-    })
-    .optional(),
-  yPositionRange: z
-    .object({
-      min: z.number().optional(),
-      max: z.number().optional(),
-    })
-    .optional(),
+  spots: z.array(z.nativeEnum(TRUCK_SPOT)).optional(),
+  categories: z.array(z.nativeEnum(TRUCK_CATEGORY)).optional(),
+  implementTypes: z.array(z.nativeEnum(IMPLEMENT_TYPE)).optional(),
+  hasSpot: z.boolean().optional(),
 };
 
 // =====================
@@ -351,39 +349,32 @@ const truckTransform = (data: any) => {
     delete data.plates;
   }
 
-  // Handle hasPosition filter
-  if (typeof data.hasPosition === "boolean") {
-    if (data.hasPosition) {
-      andConditions.push({
-        AND: [{ xPosition: { not: null } }, { yPosition: { not: null } }],
-      });
+  // Handle spots filter
+  if (data.spots && Array.isArray(data.spots) && data.spots.length > 0) {
+    andConditions.push({ spot: { in: data.spots } });
+    delete data.spots;
+  }
+
+  // Handle categories filter
+  if (data.categories && Array.isArray(data.categories) && data.categories.length > 0) {
+    andConditions.push({ category: { in: data.categories } });
+    delete data.categories;
+  }
+
+  // Handle implementTypes filter
+  if (data.implementTypes && Array.isArray(data.implementTypes) && data.implementTypes.length > 0) {
+    andConditions.push({ implementType: { in: data.implementTypes } });
+    delete data.implementTypes;
+  }
+
+  // Handle hasSpot filter
+  if (typeof data.hasSpot === "boolean") {
+    if (data.hasSpot) {
+      andConditions.push({ spot: { not: null } });
     } else {
-      andConditions.push({
-        OR: [{ xPosition: null }, { yPosition: null }],
-      });
+      andConditions.push({ spot: null });
     }
-    delete data.hasPosition;
-  }
-
-  // Handle position ranges
-  if (data.xPositionRange && typeof data.xPositionRange === "object") {
-    const condition: any = {};
-    if (typeof data.xPositionRange.min === "number") condition.gte = data.xPositionRange.min;
-    if (typeof data.xPositionRange.max === "number") condition.lte = data.xPositionRange.max;
-    if (Object.keys(condition).length > 0) {
-      andConditions.push({ xPosition: condition });
-    }
-    delete data.xPositionRange;
-  }
-
-  if (data.yPositionRange && typeof data.yPositionRange === "object") {
-    const condition: any = {};
-    if (typeof data.yPositionRange.min === "number") condition.gte = data.yPositionRange.min;
-    if (typeof data.yPositionRange.max === "number") condition.lte = data.yPositionRange.max;
-    if (Object.keys(condition).length > 0) {
-      andConditions.push({ yPosition: condition });
-    }
-    delete data.yPositionRange;
+    delete data.hasSpot;
   }
 
   // Handle date filters
@@ -449,8 +440,10 @@ export const truckGetManySchema = z
   })
   .transform(truckTransform);
 
-// Brazilian license plate pattern (ABC-1234 or ABC1234)
-const brazilianPlateRegex = /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$|^[A-Z]{3}-?[0-9]{4}$/i;
+// Brazilian license plate patterns (after hyphen removal by transform)
+// Old format: ABC1234 (3 letters + 4 numbers)
+// Mercosul format: ABC1D23 (3 letters + 1 number + 1 letter + 2 numbers)
+const brazilianPlateRegex = /^[A-Z]{3}[0-9]{4}$|^[A-Z]{3}[0-9][A-Z][0-9]{2}$/i;
 
 // =====================
 // CRUD Schemas
@@ -472,9 +465,12 @@ export const truckCreateSchema = z.object({
     .optional()
     .transform((val) => (val === "" ? null : val)),
 
-  // Optional position fields
-  xPosition: z.number().nullable().optional(),
-  yPosition: z.number().nullable().optional(),
+  // Truck specifications
+  category: z.nativeEnum(TRUCK_CATEGORY).nullable().optional(),
+  implementType: z.nativeEnum(IMPLEMENT_TYPE).nullable().optional(),
+
+  // Spot/position field
+  spot: z.nativeEnum(TRUCK_SPOT).nullable().optional(),
 
   // Required relation
   taskId: z.string().uuid("Tarefa inválida"),
@@ -501,9 +497,12 @@ export const truckUpdateSchema = z.object({
     .optional()
     .transform((val) => (val === "" ? null : val)),
 
-  // Optional position fields
-  xPosition: z.number().nullable().optional(),
-  yPosition: z.number().nullable().optional(),
+  // Truck specifications
+  category: z.nativeEnum(TRUCK_CATEGORY).nullable().optional(),
+  implementType: z.nativeEnum(IMPLEMENT_TYPE).nullable().optional(),
+
+  // Spot/position field
+  spot: z.nativeEnum(TRUCK_SPOT).nullable().optional(),
 
   // Optional relations
   taskId: z.string().uuid("Tarefa inválida").optional(),
@@ -580,8 +579,9 @@ export type TruckBatchQueryFormData = z.infer<typeof truckBatchQuerySchema>;
 export const mapTruckToFormData = createMapToFormDataHelper<Truck, TruckUpdateFormData>((truck) => ({
   plate: truck.plate || undefined,
   chassisNumber: truck.chassisNumber || undefined,
-  xPosition: truck.xPosition || undefined,
-  yPosition: truck.yPosition || undefined,
+  category: truck.category || undefined,
+  implementType: truck.implementType || undefined,
+  spot: truck.spot || undefined,
   taskId: truck.taskId,
   leftSideLayoutId: truck.leftSideLayoutId || undefined,
   rightSideLayoutId: truck.rightSideLayoutId || undefined,

@@ -77,7 +77,7 @@ export const CustomerDetailsPage = () => {
 
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.BASIC}>
+      <PrivilegeRoute requiredPrivilege={["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "COMMERCIAL"]}>
         <CustomerDetailSkeleton />
       </PrivilegeRoute>
     );
@@ -100,7 +100,7 @@ export const CustomerDetailsPage = () => {
   };
 
   return (
-    <PrivilegeRoute requiredPrivilege={SECTOR_PRIVILEGES.BASIC}>
+    <PrivilegeRoute requiredPrivilege={["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "COMMERCIAL"]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"

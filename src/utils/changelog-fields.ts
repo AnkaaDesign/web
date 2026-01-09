@@ -1148,6 +1148,43 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return cutTypeLabels[value] || value;
   }
 
+  // Handle truck category (for both TRUCK entity and truck.category in TASK entity)
+  if ((field === "category" || field === "truck.category") && typeof value === "string") {
+    const truckCategoryLabels: Record<string, string> = {
+      MINI: "Mini",
+      VUC: "VUC (Veículo Urbano de Carga)",
+      THREE_QUARTER: "3/4",
+      RIGID: "Toco",
+      TRUCK: "Caminhão",
+      SEMI_TRAILER: "Carreta",
+      B_DOUBLE: "Bitrem",
+    };
+    return truckCategoryLabels[value] || value;
+  }
+
+  // Handle truck implement type
+  if ((field === "implementType" || field === "truck.implementType") && typeof value === "string") {
+    const implementTypeLabels: Record<string, string> = {
+      CORRUGATED: "Corrugado",
+      INSULATED: "Isoplastic",
+      CURTAIN_SIDE: "Sider",
+      TANK: "Tanque",
+      FLATBED: "Carroceria",
+    };
+    return implementTypeLabels[value] || value;
+  }
+
+  // Handle truck spot
+  if ((field === "spot" || field === "truck.spot") && typeof value === "string") {
+    if (value === "PATIO") return "Pátio";
+    // Parse B1_F1_V1 format -> "Garagem 1, Fila 1, Vaga 1"
+    const match = value.match(/B(\d)_F(\d)_V(\d)/);
+    if (match) {
+      return `Garagem ${match[1]}, Fila ${match[2]}, Vaga ${match[3]}`;
+    }
+    return value;
+  }
+
   // Handle cut origin
   if (field === "origin" && entityType === CHANGE_LOG_ENTITY_TYPE.CUT && typeof value === "string") {
     const cutOriginLabels: Record<string, string> = {

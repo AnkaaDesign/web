@@ -22,7 +22,7 @@ export interface Task extends BaseEntity {
   name: string;
   status: TASK_STATUS;
   statusOrder: number;
-  commission: COMMISSION_STATUS;
+  commission: COMMISSION_STATUS | null;
   serialNumber: string | null;
   details: string | null;
   entryDate: Date | null;
@@ -35,6 +35,12 @@ export interface Task extends BaseEntity {
   invoiceToId: string | null;
   sectorId: string | null;
   negotiatingWith: { name: string; phone: string } | null;
+  budgetIds?: string[];
+  invoiceIds?: string[];
+  receiptIds?: string[];
+  reimbursementIds?: string[];
+  reimbursementInvoiceIds?: string[];
+  baseFileIds?: string[];
   createdById: string | null;
   priority?: string | null;
   price?: number | null; // Calculated from budget total
@@ -49,6 +55,7 @@ export interface Task extends BaseEntity {
   receipts?: File[]; // Many-to-many relation
   reimbursements?: File[]; // Many-to-many relation
   reimbursementInvoices?: File[]; // Many-to-many relation
+  baseFiles?: File[]; // Files used as base for artwork design
   observation?: Observation;
   generalPainting?: Paint;
   createdBy?: User;
@@ -103,6 +110,11 @@ export interface TaskIncludes {
         include?: UserIncludes;
       };
   artworks?:
+    | boolean
+    | {
+        include?: FileIncludes;
+      };
+  baseFiles?:
     | boolean
     | {
         include?: FileIncludes;

@@ -12,7 +12,9 @@ interface ImageBlockProps {
  * Responsive and optimized for various screen sizes.
  */
 export const ImageBlock = React.memo<ImageBlockProps>(({ block, className }) => {
-  const { src, alt, caption, width, height, id } = block;
+  // Support both 'src' (standard) and 'url' (from editor) properties
+  const imageSrc = (block as any).src || (block as any).url;
+  const { alt, caption, width, height, id, size, alignment } = block;
   const [isLoading, setIsLoading] = React.useState(true);
   const [hasError, setHasError] = React.useState(false);
 
@@ -25,20 +27,45 @@ export const ImageBlock = React.memo<ImageBlockProps>(({ block, className }) => 
     setHasError(true);
   }, []);
 
+  const getSizeStyle = () => {
+    // If customWidth is provided, use it directly
+    if ((block as any).customWidth) {
+      return { maxWidth: (block as any).customWidth };
+    }
+
+    // If size is provided, convert it to maxWidth
+    if (size) {
+      return { maxWidth: size };
+    }
+
+    // Default to 50% (medium)
+    return { maxWidth: '50%' };
+  };
+
+  const getAlignmentClass = () => {
+    const alignmentMap = {
+      left: 'mr-auto',
+      center: 'mx-auto',
+      right: 'ml-auto',
+    };
+    return alignmentMap[alignment || 'center'];
+  };
+
   return (
     <figure
       id={id}
-      className={cn("my-6 first:mt-0 last:mb-0", className)}
+      style={getSizeStyle()}
+      className={cn("my-6 first:mt-0 last:mb-0", getAlignmentClass(), className)}
     >
-      <div className="relative overflow-hidden rounded-lg border border-border/50 bg-muted/30">
+      <div className="relative overflow-hidden rounded-lg">
         {isLoading && !hasError && (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center bg-muted/30">
             <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         )}
 
         {hasError ? (
-          <div className="flex min-h-[200px] items-center justify-center bg-muted/50 p-8">
+          <div className="flex min-h-[200px] items-center justify-center bg-muted/50 border border-border/50 rounded-lg p-8">
             <div className="text-center">
               <svg
                 className="mx-auto h-12 w-12 text-muted-foreground"
@@ -61,14 +88,14 @@ export const ImageBlock = React.memo<ImageBlockProps>(({ block, className }) => 
           </div>
         ) : (
           <img
-            src={src}
+            src={imageSrc}
             alt={alt}
             width={width}
             height={height}
             onLoad={handleLoad}
             onError={handleError}
             className={cn(
-              "w-full h-auto object-cover transition-opacity duration-300",
+              "w-full h-auto object-contain transition-opacity duration-300 rounded-lg",
               isLoading ? "opacity-0" : "opacity-100"
             )}
             loading="lazy"

@@ -1183,14 +1183,13 @@ export const taskCreateSchema = z
 
     // Relations - Many-to-many file relations (arrays)
     budgetIds: z.array(z.string().uuid("Budget inválido")).optional(),
-    invoiceIds: z.array(z.string().uuid("Invoice inválida")).optional(), // Maps to nfes
+    invoiceIds: z.array(z.string().uuid("Invoice inválida")).optional(), // Maps to invoices/nfes
     receiptIds: z.array(z.string().uuid("Receipt inválido")).optional(),
     reimbursementIds: z.array(z.string().uuid("Reimbursement inválido")).optional(),
     reimbursementInvoiceIds: z.array(z.string().uuid("Reimbursement invoice inválida")).optional(),
-    fileIds: z.array(z.string().uuid("File inválido")).optional(), // Maps to artworks
+    artworkIds: z.array(z.string().uuid("Arquivo inválido")).optional(), // Maps to artworks
+    baseFileIds: z.array(z.string().uuid("Arquivo base inválido")).optional(), // Maps to baseFiles
     paintIds: z.array(z.string().uuid("Paint inválida")).optional(), // Maps to logoPaints
-    // Legacy field names for backwards compatibility
-    artworkIds: z.array(z.string().uuid("Artwork inválido")).optional(), // @deprecated Use fileIds instead
     observation: taskObservationCreateSchema.nullable().optional(),
     serviceOrders: z.array(taskServiceOrderCreateSchema).optional(),
     truck: taskTruckCreateSchema.nullable().optional(),
@@ -1284,15 +1283,6 @@ export const taskCreateSchema = z
         path: ["serialNumberTo"],
       });
     }
-  })
-  .transform((data) => {
-    // Map artworkIds to fileIds for backend compatibility
-    const transformed: any = { ...data };
-    if (transformed.artworkIds) {
-      transformed.fileIds = transformed.artworkIds;
-      delete transformed.artworkIds;
-    }
-    return transformed;
   });
 
 // Base task update schema with all relations
@@ -1330,14 +1320,13 @@ export const taskUpdateSchema = z
 
     // Relations - Many-to-many file relations (arrays)
     budgetIds: z.array(z.string().uuid("Budget inválido")).optional(),
-    invoiceIds: z.array(z.string().uuid("Invoice inválida")).optional(), // Maps to nfes
+    invoiceIds: z.array(z.string().uuid("Invoice inválida")).optional(), // Maps to invoices/nfes
     receiptIds: z.array(z.string().uuid("Receipt inválido")).optional(),
     reimbursementIds: z.array(z.string().uuid("Reimbursement inválido")).optional(),
     reimbursementInvoiceIds: z.array(z.string().uuid("Reimbursement invoice inválida")).optional(),
-    fileIds: z.array(z.string().uuid("File inválido")).optional(), // Maps to artworks
+    artworkIds: z.array(z.string().uuid("Arquivo inválido")).optional(), // Maps to artworks
+    baseFileIds: z.array(z.string().uuid("Arquivo base inválido")).optional(), // Maps to baseFiles
     paintIds: z.array(z.string().uuid("Paint inválida")).optional(), // Maps to logoPaints
-    // Legacy field names for backwards compatibility
-    artworkIds: z.array(z.string().uuid("Artwork inválido")).optional(), // @deprecated Use fileIds instead
     observation: taskObservationCreateSchema.nullable().optional(),
     serviceOrders: z.array(taskServiceOrderCreateSchema).optional(),
     truck: taskTruckCreateSchema.nullable().optional(),
@@ -1387,15 +1376,6 @@ export const taskUpdateSchema = z
         path: ["finishedAt"],
       });
     }
-  })
-  .transform((data) => {
-    // Map artworkIds to fileIds for backend compatibility
-    const transformed: any = { ...data };
-    if (transformed.artworkIds) {
-      transformed.fileIds = transformed.artworkIds;
-      delete transformed.artworkIds;
-    }
-    return transformed;
   });
 
 // =====================
@@ -1494,7 +1474,8 @@ export const mapTaskToFormData = createMapToFormDataHelper<Task, TaskUpdateFormD
   receiptIds: task.receipts?.map((receipt) => receipt.id),
   reimbursementIds: task.reimbursements?.map((reimbursement) => reimbursement.id),
   reimbursementInvoiceIds: task.reimbursementInvoices?.map((reimbursementInvoice) => reimbursementInvoice.id),
-  fileIds: task.artworks?.map((artwork) => artwork.id),
+  artworkIds: task.artworks?.map((artwork) => artwork.id),
+  baseFileIds: task.baseFiles?.map((baseFile) => baseFile.id),
   paintIds: task.logoPaints?.map((paint) => paint.id),
   // Complex relations need to be handled separately
 }));

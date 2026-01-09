@@ -28,6 +28,8 @@ import {
   CUT_ORIGIN_LABELS,
   AIRBRUSHING_STATUS_LABELS,
   COMMISSION_STATUS_LABELS,
+  TRUCK_CATEGORY_LABELS,
+  IMPLEMENT_TYPE_LABELS,
 } from "../../../../constants";
 import { formatDate, formatDateTime, formatCurrency, formatChassis, formatTruckSpot, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
 import { isTeamLeader } from "@/utils/user";
@@ -459,6 +461,8 @@ const TASK_SECTIONS: SectionConfig[] = [
       { id: "serialNumber", label: "Número de Série", sectionId: "overview" },
       { id: "plate", label: "Placa", sectionId: "overview" },
       { id: "chassisNumber", label: "Chassi", sectionId: "overview" },
+      { id: "truckCategory", label: "Categoria", sectionId: "overview" },
+      { id: "implementType", label: "Tipo de Implemento", sectionId: "overview" },
       { id: "truckSpot", label: "Localização", sectionId: "overview" },
       { id: "vehicle", label: "Veículo", sectionId: "overview" },
       { id: "details", label: "Detalhes", sectionId: "overview" },
@@ -507,6 +511,14 @@ const TASK_SECTIONS: SectionConfig[] = [
     defaultVisible: true,
     fields: [
       { id: "cutFiles", label: "Arquivos de Recorte", sectionId: "cuts" },
+    ],
+  },
+  {
+    id: "baseFiles",
+    label: "Arquivos Base",
+    defaultVisible: true,
+    fields: [
+      { id: "baseFileFiles", label: "Arquivos Base", sectionId: "baseFiles" },
     ],
   },
   {
@@ -576,6 +588,7 @@ export const TaskDetailsPage = () => {
   const [serviceOrderCompletionDialogOpen, setServiceOrderCompletionDialogOpen] = useState(false);
   const [pendingServiceOrder, setPendingServiceOrder] = useState<any>(null);
   const [nextServiceOrderToStart, setNextServiceOrderToStart] = useState<any>(null);
+  const [baseFilesViewMode, setBaseFilesViewMode] = useState<FileViewMode>("list");
   const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("list");
   const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("list");
 
@@ -629,6 +642,14 @@ export const TaskDetailsPage = () => {
     }
   };
 
+  // Handler for baseFiles collection viewing
+  const handleBaseFileClick = (file: any) => {
+    if (!fileViewerContext) return;
+    const baseFilesList = task?.baseFiles || [];
+    const index = baseFilesList.findIndex(f => f.id === file.id);
+    fileViewerContext.actions.viewFiles(baseFilesList, index);
+  };
+
   // Handler for artworks collection viewing
   const handleArtworkFileClick = (file: any) => {
     if (!fileViewerContext) return;
@@ -675,6 +696,7 @@ export const TaskDetailsPage = () => {
           assignedTo: true,
         },
       },
+      baseFiles: true,
       artworks: true,
       budget: true,
       budgets: true,
@@ -794,9 +816,9 @@ export const TaskDetailsPage = () => {
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [task?.services, visibleServiceOrderTypes]);
 
-  // Determine if we came from history, preparation, or schedule
+  // Determine if we came from history, preparation (agenda), or schedule
   const isFromHistory = location.pathname.includes('/historico/');
-  const isFromPreparation = location.pathname.includes('/em-preparacao/');
+  const isFromPreparation = location.pathname.includes('/agenda/');
 
   // Get display name with fallbacks
   const getTaskDisplayName = (task: any) => {
@@ -924,7 +946,7 @@ export const TaskDetailsPage = () => {
   // Loading state
   if (isLoading) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="h-full flex flex-col px-4 pt-4">
           <div className="flex-1 overflow-y-auto pb-6">
             <div className="space-y-6">
@@ -945,7 +967,7 @@ export const TaskDetailsPage = () => {
   // Error or not found state
   if (error || !task) {
     return (
-      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
+      <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
         <div className="h-full flex flex-col px-4 pt-4">
           <div className="flex-1 overflow-y-auto pb-6">
             <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in-50 duration-500">
@@ -976,7 +998,7 @@ export const TaskDetailsPage = () => {
   const isOverdue = task.term && new Date(task.term) < new Date() && task.status !== TASK_STATUS.COMPLETED && task.status !== TASK_STATUS.CANCELLED;
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <PageHeader
           variant="detail"
@@ -985,7 +1007,7 @@ export const TaskDetailsPage = () => {
                 { label: "Início", href: routes.home },
                 { label: "Produção", href: routes.production.root },
                 {
-                  label: isFromHistory ? "Histórico" : isFromPreparation ? "Em Preparação" : "Cronograma",
+                  label: isFromHistory ? "Histórico" : isFromPreparation ? "Agenda" : "Cronograma",
                   href: isFromHistory ? routes.production.history.root : isFromPreparation ? routes.production.preparation.root : routes.production.schedule.list
                 },
                 { label: taskDisplayName },
@@ -1182,6 +1204,32 @@ export const TaskDetailsPage = () => {
                   Nº Chassi
                     </span>
                     <span className="text-sm font-semibold text-foreground">{formatChassis(task.truck.chassisNumber)}</span>
+                  </div>
+                )}
+
+                {/* Truck Category */}
+                {sectionVisibility.isFieldVisible("truckCategory") && task.truck?.category && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconTruck className="h-4 w-4" />
+                      Categoria
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {TRUCK_CATEGORY_LABELS[task.truck.category]}
+                    </span>
+                  </div>
+                )}
+
+                {/* Truck Implement Type */}
+                {sectionVisibility.isFieldVisible("implementType") && task.truck?.implementType && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconTruckLoading className="h-4 w-4" />
+                      Tipo de Implemento
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">
+                      {IMPLEMENT_TYPE_LABELS[task.truck.implementType]}
+                    </span>
                   </div>
                 )}
 
@@ -1558,6 +1606,80 @@ export const TaskDetailsPage = () => {
                   ))}
                 </div>
               </CardContent>
+                </Card>
+              )}
+
+              {/* Base Files Card - 1/2 width */}
+              {sectionVisibility.isSectionVisible("baseFiles") && task.baseFiles && task.baseFiles.length > 0 && (
+                <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1">
+                  <CardHeader className="pb-6">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFiles className="h-5 w-5 text-muted-foreground" />
+                        Arquivos Base
+                        <Badge variant="secondary" className="ml-2">
+                          {task.baseFiles?.length ?? 0}
+                        </Badge>
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        {(task.baseFiles?.length ?? 0) > 1 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
+                              for (let i = 0; i < (task.baseFiles?.length ?? 0); i++) {
+                                const file = task.baseFiles?.[i];
+                                if (file) {
+                                  const downloadUrl = `${apiUrl}/files/${file.id}/download`;
+                                  window.open(downloadUrl, "_blank");
+                                }
+                                if (i < (task.baseFiles?.length ?? 0) - 1) {
+                                  await new Promise((resolve) => setTimeout(resolve, 200));
+                                }
+                              }
+                            }}
+                            className="text-xs"
+                          >
+                            <IconDownload className="h-3 w-3 mr-1" />
+                            Baixar Todos
+                          </Button>
+                        )}
+                        <div className="flex gap-1">
+                          <Button
+                            variant={baseFilesViewMode === "list" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setBaseFilesViewMode("list")}
+                            className="h-7 w-7 p-0"
+                          >
+                            <IconList className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant={baseFilesViewMode === "grid" ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setBaseFilesViewMode("grid")}
+                            className="h-7 w-7 p-0"
+                          >
+                            <IconLayoutGrid className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0 flex-1">
+                    <div className={cn(baseFilesViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                      {task.baseFiles?.map((file) => (
+                        <FileItem
+                          key={file.id}
+                          file={file}
+                          viewMode={baseFilesViewMode}
+                          onPreview={handleBaseFileClick}
+                          onDownload={handleDownload}
+                          showActions
+                        />
+                      ))}
+                    </div>
+                  </CardContent>
                 </Card>
               )}
 

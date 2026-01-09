@@ -114,6 +114,10 @@ export function TaskQuickCreateDialog({ open, onOpenChange, onSuccess }: TaskQui
               task.customerId = data.customerId;
             }
 
+            if (data.forecastDate) {
+              task.forecastDate = data.forecastDate;
+            }
+
             if (data.truck?.plate) {
               task.truck = {
                 plate: data.truck.plate,
@@ -176,6 +180,10 @@ export function TaskQuickCreateDialog({ open, onOpenChange, onSuccess }: TaskQui
 
           if (data.customerId) {
             payload.customerId = data.customerId;
+          }
+
+          if (data.forecastDate) {
+            payload.forecastDate = data.forecastDate;
           }
 
           if (data.truck?.plate) {

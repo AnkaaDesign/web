@@ -2,39 +2,6 @@ import type { Notification, SeenNotification } from "../types";
 import { NOTIFICATION_IMPORTANCE, NOTIFICATION_TYPE, NOTIFICATION_CHANNEL, NOTIFICATION_ACTION_TYPE } from "../constants";
 import { NOTIFICATION_TYPE_LABELS, NOTIFICATION_IMPORTANCE_LABELS, NOTIFICATION_CHANNEL_LABELS } from "../constants";
 import { dateUtils } from "./date";
-import type { NotificationType, NotificationImportance, NotificationChannel, NotificationActionType } from "@prisma/client";
-
-/**
- * Map NOTIFICATION_TYPE enum to Prisma NotificationType enum
- * This is needed because TypeScript doesn't recognize that the string values are compatible
- */
-export function mapNotificationTypeToPrisma(type: NOTIFICATION_TYPE | string): NotificationType {
-  return type as NotificationType;
-}
-
-/**
- * Map NOTIFICATION_IMPORTANCE enum to Prisma NotificationImportance enum
- * This is needed because TypeScript doesn't recognize that the string values are compatible
- */
-export function mapNotificationImportanceToPrisma(importance: NOTIFICATION_IMPORTANCE | string): NotificationImportance {
-  return importance as NotificationImportance;
-}
-
-/**
- * Map NOTIFICATION_ACTION_TYPE enum to Prisma NotificationActionType enum
- * This is needed because TypeScript doesn't recognize that the string values are compatible
- */
-export function mapNotificationActionTypeToPrisma(actionType: NOTIFICATION_ACTION_TYPE | string): NotificationActionType {
-  return actionType as NotificationActionType;
-}
-
-/**
- * Map NOTIFICATION_CHANNEL array to Prisma NotificationChannel enum array
- * This is needed because TypeScript doesn't recognize that the string values are compatible
- */
-export function mapNotificationChannelArrayToPrisma(channels: NOTIFICATION_CHANNEL[] | string[]): NotificationChannel[] {
-  return channels.map((channel) => channel as NotificationChannel);
-}
 
 export function getNotificationTypeLabel(type: NOTIFICATION_TYPE): string {
   return NOTIFICATION_TYPE_LABELS[type] || type;

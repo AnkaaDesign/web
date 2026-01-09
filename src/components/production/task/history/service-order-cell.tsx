@@ -53,11 +53,11 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
         <TooltipTrigger asChild>
           <div className="flex items-center gap-1.5 cursor-help w-full">
             {/* Progress bar container */}
-            <div className="relative flex-1 h-7 min-w-[90px] max-w-[140px] bg-gray-100 dark:bg-gray-800 rounded-md overflow-hidden shadow-sm">
+            <div className="relative flex-1 h-5 min-w-[90px] max-w-[140px] bg-gray-100 dark:bg-gray-700 rounded overflow-hidden shadow-sm">
               {/* Completed segment (green) */}
               {completedCount > 0 && (
                 <div
-                  className="absolute h-full bg-gradient-to-r from-green-500 to-green-600 transition-all duration-300"
+                  className="absolute h-full bg-green-500 transition-all duration-300"
                   style={{
                     left: '0%',
                     width: `${completedPercent}%`,
@@ -68,7 +68,7 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
               {/* In Progress segment (blue) */}
               {inProgressCount > 0 && (
                 <div
-                  className="absolute h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-300"
+                  className="absolute h-full bg-blue-500 transition-all duration-300"
                   style={{
                     left: `${completedPercent}%`,
                     width: `${inProgressPercent}%`,
@@ -76,10 +76,10 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
                 />
               )}
 
-              {/* Pending segment (yellow/orange) */}
+              {/* Pending segment (amber) */}
               {pendingCount > 0 && (
                 <div
-                  className="absolute h-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-300"
+                  className="absolute h-full bg-amber-500 transition-all duration-300"
                   style={{
                     left: `${completedPercent + inProgressPercent}%`,
                     width: `${pendingPercent}%`,
@@ -90,7 +90,7 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
               {/* Cancelled segment (gray) */}
               {cancelledCount > 0 && (
                 <div
-                  className="absolute h-full bg-gradient-to-r from-gray-400 to-gray-500 transition-all duration-300"
+                  className="absolute h-full bg-gray-400 transition-all duration-300"
                   style={{
                     left: `${completedPercent + inProgressPercent + pendingPercent}%`,
                     width: `${cancelledPercent}%`,
@@ -98,9 +98,9 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
                 />
               )}
 
-              {/* Count label centered with better contrast */}
+              {/* Count label centered */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] tracking-wide">
+                <span className="text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                   {completedCount}/{totalCount}
                 </span>
               </div>
@@ -108,12 +108,10 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
 
             {/* Red circle indicator for incomplete user-assigned orders */}
             {incompleteAssignedCount > 0 && (
-              <div className="relative flex items-center justify-center">
-                <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center ring-2 ring-red-200 dark:ring-red-900 shadow-sm">
-                  <span className="text-[10px] font-bold text-white">
-                    {incompleteAssignedCount}
-                  </span>
-                </div>
+              <div className="w-[18px] h-[18px] rounded-full bg-red-500 flex items-center justify-center shadow-sm">
+                <span className="text-[9px] font-bold text-white">
+                  {incompleteAssignedCount}
+                </span>
               </div>
             )}
           </div>
@@ -137,7 +135,7 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
               <span className="text-right font-medium">{inProgressCount}</span>
 
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-amber-400 ring-1 ring-amber-600" />
+                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-1 ring-amber-600" />
                 <span>Pendente:</span>
               </div>
               <span className="text-right font-medium">{pendingCount}</span>
@@ -155,7 +153,7 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
             {incompleteAssignedCount > 0 && (
               <div className="mt-2 pt-2 border-t border-border/50">
                 <div className="flex items-center gap-2 text-red-500 font-medium">
-                  <div className="w-3 h-3 rounded-full bg-red-500 ring-2 ring-red-300 flex items-center justify-center">
+                  <div className="w-3 h-3 rounded-full bg-red-500 flex items-center justify-center">
                     <span className="text-[8px] text-white font-bold">{incompleteAssignedCount}</span>
                   </div>
                   <span className="text-xs">Atribuída(s) a você (incompleta)</span>

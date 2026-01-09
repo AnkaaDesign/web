@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { IconUpload, IconPhoto } from "@tabler/icons-react";
 import type { ImageBlock } from "../types";
 
@@ -13,6 +13,21 @@ interface ImageBlockEditorProps {
 
 export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => {
   const [uploading, setUploading] = useState(false);
+
+  const getSizeStyle = () => {
+    // If customWidth is provided, use it directly
+    if (block.customWidth) {
+      return { maxWidth: block.customWidth };
+    }
+
+    // If size is provided, use it
+    if (block.size) {
+      return { maxWidth: block.size };
+    }
+
+    // Default to 50% (medium)
+    return { maxWidth: '50%' };
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -64,46 +79,66 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
           <div className="mt-3">
             <Input
               placeholder="Ou cole a URL da imagem..."
-              onChange={(e) => onUpdate({ url: e.target.value })}
+              onChange={(value) => onUpdate({ url: value as string })}
             />
           </div>
         </div>
       ) : (
         <div className="space-y-3">
           <div className={`flex ${block.alignment === 'center' ? 'justify-center' : block.alignment === 'right' ? 'justify-end' : 'justify-start'}`}>
-            <img
-              src={block.url}
-              alt={block.alt || ''}
-              className="max-w-full h-auto rounded-lg border"
-              style={{ maxHeight: '400px' }}
-            />
+            <div style={getSizeStyle()}>
+              <img
+                src={block.url}
+                alt={block.alt || ''}
+                className="w-full h-auto rounded-lg border"
+              />
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <div>
-              <Label className="text-xs">Texto Alternativo</Label>
-              <Input
-                value={block.alt || ''}
-                onChange={(e) => onUpdate({ alt: e.target.value })}
-                placeholder="Descrição da imagem"
-                className="h-8 text-sm"
+              <Label className="text-xs">Tamanho</Label>
+              <Combobox
+                value={block.size || '50%'}
+                onValueChange={(value) => onUpdate({ size: value as any })}
+                options={[
+                  { value: '64px', label: '64px (Ícone)' },
+                  { value: '128px', label: '128px (Pequeno)' },
+                  { value: '256px', label: '256px (Médio)' },
+                  { value: '384px', label: '384px (Grande)' },
+                  { value: '25%', label: '25%' },
+                  { value: '50%', label: '50%' },
+                  { value: '75%', label: '75%' },
+                  { value: '100%', label: '100%' },
+                ]}
+                placeholder="Selecione o tamanho"
+                searchable={true}
+                triggerClassName="h-8 text-sm"
               />
             </div>
             <div>
               <Label className="text-xs">Alinhamento</Label>
-              <Select
+              <Combobox
                 value={block.alignment || 'center'}
-                onValueChange={(value: any) => onUpdate({ alignment: value })}
-              >
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="left">Esquerda</SelectItem>
-                  <SelectItem value="center">Centro</SelectItem>
-                  <SelectItem value="right">Direita</SelectItem>
-                </SelectContent>
-              </Select>
+                onValueChange={(value) => onUpdate({ alignment: value as any })}
+                options={[
+                  { value: 'left', label: 'Esquerda' },
+                  { value: 'center', label: 'Centro' },
+                  { value: 'right', label: 'Direita' },
+                ]}
+                placeholder="Selecione o alinhamento"
+                searchable={false}
+                triggerClassName="h-8 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Texto Alternativo</Label>
+              <Input
+                value={block.alt || ''}
+                onChange={(value) => onUpdate({ alt: value as string })}
+                placeholder="Descrição"
+                className="h-8 text-sm"
+              />
             </div>
           </div>
 
@@ -111,7 +146,7 @@ export const ImageBlockEditor = ({ block, onUpdate }: ImageBlockEditorProps) => 
             <Label className="text-xs">Legenda (opcional)</Label>
             <Input
               value={block.caption || ''}
-              onChange={(e) => onUpdate({ caption: e.target.value })}
+              onChange={(value) => onUpdate({ caption: value as string })}
               placeholder="Adicione uma legenda..."
               className="h-8 text-sm"
             />

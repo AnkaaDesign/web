@@ -1,15 +1,6 @@
 import { SERVICE_ORDER_STATUS_LABELS } from "../constants";
 import { SERVICE_ORDER_STATUS } from "../constants";
 import type { ServiceOrder } from "../types";
-import type { ServiceOrderStatus } from "@prisma/client";
-
-/**
- * Map SERVICE_ORDER_STATUS enum to Prisma ServiceOrderStatus enum
- * This is needed because TypeScript doesn't recognize that the string values are compatible
- */
-export function mapServiceOrderStatusToPrisma(status: SERVICE_ORDER_STATUS | string): ServiceOrderStatus {
-  return status as ServiceOrderStatus;
-}
 
 export const isServiceOrderStarted = (serviceOrder: Pick<ServiceOrder, "startedAt">): boolean => {
   return serviceOrder.startedAt !== null;

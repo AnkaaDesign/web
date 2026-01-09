@@ -32,7 +32,7 @@ import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
 import { useTaskMutations, useCutsByTask, useCutMutations } from "../../../../hooks";
 import { cutService } from "../../../../api-client/cut";
-import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { useAuth } from "../../../../contexts/auth-context";
 import { Button } from "@/components/ui/button";
@@ -117,14 +117,15 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
     return result;
   };
 
-  // Check if the current user is from the Financial, Warehouse, Designer, or Logistic sector
+  // Check if the current user is from the Financial, Warehouse, Designer, Logistic, or Commercial sector
   const isFinancialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
   const isWarehouseUser = user?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
   const isDesignerUser = user?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
   const isLogisticUser = user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC;
+  const isCommercialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
   const isAdminUser = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
 
-  // Financial sections should only be visible to ADMIN and FINANCIAL users
+  // Financial sections should only be visible to ADMIN and FINANCIAL users (not Commercial)
   const canViewFinancialSections = isAdminUser || isFinancialUser;
 
   // Fetch cuts separately using useCutsByTask hook (same approach as detail page)
@@ -153,6 +154,22 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   );
   const [uploadedFileIds, setUploadedFileIds] = useState<string[]>(task.artworks?.map((f) => f.id) || []);
 
+  // Initialize base files from existing task data
+  const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>(
+    (task.baseFiles || []).map(file => ({
+      id: file.id,
+      name: file.filename || file.name || 'base file',
+      size: file.size || 0,
+      type: file.mimetype || file.type || 'application/octet-stream',
+      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+      uploaded: true,
+      uploadProgress: 100,
+      uploadedFileId: file.id,
+      thumbnailUrl: file.thumbnailUrl,
+    } as FileWithPreview))
+  );
+  const [baseFileIds, setBaseFileIds] = useState<string[]>(task.baseFiles?.map((f) => f.id) || []);
+
   // Initialize document files from existing task data
   // Handle both singular and plural field names for backward compatibility
   const [budgetFile, setBudgetFile] = useState<FileWithPreview[]>(
@@ -179,6 +196,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   const [isFinancialInfoOpen, setIsFinancialInfoOpen] = useState(
     () => budgetFile.length > 0 || nfeFile.length > 0 || receiptFile.length > 0
   );
+  const [isBaseFilesOpen, setIsBaseFilesOpen] = useState(() => baseFiles.length > 0);
+  const [isArtworksOpen, setIsArtworksOpen] = useState(() => uploadedFiles.length > 0);
   const [layoutWidthError, setLayoutWidthError] = useState<string | null>(null);
   const [observationFiles, setObservationFiles] = useState<FileWithPreview[]>(
     convertToFileWithPreview(task.observation?.files)
@@ -426,6 +445,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
       status: taskData.status || TASK_STATUS.PENDING,
       serialNumber: taskData.serialNumber || null,
       details: taskData.details || null,
+      commission: taskData.commission || null,
       entryDate: taskData.entryDate ? new Date(taskData.entryDate) : null,
       term: taskData.term ? new Date(taskData.term) : null,
       startedAt: taskData.startedAt ? new Date(taskData.startedAt) : null,
@@ -458,13 +478,15 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           finishedAt: so.finishedAt ? new Date(so.finishedAt) : null,
         })) || [],
       artworkIds: taskData.artworks?.map((f) => f.id) || [],
+      baseFileIds: taskData.baseFiles?.map((f) => f.id) || [],
       truck: {
         plate: taskData.truck?.plate || null,
         chassisNumber: taskData.truck?.chassisNumber || null,
+        model: taskData.truck?.model || "",
+        manufacturer: taskData.truck?.manufacturer,
+        category: taskData.truck?.category || null,
+        implementType: taskData.truck?.implementType || null,
         spot: taskData.truck?.spot || null,
-        xPosition: taskData.truck?.xPosition || null,
-        yPosition: taskData.truck?.yPosition || null,
-        garageId: taskData.truck?.garageId || null,
       },
       cuts: groupedCuts,
       paintIds: taskData.logoPaints?.map((lp) => lp.id) || [],
@@ -693,6 +715,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
         const newNnvoiceFiles = nfeFile.filter(f => !f.uploaded);
         const newReceiptFiles = receiptFile.filter(f => !f.uploaded);
         const newArtworkFiles = uploadedFiles.filter(f => !f.uploaded);
+        const newBaseFiles = baseFiles.filter(f => !f.uploaded);
         const newObservationFiles = observationFiles.filter(f => !f.uploaded);
 
         // Check for cut files
@@ -709,8 +732,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
 
         const hasNewFiles = newBudgetFiles.length > 0 || newNnvoiceFiles.length > 0 ||
                            newReceiptFiles.length > 0 || newArtworkFiles.length > 0 ||
-                           hasCutFiles || hasAirbrushingFiles || newObservationFiles.length > 0 ||
-                           layoutPhotoFiles.length > 0;
+                           newBaseFiles.length > 0 || hasCutFiles || hasAirbrushingFiles ||
+                           newObservationFiles.length > 0 || layoutPhotoFiles.length > 0;
 
         let result;
 
@@ -732,6 +755,9 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           }
           if (newArtworkFiles.length > 0) {
             files.artworks = newArtworkFiles.filter(f => f instanceof File) as File[];
+          }
+          if (newBaseFiles.length > 0) {
+            files.baseFiles = newBaseFiles.filter(f => f instanceof File) as File[];
           }
           if (newObservationFiles.length > 0) {
             
@@ -835,6 +861,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
           // Extract IDs of uploaded (existing) files
           const currentArtworkIds = uploadedFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentBaseFileIds = baseFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentInvoiceIds = nfeFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
@@ -842,6 +869,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           // Always send file IDs arrays when any file operation occurs
           // Backend will replace all files with these IDs + newly uploaded files
           dataForFormData.artworkIds = currentArtworkIds;
+          dataForFormData.baseFileIds = currentBaseFileIds;
           dataForFormData.budgetIds = currentBudgetIds;
           dataForFormData.invoiceIds = currentInvoiceIds;
           dataForFormData.receiptIds = currentReceiptIds;
@@ -897,6 +925,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 invoices: true,
                 receipts: true,
                 artworks: true,
+                baseFiles: true,
               },
             },
           });
@@ -908,6 +937,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
           // Extract IDs of uploaded (existing) files
           const currentArtworkIds = uploadedFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          const currentBaseFileIds = baseFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentInvoiceIds = nfeFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
@@ -915,6 +945,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           // Always send file IDs arrays when any file operation occurs
           // Backend will replace all files with these IDs
           submitData.artworkIds = currentArtworkIds;
+          submitData.baseFileIds = currentBaseFileIds;
           submitData.budgetIds = currentBudgetIds;
           submitData.invoiceIds = currentInvoiceIds;
           submitData.receiptIds = currentReceiptIds;
@@ -931,6 +962,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 invoices: true,
                 receipts: true,
                 artworks: true,
+                baseFiles: true,
               },
             },
           });
@@ -1095,6 +1127,13 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   // Handle artwork files change (no longer uploads immediately)
   const handleFilesChange = (files: FileWithPreview[]) => {
     setUploadedFiles(files);
+    setHasFileChanges(true);
+    // Files will be submitted with the form, not uploaded separately
+  };
+
+  // Handle base files change (no longer uploads immediately)
+  const handleBaseFilesChange = (files: FileWithPreview[]) => {
+    setBaseFiles(files);
     setHasFileChanges(true);
     // Files will be submitted with the form, not uploaded separately
   };
@@ -1447,7 +1486,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
 
         <div className="space-y-4">
           {/* Basic Information Card */}
-          <Card className="bg-white dark:bg-neutral-850">
+          <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <IconClipboardList className="h-5 w-5" />
@@ -1634,9 +1673,66 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                       />
                     </div>
 
+                    {/* Truck Category and Implement Type - Side by Side */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Truck Category */}
+                      <FormField
+                        control={form.control}
+                        name="truck.category"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Categoria do Caminhão</FormLabel>
+                            <Combobox
+                              value={field.value || ""}
+                              onValueChange={field.onChange}
+                              options={[
+                                { value: "", label: "Nenhuma" },
+                                ...Object.values(TRUCK_CATEGORY).map((cat) => ({
+                                  value: cat,
+                                  label: TRUCK_CATEGORY_LABELS[cat],
+                                })),
+                              ]}
+                              placeholder="Selecione a categoria"
+                              searchPlaceholder="Buscar categoria..."
+                              emptyText="Nenhuma categoria encontrada"
+                              disabled={isSubmitting || isWarehouseUser || isDesignerUser || isFinancialUser}
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Truck Implement Type */}
+                      <FormField
+                        control={form.control}
+                        name="truck.implementType"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-col">
+                            <FormLabel>Tipo de Implemento</FormLabel>
+                            <Combobox
+                              value={field.value || ""}
+                              onValueChange={field.onChange}
+                              options={[
+                                { value: "", label: "Nenhum" },
+                                ...Object.values(IMPLEMENT_TYPE).map((type) => ({
+                                  value: type,
+                                  label: IMPLEMENT_TYPE_LABELS[type],
+                                })),
+                              ]}
+                              placeholder="Selecione o tipo de implemento"
+                              searchPlaceholder="Buscar tipo de implemento..."
+                              emptyText="Nenhum tipo de implemento encontrado"
+                              disabled={isSubmitting || isWarehouseUser || isDesignerUser || isFinancialUser}
+                            />
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
                     {/* Serial Number, Plate, Chassis - in same row with 1/4, 1/4, 2/4 ratio */}
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      {/* Serial Number - 1/4 - EDITABLE by Financial users */}
+                      {/* Serial Number - 1/4 */}
                       <FormField
                         control={form.control}
                         name="serialNumber"
@@ -1653,7 +1749,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                                 placeholder="Ex: ABC-123456"
                                 className="uppercase bg-transparent"
                                 onChange={(value) => field.onChange(typeof value === "string" ? value.toUpperCase() : "")}
-                                disabled={isSubmitting || isWarehouseUser || isDesignerUser}
+                                disabled={isSubmitting || isWarehouseUser || isDesignerUser || isFinancialUser}
                               />
                             </FormControl>
                             <FormMessage />
@@ -1665,59 +1761,106 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                       <FormField
                         control={form.control}
                         name="truck.plate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="flex items-center gap-2">
-                              <IconLicense className="h-4 w-4" />
-                              Placa
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                value={field.value || ""}
-                                placeholder="Ex: ABC1234"
-                                className="uppercase bg-transparent"
-                                onChange={(value) => {
-                                  const upperValue = (value || "").toUpperCase();
-                                  field.onChange(upperValue);
-                                }}
-                                disabled={isSubmitting || isWarehouseUser || isDesignerUser}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        render={({ field }) => {
+                          // Format Brazilian license plate for display
+                          // Old format: ABC-1234 (3 letters + hyphen + 4 numbers)
+                          // Mercosul format: ABC-1D23 (3 letters + hyphen + 1 number + 1 letter + 2 numbers)
+                          const formatPlate = (value: string) => {
+                            const clean = value.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+                            if (clean.length <= 3) {
+                              return clean;
+                            }
+
+                            // Check if it's Mercosul format (5th character is a letter)
+                            const fifthChar = clean.charAt(4);
+                            const isMercosul = fifthChar && /[A-Z]/i.test(fifthChar);
+
+                            if (isMercosul) {
+                              // Mercosul format: ABC-1D23
+                              return clean.slice(0, 3) + '-' + clean.slice(3, 7);
+                            } else {
+                              // Old format: ABC-1234
+                              return clean.slice(0, 3) + '-' + clean.slice(3, 7);
+                            }
+                          };
+
+                          return (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2">
+                                <IconLicense className="h-4 w-4" />
+                                Placa
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  value={formatPlate(field.value || "")}
+                                  placeholder="Ex: ABC-1234 ou ABC-1D23"
+                                  className="uppercase bg-transparent"
+                                  maxLength={8}
+                                  onChange={(value) => {
+                                    // Remove all non-alphanumeric characters, convert to uppercase
+                                    const cleanValue = (value || "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
+                                    // Limit to 7 characters (3 letters + 4 chars)
+                                    const limitedValue = cleanValue.slice(0, 7);
+                                    field.onChange(limitedValue);
+                                  }}
+                                  disabled={isSubmitting || isWarehouseUser || isDesignerUser || isFinancialUser}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
                       />
 
                       {/* Chassis - 2/4 (col-span-2) */}
                       <FormField
                         control={form.control}
                         name="truck.chassisNumber"
-                        render={({ field }) => (
-                          <FormItem className="md:col-span-2">
-                            <FormLabel className="flex items-center gap-2">
-                              <IconId className="h-4 w-4" />
-                              Chassi
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                value={field.value || ""}
-                                placeholder="Ex: 9BWZZZ377VT004251"
-                                className="uppercase bg-transparent"
-                                onChange={(value) => {
-                                  const upperValue = (value || "").toUpperCase();
-                                  field.onChange(upperValue);
-                                }}
-                                disabled={isSubmitting || isWarehouseUser || isDesignerUser}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        render={({ field }) => {
+                          // Format chassis for display: XXX XXXXX XX XXXXXX
+                          const formatChassis = (value: string) => {
+                            const clean = value.replace(/\s/g, "");
+                            if (clean.length > 10) {
+                              return clean.slice(0, 3) + ' ' + clean.slice(3, 8) + ' ' + clean.slice(8, 10) + ' ' + clean.slice(10, 17);
+                            } else if (clean.length > 8) {
+                              return clean.slice(0, 3) + ' ' + clean.slice(3, 8) + ' ' + clean.slice(8, 10);
+                            } else if (clean.length > 3) {
+                              return clean.slice(0, 3) + ' ' + clean.slice(3, 8);
+                            }
+                            return clean.slice(0, 3);
+                          };
+
+                          return (
+                            <FormItem className="md:col-span-2">
+                              <FormLabel className="flex items-center gap-2">
+                                <IconId className="h-4 w-4" />
+                                Chassi
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  value={formatChassis(field.value || "")}
+                                  placeholder="Ex: 9BW ZZZ37 7V T004251"
+                                  className="bg-transparent uppercase"
+                                  maxLength={20}
+                                  onChange={(value) => {
+                                    // Remove all non-alphanumeric characters and spaces, convert to uppercase
+                                    const cleanValue = (value || "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
+                                    // Limit to exactly 17 characters (VIN standard)
+                                    const limitedValue = cleanValue.slice(0, 17);
+                                    field.onChange(limitedValue);
+                                  }}
+                                  disabled={isSubmitting || isWarehouseUser || isDesignerUser || isFinancialUser}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
                       />
                     </div>
 
-                    {/* Sector and Status in a row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Sector, Status and Commission in a row */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Sector */}
                       <SectorSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} productionOnly />
 
@@ -1737,8 +1880,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                                 onValueChange={field.onChange}
                                 disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isLogisticUser}
                                 options={[
-                                  TASK_STATUS.PENDING,
                                   TASK_STATUS.PREPARATION,
+                                  TASK_STATUS.WAITING_PRODUCTION,
                                   TASK_STATUS.IN_PRODUCTION,
                                   TASK_STATUS.COMPLETED,
                                   TASK_STATUS.CANCELLED,
@@ -1748,6 +1891,38 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                                 }))}
                                 placeholder="Selecione o status"
                                 searchable={false}
+                                clearable={false}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Commission Status */}
+                      <FormField
+                        control={form.control}
+                        name="commission"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                              <IconCurrencyReal className="h-4 w-4" />
+                              Status de Comissão
+                            </FormLabel>
+                            <FormControl>
+                              <Combobox
+                                value={field.value || ""}
+                                onValueChange={(value) => field.onChange(value || null)}
+                                disabled={isSubmitting || isFinancialUser || isDesignerUser}
+                                options={[
+                                  { value: "", label: "Não definido" },
+                                  ...Object.values(COMMISSION_STATUS).map((status) => ({
+                                    value: status,
+                                    label: COMMISSION_STATUS_LABELS[status],
+                                  })),
+                                ]}
+                                placeholder="Selecione o status de comissão"
+                                searchable={false}
                               />
                             </FormControl>
                             <FormMessage />
@@ -1755,34 +1930,6 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                         )}
                       />
                     </div>
-
-                    {/* Commission Status */}
-                    <FormField
-                      control={form.control}
-                      name="commission"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-2">
-                            <IconCurrencyReal className="h-4 w-4" />
-                            Status de Comissão
-                          </FormLabel>
-                          <FormControl>
-                            <Combobox
-                              value={field.value || COMMISSION_STATUS.FULL_COMMISSION}
-                              onValueChange={field.onChange}
-                              disabled={isSubmitting || isFinancialUser}
-                              options={Object.values(COMMISSION_STATUS).map((status) => ({
-                                value: status,
-                                label: COMMISSION_STATUS_LABELS[status],
-                              }))}
-                              placeholder="Selecione o status de comissão"
-                              searchable={false}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
 
                     {/* Details */}
                     <FormField
@@ -1804,9 +1951,9 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                   </CardContent>
                 </Card>
 
-                {/* Dates Card - Hidden for Warehouse and Logistic users, Disabled for Financial and Designer users */}
-                {!isWarehouseUser && !isLogisticUser && (
-                <Card className="bg-white dark:bg-neutral-850">
+                {/* Dates Card - Hidden for Warehouse, Logistic, and Commercial users, Disabled for Financial and Designer users */}
+                {!isWarehouseUser && !isLogisticUser && !isCommercialUser && (
+                <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <IconCalendar className="h-5 w-5" />
@@ -1814,7 +1961,23 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* First Row: Entry Date and Deadline */}
+                    {/* First Row: Forecast Date */}
+                    <FormField
+                      control={form.control}
+                      name="forecastDate"
+                      render={({ field }) => (
+                        <DateTimeInput
+                          field={field}
+                          mode="date"
+                          context="start"
+                          label="Data de Previsão de Liberação"
+                          disabled={isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser}
+                          allowManualInput={true}
+                        />
+                      )}
+                    />
+
+                    {/* Second Row: Entry Date and Deadline */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Entry Date - Date only - DISABLED for Financial and Designer users */}
                       <FormField
@@ -1833,7 +1996,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                       />
                     </div>
 
-                    {/* Second Row: Started At and Finished At */}
+                    {/* Third Row: Started At and Finished At */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Started At - DateTime - DISABLED for Financial and Designer users */}
                       <FormField
@@ -1874,29 +2037,13 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                         )}
                       />
                     </div>
-
-                    {/* Third Row: Forecast Date */}
-                    <FormField
-                      control={form.control}
-                      name="forecastDate"
-                      render={({ field }) => (
-                        <DateTimeInput
-                          field={field}
-                          mode="date"
-                          context="start"
-                          label="Data de Previsão"
-                          disabled={isSubmitting || isWarehouseUser || isFinancialUser || isDesignerUser}
-                          allowManualInput={true}
-                        />
-                      )}
-                    />
                   </CardContent>
                 </Card>
                 )}
 
-                {/* Services Card - Hidden for Warehouse, Financial, Designer, and Logistic users */}
-                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && (
-                <Card className="bg-white dark:bg-neutral-850">
+                {/* Services Card - Hidden for Warehouse, Financial, Designer, Logistic, and Commercial users */}
+                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && !isCommercialUser && (
+                <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <IconClipboardList className="h-5 w-5" />
@@ -1918,9 +2065,9 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 </Card>
                 )}
 
-                {/* Paint Selection (Tintas) - Hidden for Warehouse, Financial, and Logistic users, Disabled for Designer */}
-                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
-                <Card className="bg-white dark:bg-neutral-850">
+                {/* Paint Selection (Tintas) - Hidden for Warehouse, Financial, Logistic, and Commercial users, Disabled for Designer */}
+                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && !isCommercialUser && (
+                <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <IconPalette className="h-5 w-5" />
@@ -1945,9 +2092,9 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 </Card>
                 )}
 
-                {/* Layout Section - Hidden for Warehouse and Financial users, Read-only for Designer users, EDITABLE for Logistic users */}
-                {!isWarehouseUser && !isFinancialUser && (
-                <Card className="bg-white dark:bg-neutral-850">
+                {/* Layout Section - Hidden for Warehouse, Financial, Designer, and Commercial users, EDITABLE for Logistic users */}
+                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isCommercialUser && (
+                <Card>
                   <CardHeader className={`transition-all duration-200 ${!isLayoutOpen ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -2106,8 +2253,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 )}
 
                 {/* Truck Spot Selector - Available when truck layout is filled */}
-                {truckId && (
-                  <Card className="bg-white dark:bg-neutral-850">
+                {truckId && !isFinancialUser && (
+                  <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <IconMapPin className="h-5 w-5" />
@@ -2122,7 +2269,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                         onSpotChange={(spot) => {
                           form.setValue("truck.spot", spot, { shouldDirty: true });
                         }}
-                        disabled={isSubmitting || isFinancialUser || isWarehouseUser}
+                        disabled={isSubmitting || isWarehouseUser}
                       />
                     </CardContent>
                   </Card>
@@ -2130,7 +2277,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
 
                 {/* Budget Card - Only visible to ADMIN and FINANCIAL users */}
                 {canViewFinancialSections && (
-                <Card className="bg-white dark:bg-neutral-850">
+                <Card>
                   <CardHeader className={`transition-all duration-200 ${budgetCount === 0 ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -2177,9 +2324,9 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 </Card>
                 )}
 
-                {/* Cut Plans Section - Multiple Cuts Support - EDITABLE for Designer, Hidden for Financial and Logistic users */}
-                {!isFinancialUser && !isLogisticUser && (
-                <Card className="bg-white dark:bg-neutral-850">
+                {/* Cut Plans Section - Multiple Cuts Support - EDITABLE for Designer, Hidden for Financial, Logistic, and Commercial users */}
+                {!isFinancialUser && !isLogisticUser && !isCommercialUser && (
+                <Card>
                   <CardHeader className={`transition-all duration-200 ${cutsCount === 0 ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -2226,9 +2373,9 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 </Card>
                 )}
 
-                {/* Airbrushing Section - Multiple Airbrushings Support - Hidden for Warehouse, Financial, Designer, and Logistic users */}
-                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && (
-                <Card className="bg-white dark:bg-neutral-850">
+                {/* Airbrushing Section - Multiple Airbrushings Support - Hidden for Warehouse, Financial, Designer, Logistic, and Commercial users */}
+                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && !isCommercialUser && (
+                <Card>
                   <CardHeader className={`transition-all duration-200 ${airbrushingsCount === 0 ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -2277,7 +2424,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
 
                 {/* Financial Information Card - Only visible to ADMIN and FINANCIAL users */}
                 {canViewFinancialSections && (
-                <Card className="bg-white dark:bg-neutral-850">
+                <Card>
                   <CardHeader className={`transition-all duration-200 ${!isFinancialInfoOpen ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -2379,9 +2526,9 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 </Card>
                 )}
 
-                {/* Observation Section - Hidden for Warehouse, Financial, Designer, and Logistic users */}
-                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && (
-                <Card className="bg-white dark:bg-neutral-850">
+                {/* Observation Section - Hidden for Warehouse, Financial, Designer, Logistic, and Commercial users */}
+                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && !isCommercialUser && (
+                <Card>
                   <CardHeader className={`transition-all duration-200 ${!isObservationOpen ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
@@ -2481,40 +2628,112 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 </Card>
                 )}
 
-                {/* Artworks Card (optional) - EDITABLE for Designer, Hidden for Warehouse, Financial, and Logistic users */}
-                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
-                <Card className="bg-white dark:bg-neutral-850">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <IconFile className="h-5 w-5" />
-                      Artes (Opcional)
-                    </CardTitle>
+                {/* Base Files Card (optional) - EDITABLE for Designer, Hidden for Warehouse, Financial, Logistic, and Commercial users */}
+                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && !isCommercialUser && (
+                <Card>
+                  <CardHeader className={`transition-all duration-200 ${!isBaseFilesOpen ? "pt-3 pb-0" : ""}`}>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFile className="h-5 w-5" />
+                        Arquivos Base
+                      </CardTitle>
+                      {!isBaseFilesOpen ? (
+                        <Button
+                          type="button"
+                          onClick={() => setIsBaseFilesOpen(true)}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Adicionar
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setIsBaseFilesOpen(false);
+                            setBaseFiles([]);
+                          }}
+                          disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover arquivos base"
+                        >
+                          <IconX className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </CardHeader>
-                  <CardContent>
-                    {/* Edit-specific: Show existing artworks */}
-                    {task.artworks && task.artworks.length > 0 && (
-                      <div className="mb-4">
-                        <Label className="text-sm text-muted-foreground mb-2">Artes Existentes</Label>
-                        <div className="space-y-2">
-                          {task.artworks.map((file) => (
-                            <div key={file.id} className="flex items-center gap-2 text-sm">
-                              <IconFile className="h-4 w-4" />
-                              <span>{file.filename}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                  <CardContent className={`transition-all duration-200 ${!isBaseFilesOpen ? "p-2" : ""}`}>
+                    {isBaseFilesOpen && (
+                      <FileUploadField
+                        onFilesChange={handleBaseFilesChange}
+                        maxFiles={5}
+                        disabled={isSubmitting}
+                        showPreview={true}
+                        existingFiles={baseFiles}
+                        variant="compact"
+                        placeholder="Adicione arquivos base para criação das artes"
+                        label="Arquivos base anexados"
+                      />
                     )}
-                    <FileUploadField
-                      onFilesChange={handleFilesChange}
-                      maxFiles={5}
-                      disabled={isSubmitting}
-                      showPreview={true}
-                      existingFiles={uploadedFiles}
-                      variant="compact"
-                      placeholder="Adicione artes relacionadas à tarefa"
-                      label="Artes anexadas"
-                    />
+                  </CardContent>
+                </Card>
+                )}
+
+                {/* Artworks Card (optional) - EDITABLE for Designer, Hidden for Warehouse, Financial, Logistic, and Commercial users */}
+                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && !isCommercialUser && (
+                <Card>
+                  <CardHeader className={`transition-all duration-200 ${!isArtworksOpen ? "pt-3 pb-0" : ""}`}>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconFile className="h-5 w-5" />
+                        Artes
+                      </CardTitle>
+                      {!isArtworksOpen ? (
+                        <Button
+                          type="button"
+                          onClick={() => setIsArtworksOpen(true)}
+                          disabled={isSubmitting}
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <IconPlus className="h-4 w-4" />
+                          Adicionar
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setIsArtworksOpen(false);
+                            setUploadedFiles([]);
+                          }}
+                          disabled={isSubmitting}
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          title="Remover artes"
+                        >
+                          <IconX className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className={`transition-all duration-200 ${!isArtworksOpen ? "p-2" : ""}`}>
+                    {isArtworksOpen && (
+                      <FileUploadField
+                        onFilesChange={handleFilesChange}
+                        maxFiles={5}
+                        disabled={isSubmitting}
+                        showPreview={true}
+                        existingFiles={uploadedFiles}
+                        variant="compact"
+                        placeholder="Adicione artes relacionadas à tarefa"
+                        label="Artes anexadas"
+                      />
+                    )}
                   </CardContent>
           </Card>
           )}

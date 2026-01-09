@@ -3,7 +3,7 @@
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
 import type { Task, TaskIncludes, TaskOrderBy } from "./task";
 import type { Layout, LayoutIncludes } from "./layout";
-import type { ORDER_BY_DIRECTION } from "../constants";
+import type { ORDER_BY_DIRECTION, TRUCK_CATEGORY, IMPLEMENT_TYPE, TRUCK_SPOT } from "../constants";
 
 // =====================
 // Main Entity Interface
@@ -14,13 +14,15 @@ export interface Truck extends BaseEntity {
   plate: string | null;
   chassisNumber: string | null;
 
-  // Position
-  xPosition: number | null;
-  yPosition: number | null;
+  // Truck specifications
+  category: TRUCK_CATEGORY | null;
+  implementType: IMPLEMENT_TYPE | null;
+
+  // Spot (garage location)
+  spot: TRUCK_SPOT | null;
 
   // Relations
   taskId: string;
-  garageId: string | null;
   leftSideLayoutId: string | null;
   rightSideLayoutId: string | null;
   backSideLayoutId: string | null;
@@ -65,10 +67,10 @@ export interface TruckOrderBy {
   id?: ORDER_BY_DIRECTION;
   plate?: ORDER_BY_DIRECTION;
   chassisNumber?: ORDER_BY_DIRECTION;
-  xPosition?: ORDER_BY_DIRECTION;
-  yPosition?: ORDER_BY_DIRECTION;
+  category?: ORDER_BY_DIRECTION;
+  implementType?: ORDER_BY_DIRECTION;
+  spot?: ORDER_BY_DIRECTION;
   taskId?: ORDER_BY_DIRECTION;
-  garageId?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
   task?: TaskOrderBy;
@@ -91,3 +93,69 @@ export interface TruckDeleteResponse extends BaseDeleteResponse {}
 export interface TruckBatchCreateResponse<T> extends BaseBatchResponse<Truck, T> {}
 export interface TruckBatchUpdateResponse<T> extends BaseBatchResponse<Truck, T & { id: string }> {}
 export interface TruckBatchDeleteResponse extends BaseBatchResponse<{ id: string; deleted: boolean }, { id: string }> {}
+
+// =====================
+// Form Data Types
+// =====================
+
+export interface TruckGetManyFormData {
+  page?: number;
+  limit?: number;
+  take?: number;
+  skip?: number;
+  where?: any;
+  orderBy?: TruckOrderBy;
+  include?: TruckIncludes;
+  searchingFor?: string;
+  plate?: string;
+  category?: TRUCK_CATEGORY;
+  spot?: TRUCK_SPOT;
+}
+
+export interface TruckGetByIdFormData {
+  id: string;
+  include?: TruckIncludes;
+}
+
+export interface TruckCreateFormData {
+  plate?: string | null;
+  chassisNumber?: string | null;
+  category?: TRUCK_CATEGORY | null;
+  implementType?: IMPLEMENT_TYPE | null;
+  spot?: TRUCK_SPOT | null;
+  taskId?: string;
+  leftSideLayoutId?: string | null;
+  rightSideLayoutId?: string | null;
+  backSideLayoutId?: string | null;
+}
+
+export interface TruckUpdateFormData {
+  plate?: string | null;
+  chassisNumber?: string | null;
+  category?: TRUCK_CATEGORY | null;
+  implementType?: IMPLEMENT_TYPE | null;
+  spot?: TRUCK_SPOT | null;
+  taskId?: string;
+  leftSideLayoutId?: string | null;
+  rightSideLayoutId?: string | null;
+  backSideLayoutId?: string | null;
+}
+
+export interface TruckQueryFormData {
+  include?: TruckIncludes;
+}
+
+export interface TruckBatchCreateFormData {
+  trucks: TruckCreateFormData[];
+}
+
+export interface TruckBatchUpdateFormData {
+  trucks: {
+    id: string;
+    data: TruckUpdateFormData;
+  }[];
+}
+
+export interface TruckBatchDeleteFormData {
+  truckIds: string[];
+}

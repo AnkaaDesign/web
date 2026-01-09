@@ -6,15 +6,6 @@ import { ORDER_STATUS_ORDER } from "../constants";
 import { addDays, addMonths, addWeeks, addYears, dateUtils } from "./date";
 import { numberUtils } from "./number";
 import { startOfDay, getDay, setDate, setMonth } from "date-fns";
-import type { OrderStatus } from "@prisma/client";
-
-/**
- * Map ORDER_STATUS enum to Prisma OrderStatus enum
- * This is needed because TypeScript doesn't recognize that the string values are compatible
- */
-export function mapOrderStatusToPrisma(status: ORDER_STATUS | string): OrderStatus {
-  return status as OrderStatus;
-}
 
 /**
  * Get numeric order for status (for sorting and workflow)

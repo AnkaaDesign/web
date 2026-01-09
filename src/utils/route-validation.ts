@@ -306,13 +306,18 @@ export const ROUTE_FIXES: Record<string, string> = {
   "/recursos-humanos/ppe/configuracoes": "/recursos-humanos/epi",
   "/recursos-humanos/ppe/configuracoes/cadastrar": "/recursos-humanos/epi/cadastrar",
 
-  // Financial sector route mappings - redirect production routes to main production
+  // Financial sector route mappings - redirect to main production routes
   "/financeiro/producao": "/producao",
   "/financeiro/producao/aerografia": "/producao/aerografia/listar",
   "/financeiro/producao/cronograma": "/producao/cronograma",
   "/financeiro/producao/em-espera": "/producao/em-preparacao",
   "/financeiro/producao/em-preparacao": "/producao/em-preparacao",
+  "/financeiro/producao/agenda": "/producao/agenda",
   "/financeiro/producao/historico-tarefas": "/producao/historico",
+  // Simplified financial routes (cleaner menu structure)
+  "/financeiro": "/producao/agenda", // Default financial redirect
+  "/financeiro/agenda": "/producao/agenda",
+  "/financeiro/aerografia": "/producao/aerografia/listar",
 
   // Designer sector routes - no redirects needed, they use regular production/painting routes directly
 

@@ -4,7 +4,7 @@
  * Defines schema types for message API requests
  */
 
-import type { MessageStatus, MessagePriority, MessageTargeting, MessageScheduling } from '../types/message';
+import type { MessageStatus, MessageTargeting, MessageScheduling } from '../types/message';
 
 // Query parameters
 export interface MessageGetManyFormData {
@@ -12,7 +12,6 @@ export interface MessageGetManyFormData {
   limit?: number;
   searchingFor?: string;
   status?: MessageStatus[];
-  priority?: MessagePriority[];
   createdAt?: {
     gte?: Date | string;
     lte?: Date | string;
@@ -30,23 +29,23 @@ export interface MessageQueryFormData {
   include?: any;
 }
 
-// CRUD operations
+// CRUD operations - Aligned with backend CreateMessageDto
 export interface MessageCreateFormData {
   title: string;
-  content: any; // JSON blocks
-  status: MessageStatus;
-  priority: MessagePriority;
-  targeting: MessageTargeting;
-  scheduling?: MessageScheduling;
+  contentBlocks: any[]; // Array of content blocks
+  targets?: string[]; // Array of target user IDs (empty = all users)
+  isActive?: boolean; // Whether message is active/published (default: true)
+  startsAt?: string; // ISO date string for visibility start
+  endsAt?: string; // ISO date string for visibility end
 }
 
 export interface MessageUpdateFormData {
   title?: string;
-  content?: any;
-  status?: MessageStatus;
-  priority?: MessagePriority;
-  targeting?: MessageTargeting;
-  scheduling?: MessageScheduling;
+  contentBlocks?: any[]; // Array of content blocks
+  targets?: string[]; // Array of target user IDs (empty = all users)
+  isActive?: boolean;
+  startsAt?: string;
+  endsAt?: string;
 }
 
 // Batch operations

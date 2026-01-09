@@ -269,11 +269,28 @@ export function TaskHistoryList({
         ]);
       }
 
-      // History/other pages: show base columns + finishedAt + visible service order columns
+      if (navigationRoute === 'schedule') {
+        // Cronograma page: name, customer, general painting, identificador, sector, term, forecastDate
+        return new Set([
+          "name",
+          "customer.fantasyName",
+          "generalPainting",
+          "identificador",
+          "sector.name",
+          "term",
+          "forecastDate",
+        ]);
+      }
+
+      // History page: name, customer, general painting, identificador, sector, finishedAt, commission
       return new Set([
-        ...baseColumns,
+        "name",
+        "customer.fantasyName",
+        "generalPainting",
+        "identificador",
+        "sector.name",
         "finishedAt",
-        ...serviceOrderColumns,
+        "commission",
       ]);
     },
     [navigationRoute, userSectorPrivilege]
@@ -304,8 +321,9 @@ export function TaskHistoryList({
       canViewPrice,
       currentUserId: currentUser?.id,
       sectorPrivilege: userSectorPrivilege,
+      navigationRoute,
     }),
-    [canViewPrice, currentUser?.id, userSectorPrivilege]
+    [canViewPrice, currentUser?.id, userSectorPrivilege, navigationRoute]
   );
 
   // Prepare final query filters
@@ -316,8 +334,19 @@ export function TaskHistoryList({
       status: filterWithoutOrderBy.status || statusFilter,
     };
 
+    // Add service order filtering for agenda (preparation) view
+    if (statusFilter?.includes("PREPARATION") && navigationRoute === "preparation") {
+      if (isAdmin) {
+        // Admin: show tasks with no service orders OR incomplete NEGOTIATION/PRODUCTION/ARTWORK service orders
+        result.hasIncompleteNonFinancialServiceOrders = true;
+      } else if (currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)) {
+        // Financial: show tasks with ANY incomplete service orders (including FINANCIAL type)
+        result.hasIncompleteServiceOrders = true;
+      }
+    }
+
     return result;
-  }, [baseQueryFilters, statusFilter]);
+  }, [baseQueryFilters, statusFilter, isAdmin, currentUser, navigationRoute]);
 
   // Handle filter changes
   const handleFilterChange = React.useCallback(

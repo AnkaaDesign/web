@@ -4,6 +4,8 @@ import { IconBold, IconItalic, IconUnderline, IconLink } from "@tabler/icons-rea
 import { cn } from "@/lib/utils";
 import type { TextBlock } from "../types";
 import { InlineFormattingToolbar } from "../inline-formatting-toolbar";
+import { Combobox } from "@/components/ui/combobox";
+import { Label } from "@/components/ui/label";
 
 interface TextBlockEditorProps {
   block: TextBlock;
@@ -30,18 +32,43 @@ export const TextBlockEditor = ({ block, onUpdate }: TextBlockEditorProps) => {
     }
   };
 
+  const getFontSizeClass = () => {
+    const fontSizeMap = {
+      xs: 'text-xs',
+      sm: 'text-sm',
+      base: 'text-base',
+      lg: 'text-lg',
+      xl: 'text-xl',
+      '2xl': 'text-2xl',
+      '3xl': 'text-3xl',
+    };
+    return fontSizeMap[block.fontSize || 'base'];
+  };
+
+  const getFontWeightClass = () => {
+    const fontWeightMap = {
+      normal: 'font-normal',
+      medium: 'font-medium',
+      semibold: 'font-semibold',
+      bold: 'font-bold',
+    };
+    return fontWeightMap[block.fontWeight || 'normal'];
+  };
+
   const getClassName = () => {
+    const baseClasses = [getFontSizeClass(), getFontWeightClass()];
+
     switch (block.type) {
       case 'heading1':
-        return 'text-3xl font-bold';
+        return cn(baseClasses, !block.fontSize && 'text-3xl', !block.fontWeight && 'font-bold');
       case 'heading2':
-        return 'text-2xl font-semibold';
+        return cn(baseClasses, !block.fontSize && 'text-2xl', !block.fontWeight && 'font-semibold');
       case 'heading3':
-        return 'text-xl font-medium';
+        return cn(baseClasses, !block.fontSize && 'text-xl', !block.fontWeight && 'font-medium');
       case 'quote':
-        return 'text-lg italic border-l-4 border-primary pl-4';
+        return cn(baseClasses, 'italic border-l-4 border-primary pl-4', !block.fontSize && 'text-lg');
       default:
-        return 'text-base';
+        return cn(baseClasses);
     }
   };
 
@@ -87,7 +114,7 @@ export const TextBlockEditor = ({ block, onUpdate }: TextBlockEditorProps) => {
   };
 
   return (
-    <div className="relative">
+    <div className="relative space-y-3">
       <textarea
         ref={textareaRef}
         value={block.content}
@@ -108,6 +135,45 @@ export const TextBlockEditor = ({ block, onUpdate }: TextBlockEditorProps) => {
           position="below"
         />
       )}
+
+      {/* Formatting Controls */}
+      <div className="flex gap-2 pt-2 border-t border-border/50">
+        <div className="flex-1">
+          <Label className="text-xs text-muted-foreground mb-1">Tamanho</Label>
+          <Combobox
+            value={block.fontSize || 'base'}
+            onValueChange={(value) => onUpdate({ fontSize: value as any })}
+            options={[
+              { value: 'xs', label: 'Muito Pequeno' },
+              { value: 'sm', label: 'Pequeno' },
+              { value: 'base', label: 'Normal' },
+              { value: 'lg', label: 'Grande' },
+              { value: 'xl', label: 'Muito Grande' },
+              { value: '2xl', label: 'Extra Grande' },
+              { value: '3xl', label: 'Gigante' },
+            ]}
+            placeholder="Selecione o tamanho"
+            searchable={false}
+            triggerClassName="h-8 text-xs"
+          />
+        </div>
+        <div className="flex-1">
+          <Label className="text-xs text-muted-foreground mb-1">Peso</Label>
+          <Combobox
+            value={block.fontWeight || 'normal'}
+            onValueChange={(value) => onUpdate({ fontWeight: value as any })}
+            options={[
+              { value: 'normal', label: 'Normal' },
+              { value: 'medium', label: 'Médio' },
+              { value: 'semibold', label: 'Semi-Negrito' },
+              { value: 'bold', label: 'Negrito' },
+            ]}
+            placeholder="Selecione o peso"
+            searchable={false}
+            triggerClassName="h-8 text-xs"
+          />
+        </div>
+      </div>
     </div>
   );
 };

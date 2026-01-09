@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types/message";
 import { MessageBlockRenderer } from "@/components/messaging/MessageBlockRenderer";
+import { transformMessageContent } from "@/utils/message-transformer";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -132,6 +133,7 @@ export function MessageModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogOverlay className="bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 transition-all duration-300" />
       <DialogContent
+        hideClose
         className={cn(
           "max-w-2xl w-full p-0 gap-0 overflow-hidden border-0 shadow-2xl",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
@@ -186,9 +188,11 @@ export function MessageModal({
         </div>
 
         {/* Body */}
-        <div className="px-6 py-6 min-h-[200px] max-h-[60vh] overflow-y-auto">
+        <div className="px-6 pb-6 pt-2 min-h-[200px] max-h-[60vh] overflow-y-auto">
           <div className="prose prose-sm dark:prose-invert max-w-none">
-            <MessageBlockRenderer blocks={currentMessage.content?.blocks || []} />
+            <MessageBlockRenderer
+              blocks={transformMessageContent(currentMessage.content)}
+            />
           </div>
 
           {/* Action URL if available */}

@@ -3,7 +3,7 @@
 // Period dates are computed from year/month (26th of prev month to 25th of current month)
 // ponderedTasks is computed from tasks array (FULL_COMMISSION=1.0, PARTIAL_COMMISSION=0.5)
 
-import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
+import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse, DecimalValue } from "./common";
 import type { ORDER_BY_DIRECTION } from "../constants";
 import type { User, UserIncludes } from "./user";
 import type { Task, TaskIncludes } from "./task";
@@ -19,10 +19,10 @@ export interface Bonus extends BaseEntity {
   year: number;
   month: number;
   performanceLevel: number;
-  baseBonus: number | { toNumber: () => number }; // Decimal from Prisma
-  netBonus: number | { toNumber: () => number }; // Decimal - baseBonus after deductions
-  weightedTasks: number | { toNumber: () => number }; // Decimal - weighted task count for this user
-  averageTaskPerUser: number | { toNumber: () => number }; // Decimal - average tasks per eligible user
+  baseBonus: DecimalValue;
+  netBonus: DecimalValue;
+  weightedTasks: DecimalValue;
+  averageTaskPerUser: DecimalValue;
 
   // Relations (optional, populated based on query)
   user?: User;

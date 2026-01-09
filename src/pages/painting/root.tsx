@@ -5,7 +5,8 @@ import { usePageTracker } from "@/hooks/use-page-tracker";
 import { usePaintDashboard, usePaintBrands } from "../../hooks";
 import { useNavigate } from "react-router-dom";
 import { formatCurrency, formatNumber } from "../../utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/auth-context";
 import {
   IconPalette,
   IconPlus,
@@ -51,6 +52,7 @@ import { cn } from "@/lib/utils";
 
 export function Painting() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [timePeriod, setTimePeriod] = useState(DASHBOARD_TIME_PERIOD.THIS_MONTH);
 
   // Track page access
@@ -58,6 +60,13 @@ export function Painting() {
     title: "Dashboard de Pintura",
     icon: "palette",
   });
+
+  // Redirect designers to catalog-basico
+  useEffect(() => {
+    if (user?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER) {
+      navigate(routes.catalog.root, { replace: true });
+    }
+  }, [user, navigate]);
 
   // Fetch dashboard data with time period
   const { data: dashboard, isLoading, error } = usePaintDashboard({ timePeriod });

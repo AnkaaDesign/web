@@ -105,6 +105,7 @@ import {
   IconFingerprint,
   IconDeviceIpadDollar,
   IconActivity,
+  IconMessageCircle,
 } from "@tabler/icons-react";
 
 // Types for better type safety
@@ -205,6 +206,7 @@ const iconComponents: Record<string, any> = {
   IconFingerprint,
   IconDeviceIpadDollar,
   IconActivity,
+  IconMessageCircle,
 };
 
 // Get icon component helper
@@ -444,8 +446,8 @@ export const Sidebar = memo(() => {
             return filteredChild;
           }
 
-          // Check if this is a contextual item (cadastrar, editar, detalhes)
-          const isContextualItem = ["cadastrar", "editar", "detalhes"].some((action) => child.id?.includes(action) || child.path?.includes(`/${action}`));
+          // Check if this is a contextual item (cadastrar, criar, editar, detalhes)
+          const isContextualItem = ["cadastrar", "criar", "editar", "detalhes"].some((action) => child.id?.includes(action) || child.path?.includes(`/${action}`));
 
           // For dynamic routes (with :id), check if we're on a specific instance
           if (child.isDynamic && child.path) {
@@ -458,8 +460,8 @@ export const Sidebar = memo(() => {
             }
           }
 
-          // For cadastrar, only show if we're on that exact page
-          if (child.id?.includes("cadastrar") && child.path && !child.isDynamic) {
+          // For cadastrar/criar, only show if we're on that exact page
+          if ((child.id?.includes("cadastrar") || child.id?.includes("criar")) && child.path && !child.isDynamic) {
             const shouldShow = currentPath === child.path;
             if (!shouldShow) {
               return null;

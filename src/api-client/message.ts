@@ -129,6 +129,39 @@ export class MessageService {
     const response = await apiClient.post<{ count: number }>(`${this.basePath}/mark-all-as-viewed`, { userId });
     return response.data;
   }
+
+  async getMessageStats(messageId: string): Promise<{
+    success: boolean;
+    data: {
+      totalViews: number;
+      uniqueViewers: number;
+      targetedUsers: number;
+      totalDismissals: number;
+    };
+    message: string;
+  }> {
+    const response = await apiClient.get(`${this.basePath}/${messageId}/stats`);
+    return response.data;
+  }
+
+  async dismissMessage(messageId: string): Promise<{
+    success: boolean;
+    data: any;
+    message: string;
+  }> {
+    const response = await apiClient.post(`${this.basePath}/${messageId}/dismiss`);
+    return response.data;
+  }
+
+  async archiveMessage(messageId: string): Promise<MessageUpdateResponse> {
+    const response = await apiClient.patch<MessageUpdateResponse>(`${this.basePath}/${messageId}/archive`);
+    return response.data;
+  }
+
+  async activateMessage(messageId: string): Promise<MessageUpdateResponse> {
+    const response = await apiClient.patch<MessageUpdateResponse>(`${this.basePath}/${messageId}/activate`);
+    return response.data;
+  }
 }
 
 // =====================

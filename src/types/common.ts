@@ -12,6 +12,21 @@ export type BaseEntity = {
   updatedAt: Date;
 };
 
+/**
+ * Decimal type from Prisma - can be a number or Prisma Decimal object
+ * Use toNumber() helper to safely convert
+ */
+export type DecimalValue = number | { toNumber(): number };
+
+/**
+ * Convert Decimal value to number safely
+ */
+export function toNumber(value: DecimalValue | null | undefined): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return value;
+  return value.toNumber();
+}
+
 // =====================
 // Base Response Types
 // =====================

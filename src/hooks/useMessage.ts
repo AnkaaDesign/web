@@ -242,6 +242,48 @@ export function useActivateMessage() {
 }
 
 /**
+ * Mark message as viewed (automatic tracking)
+ */
+export function useMarkAsViewed() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => messageService.markAsViewed(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
+      // Silent - no toast for automatic view tracking
+    },
+    onError: (error) => {
+      console.error('[useMarkAsViewed] Failed to mark as viewed:', error);
+      // Silent failure - don't interrupt user experience
+    },
+  });
+}
+
+/**
+ * Dismiss a message (don't show again)
+ */
+export function useDismissMessage() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (id: string) => messageService.dismissMessage(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
+      // Don't show toast - dismissal is a quiet action
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao dispensar mensagem",
+        description: error?.response?.data?.message || "Ocorreu um erro ao dispensar a mensagem.",
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+/**
  * Combined mutations hook for convenience
  */
 export function useMessageMutations() {
@@ -252,5 +294,6 @@ export function useMessageMutations() {
     batchDelete: useBatchDeleteMessages(),
     archive: useArchiveMessage(),
     activate: useActivateMessage(),
+    dismiss: useDismissMessage(),
   };
 }

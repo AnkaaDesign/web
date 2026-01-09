@@ -145,7 +145,7 @@ export interface UserNotificationPreference extends BaseEntity {
   eventType: string | null;
   enabled: boolean;
   channels: NOTIFICATION_CHANNEL[];
-  isMandatory: boolean;
+  mandatoryChannels: NOTIFICATION_CHANNEL[];
 
   // Relations
   user?: User;
@@ -172,7 +172,6 @@ export interface UserNotificationPreferenceOrderBy {
   notificationType?: ORDER_BY_DIRECTION;
   eventType?: ORDER_BY_DIRECTION;
   enabled?: ORDER_BY_DIRECTION;
-  isMandatory?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
   user?: UserOrderBy;

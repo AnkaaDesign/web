@@ -35,7 +35,6 @@ export enum ORDER_STATUS {
 export enum SECTOR_PRIVILEGES {
   BASIC = "BASIC",
   PRODUCTION = "PRODUCTION",
-  LEADER = "LEADER",
   MAINTENANCE = "MAINTENANCE",
   WAREHOUSE = "WAREHOUSE",
   ADMIN = "ADMIN",
@@ -44,7 +43,16 @@ export enum SECTOR_PRIVILEGES {
   DESIGNER = "DESIGNER",
   FINANCIAL = "FINANCIAL",
   LOGISTIC = "LOGISTIC",
+  PLOTTING = "PLOTTING",
+  COMMERCIAL = "COMMERCIAL",
 }
+
+/**
+ * TEAM_LEADER is a virtual privilege - not stored in database
+ * Determined by: user.sector.privilege === PRODUCTION && user.id === user.sector.managerId
+ * Use isTeamLeader() helper function to check this status
+ */
+export const TEAM_LEADER = 'TEAM_LEADER' as const;
 
 export enum USER_STATUS {
   EXPERIENCE_PERIOD_1 = "EXPERIENCE_PERIOD_1",
@@ -145,6 +153,7 @@ export enum TASK_STATUS {
 export enum SERVICE_ORDER_STATUS {
   PENDING = "PENDING",
   IN_PROGRESS = "IN_PROGRESS",
+  WAITING_APPROVE = "WAITING_APPROVE",
   COMPLETED = "COMPLETED",
   CANCELLED = "CANCELLED",
 }
@@ -222,6 +231,7 @@ export enum BORROW_STATUS {
   ACTIVE = "ACTIVE",
   RETURNED = "RETURNED",
   LOST = "LOST",
+  OVERDUE = "OVERDUE",
 }
 
 export enum EXTERNAL_WITHDRAWAL_STATUS {
@@ -809,6 +819,32 @@ export enum TRUCK_MANUFACTURER {
   IVECO = "IVECO",
 }
 
+/**
+ * Truck categories/types
+ * Categories define the size and configuration of the truck
+ */
+export enum TRUCK_CATEGORY {
+  MINI = 'MINI', // Mini truck (small urban delivery)
+  VUC = 'VUC', // VUC - Veículo Urbano de Carga (Urban Cargo Vehicle)
+  THREE_QUARTER = 'THREE_QUARTER', // 3/4 truck (light commercial)
+  RIGID = 'RIGID', // Toco - Rigid truck with single rear axle
+  TRUCK = 'TRUCK', // Standard truck
+  SEMI_TRAILER = 'SEMI_TRAILER', // Carreta - Semi-trailer truck
+  B_DOUBLE = 'B_DOUBLE', // Bitrem - B-Double (truck with double trailer)
+}
+
+/**
+ * Truck body/implement types
+ * Defines the type of body or implement mounted on the truck
+ */
+export enum IMPLEMENT_TYPE {
+  CORRUGATED = 'CORRUGATED', // Corrugado - Corrugated body
+  INSULATED = 'INSULATED', // Isoplastic - Insulated/refrigerated body
+  CURTAIN_SIDE = 'CURTAIN_SIDE', // Sider - Curtain-side body
+  TANK = 'TANK', // Tanque - Tank truck
+  FLATBED = 'FLATBED', // Carroceria - Open flatbed/stake body
+}
+
 // =====================
 // Operations & Actions
 // =====================
@@ -1045,7 +1081,10 @@ export enum NOTIFICATION_CHANNEL {
   EMAIL = "EMAIL",
   SMS = "SMS",
   PUSH = "PUSH",
+  MOBILE_PUSH = "MOBILE_PUSH",
+  DESKTOP_PUSH = "DESKTOP_PUSH",
   IN_APP = "IN_APP",
+  WHATSAPP = "WHATSAPP",
 }
 
 // =====================
@@ -1426,12 +1465,14 @@ export enum DASHBOARD_TIME_PERIOD {
 // =====================
 
 export enum RESCHEDULE_REASON {
-  LOW_FUNDS = "LOW_FUNDS",
-  SUPPLIER_DELAY = "SUPPLIER_DELAY",
-  OPERATIONAL_ISSUE = "OPERATIONAL_ISSUE",
+  CUSTOMER_REQUEST = "CUSTOMER_REQUEST",
+  RESOURCE_UNAVAILABLE = "RESOURCE_UNAVAILABLE",
+  MATERIAL_SHORTAGE = "MATERIAL_SHORTAGE",
+  EQUIPMENT_FAILURE = "EQUIPMENT_FAILURE",
+  WEATHER_CONDITIONS = "WEATHER_CONDITIONS",
+  STAFF_UNAVAILABLE = "STAFF_UNAVAILABLE",
   PRIORITY_CHANGE = "PRIORITY_CHANGE",
-  SEASONAL_ADJUSTMENT = "SEASONAL_ADJUSTMENT",
-  EMERGENCY = "EMERGENCY",
+  TECHNICAL_ISSUES = "TECHNICAL_ISSUES",
   OTHER = "OTHER",
 }
 
@@ -1815,7 +1856,7 @@ export enum FAVORITE_PAGES {
   PRODUCAO_HISTORICO_LISTAR = "/producao/historico",
 
   // Production - Create Pages
-  PRODUCAO_CRONOGRAMA_CADASTRAR = "/producao/cronograma/cadastrar",
+  PRODUCAO_AGENDA_CADASTRAR = "/producao/agenda/cadastrar",
   PRODUCAO_RECORTE_CADASTRAR = "/producao/recorte/cadastrar",
   PRODUCAO_SERVICOS_CADASTRAR = "/producao/servicos/cadastrar",
   PRODUCAO_OBSERVACOES_CADASTRAR = "/producao/observacoes/cadastrar",

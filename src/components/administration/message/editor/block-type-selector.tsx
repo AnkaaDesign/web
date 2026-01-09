@@ -15,6 +15,9 @@ import {
   IconMinus,
   IconList,
   IconQuote,
+  IconSpacingVertical,
+  IconStar,
+  IconColumns,
 } from "@tabler/icons-react";
 import type { BlockType } from "./types";
 
@@ -73,6 +76,12 @@ const blockTypes: Array<{
     description: 'Linha horizontal',
   },
   {
+    type: 'spacer',
+    label: 'Espaço',
+    icon: IconSpacingVertical,
+    description: 'Adicionar espaçamento vertical',
+  },
+  {
     type: 'list',
     label: 'Lista',
     icon: IconList,
@@ -83,6 +92,18 @@ const blockTypes: Array<{
     label: 'Citação',
     icon: IconQuote,
     description: 'Bloco de citação',
+  },
+  {
+    type: 'icon',
+    label: 'Ícone',
+    icon: IconStar,
+    description: 'Ícone decorativo',
+  },
+  {
+    type: 'row',
+    label: 'Linha',
+    icon: IconColumns,
+    description: 'Componentes lado a lado',
   },
 ];
 
