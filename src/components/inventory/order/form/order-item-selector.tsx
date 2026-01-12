@@ -126,6 +126,9 @@ export const OrderItemSelector = ({
   // Ref to track last clicked item for shift+click range selection
   const lastClickedIdRef = useRef<string | null>(null);
 
+  // Ref to track last selection to prevent rapid repeated calls (debounce guard)
+  const lastSelectionRef = useRef<{ itemId: string; timestamp: number } | null>(null);
+
   // Form state - always use local state for immediate UI updates
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTermProp || "");
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
@@ -489,11 +492,30 @@ export const OrderItemSelector = ({
   // Handle row selection with shift+click support
   const handleRowSelection = useCallback(
     (item: typeof items[0], event?: MouseEvent) => {
+      const now = Date.now();
+
+      // Debounce guard: prevent rapid repeated calls for the same item
+      // This prevents infinite loops caused by React render timing issues
+      if (
+        lastSelectionRef.current &&
+        lastSelectionRef.current.itemId === item.id &&
+        now - lastSelectionRef.current.timestamp < 100
+      ) {
+        console.log('[OrderItemSelector] handleRowSelection SKIPPED - debounced', {
+          itemId: item.id,
+          timeSinceLast: now - lastSelectionRef.current.timestamp
+        });
+        return;
+      }
+
+      // Update the debounce ref
+      lastSelectionRef.current = { itemId: item.id, timestamp: now };
+
       console.log('[OrderItemSelector] handleRowSelection called', {
         itemId: item.id,
         itemName: item.name,
         isShiftClick: event?.shiftKey,
-        timestamp: Date.now()
+        timestamp: now
       });
 
       const itemIsSelected = selectedItems.has(item.id);

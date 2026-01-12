@@ -32,7 +32,7 @@ import {
   TRUCK_CATEGORY_LABELS,
   IMPLEMENT_TYPE_LABELS,
 } from "../../../../constants";
-import { formatDate, formatDateTime, formatCurrency, formatChassis, formatTruckSpot, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
+import { formatDate, formatDateTime, formatCurrency, formatChassis, formatTruckSpot, formatBrazilianPhone, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
 import { cn } from "@/lib/utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
@@ -98,6 +98,8 @@ import {
   IconMapPin,
   IconLayersIntersect,
   IconPhone,
+  IconCalendarTime,
+  IconBrandWhatsapp,
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
@@ -477,6 +479,7 @@ const TASK_SECTIONS: SectionConfig[] = [
     defaultVisible: true,
     fields: [
       { id: "created", label: "Criado", sectionId: "dates" },
+      { id: "forecast", label: "Previsão", sectionId: "dates" },
       { id: "entry", label: "Entrada", sectionId: "dates" },
       { id: "term", label: "Prazo", sectionId: "dates" },
       { id: "started", label: "Iniciado", sectionId: "dates" },
@@ -812,15 +815,16 @@ export const TaskDetailsPage = () => {
   }, [layouts]);
 
   // Filter service orders by:
-  // 1. Status: only PENDING, IN_PROGRESS, and COMPLETED
+  // 1. Status: only PENDING, IN_PROGRESS, WAITING_APPROVE, and COMPLETED (not CANCELLED)
   // 2. Type: only types the user has permission to view based on sector privilege
   const filteredServiceOrders = useMemo(() => {
     if (!task?.services) return [];
     return task.services
       .filter((service) => {
-        // Filter by status
+        // Filter by status - exclude only CANCELLED
         const hasValidStatus = service.status === SERVICE_ORDER_STATUS.PENDING ||
           service.status === SERVICE_ORDER_STATUS.IN_PROGRESS ||
+          service.status === SERVICE_ORDER_STATUS.WAITING_APPROVE ||
           service.status === SERVICE_ORDER_STATUS.COMPLETED;
         if (!hasValidStatus) return false;
 
@@ -1174,15 +1178,35 @@ export const TaskDetailsPage = () => {
                 )}
 
                 {/* Negotiating With - Phone */}
-                {sectionVisibility.isFieldVisible("negotiatingWithPhone") && task.negotiatingWith?.phone && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
-                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <IconPhone className="h-4 w-4" />
-                      Telefone do Responsável
-                    </span>
-                    <span className="text-sm font-semibold text-foreground">{task.negotiatingWith.phone}</span>
-                  </div>
-                )}
+                {sectionVisibility.isFieldVisible("negotiatingWithPhone") && task.negotiatingWith?.phone && (() => {
+                  const cleanPhone = task.negotiatingWith.phone.replace(/\D/g, "");
+                  const whatsappNumber = cleanPhone.startsWith("55") ? cleanPhone : `55${cleanPhone}`;
+                  return (
+                    <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                      <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                        <IconPhone className="h-4 w-4" />
+                        Telefone do Responsável
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <a
+                          href={`tel:${task.negotiatingWith.phone}`}
+                          className="text-sm font-semibold text-green-600 dark:text-green-600 hover:underline font-mono"
+                        >
+                          {formatBrazilianPhone(task.negotiatingWith.phone)}
+                        </a>
+                        <a
+                          href={`https://wa.me/${whatsappNumber}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-green-600 dark:text-green-600 hover:text-green-700 dark:hover:text-green-500 transition-colors"
+                          title="Enviar mensagem no WhatsApp"
+                        >
+                          <IconBrandWhatsapp className="h-5 w-5" />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Sector */}
                 {sectionVisibility.isFieldVisible("sector") && (
@@ -1333,6 +1357,17 @@ export const TaskDetailsPage = () => {
                   </div>
                 </div>
 
+                {/* Forecast */}
+                {task.forecast && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
+                    <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <IconCalendarTime className="h-4 w-4" />
+                      Previsão
+                    </span>
+                    <span className="text-sm font-semibold text-foreground">{formatDateTime(task.forecast)}</span>
+                  </div>
+                )}
+
                 {/* Entry Date */}
                 {task.entryDate && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
@@ -1463,8 +1498,8 @@ export const TaskDetailsPage = () => {
                 );
               })()}
 
-              {/* Truck Layout Card */}
-              {sectionVisibility.isSectionVisible("layout") && task.truck && (
+              {/* Truck Layout Card - Only show if truck has at least one layout */}
+              {sectionVisibility.isSectionVisible("layout") && task.truck && (task.truck.leftSideLayout || task.truck.rightSideLayout || task.truck.backSideLayout) && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-850">
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
@@ -1589,16 +1624,49 @@ export const TaskDetailsPage = () => {
                             );
                           }
 
+                          // Determine available status options based on service order type and user role
+                          const isArtworkServiceOrder = serviceOrder.type === SERVICE_ORDER_TYPE.ARTWORK;
+                          const isDesignerUser = userSectorPrivilege === SECTOR_PRIVILEGES.DESIGNER;
+                          const isAdminUser = userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
+
+                          // Build status options:
+                          // - ARTWORK + DESIGNER: PENDING, IN_PROGRESS, WAITING_APPROVE (no COMPLETED - must go through admin approval)
+                          // - ADMIN: All statuses including CANCELLED
+                          // - Others: PENDING, IN_PROGRESS, WAITING_APPROVE, COMPLETED (no CANCELLED)
+                          const statusOptions: ComboboxOption[] = [
+                            { value: SERVICE_ORDER_STATUS.PENDING, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.PENDING] },
+                            { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.IN_PROGRESS] },
+                          ];
+
+                          // Add WAITING_APPROVE for ARTWORK service orders (or always for admin)
+                          if (isArtworkServiceOrder || isAdminUser) {
+                            statusOptions.push({
+                              value: SERVICE_ORDER_STATUS.WAITING_APPROVE,
+                              label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.WAITING_APPROVE],
+                            });
+                          }
+
+                          // Add COMPLETED - but NOT for DESIGNER on ARTWORK service orders
+                          if (!(isArtworkServiceOrder && isDesignerUser)) {
+                            statusOptions.push({
+                              value: SERVICE_ORDER_STATUS.COMPLETED,
+                              label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.COMPLETED],
+                            });
+                          }
+
+                          // Add CANCELLED only for ADMIN
+                          if (isAdminUser) {
+                            statusOptions.push({
+                              value: SERVICE_ORDER_STATUS.CANCELLED,
+                              label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.CANCELLED],
+                            });
+                          }
+
                           return (
                             <Combobox
                               value={serviceOrder.status || undefined}
                               onValueChange={(newStatus) => handleServiceOrderStatusChange(serviceOrder.id, newStatus as SERVICE_ORDER_STATUS)}
-                              options={[
-                                { value: SERVICE_ORDER_STATUS.PENDING, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.PENDING] },
-                                { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.IN_PROGRESS] },
-                                { value: SERVICE_ORDER_STATUS.COMPLETED, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.COMPLETED] },
-                                { value: SERVICE_ORDER_STATUS.CANCELLED, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.CANCELLED] },
-                              ]}
+                              options={statusOptions}
                               placeholder="Selecione o status"
                               searchable={false}
                               disabled={false}

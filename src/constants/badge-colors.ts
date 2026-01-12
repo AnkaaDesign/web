@@ -426,10 +426,11 @@ export const ENTITY_BADGE_CONFIG = {
 
   // Service Order Status
   SERVICE_ORDER: {
-    [SERVICE_ORDER_STATUS.PENDING]: "gray" as BadgeVariant,      // Gray - not started
-    [SERVICE_ORDER_STATUS.IN_PROGRESS]: "blue" as BadgeVariant,  // Blue - in progress
-    [SERVICE_ORDER_STATUS.COMPLETED]: "green" as BadgeVariant,   // Green - completed
-    [SERVICE_ORDER_STATUS.CANCELLED]: "red" as BadgeVariant,     // Red - cancelled
+    [SERVICE_ORDER_STATUS.PENDING]: "gray" as BadgeVariant,           // Gray - not started
+    [SERVICE_ORDER_STATUS.IN_PROGRESS]: "blue" as BadgeVariant,       // Blue - in progress
+    [SERVICE_ORDER_STATUS.WAITING_APPROVE]: "purple" as BadgeVariant, // Purple - awaiting approval
+    [SERVICE_ORDER_STATUS.COMPLETED]: "green" as BadgeVariant,        // Green - completed
+    [SERVICE_ORDER_STATUS.CANCELLED]: "red" as BadgeVariant,          // Red - cancelled
   },
 
   // Airbrushing Status

@@ -659,11 +659,16 @@ export function TaskWithServiceOrdersChangelog({
   });
 
   // Combine and sort all changelogs
+  // IMPORTANT: Only include data from queries that are actually enabled to avoid stale cache data
   const combinedChangelogs = useMemo(() => {
+    // Task logs are always enabled
     const taskLogs = taskChangelogsResponse?.data || [];
-    const serviceLogs = serviceOrderChangelogsResponse?.data || [];
-    const truckLogs = truckChangelogsResponse?.data || [];
-    const layoutLogs = layoutChangelogsResponse?.data || [];
+    // Only include service order logs if the query is enabled (has service order IDs)
+    const serviceLogs = serviceOrderIds.length > 0 ? (serviceOrderChangelogsResponse?.data || []) : [];
+    // Only include truck logs if the query is enabled (has truck ID)
+    const truckLogs = truckId ? (truckChangelogsResponse?.data || []) : [];
+    // Only include layout logs if the query is enabled (has layout IDs)
+    const layoutLogs = layoutIds.length > 0 ? (layoutChangelogsResponse?.data || []) : [];
 
     // Merge all changelogs
     const allLogs = [...taskLogs, ...serviceLogs, ...truckLogs, ...layoutLogs];
@@ -674,7 +679,7 @@ export function TaskWithServiceOrdersChangelog({
     });
 
     return allLogs;
-  }, [taskChangelogsResponse, serviceOrderChangelogsResponse, truckChangelogsResponse, layoutChangelogsResponse]);
+  }, [taskChangelogsResponse, serviceOrderChangelogsResponse, truckChangelogsResponse, layoutChangelogsResponse, serviceOrderIds, truckId, layoutIds]);
 
   // Extract all entity IDs that need to be fetched for resolution
   const entityIds = useMemo(() => {

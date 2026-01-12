@@ -691,6 +691,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
 
                 return (
                   <TableRow
+                    key={item.id}
                     className={cn(
                       "transition-colors",
                       rowStatus === "changed" && "bg-yellow-50 dark:bg-yellow-900/20",

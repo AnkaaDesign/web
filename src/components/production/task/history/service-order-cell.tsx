@@ -23,6 +23,7 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
   // Count by status
   const completedCount = serviceOrders.filter(so => so.status === SO_STATUS.COMPLETED).length;
   const inProgressCount = serviceOrders.filter(so => so.status === SO_STATUS.IN_PROGRESS).length;
+  const waitingApproveCount = serviceOrders.filter(so => so.status === SO_STATUS.WAITING_APPROVE).length;
   const cancelledCount = serviceOrders.filter(so => so.status === SO_STATUS.CANCELLED).length;
   const pendingCount = serviceOrders.filter(so => so.status === SO_STATUS.PENDING).length;
 
@@ -44,6 +45,7 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
   // Calculate percentages for progress bar
   const completedPercent = (completedCount / totalCount) * 100;
   const inProgressPercent = (inProgressCount / totalCount) * 100;
+  const waitingApprovePercent = (waitingApproveCount / totalCount) * 100;
   const pendingPercent = (pendingCount / totalCount) * 100;
   const cancelledPercent = (cancelledCount / totalCount) * 100;
 
@@ -64,12 +66,23 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
                 />
               )}
 
+              {/* Waiting Approve segment (purple) */}
+              {waitingApproveCount > 0 && (
+                <div
+                  className="absolute h-full bg-purple-500 transition-all duration-300"
+                  style={{
+                    left: `${completedPercent}%`,
+                    width: `${waitingApprovePercent}%`,
+                  }}
+                />
+              )}
+
               {/* In Progress segment (blue) */}
               {inProgressCount > 0 && (
                 <div
                   className="absolute h-full bg-blue-500 transition-all duration-300"
                   style={{
-                    left: `${completedPercent}%`,
+                    left: `${completedPercent + waitingApprovePercent}%`,
                     width: `${inProgressPercent}%`,
                   }}
                 />
@@ -80,7 +93,7 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
                 <div
                   className="absolute h-full bg-amber-500 transition-all duration-300"
                   style={{
-                    left: `${completedPercent + inProgressPercent}%`,
+                    left: `${completedPercent + waitingApprovePercent + inProgressPercent}%`,
                     width: `${pendingPercent}%`,
                   }}
                 />
@@ -91,7 +104,7 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
                 <div
                   className="absolute h-full bg-gray-400 transition-all duration-300"
                   style={{
-                    left: `${completedPercent + inProgressPercent + pendingPercent}%`,
+                    left: `${completedPercent + waitingApprovePercent + inProgressPercent + pendingPercent}%`,
                     width: `${cancelledPercent}%`,
                   }}
                 />
@@ -126,6 +139,16 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
                 <span>Concluído:</span>
               </div>
               <span className="text-right font-medium">{completedCount}</span>
+
+              {waitingApproveCount > 0 && (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-full bg-purple-500 ring-1 ring-purple-600" />
+                    <span>Aguardando aprovação:</span>
+                  </div>
+                  <span className="text-right font-medium">{waitingApproveCount}</span>
+                </>
+              )}
 
               <div className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full bg-blue-500 ring-1 ring-blue-600" />

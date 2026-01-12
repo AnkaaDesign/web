@@ -135,6 +135,13 @@ export const TaskCreateForm = () => {
               name: name || undefined,
               customerId: customerId || undefined,
               serialNumber: serialNumber.toString(),
+              // Include truck data if category or implementType is provided
+              ...(category || implementType ? {
+                truck: {
+                  category: category || undefined,
+                  implementType: implementType || undefined,
+                },
+              } : {}),
             } as TaskCreateFormData);
           }
         } else {
@@ -143,6 +150,13 @@ export const TaskCreateForm = () => {
             status,
             name: name || undefined,
             customerId: customerId || undefined,
+            // Include truck data if category or implementType is provided
+            ...(category || implementType ? {
+              truck: {
+                category: category || undefined,
+                implementType: implementType || undefined,
+              },
+            } : {}),
           } as TaskCreateFormData);
         }
 

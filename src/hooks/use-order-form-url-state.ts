@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { z } from "zod";
 import { useUrlFilters } from "./use-url-filters";
 
@@ -297,6 +297,34 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     return new Set<string>(filters.selectedItems || []);
   }, [filters.selectedItems]);
 
+  // Ref to track optimistic/pending selection state to avoid race conditions
+  // This is updated immediately when toggleItemSelection is called, before the async URL update completes
+  const pendingSelectionRef = useRef<{
+    selectedItems: Set<string>;
+    quantities: Record<string, number>;
+    prices: Record<string, number>;
+    icmses: Record<string, number>;
+    ipis: Record<string, number>;
+    timestamp: number;
+  } | null>(null);
+
+  // Keep the ref in sync with URL state when it updates (clear pending state)
+  // Use a separate effect to avoid stale closure issues
+  useMemo(() => {
+    // If URL state matches our pending state, clear the pending state
+    if (pendingSelectionRef.current) {
+      const pending = pendingSelectionRef.current;
+      const urlSelectedArray = filters.selectedItems || [];
+      const pendingSelectedArray = Array.from(pending.selectedItems).sort();
+      const urlSelectedSorted = [...urlSelectedArray].sort();
+
+      if (JSON.stringify(pendingSelectedArray) === JSON.stringify(urlSelectedSorted)) {
+        // URL state has caught up, clear pending
+        pendingSelectionRef.current = null;
+      }
+    }
+  }, [filters.selectedItems]);
+
   // Memoized state values
   const quantities = filters.quantities || {};
   const prices = filters.prices || {};
@@ -562,22 +590,31 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
   // Helper to toggle item selection
   const toggleItemSelection = useCallback(
     (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => {
+      // Use pending state if available (optimistic update), otherwise use URL state
+      // This prevents race conditions when URL state hasn't caught up yet
+      const currentSelected = pendingSelectionRef.current?.selectedItems ?? selectedItems;
+      const currentQuantities = pendingSelectionRef.current?.quantities ?? quantities;
+      const currentPrices = pendingSelectionRef.current?.prices ?? prices;
+      const currentIcmses = pendingSelectionRef.current?.icmses ?? icmses;
+      const currentIpis = pendingSelectionRef.current?.ipis ?? ipis;
+
       console.log('[useOrderFormUrlState] toggleItemSelection CALLED', {
         itemId,
         quantity,
         price,
         icms,
         ipi,
-        currentSelectedSize: selectedItems.size,
-        isAlreadySelected: selectedItems.has(itemId),
+        currentSelectedSize: currentSelected.size,
+        isAlreadySelected: currentSelected.has(itemId),
+        usingPendingState: !!pendingSelectionRef.current,
         timestamp: Date.now()
       });
 
-      const newSelected = new Set(selectedItems);
-      const newQuantities = { ...quantities };
-      const newPrices = { ...prices };
-      const newIcmses = { ...icmses };
-      const newIpis = { ...ipis };
+      const newSelected = new Set(currentSelected);
+      const newQuantities = { ...currentQuantities };
+      const newPrices = { ...currentPrices };
+      const newIcmses = { ...currentIcmses };
+      const newIpis = { ...currentIpis };
 
       if (newSelected.has(itemId)) {
         // Item is already selected - check if we should deselect or just update values
@@ -618,23 +655,34 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
 
       // Batch update all related state
       const hasChanges =
-        newSelected.size !== selectedItems.size ||
-        JSON.stringify(newQuantities) !== JSON.stringify(quantities) ||
-        JSON.stringify(newPrices) !== JSON.stringify(prices) ||
-        JSON.stringify(newIcmses) !== JSON.stringify(icmses) ||
-        JSON.stringify(newIpis) !== JSON.stringify(ipis);
+        newSelected.size !== currentSelected.size ||
+        JSON.stringify(newQuantities) !== JSON.stringify(currentQuantities) ||
+        JSON.stringify(newPrices) !== JSON.stringify(currentPrices) ||
+        JSON.stringify(newIcmses) !== JSON.stringify(currentIcmses) ||
+        JSON.stringify(newIpis) !== JSON.stringify(currentIpis);
 
       console.log('[useOrderFormUrlState] toggleItemSelection - hasChanges check', {
         hasChanges,
-        oldSelectedSize: selectedItems.size,
+        oldSelectedSize: currentSelected.size,
         newSelectedSize: newSelected.size,
-        selectedItemsChanged: newSelected.size !== selectedItems.size,
-        quantitiesChanged: JSON.stringify(newQuantities) !== JSON.stringify(quantities),
-        pricesChanged: JSON.stringify(newPrices) !== JSON.stringify(prices),
+        selectedItemsChanged: newSelected.size !== currentSelected.size,
+        quantitiesChanged: JSON.stringify(newQuantities) !== JSON.stringify(currentQuantities),
+        pricesChanged: JSON.stringify(newPrices) !== JSON.stringify(currentPrices),
         timestamp: Date.now()
       });
 
       if (hasChanges) {
+        // Update pending ref IMMEDIATELY before async URL update
+        // This ensures subsequent calls see the optimistic state
+        pendingSelectionRef.current = {
+          selectedItems: newSelected,
+          quantities: newQuantities,
+          prices: newPrices,
+          icmses: newIcmses,
+          ipis: newIpis,
+          timestamp: Date.now(),
+        };
+
         console.log('[useOrderFormUrlState] toggleItemSelection - CALLING setFilters', {
           selectedItemsToSet: newSelected.size > 0 ? Array.from(newSelected) : undefined,
           quantitiesToSet: Object.keys(newQuantities).length > 0 ? newQuantities : undefined,
@@ -658,6 +706,16 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
 
   // Helper to clear all selections
   const clearAllSelections = useCallback(() => {
+    // Clear pending ref immediately
+    pendingSelectionRef.current = {
+      selectedItems: new Set(),
+      quantities: preserveQuantitiesOnDeselect ? quantities : {},
+      prices: preserveQuantitiesOnDeselect ? prices : {},
+      icmses: preserveQuantitiesOnDeselect ? icmses : {},
+      ipis: preserveQuantitiesOnDeselect ? ipis : {},
+      timestamp: Date.now(),
+    };
+
     const resetData: any = {
       selectedItems: undefined,
     };
@@ -670,11 +728,21 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     }
 
     setFilters(resetData);
-  }, [preserveQuantitiesOnDeselect, setFilters]);
+  }, [preserveQuantitiesOnDeselect, setFilters, quantities, prices, icmses, ipis]);
 
   // Helper to batch update selection (for select all / deselect all)
   const batchUpdateSelection = useCallback(
     (newSelected: Set<string>, newQuantities: Record<string, number>, newPrices: Record<string, number>, newIcmses: Record<string, number>, newIpis: Record<string, number>) => {
+      // Update pending ref immediately for optimistic UI
+      pendingSelectionRef.current = {
+        selectedItems: newSelected,
+        quantities: newQuantities,
+        prices: newPrices,
+        icmses: newIcmses,
+        ipis: newIpis,
+        timestamp: Date.now(),
+      };
+
       setFilters({
         selectedItems: newSelected.size > 0 ? Array.from(newSelected) : undefined,
         quantities: Object.keys(newQuantities).length > 0 ? newQuantities : undefined,
@@ -914,13 +982,21 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     [setFilters]
   );
 
+  // Compute effective state that uses pending values when available
+  // This ensures UI reflects optimistic updates immediately
+  const effectiveSelectedItems = pendingSelectionRef.current?.selectedItems ?? selectedItems;
+  const effectiveQuantities = pendingSelectionRef.current?.quantities ?? quantities;
+  const effectivePrices = pendingSelectionRef.current?.prices ?? prices;
+  const effectiveIcmses = pendingSelectionRef.current?.icmses ?? icmses;
+  const effectiveIpis = pendingSelectionRef.current?.ipis ?? ipis;
+
   return {
-    // Core Form State
-    selectedItems,
-    quantities,
-    prices,
-    icmses,
-    ipis,
+    // Core Form State (using effective/optimistic values)
+    selectedItems: effectiveSelectedItems,
+    quantities: effectiveQuantities,
+    prices: effectivePrices,
+    icmses: effectiveIcmses,
+    ipis: effectiveIpis,
     orderItemMode,
     temporaryItems,
     description,
@@ -995,7 +1071,7 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
     hasFormData,
 
     // Computed Values
-    selectionCount: selectedItems.size,
+    selectionCount: effectiveSelectedItems.size,
     hasActiveFilters:
       isFilterActive("showInactive") || isFilterActive("categoryIds") || isFilterActive("brandIds") || isFilterActive("supplierIds") || isFilterActive("searchTerm"),
     totalPages: totalRecords > 0 ? Math.ceil(totalRecords / pageSize) : 1,
