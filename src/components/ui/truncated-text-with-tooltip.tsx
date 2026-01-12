@@ -46,13 +46,11 @@ export function TruncatedTextWithTooltip({ text, className, tooltipClassName, to
   }
 
   return (
-    <TooltipProvider>
-      <Tooltip delayDuration={300}>
-        <TooltipTrigger asChild>{content}</TooltipTrigger>
-        <TooltipContent className={tooltipClassName}>
-          <p className="max-w-xs">{tooltipText || text}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip delayDuration={300}>
+      <TooltipTrigger asChild>{content}</TooltipTrigger>
+      <TooltipContent className={tooltipClassName}>
+        <p className="max-w-xs">{tooltipText || text}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }

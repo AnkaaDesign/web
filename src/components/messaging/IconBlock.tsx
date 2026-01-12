@@ -12,18 +12,14 @@ interface IconBlockProps {
  * Renders an icon block using Tabler icons
  */
 export const IconBlock = React.memo<IconBlockProps>(({ block, className }) => {
-  console.log('[IconBlock] Rendering icon block:', block);
   const { icon, size = 'md', color = 'text-foreground', alignment = 'center', id } = block;
 
   // Dynamically import the icon component
   const IconComponent = icon ? (TablerIcons as any)[icon] : null;
 
   if (!IconComponent) {
-    console.warn(`[IconBlock] Icon "${icon}" not found in Tabler icons`);
     return null;
   }
-
-  console.log('[IconBlock] Successfully loaded icon:', icon);
 
   const sizeClasses = {
     sm: 'h-4 w-4',
@@ -42,7 +38,7 @@ export const IconBlock = React.memo<IconBlockProps>(({ block, className }) => {
     <IconComponent
       id={id}
       className={cn(
-        "my-2",
+        "flex-shrink-0",
         sizeClasses[size],
         color,
         className

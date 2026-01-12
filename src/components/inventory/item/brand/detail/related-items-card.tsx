@@ -211,7 +211,7 @@ export function RelatedItemsCard({ items, brandId, className, maxHeight }: Relat
                           <div className="flex items-center gap-2">
                             <TooltipProvider>
                               <Tooltip>
-                                <TooltipTrigger asChild>
+                                <TooltipTrigger className="inline-flex cursor-help">
                                   <IconAlertTriangleFilled className={cn("w-4 h-4 flex-shrink-0", stockTextColor)} aria-label={STOCK_LEVEL_LABELS[stockLevel]} />
                                 </TooltipTrigger>
                                 <TooltipContent>

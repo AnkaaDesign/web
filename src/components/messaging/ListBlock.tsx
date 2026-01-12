@@ -43,7 +43,7 @@ export const ListBlock = React.memo<ListBlockProps>(({ block, className }) => {
         return (
           <li
             key={`list-item-${index}`}
-            className="text-base leading-relaxed text-foreground pl-1"
+            className="text-base leading-relaxed text-foreground pl-1 break-words"
           >
             <span className="ml-2">
               <InlineContent content={content} />

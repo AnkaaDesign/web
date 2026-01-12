@@ -202,18 +202,16 @@ export function BorrowFilters({ open, onOpenChange, filters, onFilterChange }: B
             <IconFilter className="h-5 w-5 text-muted-foreground" />
             Empréstimos - Filtros
             {activeFilterCount > 0 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="secondary" className="ml-2 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors" onClick={handleClear}>
-                      {activeFilterCount}
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Clique para limpar todos os filtros</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant="secondary" className="ml-2 cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors" onClick={handleClear}>
+                    {activeFilterCount}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Clique para limpar todos os filtros</p>
+                </TooltipContent>
+              </Tooltip>
             )}
           </SheetTitle>
           <SheetDescription>Configure os filtros para refinar sua pesquisa de empréstimos</SheetDescription>

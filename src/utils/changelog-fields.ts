@@ -716,6 +716,16 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     // Related garage fields
     "garage.name": "Nome da Garagem",
   },
+  [CHANGE_LOG_ENTITY_TYPE.LAYOUT]: {
+    height: "Altura",
+    photoId: "Foto",
+    leftSideLayoutId: "Layout Lateral Esquerdo",
+    rightSideLayoutId: "Layout Lateral Direito",
+    backSideLayoutId: "Layout Traseiro",
+    // Nested fields
+    "photo.name": "Nome da Foto",
+    "photo.path": "Caminho da Foto",
+  },
   [CHANGE_LOG_ENTITY_TYPE.CUT]: {
     type: "Tipo",
     fileId: "Arquivo",
@@ -1020,6 +1030,18 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
       CANCELLED: "Cancelado",
     };
     return externalWithdrawalStatusLabels[value] || value;
+  }
+
+  // Handle service order status
+  if ((field === "status" || field === "status_transition") && entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER && typeof value === "string") {
+    const serviceOrderStatusLabels: Record<string, string> = {
+      PENDING: "Pendente",
+      IN_PROGRESS: "Em Andamento",
+      WAITING_APPROVE: "Aguardando Aprovação",
+      COMPLETED: "Concluído",
+      CANCELLED: "Cancelado",
+    };
+    return serviceOrderStatusLabels[value] || value;
   }
 
   // Handle task status

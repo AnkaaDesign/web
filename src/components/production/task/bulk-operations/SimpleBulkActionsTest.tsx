@@ -25,7 +25,7 @@ export const SimpleBulkActionsTest = forwardRef<
       setCurrentTaskIds(taskIds);
       setIsOpen(true);
     },
-  }));
+  }), []);
 
   const handleClose = () => {
     setIsOpen(false);

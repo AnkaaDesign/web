@@ -562,6 +562,17 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
   // Helper to toggle item selection
   const toggleItemSelection = useCallback(
     (itemId: string, quantity?: number, price?: number, icms?: number, ipi?: number) => {
+      console.log('[useOrderFormUrlState] toggleItemSelection CALLED', {
+        itemId,
+        quantity,
+        price,
+        icms,
+        ipi,
+        currentSelectedSize: selectedItems.size,
+        isAlreadySelected: selectedItems.has(itemId),
+        timestamp: Date.now()
+      });
+
       const newSelected = new Set(selectedItems);
       const newQuantities = { ...quantities };
       const newPrices = { ...prices };
@@ -613,7 +624,24 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
         JSON.stringify(newIcmses) !== JSON.stringify(icmses) ||
         JSON.stringify(newIpis) !== JSON.stringify(ipis);
 
+      console.log('[useOrderFormUrlState] toggleItemSelection - hasChanges check', {
+        hasChanges,
+        oldSelectedSize: selectedItems.size,
+        newSelectedSize: newSelected.size,
+        selectedItemsChanged: newSelected.size !== selectedItems.size,
+        quantitiesChanged: JSON.stringify(newQuantities) !== JSON.stringify(quantities),
+        pricesChanged: JSON.stringify(newPrices) !== JSON.stringify(prices),
+        timestamp: Date.now()
+      });
+
       if (hasChanges) {
+        console.log('[useOrderFormUrlState] toggleItemSelection - CALLING setFilters', {
+          selectedItemsToSet: newSelected.size > 0 ? Array.from(newSelected) : undefined,
+          quantitiesToSet: Object.keys(newQuantities).length > 0 ? newQuantities : undefined,
+          pricesToSet: Object.keys(newPrices).length > 0 ? newPrices : undefined,
+          timestamp: Date.now()
+        });
+
         setFilters({
           selectedItems: newSelected.size > 0 ? Array.from(newSelected) : undefined,
           quantities: Object.keys(newQuantities).length > 0 ? newQuantities : undefined,
@@ -621,6 +649,8 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
           icmses: Object.keys(newIcmses).length > 0 ? newIcmses : undefined,
           ipis: Object.keys(newIpis).length > 0 ? newIpis : undefined,
         });
+
+        console.log('[useOrderFormUrlState] toggleItemSelection - AFTER setFilters', { timestamp: Date.now() });
       }
     },
     [selectedItems, quantities, prices, icmses, ipis, defaultQuantity, defaultPrice, defaultIcms, defaultIpi, preserveQuantitiesOnDeselect, setFilters],

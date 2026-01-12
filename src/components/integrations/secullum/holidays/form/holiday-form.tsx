@@ -42,7 +42,7 @@ export const HolidayForm = forwardRef<{ submit: () => void; isSubmitting: boolea
     submit: () => form.handleSubmit(handleSubmit)(),
     isSubmitting,
     isValid: form.formState.isValid,
-  }));
+  }), [form, handleSubmit, isSubmitting]);
 
   // URL state persistence for create mode
   const debouncedUpdateUrl = useMemo(

@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { SECTOR_PRIVILEGES, routes } from "../../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
@@ -13,7 +13,42 @@ import React from "react";
 export const TaskEditPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [formState, setFormState] = React.useState({ isValid: false, isDirty: false });
+
+  // Determine the source section from the URL path
+  // /producao/cronograma/editar/123 → 'cronograma'
+  // /producao/agenda/editar/123 → 'agenda'
+  // /producao/historico/editar/123 → 'historico'
+  const pathSegments = location.pathname.split('/');
+  const source = pathSegments[2]; // Index 2 is the section (cronograma, agenda, historico)
+
+  // Get breadcrumb configuration based on source
+  const getBreadcrumbConfig = (source: string) => {
+    switch (source) {
+      case 'agenda':
+        return {
+          label: 'Agenda',
+          href: routes.production.preparation.root,
+          detailsRoute: routes.production.preparation.details,
+        };
+      case 'historico':
+        return {
+          label: 'Histórico',
+          href: routes.production.history.root,
+          detailsRoute: routes.production.history.details,
+        };
+      case 'cronograma':
+      default:
+        return {
+          label: 'Cronograma',
+          href: routes.production.schedule.list,
+          detailsRoute: routes.production.schedule.details,
+        };
+    }
+  };
+
+  const breadcrumbConfig = getBreadcrumbConfig(source);
 
   // Debug form state
   React.useEffect(() => {
@@ -83,7 +118,7 @@ export const TaskEditPage = () => {
   };
 
   const handleCancel = () => {
-    navigate(routes.production.schedule.list);
+    navigate(breadcrumbConfig.href);
   };
 
   if (isLoading) {
@@ -99,7 +134,7 @@ export const TaskEditPage = () => {
             title="Editar Tarefa"
             breadcrumbs={[
               { label: "Produção", href: routes.production.root },
-              { label: "Agenda", href: routes.production.schedule.list },
+              { label: breadcrumbConfig.label, href: breadcrumbConfig.href },
               { label: "Editar" },
             ]}
           />
@@ -147,7 +182,7 @@ export const TaskEditPage = () => {
   ];
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <div className="container mx-auto max-w-4xl flex-shrink-0">
           <PageHeader
@@ -155,8 +190,8 @@ export const TaskEditPage = () => {
             title={`Editar ${getTaskDisplayName(task)}`}
             breadcrumbs={[
               { label: "Produção", href: routes.production.root },
-              { label: "Agenda", href: routes.production.schedule.list },
-              { label: getTaskDisplayName(task), href: routes.production.schedule.details(id!) },
+              { label: breadcrumbConfig.label, href: breadcrumbConfig.href },
+              { label: getTaskDisplayName(task), href: breadcrumbConfig.detailsRoute(id!) },
               { label: "Editar" },
             ]}
             actions={actions}

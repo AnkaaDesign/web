@@ -100,7 +100,7 @@ export const MessageBlockRenderer = React.memo<MessageBlockRendererProps>(
     return (
       <article
         className={cn(
-          "message-blocks prose prose-neutral dark:prose-invert max-w-none",
+          "message-blocks prose prose-neutral dark:prose-invert max-w-none [&>*]:mb-4 [&>*:last-child]:mb-0",
           className
         )}
         role="article"

@@ -49,7 +49,7 @@ import { BasePhoneInput } from "@/components/ui/phone-input";
 import { CustomerSelector } from "./customer-selector";
 import { SectorSelector } from "./sector-selector";
 import { ServiceSelectorAutoGrouped } from "./service-selector-auto-grouped";
-import { BudgetSelector, type BudgetSelectorRef } from "./budget-selector";
+import { PricingSelector, type PricingSelectorRef } from "../pricing/pricing-selector";
 import { MultiCutSelector, type MultiCutSelectorRef } from "./multi-cut-selector";
 import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
@@ -117,16 +117,20 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
     return result;
   };
 
-  // Check if the current user is from the Financial, Warehouse, Designer, Logistic, or Commercial sector
+  // Check if the current user is from the Financial, Warehouse, Designer, Logistic, Plotting, or Commercial sector
   const isFinancialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
   const isWarehouseUser = user?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
   const isDesignerUser = user?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
   const isLogisticUser = user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC;
+  const isPlottingUser = user?.sector?.privileges === SECTOR_PRIVILEGES.PLOTTING;
   const isCommercialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
   const isAdminUser = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
 
   // Financial sections should only be visible to ADMIN and FINANCIAL users (not Commercial)
   const canViewFinancialSections = isAdminUser || isFinancialUser;
+
+  // Pricing sections should be visible to ADMIN, FINANCIAL, and COMMERCIAL users
+  const canViewPricingSections = isAdminUser || isFinancialUser || isCommercialUser;
 
   // Fetch cuts separately using useCutsByTask hook (same approach as detail page)
   const { data: cutsData } = useCutsByTask({
@@ -186,8 +190,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   const [cutsCount, setCutsCount] = useState(0);
   const multiAirbrushingSelectorRef = useRef<MultiAirbrushingSelectorRef>(null);
   const [airbrushingsCount, setAirbrushingsCount] = useState(0);
-  const budgetSelectorRef = useRef<BudgetSelectorRef>(null);
-  const [budgetCount, setBudgetCount] = useState(0);
+  const pricingSelectorRef = useRef<PricingSelectorRef>(null);
+  const [pricingItemCount, setPricingItemCount] = useState(0);
   const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
   const [isLayoutOpen, setIsLayoutOpen] = useState(false);
   const [hasLayoutChanges, setHasLayoutChanges] = useState(false);
@@ -456,10 +460,10 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
       negotiatingWith: taskData.negotiatingWith || null,
       sectorId: taskData.sectorId || null,
       paintId: taskData.paintId || null,
-      budgetId: taskData.budgetId || null,
-      budget: taskData.budget ? {
-        expiresIn: taskData.budget.expiresIn ? new Date(taskData.budget.expiresIn) : null,
-        items: taskData.budget.items?.map((item) => ({
+      pricing: taskData.pricing ? {
+        expiresAt: taskData.pricing.expiresAt ? new Date(taskData.pricing.expiresAt) : null,
+        status: taskData.pricing.status || 'DRAFT',
+        items: taskData.pricing.items?.map((item) => ({
           id: item.id,
           description: item.description || "",
           amount: typeof item.amount === 'number' ? item.amount : (item.amount ? Number(item.amount) : 0),
@@ -515,6 +519,13 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
     async (changedData: Partial<TaskUpdateFormData>) => {
       try {
         setIsSubmitting(true);
+
+        console.log('[TaskEditForm SUBMIT] ========================================');
+        console.log('[TaskEditForm SUBMIT] changedData keys:', Object.keys(changedData));
+        console.log('[TaskEditForm SUBMIT] pricing in changedData:', 'pricing' in changedData);
+        console.log('[TaskEditForm SUBMIT] pricing value:', changedData.pricing);
+        console.log('[TaskEditForm SUBMIT] ========================================');
+
 
         // Set entry date to 7:30 if provided (since the date picker only allows date selection)
         if (changedData.entryDate) {
@@ -576,24 +587,24 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           
         }
 
-        // Validate that budget is complete (if it exists)
-        const budget = form.getValues('budget') as any;
-        if (budget && budget.items && budget.items.length > 0) {
+        // Validate that pricing is complete (if it exists)
+        const pricing = form.getValues('pricing') as any;
+        if (pricing && pricing.items && pricing.items.length > 0) {
           // Check if any item is incomplete
-          const hasIncompleteItems = budget.items.some((item: any) => {
+          const hasIncompleteItems = pricing.items.some((item: any) => {
             const hasDescription = item.description && item.description.trim() !== "";
             const hasAmount = item.amount !== null && item.amount !== undefined && item.amount !== 0;
             return !hasDescription || !hasAmount;
           });
 
           if (hasIncompleteItems) {
-            toast.error("Alguns itens do orçamento estão incompletos. Preencha a descrição e o valor antes de enviar o formulário.");
+            toast.error("Alguns itens do precificação estão incompletos. Preencha a descrição e o valor antes de enviar o formulário.");
             return;
           }
 
           // Check if expiry date is missing
-          if (!budget.expiresIn) {
-            toast.error("A data de validade do orçamento é obrigatória.");
+          if (!pricing.expiresAt) {
+            toast.error("A data de validade do precificação é obrigatória.");
             return;
           }
         }
@@ -868,11 +879,56 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
 
           // Always send file IDs arrays when any file operation occurs
           // Backend will replace all files with these IDs + newly uploaded files
+          // FormData helper properly handles empty arrays (converts to `field[]` with empty string)
           dataForFormData.artworkIds = currentArtworkIds;
           dataForFormData.baseFileIds = currentBaseFileIds;
           dataForFormData.budgetIds = currentBudgetIds;
           dataForFormData.invoiceIds = currentInvoiceIds;
           dataForFormData.receiptIds = currentReceiptIds;
+
+          // CRITICAL: Clean up malformed data before creating FormData
+          const fileIdFields = ['artworkIds', 'baseFileIds', 'budgetIds', 'invoiceIds', 'receiptIds'];
+          const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate'];
+
+          for (const field of fileIdFields) {
+            if (field in dataForFormData) {
+              const value = dataForFormData[field];
+              // Check if it's an empty object {} (not an array) and fix it
+              if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
+                dataForFormData[field] = []; // Convert empty objects to empty arrays
+              }
+              // Convert objects with numeric keys to arrays
+              else if (value && typeof value === 'object' && !Array.isArray(value)) {
+                const keys = Object.keys(value);
+                const isNumericKeys = keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
+                if (isNumericKeys) {
+                  dataForFormData[field] = Object.values(value);
+                }
+              }
+            }
+          }
+
+          // Remove empty object date fields
+          for (const field of dateFields) {
+            if (field in dataForFormData) {
+              const value = dataForFormData[field];
+              if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date) && Object.keys(value).length === 0) {
+                delete dataForFormData[field]; // Remove empty date objects
+              }
+            }
+          }
+
+          // Fix serviceOrders if it's an object with numeric keys instead of an array
+          if ('serviceOrders' in dataForFormData && dataForFormData.serviceOrders) {
+            const value = dataForFormData.serviceOrders;
+            if (typeof value === 'object' && !Array.isArray(value)) {
+              const keys = Object.keys(value);
+              const isNumericKeys = keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
+              if (isNumericKeys) {
+                dataForFormData.serviceOrders = Object.values(value);
+              }
+            }
+          }
 
           // CRITICAL: Add back excluded fields if they actually changed
           // These were excluded to optimize payload size but need to be sent if modified
@@ -942,16 +998,76 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           const currentInvoiceIds = nfeFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
 
-          // Always send file IDs arrays when any file operation occurs
-          // Backend will replace all files with these IDs
-          submitData.artworkIds = currentArtworkIds;
-          submitData.baseFileIds = currentBaseFileIds;
-          submitData.budgetIds = currentBudgetIds;
-          submitData.invoiceIds = currentInvoiceIds;
-          submitData.receiptIds = currentReceiptIds;
+          // Send file IDs arrays when files exist
+          // Backend uses these to replace all files via 'set' operation
+          // CRITICAL: Ensure these are always proper arrays, never objects (even when empty)
+          if (currentArtworkIds.length > 0) {
+            submitData.artworkIds = [...currentArtworkIds]; // Spread to ensure it's an array
+          }
+          if (currentBaseFileIds.length > 0) {
+            submitData.baseFileIds = [...currentBaseFileIds];
+          }
+          if (currentBudgetIds.length > 0) {
+            submitData.budgetIds = [...currentBudgetIds];
+          }
+          if (currentInvoiceIds.length > 0) {
+            submitData.invoiceIds = [...currentInvoiceIds];
+          }
+          if (currentReceiptIds.length > 0) {
+            submitData.receiptIds = [...currentReceiptIds];
+          }
+
+          // CRITICAL: Clean up malformed data before sending
+          // Remove empty objects that should be arrays or dates
+          const fileIdFields = ['artworkIds', 'baseFileIds', 'budgetIds', 'invoiceIds', 'receiptIds'];
+          const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate'];
+
+          for (const field of fileIdFields) {
+            if (field in submitData) {
+              const value = submitData[field];
+              // Check if it's an empty object {} (not an array)
+              if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
+                delete submitData[field]; // Remove empty objects
+              }
+              // Convert objects with numeric keys to arrays
+              else if (value && typeof value === 'object' && !Array.isArray(value)) {
+                const keys = Object.keys(value);
+                const isNumericKeys = keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
+                if (isNumericKeys) {
+                  submitData[field] = Object.values(value);
+                }
+              }
+            }
+          }
+
+          // Remove empty object date fields
+          for (const field of dateFields) {
+            if (field in submitData) {
+              const value = submitData[field];
+              if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date) && Object.keys(value).length === 0) {
+                delete submitData[field]; // Remove empty date objects
+              }
+            }
+          }
+
+          // Fix serviceOrders if it's an object with numeric keys instead of an array
+          if ('serviceOrders' in submitData && submitData.serviceOrders) {
+            const value = submitData.serviceOrders;
+            if (typeof value === 'object' && !Array.isArray(value)) {
+              const keys = Object.keys(value);
+              const isNumericKeys = keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
+              if (isNumericKeys) {
+                submitData.serviceOrders = Object.values(value);
+              }
+            }
+          }
 
           // CRITICAL: paintIds is already in changedData (not excluded in JSON path)
           // No need to add it separately like in FormData path
+
+          console.log('[TaskEditForm] 🚀 ABOUT TO SEND API REQUEST');
+          console.log('[TaskEditForm] submitData.pricing:', submitData.pricing);
+          console.log('[TaskEditForm] submitData keys:', Object.keys(submitData));
 
           result = await updateAsync({
             id: task.id,
@@ -1165,9 +1281,9 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   const formValues = form.watch();
 
   // Watch specific fields with useWatch for better reactivity
-  const budgetValues = useWatch({
+  const pricingValues = useWatch({
     control: form.control,
-    name: 'budget',
+    name: 'pricing',
   });
 
   const cutsValues = useWatch({
@@ -1230,6 +1346,11 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
       if ('serviceOrders' in formFieldChanges) {
         console.log('[TaskEditForm] Service Orders changed:', formFieldChanges.serviceOrders);
       }
+      if ('pricing' in formFieldChanges) {
+        console.log('[TaskEditForm] ✅ PRICING CHANGED:', formFieldChanges.pricing);
+      } else {
+        console.log('[TaskEditForm] ❌ PRICING NOT in formFieldChanges');
+      }
     }
   }, [formFieldChanges]);
 
@@ -1266,27 +1387,27 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
     return cuts.length > 0 && cuts.some((cut) => !cut.file && !cut.fileId);
   }, [cutsValues]);
 
-  const hasIncompleteBudgets = useMemo(() => {
-    const budget = budgetValues as any;
-    if (!budget || !budget.items || budget.items.length === 0) return false;
+  const hasIncompletePricing = useMemo(() => {
+    const pricing = pricingValues as any;
+    if (!pricing || !pricing.items || pricing.items.length === 0) return false;
 
-    // Only validate budget if it's being changed (in formFieldChanges)
-    // This prevents existing incomplete budgets from blocking unrelated edits
-    const isBudgetBeingChanged = 'budget' in formFieldChanges;
-    if (!isBudgetBeingChanged) return false;
+    // Only validate pricing if it's being changed (in formFieldChanges)
+    // This prevents existing incomplete pricing from blocking unrelated edits
+    const isPricingBeingChanged = 'pricing' in formFieldChanges;
+    if (!isPricingBeingChanged) return false;
 
     // Check if any item is incomplete
-    const hasIncompleteItems = budget.items.some((item: any) => {
+    const hasIncompleteItems = pricing.items.some((item: any) => {
       const hasDescription = item.description && item.description.trim() !== "";
       const hasAmount = item.amount !== null && item.amount !== undefined && item.amount !== 0;
       return !hasDescription || !hasAmount;
     });
 
     // Check if expiry date is missing
-    const missingExpiryDate = !budget.expiresIn;
+    const missingExpiryDate = !pricing.expiresAt;
 
     return hasIncompleteItems || missingExpiryDate;
-  }, [budgetValues, formFieldChanges]);
+  }, [pricingValues, formFieldChanges]);
 
   const hasIncompleteServices = useMemo(() => {
     const services = servicesValues as any[] || [];
@@ -1355,7 +1476,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
       // Check if form is valid (no blocking validation errors)
       // This matches the form's internal validation but WITHOUT the hasChanges check
       // (isDirty will handle whether there are changes)
-      const isValid = !isSubmitting && !hasCutsWithoutFiles && !hasIncompleteBudgets && !hasIncompleteServices && !hasIncompleteObservation && !layoutWidthError;
+      const isValid = !isSubmitting && !hasCutsWithoutFiles && !hasIncompletePricing && !hasIncompleteServices && !hasIncompleteObservation && !layoutWidthError;
 
       if (process.env.NODE_ENV !== 'production') {
         console.log('[TaskEditForm] State check:', {
@@ -1396,7 +1517,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
     hasFileChanges,
     isSubmitting,
     hasCutsWithoutFiles,
-    hasIncompleteBudgets,
+    hasIncompletePricing,
     hasIncompleteServices,
     hasIncompleteObservation,
     layoutWidthError,
@@ -1414,9 +1535,9 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   // Log whenever hasChanges evaluation happens
   useEffect(() => {
 
-    const isDisabled = isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompleteBudgets || hasIncompleteServices || hasIncompleteObservation || !!layoutWidthError;
+    const isDisabled = isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompletePricing || hasIncompleteServices || hasIncompleteObservation || !!layoutWidthError;
 
-  }, [hasChanges, hasLayoutChanges, hasFileChanges, hasCutsToCreate, formFieldChanges, isSubmitting, hasCutsWithoutFiles, hasIncompleteBudgets, hasIncompleteServices, hasIncompleteObservation, layoutWidthError]);
+  }, [hasChanges, hasLayoutChanges, hasFileChanges, hasCutsToCreate, formFieldChanges, isSubmitting, hasCutsWithoutFiles, hasIncompletePricing, hasIncompleteServices, hasIncompleteObservation, layoutWidthError]);
 
   // Navigation actions - wrapped in useMemo to ensure re-renders when dependencies change
   const navigationActions = useMemo(() => {
@@ -1424,14 +1545,14 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
       console.log('[TaskEditForm] 🔄 navigationActions useMemo recalculating...');
     }
 
-    const isSubmitDisabled = isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompleteBudgets || hasIncompleteServices || hasIncompleteObservation || !!layoutWidthError;
+    const isSubmitDisabled = isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompletePricing || hasIncompleteServices || hasIncompleteObservation || !!layoutWidthError;
 
     if (process.env.NODE_ENV !== 'production') {
       console.log('[TaskEditForm] Submit button disabled calculation:');
       console.log('  isSubmitting:', isSubmitting);
       console.log('  hasChanges:', hasChanges);
       console.log('  hasCutsWithoutFiles:', hasCutsWithoutFiles);
-      console.log('  hasIncompleteBudgets:', hasIncompleteBudgets);
+      console.log('  hasIncompletePricing:', hasIncompletePricing);
       console.log('  hasIncompleteServices:', hasIncompleteServices);
       console.log('  hasIncompleteObservation:', hasIncompleteObservation);
       console.log('  layoutWidthError:', layoutWidthError);
@@ -1470,7 +1591,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
         loading: isSubmitting,
       },
     ];
-  }, [isSubmitting, hasChanges, hasCutsWithoutFiles, hasIncompleteBudgets, hasIncompleteServices, hasIncompleteObservation, layoutWidthError, handleCancel, handleSubmitChanges]);
+  }, [isSubmitting, hasChanges, hasCutsWithoutFiles, hasIncompletePricing, hasIncompleteServices, hasIncompleteObservation, layoutWidthError, handleCancel, handleSubmitChanges]);
 
   return (
     <Form {...form}>
@@ -2041,8 +2162,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 </Card>
                 )}
 
-                {/* Services Card - Hidden for Warehouse, Financial, Designer, Logistic, and Commercial users */}
-                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && !isCommercialUser && (
+                {/* Services Card - Visible for Admin, Financial, Designer, Commercial, and Logistic users */}
+                {!isWarehouseUser && !isPlottingUser && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -2056,7 +2177,12 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                       name="services"
                       render={() => (
                         <FormItem>
-                          <ServiceSelectorAutoGrouped control={form.control} disabled={isSubmitting || isWarehouseUser} />
+                          <ServiceSelectorAutoGrouped
+                            control={form.control}
+                            disabled={isSubmitting || isWarehouseUser}
+                            currentUserId={user?.id}
+                            userPrivilege={user?.sector?.privileges}
+                          />
                           <FormMessage />
                         </FormItem>
                       )}
@@ -2252,8 +2378,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 </Card>
                 )}
 
-                {/* Truck Spot Selector - Available when truck layout is filled */}
-                {truckId && !isFinancialUser && (
+                {/* Truck Spot Selector - Only visible to ADMIN and LOGISTIC users */}
+                {truckId && (isAdminUser || isLogisticUser) && (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -2275,21 +2401,21 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                   </Card>
                 )}
 
-                {/* Budget Card - Only visible to ADMIN and FINANCIAL users */}
-                {canViewFinancialSections && (
+                {/* Pricing Card - Visible to ADMIN, FINANCIAL, and COMMERCIAL users */}
+                {canViewPricingSections && (
                 <Card>
-                  <CardHeader className={`transition-all duration-200 ${budgetCount === 0 ? "pt-3 pb-0" : ""}`}>
+                  <CardHeader className={`transition-all duration-200 ${pricingItemCount === 0 ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <IconFileInvoice className="h-5 w-5" />
-                        Orçamento Detalhado
+                        Precificação
                       </CardTitle>
-                      {budgetCount === 0 ? (
+                      {pricingItemCount === 0 ? (
                         <Button
                           type="button"
                           onClick={() => {
-                            if (budgetSelectorRef.current) {
-                              budgetSelectorRef.current.addBudget();
+                            if (pricingSelectorRef.current) {
+                              pricingSelectorRef.current.addItem();
                             }
                           }}
                           disabled={isSubmitting}
@@ -2305,21 +2431,27 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                           variant="ghost"
                           size="icon"
                           onClick={() => {
-                            if (budgetSelectorRef.current) {
-                              budgetSelectorRef.current.clearAll();
+                            if (pricingSelectorRef.current) {
+                              pricingSelectorRef.current.clearAll();
                             }
                           }}
                           disabled={isSubmitting}
                           className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          title="Remover orçamento"
+                          title="Remover precificação"
                         >
                           <IconX className="h-4 w-4" />
                         </Button>
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent className={`transition-all duration-200 ${budgetCount === 0 ? "p-2" : ""}`}>
-                    <BudgetSelector ref={budgetSelectorRef} control={form.control} disabled={isSubmitting} onBudgetCountChange={setBudgetCount} />
+                  <CardContent className={`transition-all duration-200 ${pricingItemCount === 0 ? "p-2" : ""}`}>
+                    <PricingSelector
+                      ref={pricingSelectorRef}
+                      control={form.control}
+                      disabled={isSubmitting}
+                      userRole={user?.sector?.privileges}
+                      onItemCountChange={setPricingItemCount}
+                    />
                   </CardContent>
                 </Card>
                 )}
@@ -2470,7 +2602,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                           <div className="space-y-2">
                             <label className="text-sm font-medium flex items-center gap-2">
                               <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                              Orçamento
+                              Precificação
                             </label>
                             <FileUploadField
                               onFilesChange={handleBudgetFileChange}
@@ -2479,7 +2611,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                               showPreview={true}
                               existingFiles={budgetFile}
                               variant="compact"
-                              placeholder="Adicionar orçamentos"
+                              placeholder="Adicionar precificaçãos"
                               label=""
                             />
                           </div>
@@ -2628,8 +2760,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 </Card>
                 )}
 
-                {/* Base Files Card (optional) - EDITABLE for Designer, Hidden for Warehouse, Financial, Logistic, and Commercial users */}
-                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && !isCommercialUser && (
+                {/* Base Files Card (optional) - EDITABLE for Designer and Commercial, Hidden for Warehouse, Financial, and Logistic users */}
+                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
                 <Card>
                   <CardHeader className={`transition-all duration-200 ${!isBaseFilesOpen ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">
@@ -2683,8 +2815,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 </Card>
                 )}
 
-                {/* Artworks Card (optional) - EDITABLE for Designer, Hidden for Warehouse, Financial, Logistic, and Commercial users */}
-                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && !isCommercialUser && (
+                {/* Artworks Card (optional) - EDITABLE for Designer and Commercial, Hidden for Warehouse, Financial, and Logistic users */}
+                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
                 <Card>
                   <CardHeader className={`transition-all duration-200 ${!isArtworksOpen ? "pt-3 pb-0" : ""}`}>
                     <div className="flex items-center justify-between">

@@ -13,6 +13,7 @@ import type { Airbrushing, AirbrushingIncludes } from "./airbrushing";
 import type { Cut, CutIncludes } from "./cut";
 import type { Truck, TruckIncludes } from "./truck";
 import type { Budget, BudgetIncludes } from "./budget";
+import type { TaskPricing } from "./task-pricing";
 
 // =====================
 // Task Interface
@@ -51,6 +52,7 @@ export interface Task extends BaseEntity {
   invoiceTo?: Customer;
   budget?: Budget; // Budget with items
   budgets?: File[]; // Many-to-many relation (budget files)
+  pricing?: TaskPricing; // Task pricing with status and items
   invoices?: File[]; // Many-to-many relation
   receipts?: File[]; // Many-to-many relation
   reimbursements?: File[]; // Many-to-many relation
@@ -90,6 +92,7 @@ export interface TaskIncludes {
         include?: BudgetIncludes;
       }; // Budget items relation
   budgets?: boolean; // Many-to-many relation (budget files)
+  pricing?: boolean; // Task pricing with status and items
   invoices?: boolean; // Many-to-many relation
   receipts?: boolean; // Many-to-many relation
   reimbursements?: boolean; // Many-to-many relation

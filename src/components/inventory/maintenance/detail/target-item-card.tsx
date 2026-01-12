@@ -146,7 +146,7 @@ export function TargetItemCard({ item, className }: TargetItemCardProps) {
                 <div className="flex items-center gap-2">
                   <TooltipProvider>
                     <Tooltip>
-                      <TooltipTrigger asChild>
+                      <TooltipTrigger className="inline-flex cursor-help">
                         <IconAlertTriangleFilled className={cn("w-5 h-5 flex-shrink-0", stockStatus.color)} aria-label={stockStatus.label} />
                       </TooltipTrigger>
                       <TooltipContent>

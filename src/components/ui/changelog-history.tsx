@@ -96,6 +96,86 @@ const LogoDisplay = ({ logoId, size = "w-12 h-12", className = "", useThumbnail 
   );
 };
 
+// Helper function to generate layout SVG for changelog display
+const generateLayoutSVG = (layout: any): string => {
+  if (!layout || !layout.layoutSections) return '';
+
+  const height = (layout.height || 0) * 100; // Convert to cm
+  const sections = layout.layoutSections || [];
+  const totalWidth = sections.reduce((sum: number, s: any) => sum + (s.width || 0) * 100, 0);
+  const margin = 30;
+  const extraSpace = 40;
+  const svgWidth = totalWidth + margin * 2 + extraSpace;
+  const svgHeight = height + margin * 2 + extraSpace;
+
+  let svg = `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
+
+  // Main container
+  svg += `<rect x="${margin}" y="${margin}" width="${totalWidth}" height="${height}" fill="none" stroke="#000" stroke-width="1"/>`;
+
+  // Add section dividers
+  let currentPos = 0;
+  sections.forEach((section: any, index: number) => {
+    const sectionWidth = (section.width || 0) * 100;
+
+    if (index > 0) {
+      const prevSection = sections[index - 1];
+      if (!section.isDoor && !prevSection.isDoor) {
+        const lineX = margin + currentPos;
+        svg += `<line x1="${lineX}" y1="${margin}" x2="${lineX}" y2="${margin + height}" stroke="#333" stroke-width="0.5"/>`;
+      }
+    }
+
+    currentPos += sectionWidth;
+  });
+
+  // Add doors from layoutSections
+  currentPos = 0;
+  sections.forEach((section: any) => {
+    const sectionWidth = (section.width || 0) * 100;
+    const sectionX = margin + currentPos;
+
+    if (section.isDoor && section.doorHeight !== null && section.doorHeight !== undefined) {
+      const doorHeightCm = (section.doorHeight || 0) * 100;
+      const doorTopY = margin + (height - doorHeightCm);
+
+      // Door lines
+      svg += `<line x1="${sectionX}" y1="${doorTopY}" x2="${sectionX}" y2="${margin + height}" stroke="#000" stroke-width="1"/>`;
+      svg += `<line x1="${sectionX + sectionWidth}" y1="${doorTopY}" x2="${sectionX + sectionWidth}" y2="${margin + height}" stroke="#000" stroke-width="1"/>`;
+      svg += `<line x1="${sectionX}" y1="${doorTopY}" x2="${sectionX + sectionWidth}" y2="${doorTopY}" stroke="#000" stroke-width="1"/>`;
+    }
+
+    currentPos += sectionWidth;
+  });
+
+  // Add width dimensions
+  currentPos = 0;
+  sections.forEach((section: any) => {
+    const sectionWidth = (section.width || 0) * 100;
+    const startX = margin + currentPos;
+    const endX = margin + currentPos + sectionWidth;
+    const centerX = startX + sectionWidth / 2;
+    const dimY = margin + height + 15;
+
+    svg += `<line x1="${startX}" y1="${dimY}" x2="${endX}" y2="${dimY}" stroke="#0066cc" stroke-width="1"/>`;
+    svg += `<polygon points="${startX},${dimY} ${startX + 5},${dimY - 3} ${startX + 5},${dimY + 3}" fill="#0066cc"/>`;
+    svg += `<polygon points="${endX},${dimY} ${endX - 5},${dimY - 3} ${endX - 5},${dimY + 3}" fill="#0066cc"/>`;
+    svg += `<text x="${centerX}" y="${dimY + 12}" text-anchor="middle" font-size="10" fill="#0066cc">${Math.round(sectionWidth)}</text>`;
+
+    currentPos += sectionWidth;
+  });
+
+  // Height dimension
+  const dimX = margin - 15;
+  svg += `<line x1="${dimX}" y1="${margin}" x2="${dimX}" y2="${margin + height}" stroke="#0066cc" stroke-width="1"/>`;
+  svg += `<polygon points="${dimX},${margin} ${dimX - 3},${margin + 5} ${dimX + 3},${margin + 5}" fill="#0066cc"/>`;
+  svg += `<polygon points="${dimX},${margin + height} ${dimX - 3},${margin + height - 5} ${dimX + 3},${margin + height - 5}" fill="#0066cc"/>`;
+  svg += `<text x="${dimX - 8}" y="${margin + height / 2}" text-anchor="middle" font-size="10" fill="#0066cc" transform="rotate(-90, ${dimX - 8}, ${margin + height / 2})">${Math.round(height)}</text>`;
+  svg += `</svg>`;
+
+  return svg;
+};
+
 // Map actions to icons and colors
 const actionConfig: Record<CHANGE_LOG_ACTION, { icon: React.ElementType; color: string }> = {
   [CHANGE_LOG_ACTION.CREATE]: { icon: IconPlus, color: "text-green-600" },
@@ -531,6 +611,18 @@ const ChangelogTimelineItem = ({
 
   // Check if this is a CREATE action
   if (firstChange.action === CHANGE_LOG_ACTION.CREATE) {
+    // Extract entity details from newValue for CREATE actions
+    let entityDetails: any = null;
+    try {
+      if (firstChange.newValue) {
+        entityDetails = typeof firstChange.newValue === 'string'
+          ? JSON.parse(firstChange.newValue)
+          : firstChange.newValue;
+      }
+    } catch (e) {
+      // Failed to parse
+    }
+
     return (
       <div className="relative">
         <div className="flex items-start gap-4 group">
@@ -542,6 +634,92 @@ const ChangelogTimelineItem = ({
           {/* Change card */}
           <div className="flex-1 bg-card-nested rounded-xl p-4 border border-border">
             <div className="text-lg font-semibold mb-2">{actionLabel}</div>
+
+            {/* Service Order Details */}
+            {entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER && entityDetails && (
+              <div className="space-y-2 mb-3">
+                {entityDetails.type && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Tipo: </span>
+                    <span className="text-foreground font-medium">
+                      {SERVICE_ORDER_TYPE_LABELS[entityDetails.type] || entityDetails.type}
+                    </span>
+                  </div>
+                )}
+                {entityDetails.description && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Descrição: </span>
+                    <span className="text-foreground font-medium">{entityDetails.description}</span>
+                  </div>
+                )}
+                {entityDetails.status && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Status: </span>
+                    <span className="text-foreground font-medium">
+                      {SERVICE_ORDER_STATUS_LABELS[entityDetails.status] || entityDetails.status}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Truck Details */}
+            {entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK && entityDetails && (
+              <div className="space-y-2 mb-3">
+                {entityDetails.plate && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Placa: </span>
+                    <span className="text-foreground font-medium">{entityDetails.plate}</span>
+                  </div>
+                )}
+                {entityDetails.chassisNumber && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Chassi: </span>
+                    <span className="text-foreground font-medium">{entityDetails.chassisNumber}</span>
+                  </div>
+                )}
+                {entityDetails.category && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Categoria: </span>
+                    <span className="text-foreground font-medium">
+                      {TRUCK_MANUFACTURER_LABELS[entityDetails.category] || entityDetails.category}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Layout Details with SVG Visualization */}
+            {entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT && entityDetails && (
+              <div className="space-y-3 mb-3">
+                {/* Basic Layout Info */}
+                <div className="space-y-2">
+                  {entityDetails.height && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Altura: </span>
+                      <span className="text-foreground font-medium">{(entityDetails.height * 100).toFixed(0)} cm</span>
+                    </div>
+                  )}
+                  {entityDetails.layoutSections && entityDetails.layoutSections.length > 0 && (
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">Seções: </span>
+                      <span className="text-foreground font-medium">{entityDetails.layoutSections.length}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* SVG Visualization */}
+                {entityDetails.layoutSections && entityDetails.layoutSections.length > 0 && (
+                  <div className="bg-muted/30 rounded-lg p-4 border border-border">
+                    <div
+                      className="flex justify-center [&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[280px] [&>svg]:max-h-[100px]"
+                      dangerouslySetInnerHTML={{ __html: generateLayoutSVG(entityDetails) }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="text-sm text-muted-foreground">
               <span className="text-muted-foreground">Por: </span>
               <span className="text-foreground font-medium">{firstChange.user?.name || "Sistema"}</span>
@@ -862,6 +1040,64 @@ const ChangelogTimelineItem = ({
                               );
                             })()}
                           </>
+                        ) : changelog.field === "truck.leftSideLayoutId" || changelog.field === "truck.rightSideLayoutId" || changelog.field === "truck.backSideLayoutId" ? (
+                          // Special handling for truck layout fields - show SVG visualization
+                          (() => {
+                            const parseLayoutValue = (val: any) => {
+                              if (!val) return null;
+                              if (typeof val === "string" && val.trim().startsWith("{")) {
+                                try {
+                                  return JSON.parse(val);
+                                } catch (e) {
+                                  return null;
+                                }
+                              }
+                              return typeof val === "object" ? val : null;
+                            };
+
+                            const oldLayout = parseLayoutValue(changelog.oldValue);
+                            const newLayout = parseLayoutValue(changelog.newValue);
+
+                            const sideName = changelog.field.includes("leftSide") ? "Lado Motorista" :
+                                           changelog.field.includes("rightSide") ? "Lado Sapo" :
+                                           changelog.field.includes("backSide") ? "Traseira" : "Layout";
+
+                            return (
+                              <div className="space-y-3">
+                                <div className="text-xs font-medium text-muted-foreground">{sideName}</div>
+
+                                {oldLayout && oldLayout.layoutSections && oldLayout.layoutSections.length > 0 && (
+                                  <div>
+                                    <span className="text-sm text-muted-foreground mb-2 block">Antes:</span>
+                                    <div className="border rounded-lg bg-white/50 backdrop-blur-sm p-2">
+                                      <div
+                                        dangerouslySetInnerHTML={{ __html: generateLayoutSVG(oldLayout) }}
+                                        className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[280px] [&>svg]:max-h-[100px]"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {newLayout && newLayout.layoutSections && newLayout.layoutSections.length > 0 && (
+                                  <div>
+                                    <span className="text-sm text-muted-foreground mb-2 block">Depois:</span>
+                                    <div className="border rounded-lg bg-white/50 backdrop-blur-sm p-2">
+                                      <div
+                                        dangerouslySetInnerHTML={{ __html: generateLayoutSVG(newLayout) }}
+                                        className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[280px] [&>svg]:max-h-[100px]"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {!oldLayout?.layoutSections?.length && !newLayout?.layoutSections?.length && (
+                                  <div className="text-sm text-muted-foreground">
+                                    Layout modificado (sem visualização disponível)
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()
                         ) : changelog.field === "logoId" || changelog.field === "logo" ? (
                           // Special handling for logo fields - show "Antes" and "Depois" format
                           <>

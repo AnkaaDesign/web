@@ -246,7 +246,7 @@ export function RelatedOrdersCard({ supplier, className }: RelatedOrdersCardProp
                           <div className="flex items-center gap-2">
                             <TooltipProvider>
                               <Tooltip>
-                                <TooltipTrigger asChild>
+                                <TooltipTrigger className="inline-flex cursor-help">
                                   <StatusIcon className={cn("w-4 h-4 flex-shrink-0", config.color)} aria-label={ORDER_STATUS_LABELS[order.status]} />
                                 </TooltipTrigger>
                                 <TooltipContent>

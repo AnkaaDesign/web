@@ -61,25 +61,23 @@ export function TagsInput({ control, disabled, required }: TagsInputProps) {
                     disabled={disabled}
                     className="flex-1 bg-transparent"
                   />
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={addTag}
-                          disabled={disabled || !inputValue.trim()}
-                          className="border border-border bg-transparent hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
-                        >
-                          <IconPlus className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{!inputValue.trim() ? "Digite uma tag primeiro" : "Adicionar tag"}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={addTag}
+                        disabled={disabled || !inputValue.trim()}
+                        className="border border-border bg-transparent hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+                      >
+                        <IconPlus className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{!inputValue.trim() ? "Digite uma tag primeiro" : "Adicionar tag"}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 {tags.length > 0 && (
                   <div className="flex flex-wrap gap-2">

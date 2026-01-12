@@ -73,7 +73,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       resetForm();
       setIsOpen(true);
     },
-  }));
+  }), [resetForm]);
 
   const resetForm = () => {
     setSelectedArtIds([]);

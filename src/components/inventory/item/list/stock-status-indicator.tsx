@@ -50,19 +50,17 @@ export function StockStatusIndicator({ item, showQuantity = true, className }: S
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <IconAlertTriangleFilled className={cn("w-4 h-4 flex-shrink-0", status.color)} aria-label={status.label} />
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="space-y-1">
-              <p className="font-semibold">{status.label}</p>
-              <p className="text-xs">{status.description}</p>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger className="inline-flex cursor-help" aria-label={status.label}>
+          <IconAlertTriangleFilled className={cn("w-4 h-4 flex-shrink-0", status.color)} />
+        </TooltipTrigger>
+        <TooltipContent>
+          <div className="space-y-1">
+            <p className="font-semibold">{status.label}</p>
+            <p className="text-xs">{status.description}</p>
+          </div>
+        </TooltipContent>
+      </Tooltip>
 
       {showQuantity && (
         <span className="font-medium tabular-nums">

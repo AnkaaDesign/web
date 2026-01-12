@@ -48,10 +48,9 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
   const cancelledPercent = (cancelledCount / totalCount) * 100;
 
   return (
-    <TooltipProvider delayDuration={0}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="flex items-center gap-1.5 cursor-help w-full">
+    <Tooltip delayDuration={0}>
+      <TooltipTrigger asChild>
+        <div className="flex items-center gap-1.5 cursor-help w-full">
             {/* Progress bar container */}
             <div className="relative flex-1 h-5 min-w-[90px] max-w-[140px] bg-gray-100 dark:bg-gray-700 rounded overflow-hidden shadow-sm">
               {/* Completed segment (green) */}
@@ -163,6 +162,5 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
           </div>
         </TooltipContent>
       </Tooltip>
-    </TooltipProvider>
   );
 }

@@ -489,6 +489,13 @@ export const OrderItemSelector = ({
   // Handle row selection with shift+click support
   const handleRowSelection = useCallback(
     (item: typeof items[0], event?: MouseEvent) => {
+      console.log('[OrderItemSelector] handleRowSelection called', {
+        itemId: item.id,
+        itemName: item.name,
+        isShiftClick: event?.shiftKey,
+        timestamp: Date.now()
+      });
+
       const itemIsSelected = selectedItems.has(item.id);
 
       // Shift+click: select range of items
@@ -516,15 +523,31 @@ export const OrderItemSelector = ({
         }
       } else {
         // Regular click: toggle single item
+        console.log('[OrderItemSelector] Regular click - calling onSelectItem', {
+          itemId: item.id,
+          itemIsSelected,
+          willDeselect: itemIsSelected
+        });
+
         if (itemIsSelected) {
           // Deselect - call with no parameters
+          console.log('[OrderItemSelector] BEFORE onSelectItem (deselect)', { itemId: item.id });
           onSelectItem(item.id);
+          console.log('[OrderItemSelector] AFTER onSelectItem (deselect)', { itemId: item.id });
         } else {
           // Select - call with default values
           const defaultPrice = item.prices?.[0]?.value || 0;
           const defaultIcms = item.icms || 0;
           const defaultIpi = item.ipi || 0;
+          console.log('[OrderItemSelector] BEFORE onSelectItem (select)', {
+            itemId: item.id,
+            quantity: 1,
+            defaultPrice,
+            defaultIcms,
+            defaultIpi
+          });
           onSelectItem(item.id, 1, defaultPrice, defaultIcms, defaultIpi);
+          console.log('[OrderItemSelector] AFTER onSelectItem (select)', { itemId: item.id });
         }
       }
 

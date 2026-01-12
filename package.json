@@ -13,7 +13,8 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "clean": "rm -rf dist node_modules .turbo"
+    "clean": "rm -rf dist node_modules .turbo",
+    "update-ip": "bash scripts/update-local-ip.sh"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

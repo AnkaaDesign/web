@@ -252,7 +252,7 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
                           <div className="flex items-center gap-2">
                             <TooltipProvider>
                               <Tooltip>
-                                <TooltipTrigger asChild>
+                                <TooltipTrigger className="inline-flex cursor-help">
                                   <StatusIcon className={cn("w-4 h-4 flex-shrink-0", config.color)} aria-label={TASK_STATUS_LABELS[task.status as TASK_STATUS]} />
                                 </TooltipTrigger>
                                 <TooltipContent>

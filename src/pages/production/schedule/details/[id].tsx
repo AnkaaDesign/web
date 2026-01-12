@@ -16,6 +16,7 @@ import {
   TASK_STATUS,
   TASK_STATUS_LABELS,
   SERVICE_ORDER_STATUS,
+  SERVICE_ORDER_TYPE_LABELS,
   PAINT_FINISH,
   CHANGE_LOG_ENTITY_TYPE,
   ENTITY_BADGE_CONFIG,
@@ -32,11 +33,11 @@ import {
   IMPLEMENT_TYPE_LABELS,
 } from "../../../../constants";
 import { formatDate, formatDateTime, formatCurrency, formatChassis, formatTruckSpot, isValidTaskStatusTransition, hasPrivilege } from "../../../../utils";
+import { cn } from "@/lib/utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { canViewServiceOrderType, canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { SERVICE_ORDER_TYPE } from "../../../../constants";
-import { generateBudgetPDF } from "../../../../utils/budget-pdf-generator";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import {
   AlertDialog,
@@ -50,12 +51,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
+import { TaskWithServiceOrdersChangelog } from "@/components/ui/task-with-service-orders-changelog";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import {
   IconClipboardList,
   IconEdit,
   IconPlayerPlay,
   IconCheck,
+  IconX,
+  IconBan,
   IconClock,
   IconCalendar,
   IconCalendarPlus,
@@ -95,7 +99,6 @@ import {
   IconLayersIntersect,
   IconPhone,
 } from "@tabler/icons-react";
-import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { DETAIL_PAGE_SPACING, getDetailGridClasses } from "@/lib/layout-constants";
@@ -481,12 +484,12 @@ const TASK_SECTIONS: SectionConfig[] = [
     ],
   },
   {
-    id: "budget",
-    label: "Orçamento",
+    id: "pricing",
+    label: "Precificação",
     defaultVisible: true,
     fields: [
-      { id: "budgetItems", label: "Itens do Orçamento", sectionId: "budget" },
-      { id: "totalValue", label: "Valor Total", sectionId: "budget" },
+      { id: "pricingItems", label: "Itens de Precificação", sectionId: "pricing" },
+      { id: "totalValue", label: "Valor Total", sectionId: "pricing" },
     ],
   },
   {
@@ -601,6 +604,14 @@ export const TaskDetailsPage = () => {
   // Check if user is from Warehouse sector (should hide documents, budgets, and changelog)
   const isWarehouseSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
 
+  // Check if user can view base files (ADMIN, COMMERCIAL, LOGISTIC, DESIGNER only)
+  const canViewBaseFiles = currentUser && (
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER)
+  );
+
   // Get visible service order types based on user's sector privilege
   const visibleServiceOrderTypes = useMemo(
     () => getVisibleServiceOrderTypes(userSectorPrivilege),
@@ -698,7 +709,11 @@ export const TaskDetailsPage = () => {
       },
       baseFiles: true,
       artworks: true,
-      budget: true,
+      pricing: {
+        include: {
+          items: true,
+        },
+      },
       budgets: true,
       invoices: true,
       receipts: true,
@@ -816,9 +831,39 @@ export const TaskDetailsPage = () => {
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [task?.services, visibleServiceOrderTypes]);
 
-  // Determine if we came from history, preparation (agenda), or schedule
-  const isFromHistory = location.pathname.includes('/historico/');
-  const isFromPreparation = location.pathname.includes('/agenda/');
+  // Determine the source section from the URL path
+  // /producao/cronograma/detalhes/123 → 'cronograma'
+  // /producao/agenda/detalhes/123 → 'agenda'
+  // /producao/historico/detalhes/123 → 'historico'
+  const pathSegments = location.pathname.split('/');
+  const source = pathSegments[2]; // Index 2 is the section (cronograma, agenda, historico)
+
+  // Get breadcrumb configuration based on source
+  const getBreadcrumbConfig = (source: string) => {
+    switch (source) {
+      case 'agenda':
+        return {
+          label: 'Agenda',
+          href: routes.production.preparation.root,
+          editRoute: routes.production.preparation.edit,
+        };
+      case 'historico':
+        return {
+          label: 'Histórico',
+          href: routes.production.history.root,
+          editRoute: routes.production.history.edit,
+        };
+      case 'cronograma':
+      default:
+        return {
+          label: 'Cronograma',
+          href: routes.production.schedule.list,
+          editRoute: routes.production.schedule.edit,
+        };
+    }
+  };
+
+  const breadcrumbConfig = getBreadcrumbConfig(source);
 
   // Get display name with fallbacks
   const getTaskDisplayName = (task: any) => {
@@ -834,7 +879,7 @@ export const TaskDetailsPage = () => {
   // Track page access
   usePageTracker({
     title: task ? `Tarefa: ${taskDisplayName}` : "Detalhes da Tarefa",
-    icon: isFromHistory ? "history" : isFromPreparation ? "clipboard-list" : "clipboard-list",
+    icon: source === 'historico' ? "history" : "clipboard-list",
   });
 
   // Status change handlers
@@ -937,12 +982,6 @@ export const TaskDetailsPage = () => {
     setNextServiceOrderToStart(null);
   };
 
-  // Handle budget PDF download
-  const handleDownloadBudgetPDF = () => {
-    if (!task || !task.budget) return;
-    generateBudgetPDF({ task });
-  };
-
   // Loading state
   if (isLoading) {
     return (
@@ -978,7 +1017,7 @@ export const TaskDetailsPage = () => {
                 <h2 className="text-2xl font-semibold">Tarefa não encontrada</h2>
                 <p className="text-muted-foreground">A tarefa que você está procurando não existe ou foi removida.</p>
                 <div className="flex gap-2 justify-center">
-                  <Button onClick={() => navigate(routes.production.schedule.list)} variant="outline">
+                  <Button onClick={() => navigate(breadcrumbConfig.href)} variant="outline">
                     <IconClipboardList className="h-4 w-4 mr-2" />
                     Voltar para lista
                   </Button>
@@ -1006,10 +1045,7 @@ export const TaskDetailsPage = () => {
           breadcrumbs={[
                 { label: "Início", href: routes.home },
                 { label: "Produção", href: routes.production.root },
-                {
-                  label: isFromHistory ? "Histórico" : isFromPreparation ? "Agenda" : "Cronograma",
-                  href: isFromHistory ? routes.production.history.root : isFromPreparation ? routes.production.preparation.root : routes.production.schedule.list
-                },
+                { label: breadcrumbConfig.label, href: breadcrumbConfig.href },
                 { label: taskDisplayName },
               ]}
               actions={[
@@ -1064,7 +1100,7 @@ export const TaskDetailsPage = () => {
                 key: "edit",
                 label: "Editar",
                 icon: IconEdit,
-                onClick: () => navigate(routes.production.schedule.edit(task.id)),
+                onClick: () => navigate(breadcrumbConfig.editRoute(task.id)),
               }] : []),
             ]}
           className="flex-shrink-0"
@@ -1168,9 +1204,9 @@ export const TaskDetailsPage = () => {
                   <IconCoin className="h-4 w-4" />
                   Comissão
                     </span>
-                    <Badge variant={ENTITY_BADGE_CONFIG.COMMISSION_STATUS?.[task.commission] || "default"}>
+                    <span className="text-sm font-medium">
                   {COMMISSION_STATUS_LABELS[task.commission]}
-                    </Badge>
+                    </span>
                   </div>
                 )}
 
@@ -1348,37 +1384,41 @@ export const TaskDetailsPage = () => {
               </Card>
               )}
 
-              {/* Budget Card - Hidden for Warehouse sector users */}
-              {sectionVisibility.isSectionVisible("budget") && !isWarehouseSector && task.budget && task.budget.items && task.budget.items.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-825">
-                  <CardHeader className="pb-6">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-2">
+              {/* Pricing Card - Hidden for Warehouse sector users */}
+              {sectionVisibility.isSectionVisible("pricing") && !isWarehouseSector && task.pricing && task.pricing.items && task.pricing.items.length > 0 && (() => {
+                const statusConfig = {
+                  DRAFT: { label: 'Rascunho', icon: IconClock, className: 'bg-gray-100 text-gray-700' },
+                  APPROVED: { label: 'Aprovado', icon: IconCheck, className: 'bg-green-100 text-green-700' },
+                  REJECTED: { label: 'Rejeitado', icon: IconX, className: 'bg-red-100 text-red-700' },
+                  CANCELLED: { label: 'Cancelado', icon: IconBan, className: 'bg-gray-50 text-gray-600' },
+                };
+                const { label, icon: StatusIcon, className: statusClass } = statusConfig[task.pricing.status] || statusConfig.DRAFT;
+
+                return (
+                  <Card className="border flex flex-col animate-in fade-in-50 duration-825">
+                    <CardHeader className="pb-6">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
           <IconFileInvoice className="h-5 w-5 text-muted-foreground" />
-          Orçamento Detalhado
+          Precificação Detalhada
         </CardTitle>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleDownloadBudgetPDF}
-                        className="gap-2"
-                      >
-                        <IconDownload className="h-4 w-4" />
-                        Baixar PDF
-                      </Button>
-                    </div>
-                  </CardHeader>
+                        <Badge className={statusClass}>
+                          <StatusIcon className="w-3 h-3 mr-1" />
+                          {label}
+                        </Badge>
+                      </div>
+                    </CardHeader>
               <CardContent className="pt-0 flex-1">
                 <div className="space-y-4">
-                  {/* Budget validity date */}
-                  {task.budget.expiresIn && (
+                  {/* Pricing validity date */}
+                  {task.pricing.expiresAt && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
                   <IconCalendar className="h-4 w-4" />
-                  <span>Validade: <span className="font-medium text-foreground">{formatDate(task.budget.expiresIn)}</span></span>
+                  <span>Validade: <span className="font-medium text-foreground">{formatDate(task.pricing.expiresAt)}</span></span>
                 </div>
                   )}
 
-                  {/* Budget items table */}
+                  {/* Pricing items table */}
                   <div className="border rounded-lg overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-muted/50">
@@ -1392,11 +1432,13 @@ export const TaskDetailsPage = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y">
-                    {task.budget.items.map((item, index) => (
+                    {task.pricing.items.map((item, index) => (
                   <tr key={item.id || index} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 text-sm">{item.description}</td>
                     <td className="px-4 py-3 text-sm text-right font-medium">
-                      {formatCurrency(item.amount)}
+                      {formatCurrency(
+                        typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0
+                      )}
                     </td>
                   </tr>
                     ))}
@@ -1410,7 +1452,7 @@ export const TaskDetailsPage = () => {
                   <span className="text-base font-bold text-foreground">TOTAL</span>
                   <span className="text-lg font-bold text-primary">
                     {formatCurrency(
-                  typeof task.budget.total === 'number' ? task.budget.total : Number(task.budget.total) || 0
+                  typeof task.pricing.total === 'number' ? task.pricing.total : Number(task.pricing.total) || 0
                     )}
                   </span>
                 </div>
@@ -1418,7 +1460,8 @@ export const TaskDetailsPage = () => {
                 </div>
               </CardContent>
                 </Card>
-              )}
+                );
+              })()}
 
               {/* Truck Layout Card */}
               {sectionVisibility.isSectionVisible("layout") && task.truck && (
@@ -1453,86 +1496,127 @@ export const TaskDetailsPage = () => {
               )}
 
               {/* Service Orders Card - Visibility based on sector privilege and service order type */}
-              {sectionVisibility.isSectionVisible("serviceOrders") && hasVisibleServiceOrders && filteredServiceOrders.length > 0 && (
-                <Card className="border flex flex-col animate-in fade-in-50 duration-900">
-                  <CardHeader className="pb-6">
-                    <CardTitle className="flex items-center gap-2">
-                      <IconClipboardList className="h-5 w-5 text-muted-foreground" />
-                      Ordens de Serviço
-                      <Badge variant="secondary" className="ml-auto">
-                        {filteredServiceOrders.length}
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-              <CardContent className="pt-0 flex-1">
-                <div className="space-y-2">
-                  {filteredServiceOrders.map((serviceOrder) => (
-                <div key={serviceOrder.id} className="bg-muted/50 rounded-lg px-3 py-2">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-semibold">{serviceOrder.description}</h4>
+              {sectionVisibility.isSectionVisible("serviceOrders") && hasVisibleServiceOrders && filteredServiceOrders.length > 0 && (() => {
+                // Group service orders by type
+                const groupedServiceOrders = filteredServiceOrders.reduce((acc, serviceOrder) => {
+                  const type = serviceOrder.type as SERVICE_ORDER_TYPE;
+                  if (!acc[type]) {
+                    acc[type] = [];
+                  }
+                  acc[type].push(serviceOrder);
+                  return acc;
+                }, {} as Record<SERVICE_ORDER_TYPE, typeof filteredServiceOrders>);
+
+                return (
+                  <Card className="border flex flex-col animate-in fade-in-50 duration-900">
+                    <CardHeader className="pb-6">
+                      <CardTitle className="flex items-center gap-2">
+                        <IconClipboardList className="h-5 w-5 text-muted-foreground" />
+                        Ordens de Serviço
+                        <Badge variant="secondary" className="ml-auto">
+                          {filteredServiceOrders.length}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                <CardContent className="pt-0 flex-1">
+                  <div className="space-y-6">
+                    {Object.entries(groupedServiceOrders).map(([type, orders]) => (
+                      <div key={type} className="space-y-2">
+                        {/* Group Header */}
+                        <div className="flex items-center gap-2 pb-2 border-b">
+                          <h3 className="text-sm font-semibold text-foreground">
+                            {SERVICE_ORDER_TYPE_LABELS[type as SERVICE_ORDER_TYPE]}
+                          </h3>
+                          <Badge variant="outline" className="text-xs">
+                            {orders.length}
+                          </Badge>
+                        </div>
+
+                        {/* Service Orders in this group */}
+                        {orders.map((serviceOrder) => (
+                      <div key={serviceOrder.id} className="bg-muted/50 rounded-lg px-3 py-2">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex-1 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-semibold">{serviceOrder.description}</h4>
+                        </div>
+
+                        {serviceOrder.assignedTo && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <IconUser className="h-3 w-3" />
+                            <span>Responsável: {serviceOrder.assignedTo.name}</span>
+                          </div>
+                        )}
+
+                        {(serviceOrder.startedAt || serviceOrder.finishedAt) && (
+                          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                            {serviceOrder.startedAt && (
+                          <div className="flex items-center gap-1">
+                            <IconClock className="h-3 w-3" />
+                            <span>Iniciado: {formatDateTime(serviceOrder.startedAt)}</span>
+                          </div>
+                            )}
+                            {serviceOrder.finishedAt && (
+                          <div className="flex items-center gap-1">
+                            <IconCheck className="h-3 w-3 text-green-600" />
+                            <span>Finalizado: {formatDateTime(serviceOrder.finishedAt)}</span>
+                          </div>
+                            )}
+                          </div>
+                        )}
+                          </div>
+
+                          {/* Status Change Dropdown - Permission-based per service order type and assignment */}
+                          <div className="flex items-center">
+                        {(() => {
+                          const isEditable = canEditServiceOrder(
+                            userSectorPrivilege,
+                            serviceOrder.type as SERVICE_ORDER_TYPE,
+                            serviceOrder.assignedToId,
+                            currentUser?.id
+                          );
+
+                          // Use Badge for read-only, Combobox for editable
+                          if (!isEditable) {
+                            const variant = getBadgeVariantFromStatus(serviceOrder.status, "SERVICE_ORDER");
+                            return (
+                              <Badge
+                                variant={variant}
+                                className="w-40 h-8 flex items-center justify-center text-sm font-medium"
+                              >
+                                {SERVICE_ORDER_STATUS_LABELS[serviceOrder.status as SERVICE_ORDER_STATUS]}
+                              </Badge>
+                            );
+                          }
+
+                          return (
+                            <Combobox
+                              value={serviceOrder.status || undefined}
+                              onValueChange={(newStatus) => handleServiceOrderStatusChange(serviceOrder.id, newStatus as SERVICE_ORDER_STATUS)}
+                              options={[
+                                { value: SERVICE_ORDER_STATUS.PENDING, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.PENDING] },
+                                { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.IN_PROGRESS] },
+                                { value: SERVICE_ORDER_STATUS.COMPLETED, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.COMPLETED] },
+                                { value: SERVICE_ORDER_STATUS.CANCELLED, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.CANCELLED] },
+                              ]}
+                              placeholder="Selecione o status"
+                              searchable={false}
+                              disabled={false}
+                              className="w-40 h-8 rounded-md"
+                            />
+                          );
+                        })()}
+                          </div>
+                        </div>
+                      </div>
+                        ))}
+                      </div>
+                    ))}
                   </div>
-
-                  {serviceOrder.assignedTo && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <IconUser className="h-3 w-3" />
-                      <span>Responsável: {serviceOrder.assignedTo.name}</span>
-                    </div>
-                  )}
-
-                  {(serviceOrder.startedAt || serviceOrder.finishedAt) && (
-                    <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                      {serviceOrder.startedAt && (
-                    <div className="flex items-center gap-1">
-                      <IconClock className="h-3 w-3" />
-                      <span>Iniciado: {formatDateTime(serviceOrder.startedAt)}</span>
-                    </div>
-                      )}
-                      {serviceOrder.finishedAt && (
-                    <div className="flex items-center gap-1">
-                      <IconCheck className="h-3 w-3 text-green-600" />
-                      <span>Finalizado: {formatDateTime(serviceOrder.finishedAt)}</span>
-                    </div>
-                      )}
-                    </div>
-                  )}
-                    </div>
-
-                    {/* Status Change Dropdown - Permission-based per service order type and assignment */}
-                    <div className="flex items-center">
-                  {canEditServiceOrder(
-                    userSectorPrivilege,
-                    serviceOrder.type as SERVICE_ORDER_TYPE,
-                    serviceOrder.assignedToId,
-                    currentUser?.id
-                  ) ? (
-                    <Combobox
-                      value={serviceOrder.status || undefined}
-                      onValueChange={(newStatus) => handleServiceOrderStatusChange(serviceOrder.id, newStatus as SERVICE_ORDER_STATUS)}
-                      options={[
-                    { value: SERVICE_ORDER_STATUS.PENDING, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.PENDING] },
-                    { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.IN_PROGRESS] },
-                    { value: SERVICE_ORDER_STATUS.COMPLETED, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.COMPLETED] },
-                    { value: SERVICE_ORDER_STATUS.CANCELLED, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.CANCELLED] },
-                      ]}
-                      placeholder="Selecione o status"
-                      searchable={false}
-                      className="w-40 h-8"
-                    />
-                  ) : (
-                    <Badge variant={getBadgeVariantFromStatus(serviceOrder.status)}>
-                      {SERVICE_ORDER_STATUS_LABELS[serviceOrder.status]}
-                    </Badge>
-                  )}
-                    </div>
-                  </div>
-                </div>
-                  ))}
-                </div>
-              </CardContent>
-                </Card>
-              )}
+                </CardContent>
+                  </Card>
+                );
+              })()}
 
               {/* Cuts Card - Hidden for Financial sector users */}
               {sectionVisibility.isSectionVisible("cuts") && !isFinancialSector && cuts.length > 0 && (
@@ -1609,8 +1693,8 @@ export const TaskDetailsPage = () => {
                 </Card>
               )}
 
-              {/* Base Files Card - 1/2 width */}
-              {sectionVisibility.isSectionVisible("baseFiles") && task.baseFiles && task.baseFiles.length > 0 && (
+              {/* Base Files Card - 1/2 width - Only for ADMIN, COMMERCIAL, LOGISTIC, DESIGNER */}
+              {sectionVisibility.isSectionVisible("baseFiles") && canViewBaseFiles && task.baseFiles && task.baseFiles.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1">
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
@@ -2295,7 +2379,19 @@ export const TaskDetailsPage = () => {
             {/* Changelog History - Hidden for Financial and Warehouse sector users */}
             {sectionVisibility.isSectionVisible("changelog") && !isFinancialSector && !isWarehouseSector && (
               <Card className="border flex flex-col animate-in fade-in-50 duration-1300">
-                <ChangelogHistory entityType={CHANGE_LOG_ENTITY_TYPE.TASK} entityId={task.id} entityName={taskDisplayName} entityCreatedAt={task.createdAt} className="h-full" />
+                <TaskWithServiceOrdersChangelog
+                  taskId={task.id}
+                  taskName={taskDisplayName}
+                  taskCreatedAt={task.createdAt}
+                  serviceOrderIds={task.services?.map(s => s.id) || []}
+                  truckId={task.truck?.id}
+                  layoutIds={[
+                    task.truck?.leftSideLayoutId,
+                    task.truck?.rightSideLayoutId,
+                    task.truck?.backSideLayoutId,
+                  ].filter(Boolean) as string[]}
+                  className="h-full"
+                />
               </Card>
             )}
           </div>

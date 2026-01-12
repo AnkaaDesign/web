@@ -519,12 +519,16 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         }
       }
 
-      // Debug logging for batch operations
-      if (config.url?.includes("/batch") && config.method?.toLowerCase() === "put") {
+      // Fix array serialization issues for batch operations and regular task updates
+      if ((config.url?.includes("/batch") || config.url?.includes("/tasks/")) && (config.method?.toLowerCase() === "put" || config.method?.toLowerCase() === "patch")) {
         // Skip object transformation if data is FormData
         if (config.data && typeof config.data === "object" && !Array.isArray(config.data) && !(config.data instanceof FormData)) {
+          // Known date fields that should never be empty objects
+          const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate', 'createdAt', 'updatedAt'];
+
           // Recursively fix any array field that was serialized as an object with numeric keys
-          const fixArrays = (obj: any): any => {
+          // Also remove empty objects that should be dates
+          const fixArrays = (obj: any, parentKey?: string): any => {
             if (obj === null || obj === undefined) return obj;
             if (Array.isArray(obj)) {
               return obj.map(item => fixArrays(item));
@@ -532,14 +536,26 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
             if (typeof obj === "object") {
               const keys = Object.keys(obj);
               const isNumericKeys = keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
+              const isEmptyObject = keys.length === 0;
+
+              // If this is an empty object and the parent key is a date field, return null
+              if (isEmptyObject && parentKey && dateFields.includes(parentKey)) {
+                return null;
+              }
+
               if (isNumericKeys) {
                 // Convert object with numeric keys to array, then recursively fix items
                 return Object.values(obj).map(item => fixArrays(item));
               }
+
               // Regular object, recursively fix all properties
               const fixed: any = {};
               for (const key of keys) {
-                fixed[key] = fixArrays(obj[key]);
+                const value = fixArrays(obj[key], key);
+                // Skip null values for date fields (they'll be handled by backend as optional)
+                if (value !== null || !dateFields.includes(key)) {
+                  fixed[key] = value;
+                }
               }
               return fixed;
             }

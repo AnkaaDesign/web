@@ -218,18 +218,16 @@ export const createTaskColumns = (): TaskColumn[] => [
   {
     id: "serviceOrders.production",
     header: (
-      <TooltipProvider delayDuration={0}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.PRODUCTION]}</span>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            <div className="text-sm">
-              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.PRODUCTION].toLowerCase()}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
+          <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.PRODUCTION]}</span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <div className="text-sm">
+            Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.PRODUCTION].toLowerCase()}
+          </div>
+        </TooltipContent>
+      </Tooltip>
     ),
     accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.PRODUCTION).length || 0,
     sortable: true,
@@ -241,18 +239,16 @@ export const createTaskColumns = (): TaskColumn[] => [
   {
     id: "serviceOrders.financial",
     header: (
-      <TooltipProvider delayDuration={0}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.FINANCIAL]}</span>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            <div className="text-sm">
-              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.FINANCIAL].toLowerCase()}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
+          <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.FINANCIAL]}</span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <div className="text-sm">
+            Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.FINANCIAL].toLowerCase()}
+          </div>
+        </TooltipContent>
+      </Tooltip>
     ),
     accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.FINANCIAL).length || 0,
     sortable: true,
@@ -264,18 +260,16 @@ export const createTaskColumns = (): TaskColumn[] => [
   {
     id: "serviceOrders.negotiation",
     header: (
-      <TooltipProvider delayDuration={0}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.NEGOTIATION]}</span>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            <div className="text-sm">
-              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.NEGOTIATION].toLowerCase()}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
+          <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.NEGOTIATION]}</span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <div className="text-sm">
+            Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.NEGOTIATION].toLowerCase()}
+          </div>
+        </TooltipContent>
+      </Tooltip>
     ),
     accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.NEGOTIATION).length || 0,
     sortable: true,
@@ -287,18 +281,16 @@ export const createTaskColumns = (): TaskColumn[] => [
   {
     id: "serviceOrders.artwork",
     header: (
-      <TooltipProvider delayDuration={0}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.ARTWORK]}</span>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            <div className="text-sm">
-              Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.ARTWORK].toLowerCase()}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
+          <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.ARTWORK]}</span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <div className="text-sm">
+            Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.ARTWORK].toLowerCase()}
+          </div>
+        </TooltipContent>
+      </Tooltip>
     ),
     accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.ARTWORK).length || 0,
     sortable: true,
@@ -324,37 +316,35 @@ export const createTaskColumns = (): TaskColumn[] => [
       const paintFinish = paint.finish as PAINT_FINISH;
 
       return (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="w-16 h-8 rounded-md ring-1 ring-border shadow-sm overflow-hidden">
-                {paint.colorPreview ? (
-                  <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" loading="lazy" />
-                ) : (
-                  <CanvasNormalMapRenderer
-                    baseColor={paint.hex || "#888888"}
-                    finish={paintFinish || PAINT_FINISH.SOLID}
-                    width={64}
-                    height={32}
-                    quality="medium"
-                    className="w-full h-full"
-                  />
-                )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="w-16 h-8 rounded-md ring-1 ring-border shadow-sm overflow-hidden">
+              {paint.colorPreview ? (
+                <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover" loading="lazy" />
+              ) : (
+                <CanvasNormalMapRenderer
+                  baseColor={paint.hex || "#888888"}
+                  finish={paintFinish || PAINT_FINISH.SOLID}
+                  width={64}
+                  height={32}
+                  quality="medium"
+                  className="w-full h-full"
+                />
+              )}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="space-y-1">
+              <div className="font-semibold">{paint.name}</div>
+              <div className="text-xs text-muted-foreground space-y-0.5">
+                {paint.paintType?.name && <div>{paint.paintType.name}</div>}
+                {paintFinish && <div>{PAINT_FINISH_LABELS[paintFinish]}</div>}
+                {paint.manufacturer && <div>{TRUCK_MANUFACTURER_LABELS[paint.manufacturer as TRUCK_MANUFACTURER]}</div>}
+                {paint.paintBrand?.name && !paint.manufacturer && <div>{paint.paintBrand.name}</div>}
               </div>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs">
-              <div className="space-y-1">
-                <div className="font-semibold">{paint.name}</div>
-                <div className="text-xs text-muted-foreground space-y-0.5">
-                  {paint.paintType?.name && <div>{paint.paintType.name}</div>}
-                  {paintFinish && <div>{PAINT_FINISH_LABELS[paintFinish]}</div>}
-                  {paint.manufacturer && <div>{TRUCK_MANUFACTURER_LABELS[paint.manufacturer as TRUCK_MANUFACTURER]}</div>}
-                  {paint.paintBrand?.name && !paint.manufacturer && <div>{paint.paintBrand.name}</div>}
-                </div>
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+            </div>
+          </TooltipContent>
+        </Tooltip>
       );
     },
   },

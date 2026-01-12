@@ -7,13 +7,17 @@
 
 import type { ContentBlock } from '@/components/administration/message/editor/types';
 import type { MessageBlock, InlineFormat } from '@/components/messaging/types';
+import { parseMarkdownToInlineFormat } from './markdown-parser';
 
 /**
  * Converts plain text string to InlineFormat array
+ * Now supports markdown-style formatting: **bold**, *italic*, __underline__, [link](url)
  */
 function textToInlineFormat(text: string): InlineFormat[] {
   if (!text) return [];
-  return [{ type: 'text', content: text }];
+
+  // Use the markdown parser to convert formatting markers to InlineFormat objects
+  return parseMarkdownToInlineFormat(text);
 }
 
 /**
@@ -31,11 +35,8 @@ function textToInlineFormat(text: string): InlineFormat[] {
  */
 export function transformBlocksForDisplay(editorBlocks: ContentBlock[]): MessageBlock[] {
   if (!editorBlocks || !Array.isArray(editorBlocks)) {
-    console.warn('[transformBlocksForDisplay] Invalid blocks:', editorBlocks);
     return [];
   }
-
-  console.log('[transformBlocksForDisplay] Transforming', editorBlocks.length, 'blocks:', editorBlocks);
 
   return editorBlocks.map((block): MessageBlock | null => {
     // IMPORTANT: Check if block is already in renderer format
@@ -134,7 +135,6 @@ export function transformBlocksForDisplay(editorBlocks: ContentBlock[]): Message
 
     // Handle icon blocks
     if (block.type === 'icon') {
-      console.log('[transformBlocksForDisplay] Transforming icon block:', block);
       return {
         ...block,
         type: 'icon',
@@ -147,12 +147,9 @@ export function transformBlocksForDisplay(editorBlocks: ContentBlock[]): Message
 
     // Handle row blocks (recursively transform nested blocks)
     if (block.type === 'row') {
-      console.log('[transformBlocksForDisplay] Transforming row block:', block);
       const rowBlock = block as any;
       const nestedBlocks = rowBlock.blocks || [];
-      console.log('[transformBlocksForDisplay] Row has', nestedBlocks.length, 'nested blocks:', nestedBlocks);
       const transformedNested = transformBlocksForDisplay(nestedBlocks);
-      console.log('[transformBlocksForDisplay] Transformed nested blocks:', transformedNested);
 
       return {
         ...block,
@@ -173,7 +170,7 @@ export function transformBlocksForDisplay(editorBlocks: ContentBlock[]): Message
       };
     }
 
-    console.warn('[transformBlocksForDisplay] Unknown block type:', block);
+    // Unknown block type - skip rendering
     return null;
   }).filter((block): block is MessageBlock => block !== null);
 }
@@ -198,6 +195,6 @@ export function transformMessageContent(content: any): MessageBlock[] {
     return transformBlocksForDisplay(content);
   }
 
-  console.warn('[transformMessageContent] Unknown content format:', content);
+  // Unknown content format - return empty array
   return [];
 }

@@ -216,6 +216,41 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     setNfeFiles(initialNfeFiles);
   }, [initialBudgetFiles, initialReceiptFiles, initialNfeFiles]);
 
+  // Memoize initialData to prevent infinite loop from recreating the object on every render
+  const initialDataForUrlState = useMemo(() => {
+    console.log('[OrderEditForm] initialDataForUrlState RECREATED', {
+      selectedItemsSize: initialSelectedItems.size,
+      hasTemporaryItems,
+      timestamp: Date.now()
+    });
+
+    return {
+      description: order.description,
+      supplierId: order.supplierId || undefined,
+      forecast: order.forecast,
+      notes: order.notes || "",
+      orderItemMode: hasTemporaryItems ? ("temporary" as const) : ("inventory" as const),
+      selectedItems: initialSelectedItems,
+      quantities: initialQuantities,
+      prices: initialPrices,
+      icmses: initialIcmses,
+      ipis: initialIpis,
+      temporaryItems: temporaryItems,
+    };
+  }, [
+    order.description,
+    order.supplierId,
+    order.forecast,
+    order.notes,
+    hasTemporaryItems,
+    initialSelectedItems,
+    initialQuantities,
+    initialPrices,
+    initialIcmses,
+    initialIpis,
+    temporaryItems
+  ]);
+
   // URL state management for item selection (Stage 2) - initialized with existing data
   const {
     selectedItems,
@@ -268,20 +303,18 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     defaultPageSize: 40,
     // Always provide initial data - URL params will override if present
     // This ensures fields retain their values when other fields are updated
-    initialData: {
-      description: order.description,
-      supplierId: order.supplierId || undefined,
-      forecast: order.forecast,
-      notes: order.notes || "",
-      orderItemMode: hasTemporaryItems ? "temporary" : "inventory",
-      selectedItems: initialSelectedItems,
-      quantities: initialQuantities,
-      prices: initialPrices,
-      icmses: initialIcmses,
-      ipis: initialIpis,
-      temporaryItems: temporaryItems,
-    },
+    // IMPORTANT: Use memoized initialData to prevent infinite render loop
+    initialData: initialDataForUrlState,
   });
+
+  // Log when selectedItems from URL state changes
+  useEffect(() => {
+    console.log('[OrderEditForm] selectedItems from URL state CHANGED', {
+      size: selectedItems.size,
+      items: Array.from(selectedItems),
+      timestamp: Date.now()
+    });
+  }, [selectedItems]);
 
   // Form setup with default values from URL state
   const defaultValues: Partial<OrderUpdateFormData> = {

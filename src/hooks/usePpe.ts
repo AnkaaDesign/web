@@ -389,33 +389,6 @@ export const usePendingPpeDeliveries = createSpecializedQueryHook({
   staleTime: 1000 * 60 * 2, // 2 minutes for pending items
 });
 
-// Legacy individual mutation exports for backward compatibility
-export function useCreatePpeDelivery() {
-  const { createMutation } = usePpeDeliveryMutations();
-  return createMutation;
-}
-
-export function useUpdatePpeDelivery(id: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (_data: PpeDeliveryUpdateFormData) => updatePpeDelivery(id, _data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ppeDeliveryKeys.detail(id),
-      });
-      queryClient.invalidateQueries({
-        queryKey: ppeDeliveryKeys.all,
-      });
-    },
-  });
-}
-
-export function useDeletePpeDelivery() {
-  const { deleteMutation } = usePpeDeliveryMutations();
-  return deleteMutation;
-}
-
 // =====================================================
 // PPE Config Service Adapter - COMMENTED OUT: PPE config now in Item model
 // =====================================================

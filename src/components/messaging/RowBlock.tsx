@@ -13,9 +13,7 @@ interface RowBlockProps {
  * Responsive: stacks vertically on mobile, horizontal on larger screens
  */
 export const RowBlock = React.memo<RowBlockProps>(({ block, className }) => {
-  console.log('[RowBlock] Rendering row block:', block);
   const { blocks, columns, gap = 'md', verticalAlign = 'top', id } = block;
-  console.log('[RowBlock] Blocks to render:', blocks, 'Count:', blocks?.length || 0);
 
   const gapClasses = {
     none: 'gap-0',
@@ -35,17 +33,27 @@ export const RowBlock = React.memo<RowBlockProps>(({ block, className }) => {
       id={id}
       className={cn(
         "my-4 first:mt-0 last:mb-0",
-        "flex flex-wrap", // Use flexbox for inline behavior
+        "flex flex-wrap md:flex-nowrap", // Wrap on mobile, inline on desktop
         gapClasses[gap],
         alignClasses[verticalAlign],
+        "[&>*]:m-0", // Remove margins from direct children
         className
       )}
     >
-      {blocks.map((nestedBlock, index) => (
-        <div key={nestedBlock.id || `row-block-${index}`} className="inline-flex">
-          <MessageBlockRenderer blocks={[nestedBlock]} />
-        </div>
-      ))}
+      {blocks.map((nestedBlock, index) => {
+        // Icons and buttons should only take their natural width, other blocks should grow
+        const isIconBlock = nestedBlock.type === 'icon';
+        const isButtonBlock = nestedBlock.type === 'button';
+        const flexClass = (isIconBlock || isButtonBlock) ? 'flex-none' : 'flex-1 min-w-0';
+        // Icons need slight top margin to align with text baseline
+        const iconAdjustment = isIconBlock ? 'mt-[0.2em]' : '';
+
+        return (
+          <div key={nestedBlock.id || `row-block-${index}`} className={`${flexClass} ${iconAdjustment} [&>*]:my-0 [&>*]:first:mt-0 [&>*]:last:mb-0`}>
+            <MessageBlockRenderer blocks={[nestedBlock]} />
+          </div>
+        );
+      })}
     </div>
   );
 });

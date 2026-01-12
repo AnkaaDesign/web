@@ -14,6 +14,7 @@ import {
   IconInfoCircle,
   IconClock,
   IconX,
+  IconClipboardCheck,
 } from "@tabler/icons-react";
 import type { Notification } from "@/types";
 import { NOTIFICATION_TYPE } from "@/constants";
@@ -35,6 +36,8 @@ const getNotificationIcon = (type: NOTIFICATION_TYPE) => {
       return <IconChecklist {...iconProps} />;
     case NOTIFICATION_TYPE.ORDER:
       return <IconShoppingCart {...iconProps} />;
+    case NOTIFICATION_TYPE.SERVICE_ORDER:
+      return <IconClipboardCheck {...iconProps} />;
     case NOTIFICATION_TYPE.PPE:
       return <IconShield {...iconProps} />;
     case NOTIFICATION_TYPE.VACATION:
@@ -57,6 +60,8 @@ const getNotificationIconBgColor = (type: NOTIFICATION_TYPE) => {
       return "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400";
     case NOTIFICATION_TYPE.ORDER:
       return "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400";
+    case NOTIFICATION_TYPE.SERVICE_ORDER:
+      return "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400";
     case NOTIFICATION_TYPE.PPE:
       return "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400";
     case NOTIFICATION_TYPE.VACATION:

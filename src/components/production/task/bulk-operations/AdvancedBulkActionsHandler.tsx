@@ -101,6 +101,35 @@ export const AdvancedBulkActionsHandler = forwardRef<
     },
   });
 
+  const resetForm = (type: BulkOperationType) => {
+    // Reset all file states
+    setArtworkFiles([]);
+    setBudgetFiles([]);
+    setInvoiceFiles([]);
+    setReceiptFiles([]);
+    setCutsCount(0);
+
+    // Reset common values
+    setCommonValues({
+      paintId: null,
+      generalPainting: null,
+      paintIds: [],
+      logoPaints: [],
+      artworkFiles: [],
+      budgetFiles: [],
+      invoiceFiles: [],
+      receiptFiles: [],
+      cuts: [],
+    });
+
+    // Reset form
+    form.reset({
+      paintId: null,
+      paintIds: [],
+      cuts: [],
+    });
+  };
+
   // Expose the openModal method to parent component
   useImperativeHandle(ref, () => ({
     openModal: async (type: BulkOperationType, taskIds: string[]) => {
@@ -362,36 +391,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
         setIsLoadingData(false);
       }
     },
-  }));
-
-  const resetForm = (type: BulkOperationType) => {
-    // Reset all file states
-    setArtworkFiles([]);
-    setBudgetFiles([]);
-    setInvoiceFiles([]);
-    setReceiptFiles([]);
-    setCutsCount(0);
-
-    // Reset common values
-    setCommonValues({
-      paintId: null,
-      generalPainting: null,
-      paintIds: [],
-      logoPaints: [],
-      artworkFiles: [],
-      budgetFiles: [],
-      invoiceFiles: [],
-      receiptFiles: [],
-      cuts: [],
-    });
-
-    // Reset form
-    form.reset({
-      paintId: null,
-      paintIds: [],
-      cuts: [],
-    });
-  };
+  }), [form, resetForm]);
 
   const handleClose = () => {
     if (!isSubmitting && !isLoadingData) {

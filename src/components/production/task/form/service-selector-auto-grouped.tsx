@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { Combobox } from "@/components/ui/combobox";
 import type { Service } from "../../../../types";
-import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_LABELS } from "../../../../constants";
+import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useServiceMutations } from "../../../../hooks";
 import { serviceService } from "../../../../api-client";
 import { AdminUserSelector } from "@/components/administration/user/form/user-selector";
@@ -14,9 +14,11 @@ import { AdminUserSelector } from "@/components/administration/user/form/user-se
 interface ServiceSelectorProps {
   control: any;
   disabled?: boolean;
+  currentUserId?: string;
+  userPrivilege?: string;
 }
 
-export function ServiceSelectorAutoGrouped({ control, disabled }: ServiceSelectorProps) {
+export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, userPrivilege }: ServiceSelectorProps) {
   const [creatingServiceIndex, setCreatingServiceIndex] = useState<number | null>(null);
 
   const { fields, append, remove } = useFieldArray({
@@ -31,6 +33,46 @@ export function ServiceSelectorAutoGrouped({ control, disabled }: ServiceSelecto
     control,
     name: "serviceOrders",
   }) as any[] || [];
+
+  // Helper function to determine if a service order can be edited by the current user
+  const canEditServiceOrder = useCallback((serviceOrder: any) => {
+    if (!userPrivilege || !serviceOrder) return true; // If no privilege info, allow editing (fallback)
+
+    // Admin can edit all service orders
+    if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) return true;
+
+    // Allow editing of new service orders (ones without an id) so users can set type and description
+    const isNewServiceOrder = !serviceOrder.id || (typeof serviceOrder.id === 'string' && serviceOrder.id.startsWith('temp-'));
+    if (isNewServiceOrder) return true;
+
+    // Get the service order type and assignment
+    const { type, assignedToId } = serviceOrder;
+    const isNotAssigned = !assignedToId || assignedToId === null || assignedToId === "";
+    const isAssignedToCurrentUser = assignedToId === currentUserId;
+
+    // Check permissions based on sector and service order type
+    switch (userPrivilege) {
+      case SECTOR_PRIVILEGES.COMMERCIAL:
+        // Can edit NEGOTIATION service orders if not assigned or assigned to them
+        return type === SERVICE_ORDER_TYPE.NEGOTIATION && (isNotAssigned || isAssignedToCurrentUser);
+
+      case SECTOR_PRIVILEGES.FINANCIAL:
+        // Can edit FINANCIAL service orders if not assigned or assigned to them
+        return type === SERVICE_ORDER_TYPE.FINANCIAL && (isNotAssigned || isAssignedToCurrentUser);
+
+      case SECTOR_PRIVILEGES.DESIGNER:
+        // Can edit ARTWORK service orders if not assigned or assigned to them
+        return type === SERVICE_ORDER_TYPE.ARTWORK && (isNotAssigned || isAssignedToCurrentUser);
+
+      case SECTOR_PRIVILEGES.LOGISTIC:
+        // Can edit PRODUCTION service orders if not assigned or assigned to them
+        return type === SERVICE_ORDER_TYPE.PRODUCTION && (isNotAssigned || isAssignedToCurrentUser);
+
+      default:
+        // Other sectors cannot edit any service orders
+        return false;
+    }
+  }, [userPrivilege, currentUserId]);
 
   // Memoize callbacks
   const getOptionLabel = useCallback((service: Service) => service.description, []);
@@ -65,11 +107,24 @@ export function ServiceSelectorAutoGrouped({ control, disabled }: ServiceSelecto
   }, [fields, servicesValues, creatingServiceIndex]);
 
   const handleAddService = () => {
+    // Set default service order type based on user's sector privilege
+    let defaultType = SERVICE_ORDER_TYPE.PRODUCTION;
+
+    if (userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
+      defaultType = SERVICE_ORDER_TYPE.NEGOTIATION;
+    } else if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
+      defaultType = SERVICE_ORDER_TYPE.FINANCIAL;
+    } else if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
+      defaultType = SERVICE_ORDER_TYPE.ARTWORK;
+    } else if (userPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
+      defaultType = SERVICE_ORDER_TYPE.PRODUCTION;
+    }
+
     append({
       status: SERVICE_ORDER_STATUS.PENDING,
       statusOrder: 1,
       description: "",
-      type: SERVICE_ORDER_TYPE.PRODUCTION,
+      type: defaultType,
       assignedToId: null,
     });
   };
@@ -118,22 +173,27 @@ export function ServiceSelectorAutoGrouped({ control, disabled }: ServiceSelecto
           </div>
 
           {/* Services in this group */}
-          {serviceIndices.map((index) => (
-            <ServiceRow
-              key={fields[index].id}
-              control={control}
-              index={index}
-              type={type}
-              disabled={disabled}
-              isCreating={creatingServiceIndex === index}
-              onRemove={() => remove(index)}
-              onCreateService={handleCreateService}
-              getOptionLabel={getOptionLabel}
-              getOptionValue={getOptionValue}
-              isGrouped={true}
-              clearCreatingState={() => setCreatingServiceIndex(null)}
-            />
-          ))}
+          {serviceIndices.map((index) => {
+            const serviceOrder = servicesValues[index];
+            const isServiceDisabled = disabled || !canEditServiceOrder(serviceOrder);
+
+            return (
+              <ServiceRow
+                key={fields[index].id}
+                control={control}
+                index={index}
+                type={type}
+                disabled={isServiceDisabled}
+                isCreating={creatingServiceIndex === index}
+                onRemove={() => remove(index)}
+                onCreateService={handleCreateService}
+                getOptionLabel={getOptionLabel}
+                getOptionValue={getOptionValue}
+                isGrouped={true}
+                clearCreatingState={() => setCreatingServiceIndex(null)}
+              />
+            );
+          })}
         </CardContent>
       </Card>
     );
@@ -146,22 +206,27 @@ export function ServiceSelectorAutoGrouped({ control, disabled }: ServiceSelecto
       {/* Ungrouped services (being edited) */}
       {ungroupedIndices.length > 0 && (
         <div className="space-y-3 pb-4 border-b">
-          {ungroupedIndices.map((index) => (
-            <ServiceRow
-              key={fields[index].id}
-              control={control}
-              index={index}
-              type={servicesValues[index]?.type || SERVICE_ORDER_TYPE.PRODUCTION}
-              disabled={disabled}
-              isCreating={creatingServiceIndex === index}
-              onRemove={() => remove(index)}
-              onCreateService={handleCreateService}
-              getOptionLabel={getOptionLabel}
-              getOptionValue={getOptionValue}
-              isGrouped={false}
-              clearCreatingState={() => setCreatingServiceIndex(null)}
-            />
-          ))}
+          {ungroupedIndices.map((index) => {
+            const serviceOrder = servicesValues[index];
+            const isServiceDisabled = disabled || !canEditServiceOrder(serviceOrder);
+
+            return (
+              <ServiceRow
+                key={fields[index].id}
+                control={control}
+                index={index}
+                type={servicesValues[index]?.type || SERVICE_ORDER_TYPE.PRODUCTION}
+                disabled={isServiceDisabled}
+                isCreating={creatingServiceIndex === index}
+                onRemove={() => remove(index)}
+                onCreateService={handleCreateService}
+                getOptionLabel={getOptionLabel}
+                getOptionValue={getOptionValue}
+                isGrouped={false}
+                clearCreatingState={() => setCreatingServiceIndex(null)}
+              />
+            );
+          })}
         </div>
       )}
 

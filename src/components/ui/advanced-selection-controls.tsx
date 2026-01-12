@@ -178,30 +178,28 @@ export function AdvancedSelectionControls({
     return (
       <div className={cn("flex items-center gap-2", className)}>
         {/* Compact selection indicator */}
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSmartSelectAll}
-                disabled={disabled}
-                className={cn("h-8 px-2 gap-1", selectionStats.selectedCount > 0 && "text-primary")}
-              >
-                {selectionState.icon}
-                <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                  {selectionStats.selectedCount}
-                </Badge>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <div className="text-xs">
-                <div>{selectionState.label}</div>
-                {showKeyboardHints && <div className="text-muted-foreground mt-1">Clique para alternar seleção</div>}
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSmartSelectAll}
+              disabled={disabled}
+              className={cn("h-8 px-2 gap-1", selectionStats.selectedCount > 0 && "text-primary")}
+            >
+              {selectionState.icon}
+              <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                {selectionStats.selectedCount}
+              </Badge>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="text-xs">
+              <div>{selectionState.label}</div>
+              {showKeyboardHints && <div className="text-muted-foreground mt-1">Clique para alternar seleção</div>}
+            </div>
+          </TooltipContent>
+        </Tooltip>
 
         {/* Show selected only toggle */}
         {selectionStats.selectedCount > 0 && (
@@ -222,26 +220,24 @@ export function AdvancedSelectionControls({
             {selectionState.icon}
             Controles de Seleção
             {showKeyboardHints && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <IconKeyboard className="h-4 w-4 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="text-xs space-y-1">
-                      <div>
-                        <kbd>Ctrl+Clique</kbd> - Alternar item
-                      </div>
-                      <div>
-                        <kbd>Shift+Clique</kbd> - Selecionar intervalo
-                      </div>
-                      <div>
-                        <kbd>Ctrl+A</kbd> - Selecionar página
-                      </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <IconKeyboard className="h-4 w-4 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="text-xs space-y-1">
+                    <div>
+                      <kbd>Ctrl+Clique</kbd> - Alternar item
                     </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                    <div>
+                      <kbd>Shift+Clique</kbd> - Selecionar intervalo
+                    </div>
+                    <div>
+                      <kbd>Ctrl+A</kbd> - Selecionar página
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             )}
           </CardTitle>
           <Button variant="ghost" size="sm" onClick={() => setShowStats(!showStats)} className="h-auto p-1">
@@ -403,6 +399,23 @@ export function AdvancedTableHeaderCheckbox({
   const isChecked = selectionStats.allCurrentPageSelected;
   const isIndeterminate = selectionStats.someCurrentPageSelected && !selectionStats.allCurrentPageSelected;
 
+  // Create stable ref callbacks
+  const checkboxRef = React.useRef<HTMLButtonElement>(null);
+  const checkboxRef2 = React.useRef<HTMLButtonElement>(null);
+
+  // Use effect to set indeterminate state instead of inline callback ref
+  React.useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = isIndeterminate;
+    }
+  }, [isIndeterminate]);
+
+  React.useEffect(() => {
+    if (checkboxRef2.current) {
+      checkboxRef2.current.indeterminate = isIndeterminate;
+    }
+  }, [isIndeterminate]);
+
   const handleMainCheckbox = useCallback(() => {
     if (isChecked) {
       onDeselectAll();
@@ -414,10 +427,8 @@ export function AdvancedTableHeaderCheckbox({
   if (!showDropdown) {
     return (
       <Checkbox
+        ref={checkboxRef}
         checked={isChecked}
-        ref={(el) => {
-          if (el) el.indeterminate = isIndeterminate;
-        }}
         onCheckedChange={handleMainCheckbox}
         disabled={disabled}
         className={cn("border-neutral-500 dark:border-neutral-300", className)}
@@ -429,10 +440,8 @@ export function AdvancedTableHeaderCheckbox({
   return (
     <div className={cn("flex items-center", className)}>
       <Checkbox
+        ref={checkboxRef2}
         checked={isChecked}
-        ref={(el) => {
-          if (el) el.indeterminate = isIndeterminate;
-        }}
         onCheckedChange={handleMainCheckbox}
         disabled={disabled}
         className="border-neutral-500 dark:border-neutral-300"

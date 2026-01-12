@@ -6,7 +6,7 @@ import type { Task } from "../types";
 import { TASK_STATUS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../constants";
 import { cutCreateNestedSchema } from "./cut";
 import { airbrushingCreateNestedSchema } from "./airbrushing";
-import { budgetCreateNestedSchema } from "./budget";
+import { pricingCreateNestedSchema } from "./task-pricing";
 
 // =====================
 // Include Schema Based on Prisma Schema (Second Level Only)
@@ -231,6 +231,19 @@ export const taskIncludeSchema: z.ZodSchema = z.lazy(() =>
         .optional(),
       cutRequest: z.boolean().optional(),
       cutPlan: z.boolean().optional(),
+      pricing: z
+        .union([
+          z.boolean(),
+          z.object({
+            include: z
+              .object({
+                task: z.boolean().optional(),
+                items: z.boolean().optional(),
+              })
+              .optional(),
+          }),
+        ])
+        .optional(),
       relatedTasks: z
         .union([
           z.boolean(),
@@ -1196,7 +1209,7 @@ export const taskCreateSchema = z
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings
-    budget: budgetCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
+    pricing: pricingCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
   })
   .superRefine((data, ctx) => {
     // Require at least one of: customer, serialNumber, plate, or name
@@ -1333,7 +1346,7 @@ export const taskUpdateSchema = z
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings
-    budget: budgetCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
+    pricing: pricingCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
   })
   .superRefine((data, ctx) => {
     if (data.entryDate && data.term && data.term <= data.entryDate) {

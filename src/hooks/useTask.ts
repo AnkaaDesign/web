@@ -615,42 +615,6 @@ export function useTaskOperations() {
 }
 
 // -------------------------------------
-// BACKWARD COMPATIBILITY EXPORTS
-// -------------------------------------
-export function useCreateTask() {
-  const { create, createAsync } = useTaskMutations();
-  return { mutate: create, mutateAsync: createAsync };
-}
-
-export function useUpdateTask(id: string) {
-  const { update, updateAsync } = useTaskMutations();
-  return {
-    mutate: (data: TaskUpdateFormData) => update({ id, data }),
-    mutateAsync: (data: TaskUpdateFormData) => updateAsync({ id, data }),
-  };
-}
-
-export function useDeleteTask() {
-  const { delete: deleteTask, deleteAsync } = useTaskMutations();
-  return { mutate: deleteTask, mutateAsync: deleteAsync };
-}
-
-export function useBatchCreateTasks() {
-  const { batchCreate, batchCreateAsync } = useTaskBatchMutations();
-  return { mutate: batchCreate, mutateAsync: batchCreateAsync };
-}
-
-export function useBatchUpdateTasks() {
-  const { batchUpdate, batchUpdateAsync } = useTaskBatchMutations();
-  return { mutate: batchUpdate, mutateAsync: batchUpdateAsync };
-}
-
-export function useBatchDeleteTasks() {
-  const { batchDelete, batchDeleteAsync } = useTaskBatchMutations();
-  return { mutate: batchDelete, mutateAsync: batchDeleteAsync };
-}
-
-// -------------------------------------
 // URL STATE MANAGEMENT
 // -------------------------------------
 export { useTaskFormUrlState } from "./task/use-task-form-url-state";

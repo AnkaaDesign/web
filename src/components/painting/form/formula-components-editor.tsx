@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from "react";
+import React, { useEffect, useRef, useMemo, useCallback } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
 import { IconTrash, IconPlus } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,15 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const lastRowRef = useRef<HTMLDivElement>(null);
   const lastDeductedWeights = useRef<Record<number, number>>({});
+
+  // Stable ref callback to store input refs in array
+  const setInputRef = useCallback((index: number) => {
+    return (el: HTMLInputElement | null) => {
+      if (el) {
+        inputRefs.current[index] = el;
+      }
+    };
+  }, []);
 
   // Get already selected item IDs to filter them out
   // Use useWatch instead of watch to ensure re-renders on nested changes
@@ -238,9 +247,7 @@ export function FormulaComponentsEditor({ className, availableItems = [], formul
 
                 <div className="w-40">
                   <Input
-                    ref={(el) => {
-                      if (el) inputRefs.current[index] = el;
-                    }}
+                    ref={setInputRef(index)}
                     type="text"
                     placeholder="0"
                     value={watch(`components.${index}.rawInput`) || watch(`components.${index}.weightInGrams`) || ""}

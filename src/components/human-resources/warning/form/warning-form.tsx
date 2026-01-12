@@ -156,7 +156,7 @@ export const WarningForm = forwardRef<{ submit: () => void; isSubmitting: boolea
     submit: () => form.handleSubmit(handleSubmit)(),
     isSubmitting,
     isValid,
-  }));
+  }), [form, handleSubmit, isSubmitting, isValid]);
 
   // URL state persistence for create mode
   const debouncedUpdateUrl = useMemo(

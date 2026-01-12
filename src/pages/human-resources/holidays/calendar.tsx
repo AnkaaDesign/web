@@ -129,22 +129,20 @@ export default function HolidayCalendarPage() {
                     {dayHolidays.length > 0 && (
                       <div className="mt-1 space-y-1">
                         {dayHolidays.map((holiday: any, i: number) => (
-                          <TooltipProvider key={i}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="text-xs p-1 bg-red-100 dark:bg-red-900/20 rounded cursor-pointer truncate">
-                                  {holiday.descricao || holiday.description || holiday.nome || "Feriado"}
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <div className="space-y-1">
-                                  <p className="font-semibold">{holiday.descricao || holiday.description || holiday.nome}</p>
-                                  <p className="text-sm">Tipo: {getHolidayType(holiday)}</p>
-                                  {holiday.observacao && <p className="text-sm text-muted-foreground">{holiday.observacao}</p>}
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Tooltip key={i}>
+                            <TooltipTrigger asChild>
+                              <div className="text-xs p-1 bg-red-100 dark:bg-red-900/20 rounded cursor-pointer truncate">
+                                {holiday.descricao || holiday.description || holiday.nome || "Feriado"}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="space-y-1">
+                                <p className="font-semibold">{holiday.descricao || holiday.description || holiday.nome}</p>
+                                <p className="text-sm">Tipo: {getHolidayType(holiday)}</p>
+                                {holiday.observacao && <p className="text-sm text-muted-foreground">{holiday.observacao}</p>}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
                         ))}
                       </div>
                     )}

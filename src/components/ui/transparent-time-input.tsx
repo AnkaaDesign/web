@@ -12,8 +12,8 @@ const TransparentTimeInput = React.forwardRef<HTMLInputElement, TransparentTimeI
   const inputRef = React.useRef<HTMLInputElement>(null);
   const cursorPositionRef = React.useRef<number | null>(null);
 
-  // Merge refs
-  React.useImperativeHandle(ref, () => inputRef.current!);
+  // Merge refs - add empty dependency array to prevent infinite re-renders
+  React.useImperativeHandle(ref, () => inputRef.current!, []);
 
   React.useEffect(() => {
     if (!isFocused) {

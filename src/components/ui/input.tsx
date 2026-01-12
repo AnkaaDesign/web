@@ -133,8 +133,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       onSuccess: onCepLookup,
     });
 
-    // Merge refs
-    React.useImperativeHandle(ref, () => inputRef.current as HTMLInputElement);
+    // Merge refs - add empty dependency array to prevent infinite re-renders
+    React.useImperativeHandle(ref, () => inputRef.current as HTMLInputElement, []);
 
     // Format value based on type
     const formatValue = React.useCallback(

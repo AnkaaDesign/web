@@ -211,7 +211,7 @@ export function RelatedServiceOrdersCard({ customer, className }: RelatedService
                           <div className="flex items-center gap-2">
                             <TooltipProvider>
                               <Tooltip>
-                                <TooltipTrigger asChild>
+                                <TooltipTrigger className="inline-flex cursor-help">
                                   <StatusIcon className={cn("w-4 h-4 flex-shrink-0", config.color)} aria-label={SERVICE_ORDER_STATUS_LABELS[status as SERVICE_ORDER_STATUS]} />
                                 </TooltipTrigger>
                                 <TooltipContent>

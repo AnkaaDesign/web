@@ -216,6 +216,11 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
     const [showYearSelect, setShowYearSelect] = React.useState<false | 'left' | 'right'>(false);
     const [showMonthSelect, setShowMonthSelect] = React.useState<false | 'left' | 'right'>(false);
 
+    // Stable refs for scroll containers
+    const yearScrollRef = React.useRef<HTMLDivElement>(null);
+    const hourScrollRef = React.useRef<HTMLDivElement>(null);
+    const minuteScrollRef = React.useRef<HTMLDivElement>(null);
+
     // For date-range mode, we need two separate calendar months
     const [calendarMonth, setCalendarMonth] = React.useState<Date>(() => {
       if (mode === "date-range" && currentValue) {
@@ -248,6 +253,43 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
     const currentMonth = calendarMonth.getMonth();
     const currentYearRight = calendarMonthRight.getFullYear();
     const currentMonthRight = calendarMonthRight.getMonth();
+
+    // Auto-scroll year selector to current year
+    React.useEffect(() => {
+      if (yearScrollRef.current && showYearSelect) {
+        const targetYear = showYearSelect === 'right' ? currentYearRight : currentYear;
+        setTimeout(() => {
+          const currentYearElement = yearScrollRef.current?.querySelector(`#year-${targetYear}`);
+          if (currentYearElement) {
+            currentYearElement.scrollIntoView({ block: "center", behavior: "auto" });
+          }
+        }, 0);
+      }
+    }, [showYearSelect, currentYear, currentYearRight]);
+
+    // Auto-scroll hour selector to selected hour
+    React.useEffect(() => {
+      if (hourScrollRef.current && mode === "datetime") {
+        setTimeout(() => {
+          const currentHourElement = hourScrollRef.current?.querySelector(`#hour-${selectedHour}`);
+          if (currentHourElement) {
+            currentHourElement.scrollIntoView({ block: "center", behavior: "auto" });
+          }
+        }, 0);
+      }
+    }, [mode, selectedHour]);
+
+    // Auto-scroll minute selector to selected minute
+    React.useEffect(() => {
+      if (minuteScrollRef.current && mode === "datetime") {
+        setTimeout(() => {
+          const currentMinuteElement = minuteScrollRef.current?.querySelector(`#minute-${selectedMinute}`);
+          if (currentMinuteElement) {
+            currentMinuteElement.scrollIntoView({ block: "center", behavior: "auto" });
+          }
+        }, 0);
+      }
+    }, [mode, selectedMinute]);
 
     // Generate year range (current year ± 50 years)
     const yearRange = Array.from({ length: 101 }, (_, i) => new Date().getFullYear() - 50 + i);
@@ -755,18 +797,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
               </div>
               <div
                 className="h-[277px] overflow-y-auto overflow-x-hidden p-2"
-                ref={(el) => {
-                  if (el && showYearSelect) {
-                    // Auto-scroll to current year
-                    const targetYear = showYearSelect === 'right' ? currentYearRight : currentYear;
-                    setTimeout(() => {
-                      const currentYearElement = el.querySelector(`#year-${targetYear}`);
-                      if (currentYearElement) {
-                        currentYearElement.scrollIntoView({ block: "center", behavior: "auto" });
-                      }
-                    }, 0);
-                  }
-                }}
+                ref={yearScrollRef}
               >
                 <div className="space-y-1">
                   {yearRange.map((year) => {
@@ -838,16 +869,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
                 <div className="w-[60px]">
                   <div
                     className="h-[277px] overflow-y-auto overflow-x-hidden"
-                    ref={(el) => {
-                      if (el && mode === "datetime") {
-                        setTimeout(() => {
-                          const currentHourElement = el.querySelector(`#hour-${selectedHour}`);
-                          if (currentHourElement) {
-                            currentHourElement.scrollIntoView({ block: "center", behavior: "auto" });
-                          }
-                        }, 0);
-                      }
-                    }}
+                    ref={hourScrollRef}
                   >
                     <div className="py-1">
                       {Array.from({ length: 24 }, (_, i) => (
@@ -874,16 +896,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
                 <div className="w-[60px] border-l border-border">
                   <div
                     className="h-[277px] overflow-y-auto overflow-x-hidden"
-                    ref={(el) => {
-                      if (el && mode === "datetime") {
-                        setTimeout(() => {
-                          const currentMinuteElement = el.querySelector(`#minute-${selectedMinute}`);
-                          if (currentMinuteElement) {
-                            currentMinuteElement.scrollIntoView({ block: "center", behavior: "auto" });
-                          }
-                        }, 0);
-                      }
-                    }}
+                    ref={minuteScrollRef}
                   >
                     <div className="py-1">
                       {Array.from({ length: 60 }, (_, i) => (

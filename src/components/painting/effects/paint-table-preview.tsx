@@ -70,14 +70,12 @@ export const PaintTablePreview: React.FC<PaintTablePreviewProps> = ({ paint, siz
   }
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>{preview}</TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs">
-          {tooltipContent}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>{preview}</TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs">
+        {tooltipContent}
+      </TooltipContent>
+    </Tooltip>
   );
 };
 

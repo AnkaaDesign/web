@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Shield,
   Calendar,
+  ClipboardCheck,
 } from "lucide-react";
 import { getProfile, notificationPreferenceService } from "@/api-client";
 import type { UserNotificationPreference } from "@/types";
@@ -80,6 +81,10 @@ interface NotificationPreferences {
     cancelled: NotificationEventPreference;
     overdue: NotificationEventPreference;
   };
+  service_order: {
+    created: NotificationEventPreference;
+    "status.changed": NotificationEventPreference;
+  };
   stock: {
     low: NotificationEventPreference;
     out: NotificationEventPreference;
@@ -135,6 +140,10 @@ const notificationPreferencesSchema = z.object({
     fulfilled: channelSchema,
     cancelled: channelSchema,
     overdue: channelSchema,
+  }),
+  service_order: z.object({
+    created: channelSchema,
+    "status.changed": channelSchema,
   }),
   stock: z.object({
     low: channelSchema,
@@ -332,6 +341,15 @@ const notificationSections: NotificationSection[] = [
     ],
   },
   {
+    id: "service_order",
+    title: "Ordens de Serviço",
+    icon: ClipboardCheck,
+    events: [
+      { key: "created", label: "Nova Ordem de Serviço", description: "Quando uma nova ordem de serviço é criada", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
+      { key: "status.changed", label: "Mudança de Status", description: "Quando o status de uma ordem de serviço é alterado", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
+    ],
+  },
+  {
     id: "stock",
     title: "Estoque",
     icon: Package,
@@ -408,6 +426,10 @@ const defaultPreferences: NotificationPreferencesFormData = {
     fulfilled: createDefaultPreference(["IN_APP", "EMAIL"], []),
     cancelled: createDefaultPreference(["IN_APP", "EMAIL"], []),
     overdue: createDefaultPreference(["IN_APP", "EMAIL", "PUSH"], []),
+  },
+  service_order: {
+    created: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    "status.changed": createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP"], ["IN_APP", "PUSH", "WHATSAPP"]),
   },
   stock: {
     low: createDefaultPreference(["IN_APP", "EMAIL"], []),

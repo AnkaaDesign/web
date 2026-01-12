@@ -46,7 +46,7 @@ export const ParagraphBlock = React.memo<ParagraphBlockProps>(({ block, classNam
     <p
       id={id}
       className={cn(
-        "leading-relaxed text-foreground mb-4 last:mb-0",
+        "leading-relaxed text-foreground break-words whitespace-normal",
         customFontSize,
         customFontWeight,
         className

@@ -118,29 +118,27 @@ export function QuickActions({ selectedBorrows = [], className, size = "default"
 
   return (
     <>
-      <TooltipProvider>
-        <div className={cn("flex flex-wrap gap-2", className)}>
-          {visibleActions.map((action, index) => (
-            <Tooltip key={index}>
-              <TooltipTrigger asChild>
-                <Button
-                  onClick={action.onClick}
-                  size={size}
-                  variant={action.variant || variant}
-                  disabled={action.disabled}
-                  className={cn(action.variant === "destructive" && "hover:bg-destructive/90")}
-                >
-                  <action.icon className="h-4 w-4" />
-                  <span className="hidden sm:inline">{action.label}</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{action.tooltip}</p>
-              </TooltipContent>
-            </Tooltip>
-          ))}
-        </div>
-      </TooltipProvider>
+      <div className={cn("flex flex-wrap gap-2", className)}>
+        {visibleActions.map((action, index) => (
+          <Tooltip key={index}>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={action.onClick}
+                size={size}
+                variant={action.variant || variant}
+                disabled={action.disabled}
+                className={cn(action.variant === "destructive" && "hover:bg-destructive/90")}
+              >
+                <action.icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{action.label}</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{action.tooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        ))}
+      </div>
 
       {/* Batch Return Confirmation Dialog */}
       <Dialog open={showBatchReturnDialog} onOpenChange={setShowBatchReturnDialog}>
@@ -238,50 +236,48 @@ export function BorrowQuickActions({ borrow, className, showLabels = true }: Bor
   return (
     <>
       <div className={cn("flex items-center gap-2", className)}>
-        <TooltipProvider>
-          {/* Quick Return */}
-          {isActive && canManageWarehouse && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={() => setShowReturnDialog(true)} disabled={updateMutation.isPending}>
-                  <IconPackageExport className="h-4 w-4" />
-                  {showLabels && <span className="ml-1">Devolver</span>}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Devolução rápida</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-
-          {/* Extend Period (placeholder for future feature) */}
-          {isActive && canManageWarehouse && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="sm" variant="outline" onClick={handleExtendPeriod}>
-                  <IconCalendarTime className="h-4 w-4" />
-                  {showLabels && <span className="ml-1">Prorrogar</span>}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Estender prazo de devolução</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-
-          {/* View Details */}
+        {/* Quick Return */}
+        {isActive && canManageWarehouse && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="sm" variant="ghost" onClick={handleViewDetails}>
-                <IconSearch className="h-4 w-4" />
-                {showLabels && <span className="ml-1">Detalhes</span>}
+              <Button size="sm" variant="outline" onClick={() => setShowReturnDialog(true)} disabled={updateMutation.isPending}>
+                <IconPackageExport className="h-4 w-4" />
+                {showLabels && <span className="ml-1">Devolver</span>}
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Ver detalhes completos</p>
+              <p>Devolução rápida</p>
             </TooltipContent>
           </Tooltip>
-        </TooltipProvider>
+        )}
+
+        {/* Extend Period (placeholder for future feature) */}
+        {isActive && canManageWarehouse && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="sm" variant="outline" onClick={handleExtendPeriod}>
+                <IconCalendarTime className="h-4 w-4" />
+                {showLabels && <span className="ml-1">Prorrogar</span>}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Estender prazo de devolução</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* View Details */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="sm" variant="ghost" onClick={handleViewDetails}>
+              <IconSearch className="h-4 w-4" />
+              {showLabels && <span className="ml-1">Detalhes</span>}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Ver detalhes completos</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Quick Return Dialog */}

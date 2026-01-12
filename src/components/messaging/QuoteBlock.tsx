@@ -29,7 +29,7 @@ export const QuoteBlock = React.memo<QuoteBlockProps>(({ block, className }) => 
       )}
       role="blockquote"
     >
-      <div className="text-base leading-relaxed text-foreground italic">
+      <div className="text-base leading-relaxed text-foreground italic break-words whitespace-normal">
         <InlineContent content={content} />
       </div>
 

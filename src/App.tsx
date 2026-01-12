@@ -10,6 +10,7 @@ import { AutoPrivilegeRoute } from "@/components/navigation/auto-privilege-route
 import { MainLayout } from "@/layouts/main-layout";
 import { AuthLayout } from "@/layouts/auth-layout";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { setupWebNotifications } from "@/lib/setup-notifications";
 import { PushNotificationSetup } from "@/components/common/push-notification-setup";
 import { SocketNotificationsListener } from "@/components/common/socket-notifications-listener";
@@ -312,15 +313,16 @@ function App() {
   return (
     <Router>
       <ThemeProvider defaultTheme="light" storageKey="ankaa-ui-theme">
-        <AuthProvider>
-          <SocketNotificationsListener />
-          <SocketReconnectHandler />
-          <FavoritesProvider>
-            <FileViewerProvider>
-              <MessageModalProvider>
-                <Toaster />
-                <PushNotificationSetup />
-                <Routes>
+        <TooltipProvider>
+          <AuthProvider>
+            <SocketNotificationsListener />
+            <SocketReconnectHandler />
+            <FavoritesProvider>
+              <FileViewerProvider>
+                <MessageModalProvider>
+                  <Toaster />
+                  <PushNotificationSetup />
+                  <Routes>
               {/* Auth routes */}
               <Route element={<AuthLayout />}>
                 <Route path={routes.authentication.login} element={<LoginPage />} />
@@ -2218,6 +2220,7 @@ function App() {
             </FileViewerProvider>
           </FavoritesProvider>
         </AuthProvider>
+      </TooltipProvider>
       </ThemeProvider>
     </Router>
   );

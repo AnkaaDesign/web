@@ -12,6 +12,7 @@ import { IconDeviceDesktop, IconDeviceMobile } from "@tabler/icons-react";
 import * as TablerIcons from "@tabler/icons-react";
 import type { MessageFormData } from "./types";
 import { useState } from "react";
+import { parseMarkdownToInlineFormat } from "@/utils/markdown-parser";
 
 interface MessagePreviewDialogProps {
   open: boolean;
@@ -21,6 +22,37 @@ interface MessagePreviewDialogProps {
 
 export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePreviewDialogProps) => {
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');
+
+  // Helper to render formatted text with markdown support
+  const renderFormattedText = (text: string) => {
+    const formatted = parseMarkdownToInlineFormat(text);
+    return formatted.map((format, index) => {
+      const key = `fmt-${index}`;
+      switch (format.type) {
+        case 'text':
+          return <span key={key}>{format.content}</span>;
+        case 'bold':
+          return <strong key={key} className="font-semibold">{format.content}</strong>;
+        case 'italic':
+          return <em key={key} className="italic">{format.content}</em>;
+        case 'link':
+          return (
+            <a
+              key={key}
+              href={format.url}
+              className="text-primary hover:underline underline-offset-2"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {format.content}
+            </a>
+          );
+        default:
+          return null;
+      }
+    });
+  };
+
   const renderBlock = (block: any) => {
     // Helper to get font size class
     const getFontSizeClass = (size?: string) => {
@@ -34,6 +66,19 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
         '3xl': 'text-3xl',
       };
       return size ? sizes[size] : '';
+    };
+
+    // Default sizes for headings when no custom size is set
+    const defaultHeadingSizes: Record<number, string> = {
+      1: 'text-4xl md:text-5xl',
+      2: 'text-3xl md:text-4xl',
+      3: 'text-2xl md:text-3xl',
+    };
+
+    // Get effective heading size: custom if provided, otherwise default
+    const getEffectiveHeadingSize = (level: number, customSize?: string) => {
+      if (!customSize) return defaultHeadingSizes[level];
+      return getFontSizeClass(customSize);
     };
 
     // Helper to get font weight class
@@ -50,32 +95,32 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
     switch (block.type) {
       case 'heading1':
         return (
-          <h1 className={`${getFontSizeClass(block.fontSize) || 'text-3xl'} ${getFontWeightClass(block.fontWeight) || 'font-bold'}`}>
-            {block.content}
+          <h1 className={`${getEffectiveHeadingSize(1, block.fontSize)} ${getFontWeightClass(block.fontWeight) || 'font-bold'} break-words whitespace-normal`}>
+            {renderFormattedText(block.content)}
           </h1>
         );
       case 'heading2':
         return (
-          <h2 className={`${getFontSizeClass(block.fontSize) || 'text-2xl'} ${getFontWeightClass(block.fontWeight) || 'font-semibold'}`}>
-            {block.content}
+          <h2 className={`${getEffectiveHeadingSize(2, block.fontSize)} ${getFontWeightClass(block.fontWeight) || 'font-semibold'} break-words whitespace-normal`}>
+            {renderFormattedText(block.content)}
           </h2>
         );
       case 'heading3':
         return (
-          <h3 className={`${getFontSizeClass(block.fontSize) || 'text-xl'} ${getFontWeightClass(block.fontWeight) || 'font-medium'}`}>
-            {block.content}
+          <h3 className={`${getEffectiveHeadingSize(3, block.fontSize)} ${getFontWeightClass(block.fontWeight) || 'font-medium'} break-words whitespace-normal`}>
+            {renderFormattedText(block.content)}
           </h3>
         );
       case 'paragraph':
         return (
-          <p className={`${getFontSizeClass(block.fontSize) || 'text-base'} ${getFontWeightClass(block.fontWeight) || 'font-normal'}`}>
-            {block.content}
+          <p className={`${getFontSizeClass(block.fontSize) || 'text-base'} ${getFontWeightClass(block.fontWeight) || 'font-normal'} leading-relaxed break-words whitespace-normal`}>
+            {renderFormattedText(block.content)}
           </p>
         );
       case 'quote':
         return (
-          <blockquote className={`border-l-4 border-primary pl-4 italic ${getFontSizeClass(block.fontSize) || 'text-lg'} ${getFontWeightClass(block.fontWeight) || 'font-normal'}`}>
-            {block.content}
+          <blockquote className={`border-l-4 border-primary pl-4 italic ${getFontSizeClass(block.fontSize) || 'text-lg'} ${getFontWeightClass(block.fontWeight) || 'font-normal'} break-words whitespace-normal`}>
+            {renderFormattedText(block.content)}
           </blockquote>
         );
       case 'image':
@@ -176,11 +221,11 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
 
         const iconContent = (
           <IconComponent
-            className={`my-2 ${iconSizeClasses[block.size || 'md']} ${block.color || 'text-foreground'}`}
+            className={`flex-shrink-0 ${iconSizeClasses[block.size || 'md']} ${block.color || 'text-foreground'}`}
           />
         );
 
-        // Apply alignment wrapper for standalone icons
+        // Apply alignment wrapper for standalone icons (not in rows)
         return block.alignment ? (
           <div className={`flex my-4 first:mt-0 last:mb-0 ${iconAlignmentClasses[block.alignment]}`}>
             {iconContent}
@@ -201,16 +246,23 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
         };
 
         return (
-          <div className={`flex flex-wrap ${rowGapClasses[block.gap || 'md']} ${rowAlignClasses[block.verticalAlign || 'top']}`}>
-            {(block.blocks || []).map((nestedBlock: any, idx: number) => (
-              <div key={nestedBlock.id || `nested-${idx}`} className="inline-flex">
-                {renderBlock(nestedBlock)}
-              </div>
-            ))}
+          <div className={`flex flex-wrap md:flex-nowrap ${rowGapClasses[block.gap || 'md']} ${rowAlignClasses[block.verticalAlign || 'top']} my-4 first:mt-0 last:mb-0 [&>*]:m-0`}>
+            {(block.blocks || []).map((nestedBlock: any, idx: number) => {
+              // Icons should only take their natural width, other blocks should grow
+              const isIconBlock = nestedBlock.type === 'icon';
+              const flexClass = isIconBlock ? 'flex-none' : 'flex-1 min-w-0';
+              // Icons need slight top margin to align with text baseline
+              const iconAdjustment = isIconBlock ? 'mt-[0.2em]' : '';
+
+              return (
+                <div key={nestedBlock.id || `nested-${idx}`} className={`${flexClass} ${iconAdjustment} [&>*]:my-0 [&>*]:first:mt-0 [&>*]:last:mb-0`}>
+                  {renderBlock(nestedBlock)}
+                </div>
+              );
+            })}
           </div>
         );
       default:
-        console.warn('[MessagePreviewDialog] Unknown block type:', block.type);
         return null;
     }
   };
@@ -229,11 +281,11 @@ export const MessagePreviewDialog = ({ open, onOpenChange, data }: MessagePrevie
   };
 
   const PreviewContent = () => (
-    <Card>
-      <CardContent className="p-6 space-y-6">
+    <Card className="w-full overflow-hidden">
+      <CardContent className="p-6 space-y-6 overflow-hidden">
             {/* Header */}
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold">{data.title}</h2>
+              <h2 className="text-2xl font-bold break-words">{data.title}</h2>
 
               <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                 <div>Público: {getTargetingText()}</div>

@@ -167,20 +167,28 @@ export function formatTaskSummary(task: Task): string {
 }
 
 /**
- * Calculate task price from budget total
+ * Calculate task price from pricing total (only APPROVED pricing)
  */
 export function calculateTaskPrice(task: Task): number {
-  if (!task.budget) return 0;
-  return task.budget.total || 0;
+  if (!task.pricing) return 0;
+  if (task.pricing.status !== 'APPROVED') return 0;
+  return task.pricing.total || 0;
 }
 
 /**
- * Format task price from budget total
+ * Get task price from APPROVED pricing (alias for calculateTaskPrice)
+ */
+export function getTaskPrice(task: Task): number {
+  return calculateTaskPrice(task);
+}
+
+/**
+ * Format task price from pricing total
  */
 export function formatTaskPrice(task: Task): string {
-  if (!task.budget || !task.budget.total) return "Sem valor";
-  const totalValue = calculateTaskPrice(task);
-  return numberUtils.formatCurrency(totalValue);
+  const price = calculateTaskPrice(task);
+  if (price === 0) return "Sem valor";
+  return numberUtils.formatCurrency(price);
 }
 
 /**
@@ -366,4 +374,31 @@ export function validateAllServiceOrdersCompleted(task: Task): ServiceOrderValid
 
   // All service orders are completed
   return { isValid: true };
+}
+
+// ============================================================================
+// TASK PRICING UTILITIES
+// ============================================================================
+
+import type { TaskPricing } from '../types/task-pricing';
+
+/**
+ * Check if pricing is expired
+ */
+export function isPricingExpired(pricing: TaskPricing): boolean {
+  if (!pricing.expiresAt) return false;
+  return new Date(pricing.expiresAt) < new Date();
+}
+
+/**
+ * Get pricing status label in Portuguese
+ */
+export function getPricingStatusLabel(status: string): string {
+  const labels = {
+    DRAFT: 'Rascunho',
+    APPROVED: 'Aprovado',
+    REJECTED: 'Rejeitado',
+    CANCELLED: 'Cancelado',
+  };
+  return labels[status as keyof typeof labels] || status;
 }

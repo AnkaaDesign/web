@@ -46,8 +46,8 @@ export function TaskHistoryContextMenu({
 }: TaskHistoryContextMenuProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { update, remove, createAsync } = useTaskMutations();
-  const { batchUpdate, batchDelete } = useTaskBatchMutations();
+  const { update, delete: deleteTask, createAsync } = useTaskMutations();
+  const { batchUpdate, batchDeleteAsync } = useTaskBatchMutations();
   const [setStatusModalOpen, setSetStatusModalOpen] = useState(false);
   const [setSectorModalOpen, setSetSectorModalOpen] = useState(false);
   const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
@@ -243,9 +243,9 @@ export function TaskHistoryContextMenu({
     const tasksToDelete = deleteDialog.tasks;
     try {
       if (tasksToDelete.length === 1) {
-        await remove(tasksToDelete[0].id);
+        await deleteTask(tasksToDelete[0].id);
       } else {
-        await batchDelete({ taskIds: tasksToDelete.map(t => t.id) });
+        await batchDeleteAsync({ taskIds: tasksToDelete.map(t => t.id) });
       }
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
