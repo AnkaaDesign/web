@@ -4,9 +4,9 @@ import { Combobox } from "@/components/ui/combobox";
 import { getCustomers, quickCreateCustomer } from "../../../../api-client";
 import type { Customer } from "../../../../types";
 import { formatCNPJ } from "../../../../utils";
-import { cn } from "@/lib/utils";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { IconUser } from "@tabler/icons-react";
+import { useCnpjAutocomplete } from "@/hooks/use-cnpj-autocomplete";
 
 interface CustomerSelectorProps {
   control: any;
@@ -18,6 +18,15 @@ interface CustomerSelectorProps {
 export function CustomerSelector({ control, disabled, required, initialCustomer }: CustomerSelectorProps) {
   const [isCreating, setIsCreating] = useState(false);
 
+  // CNPJ autocomplete integration - detects CNPJ input and fetches company data from Brasil API
+  const {
+    isLookingUp,
+    getCreateLabel,
+    buildCustomerData,
+    processInput,
+    reset: resetCnpjState,
+  } = useCnpjAutocomplete();
+
   // Memoize initialOptions to prevent infinite loop
   const initialOptions = useMemo(() => initialCustomer ? [initialCustomer] : [], [initialCustomer?.id]);
 
@@ -26,13 +35,16 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
   const getOptionValue = useCallback((customer: Customer) => customer.id, []);
 
   // Search function for Combobox - let the combobox handle state internally
-  const searchCustomers = async (
+  const searchCustomers = useCallback(async (
     search: string,
     page: number = 1,
   ): Promise<{
     data: Customer[];
     hasMore: boolean;
   }> => {
+    // Process input for CNPJ detection
+    processInput(search);
+
     const params: any = {
       orderBy: { fantasyName: "asc" },
       page: page,
@@ -60,18 +72,26 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
       }
       return { data: [], hasMore: false };
     }
-  };
+  }, [processInput]);
 
-  const handleCreateCustomer = async (fantasyName: string) => {
+  // Handle customer creation with CNPJ data support
+  // Returns the full customer object so the combobox can add it to cache and select it
+  const handleCreateCustomer = useCallback(async (searchText: string): Promise<Customer | undefined> => {
     setIsCreating(true);
     try {
-      const result = await quickCreateCustomer({
-        fantasyName,
-      });
+      // Build customer data based on CNPJ lookup result
+      const customerData = buildCustomerData(searchText);
+
+      // Debug: Log the data being sent to the API
+      console.log('[CustomerSelector] Quick create with data:', JSON.stringify(customerData, null, 2));
+
+      const result = await quickCreateCustomer(customerData);
 
       if (result.success && result.data) {
-        // Return the newly created customer for selection
-        return result.data.id;
+        // Reset CNPJ state after successful creation
+        resetCnpjState();
+        // Return the full customer object for the combobox to handle selection
+        return result.data;
       }
     } catch (error) {
       // Error is handled by the API client
@@ -79,7 +99,12 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
     } finally {
       setIsCreating(false);
     }
-  };
+  }, [buildCustomerData, resetCnpjState]);
+
+  // Dynamic create label based on CNPJ lookup state
+  const dynamicCreateLabel = useCallback((value: string) => {
+    return getCreateLabel(value);
+  }, [getCreateLabel]);
 
   return (
     <FormField
@@ -97,21 +122,20 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
               value={field.value || ""}
               onValueChange={(value) => {
                 field.onChange(value);
+                // Reset CNPJ state when a customer is selected
+                if (value) {
+                  resetCnpjState();
+                }
               }}
               placeholder="Selecione um cliente"
-              emptyText="Nenhum cliente encontrado"
-              searchPlaceholder="Pesquisar clientes..."
+              emptyText={isLookingUp ? "Buscando CNPJ..." : "Nenhum cliente encontrado"}
+              searchPlaceholder="Pesquisar por nome ou CNPJ..."
               disabled={disabled || isCreating}
               async={true}
               allowCreate={true}
-              createLabel={(value) => `Criar cliente "${value}"`}
-              onCreate={async (fantasyName) => {
-                const newCustomerId = await handleCreateCustomer(fantasyName);
-                if (newCustomerId) {
-                  field.onChange(newCustomerId);
-                }
-              }}
-              isCreating={isCreating}
+              createLabel={dynamicCreateLabel}
+              onCreate={handleCreateCustomer}
+              isCreating={isCreating || isLookingUp}
               queryKey={["customers", "search"]}
               queryFn={searchCustomers}
               initialOptions={initialOptions}

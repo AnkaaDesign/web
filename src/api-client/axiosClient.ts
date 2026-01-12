@@ -686,10 +686,13 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         const isBatchOperation = config.url?.includes("/batch");
         // Skip notifications for mark-viewed - this is a background operation
         const isMarkViewed = config.url?.includes("/mark-viewed");
+        // Skip notifications for notification-related endpoints - these are background operations
+        // that would create confusing duplicate toasts when marking notifications as read
+        const isNotificationEndpoint = config.url?.includes("/notifications") || config.url?.includes("/seen-notifications");
         // Only show success if the response indicates success
         const isSuccess = (response.data?.success as boolean | undefined) !== false; // Show success unless explicitly false
 
-        if (!isBatchOperation && !isMarkViewed && isSuccess) {
+        if (!isBatchOperation && !isMarkViewed && !isNotificationEndpoint && isSuccess) {
           const message = response.data?.message || getSuccessMessage(config.method);
           notify.success("Sucesso", message);
         }
@@ -825,11 +828,13 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         const isBatchOperation = config?.url?.includes("/batch");
         // Skip notifications for file uploads - they should be handled by upload components
         const isFileUpload = config?.url?.includes("/files/upload");
+        // Skip notifications for notification-related endpoints - these are background operations
+        const isNotificationEndpoint = config?.url?.includes("/notifications") || config?.url?.includes("/seen-notifications");
 
         // Check if we should show this toast (deduplication check)
         const shouldShow = retryTracker.shouldShowToast(metadata.url, metadata.method, errorInfo.message);
 
-        if (!isBatchOperation && !isFileUpload && shouldShow) {
+        if (!isBatchOperation && !isFileUpload && !isNotificationEndpoint && shouldShow) {
           // For rate limit errors, show specialized message
           if (errorInfo.category === ErrorCategory.RATE_LIMIT) {
             notify.error("Limite de Requisições", errorInfo.message, {

@@ -106,6 +106,7 @@ export * from "./use-notification-socket";
 // Other Module Hooks
 // =====================================================
 export * from "./useCustomer";
+export * from "./use-cnpj-autocomplete";
 export * from "./useLayout";
 export * from "./useLayoutSection";
 

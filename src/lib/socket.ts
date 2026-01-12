@@ -216,7 +216,7 @@ class SocketService {
     // Optionally show a notification to the user
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('socket:reconnect-failed', {
-        detail: { message: 'Unable to establish connection. Please refresh the page.' }
+        detail: { message: 'Não foi possível restabelecer a conexão. Por favor, atualize a página.' }
       }));
     }
   }

@@ -6,6 +6,9 @@ import { IconCircleCheck, IconCircleX, IconAlertCircle, IconInfoCircle } from "@
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 type ToastOptions = Parameters<typeof sonnerToast>[1];
 
+// Unique toast IDs for specific error types
+const NETWORK_ERROR_TOAST_ID = 'network-error-toast';
+
 // Simplified toast deduplication system
 class ToastManager {
   private activeToasts = new Map<string, string>(); // key -> toastId
@@ -15,8 +18,30 @@ class ToastManager {
     return `${title}:${desc}`.toLowerCase().trim();
   }
 
-  shouldShowToast(title: string, description?: string | string[]): boolean {
+  // Check if this is a network/connection error
+  private isNetworkError(title: string, description?: string | string[]): boolean {
+    const titleLower = title.toLowerCase();
+    const descLower = (Array.isArray(description) ? description.join(" ") : description || "").toLowerCase();
+
+    return (
+      titleLower.includes("conexão") ||
+      titleLower.includes("connection") ||
+      titleLower.includes("erro de conexão") ||
+      descLower.includes("não foi possível conectar") ||
+      descLower.includes("conexão com a internet") ||
+      descLower.includes("connection refused")
+    );
+  }
+
+  shouldShowToast(title: string, description?: string | string[]): { show: boolean; id?: string } {
     const key = this.generateKey(title, description);
+
+    // Special handling for network errors - use a single toast that gets updated
+    if (this.isNetworkError(title, description)) {
+      // Return the fixed ID - sonner will update the existing toast and reset its timer
+      // This keeps one toast visible that refreshes each time an error occurs
+      return { show: true, id: NETWORK_ERROR_TOAST_ID };
+    }
 
     // If duplicate exists, dismiss it and allow new one
     const existingId = this.activeToasts.get(key);
@@ -24,10 +49,15 @@ class ToastManager {
       sonnerToast.dismiss(existingId);
     }
 
-    return true;
+    return { show: true };
   }
 
   trackToast(toastId: string, title: string, description?: string | string[]) {
+    // Don't track network errors - they use a fixed ID
+    if (this.isNetworkError(title, description)) {
+      return;
+    }
+
     const key = this.generateKey(title, description);
     this.activeToasts.set(key, toastId);
 
@@ -87,14 +117,16 @@ const Toaster = ({ ...props }: ToasterProps) => {
 // Simplified toast system with deduplication
 const toast = {
   success: (title: string, description?: string, options?: ToastOptions & { allowDuplicate?: boolean }) => {
+    let dedupResult: { show: boolean; id?: string } = { show: true };
     if (!options?.allowDuplicate) {
-      toastManager.shouldShowToast(title, description);
+      dedupResult = toastManager.shouldShowToast(title, description);
     }
 
     const toastId = sonnerToast.success(title, {
       description,
       icon: <IconCircleCheck className="h-4 w-4" />,
       ...options,
+      ...(dedupResult.id ? { id: dedupResult.id } : {}),
     });
 
     if (!options?.allowDuplicate && toastId) {
@@ -107,8 +139,9 @@ const toast = {
   error: (title: string, description?: string | string[], options?: ToastOptions & { allowDuplicate?: boolean }) => {
     const errorDescription = Array.isArray(description) ? description.join("\n") : description;
 
+    let dedupResult: { show: boolean; id?: string } = { show: true };
     if (!options?.allowDuplicate) {
-      toastManager.shouldShowToast(title, errorDescription);
+      dedupResult = toastManager.shouldShowToast(title, errorDescription);
     }
 
     const toastId = sonnerToast.error(title, {
@@ -116,6 +149,7 @@ const toast = {
       icon: <IconCircleX className="h-4 w-4" />,
       duration: 8000,
       ...options,
+      ...(dedupResult.id ? { id: dedupResult.id } : {}),
     });
 
     if (!options?.allowDuplicate && toastId) {
@@ -126,8 +160,9 @@ const toast = {
   },
 
   warning: (title: string, description?: string, options?: ToastOptions & { allowDuplicate?: boolean }) => {
+    let dedupResult: { show: boolean; id?: string } = { show: true };
     if (!options?.allowDuplicate) {
-      toastManager.shouldShowToast(title, description);
+      dedupResult = toastManager.shouldShowToast(title, description);
     }
 
     const toastId = sonnerToast.warning(title, {
@@ -135,6 +170,7 @@ const toast = {
       icon: <IconAlertCircle className="h-4 w-4" />,
       duration: 6000,
       ...options,
+      ...(dedupResult.id ? { id: dedupResult.id } : {}),
     });
 
     if (!options?.allowDuplicate && toastId) {
@@ -145,14 +181,16 @@ const toast = {
   },
 
   info: (title: string, description?: string, options?: ToastOptions & { allowDuplicate?: boolean }) => {
+    let dedupResult: { show: boolean; id?: string } = { show: true };
     if (!options?.allowDuplicate) {
-      toastManager.shouldShowToast(title, description);
+      dedupResult = toastManager.shouldShowToast(title, description);
     }
 
     const toastId = sonnerToast.info(title, {
       description,
       icon: <IconInfoCircle className="h-4 w-4" />,
       ...options,
+      ...(dedupResult.id ? { id: dedupResult.id } : {}),
     });
 
     if (!options?.allowDuplicate && toastId) {

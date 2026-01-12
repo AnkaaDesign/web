@@ -1,7 +1,7 @@
 // packages/interfaces/src/order.ts
 
 import type { BaseEntity, BaseGetUniqueResponse, BaseGetManyResponse, BaseCreateResponse, BaseUpdateResponse, BaseDeleteResponse, BaseBatchResponse } from "./common";
-import type { ORDER_STATUS, SCHEDULE_FREQUENCY, WEEK_DAY, MONTH, ORDER_TRIGGER_TYPE, ORDER_BY_DIRECTION, RESCHEDULE_REASON } from '@constants';
+import type { ORDER_STATUS, PAYMENT_METHOD, SCHEDULE_FREQUENCY, WEEK_DAY, MONTH, ORDER_TRIGGER_TYPE, ORDER_BY_DIRECTION, RESCHEDULE_REASON } from '@constants';
 import type { Supplier, SupplierIncludes, SupplierOrderBy } from "./supplier";
 import type { Item, ItemIncludes, ItemOrderBy, ItemWhere } from "./item";
 import type { File, FileIncludes } from "./file";
@@ -125,6 +125,9 @@ export interface Order extends BaseEntity {
   orderRuleId: string | null;
   ppeScheduleId: string | null;
   notes: string | null;
+  paymentMethod: PAYMENT_METHOD | null;
+  paymentPix: string | null;
+  paymentDueDays: number | null;
 
   // Relations (optional, populated based on query)
   budgets?: File[];

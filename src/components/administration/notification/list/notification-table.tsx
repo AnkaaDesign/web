@@ -173,7 +173,7 @@ export function NotificationTable({
   const columns: NotificationColumn[] = [
     {
       key: "title",
-      header: "Título",
+      header: "TÍTULO",
       sortable: true,
       className: "w-64",
       align: "left",
@@ -183,21 +183,21 @@ export function NotificationTable({
     },
     {
       key: "type",
-      header: "Tipo",
+      header: "TIPO",
       sortable: true,
-      className: "w-28",
+      className: "w-36",
       align: "left",
       accessor: (notification) => (
-        <Badge variant="outline">
+        <Badge variant="outline" className="whitespace-nowrap">
           {NOTIFICATION_TYPE_LABELS[notification.type] || notification.type}
         </Badge>
       ),
     },
     {
       key: "importance",
-      header: "Importância",
+      header: "IMPORTÂNCIA",
       sortable: true,
-      className: "w-28",
+      className: "w-24",
       align: "left",
       accessor: (notification) => {
         const variant = notification.importance === "HIGH"
@@ -206,7 +206,7 @@ export function NotificationTable({
           ? "warning"
           : "secondary";
         return (
-          <Badge variant={variant as any}>
+          <Badge variant={variant as any} className="whitespace-nowrap">
             {NOTIFICATION_IMPORTANCE_LABELS[notification.importance] || notification.importance}
           </Badge>
         );
@@ -214,47 +214,42 @@ export function NotificationTable({
     },
     {
       key: "channel",
-      header: "Canais",
+      header: "CANAIS",
       sortable: false,
-      className: "w-32",
+      className: "w-auto",
       align: "left",
       accessor: (notification) => (
-        <div className="flex flex-wrap gap-1">
-          {notification.channel?.slice(0, 2).map((ch: string) => (
-            <Badge key={ch} variant="secondary" className="text-xs">
+        <div className="flex flex-nowrap gap-1">
+          {notification.channel?.map((ch: string) => (
+            <Badge key={ch} variant="secondary" className="text-xs whitespace-nowrap">
               {NOTIFICATION_CHANNEL_LABELS[ch] || ch}
             </Badge>
           ))}
-          {notification.channel?.length > 2 && (
-            <Badge variant="secondary" className="text-xs">
-              +{notification.channel.length - 2}
-            </Badge>
-          )}
         </div>
       ),
     },
     {
       key: "sentAt",
-      header: "Status",
+      header: "STATUS",
       sortable: true,
       className: "w-24",
       align: "left",
       accessor: (notification) => (
         notification.sentAt ? (
-          <Badge variant="default" className="bg-green-600">Enviada</Badge>
+          <Badge variant="default" className="bg-green-600 whitespace-nowrap">Enviada</Badge>
         ) : (
-          <Badge variant="secondary">Pendente</Badge>
+          <Badge variant="secondary" className="whitespace-nowrap">Pendente</Badge>
         )
       ),
     },
     {
       key: "createdAt",
-      header: "Criada em",
+      header: "CRIADA EM",
       sortable: true,
-      className: "w-32",
+      className: "w-40",
       align: "left",
       accessor: (notification) => (
-        <div className="text-sm text-muted-foreground">
+        <div className="text-sm text-muted-foreground whitespace-nowrap">
           {notification.createdAt
             ? format(new Date(notification.createdAt), "dd/MM/yyyy HH:mm", { locale: ptBR })
             : "-"}

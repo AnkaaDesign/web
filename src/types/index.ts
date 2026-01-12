@@ -7,7 +7,6 @@ export * from "./common";
 export * from "./activity";
 export * from "./airbrushing";
 export * from "./borrow";
-export * from "./budget";
 export * from "./changelog";
 export * from "./customer";
 export * from "./cut";

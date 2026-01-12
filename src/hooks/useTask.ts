@@ -615,6 +615,22 @@ export function useTaskOperations() {
 }
 
 // -------------------------------------
+// BATCH UPDATE ALIAS
+// -------------------------------------
+// Alias for backward compatibility with components using useBatchUpdateTasks
+export function useBatchUpdateTasks() {
+  const { batchUpdate, batchUpdateAsync, isLoading, error, refresh } = useTaskBatchMutations();
+  return {
+    mutate: batchUpdate,
+    mutateAsync: batchUpdateAsync,
+    isPending: isLoading,
+    isLoading,
+    error,
+    refresh,
+  };
+}
+
+// -------------------------------------
 // URL STATE MANAGEMENT
 // -------------------------------------
 export { useTaskFormUrlState } from "./task/use-task-form-url-state";

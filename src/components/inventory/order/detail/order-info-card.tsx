@@ -3,10 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { OrderStatusBadge } from "../common/order-status-badge";
 import { OrderTotalBadge } from "../common/order-total-calculator";
-import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFile, IconFileInvoice, IconReceipt, IconFileText, IconId } from "@tabler/icons-react";
+import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFile, IconFileInvoice, IconReceipt, IconFileText, IconId, IconCreditCard } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { formatDate, formatDateTime, formatCNPJ } from "../../../../utils";
 import type { Order } from "../../../../types";
+import { PAYMENT_METHOD_LABELS } from "../../../../constants";
 import { FilePreviewCard } from "@/components/common/file";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
@@ -150,6 +151,39 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
             )}
           </div>
         </div>
+
+        {/* Payment Information */}
+        {order.paymentMethod && (
+          <>
+            <Separator className="bg-border/50" />
+            <div className="space-y-4">
+              <h3 className="text-base font-semibold mb-4 text-foreground">Pagamento</h3>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCreditCard className="h-4 w-4" />
+                    Método de Pagamento
+                  </span>
+                  <Badge variant="outline">{PAYMENT_METHOD_LABELS[order.paymentMethod as keyof typeof PAYMENT_METHOD_LABELS]}</Badge>
+                </div>
+
+                {order.paymentMethod === "PIX" && order.paymentPix && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground">Chave Pix</span>
+                    <span className="text-sm font-semibold text-foreground font-mono">{order.paymentPix}</span>
+                  </div>
+                )}
+
+                {order.paymentMethod === "BANK_SLIP" && order.paymentDueDays && (
+                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                    <span className="text-sm font-medium text-muted-foreground">Prazo de Vencimento</span>
+                    <span className="text-sm font-semibold text-foreground">{order.paymentDueDays} dias</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* File Attachments */}
         {(order.budget || order.nfe || order.receipt) && (

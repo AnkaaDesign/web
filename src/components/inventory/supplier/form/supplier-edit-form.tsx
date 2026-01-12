@@ -1,7 +1,7 @@
 import React from "react";
 import type { Supplier } from "../../../../types";
 import { type SupplierUpdateFormData } from "../../../../schemas";
-import { SupplierForm } from "./supplier-form";
+import { SupplierForm, type SupplierUpdateSubmitData } from "./supplier-form";
 
 interface SupplierEditFormProps {
   supplier: Supplier;
@@ -20,6 +20,7 @@ export function SupplierEditForm({ supplier, onSubmit, isSubmitting, onDirtyChan
       cnpj: supplier.cnpj,
       corporateName: supplier.corporateName,
       email: supplier.email,
+      streetType: (supplier as any).streetType || null,
       address: supplier.address,
       addressNumber: supplier.addressNumber,
       addressComplement: supplier.addressComplement,
@@ -29,16 +30,26 @@ export function SupplierEditForm({ supplier, onSubmit, isSubmitting, onDirtyChan
       zipCode: supplier.zipCode,
       site: supplier.site,
       phones: supplier.phones || [],
+      pix: supplier.pix,
       tags: supplier.tags || [],
       logoId: supplier.logoId,
     }),
     [supplier],
   );
 
-  // Track original values to determine what changed (only set once on mount)
+  // Track original values to determine what changed
+  // Use ref but update it when supplier data changes
   const originalValuesRef = React.useRef(defaultValues);
 
-  const handleSubmit = async (data: SupplierUpdateFormData & { logoFile?: File } | FormData) => {
+  // Update originalValuesRef when supplier data is loaded/changed
+  // This ensures we compare against the actual loaded data, not stale data
+  React.useEffect(() => {
+    if (supplier.id) {
+      originalValuesRef.current = defaultValues;
+    }
+  }, [supplier.id, defaultValues]);
+
+  const handleSubmit = async (data: SupplierUpdateSubmitData & { logoFile?: File } | FormData) => {
     // If data is FormData (file upload), pass it through directly without filtering
     // FormData is already prepared with all necessary fields by SupplierForm
     if (data instanceof FormData) {
@@ -46,8 +57,8 @@ export function SupplierEditForm({ supplier, onSubmit, isSubmitting, onDirtyChan
       return;
     }
 
-    // Extract logoFile from data (passed by SupplierForm)
-    const { logoFile, ...formData } = data;
+    // Extract logoFile and dirtyFields from data (passed by SupplierForm)
+    const { logoFile, __dirtyFields, ...formData } = data;
 
     // If there's a logo file, we need to send ALL current form data (not just changes)
     // because FormData requires all fields to be present
@@ -62,6 +73,12 @@ export function SupplierEditForm({ supplier, onSubmit, isSubmitting, onDirtyChan
     // No logo file - proceed with change detection as usual
     const changedFields: Partial<SupplierUpdateFormData> = {};
     const original = originalValuesRef.current;
+    const dirtyFields = __dirtyFields || {};
+
+    // Debug logging to understand what's being submitted
+    console.log('[SupplierEditForm] Form data received:', formData);
+    console.log('[SupplierEditForm] Dirty fields:', dirtyFields);
+    console.log('[SupplierEditForm] Original values:', original);
 
     // Check each field for changes
     Object.keys(formData).forEach((key) => {
@@ -72,6 +89,7 @@ export function SupplierEditForm({ supplier, onSubmit, isSubmitting, onDirtyChan
 
       const newValue = formData[typedKey];
       const oldValue = typedKey in original ? (original as any)[typedKey] : undefined;
+      const isDirty = dirtyFields[typedKey] === true;
 
       // Special handling for phones - normalize for comparison
       if (typedKey === "phones") {
@@ -126,6 +144,22 @@ export function SupplierEditForm({ supplier, onSubmit, isSubmitting, onDirtyChan
           changedFields.cnpj = cleanNew === "" ? null : (cleanNew as any);
         }
       }
+      // Special handling for site - protect against accidental clearing
+      else if (typedKey === "site") {
+        // Treat null, undefined, and empty string as equivalent (no site)
+        const normalizedNew = newValue && String(newValue).trim() !== "" ? String(newValue).trim() : null;
+        const normalizedOld = oldValue && String(oldValue).trim() !== "" ? String(oldValue).trim() : null;
+
+        if (normalizedNew !== normalizedOld) {
+          // If trying to clear site (new is null) but old had a value:
+          // ONLY allow if the field was explicitly marked as dirty (user touched it)
+          if (normalizedNew === null && normalizedOld !== null && !isDirty) {
+            console.warn('[SupplierEditForm] Blocked unintentional site clearing. Field not dirty. Old value:', normalizedOld);
+            return; // Skip - user didn't touch this field
+          }
+          changedFields.site = normalizedNew;
+        }
+      }
       // Deep equality check for other arrays
       else if (Array.isArray(newValue) && Array.isArray(oldValue)) {
         if (JSON.stringify(newValue) !== JSON.stringify(oldValue)) {
@@ -139,8 +173,12 @@ export function SupplierEditForm({ supplier, onSubmit, isSubmitting, onDirtyChan
     });
 
     // Only submit if there are changes
+    console.log('[SupplierEditForm] Changed fields to submit:', changedFields);
+
     if (Object.keys(changedFields).length > 0) {
       await onSubmit(changedFields);
+    } else {
+      console.log('[SupplierEditForm] No changes detected, skipping submit');
     }
   };
 

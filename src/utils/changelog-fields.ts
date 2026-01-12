@@ -293,6 +293,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     cutPlan: "Planos de Corte",
     relatedTasks: "Tarefas Relacionadas",
     relatedTo: "Relacionado a",
+    trucks: "Caminhões",
     // Nested relationship fields
     "customer.fantasyName": "Nome Fantasia do Cliente",
     "customer.corporateName": "Razão Social do Cliente",
@@ -798,6 +799,22 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     description: "Descrição",
     status: "Status",
     statusOrder: "Ordem do Status",
+  },
+  [CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER]: {
+    type: "Tipo",
+    status: "Status",
+    statusOrder: "Ordem do Status",
+    description: "Descrição",
+    startedAt: "Iniciado em",
+    finishedAt: "Finalizado em",
+    completedAt: "Concluído em",
+    taskId: "Tarefa",
+    userId: "Responsável",
+    notes: "Observações",
+    // Nested relationship fields
+    "task.name": "Nome da Tarefa",
+    "task.serialNumber": "Número de Série da Tarefa",
+    "user.name": "Nome do Responsável",
   },
   [CHANGE_LOG_ENTITY_TYPE.TIME_CLOCK_ENTRY]: {
     userId: "Funcionário",

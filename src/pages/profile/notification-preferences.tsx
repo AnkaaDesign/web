@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -19,9 +19,29 @@ import {
   Shield,
   Calendar,
   ClipboardCheck,
+  Scissors,
+  HardHat,
 } from "lucide-react";
 import { getProfile, notificationPreferenceService } from "@/api-client";
 import type { UserNotificationPreference } from "@/types";
+
+// =====================
+// Sector Privileges (must match backend)
+// =====================
+
+type SectorPrivilege =
+  | "BASIC"
+  | "PRODUCTION"
+  | "MAINTENANCE"
+  | "WAREHOUSE"
+  | "PLOTTING"
+  | "ADMIN"
+  | "HUMAN_RESOURCES"
+  | "EXTERNAL"
+  | "DESIGNER"
+  | "FINANCIAL"
+  | "LOGISTIC"
+  | "COMMERCIAL";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -70,6 +90,7 @@ interface NotificationPreferences {
     negotiatingWith: NotificationEventPreference;
     // Production
     paint: NotificationEventPreference;
+    logoPaints: NotificationEventPreference;
     observation: NotificationEventPreference;
     // Financial
     commission: NotificationEventPreference;
@@ -83,12 +104,26 @@ interface NotificationPreferences {
   };
   service_order: {
     created: NotificationEventPreference;
+    assigned: NotificationEventPreference;
     "status.changed": NotificationEventPreference;
+    completed: NotificationEventPreference;
   };
   stock: {
     low: NotificationEventPreference;
     out: NotificationEventPreference;
     restock: NotificationEventPreference;
+  };
+  cut: {
+    created: NotificationEventPreference;
+    started: NotificationEventPreference;
+    completed: NotificationEventPreference;
+    request: NotificationEventPreference;
+  };
+  ppe: {
+    requested: NotificationEventPreference;
+    approved: NotificationEventPreference;
+    rejected: NotificationEventPreference;
+    delivered: NotificationEventPreference;
   };
   system: {
     maintenance: NotificationEventPreference;
@@ -130,6 +165,7 @@ const notificationPreferencesSchema = z.object({
     negotiatingWith: channelSchema,
     // Production
     paint: channelSchema,
+    logoPaints: channelSchema,
     observation: channelSchema,
     // Financial
     commission: channelSchema,
@@ -143,12 +179,26 @@ const notificationPreferencesSchema = z.object({
   }),
   service_order: z.object({
     created: channelSchema,
+    assigned: channelSchema,
     "status.changed": channelSchema,
+    completed: channelSchema,
   }),
   stock: z.object({
     low: channelSchema,
     out: channelSchema,
     restock: channelSchema,
+  }),
+  cut: z.object({
+    created: channelSchema,
+    started: channelSchema,
+    completed: channelSchema,
+    request: channelSchema,
+  }),
+  ppe: z.object({
+    requested: channelSchema,
+    approved: channelSchema,
+    rejected: channelSchema,
+    delivered: channelSchema,
   }),
   system: z.object({
     maintenance: channelSchema,
@@ -288,6 +338,7 @@ interface NotificationEvent {
   label: string;
   description: string;
   mandatoryChannels: NotificationChannel[];
+  allowedSectors?: SectorPrivilege[]; // If set, only these sectors can see this event
 }
 
 interface NotificationSection {
@@ -295,6 +346,95 @@ interface NotificationSection {
   title: string;
   icon: typeof ClipboardList;
   events: NotificationEvent[];
+  allowedSectors?: SectorPrivilege[]; // If set, only these sectors can see this section
+}
+
+// =====================
+// Sector-based Access Control
+// =====================
+
+// Sectors that can see each notification category (matches backend notification-filter.service.ts)
+const CATEGORY_ALLOWED_SECTORS: Record<string, SectorPrivilege[]> = {
+  // TASK: All sectors can see task notifications (but individual events are filtered)
+  task: [],
+  // ORDER: Only ADMIN and WAREHOUSE
+  order: ["ADMIN", "WAREHOUSE"],
+  // SERVICE_ORDER: ADMIN, DESIGNER, PRODUCTION, FINANCIAL, LOGISTIC, COMMERCIAL
+  service_order: ["ADMIN", "DESIGNER", "PRODUCTION", "FINANCIAL", "LOGISTIC", "COMMERCIAL"],
+  // STOCK: Only ADMIN and WAREHOUSE
+  stock: ["ADMIN", "WAREHOUSE"],
+  // CUT: ADMIN, PLOTTING, PRODUCTION
+  cut: ["ADMIN", "PLOTTING", "PRODUCTION"],
+  // PPE: ADMIN, HUMAN_RESOURCES, WAREHOUSE + all users can receive their own PPE notifications
+  ppe: [],
+  // SYSTEM: All users
+  system: [],
+  // VACATION: All users (HR sees all, others see their own)
+  vacation: [],
+};
+
+// Task event-specific sector restrictions (matches backend task-notification.config.ts FIELD_ALLOWED_ROLES)
+const TASK_EVENT_ALLOWED_SECTORS: Record<string, SectorPrivilege[]> = {
+  // created: ADMIN, FINANCIAL, COMMERCIAL (production gets notified separately when status changes to WAITING_PRODUCTION)
+  created: ["ADMIN", "FINANCIAL", "COMMERCIAL", "DESIGNER", "LOGISTIC"],
+  // status: All sectors that can access tasks
+  status: [],
+  // finishedAt: ADMIN, PRODUCTION, FINANCIAL, LOGISTIC
+  finishedAt: ["ADMIN", "PRODUCTION", "FINANCIAL", "LOGISTIC"],
+  // overdue: ADMIN, PRODUCTION, FINANCIAL
+  overdue: ["ADMIN", "PRODUCTION", "FINANCIAL"],
+  // term: ADMIN, PRODUCTION, FINANCIAL, LOGISTIC
+  term: ["ADMIN", "PRODUCTION", "FINANCIAL", "LOGISTIC"],
+  // deadline: ADMIN, PRODUCTION, LOGISTIC, COMMERCIAL
+  deadline: ["ADMIN", "PRODUCTION", "LOGISTIC", "COMMERCIAL"],
+  // forecastDate: ADMIN, FINANCIAL, LOGISTIC
+  forecastDate: ["ADMIN", "FINANCIAL", "LOGISTIC"],
+  // details: All sectors
+  details: [],
+  // serialNumber: All sectors
+  serialNumber: [],
+  // sector: ADMIN, PRODUCTION, FINANCIAL, LOGISTIC
+  sector: ["ADMIN", "PRODUCTION", "FINANCIAL", "LOGISTIC"],
+  // artworks: ADMIN, PRODUCTION, DESIGNER, COMMERCIAL
+  artworks: ["ADMIN", "PRODUCTION", "DESIGNER", "COMMERCIAL"],
+  // negotiatingWith: ADMIN, PRODUCTION, FINANCIAL, LOGISTIC
+  negotiatingWith: ["ADMIN", "PRODUCTION", "FINANCIAL", "LOGISTIC"],
+  // paint: ADMIN, PRODUCTION, WAREHOUSE
+  paint: ["ADMIN", "PRODUCTION", "WAREHOUSE"],
+  // logoPaints: ADMIN, PRODUCTION, WAREHOUSE
+  logoPaints: ["ADMIN", "PRODUCTION", "WAREHOUSE"],
+  // observation: ADMIN, PRODUCTION, COMMERCIAL
+  observation: ["ADMIN", "PRODUCTION", "COMMERCIAL"],
+  // commission: ADMIN, FINANCIAL, PRODUCTION, WAREHOUSE
+  commission: ["ADMIN", "FINANCIAL", "PRODUCTION", "WAREHOUSE"],
+};
+
+/**
+ * Check if a user can access a notification category
+ */
+function canAccessCategory(categoryId: string, userPrivilege: SectorPrivilege | null): boolean {
+  if (!userPrivilege) return false;
+  if (userPrivilege === "ADMIN") return true;
+
+  const allowedSectors = CATEGORY_ALLOWED_SECTORS[categoryId];
+  // Empty array means all sectors can access
+  if (!allowedSectors || allowedSectors.length === 0) return true;
+
+  return allowedSectors.includes(userPrivilege);
+}
+
+/**
+ * Check if a user can access a specific task event
+ */
+function canAccessTaskEvent(eventKey: string, userPrivilege: SectorPrivilege | null): boolean {
+  if (!userPrivilege) return false;
+  if (userPrivilege === "ADMIN") return true;
+
+  const allowedSectors = TASK_EVENT_ALLOWED_SECTORS[eventKey];
+  // Empty array means all sectors can access
+  if (!allowedSectors || allowedSectors.length === 0) return true;
+
+  return allowedSectors.includes(userPrivilege);
 }
 
 const notificationSections: NotificationSection[] = [
@@ -322,7 +462,8 @@ const notificationSections: NotificationSection[] = [
       // Negotiation - optional
       { key: "negotiatingWith", label: "Negociação", description: "Quando o contato de negociação é alterado", mandatoryChannels: [] },
       // Production - optional
-      { key: "paint", label: "Pintura Geral", description: "Quando a pintura geral é definida/alterada", mandatoryChannels: [] },
+      { key: "paint", label: "Pintura Geral", description: "Quando a pintura geral é definida ou alterada", mandatoryChannels: [] },
+      { key: "logoPaints", label: "Pinturas do Logotipo", description: "Quando as cores do logotipo são alteradas", mandatoryChannels: [] },
       { key: "observation", label: "Observação", description: "Quando observações são adicionadas", mandatoryChannels: [] },
       // Financial - optional
       { key: "commission", label: "Comissão", description: "Quando o status de comissão é alterado", mandatoryChannels: [] },
@@ -345,8 +486,10 @@ const notificationSections: NotificationSection[] = [
     title: "Ordens de Serviço",
     icon: ClipboardCheck,
     events: [
-      { key: "created", label: "Nova Ordem de Serviço", description: "Quando uma nova ordem de serviço é criada", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
-      { key: "status.changed", label: "Mudança de Status", description: "Quando o status de uma ordem de serviço é alterado", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
+      { key: "created", label: "Nova Ordem de Serviço", description: "Quando uma nova ordem de serviço é criada", mandatoryChannels: ["IN_APP", "PUSH"] },
+      { key: "assigned", label: "Atribuída a Mim", description: "Quando uma ordem de serviço é atribuída a você", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
+      { key: "status.changed", label: "Mudança de Status", description: "Quando o status de uma ordem de serviço é alterado", mandatoryChannels: ["IN_APP", "PUSH"] },
+      { key: "completed", label: "Minha OS Concluída", description: "Quando uma ordem de serviço que você criou é concluída", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
     ],
   },
   {
@@ -357,6 +500,28 @@ const notificationSections: NotificationSection[] = [
       { key: "low", label: "Estoque Baixo", description: "Quando um item está abaixo do mínimo", mandatoryChannels: [] },
       { key: "out", label: "Estoque Esgotado", description: "Quando um item fica sem estoque", mandatoryChannels: [] },
       { key: "restock", label: "Reabastecimento", description: "Quando é necessário reabastecer", mandatoryChannels: [] },
+    ],
+  },
+  {
+    id: "cut",
+    title: "Recortes",
+    icon: Scissors,
+    events: [
+      { key: "created", label: "Novo Recorte", description: "Quando um novo recorte é adicionado à tarefa", mandatoryChannels: ["IN_APP"] },
+      { key: "started", label: "Recorte Iniciado", description: "Quando o corte de um recorte é iniciado", mandatoryChannels: ["IN_APP"] },
+      { key: "completed", label: "Recorte Concluído", description: "Quando o corte de um recorte é finalizado", mandatoryChannels: ["IN_APP"] },
+      { key: "request", label: "Solicitação de Recorte", description: "Quando é solicitado um novo recorte (retrabalho)", mandatoryChannels: ["IN_APP", "PUSH"] },
+    ],
+  },
+  {
+    id: "ppe",
+    title: "Entrega de EPI",
+    icon: HardHat,
+    events: [
+      { key: "requested", label: "Nova Solicitação", description: "Quando um EPI é solicitado", mandatoryChannels: ["IN_APP", "PUSH"] },
+      { key: "approved", label: "Solicitação Aprovada", description: "Quando sua solicitação de EPI é aprovada", mandatoryChannels: ["IN_APP", "PUSH"] },
+      { key: "rejected", label: "Solicitação Reprovada", description: "Quando sua solicitação de EPI é reprovada", mandatoryChannels: ["IN_APP", "PUSH"] },
+      { key: "delivered", label: "EPI Entregue", description: "Quando o EPI é entregue a você", mandatoryChannels: ["IN_APP", "PUSH"] },
     ],
   },
   {
@@ -416,6 +581,7 @@ const defaultPreferences: NotificationPreferencesFormData = {
     negotiatingWith: createDefaultPreference(["IN_APP", "EMAIL"], []),
     // Production
     paint: createDefaultPreference(["IN_APP", "EMAIL"], []),
+    logoPaints: createDefaultPreference(["IN_APP", "EMAIL"], []),
     observation: createDefaultPreference(["IN_APP", "EMAIL"], []),
     // Financial
     commission: createDefaultPreference(["IN_APP", "EMAIL"], []),
@@ -428,13 +594,27 @@ const defaultPreferences: NotificationPreferencesFormData = {
     overdue: createDefaultPreference(["IN_APP", "EMAIL", "PUSH"], []),
   },
   service_order: {
-    created: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP"], ["IN_APP", "PUSH", "WHATSAPP"]),
-    "status.changed": createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    created: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
+    assigned: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    "status.changed": createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
+    completed: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
   },
   stock: {
     low: createDefaultPreference(["IN_APP", "EMAIL"], []),
     out: createDefaultPreference(["IN_APP", "EMAIL"], []),
     restock: createDefaultPreference(["IN_APP"], []),
+  },
+  cut: {
+    created: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP"]),
+    started: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP"]),
+    completed: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP"]),
+    request: createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
+  },
+  ppe: {
+    requested: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
+    approved: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP"], ["IN_APP", "PUSH"]),
+    rejected: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP"], ["IN_APP", "PUSH"]),
+    delivered: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
   },
   system: {
     maintenance: createDefaultPreference(["IN_APP", "EMAIL"], []),
@@ -457,6 +637,7 @@ export function NotificationPreferencesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [userSectorPrivilege, setUserSectorPrivilege] = useState<SectorPrivilege | null>(null);
   const [openAccordions, setOpenAccordions] = useState<string[]>([]);
 
   const form = useForm<NotificationPreferencesFormData>({
@@ -522,6 +703,10 @@ export function NotificationPreferencesPage() {
       if (profileResponse.success && profileResponse.data) {
         const currentUserId = profileResponse.data.id;
         setUserId(currentUserId);
+
+        // Get user's sector privilege for filtering
+        const sectorPrivilege = profileResponse.data.sector?.privileges as SectorPrivilege | undefined;
+        setUserSectorPrivilege(sectorPrivilege || null);
 
         // Load user's notification preferences from API
         const prefsResponse = await notificationPreferenceService.getPreferences(currentUserId);
@@ -590,6 +775,27 @@ export function NotificationPreferencesPage() {
     toast.success("Preferências restauradas para o padrão");
   };
 
+  // Filter notification sections based on user's sector privilege
+  const filteredSections = useMemo(() => {
+    if (!userSectorPrivilege) return [];
+
+    return notificationSections
+      .filter((section) => canAccessCategory(section.id, userSectorPrivilege))
+      .map((section) => {
+        // For task section, filter individual events based on sector
+        if (section.id === "task") {
+          return {
+            ...section,
+            events: section.events.filter((event) =>
+              canAccessTaskEvent(event.key, userSectorPrivilege)
+            ),
+          };
+        }
+        return section;
+      })
+      .filter((section) => section.events.length > 0); // Remove empty sections
+  }, [userSectorPrivilege]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -655,7 +861,7 @@ export function NotificationPreferencesPage() {
             onValueChange={setOpenAccordions}
             className="space-y-2"
           >
-            {notificationSections.map((section) => {
+            {filteredSections.map((section) => {
               const Icon = section.icon;
               const sectionKey = section.id as keyof NotificationPreferencesFormData;
 

@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
-import { IconInfoCircle, IconPhoto, IconPhone, IconMapPin, IconTag } from "@tabler/icons-react";
+import { IconInfoCircle, IconPhoto, IconPhone, IconMapPin, IconTag, IconCreditCard } from "@tabler/icons-react";
 import { Form } from "@/components/ui/form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { supplierCreateSchema, supplierUpdateSchema, type SupplierCreateFormData, type SupplierUpdateFormData } from "../../../../schemas";
@@ -38,9 +38,14 @@ interface CreateSupplierFormProps extends BaseSupplierFormProps {
   defaultValues?: Partial<SupplierCreateFormData>;
 }
 
+// Extended data type that includes dirtyFields info for update mode
+export interface SupplierUpdateSubmitData extends SupplierUpdateFormData {
+  __dirtyFields?: Record<string, boolean>;
+}
+
 interface UpdateSupplierFormProps extends BaseSupplierFormProps {
   mode: "update";
-  onSubmit: (data: SupplierUpdateFormData) => Promise<void>;
+  onSubmit: (data: SupplierUpdateSubmitData) => Promise<void>;
   defaultValues?: Partial<SupplierUpdateFormData>;
 }
 
@@ -80,6 +85,7 @@ export function SupplierForm(props: SupplierFormProps) {
       zipCode: null,
       site: null,
       phones: [],
+      pix: null,
       tags: [],
       logoId: null,
       ...defaultValues,
@@ -104,6 +110,7 @@ export function SupplierForm(props: SupplierFormProps) {
       zipCode: null,
       site: null,
       phones: [],
+      pix: null,
       tags: [],
       logoId: null,
     }),
@@ -260,6 +267,23 @@ export function SupplierForm(props: SupplierFormProps) {
         transformedData.tags = Object.values(transformedData.tags) as string[];
       }
 
+      // For update mode, only include fields that were actually modified (dirty)
+      // This prevents sending null values for fields the user didn't touch
+      let dataToSubmit = transformedData;
+      if (mode === "update") {
+        const dirtyFields = form.formState.dirtyFields;
+        const onlyDirtyData: Partial<SupplierUpdateFormData> = {};
+
+        // Only include fields that are marked as dirty by react-hook-form
+        Object.keys(dirtyFields).forEach((key) => {
+          if (dirtyFields[key as keyof typeof dirtyFields]) {
+            (onlyDirtyData as any)[key] = (transformedData as any)[key];
+          }
+        });
+
+        dataToSubmit = onlyDirtyData as SupplierUpdateFormData;
+      }
+
       // Check if we have a logo file to upload
       // Get logoFile from both submitted data AND current form state (in case it wasn't included in submission)
       const logoFile = (transformedData as any).logoFile || form.getValues('logoFile' as any);
@@ -289,12 +313,22 @@ export function SupplierForm(props: SupplierFormProps) {
         }
       } else {
         // No file, send as regular JSON (remove logoFile field if present)
-        const { logoFile: _, ...dataWithoutFile } = transformedData as any;
+        const { logoFile: _, ...dataWithoutFile } = dataToSubmit as any;
 
         if (mode === "create") {
           await (props as CreateSupplierFormProps).onSubmit(dataWithoutFile as SupplierCreateFormData);
         } else {
-          await (props as UpdateSupplierFormProps).onSubmit(dataWithoutFile as SupplierUpdateFormData);
+          // For update mode, include dirtyFields info so parent can make smart decisions
+          const dirtyFields = form.formState.dirtyFields;
+          const flatDirtyFields: Record<string, boolean> = {};
+          Object.keys(dirtyFields).forEach((key) => {
+            flatDirtyFields[key] = Boolean((dirtyFields as any)[key]);
+          });
+
+          await (props as UpdateSupplierFormProps).onSubmit({
+            ...dataWithoutFile,
+            __dirtyFields: flatDirtyFields,
+          } as SupplierUpdateSubmitData);
         }
       }
     } catch (error) {
@@ -360,6 +394,25 @@ export function SupplierForm(props: SupplierFormProps) {
             </CardHeader>
             <CardContent>
               <PhoneArrayInput control={form.control} disabled={isSubmitting} maxPhones={5} />
+            </CardContent>
+          </Card>
+
+          {/* Payment Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <IconCreditCard className="h-5 w-5 text-muted-foreground" />
+                Informações de Pagamento
+              </CardTitle>
+              <CardDescription>Chave Pix para pagamentos</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FormInput<SupplierCreateFormData | SupplierUpdateFormData>
+                name="pix"
+                label="Chave Pix"
+                placeholder="CPF, CNPJ, E-mail, Telefone ou Chave Aleatória"
+                disabled={isSubmitting}
+              />
             </CardContent>
           </Card>
 

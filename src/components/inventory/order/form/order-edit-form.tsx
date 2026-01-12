@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconDownload, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconNotes, IconClipboardList } from "@tabler/icons-react";
+import { IconLoader2, IconArrowLeft, IconArrowRight, IconCheck, IconTruck, IconPackage, IconShoppingCart, IconDownload, IconCalendar, IconFileInvoice, IconReceipt, IconCurrencyReal, IconFileText, IconNotes, IconClipboardList, IconCreditCard } from "@tabler/icons-react";
 import type { OrderUpdateFormData } from "../../../../schemas";
 import type { Order, OrderItem } from "../../../../types";
 import { orderUpdateSchema } from "../../../../schemas";
@@ -236,12 +236,18 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       icmses: initialIcmses,
       ipis: initialIpis,
       temporaryItems: temporaryItems,
+      paymentMethod: order.paymentMethod || null,
+      paymentPix: order.paymentPix || null,
+      paymentDueDays: order.paymentDueDays || null,
     };
   }, [
     order.description,
     order.supplierId,
     order.forecast,
     order.notes,
+    order.paymentMethod,
+    order.paymentPix,
+    order.paymentDueDays,
     hasTemporaryItems,
     initialSelectedItems,
     initialQuantities,
@@ -324,6 +330,10 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     notes: notes || order.notes || "",
     // Initialize temporary items from URL state or order data
     temporaryItems: temporaryItemsState.length > 0 ? temporaryItemsState : temporaryItems,
+    // Payment fields
+    paymentMethod: order.paymentMethod || null,
+    paymentPix: order.paymentPix || null,
+    paymentDueDays: order.paymentDueDays || null,
   };
 
   const form = useForm<OrderUpdateFormData>({
@@ -545,12 +555,22 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     setHasFileChanges(true);
   }, []);
 
+  // Watch payment fields to detect changes (form.watch triggers re-renders)
+  const watchedPaymentMethod = form.watch("paymentMethod");
+  const watchedPaymentPix = form.watch("paymentPix");
+  const watchedPaymentDueDays = form.watch("paymentDueDays");
+
   // Detect if form has actual changes from original order
   const hasFormChanges = useMemo(() => {
     const descriptionChanged = description?.trim() !== order.description?.trim();
     const supplierChanged = (supplierId || null) !== (order.supplierId || null);
     const forecastChanged = (forecast ? new Date(forecast).getTime() : null) !== (order.forecast ? new Date(order.forecast).getTime() : null);
     const notesChanged = (notes?.trim() || "") !== (order.notes?.trim() || "");
+
+    // Check payment fields for changes
+    const paymentMethodChanged = (watchedPaymentMethod || null) !== (order.paymentMethod || null);
+    const paymentPixChanged = (watchedPaymentPix || null) !== (order.paymentPix || null);
+    const paymentDueDaysChanged = (watchedPaymentDueDays || null) !== (order.paymentDueDays || null);
 
     // Check if selected items have changed
     const originalItemIds = new Set(order.items.map(item => item.itemId));
@@ -569,9 +589,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       return currentPrice !== undefined && currentPrice !== item.price;
     });
 
-    const hasChanges = descriptionChanged || supplierChanged || forecastChanged || notesChanged || itemsChanged || quantitiesChanged || pricesChanged || hasFileChanges;
+    const hasChanges = descriptionChanged || supplierChanged || forecastChanged || notesChanged || itemsChanged || quantitiesChanged || pricesChanged || hasFileChanges || paymentMethodChanged || paymentPixChanged || paymentDueDaysChanged;
     return hasChanges;
-  }, [description, supplierId, forecast, notes, selectedItems, quantities, prices, order, hasFileChanges]);
+  }, [description, supplierId, forecast, notes, selectedItems, quantities, prices, order, hasFileChanges, watchedPaymentMethod, watchedPaymentPix, watchedPaymentDueDays]);
 
   // Stage validation
   const validateCurrentStep = useCallback((): boolean => {
@@ -682,12 +702,20 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
         }));
       }
 
+      // Get payment fields from form
+      const currentPaymentMethod = form.getValues("paymentMethod");
+      const currentPaymentPix = form.getValues("paymentPix");
+      const currentPaymentDueDays = form.getValues("paymentDueDays");
+
       const data = {
         description: description!.trim(),
         supplierId: supplierId || undefined,
         forecast: forecast || undefined,
         notes: notes?.trim() || undefined,
         items,
+        paymentMethod: currentPaymentMethod || undefined,
+        paymentPix: currentPaymentMethod === "PIX" ? currentPaymentPix || undefined : undefined,
+        paymentDueDays: currentPaymentMethod === "BANK_SLIP" ? currentPaymentDueDays || undefined : undefined,
       };
 
       // Check if there are new files to upload (files without uploadedFileId)
@@ -1321,11 +1349,11 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                             <RadioGroup
                               value={orderItemMode}
                               disabled={true}
-                              className="flex flex-col gap-3 opacity-60 pointer-events-none"
+                              className="flex flex-col gap-2 opacity-60 pointer-events-none"
                             >
-                              <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 group">
+                              <div className="flex items-start space-x-3 space-y-0 rounded-md border p-3 group">
                                 <RadioGroupItem value="inventory" id="edit-mode-inventory" className="mt-0.5" />
-                                <div className="flex-1 space-y-1">
+                                <div className="flex-1 space-y-0.5">
                                   <Label htmlFor="edit-mode-inventory" className="flex items-center gap-2 font-medium group-hover:text-white">
                                     <IconShoppingCart className="h-4 w-4" />
                                     Itens do Estoque
@@ -1335,9 +1363,9 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 group">
+                              <div className="flex items-start space-x-3 space-y-0 rounded-md border p-3 group">
                                 <RadioGroupItem value="temporary" id="edit-mode-temporary" className="mt-0.5" />
-                                <div className="flex-1 space-y-1">
+                                <div className="flex-1 space-y-0.5">
                                   <Label htmlFor="edit-mode-temporary" className="flex items-center gap-2 font-medium group-hover:text-white">
                                     <IconFileInvoice className="h-4 w-4" />
                                     Itens Temporários
@@ -1365,8 +1393,87 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                 // Trigger validation after state update
                                 setTimeout(() => form.trigger(), 0);
                               }}
-                              className="resize-none w-full flex-1"
+                              className="resize-none w-full flex-1 min-h-[134px]"
                             />
+                          </div>
+                        </div>
+
+                        {/* Payment Method */}
+                        <div className="space-y-4">
+                          <Separator />
+                          <div className="space-y-4">
+                            <Label className="text-sm font-medium flex items-center gap-2">
+                              <IconCreditCard className="h-4 w-4" />
+                              Método de Pagamento
+                            </Label>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {/* Payment Method Selector */}
+                              <div className="space-y-2">
+                                <Label className="text-sm text-muted-foreground">Forma de Pagamento</Label>
+                                <Combobox
+                                  value={form.watch("paymentMethod") || ""}
+                                  onValueChange={(value) => {
+                                    form.setValue("paymentMethod", value || null, { shouldDirty: true });
+                                    // Clear conditional fields when payment method changes
+                                    if (value !== "PIX") {
+                                      form.setValue("paymentPix", null, { shouldDirty: true });
+                                    }
+                                    if (value !== "BANK_SLIP") {
+                                      form.setValue("paymentDueDays", null, { shouldDirty: true });
+                                    }
+                                  }}
+                                  options={[
+                                    { value: "PIX", label: "Pix" },
+                                    { value: "BANK_SLIP", label: "Boleto" },
+                                    { value: "CREDIT_CARD", label: "Cartão de Crédito" },
+                                  ]}
+                                  placeholder="Selecione (opcional)"
+                                  emptyText="Nenhuma opção"
+                                  className="h-10 w-full"
+                                />
+                              </div>
+
+                              {/* PIX Key - Show only when PIX is selected */}
+                              {form.watch("paymentMethod") === "PIX" && (
+                                <div className="space-y-2 md:col-span-2">
+                                  <Label className="text-sm text-muted-foreground">Chave Pix</Label>
+                                  <Input
+                                    placeholder={
+                                      suppliers.find(s => s.id === supplierId)?.pix
+                                        ? `Padrão do fornecedor: ${suppliers.find(s => s.id === supplierId)?.pix}`
+                                        : "CPF, CNPJ, E-mail, Telefone ou Chave Aleatória"
+                                    }
+                                    value={form.watch("paymentPix") || suppliers.find(s => s.id === supplierId)?.pix || ""}
+                                    onChange={(value) => {
+                                      // Input component passes value directly, not an event
+                                      form.setValue("paymentPix", (value as string) || null, { shouldDirty: true });
+                                    }}
+                                    transparent
+                                    className="h-10 w-full"
+                                  />
+                                </div>
+                              )}
+
+                              {/* Due Days - Show only when BANK_SLIP is selected */}
+                              {form.watch("paymentMethod") === "BANK_SLIP" && (
+                                <div className="space-y-2">
+                                  <Label className="text-sm text-muted-foreground">Prazo de Vencimento</Label>
+                                  <Combobox
+                                    value={form.watch("paymentDueDays")?.toString() || ""}
+                                    onValueChange={(value) => form.setValue("paymentDueDays", value ? parseInt(value) : null, { shouldDirty: true })}
+                                    options={[
+                                      { value: "30", label: "30 dias" },
+                                      { value: "60", label: "60 dias" },
+                                      { value: "90", label: "90 dias" },
+                                      { value: "120", label: "120 dias" },
+                                    ]}
+                                    placeholder="Selecione o prazo"
+                                    emptyText="Nenhum prazo"
+                                    className="h-10 w-full"
+                                  />
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
 

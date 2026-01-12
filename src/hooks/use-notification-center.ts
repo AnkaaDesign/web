@@ -134,12 +134,6 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
       });
     };
 
-    // Handle reconnection failure
-    const handleReconnectFailed = () => {
-      console.error("[NotificationCenter] Failed to reconnect to notification server");
-      toast.error("Conexão perdida", "Não foi possível conectar ao servidor de notificações. Por favor, recarregue a página.");
-    };
-
     // Register event listeners
     socket.on("connect", handleConnect);
     socket.on("disconnect", handleDisconnect);
@@ -148,8 +142,8 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
     socket.on("notification:update", handleNotificationUpdate);
     socket.on("notification:delete", handleNotificationDelete);
 
-    // Listen for reconnection failures from the window
-    window.addEventListener("socket:reconnect-failed", handleReconnectFailed);
+    // Note: socket:reconnect-failed is handled by SocketReconnectHandler component
+    // to avoid duplicate toasts. It shows a persistent toast with an action button.
 
     // Set initial connection state
     setIsConnected(socketService.isConnected());
@@ -162,7 +156,6 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
       socket.off("notification:count", handleNotificationCount);
       socket.off("notification:update", handleNotificationUpdate);
       socket.off("notification:delete", handleNotificationDelete);
-      window.removeEventListener("socket:reconnect-failed", handleReconnectFailed);
 
       // Don't disconnect socket on unmount - let it persist for the session
       // socketService.disconnect();

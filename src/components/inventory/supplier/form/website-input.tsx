@@ -49,22 +49,27 @@ export function WebsiteInput({ disabled }: WebsiteInputProps) {
           <FormControl>
             <Input
               {...field}
-              type="url"
+              type="text"
               value={value || ""}
               placeholder="https://www.fornecedor.com.br"
               disabled={disabled}
               className="transition-all duration-200"
-              onChange={(e) => {
-                const val = e.target.value;
-                onChange(val === "" ? null : val);
+              onChange={(inputValue) => {
+                // Input component passes value directly, not an event
+                const val = inputValue as string | null;
+                onChange(val === "" || val === null ? null : val);
               }}
-              onBlur={(e) => {
-                const val = e.target.value;
-                if (val && val.trim() !== "") {
-                  const formattedUrl = formatUrl(val);
-                  onChange(formattedUrl);
+              onBlur={() => {
+                // Format URL on blur if value exists
+                const currentValue = value as string | null;
+                if (currentValue && currentValue.trim() !== "") {
+                  const formattedUrl = formatUrl(currentValue);
+                  if (formattedUrl !== currentValue) {
+                    onChange(formattedUrl);
+                  }
                 }
-                onBlur?.(e);
+                // Call original onBlur to mark field as touched
+                onBlur();
               }}
             />
           </FormControl>

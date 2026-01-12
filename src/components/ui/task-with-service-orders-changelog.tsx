@@ -1,7 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { FilePreviewCard } from "@/components/common/file";
+import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import {
   IconHistory,
   IconEdit,
@@ -15,7 +18,17 @@ import {
 } from "@tabler/icons-react";
 import type { ChangeLog } from "../../types";
 import { CHANGE_LOG_ENTITY_TYPE, CHANGE_LOG_ACTION, CHANGE_TRIGGERED_BY } from "../../constants";
-import { SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS_LABELS } from "../../constants/enum-labels";
+import {
+  SERVICE_ORDER_TYPE_LABELS,
+  SERVICE_ORDER_STATUS_LABELS,
+  CUT_TYPE_LABELS,
+  CUT_STATUS_LABELS,
+  CUT_ORIGIN_LABELS,
+  AIRBRUSHING_STATUS_LABELS,
+  PAINT_FINISH_LABELS,
+  TRUCK_MANUFACTURER_LABELS,
+} from "../../constants/enum-labels";
+import { ENTITY_BADGE_CONFIG, PAINT_FINISH } from "../../constants";
 import { formatRelativeTime, getFieldLabel, formatFieldValue, getActionLabel } from "../../utils";
 import { useChangeLogs } from "../../hooks";
 import { useEntityDetails } from "@/hooks/use-entity-details";
@@ -99,6 +112,239 @@ const generateLayoutSVG = (layout: any): string => {
   svg += `</svg>`;
 
   return svg;
+};
+
+// Logo component for changelog display
+const LogoDisplay = ({ logoId, size = "w-12 h-12", className = "", useThumbnail = false }: { logoId?: string; size?: string; className?: string; useThumbnail?: boolean }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  if (!logoId) {
+    return (
+      <div className={cn("bg-muted border border-border rounded-md flex items-center justify-center", size, className)}>
+        <span className="text-xs text-muted-foreground">📷</span>
+      </div>
+    );
+  }
+
+  if (imageError) {
+    return (
+      <div className={cn("bg-muted border border-border rounded-md flex items-center justify-center", size, className)}>
+        <span className="text-xs text-muted-foreground">📷</span>
+      </div>
+    );
+  }
+
+  const apiUrl = import.meta.env.VITE_API_URL || "http://192.168.0.13:3030";
+  const imageUrl = useThumbnail
+    ? `${apiUrl}/files/thumbnail/${logoId}`
+    : `${apiUrl}/files/serve/${logoId}`;
+  return (
+    <div className={cn("relative", size, className)}>
+      {imageLoading && (
+        <div className={cn("absolute inset-0 bg-muted border border-border rounded-md flex items-center justify-center", size)}>
+          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+      <img
+        src={imageUrl}
+        alt="Preview"
+        className={cn("object-cover border border-border rounded-md bg-muted", size, imageLoading ? "opacity-0" : "opacity-100")}
+        onError={() => {
+          setImageError(true);
+          setImageLoading(false);
+        }}
+        onLoad={() => {
+          setImageLoading(false);
+        }}
+      />
+    </div>
+  );
+};
+
+// Render cuts as cards (matching task detail page design)
+const renderCutsCards = (cuts: any[]) => {
+  if (!Array.isArray(cuts) || cuts.length === 0) {
+    return <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>;
+  }
+
+  return (
+    <div className="space-y-2 mt-2">
+      {cuts.map((cut: any, index: number) => {
+        const fileObject = cut.file || (cut.fileId ? {
+          id: cut.fileId,
+          filename: 'Arquivo de recorte',
+          mimetype: 'application/octet-stream',
+          size: 0,
+          thumbnailUrl: null,
+        } : null);
+
+        return (
+          <div key={index} className="border rounded-lg px-2.5 py-1.5 flex items-center gap-2.5 bg-card">
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <h4 className="text-xs font-semibold truncate min-w-0 flex-1">
+                  {cut.file?.filename || cut.file?.name || "Arquivo de recorte"}
+                </h4>
+                {cut.status && (
+                  <Badge variant={ENTITY_BADGE_CONFIG.CUT?.[cut.status] || "default"} className="text-[10px] h-4 px-1.5 flex-shrink-0">
+                    {CUT_STATUS_LABELS[cut.status] || cut.status}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+                {cut.type && (
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium">Tipo:</span>
+                    <span>{CUT_TYPE_LABELS[cut.type] || cut.type}</span>
+                  </div>
+                )}
+                {cut.quantity && (
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium">Qtd:</span>
+                    <span>{cut.quantity}</span>
+                  </div>
+                )}
+                {cut.origin && (
+                  <div className="flex items-center gap-1">
+                    <span className="font-medium">Origem:</span>
+                    <span>{CUT_ORIGIN_LABELS[cut.origin] || cut.origin}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            {fileObject && (
+              <div className="flex-shrink-0">
+                <FilePreviewCard file={fileObject} size="sm" className="w-12 h-12" showActions={false} showMetadata={false} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// Render services as cards
+const renderServicesCards = (services: any[]) => {
+  if (!Array.isArray(services) || services.length === 0) {
+    return <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>;
+  }
+
+  const statusLabels: Record<string, string> = {
+    PENDING: "Pendente",
+    IN_PROGRESS: "Em Progresso",
+    COMPLETED: "Concluído",
+    CANCELLED: "Cancelado",
+  };
+
+  return (
+    <div className="space-y-2 mt-2">
+      {services.map((service: any, index: number) => (
+        <div key={index} className="border rounded-lg px-2.5 py-1.5 bg-card">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-xs font-semibold truncate flex-1">
+              {service.description || "Serviço"}
+            </h4>
+            {service.status && (
+              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 flex-shrink-0">
+                {statusLabels[service.status] || service.status}
+              </Badge>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Render airbrushings as cards
+const renderAirbrushingsCards = (airbrushings: any[]) => {
+  if (!Array.isArray(airbrushings) || airbrushings.length === 0) {
+    return <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>;
+  }
+
+  return (
+    <div className="space-y-2 mt-2">
+      {airbrushings.map((airbrushing: any, index: number) => (
+        <div key={index} className="border rounded-lg px-2.5 py-1.5 bg-card">
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-xs font-semibold truncate flex-1">
+              {airbrushing.description || "Aerografia"}
+            </h4>
+            {airbrushing.status && (
+              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 flex-shrink-0">
+                {AIRBRUSHING_STATUS_LABELS[airbrushing.status] || airbrushing.status}
+              </Badge>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Render paints as cards
+const renderPaintsCards = (paints: any[]) => {
+  if (!Array.isArray(paints) || paints.length === 0) {
+    return <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>;
+  }
+
+  return (
+    <div className="space-y-2 mt-2">
+      {paints.map((paint: any, index: number) => (
+        <div key={paint.id || index} className="border rounded-lg px-2.5 py-1.5 bg-card">
+          <div className="flex items-start gap-3">
+            <div className="relative flex-shrink-0">
+              <div className="w-10 h-10 rounded-md ring-1 ring-border shadow-sm overflow-hidden">
+                {paint.colorPreview ? (
+                  <img src={paint.colorPreview} alt={paint.name} className="w-full h-full object-cover rounded-md" loading="lazy" />
+                ) : (
+                  <CanvasNormalMapRenderer
+                    baseColor={paint.hex || "#888888"}
+                    finish={(paint.finish as PAINT_FINISH) || PAINT_FINISH.SOLID}
+                    width={40}
+                    height={40}
+                    quality="medium"
+                    className="w-full h-full object-cover rounded-md"
+                  />
+                )}
+              </div>
+            </div>
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-xs font-semibold truncate">{paint.name}</h4>
+                {paint.code && (
+                  <span className="text-[10px] font-mono text-muted-foreground">{paint.code}</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {paint.paintType?.name && (
+                  <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
+                    {paint.paintType.name}
+                  </Badge>
+                )}
+                {paint.finish && (
+                  <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
+                    {PAINT_FINISH_LABELS[paint.finish]}
+                  </Badge>
+                )}
+                {paint.paintBrand?.name && (
+                  <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
+                    {paint.paintBrand.name}
+                  </Badge>
+                )}
+                {paint.manufacturer && (
+                  <Badge className="text-[10px] h-4 px-1.5 bg-neutral-200/70 text-neutral-600 dark:bg-neutral-700/50 dark:text-neutral-300 hover:bg-neutral-200/70 hover:text-neutral-600 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-300 border-0">
+                    {TRUCK_MANUFACTURER_LABELS[paint.manufacturer]}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 };
 
 interface TaskWithServiceOrdersChangelogProps {
@@ -238,8 +484,8 @@ const formatValueWithEntity = (
         return entityDetails.sectors.get(parsedValue) || "Setor";
       }
       if (field === "paintId" && entityDetails.paints.has(parsedValue)) {
-        // Return the full paint object for special rendering
-        return entityDetails.paints.get(parsedValue) || "Tinta";
+        const paint = entityDetails.paints.get(parsedValue);
+        return paint?.name || "Tinta";
       }
       if (field === "invoiceToId" && entityDetails.customers.has(parsedValue)) {
         return entityDetails.customers.get(parsedValue) || "Cliente";
@@ -523,18 +769,258 @@ const ChangelogTimelineItem = ({
                     <div className="space-y-1">
                       {changelog.oldValue !== undefined || changelog.newValue !== undefined ? (
                         <>
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Antes: </span>
-                            <span className="text-red-600 dark:text-red-400 font-medium">
-                              {formatValueWithEntity(changelog.oldValue, changelog.field, entityType, entityDetails, changelog.metadata)}
-                            </span>
-                          </div>
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Depois: </span>
-                            <span className="text-green-600 dark:text-green-400 font-medium">
-                              {formatValueWithEntity(changelog.newValue, changelog.field, entityType, entityDetails, changelog.metadata)}
-                            </span>
-                          </div>
+                          {/* Special handling for cuts */}
+                          {changelog.field === "cuts" || changelog.field === "cutRequest" || changelog.field === "cutPlan" ? (
+                            (() => {
+                              const parseValue = (val: any) => {
+                                if (!val) return val;
+                                if (typeof val === "string" && (val.trim().startsWith("[") || val.trim().startsWith("{"))) {
+                                  try {
+                                    return JSON.parse(val);
+                                  } catch (e) {
+                                    return val;
+                                  }
+                                }
+                                return val;
+                              };
+                              const oldParsed = parseValue(changelog.oldValue);
+                              const newParsed = parseValue(changelog.newValue);
+                              return (
+                                <>
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">Antes:</span>
+                                    {renderCutsCards(oldParsed)}
+                                  </div>
+                                  <div className="mt-3">
+                                    <span className="text-sm text-muted-foreground">Depois:</span>
+                                    {renderCutsCards(newParsed)}
+                                  </div>
+                                </>
+                              );
+                            })()
+                          ) : changelog.field === "services" ? (
+                            (() => {
+                              const parseValue = (val: any) => {
+                                if (!val) return val;
+                                if (typeof val === "string" && (val.trim().startsWith("[") || val.trim().startsWith("{"))) {
+                                  try {
+                                    return JSON.parse(val);
+                                  } catch (e) {
+                                    return val;
+                                  }
+                                }
+                                return val;
+                              };
+                              const oldParsed = parseValue(changelog.oldValue);
+                              const newParsed = parseValue(changelog.newValue);
+                              return (
+                                <>
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">Antes:</span>
+                                    {renderServicesCards(oldParsed)}
+                                  </div>
+                                  <div className="mt-3">
+                                    <span className="text-sm text-muted-foreground">Depois:</span>
+                                    {renderServicesCards(newParsed)}
+                                  </div>
+                                </>
+                              );
+                            })()
+                          ) : changelog.field === "airbrushings" ? (
+                            (() => {
+                              const parseValue = (val: any) => {
+                                if (!val) return val;
+                                if (typeof val === "string" && (val.trim().startsWith("[") || val.trim().startsWith("{"))) {
+                                  try {
+                                    return JSON.parse(val);
+                                  } catch (e) {
+                                    return val;
+                                  }
+                                }
+                                return val;
+                              };
+                              const oldParsed = parseValue(changelog.oldValue);
+                              const newParsed = parseValue(changelog.newValue);
+                              return (
+                                <>
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">Antes:</span>
+                                    {renderAirbrushingsCards(oldParsed)}
+                                  </div>
+                                  <div className="mt-3">
+                                    <span className="text-sm text-muted-foreground">Depois:</span>
+                                    {renderAirbrushingsCards(newParsed)}
+                                  </div>
+                                </>
+                              );
+                            })()
+                          ) : changelog.field === "paintId" ? (
+                            (() => {
+                              const getFullPaint = (paintIdValue: any) => {
+                                if (!paintIdValue || typeof paintIdValue !== "string") return null;
+                                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                                if (!uuidRegex.test(paintIdValue)) return null;
+                                return entityDetails?.paints?.get(paintIdValue) || null;
+                              };
+                              const oldPaint = getFullPaint(changelog.oldValue);
+                              const newPaint = getFullPaint(changelog.newValue);
+                              return (
+                                <>
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">Antes:</span>
+                                    {oldPaint ? renderPaintsCards([oldPaint]) : <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>}
+                                  </div>
+                                  <div className="mt-3">
+                                    <span className="text-sm text-muted-foreground">Depois:</span>
+                                    {newPaint ? renderPaintsCards([newPaint]) : <span className="text-green-600 dark:text-green-400 font-medium ml-1">—</span>}
+                                  </div>
+                                </>
+                              );
+                            })()
+                          ) : changelog.field === "logoPaints" || changelog.field === "paints" || changelog.field === "paintGrounds" || changelog.field === "groundPaints" ? (
+                            (() => {
+                              const parseValue = (val: any) => {
+                                if (!val) return val;
+                                if (typeof val === "string" && (val.trim().startsWith("[") || val.trim().startsWith("{"))) {
+                                  try {
+                                    return JSON.parse(val);
+                                  } catch (e) {
+                                    return val;
+                                  }
+                                }
+                                return val;
+                              };
+                              const getPaintObjects = (paintIds: any) => {
+                                if (!paintIds || !Array.isArray(paintIds)) return null;
+                                const paintObjects = paintIds
+                                  .map((id: string) => {
+                                    if (typeof id === "object" && id !== null) return id;
+                                    if (typeof id !== "string") return null;
+                                    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                                    if (!uuidRegex.test(id)) return null;
+                                    return entityDetails?.paints?.get(id) || null;
+                                  })
+                                  .filter(Boolean);
+                                return paintObjects.length > 0 ? paintObjects : null;
+                              };
+                              const oldParsed = parseValue(changelog.oldValue);
+                              const newParsed = parseValue(changelog.newValue);
+                              const oldPaints = getPaintObjects(oldParsed);
+                              const newPaints = getPaintObjects(newParsed);
+                              return (
+                                <>
+                                  <div>
+                                    <span className="text-sm text-muted-foreground">Antes:</span>
+                                    {renderPaintsCards(oldPaints)}
+                                  </div>
+                                  <div className="mt-3">
+                                    <span className="text-sm text-muted-foreground">Depois:</span>
+                                    {renderPaintsCards(newPaints)}
+                                  </div>
+                                </>
+                              );
+                            })()
+                          ) : changelog.field === "artworks" || changelog.field === "budgets" || changelog.field === "invoices" || changelog.field === "receipts" ? (
+                            <>
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">Antes: </span>
+                                {(() => {
+                                  const parseValue = (val: any) => {
+                                    if (val === null || val === undefined) return null;
+                                    if (Array.isArray(val)) return val;
+                                    if (typeof val === "string") {
+                                      try {
+                                        const parsed = JSON.parse(val);
+                                        return Array.isArray(parsed) ? parsed : null;
+                                      } catch {
+                                        return null;
+                                      }
+                                    }
+                                    return null;
+                                  };
+                                  const files = parseValue(changelog.oldValue);
+                                  if (!files || files.length === 0) {
+                                    return <span className="text-red-600 dark:text-red-400 font-medium">Nenhum arquivo</span>;
+                                  }
+                                  return (
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                      {files.map((file: any, idx: number) => {
+                                        const fileId = typeof file === 'string' ? file : file.id;
+                                        return <LogoDisplay key={idx} logoId={fileId} size="w-12 h-12" useThumbnail />;
+                                      })}
+                                      <span className="text-sm text-muted-foreground self-center">({files.length} arquivo{files.length > 1 ? 's' : ''})</span>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">Depois: </span>
+                                {(() => {
+                                  const parseValue = (val: any) => {
+                                    if (val === null || val === undefined) return null;
+                                    if (Array.isArray(val)) return val;
+                                    if (typeof val === "string") {
+                                      try {
+                                        const parsed = JSON.parse(val);
+                                        return Array.isArray(parsed) ? parsed : null;
+                                      } catch {
+                                        return null;
+                                      }
+                                    }
+                                    return null;
+                                  };
+                                  const files = parseValue(changelog.newValue);
+                                  if (!files || files.length === 0) {
+                                    return <span className="text-green-600 dark:text-green-400 font-medium">Nenhum arquivo</span>;
+                                  }
+                                  return (
+                                    <div className="flex flex-wrap gap-2 mt-1">
+                                      {files.map((file: any, idx: number) => {
+                                        const fileId = typeof file === 'string' ? file : file.id;
+                                        return <LogoDisplay key={idx} logoId={fileId} size="w-12 h-12" useThumbnail />;
+                                      })}
+                                      <span className="text-sm text-muted-foreground self-center">({files.length} arquivo{files.length > 1 ? 's' : ''})</span>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            </>
+                          ) : changelog.field === "logoId" || changelog.field === "logo" ? (
+                            <>
+                              <div className="text-sm flex items-center gap-2">
+                                <span className="text-muted-foreground">Antes: </span>
+                                {changelog.oldValue && changelog.oldValue !== null ? (
+                                  <LogoDisplay logoId={changelog.oldValue as string} size="w-10 h-10" />
+                                ) : (
+                                  <span className="text-red-600 dark:text-red-400 font-medium">—</span>
+                                )}
+                              </div>
+                              <div className="text-sm flex items-center gap-2">
+                                <span className="text-muted-foreground">Depois: </span>
+                                {changelog.newValue && changelog.newValue !== null ? (
+                                  <LogoDisplay logoId={changelog.newValue as string} size="w-10 h-10" />
+                                ) : (
+                                  <span className="text-green-600 dark:text-green-400 font-medium">—</span>
+                                )}
+                              </div>
+                            </>
+                          ) : (
+                            // Default rendering for other fields
+                            <>
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">Antes: </span>
+                                <span className="text-red-600 dark:text-red-400 font-medium">
+                                  {formatValueWithEntity(changelog.oldValue, changelog.field, entityType, entityDetails, changelog.metadata)}
+                                </span>
+                              </div>
+                              <div className="text-sm">
+                                <span className="text-muted-foreground">Depois: </span>
+                                <span className="text-green-600 dark:text-green-400 font-medium">
+                                  {formatValueWithEntity(changelog.newValue, changelog.field, entityType, entityDetails, changelog.metadata)}
+                                </span>
+                              </div>
+                            </>
+                          )}
                         </>
                       ) : (
                         <div className="text-sm text-muted-foreground">Sem alteração de valor registrada</div>
@@ -707,6 +1193,35 @@ export function TaskWithServiceOrdersChangelog({
       if (changelog.field === "paintId") {
         if (changelog.oldValue && typeof changelog.oldValue === "string") paintIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string") paintIds.add(changelog.newValue);
+      }
+
+      // Extract paint IDs from arrays (logoPaints, paints, groundPaints)
+      if (changelog.field === "logoPaints" || changelog.field === "paints" || changelog.field === "groundPaints" || changelog.field === "paintGrounds") {
+        const extractPaintIds = (val: any) => {
+          if (!val) return;
+          let parsed = val;
+          if (typeof val === "string" && (val.trim().startsWith("[") || val.trim().startsWith("{"))) {
+            try {
+              parsed = JSON.parse(val);
+            } catch (e) {
+              return;
+            }
+          }
+          if (Array.isArray(parsed)) {
+            parsed.forEach((item: any) => {
+              if (typeof item === "string") {
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                if (uuidRegex.test(item)) {
+                  paintIds.add(item);
+                }
+              } else if (item && typeof item === "object" && item.id) {
+                paintIds.add(item.id);
+              }
+            });
+          }
+        };
+        extractPaintIds(changelog.oldValue);
+        extractPaintIds(changelog.newValue);
       }
 
       // Extract invoiceTo IDs

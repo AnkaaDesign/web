@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconPhone, IconMail, IconPhoneCall, IconWorld, IconBrandWhatsapp } from "@tabler/icons-react";
+import { IconPhone, IconMail, IconPhoneCall, IconWorld, IconBrandWhatsapp, IconCreditCard } from "@tabler/icons-react";
 import type { Supplier } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { formatBrazilianPhone } from "../../../../utils";
@@ -94,8 +94,24 @@ export function ContactDetailsCard({ supplier, className }: ContactDetailsCardPr
             </div>
           )}
 
+          {/* Pix Section */}
+          {supplier.pix && (
+            <div className={supplier.email || (supplier.phones && supplier.phones.length > 0) || supplier.site ? "pt-6 border-t border-border/50" : ""}>
+              <h3 className="text-base font-semibold mb-4 text-foreground">Pagamento</h3>
+              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <IconCreditCard className="h-4 w-4" />
+                  Chave Pix
+                </span>
+                <span className="text-sm font-semibold text-foreground font-mono">
+                  {supplier.pix}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Empty State */}
-          {!supplier.email && (!supplier.phones || supplier.phones.length === 0) && !supplier.site && (
+          {!supplier.email && (!supplier.phones || supplier.phones.length === 0) && !supplier.site && !supplier.pix && (
             <div className="text-center py-8">
               <div className="p-4 bg-muted/30 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
                 <IconPhoneCall className="h-8 w-8 text-muted-foreground" />
