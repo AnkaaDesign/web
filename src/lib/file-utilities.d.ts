@@ -24,7 +24,7 @@ export type ThumbnailSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 export type PreviewType = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'code' | 'none';
 
-export type StorageType = 'local' | 's3' | 'webdav' | 'azure' | 'gcs';
+export type StorageType = 'local' | 's3' | 'remote' | 'azure' | 'gcs';
 
 // =====================================================
 // Interfaces

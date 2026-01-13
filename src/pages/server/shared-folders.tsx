@@ -57,8 +57,8 @@ import { FileViewerProvider, useFileViewer } from "@/components/common/file/file
 import { FileItem, type FileViewMode } from "@/components/common/file";
 import type { File as AnkaaFile } from "@/types";
 
-// Utility function to parse WebDAV size string to bytes
-function parseWebDAVSize(sizeStr: string): number {
+// Utility function to parse remote storage size string to bytes
+function parseRemoteSize(sizeStr: string): number {
   if (!sizeStr || sizeStr === "-" || sizeStr === "0") return 0;
 
   // Match pattern like "1.2M", "500K", "1.5G", "100" (bytes)
@@ -79,14 +79,14 @@ function parseWebDAVSize(sizeStr: string): number {
   return Math.floor(num * (multipliers[unit.toUpperCase()] || 1));
 }
 
-// Utility function to convert WebDAV items to AnkaaFile format for viewer
-function convertWebDAVItemToAnkaaFile(
+// Utility function to convert remote storage items to AnkaaFile format for viewer
+function convertRemoteItemToAnkaaFile(
   item: {
     name: string;
     type: "file" | "directory";
     size: string;
     lastModified: Date;
-    webdavUrl?: string;
+    remoteUrl?: string;
   },
   folderPath: string
 ): AnkaaFile {
@@ -106,21 +106,21 @@ function convertWebDAVItemToAnkaaFile(
     mimetype = "application/vnd.ms-excel";
   }
 
-  // Use webdavUrl as thumbnailUrl for images
-  // For PDFs, set to webdavUrl too - it will fail to load as image and trigger error fallback to show PDF icon
+  // Use remoteUrl as thumbnailUrl for images
+  // For PDFs, set to remoteUrl too - it will fail to load as image and trigger error fallback to show PDF icon
   const isImage = ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(extension);
   const isPdf = extension === "pdf";
 
   return {
-    id: `webdav-${folderPath}-${item.name}`,
+    id: `remote-${folderPath}-${item.name}`,
     filename: item.name,
     originalName: item.name,
     mimetype,
-    path: item.webdavUrl || "",
-    size: parseWebDAVSize(item.size), // Parse WebDAV size string to bytes
-    // Set thumbnailUrl to webdavUrl for images and PDFs
+    path: item.remoteUrl || "",
+    size: parseRemoteSize(item.size), // Parse remote size string to bytes
+    // Set thumbnailUrl to remoteUrl for images and PDFs
     // For PDFs, the image load will fail (ORB) and FileItem will show icon as fallback
-    thumbnailUrl: (isImage || isPdf) && item.webdavUrl ? item.webdavUrl : null,
+    thumbnailUrl: (isImage || isPdf) && item.remoteUrl ? item.remoteUrl : null,
     createdAt: item.lastModified,
     updatedAt: item.lastModified,
   };
@@ -145,8 +145,8 @@ function FileContentsBrowser({
   const fileViewer = useFileViewer();
 
   const handleFileClick = (file: AnkaaFile, index: number) => {
-    // For WebDAV files, use direct URL instead of API endpoints
-    const webdavUrl = file.path;
+    // For remote files, use direct URL instead of API endpoints
+    const remoteUrl = file.path;
 
     // Check if it's a previewable file
     const extension = file.filename.split(".").pop()?.toLowerCase() || "";
@@ -161,19 +161,19 @@ function FileContentsBrowser({
           const ext = item.name.split(".").pop()?.toLowerCase() || "";
           return item.type !== "directory" && ["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext);
         })
-        .map((item: any) => convertWebDAVItemToAnkaaFile(item, `${selectedFolder}/${currentSubPath || ""}`)) || [];
+        .map((item: any) => convertRemoteItemToAnkaaFile(item, `${selectedFolder}/${currentSubPath || ""}`)) || [];
 
       const imageIndex = allImageFiles.findIndex(f => f.id === file.id);
       if (imageIndex !== -1) {
         fileViewer?.actions.viewFiles(allImageFiles, imageIndex);
       }
     } else if (isPdf || isVideo) {
-      // For PDFs and videos, open directly in new tab (WebDAV doesn't support inline viewing)
-      window.open(webdavUrl, "_blank");
+      // For PDFs and videos, open directly in new tab (remote storage doesn't support inline viewing)
+      window.open(remoteUrl, "_blank");
     } else {
       // For other files, trigger download
       const link = document.createElement("a");
-      link.href = webdavUrl;
+      link.href = remoteUrl;
       link.download = file.filename;
       link.target = "_blank";
       document.body.appendChild(link);
@@ -188,7 +188,7 @@ function FileContentsBrowser({
   };
 
   const handleDownload = (file: AnkaaFile) => {
-    // Use webdavUrl directly for download
+    // Use remoteUrl directly for download
     const link = document.createElement("a");
     link.href = file.path;
     link.download = file.filename;
@@ -235,7 +235,7 @@ function FileContentsBrowser({
   const files = folderContents.data.files.filter((item: any) => item.type !== "directory");
 
   // Convert files to AnkaaFile format
-  const ankaaFiles = files.map((item: any) => convertWebDAVItemToAnkaaFile(item, `${selectedFolder}/${currentSubPath || ""}`));
+  const ankaaFiles = files.map((item: any) => convertRemoteItemToAnkaaFile(item, `${selectedFolder}/${currentSubPath || ""}`));
 
   return (
     <div className={fileDisplayMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2"}>
@@ -433,9 +433,9 @@ export function ServerSharedFoldersPage() {
   const getThumbnailUrl = (item: any): string | null => {
     if (item.type !== "file" || !isImageFile(item.name)) return null;
 
-    // If webdavUrl exists, use it as the thumbnail source
-    if (item.webdavUrl) {
-      return item.webdavUrl;
+    // If remoteUrl exists, use it as the thumbnail source
+    if (item.remoteUrl) {
+      return item.remoteUrl;
     }
 
     return null;
@@ -844,13 +844,13 @@ export function ServerSharedFoldersPage() {
                                   <span>Caminho: {folder.path}</span>
                                 </div>
 
-                                {/* WebDAV URL */}
-                                {folder.webdavPath && (
+                                {/* Remote URL */}
+                                {folder.remotePath && (
                                   <div className="flex items-center gap-2">
                                     <IconExternalLink className="h-4 w-4" />
-                                    <span>WebDAV: </span>
-                                    <a href={folder.webdavPath} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline truncate">
-                                      {folder.webdavPath}
+                                    <span>Remoto: </span>
+                                    <a href={folder.remotePath} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline truncate">
+                                      {folder.remotePath}
                                     </a>
                                   </div>
                                 )}
@@ -907,9 +907,9 @@ export function ServerSharedFoldersPage() {
                   {(!sharedFolders?.data || sharedFolders.data.length === 0) && !isLoading && (
                     <div className="text-center py-12">
                       <IconFolderShare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-muted-foreground mb-2">Nenhuma pasta WebDAV encontrada</h3>
+                      <h3 className="text-lg font-medium text-muted-foreground mb-2">Nenhuma pasta compartilhada encontrada</h3>
                       <p className="text-sm text-muted-foreground">
-                        Não há pastas WebDAV configuradas no diretório /srv/samba/shares no momento.
+                        Não há pastas compartilhadas configuradas no diretório /srv/samba/shares no momento.
                         <br />
                         Verifique se o serviço de compartilhamento de arquivos está ativo.
                       </p>

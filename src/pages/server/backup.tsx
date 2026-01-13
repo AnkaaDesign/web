@@ -71,7 +71,7 @@ interface NewBackupForm {
   customPaths: string[];
   usePresetPaths: boolean;
   presetPathType: "critical" | "high" | "medium" | "low";
-  webdavFolders: string[];
+  sharedFolders: string[];
 }
 
 interface NewScheduleForm {
@@ -85,7 +85,7 @@ interface NewScheduleForm {
   encrypted: boolean;
   usePresetPaths: boolean;
   presetPathType: "critical" | "high" | "medium" | "low";
-  webdavFolders: string[];
+  sharedFolders: string[];
 }
 
 // Priority options for backups
@@ -116,40 +116,40 @@ const BackupManagementPage = () => {
   // Authentication state
   const { isAuthenticated } = useAuth();
 
-  // WebDAV folders state (fetched dynamically from API)
-  const [webdavFolders, setWebdavFolders] = useState<Array<{ value: string; label: string }>>([]);
+  // Storage folders state (fetched dynamically from API)
+  const [storageFolders, setStorageFolders] = useState<Array<{ value: string; label: string }>>([]);
   const [loadingFolders, setLoadingFolders] = useState(false);
 
-  // Fetch WebDAV folders on mount
+  // Fetch storage folders on mount
   useEffect(() => {
-    const fetchWebDAVFolders = async () => {
+    const fetchStorageFolders = async () => {
       if (!isAuthenticated) return;
 
       setLoadingFolders(true);
       try {
-        const folders = await backupApi.getWebDAVFolders();
+        const folders = await backupApi.getStorageFolders();
 
         if (folders && folders.length > 0) {
           const formattedFolders = folders.map(f => ({ value: f, label: f }));
-          setWebdavFolders(formattedFolders);
+          setStorageFolders(formattedFolders);
         } else {
           if (process.env.NODE_ENV !== "production") {
-            console.warn("No WebDAV folders found");
+            console.warn("No storage folders found");
           }
-          setWebdavFolders([]);
+          setStorageFolders([]);
         }
       } catch (error) {
         if (process.env.NODE_ENV !== "production") {
-          console.error("Failed to fetch WebDAV folders:", error);
+          console.error("Failed to fetch storage folders:", error);
         }
-        toast.error("Erro ao carregar pastas do WebDAV");
-        setWebdavFolders([]);
+        toast.error("Erro ao carregar pastas de armazenamento");
+        setStorageFolders([]);
       } finally {
         setLoadingFolders(false);
       }
     };
 
-    fetchWebDAVFolders();
+    fetchStorageFolders();
   }, [isAuthenticated]);
 
   // Fetch backups data (only when authenticated)
@@ -369,7 +369,7 @@ const BackupManagementPage = () => {
     customPaths: [],
     usePresetPaths: false,
     presetPathType: "high",
-    webdavFolders: [],
+    sharedFolders: [],
   });
 
   // Custom path input state
@@ -386,7 +386,7 @@ const BackupManagementPage = () => {
     encrypted: false,
     usePresetPaths: false,
     presetPathType: "high",
-    webdavFolders: [],
+    sharedFolders: [],
   });
 
   // Reset usePresetPaths when schedule type changes to files/full
@@ -543,11 +543,11 @@ const BackupManagementPage = () => {
     let pathsToBackup: string[] | undefined;
 
     if (newBackup.type === "files") {
-      // Files backup - WebDAV folders
-      if (newBackup.webdavFolders.length > 0) {
-        pathsToBackup = newBackup.webdavFolders;
+      // Files backup - shared storage folders
+      if (newBackup.sharedFolders.length > 0) {
+        pathsToBackup = newBackup.sharedFolders;
       }
-      // If no folders selected, will backup entire WebDAV directory
+      // If no folders selected, will backup entire shared storage directory
     } else if (newBackup.type === "system") {
       // System backup - System configuration paths
       if (newBackup.usePresetPaths) {
@@ -580,7 +580,7 @@ const BackupManagementPage = () => {
         customPaths: [],
         usePresetPaths: true,
         presetPathType: "high",
-        webdavFolders: [],
+        sharedFolders: [],
       });
       setCustomPathInput("");
     }
@@ -641,9 +641,9 @@ const BackupManagementPage = () => {
       let pathsToBackup: string[] | undefined;
 
       if (newSchedule.type === "files") {
-        // Files backup - WebDAV folders
-        if (newSchedule.webdavFolders.length > 0) {
-          pathsToBackup = newSchedule.webdavFolders;
+        // Files backup - shared storage folders
+        if (newSchedule.sharedFolders.length > 0) {
+          pathsToBackup = newSchedule.sharedFolders;
         }
       } else if (newSchedule.type === "system") {
         // System backup - System configuration paths
@@ -693,7 +693,7 @@ const BackupManagementPage = () => {
           encrypted: false,
           usePresetPaths: true,
           presetPathType: "high",
-          webdavFolders: [],
+          sharedFolders: [],
         });
       }
     } catch (error) {
@@ -1214,13 +1214,13 @@ const BackupManagementPage = () => {
                   <Label>Pastas para Backup</Label>
                   <p className="text-sm text-muted-foreground">Selecione as pastas ou deixe vazio para backup completo</p>
                   <Combobox
-                    value={newBackup.webdavFolders}
+                    value={newBackup.sharedFolders}
                     onValueChange={(value) => {
                       if (Array.isArray(value)) {
-                        setNewBackup({ ...newBackup, webdavFolders: value as string[] });
+                        setNewBackup({ ...newBackup, sharedFolders: value as string[] });
                       }
                     }}
-                    options={webdavFolders}
+                    options={storageFolders}
                     placeholder={loadingFolders ? "Carregando pastas..." : "Selecione as pastas"}
                     emptyText="Nenhuma pasta disponível"
                     searchable={true}
@@ -1228,9 +1228,9 @@ const BackupManagementPage = () => {
                     mode="multiple"
                     disabled={loadingFolders}
                   />
-                  {newBackup.webdavFolders.length > 0 && (
+                  {newBackup.sharedFolders.length > 0 && (
                     <div className="text-xs text-muted-foreground">
-                      <strong>{newBackup.webdavFolders.length} {newBackup.webdavFolders.length === 1 ? "pasta selecionada" : "pastas selecionadas"}</strong>
+                      <strong>{newBackup.sharedFolders.length} {newBackup.sharedFolders.length === 1 ? "pasta selecionada" : "pastas selecionadas"}</strong>
                     </div>
                   )}
                 </div>
@@ -1453,15 +1453,15 @@ const BackupManagementPage = () => {
               {(newSchedule.type === "files" || newSchedule.type === "full") && (
                 <div className="space-y-4 border-t pt-4">
                   <Label>Pastas para Backup</Label>
-                  <p className="text-sm text-muted-foreground">Selecione as pastas do WebDAV ou deixe vazio para backup completo</p>
+                  <p className="text-sm text-muted-foreground">Selecione as pastas compartilhadas ou deixe vazio para backup completo</p>
                   <Combobox
-                    value={newSchedule.webdavFolders}
+                    value={newSchedule.sharedFolders}
                     onValueChange={(value) => {
                       if (Array.isArray(value)) {
-                        setNewSchedule({ ...newSchedule, webdavFolders: value as string[] });
+                        setNewSchedule({ ...newSchedule, sharedFolders: value as string[] });
                       }
                     }}
-                    options={webdavFolders}
+                    options={storageFolders}
                     placeholder={loadingFolders ? "Carregando pastas..." : "Selecione as pastas"}
                     emptyText="Nenhuma pasta disponível"
                     searchable={true}
@@ -1469,9 +1469,9 @@ const BackupManagementPage = () => {
                     mode="multiple"
                     disabled={loadingFolders}
                   />
-                  {newSchedule.webdavFolders.length > 0 && (
+                  {newSchedule.sharedFolders.length > 0 && (
                     <div className="text-xs text-muted-foreground">
-                      <strong>{newSchedule.webdavFolders.length} {newSchedule.webdavFolders.length === 1 ? "pasta selecionada" : "pastas selecionadas"}</strong>
+                      <strong>{newSchedule.sharedFolders.length} {newSchedule.sharedFolders.length === 1 ? "pasta selecionada" : "pastas selecionadas"}</strong>
                     </div>
                   )}
                 </div>
@@ -1517,16 +1517,16 @@ const BackupManagementPage = () => {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <Label>Pastas WebDAV para Backup</Label>
-                      <p className="text-sm text-muted-foreground">Selecione as pastas do WebDAV para backup</p>
+                      <Label>Pastas compartilhadas para Backup</Label>
+                      <p className="text-sm text-muted-foreground">Selecione as pastas compartilhadas para backup</p>
                       <Combobox
-                        value={newSchedule.webdavFolders}
+                        value={newSchedule.sharedFolders}
                         onValueChange={(value) => {
                           if (Array.isArray(value)) {
-                            setNewSchedule({ ...newSchedule, webdavFolders: value as string[] });
+                            setNewSchedule({ ...newSchedule, sharedFolders: value as string[] });
                           }
                         }}
-                        options={webdavFolders}
+                        options={storageFolders}
                         placeholder={loadingFolders ? "Carregando pastas..." : "Selecione as pastas"}
                         emptyText="Nenhuma pasta disponível"
                         searchable={true}
@@ -1534,9 +1534,9 @@ const BackupManagementPage = () => {
                         mode="multiple"
                         disabled={loadingFolders}
                       />
-                      {newSchedule.webdavFolders.length > 0 && (
+                      {newSchedule.sharedFolders.length > 0 && (
                         <div className="text-xs text-muted-foreground">
-                          <strong>{newSchedule.webdavFolders.length} {newSchedule.webdavFolders.length === 1 ? "pasta selecionada" : "pastas selecionadas"}</strong>
+                          <strong>{newSchedule.sharedFolders.length} {newSchedule.sharedFolders.length === 1 ? "pasta selecionada" : "pastas selecionadas"}</strong>
                         </div>
                       )}
                     </div>

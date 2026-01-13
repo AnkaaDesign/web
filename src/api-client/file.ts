@@ -41,7 +41,7 @@ interface FileUploadOptions {
   onProgress?: (progress: FileUploadProgress) => void;
   signal?: AbortSignal;
   timeout?: number;
-  // WebDAV context parameters
+  // Remote storage context parameters
   fileContext?: string;
   entityId?: string;
   entityType?: string;
@@ -173,7 +173,7 @@ export class FileService {
             options.onProgress(progress);
           }
         },
-        // Add WebDAV context as query parameters
+        // Add remote storage context as query parameters
         params: {
           ...(options.fileContext && { fileContext: options.fileContext }),
           ...(options.entityId && { entityId: options.entityId }),
@@ -228,7 +228,7 @@ export class FileService {
               options.onProgress!({ loaded, total, percentage });
             }
           : undefined,
-        // Add WebDAV context as query parameters
+        // Add remote storage context as query parameters
         params: {
           ...(options.fileContext && { fileContext: options.fileContext }),
           ...(options.entityId && { entityId: options.entityId }),

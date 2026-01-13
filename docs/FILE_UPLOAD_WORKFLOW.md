@@ -1,7 +1,7 @@
 # File Upload Workflow Documentation
 
 ## Overview
-This document describes the new unified file upload workflow that ensures files are properly organized in the WebDAV directory structure based on their entity type and relationships.
+This document describes the new unified file upload workflow that ensures files are properly organized in the remote storage directory structure based on their entity type and relationships.
 
 ## Architecture Changes
 
@@ -15,14 +15,14 @@ This document describes the new unified file upload workflow that ensures files 
 1. Files selected and stored in form state
 2. Form submission creates FormData with files and context
 3. Backend receives files with full entity context
-4. Files saved directly to correct WebDAV directories
+4. Files saved directly to correct remote storage directories
 
 ## Directory Structure
 
-### WebDAV Root: `/srv/webdav/`
+### Storage Root: `/srv/remote-storage/`
 
 ```
-/srv/webdav/
+/srv/remote-storage/
 ├── Advertencias/           # Warnings - organized by employee name
 │   └── {UserName}/
 ├── Comprovantes/          # Receipts

@@ -1,6 +1,6 @@
 {
-  "description": "File organization configuration for backend services - Maps file types and entities to WebDAV directories",
-  "webdavRoot": "/srv/webdav",
+  "description": "File organization configuration for backend services - Maps file types and entities to remote storage directories",
+  "storageRoot": "/srv/remote-storage",
   "fileOrganization": {
     "customer": {
       "logo": "Logos/Clientes/{customerFantasyName}/"

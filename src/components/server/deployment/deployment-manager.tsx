@@ -92,7 +92,7 @@ export function DeploymentManager({ className }: DeploymentManagerProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>Teste (test.ankaa.live)</span>
+                  <span>Teste (test.ankaadesign.com.br)</span>
                   {testDeployment?.data?.status && getStatusBadge(testDeployment.data.status)}
                 </CardTitle>
                 <CardDescription>Ambiente de teste automático</CardDescription>
@@ -136,7 +136,7 @@ export function DeploymentManager({ className }: DeploymentManagerProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>Produção (ankaa.live)</span>
+                  <span>Produção (ankaadesign.com.br)</span>
                   {prodDeployment?.data?.status && getStatusBadge(prodDeployment.data.status)}
                 </CardTitle>
                 <CardDescription>Ambiente de produção</CardDescription>

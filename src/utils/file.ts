@@ -218,9 +218,9 @@ export const normalizeThumbnailUrl = (thumbnailUrl: string | undefined | null): 
 };
 
 export const getFileUrl = (file: File, baseUrl?: string): string => {
-  // Check if this is a WebDAV file (path starts with http)
+  // Check if this is a remote storage file (path starts with http)
   if (file.path && file.path.startsWith("http")) {
-    return file.path; // Use direct WebDAV URL
+    return file.path; // Use direct remote storage URL
   }
 
   // Database file - use API endpoint
@@ -229,9 +229,9 @@ export const getFileUrl = (file: File, baseUrl?: string): string => {
 };
 
 export const getFileDownloadUrl = (file: File, baseUrl?: string): string => {
-  // Check if this is a WebDAV file (path starts with http)
+  // Check if this is a remote storage file (path starts with http)
   if (file.path && file.path.startsWith("http")) {
-    return file.path; // Use direct WebDAV URL
+    return file.path; // Use direct remote storage URL
   }
 
   // Database file - use API endpoint
@@ -242,9 +242,9 @@ export const getFileDownloadUrl = (file: File, baseUrl?: string): string => {
 export const getFileThumbnailUrl = (file: File, size: "small" | "medium" | "large" = "medium", baseUrl?: string): string => {
   if (!isImageFile(file)) return "";
 
-  // Check if this is a WebDAV file with thumbnailUrl (images only)
+  // Check if this is a remote storage file with thumbnailUrl (images only)
   if (file.thumbnailUrl && file.thumbnailUrl.startsWith("http")) {
-    return file.thumbnailUrl; // Use direct WebDAV URL as thumbnail
+    return file.thumbnailUrl; // Use direct remote storage URL as thumbnail
   }
 
   // Database file - use API endpoint

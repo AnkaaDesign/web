@@ -23,10 +23,10 @@ The socket client uses the same backend URL as the REST API. Set this in your `.
 VITE_API_URL=http://localhost:3030
 
 # Staging
-VITE_API_URL=https://api.staging.ankaa.live
+VITE_API_URL=https://api.staging.ankaadesign.com.br
 
 # Production
-VITE_API_URL=https://api.ankaa.live
+VITE_API_URL=https://api.ankaadesign.com.br
 ```
 
 Socket.io will automatically handle the WebSocket connection upgrade from this URL.

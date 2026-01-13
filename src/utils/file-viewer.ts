@@ -177,16 +177,16 @@ export const validateFileSecurity = (file: AnkaaFile, config: FileViewerConfig =
 export const generateFileUrls = (file: AnkaaFile, baseUrl?: string) => {
   const apiUrl = baseUrl || getApiBaseUrl();
 
-  // Check if this is a WebDAV file (path starts with http)
-  const isWebDAVFile = file.path && file.path.startsWith("http");
+  // Check if this is a remote storage file (path starts with http)
+  const isRemoteFile = file.path && file.path.startsWith("http");
 
-  // For WebDAV files, use the direct URLs; for database files, use API endpoints
-  if (isWebDAVFile) {
+  // For remote storage files, use the direct URLs; for database files, use API endpoints
+  if (isRemoteFile) {
     return {
-      serve: file.path, // Direct WebDAV URL
-      download: file.path, // Direct WebDAV URL
+      serve: file.path, // Direct remote storage URL
+      download: file.path, // Direct remote storage URL
       thumbnail: file.thumbnailUrl ? (file.thumbnailUrl.startsWith("http") ? file.thumbnailUrl : `${apiUrl}${file.thumbnailUrl}`) : null,
-      thumbnailSmall: file.thumbnailUrl || file.path, // Use thumbnail or file itself for WebDAV
+      thumbnailSmall: file.thumbnailUrl || file.path, // Use thumbnail or file itself for remote storage
       thumbnailMedium: file.thumbnailUrl || file.path,
       thumbnailLarge: file.thumbnailUrl || file.path,
     };

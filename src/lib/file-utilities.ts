@@ -63,7 +63,7 @@ export interface DownloadOptions {
 }
 
 export interface StorageUrlOptions {
-  storageType: 'local' | 's3' | 'webdav' | 'azure' | 'gcs';
+  storageType: 'local' | 's3' | 'remote' | 'azure' | 'gcs';
   baseUrl?: string;
   bucket?: string;
   path?: string;
@@ -790,8 +790,8 @@ export function generateStorageUrl(
       });
       return `${baseUrl}/files/s3?${s3Params.toString()}`;
 
-    case 'webdav':
-      return `${baseUrl}/files/webdav/${fileId}/${encodeURIComponent(filename)}`;
+    case 'remote':
+      return `${baseUrl}/files/remote/${fileId}/${encodeURIComponent(filename)}`;
 
     case 'azure':
       const azureParams = new URLSearchParams({

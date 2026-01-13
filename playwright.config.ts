@@ -13,7 +13,7 @@ export default defineConfig({
     ['json', { outputFile: 'test-results.json' }],
   ],
   use: {
-    baseURL: process.env.BASE_URL || 'https://ankaa.live',
+    baseURL: process.env.BASE_URL || 'https://ankaadesign.com.br',
     trace: 'on-first-retry',
     screenshot: 'on',
     video: 'on',

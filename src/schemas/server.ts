@@ -52,7 +52,7 @@ export const sharedFolderSchema = z.object({
   group: z.string(),
   size: z.string(),
   lastModified: z.date(),
-  webdavPath: z.string().optional(),
+  remotePath: z.string().optional(),
   description: z.string().optional(),
   type: z.string().optional(),
   accessible: z.boolean().optional(),

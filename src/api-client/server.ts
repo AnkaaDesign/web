@@ -145,7 +145,7 @@ export class ServerService {
         permissions: string;
         owner: string;
         group: string;
-        webdavUrl?: string;
+        remoteUrl?: string;
       }>;
       totalFiles: number;
       totalSize: string;

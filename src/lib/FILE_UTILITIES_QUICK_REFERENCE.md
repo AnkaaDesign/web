@@ -185,8 +185,8 @@ generateStorageUrl(fileId, filename, {
   expiresIn: 3600
 })
 
-// WebDAV
-generateStorageUrl(fileId, filename, { storageType: 'webdav' })
+// Remote Storage
+generateStorageUrl(fileId, filename, { storageType: 'remote' })
 
 // Azure Blob Storage
 generateStorageUrl(fileId, filename, {

@@ -9,8 +9,8 @@ import type {
   RaidStatusGetManyResponse,
   BackupMetadataGetUniqueResponse,
   BackupMetadataGetManyResponse,
-  WebDavInfoGetUniqueResponse,
-  WebDavInfoGetManyResponse,
+  RemoteStorageInfoGetUniqueResponse,
+  RemoteStorageInfoGetManyResponse,
   SystemMetricsGetUniqueResponse,
   // @ts-ignore - This type is used in return types
   SystemMetricsGetManyResponse,
@@ -33,7 +33,7 @@ import type {
   // @ts-ignore - These types are used in return types
   BackupMetadata,
   // @ts-ignore - These types are used in return types
-  WebDavInfo,
+  RemoteStorageInfo,
   // @ts-ignore - These types are used in return types
   SystemMetrics,
   // @ts-ignore - These types are used in return types
@@ -45,7 +45,7 @@ import type {
 // =====================
 
 export class SsdHealthService {
-  private readonly basePath = "/monitoring/ssd";
+  private readonly basePath = "/server/ssd-health";
 
   async getSsdHealthData(): Promise<SsdHealthDataGetManyResponse> {
     const response = await apiClient.get<SsdHealthDataGetManyResponse>(this.basePath);
@@ -68,7 +68,7 @@ export class SsdHealthService {
 // =====================
 
 export class RaidStatusService {
-  private readonly basePath = "/monitoring/raid";
+  private readonly basePath = "/server/raid-status";
 
   async getRaidStatus(): Promise<RaidStatusGetManyResponse> {
     const response = await apiClient.get<RaidStatusGetManyResponse>(this.basePath);
@@ -91,7 +91,7 @@ export class RaidStatusService {
 // =====================
 
 export class BackupService {
-  private readonly basePath = "/monitoring/backup";
+  private readonly basePath = "/backups";
 
   async getBackupMetadata(): Promise<BackupMetadataGetManyResponse> {
     const response = await apiClient.get<BackupMetadataGetManyResponse>(this.basePath);
@@ -130,28 +130,37 @@ export class BackupService {
 }
 
 // =====================
-// WebDAV Service
+// Remote Storage Service (for network-accessible file storage)
+// WARNING: Backend endpoints for this service DO NOT EXIST.
+// These calls will fail with 404 errors until the backend implements
+// the /server/remote-storage/* endpoints. See backup.controller.ts
+// for storage folder listing via /backups/storage-folders endpoint.
 // =====================
 
-export class WebDavService {
-  private readonly basePath = "/monitoring/webdav";
+/**
+ * @deprecated This service is not yet implemented in the backend.
+ * The /monitoring/remote-storage/* endpoints do not exist.
+ * Use backupApi.getStorageFolders() instead for storage folder listing.
+ */
+export class RemoteStorageService {
+  private readonly basePath = "/server/remote-storage";
 
-  async getWebDavInfo(): Promise<WebDavInfoGetManyResponse> {
-    const response = await apiClient.get<WebDavInfoGetManyResponse>(this.basePath);
+  async getRemoteStorageInfo(): Promise<RemoteStorageInfoGetManyResponse> {
+    const response = await apiClient.get<RemoteStorageInfoGetManyResponse>(this.basePath);
     return response.data;
   }
 
-  async getWebDavInfoById(id: string): Promise<WebDavInfoGetUniqueResponse> {
-    const response = await apiClient.get<WebDavInfoGetUniqueResponse>(`${this.basePath}/${id}`);
+  async getRemoteStorageInfoById(id: string): Promise<RemoteStorageInfoGetUniqueResponse> {
+    const response = await apiClient.get<RemoteStorageInfoGetUniqueResponse>(`${this.basePath}/${id}`);
     return response.data;
   }
 
-  async refreshWebDavInfo(): Promise<WebDavInfoGetManyResponse> {
-    const response = await apiClient.post<WebDavInfoGetManyResponse>(`${this.basePath}/refresh`);
+  async refreshRemoteStorageInfo(): Promise<RemoteStorageInfoGetManyResponse> {
+    const response = await apiClient.post<RemoteStorageInfoGetManyResponse>(`${this.basePath}/refresh`);
     return response.data;
   }
 
-  async syncWebDavFolder(id: string, folderPath: string): Promise<ServiceActionResponse> {
+  async syncRemoteFolder(id: string, folderPath: string): Promise<ServiceActionResponse> {
     const response = await apiClient.post<ServiceActionResponse>(`${this.basePath}/${id}/sync`, {
       folderPath,
     });
@@ -222,7 +231,7 @@ export class ServerMonitoringService {
   }
 
   async setUserPassword(username: string, passwordData: SetPasswordRequest): Promise<ServiceActionResponse> {
-    const response = await apiClient.post<ServiceActionResponse>(`${this.basePath}/users/${username}/password`, passwordData);
+    const response = await apiClient.put<ServiceActionResponse>(`${this.basePath}/users/${username}/password`, passwordData);
     return response.data;
   }
 
@@ -301,7 +310,7 @@ export class SystemHealthService {
 export const ssdHealthService = new SsdHealthService();
 export const raidStatusService = new RaidStatusService();
 export const backupService = new BackupService();
-export const webDavService = new WebDavService();
+export const remoteStorageService = new RemoteStorageService();
 export const serverMonitoringService = new ServerMonitoringService();
 export const systemHealthService = new SystemHealthService();
 
@@ -334,13 +343,13 @@ export const pauseBackupJob = (jobId: string) => backupService.pauseBackupJob(jo
 export const resumeBackupJob = (jobId: string) => backupService.resumeBackupJob(jobId);
 
 // =====================
-// Export individual functions for WebDAV
+// Export individual functions for Remote Storage
 // =====================
 
-export const getWebDavInfo = () => webDavService.getWebDavInfo();
-export const getWebDavInfoById = (id: string) => webDavService.getWebDavInfoById(id);
-export const refreshWebDavInfo = () => webDavService.refreshWebDavInfo();
-export const syncWebDavFolder = (id: string, folderPath: string) => webDavService.syncWebDavFolder(id, folderPath);
+export const getRemoteStorageInfo = () => remoteStorageService.getRemoteStorageInfo();
+export const getRemoteStorageInfoById = (id: string) => remoteStorageService.getRemoteStorageInfoById(id);
+export const refreshRemoteStorageInfo = () => remoteStorageService.refreshRemoteStorageInfo();
+export const syncRemoteFolder = (id: string, folderPath: string) => remoteStorageService.syncRemoteFolder(id, folderPath);
 
 // =====================
 // Export individual functions for Server Monitoring

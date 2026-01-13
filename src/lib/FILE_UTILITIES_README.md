@@ -92,7 +92,7 @@ await fileUtilities.downloadFile(fileUrl, 'document.pdf');
 - **URL generation** - Support for multiple storage types:
   - Local storage
   - AWS S3
-  - WebDAV
+  - Remote Storage (network file sharing)
   - Azure Blob Storage
   - Google Cloud Storage
 

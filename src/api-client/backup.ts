@@ -278,9 +278,9 @@ class BackupApiClient {
     return `Às ${hours.padStart(2, "0")}:${minutes.padStart(2, "0")} (${cron})`;
   }
 
-  // Get list of WebDAV folders available for backup
-  async getWebDAVFolders(): Promise<string[]> {
-    const response = await this.api.get<{ success: boolean; data: string[]; message: string }>("/backups/webdav-folders");
+  // Get list of storage folders available for backup
+  async getStorageFolders(): Promise<string[]> {
+    const response = await this.api.get<{ success: boolean; data: string[]; message: string }>("/backups/storage-folders");
     return response.data.data || [];
   }
 }

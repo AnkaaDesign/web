@@ -1,4 +1,4 @@
-// File Organization Configuration for WebDAV
+// File Organization Configuration for Remote Storage
 // This module defines the directory structure for different file types and entities
 
 export interface FileOrganizationConfig {
@@ -31,7 +31,7 @@ export interface FileContext {
   cutType?: 'vinyl' | 'stencil';
 }
 
-// Directory structure mapping based on WebDAV organization
+// Directory structure mapping based on remote storage organization
 export const FILE_ORGANIZATION: FileOrganizationConfig[] = [
   // ==================
   // CUSTOMER FILES
@@ -278,7 +278,7 @@ export const SPECIAL_DIRECTORIES = [
   'Thumbnails',     // Auto-generated thumbnails
   'Lixeira',        // Trash
   '.recycle',       // Recycle bin
-  'Auxiliares',     // Auxiliary files (direct WebDAV access only)
+  'Auxiliares',     // Auxiliary files (direct remote storage access only)
   'Rascunhos',      // Drafts (for another project)
   'Fotos',          // Photos (for another project)
   'Artes',          // Arts (for another project)
