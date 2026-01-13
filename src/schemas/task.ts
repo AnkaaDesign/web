@@ -881,6 +881,8 @@ export const taskGetManySchema = z
     hasBudget: z.boolean().optional(),
     hasNfe: z.boolean().optional(),
     hasReceipt: z.boolean().optional(),
+    // Agenda display logic filter
+    shouldDisplayInAgenda: z.boolean().optional(),
     // Boolean status convenience filters
     isOverdue: z.boolean().optional(),
     isActive: z.boolean().optional(),

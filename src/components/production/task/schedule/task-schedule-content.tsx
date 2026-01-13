@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { useSectors, useTasks, useCurrentUser, useTaskBatchMutations } from "../../../../hooks";
-import { TASK_STATUS, SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
-import type { Task, ServiceOrder } from "../../../../types";
+import { SECTOR_PRIVILEGES } from "../../../../constants";
+import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,54 +18,6 @@ import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
 import { hasPrivilege } from "@/utils";
 import { toast } from "sonner";
-
-// All required service order types for a task to be considered "complete"
-const ALL_SERVICE_ORDER_TYPES = [
-  SERVICE_ORDER_TYPE.PRODUCTION,
-  SERVICE_ORDER_TYPE.FINANCIAL,
-  SERVICE_ORDER_TYPE.NEGOTIATION,
-  SERVICE_ORDER_TYPE.ARTWORK,
-];
-
-/**
- * Checks if a task should be displayed in the agenda based on service order completeness.
- *
- * Rules:
- * 1. Display task if it has NO service orders yet
- * 2. Display task if any service order type is missing (all 4 types should have at least one)
- * 3. Display task if any service order is incomplete (not COMPLETED or CANCELLED)
- * 4. Only hide task if ALL 4 service order types exist AND all are complete/cancelled
- */
-function shouldDisplayTaskInAgenda(task: Task): boolean {
-  const services = task.services || [];
-
-  // Rule 1: If no service orders exist, display the task
-  if (services.length === 0) {
-    return true;
-  }
-
-  // Get the types of service orders that exist for this task
-  const existingTypes = new Set(services.map((s) => s.type));
-
-  // Rule 2: If any service order type is missing, display the task
-  for (const requiredType of ALL_SERVICE_ORDER_TYPES) {
-    if (!existingTypes.has(requiredType)) {
-      return true;
-    }
-  }
-
-  // Rule 3: If any service order is incomplete (not COMPLETED or CANCELLED), display the task
-  const hasIncompleteServiceOrder = services.some(
-    (s) => s.status !== SERVICE_ORDER_STATUS.COMPLETED && s.status !== SERVICE_ORDER_STATUS.CANCELLED
-  );
-
-  if (hasIncompleteServiceOrder) {
-    return true;
-  }
-
-  // Rule 4: All service order types exist AND all are complete/cancelled -> hide the task
-  return false;
-}
 
 interface TaskScheduleContentProps {
   className?: string;
@@ -120,7 +72,10 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   // Filters state
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState<Partial<TaskGetManyFormData>>({
-    status: [TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION],
+    // Use backend agenda display logic (same as mobile):
+    // - Excludes CANCELLED tasks
+    // - Excludes COMPLETED tasks only if they have all 4 SO types AND all SOs are completed
+    shouldDisplayInAgenda: true,
     limit: 1000,
   });
 
@@ -394,16 +349,13 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [copyFromTaskState.step, handleCopyFromTaskCancel]);
 
-  // Filter tasks based on search and service order completeness
+  // Filter tasks based on search (agenda display filtering is done by backend via shouldDisplayInAgenda)
   const filteredTasks = useMemo(() => {
-    // First, filter by service order completeness
-    const tasksWithIncompleteServiceOrders = allTasks.filter(shouldDisplayTaskInAgenda);
-
-    // Then, filter by search text if provided
-    if (!searchText) return tasksWithIncompleteServiceOrders;
+    // Filter by search text if provided
+    if (!searchText) return allTasks;
 
     const searchLower = searchText.toLowerCase();
-    return tasksWithIncompleteServiceOrders.filter((task) => {
+    return allTasks.filter((task) => {
       return (
         task.name?.toLowerCase().includes(searchLower) ||
         task.customer?.fantasyName?.toLowerCase().includes(searchLower) ||
