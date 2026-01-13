@@ -454,11 +454,10 @@ export const truckCreateSchema = z.object({
   plate: z
     .string()
     .max(8, "Placa deve ter no máximo 8 caracteres")
-    .transform((val) => val.toUpperCase().replace(/[^A-Z0-9]/g, ""))
-    .refine((val) => brazilianPlateRegex.test(val), "Formato de placa inválido (ex: ABC1234 ou ABC-1234)")
-    .nullable()
     .optional()
-    .transform((val) => (val === "" ? null : val)),
+    .nullable()
+    .transform((val) => (val === "" ? null : val?.toUpperCase().replace(/[^A-Z0-9]/g, "")))
+    .refine((val) => !val || brazilianPlateRegex.test(val), "Formato de placa inválido (ex: ABC1234 ou ABC-1234)"),
   chassisNumber: z
     .string()
     .nullable()
@@ -486,11 +485,10 @@ export const truckUpdateSchema = z.object({
   plate: z
     .string()
     .max(8, "Placa deve ter no máximo 8 caracteres")
-    .transform((val) => val.toUpperCase().replace(/[^A-Z0-9]/g, ""))
-    .refine((val) => brazilianPlateRegex.test(val), "Formato de placa inválido (ex: ABC1234 ou ABC-1234)")
-    .nullable()
     .optional()
-    .transform((val) => (val === "" ? null : val)),
+    .nullable()
+    .transform((val) => (val === "" ? null : val?.toUpperCase().replace(/[^A-Z0-9]/g, "")))
+    .refine((val) => !val || brazilianPlateRegex.test(val), "Formato de placa inválido (ex: ABC1234 ou ABC-1234)"),
   chassisNumber: z
     .string()
     .nullable()

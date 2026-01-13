@@ -293,6 +293,21 @@ function ServiceRow({
     defaultValue: "",
   });
 
+  // Create initial options that include the existing description
+  // This ensures the Combobox can display the selected value even after remounting
+  const initialOptions = useMemo(() => {
+    if (!existingDescription || !existingDescription.trim()) {
+      return [];
+    }
+    return [{
+      id: `existing-${existingDescription}`,
+      description: existingDescription,
+      type: selectedType,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Service];
+  }, [existingDescription, selectedType]);
+
   // Search function for Combobox - filtered by type
   const searchServices = async (
     search: string,
@@ -414,6 +429,7 @@ function ServiceRow({
                 searchPlaceholder="Pesquisar serviços..."
                 disabled={disabled || isCreating}
                 async={true}
+                initialOptions={initialOptions}
                 allowCreate={true}
                 createLabel={(value) => `Criar serviço "${value}"`}
 onCreate={async (value) => {

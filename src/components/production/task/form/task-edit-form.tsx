@@ -454,7 +454,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
       forecastDate: taskData.forecastDate ? new Date(taskData.forecastDate) : null,
       customerId: taskData.customerId || null,
       invoiceToId: taskData.invoiceToId || null,
-      negotiatingWith: taskData.negotiatingWith || null,
+      negotiatingWith: taskData.negotiatingWith || { name: null, phone: null },
       sectorId: taskData.sectorId || null,
       paintId: taskData.paintId || null,
       pricing: taskData.pricing ? {
@@ -1152,8 +1152,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           // Layout photos are uploaded WITH the task update (not separately like cuts)
           // The backend handles them in the transaction at lines 683-728 of task.service.ts
 
-          // Navigate to the task detail page
-          toast.success("Alterações salvas com sucesso!");
+          // Navigate to the task detail page (toast is already shown by API client)
           await new Promise(resolve => setTimeout(resolve, 100));
           window.location.href = `/producao/cronograma/detalhes/${task.id}`;
         }
