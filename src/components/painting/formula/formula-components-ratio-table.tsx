@@ -55,7 +55,7 @@ export function FormulaComponentsRatioTable({ components, className, variant = "
               </TableRow>
             ) : (
               sortedComponents.map((component, index) => (
-                <TableRow key={component.id || index}>
+                <TableRow key={component.id || index} className="border-2 border-transparent hover:border-red-500 transition-all duration-200">
                   <TableCell className="font-mono text-sm p-2 sm:p-4">
                     {component.item?.uniCode ? (
                       <Badge variant="outline" className="font-mono text-xs">

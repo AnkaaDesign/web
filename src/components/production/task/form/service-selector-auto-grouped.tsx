@@ -1,15 +1,24 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { useFieldArray, useWatch } from "react-hook-form";
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useState, useMemo, useCallback } from "react";
+import { useFieldArray, useWatch, useController } from "react-hook-form";
+import { FormField, FormLabel } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconNote } from "@tabler/icons-react";
 import { Combobox } from "@/components/ui/combobox";
 import type { Service } from "../../../../types";
-import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { Textarea } from "@/components/ui/textarea";
 import { useServiceMutations } from "../../../../hooks";
 import { serviceService } from "../../../../api-client";
 import { AdminUserSelector } from "@/components/administration/user/form/user-selector";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ServiceSelectorProps {
   control: any;
@@ -190,6 +199,8 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
                 getOptionValue={getOptionValue}
                 isGrouped={true}
                 clearCreatingState={() => setCreatingServiceIndex(null)}
+                userPrivilege={userPrivilege}
+                currentUserId={currentUserId}
               />
             );
           })}
@@ -202,31 +213,45 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     <div className="space-y-4">
       <FormLabel>Serviços</FormLabel>
 
-      {/* Ungrouped services (being edited) */}
+      {/* Ungrouped services (being edited) - shown in a card for consistency */}
       {ungroupedIndices.length > 0 && (
-        <div className="space-y-3 pb-4 border-b">
-          {ungroupedIndices.map((index) => {
-            const serviceOrder = servicesValues[index];
-            const isServiceDisabled = disabled || !canEditServiceOrder(serviceOrder);
+        <Card className="bg-transparent border-muted border-dashed">
+          <CardContent className="pt-4 space-y-3">
+            {/* Header for new/editing services */}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-muted-foreground">
+                Configurando Serviço
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Preencha o tipo e descrição
+              </span>
+            </div>
 
-            return (
-              <ServiceRow
-                key={fields[index].id}
-                control={control}
-                index={index}
-                type={servicesValues[index]?.type || SERVICE_ORDER_TYPE.PRODUCTION}
-                disabled={isServiceDisabled}
-                isCreating={creatingServiceIndex === index}
-                onRemove={() => remove(index)}
-                onCreateService={handleCreateService}
-                getOptionLabel={getOptionLabel}
-                getOptionValue={getOptionValue}
-                isGrouped={false}
-                clearCreatingState={() => setCreatingServiceIndex(null)}
-              />
-            );
-          })}
-        </div>
+            {ungroupedIndices.map((index) => {
+              const serviceOrder = servicesValues[index];
+              const isServiceDisabled = disabled || !canEditServiceOrder(serviceOrder);
+
+              return (
+                <ServiceRow
+                  key={fields[index].id}
+                  control={control}
+                  index={index}
+                  type={servicesValues[index]?.type || SERVICE_ORDER_TYPE.PRODUCTION}
+                  disabled={isServiceDisabled}
+                  isCreating={creatingServiceIndex === index}
+                  onRemove={() => remove(index)}
+                  onCreateService={handleCreateService}
+                  getOptionLabel={getOptionLabel}
+                  getOptionValue={getOptionValue}
+                  isGrouped={false}
+                  clearCreatingState={() => setCreatingServiceIndex(null)}
+                  userPrivilege={userPrivilege}
+                  currentUserId={currentUserId}
+                />
+              );
+            })}
+          </CardContent>
+        </Card>
       )}
 
       {/* Grouped services by type */}
@@ -264,6 +289,8 @@ interface ServiceRowProps {
   getOptionValue: (service: Service) => string;
   isGrouped: boolean; // Whether this service is in a group card or being edited
   clearCreatingState: () => void;
+  userPrivilege?: string;
+  currentUserId?: string;
 }
 
 function ServiceRow({
@@ -278,12 +305,45 @@ function ServiceRow({
   getOptionValue,
   isGrouped,
   clearCreatingState,
+  userPrivilege,
+  currentUserId,
 }: ServiceRowProps) {
+  // Observation modal state
+  const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
+  const [tempObservation, setTempObservation] = useState("");
+
   // Watch the type field for this service to filter descriptions
   const selectedType = useWatch({
     control,
     name: `serviceOrders.${index}.type`,
     defaultValue: SERVICE_ORDER_TYPE.PRODUCTION,
+  });
+
+  // Watch the current status
+  const currentStatus = useWatch({
+    control,
+    name: `serviceOrders.${index}.status`,
+    defaultValue: SERVICE_ORDER_STATUS.PENDING,
+  });
+
+  // Watch if this is an existing service order (has id)
+  const serviceOrderId = useWatch({
+    control,
+    name: `serviceOrders.${index}.id`,
+  });
+
+  // Watch observation field
+  const currentObservation = useWatch({
+    control,
+    name: `serviceOrders.${index}.observation`,
+    defaultValue: "",
+  });
+
+  // Get observation field controller for updating
+  const { field: observationField } = useController({
+    control,
+    name: `serviceOrders.${index}.observation`,
+    defaultValue: "",
   });
 
   // Extract existing service description for this row
@@ -292,6 +352,75 @@ function ServiceRow({
     name: `serviceOrders.${index}.description`,
     defaultValue: "",
   });
+
+  // Handle opening observation modal
+  const handleOpenObservationModal = () => {
+    setTempObservation(currentObservation || "");
+    setIsObservationModalOpen(true);
+  };
+
+  // Handle saving observation (just updates form field and closes modal)
+  const handleSaveObservation = () => {
+    observationField.onChange(tempObservation || null);
+    setIsObservationModalOpen(false);
+  };
+
+  // Handle canceling observation modal
+  const handleCancelObservation = () => {
+    setTempObservation("");
+    setIsObservationModalOpen(false);
+  };
+
+  // Check if observation has content
+  const hasObservation = Boolean(currentObservation && currentObservation.trim());
+
+  // Determine which status options are available based on type and user privilege
+  const getAvailableStatuses = useMemo(() => {
+    // For new service orders (no id), only PENDING is allowed
+    const isNewServiceOrder = !serviceOrderId || (typeof serviceOrderId === 'string' && serviceOrderId.startsWith('temp-'));
+    if (isNewServiceOrder) {
+      return [SERVICE_ORDER_STATUS.PENDING];
+    }
+
+    // Admin can set any status
+    if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) {
+      return [
+        SERVICE_ORDER_STATUS.PENDING,
+        SERVICE_ORDER_STATUS.IN_PROGRESS,
+        SERVICE_ORDER_STATUS.WAITING_APPROVE,
+        SERVICE_ORDER_STATUS.COMPLETED,
+        SERVICE_ORDER_STATUS.CANCELLED,
+      ];
+    }
+
+    // ARTWORK type has special two-step approval - designer can only go to WAITING_APPROVE
+    if (selectedType === SERVICE_ORDER_TYPE.ARTWORK && userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
+      return [
+        SERVICE_ORDER_STATUS.PENDING,
+        SERVICE_ORDER_STATUS.IN_PROGRESS,
+        SERVICE_ORDER_STATUS.WAITING_APPROVE,
+        SERVICE_ORDER_STATUS.CANCELLED,
+      ];
+    }
+
+    // For other users, return available statuses without WAITING_APPROVE (not needed for non-artwork)
+    return [
+      SERVICE_ORDER_STATUS.PENDING,
+      SERVICE_ORDER_STATUS.IN_PROGRESS,
+      SERVICE_ORDER_STATUS.COMPLETED,
+      SERVICE_ORDER_STATUS.CANCELLED,
+    ];
+  }, [serviceOrderId, userPrivilege, selectedType]);
+
+  // Determine if status field should be shown (for all grouped service orders)
+  const showStatusField = useMemo(() => {
+    return isGrouped; // Show for all grouped service orders (new ones will only have PENDING option)
+  }, [isGrouped]);
+
+  // Determine if this is a new service order (for observation button visibility)
+  const isNewServiceOrder = useMemo(() => {
+    return !serviceOrderId || (typeof serviceOrderId === 'string' && serviceOrderId.startsWith('temp-'));
+  }, [serviceOrderId]);
 
   // Create initial options that include the existing description
   // This ensures the Combobox can display the selected value even after remounting
@@ -361,17 +490,24 @@ function ServiceRow({
     }
   };
 
+  // Grid layout: consistent proportions for both grouped and ungrouped
+  // Using min-w-0 on children to prevent content from affecting column width
+  // Grouped: [Description 2fr] [User 1fr] [Status 1fr] [Buttons 80px]
+  // Ungrouped: [Type 120px] [Description 2fr] [User 1fr] [Buttons 80px]
+  const gridClass = isGrouped
+    ? "grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_80px] gap-3 items-center"
+    : "grid grid-cols-1 md:grid-cols-[120px_2fr_1fr_80px] gap-3 items-center";
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_200px_auto] gap-3 items-end">
-      {/* Type Field - Only show if not grouped */}
-      {!isGrouped && (
-        <FormField
-          control={control}
-          name={`serviceOrders.${index}.type`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tipo</FormLabel>
-              <FormControl>
+    <>
+      <div className={gridClass}>
+        {/* Type Field - Only show if not grouped (no label, inline) */}
+        {!isGrouped && (
+          <div className="min-w-0">
+            <FormField
+              control={control}
+              name={`serviceOrders.${index}.type`}
+              render={({ field }) => (
                 <Combobox
                   value={field.value || SERVICE_ORDER_TYPE.PRODUCTION}
                   onValueChange={field.onChange}
@@ -387,22 +523,19 @@ function ServiceRow({
                   }))}
                   placeholder="Tipo"
                   searchable={false}
+                  className="w-full"
                 />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      )}
+              )}
+            />
+          </div>
+        )}
 
-      {/* Description Field */}
-      <FormField
-        control={control}
-        name={`serviceOrders.${index}.description`}
-        render={({ field }) => (
-          <FormItem className={!isGrouped ? "" : "col-span-2"}>
-            {!isGrouped && <FormLabel>Descrição</FormLabel>}
-            <FormControl>
+        {/* Description Field - largest proportion */}
+        <div className="min-w-0">
+          <FormField
+            control={control}
+            name={`serviceOrders.${index}.description`}
+            render={({ field, fieldState }) => (
               <Combobox<Service>
                 value={field.value}
                 onValueChange={(newValue) => {
@@ -424,15 +557,15 @@ function ServiceRow({
                     }
                   }, 1000); // Wait 1 full second
                 }}
-                placeholder="Selecione ou crie um serviço"
-                emptyText="Digite para criar um novo serviço"
-                searchPlaceholder="Pesquisar serviços..."
+                placeholder="Selecione o serviço..."
+                emptyText="Digite para criar um novo"
+                searchPlaceholder="Buscar serviço..."
                 disabled={disabled || isCreating}
                 async={true}
                 initialOptions={initialOptions}
                 allowCreate={true}
-                createLabel={(value) => `Criar serviço "${value}"`}
-onCreate={async (value) => {
+                createLabel={(value) => `Criar "${value}"`}
+                onCreate={async (value) => {
                   const newService = await onCreateService(value, selectedType, index);
 
                   if (newService) {
@@ -449,59 +582,123 @@ onCreate={async (value) => {
                 getOptionLabel={getOptionLabel}
                 getOptionValue={getOptionValue}
                 renderOption={(service) => <span>{service.description}</span>}
-                loadMoreText="Carregar mais serviços"
+                loadMoreText="Carregar mais"
                 loadingMoreText="Carregando..."
                 minSearchLength={0}
                 pageSize={50}
                 debounceMs={300}
-                className="w-full"
+                className={`w-full ${fieldState.error ? 'border-destructive ring-destructive' : ''}`}
               />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+            )}
+          />
+        </div>
 
-      {/* Assigned User Field */}
-      <FormField
-        control={control}
-        name={`serviceOrders.${index}.assignedToId`}
-        render={({ field }) => (
-          <FormItem>
-            {!isGrouped && <FormLabel>Responsável</FormLabel>}
-            <FormControl>
-              <AdminUserSelector
-                control={control}
-                name={`serviceOrders.${index}.assignedToId`}
-                label=""
-                placeholder="Responsável"
-                disabled={disabled}
-                required={false}
-              />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+        {/* Assigned User Field - No wrapper needed, AdminUserSelector has its own FormField */}
+        <div className="min-w-0">
+          <AdminUserSelector
+            control={control}
+            name={`serviceOrders.${index}.assignedToId`}
+            label=""
+            placeholder="Responsável"
+            disabled={disabled}
+            required={false}
+          />
+        </div>
 
-      {/* Remove Button - Add FormItem wrapper with hidden label for alignment */}
-      <FormItem>
-        {!isGrouped && <FormLabel className="opacity-0 select-none">-</FormLabel>}
-        <FormControl>
+        {/* Status Field - Only show for existing grouped service orders */}
+        {showStatusField ? (
+          <div className="min-w-0">
+            <FormField
+              control={control}
+              name={`serviceOrders.${index}.status`}
+              render={({ field }) => (
+                <Combobox
+                  value={field.value || SERVICE_ORDER_STATUS.PENDING}
+                  onValueChange={field.onChange}
+                  disabled={disabled}
+                  options={getAvailableStatuses.map((status) => ({
+                    value: status,
+                    label: SERVICE_ORDER_STATUS_LABELS[status],
+                  }))}
+                  placeholder="Status"
+                  searchable={false}
+                  className="w-full"
+                />
+              )}
+            />
+          </div>
+        ) : (
+          // Placeholder for grouped items without status to maintain grid structure
+          isGrouped && <div className="min-w-0" />
+        )}
+
+        {/* Action Buttons - fixed width */}
+        <div className="flex items-center justify-end gap-1">
+          {/* Observation Button - Only show for existing grouped service orders */}
+          {showStatusField && !isNewServiceOrder && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleOpenObservationModal}
+              disabled={disabled}
+              className="relative flex-shrink-0 h-9 w-9"
+              title={hasObservation ? "Ver/Editar observação" : "Adicionar observação"}
+            >
+              <IconNote className="h-4 w-4" />
+              {/* Red indicator when observation exists */}
+              {hasObservation && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                  !
+                </span>
+              )}
+            </Button>
+          )}
+
+          {/* Remove Button */}
           <Button
             type="button"
             variant="ghost"
             size="icon"
             onClick={onRemove}
             disabled={disabled}
-            className="text-destructive flex-shrink-0"
+            className="text-destructive flex-shrink-0 h-9 w-9"
             title="Remover serviço"
           >
             <IconTrash className="h-4 w-4" />
           </Button>
-        </FormControl>
-      </FormItem>
-    </div>
+        </div>
+      </div>
+
+      {/* Observation Modal */}
+      <Dialog open={isObservationModalOpen} onOpenChange={setIsObservationModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Observação do Serviço</DialogTitle>
+            <DialogDescription>
+              Adicione notas ou justificativas para este serviço (ex: motivo de reprovação).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={tempObservation}
+              onChange={(e) => setTempObservation(e.target.value)}
+              placeholder="Digite a observação..."
+              rows={4}
+              className="resize-none"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={handleCancelObservation}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={handleSaveObservation}>
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

@@ -470,11 +470,13 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
       receiptId: taskData.receiptId || null,
       serviceOrders:
         taskData.services?.map((so) => ({
+          id: so.id, // Include the ID to identify existing service orders
           description: so.description || "",
           type: so.type,
           status: so.status,
           statusOrder: so.statusOrder,
           assignedToId: so.assignedToId || null,
+          observation: so.observation || null, // Include observation field
           startedAt: so.startedAt ? new Date(so.startedAt) : null,
           finishedAt: so.finishedAt ? new Date(so.finishedAt) : null,
         })) || [],

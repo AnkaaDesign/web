@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { IconFlask, IconChevronDown, IconChevronRight, IconCurrencyReal, IconDroplet, IconFilter } from "@tabler/icons-react";
 
 import { usePaintFormulas } from "../../../hooks";
-import { routes } from "../../../constants";
+import { useCurrentUser } from "../../../hooks/useAuth";
+import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { formatCurrency, formatNumberWithDecimals } from "../../../utils";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +26,8 @@ import { DETAIL_PAGE_SPACING } from "@/lib/layout-constants";
 
 export default function FormulasList() {
   const navigate = useNavigate();
+  const { data: currentUser } = useCurrentUser();
+  const isWarehouseSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
   const [searchTerm, setSearchTerm] = useState("");
   const debouncedSearch = useDebounce(searchTerm, 300);
   const [openFormulas, setOpenFormulas] = useState<Set<string>>(new Set());
@@ -303,7 +306,7 @@ export default function FormulasList() {
 
               return (
                 <Collapsible key={formula.id} open={openFormulas.has(formula.id)} onOpenChange={() => toggleFormula(formula.id)}>
-                  <Card className="shadow-sm border border-border overflow-hidden hover:shadow-sm transition-all duration-200">
+                  <Card className="shadow-sm border border-border overflow-hidden hover:shadow-sm hover:border-red-500 transition-all duration-200">
                     <CollapsibleTrigger asChild>
                       <Button variant="ghost" className="w-full p-0 h-auto justify-start hover:bg-transparent">
                         <div className="w-full p-4 sm:p-4">
@@ -319,10 +322,12 @@ export default function FormulasList() {
                                   {formula.description || "Fórmula sem descrição"}
                                 </h3>
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-1">
-                                  <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
-                                    <IconCurrencyReal className="h-3 w-3 sm:h-4 sm:w-4" />
-                                    <span className="font-mono">{hasValidPrice ? formatCurrency(Number(formula.pricePerLiter)) + "/L" : "-"}</span>
-                                  </div>
+                                  {!isWarehouseSector && (
+                                    <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
+                                      <IconCurrencyReal className="h-3 w-3 sm:h-4 sm:w-4" />
+                                      <span className="font-mono">{hasValidPrice ? formatCurrency(Number(formula.pricePerLiter)) + "/L" : "-"}</span>
+                                    </div>
+                                  )}
                                   <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
                                     <IconDroplet className="h-3 w-3 sm:h-4 sm:w-4" />
                                     <span className="font-mono">{hasValidDensity ? `${formatNumberWithDecimals(Number(formula.density), 2)} g/ml` : "-"}</span>
@@ -361,7 +366,9 @@ export default function FormulasList() {
                                 <TableHeader>
                                   <TableRow className="bg-muted hover:bg-muted">
                                     <TableHead className="font-semibold text-xs uppercase">Componente</TableHead>
-                                    <TableHead className="text-right font-semibold text-xs uppercase w-32">Preço</TableHead>
+                                    {!isWarehouseSector && (
+                                      <TableHead className="text-right font-semibold text-xs uppercase w-32">Preço</TableHead>
+                                    )}
                                     <TableHead className="text-right font-semibold text-xs uppercase w-32">Proporção</TableHead>
                                   </TableRow>
                                 </TableHeader>
@@ -371,7 +378,7 @@ export default function FormulasList() {
                                     .map((component, index) => (
                                       <TableRow
                                         key={component.id}
-                                        className={cn("cursor-pointer transition-colors border-b border-border", index % 2 === 1 && "bg-muted/10", "hover:bg-muted/20")}
+                                        className={cn("cursor-pointer transition-all border-b border-border border-2 border-transparent hover:border-red-500", index % 2 === 1 && "bg-muted/10", "hover:bg-muted/20")}
                                       >
                                         <TableCell className="p-0">
                                           <div className="px-4 py-2">
@@ -384,14 +391,16 @@ export default function FormulasList() {
                                             </div>
                                           </div>
                                         </TableCell>
-                                        <TableCell className="p-0 text-right">
-                                          <div className="px-4 py-2 tabular-nums text-base">
-                                            {(() => {
-                                              const price = calculateComponentPrice(component, formula);
-                                              return price !== null ? formatCurrency(price) : "-";
-                                            })()}
-                                          </div>
-                                        </TableCell>
+                                        {!isWarehouseSector && (
+                                          <TableCell className="p-0 text-right">
+                                            <div className="px-4 py-2 tabular-nums text-base">
+                                              {(() => {
+                                                const price = calculateComponentPrice(component, formula);
+                                                return price !== null ? formatCurrency(price) : "-";
+                                              })()}
+                                            </div>
+                                          </TableCell>
+                                        )}
                                         <TableCell className="p-0 text-right">
                                           <div className="px-4 py-2 tabular-nums text-base">{formatNumberWithDecimals(component.ratio || 0, 2)}%</div>
                                         </TableCell>
@@ -402,9 +411,9 @@ export default function FormulasList() {
                             </div>
 
                             {/* Summary */}
-                            {(hasValidPrice || hasValidDensity) && (
+                            {((!isWarehouseSector && hasValidPrice) || hasValidDensity) && (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {hasValidPrice && (
+                                {!isWarehouseSector && hasValidPrice && (
                                   <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
                                     <IconCurrencyReal className="h-4 w-4 text-primary" />
                                     <span className="text-sm text-muted-foreground">Preço por litro:</span>

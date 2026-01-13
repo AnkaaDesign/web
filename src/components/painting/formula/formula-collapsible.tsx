@@ -21,7 +21,7 @@ export function FormulaCollapsible({ formula, isOpen = false, onOpenChange, clas
   return (
     <Collapsible open={isOpen} onOpenChange={onOpenChange} className={cn("w-full", className)}>
       <CollapsibleTrigger className="w-full">
-        <div className="flex items-center justify-between p-4 hover:bg-muted/50 rounded-lg transition-colors">
+        <div className="flex items-center justify-between p-4 hover:bg-muted/50 rounded-lg transition-all duration-200 border-2 border-transparent hover:border-red-500">
           <div className="flex items-center gap-3">
             <IconFlask className="h-5 w-5 text-primary" />
             <div className="flex flex-col items-start">
@@ -66,7 +66,7 @@ export function FormulaCollapsible({ formula, isOpen = false, onOpenChange, clas
                   {formula.components
                     ?.sort((a, b) => (b.ratio || 0) - (a.ratio || 0))
                     .map((component) => (
-                      <TableRow key={component.id}>
+                      <TableRow key={component.id} className="border-2 border-transparent hover:border-red-500 transition-all duration-200">
                         <TableCell className="font-mono text-sm">{component.item?.uniCode || "-"}</TableCell>
                         <TableCell className="font-medium">{component.item?.name || "Item desconhecido"}</TableCell>
                         <TableCell className="text-right">{formatNumberWithDecimals(component.ratio || 0, 2)}%</TableCell>

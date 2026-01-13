@@ -5,9 +5,10 @@ import { Separator } from "@/components/ui/separator";
 import { IconFlask, IconPackage, IconDroplet } from "@tabler/icons-react";
 import { IconBrush, IconCurrencyReal } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
-import { routes } from "../../../constants";
+import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import type { PaintFormula } from "../../../types";
 import { formatCurrency, formatNumberWithDecimals } from "../../../utils";
+import { useCurrentUser } from "../../../hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 interface PaintFormulaListItemProps {
@@ -17,6 +18,8 @@ interface PaintFormulaListItemProps {
 
 export function PaintFormulaListItem({ formula, className }: PaintFormulaListItemProps) {
   const navigate = useNavigate();
+  const { data: currentUser } = useCurrentUser();
+  const isWarehouseSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
 
   const handleClick = () => {
     // Navigate to paint details page since formulas are now managed there
@@ -30,7 +33,7 @@ export function PaintFormulaListItem({ formula, className }: PaintFormulaListIte
   const hasValidPrice = formula.pricePerLiter && Number(formula.pricePerLiter) > 0;
 
   return (
-    <Card className={cn("hover:shadow-sm transition-all duration-200 cursor-pointer", "border hover:border-primary/50", className)} onClick={handleClick}>
+    <Card className={cn("hover:shadow-sm transition-all duration-200 cursor-pointer", "border-2 border-transparent hover:border-red-500", className)} onClick={handleClick}>
       <CardHeader className="pb-2 sm:pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-1 flex-1 min-w-0">
@@ -60,15 +63,17 @@ export function PaintFormulaListItem({ formula, className }: PaintFormulaListIte
         <Separator />
 
         {/* Metrics */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-          {/* Price per Liter */}
-          <div className="space-y-1">
-            <div className="flex items-center gap-1 sm:gap-1.5">
-              <IconCurrencyReal className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Preço/L</span>
+        <div className={cn("grid gap-3 sm:gap-4", isWarehouseSector ? "grid-cols-1" : "grid-cols-2")}>
+          {/* Price per Liter - Hidden for warehouse users */}
+          {!isWarehouseSector && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-1 sm:gap-1.5">
+                <IconCurrencyReal className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Preço/L</span>
+              </div>
+              <p className="text-xs sm:text-sm font-medium">{hasValidPrice ? formatCurrency(Number(formula.pricePerLiter)) : "-"}</p>
             </div>
-            <p className="text-xs sm:text-sm font-medium">{hasValidPrice ? formatCurrency(Number(formula.pricePerLiter)) : "-"}</p>
-          </div>
+          )}
 
           {/* Density */}
           <div className="space-y-1">

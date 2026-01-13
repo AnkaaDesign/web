@@ -52,7 +52,7 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
       title: "",
       body: "",
       type: NOTIFICATION_TYPE.GENERAL,
-      channel: [NOTIFICATION_CHANNEL.IN_APP],
+      channel: [NOTIFICATION_CHANNEL.MOBILE_PUSH],
       importance: NOTIFICATION_IMPORTANCE.NORMAL,
       actionType: null,
       actionUrl: null,
@@ -174,7 +174,7 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center justify-between">
-                      <span>Título *</span>
+                      <span>Título <span className="text-destructive">*</span></span>
                       <span className={`text-xs ${titleLength > TITLE_MAX_LENGTH ? "text-destructive" : "text-muted-foreground"}`}>
                         {titleLength}/{TITLE_MAX_LENGTH}
                       </span>
@@ -193,7 +193,7 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
                 name="type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tipo *</FormLabel>
+                    <FormLabel>Tipo <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
                       <Combobox
                         value={field.value}
@@ -220,7 +220,7 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center justify-between">
-                    <span>Mensagem *</span>
+                    <span>Mensagem <span className="text-destructive">*</span></span>
                     <span className={`text-xs ${messageLength > MESSAGE_MAX_LENGTH ? "text-destructive" : "text-muted-foreground"}`}>
                       {messageLength}/{MESSAGE_MAX_LENGTH}
                     </span>
@@ -284,7 +284,7 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
                 name="importance"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Importância *</FormLabel>
+                    <FormLabel>Importância <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
                       <Combobox
                         value={field.value}
@@ -312,7 +312,7 @@ export function NotificationForm({ onSubmit, defaultValues, isLoading, isEdit = 
                 <FormItem>
                   <FormLabel className="flex items-center gap-2">
                     <Send className="h-4 w-4" />
-                    Canais de Notificação *
+                    Canais de Notificação <span className="text-destructive">*</span>
                   </FormLabel>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {Object.values(NOTIFICATION_CHANNEL).map((channel) => (

@@ -1086,24 +1086,34 @@ const taskObservationCreateSchema = z.object({
 
 // ServiceOrder schema without taskId (will be auto-linked)
 const taskServiceOrderCreateSchema = z.object({
+  id: z.string().uuid().optional(), // For existing service orders
   status: z
     .enum([
       SERVICE_ORDER_STATUS.PENDING,
       SERVICE_ORDER_STATUS.IN_PROGRESS,
       SERVICE_ORDER_STATUS.COMPLETED,
       SERVICE_ORDER_STATUS.CANCELLED,
+      SERVICE_ORDER_STATUS.WAITING_APPROVE,
     ] as [string, ...string[]], {
-      errorMap: () => ({ message: "status inválido" }),
+      errorMap: () => ({ message: "Selecione um status válido" }),
     })
     .default(SERVICE_ORDER_STATUS.PENDING),
   statusOrder: z.number().int().min(1).max(4).default(1).optional(),
-  description: z.string().min(3, { message: "Mínimo de 3 caracteres" }).max(400, { message: "Máximo de 400 caracteres atingido" }),
+  description: z.string({
+    required_error: "Selecione um serviço",
+    invalid_type_error: "Selecione um serviço",
+  }).min(3, { message: "Selecione um serviço" }).max(400, { message: "Nome do serviço muito longo" }),
   type: z
-    .enum(Object.values(SERVICE_ORDER_TYPE) as [string, ...string[]], {
-      errorMap: () => ({ message: "tipo inválido" }),
+    .string({
+      required_error: "Selecione o tipo",
+      invalid_type_error: "Selecione o tipo",
+    })
+    .refine((val) => Object.values(SERVICE_ORDER_TYPE).includes(val as SERVICE_ORDER_TYPE), {
+      message: "Selecione o tipo",
     })
     .default(SERVICE_ORDER_TYPE.PRODUCTION),
-  assignedToId: z.string().uuid("Usuário inválido").nullable().optional(),
+  assignedToId: z.string().uuid("Selecione um responsável válido").nullable().optional(),
+  observation: z.string().nullable().optional(), // For rejection notes
   startedAt: nullableDate.optional(),
   finishedAt: nullableDate.optional(),
 });

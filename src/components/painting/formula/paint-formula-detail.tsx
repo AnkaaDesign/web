@@ -5,7 +5,8 @@ import { IconAlertTriangle, IconScale, IconFlask, IconCalculator, IconPackage } 
 import type { PaintFormula } from "../../../types";
 import { formatCurrency } from "../../../utils";
 import { measureUtils } from "../../../utils";
-import { MEASURE_UNIT } from "../../../constants";
+import { MEASURE_UNIT, SECTOR_PRIVILEGES } from "../../../constants";
+import { useAuth } from "@/contexts/auth-context";
 import { DensityValidator } from "./density-validator";
 import { FormulaComponentsRatioTable } from "./formula-components-ratio-table";
 import { PaintFormulaChangelogHistoryCard } from "./paint-formula-changelog-history-card";
@@ -15,7 +16,12 @@ interface PaintFormulaDetailProps {
 }
 
 export function PaintFormulaDetail({ formula }: PaintFormulaDetailProps) {
+  const { user } = useAuth();
   const components = formula.components || [];
+
+  // Hide prices for warehouse users
+  const isWarehouseUser = user?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
+  const showPrices = !isWarehouseUser;
 
   // Calculate total ratio (should be 100%)
   const totalRatio = components.reduce((sum, comp) => sum + (comp.ratio || 0), 0);
@@ -35,7 +41,9 @@ export function PaintFormulaDetail({ formula }: PaintFormulaDetailProps) {
               <CardDescription>{formula.description}</CardDescription>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-primary">{formatCurrency(Number(formula.pricePerLiter))}/L</div>
+              {showPrices && (
+                <div className="text-2xl font-bold text-primary">{formatCurrency(Number(formula.pricePerLiter))}/L</div>
+              )}
               <div className="text-sm text-muted-foreground">Densidade: {Number(formula.density).toFixed(3)} g/ml</div>
             </div>
           </div>
@@ -57,7 +65,7 @@ export function PaintFormulaDetail({ formula }: PaintFormulaDetailProps) {
           <div className="space-y-4">
             {components.map((component, index) => (
               <div key={component.id || index}>
-                <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center justify-between p-4 border-2 border-border rounded-lg hover:border-red-500 transition-all duration-200 cursor-pointer">
                   <div className="flex-1">
                     <h4 className="font-medium">{component.item?.name || `Componente ${index + 1}`}</h4>
                     <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
@@ -103,7 +111,7 @@ export function PaintFormulaDetail({ formula }: PaintFormulaDetailProps) {
                     {component.item && (
                       <div className="mt-2 text-xs text-muted-foreground">
                         Estoque: {component.item.quantity} {component.item.measures?.[0]?.unit || "un"}
-                        {component.item.prices?.[0] && (
+                        {showPrices && component.item.prices?.[0] && (
                           <span className="ml-2">
                             <span className="font-enhanced-unicode">•</span> Preço: {formatCurrency(component.item.prices[0].value)}
                           </span>

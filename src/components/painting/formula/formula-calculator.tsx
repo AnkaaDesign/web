@@ -461,10 +461,11 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                   handleResetCorrection();
                 } else {
                   setCorrectionMode(true);
-                  // Find first unchecked component and open error dialog
-                  const firstUnchecked = calculatedComponents.find((c) => !selectedComponents.includes(c.id));
-                  if (firstUnchecked) {
-                    handleComponentError(firstUnchecked.id);
+                  // Find the last checked component (the proper marked item itself is the wrong one)
+                  const checkedComponents = calculatedComponents.filter((c) => selectedComponents.includes(c.id));
+                  const lastChecked = checkedComponents.length > 0 ? checkedComponents[checkedComponents.length - 1] : null;
+                  if (lastChecked) {
+                    handleComponentError(lastChecked.id);
                   }
                 }
               }}
@@ -508,30 +509,21 @@ export function FormulaCalculator({ formula, onStartProduction }: FormulaCalcula
                 <TableRow
                   key={component.id}
                   className={cn(
-                    "cursor-pointer transition-colors border-b border-border",
+                    "cursor-pointer transition-all duration-200 outline outline-2 outline-transparent -outline-offset-2",
                     index % 2 === 1 && "bg-muted/10",
-                    "hover:bg-muted/20",
+                    "hover:bg-muted/20 hover:outline-red-500",
                     selectedComponents.includes(component.id) && "bg-muted/30 hover:bg-muted/40",
                     correctionMode && component.hasError && "bg-red-50 hover:bg-red-100",
                   )}
                   onClick={() => {
-                    // In correction mode: don't toggle checkboxes
-                    // In normal mode: toggle checkboxes
-                    if (!correctionMode) {
-                      handleToggleComponent(component.id);
-                    }
+                    // Allow toggling checkboxes in both normal and correction mode
+                    handleToggleComponent(component.id);
                   }}
                 >
                   <TableCell className="w-12 min-w-12 max-w-12 shrink-0 p-0">
                     <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                      {correctionMode ? (
-                        component.hasError ? (
-                          <IconAlertCircle className="h-4 w-4 text-red-600" />
-                        ) : component.wasAlreadyAdded ? (
-                          <IconCheck className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <IconX className="h-4 w-4 text-muted-foreground" />
-                        )
+                      {correctionMode && component.hasError ? (
+                        <IconAlertCircle className="h-4 w-4 text-red-600" />
                       ) : (
                         <Checkbox checked={selectedComponents.includes(component.id)} onCheckedChange={() => handleToggleComponent(component.id)} />
                       )}

@@ -49,6 +49,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { ChangelogHistory } from "@/components/ui/changelog-history";
 import { TaskWithServiceOrdersChangelog } from "@/components/ui/task-with-service-orders-changelog";
@@ -100,6 +105,7 @@ import {
   IconPhone,
   IconCalendarTime,
   IconBrandWhatsapp,
+  IconNote,
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
@@ -1574,6 +1580,28 @@ export const TaskDetailsPage = () => {
                           <div className="flex-1 space-y-1.5">
                         <div className="flex items-center gap-2">
                           <h4 className="text-sm font-semibold">{serviceOrder.description}</h4>
+                          {/* Observation Indicator with HoverCard */}
+                          {serviceOrder.observation && (
+                            <HoverCard openDelay={100} closeDelay={100}>
+                              <HoverCardTrigger asChild>
+                                <button className="relative flex items-center justify-center h-6 w-6 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+                                  <IconNote className="h-4 w-4" />
+                                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                                    !
+                                  </span>
+                                </button>
+                              </HoverCardTrigger>
+                              <HoverCardContent className="w-72 p-3" side="top">
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <IconNote className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm font-medium">Observação</span>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">{serviceOrder.observation}</p>
+                                </div>
+                              </HoverCardContent>
+                            </HoverCard>
+                          )}
                         </div>
 
                         {serviceOrder.assignedTo && (
@@ -1617,7 +1645,7 @@ export const TaskDetailsPage = () => {
                             return (
                               <Badge
                                 variant={variant}
-                                className="w-40 h-8 flex items-center justify-center text-sm font-medium"
+                                className="w-[200px] h-8 flex items-center justify-center text-sm font-medium"
                               >
                                 {SERVICE_ORDER_STATUS_LABELS[serviceOrder.status as SERVICE_ORDER_STATUS]}
                               </Badge>
@@ -1662,6 +1690,24 @@ export const TaskDetailsPage = () => {
                             });
                           }
 
+                          // Get trigger style based on current status (matching badge colors)
+                          const getStatusTriggerClass = (status: string) => {
+                            switch (status) {
+                              case SERVICE_ORDER_STATUS.PENDING:
+                                return "bg-neutral-500 text-white hover:bg-neutral-600 border-neutral-600";
+                              case SERVICE_ORDER_STATUS.IN_PROGRESS:
+                                return "bg-blue-700 text-white hover:bg-blue-800 border-blue-800";
+                              case SERVICE_ORDER_STATUS.WAITING_APPROVE:
+                                return "bg-purple-600 text-white hover:bg-purple-700 border-purple-700";
+                              case SERVICE_ORDER_STATUS.COMPLETED:
+                                return "bg-green-700 text-white hover:bg-green-800 border-green-800";
+                              case SERVICE_ORDER_STATUS.CANCELLED:
+                                return "bg-red-700 text-white hover:bg-red-800 border-red-800";
+                              default:
+                                return "";
+                            }
+                          };
+
                           return (
                             <Combobox
                               value={serviceOrder.status || undefined}
@@ -1670,7 +1716,11 @@ export const TaskDetailsPage = () => {
                               placeholder="Selecione o status"
                               searchable={false}
                               disabled={false}
-                              className="w-40 h-8 rounded-md"
+                              className="w-[200px] h-8 rounded-md"
+                              triggerClassName={cn(
+                                "font-medium",
+                                getStatusTriggerClass(serviceOrder.status)
+                              )}
                             />
                           );
                         })()}

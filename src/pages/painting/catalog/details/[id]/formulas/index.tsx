@@ -188,7 +188,7 @@ export default function PaintFormulasPage() {
             ) : (
               formulas.map((formula) => (
                 <Collapsible key={formula.id} open={openFormulas.has(formula.id)} onOpenChange={() => toggleFormula(formula.id)}>
-                  <Card className="shadow-sm border border-border overflow-hidden">
+                  <Card className="shadow-sm border border-border overflow-hidden hover:border-red-500 transition-all duration-200">
                     <CollapsibleTrigger asChild>
                       <Button variant="ghost" className="w-full p-0 h-auto justify-start hover:bg-transparent">
                         <div className="w-full p-4 sm:p-4">
@@ -239,7 +239,7 @@ export default function PaintFormulasPage() {
                                     .map((component, index) => (
                                       <TableRow
                                         key={component.id}
-                                        className={cn("cursor-pointer transition-colors border-b border-border", index % 2 === 1 && "bg-muted/10", "hover:bg-muted/20")}
+                                        className={cn("cursor-pointer transition-all border-2 border-transparent hover:border-red-500", index % 2 === 1 && "bg-muted/10", "hover:bg-muted/20")}
                                       >
                                         <TableCell className="p-0">
                                           <div className="px-4 py-2">

@@ -3,8 +3,9 @@ import { IconFlask, IconPlus, IconCurrencyDollar, IconWeight, IconBrush, IconAle
 
 import type { Item } from "../../../../types";
 import { formatCurrency } from "../../../../utils";
-import { routes } from "../../../../constants";
+import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
 import { usePaintFormulas } from "../../../../hooks";
+import { useCurrentUser } from "../../../../hooks/useAuth";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,8 @@ interface PaintFormulasCardProps {
 
 export function PaintFormulasCard({ item, className }: PaintFormulasCardProps) {
   const navigate = useNavigate();
+  const { data: currentUser } = useCurrentUser();
+  const isWarehouseSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
 
   // Fetch all formulas that use this item as a component
   const {
@@ -140,7 +143,7 @@ export function PaintFormulasCard({ item, className }: PaintFormulasCardProps) {
               return (
                 <div key={formula.id}>
                   <div
-                    className="bg-muted/50 rounded-lg p-4 hover:bg-muted/70 transition-all duration-200 cursor-pointer transform hover:scale-[1.02]"
+                    className="bg-muted/50 rounded-lg p-4 hover:bg-muted/70 transition-all duration-200 cursor-pointer transform hover:scale-[1.02] border-2 border-transparent hover:border-red-500"
                     onClick={() => handleFormulaClick(formula)}
                   >
                     <div className="flex items-start justify-between">
@@ -156,10 +159,12 @@ export function PaintFormulasCard({ item, className }: PaintFormulasCardProps) {
                         </div>
                         <p className="text-sm text-muted-foreground">{formula.description}</p>
                         <div className="flex flex-wrap gap-4 text-sm">
-                          <div className="flex items-center gap-1 text-muted-foreground">
-                            <IconCurrencyDollar className="h-4 w-4" />
-                            <span>{formatCurrency(formula.pricePerLiter)}/L</span>
-                          </div>
+                          {!isWarehouseSector && (
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <IconCurrencyDollar className="h-4 w-4" />
+                              <span>{formatCurrency(formula.pricePerLiter)}/L</span>
+                            </div>
+                          )}
                           <div className="flex items-center gap-1 text-muted-foreground">
                             <IconWeight className="h-4 w-4" />
                             <span>{Number(formula.density).toFixed(3)} g/ml</span>

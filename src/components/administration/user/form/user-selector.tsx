@@ -112,10 +112,12 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
       control={control as any}
       name={name}
       render={({ field }) => (
-        <FormItem>
-          <FormLabel>
-            {label} {required && <span className="text-red-500">*</span>}
-          </FormLabel>
+        <FormItem className="space-y-1">
+          {label && (
+            <FormLabel>
+              {label} {required && <span className="text-red-500">*</span>}
+            </FormLabel>
+          )}
           <FormControl>
             <Combobox
               async={true}
@@ -141,6 +143,7 @@ export function AdminUserSelector<T extends FieldValues = FieldValues>({
               minSearchLength={0}
               pageSize={50}
               debounceMs={300}
+              className="w-full"
             />
           </FormControl>
           <FormMessage />

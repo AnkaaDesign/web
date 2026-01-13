@@ -750,7 +750,102 @@ const ChangelogTimelineItem = ({
             <div className="text-sm text-muted-foreground">{formatRelativeTime(firstChange.createdAt)}</div>
           </div>
 
-          {/* Field changes */}
+          {/* SERVICE_ORDER UPDATE - Special handling to group related changes */}
+          {entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER && firstChange.action === CHANGE_LOG_ACTION.UPDATE && (() => {
+            // Group related field changes intelligently for service orders
+            const statusChange = changelogGroup.find(c => c.field === 'status');
+            const timestampChanges = changelogGroup.filter(c =>
+              ['startedAt', 'finishedAt', 'approvedAt', 'completedAt'].includes(c.field || '')
+            );
+            const userChanges = changelogGroup.filter(c =>
+              ['startedById', 'completedById', 'approvedById'].includes(c.field || '')
+            );
+            const otherChanges = changelogGroup.filter(c =>
+              c.field &&
+              !['status', 'statusOrder', 'startedAt', 'finishedAt', 'approvedAt', 'completedAt', 'startedById', 'completedById', 'approvedById'].includes(c.field)
+            );
+
+            // Build a summary of the status change
+            let statusSummary: { title: string; details: string[]; timestamp?: string; user?: string } | null = null;
+
+            if (statusChange) {
+              const newStatus = statusChange.newValue;
+              const oldStatus = statusChange.oldValue;
+              const newStatusLabel = SERVICE_ORDER_STATUS_LABELS[newStatus as keyof typeof SERVICE_ORDER_STATUS_LABELS] || newStatus;
+              const oldStatusLabel = SERVICE_ORDER_STATUS_LABELS[oldStatus as keyof typeof SERVICE_ORDER_STATUS_LABELS] || oldStatus;
+
+              statusSummary = {
+                title: `Status: ${oldStatusLabel} → ${newStatusLabel}`,
+                details: [],
+              };
+
+              // Add timestamp if available
+              const relevantTimestamp = timestampChanges.find(c => {
+                if (newStatus === 'IN_PROGRESS' && c.field === 'startedAt') return true;
+                if (newStatus === 'COMPLETED' && (c.field === 'finishedAt' || c.field === 'completedAt')) return true;
+                if (newStatus === 'WAITING_APPROVE' && c.field === 'approvedAt') return true;
+                return false;
+              });
+              if (relevantTimestamp?.newValue) {
+                const date = new Date(relevantTimestamp.newValue);
+                statusSummary.timestamp = date.toLocaleDateString('pt-BR') + ' - ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+              }
+
+              // Add user info if available
+              const relevantUser = userChanges.find(c => {
+                if (newStatus === 'IN_PROGRESS' && c.field === 'startedById') return true;
+                if (newStatus === 'COMPLETED' && c.field === 'completedById') return true;
+                if (newStatus === 'WAITING_APPROVE' && c.field === 'approvedById') return true;
+                return false;
+              });
+              if (relevantUser?.newValue && entityDetails?.users) {
+                statusSummary.user = entityDetails.users.get(relevantUser.newValue)?.name;
+              }
+            }
+
+            return (
+              <div className="space-y-3">
+                {/* Status change summary */}
+                {statusSummary && (
+                  <div className="mb-3 p-3 bg-muted/50 rounded-lg">
+                    <div className="font-medium text-foreground">{statusSummary.title}</div>
+                    {statusSummary.timestamp && (
+                      <div className="text-sm text-muted-foreground mt-1">
+                        <IconClock className="inline h-3.5 w-3.5 mr-1" />
+                        {statusSummary.timestamp}
+                      </div>
+                    )}
+                    {statusSummary.user && (
+                      <div className="text-sm text-muted-foreground mt-1">
+                        <IconUser className="inline h-3.5 w-3.5 mr-1" />
+                        Por: {statusSummary.user}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Other field changes (observation, description, type, assignedToId) */}
+                {otherChanges.length > 0 && (
+                  <div className="space-y-2">
+                    {otherChanges.map((changelog) => (
+                      <div key={changelog.id} className="text-sm">
+                        <span className="text-muted-foreground">{getFieldLabel(changelog.field, entityType)}: </span>
+                        <span className="text-red-600 dark:text-red-400 line-through mr-2">
+                          {formatFieldValue(changelog.oldValue, changelog.field, entityType) || 'Nenhum'}
+                        </span>
+                        <span className="text-green-600 dark:text-green-400">
+                          {formatFieldValue(changelog.newValue, changelog.field, entityType) || 'Nenhum'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Field changes (generic - not SERVICE_ORDER) */}
+          {entityType !== CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER && (
           <div className="space-y-3">
             {changelogGroup
               .filter((changelog) => {
@@ -1211,6 +1306,7 @@ const ChangelogTimelineItem = ({
               );
             })}
           </div>
+          )}
 
           {/* Footer */}
           <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">

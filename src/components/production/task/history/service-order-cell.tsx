@@ -52,13 +52,13 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
   return (
     <Tooltip delayDuration={0}>
       <TooltipTrigger asChild>
-        <div className="flex items-center gap-1.5 cursor-help w-full">
+        <div className="relative cursor-help w-full">
             {/* Progress bar container */}
-            <div className="relative flex-1 h-5 min-w-[90px] max-w-[140px] bg-gray-100 dark:bg-gray-700 rounded overflow-hidden shadow-sm">
-              {/* Completed segment (green) */}
+            <div className="relative h-5 min-w-[90px] max-w-[140px] bg-gray-200 dark:bg-gray-700 rounded overflow-hidden shadow-sm">
+              {/* Completed segment (green-700 matching badge) */}
               {completedCount > 0 && (
                 <div
-                  className="absolute h-full bg-green-500 transition-all duration-300"
+                  className="absolute h-full bg-green-700 transition-all duration-300"
                   style={{
                     left: '0%',
                     width: `${completedPercent}%`,
@@ -66,10 +66,10 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
                 />
               )}
 
-              {/* Waiting Approve segment (purple) */}
+              {/* Waiting Approve segment (purple-600 matching badge) */}
               {waitingApproveCount > 0 && (
                 <div
-                  className="absolute h-full bg-purple-500 transition-all duration-300"
+                  className="absolute h-full bg-purple-600 transition-all duration-300"
                   style={{
                     left: `${completedPercent}%`,
                     width: `${waitingApprovePercent}%`,
@@ -77,10 +77,10 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
                 />
               )}
 
-              {/* In Progress segment (blue) */}
+              {/* In Progress segment (blue-700 matching badge) */}
               {inProgressCount > 0 && (
                 <div
-                  className="absolute h-full bg-blue-500 transition-all duration-300"
+                  className="absolute h-full bg-blue-700 transition-all duration-300"
                   style={{
                     left: `${completedPercent + waitingApprovePercent}%`,
                     width: `${inProgressPercent}%`,
@@ -88,10 +88,10 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
                 />
               )}
 
-              {/* Pending segment (amber) */}
+              {/* Pending segment (neutral-500 matching badge) */}
               {pendingCount > 0 && (
                 <div
-                  className="absolute h-full bg-amber-500 transition-all duration-300"
+                  className="absolute h-full bg-neutral-500 transition-all duration-300"
                   style={{
                     left: `${completedPercent + waitingApprovePercent + inProgressPercent}%`,
                     width: `${pendingPercent}%`,
@@ -99,10 +99,10 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
                 />
               )}
 
-              {/* Cancelled segment (gray) */}
+              {/* Cancelled segment (red-700 matching badge) */}
               {cancelledCount > 0 && (
                 <div
-                  className="absolute h-full bg-gray-400 transition-all duration-300"
+                  className="absolute h-full bg-red-700 transition-all duration-300"
                   style={{
                     left: `${completedPercent + waitingApprovePercent + inProgressPercent + pendingPercent}%`,
                     width: `${cancelledPercent}%`,
@@ -118,13 +118,11 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
               </div>
             </div>
 
-            {/* Red circle indicator for incomplete user-assigned orders */}
+            {/* Red circle indicator for incomplete user-assigned orders - positioned like observation indicator */}
             {incompleteAssignedCount > 0 && (
-              <div className="w-[18px] h-[18px] rounded-full bg-red-500 flex items-center justify-center shadow-sm">
-                <span className="text-[9px] font-bold text-white">
-                  {incompleteAssignedCount}
-                </span>
-              </div>
+              <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground shadow-sm">
+                {incompleteAssignedCount}
+              </span>
             )}
           </div>
         </TooltipTrigger>
@@ -135,7 +133,7 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-green-500 ring-1 ring-green-600" />
+                <div className="w-2.5 h-2.5 rounded-full bg-green-700 ring-1 ring-green-800" />
                 <span>Concluído:</span>
               </div>
               <span className="text-right font-medium">{completedCount}</span>
@@ -143,7 +141,7 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
               {waitingApproveCount > 0 && (
                 <>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-purple-500 ring-1 ring-purple-600" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-purple-600 ring-1 ring-purple-700" />
                     <span>Aguardando aprovação:</span>
                   </div>
                   <span className="text-right font-medium">{waitingApproveCount}</span>
@@ -151,13 +149,13 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
               )}
 
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-blue-500 ring-1 ring-blue-600" />
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-700 ring-1 ring-blue-800" />
                 <span>Em andamento:</span>
               </div>
               <span className="text-right font-medium">{inProgressCount}</span>
 
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-1 ring-amber-600" />
+                <div className="w-2.5 h-2.5 rounded-full bg-neutral-500 ring-1 ring-neutral-600" />
                 <span>Pendente:</span>
               </div>
               <span className="text-right font-medium">{pendingCount}</span>
@@ -165,7 +163,7 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
               {cancelledCount > 0 && (
                 <>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-gray-400 ring-1 ring-gray-600" />
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-700 ring-1 ring-red-800" />
                     <span>Cancelado:</span>
                   </div>
                   <span className="text-right font-medium">{cancelledCount}</span>
