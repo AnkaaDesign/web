@@ -334,19 +334,18 @@ export function TaskHistoryList({
       status: filterWithoutOrderBy.status || statusFilter,
     };
 
-    // Add service order filtering for agenda (preparation) view
-    if (statusFilter?.includes("PREPARATION") && navigationRoute === "preparation") {
-      if (isAdmin) {
-        // Admin: show tasks with no service orders OR incomplete NEGOTIATION/PRODUCTION/ARTWORK service orders
-        result.hasIncompleteNonFinancialServiceOrders = true;
-      } else if (currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL)) {
-        // Financial: show tasks with ANY incomplete service orders (including FINANCIAL type)
-        result.hasIncompleteServiceOrders = true;
-      }
+    // Add agenda display filtering for preparation view
+    // This applies the universal agenda logic (not role-based):
+    // - Excludes CANCELLED tasks
+    // - Excludes COMPLETED tasks only if they have all 4 SO types AND all SOs are completed
+    if (navigationRoute === "preparation") {
+      result.shouldDisplayInAgenda = true;
+      // Remove status filter to allow any status (except CANCELLED and fully completed)
+      delete result.status;
     }
 
     return result;
-  }, [baseQueryFilters, statusFilter, isAdmin, currentUser, navigationRoute]);
+  }, [baseQueryFilters, statusFilter, navigationRoute]);
 
   // Handle filter changes
   const handleFilterChange = React.useCallback(
