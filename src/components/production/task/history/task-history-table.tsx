@@ -170,13 +170,17 @@ export function TaskHistoryTable({
   // Build query parameters
   const queryParams = React.useMemo(() => {
     // Determine status to use
-    const statusToUse = (!filters.status || (Array.isArray(filters.status) && filters.status.length === 0))
-      ? [TASK_STATUS.COMPLETED]
-      : filters.status;
+    // Don't default to COMPLETED if shouldDisplayInAgenda is set (agenda has its own filtering logic)
+    const hasAgendaFilter = filters.shouldDisplayInAgenda === true;
+    const statusToUse = hasAgendaFilter
+      ? undefined // Let shouldDisplayInAgenda handle the filtering
+      : (!filters.status || (Array.isArray(filters.status) && filters.status.length === 0))
+        ? [TASK_STATUS.COMPLETED]
+        : filters.status;
 
     const params = {
       // When showSelectedOnly is true, don't apply filters
-      ...(showSelectedOnly ? {} : { ...filters, status: statusToUse }),
+      ...(showSelectedOnly ? {} : { ...filters, ...(statusToUse && { status: statusToUse }) }),
       page: page + 1, // Convert 0-based to 1-based for API
       limit: pageSize,
       include: includeConfig,

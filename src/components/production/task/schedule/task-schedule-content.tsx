@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { useSectors, useTasks, useCurrentUser, useTaskBatchMutations } from "../../../../hooks";
-import { SECTOR_PRIVILEGES } from "../../../../constants";
+import { SECTOR_PRIVILEGES, TASK_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { Card, CardContent } from "@/components/ui/card";
@@ -72,10 +72,8 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   // Filters state
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState<Partial<TaskGetManyFormData>>({
-    // Use backend agenda display logic (same as mobile):
-    // - Excludes CANCELLED tasks
-    // - Excludes COMPLETED tasks only if they have all 4 SO types AND all SOs are completed
-    shouldDisplayInAgenda: true,
+    // Cronograma shows only tasks waiting for or in production
+    status: [TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION],
     limit: 1000,
   });
 
