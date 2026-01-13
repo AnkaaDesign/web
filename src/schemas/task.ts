@@ -6,7 +6,7 @@ import type { Task } from "../types";
 import { TASK_STATUS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../constants";
 import { cutCreateNestedSchema } from "./cut";
 import { airbrushingCreateNestedSchema } from "./airbrushing";
-import { pricingCreateNestedSchema } from "./task-pricing";
+import { taskPricingCreateNestedSchema } from "./task-pricing";
 
 // =====================
 // Include Schema Based on Prisma Schema (Second Level Only)
@@ -1212,7 +1212,7 @@ export const taskCreateSchema = z
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings
-    pricing: pricingCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
+    pricing: taskPricingCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
   })
   .superRefine((data, ctx) => {
     // Require at least one of: customer, serialNumber, plate, or name
@@ -1349,7 +1349,7 @@ export const taskUpdateSchema = z
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
     airbrushings: z.array(airbrushingCreateNestedSchema).optional(), // Support for multiple airbrushings
-    pricing: pricingCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
+    pricing: taskPricingCreateNestedSchema.optional(), // ONE-TO-ONE relation with Budget entity
   })
   .superRefine((data, ctx) => {
     if (data.entryDate && data.term && data.term <= data.entryDate) {

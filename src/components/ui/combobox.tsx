@@ -127,8 +127,6 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   showCount = true,
   hideDefaultBadges = false,
 }: ComboboxProps<TData>) {
-  console.log('[Combobox] 🔄 Render - Current value prop:', value);
-
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -412,17 +410,11 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
 
   // Get selected option(s)
   const selectedOptions = useMemo(() => {
-    console.log('[Combobox] 🔍 selectedOptions useMemo - Looking for values:', selectedValues);
-    console.log('[Combobox] 🔍 Current options count:', options.length);
-    console.log('[Combobox] 🔍 Cache size:', allItemsCacheRef.current.size);
-
     // First, try to find in current options
     const foundInOptions = options.filter((option) => selectedValues.includes(getOptionValue(option)));
-    console.log('[Combobox] 🔍 Found in options:', foundInOptions.length);
 
     // If we found all selected values, return them
     if (foundInOptions.length === selectedValues.length) {
-      console.log('[Combobox] ✅ All values found in options');
       return foundInOptions;
     }
 
@@ -432,11 +424,8 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
     const foundValues = new Set(foundInOptions.map(opt => getOptionValue(opt)));
 
     selectedValues.forEach(selectedValue => {
-      console.log('[Combobox] 🔍 Checking cache for:', selectedValue);
-      console.log('[Combobox] 🔍 In cache?', allItemsCacheRef.current.has(selectedValue));
       if (!foundValues.has(selectedValue) && allItemsCacheRef.current.has(selectedValue)) {
         const cachedItem = allItemsCacheRef.current.get(selectedValue);
-        console.log('[Combobox] ✅ Found in cache:', cachedItem);
         if (cachedItem) {
           result.push(cachedItem);
           foundValues.add(selectedValue);
@@ -444,7 +433,6 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
       }
     });
 
-    console.log('[Combobox] 🔍 Final selectedOptions count:', result.length);
     return result;
   }, [options, selectedValues, getOptionValue]);
 
@@ -513,18 +501,15 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
       // If onCreate returned the created item, process it
       if (createdItem) {
         const itemValue = getOptionValueRef.current(createdItem as TData);
-        console.log('[Combobox] ✅ Service created, extracted value:', itemValue, 'Type:', typeof itemValue);
 
         // Validate the extracted value
         if (!itemValue || (typeof itemValue === 'string' && itemValue.trim() === '')) {
-          console.error('[Combobox] ❌ Invalid itemValue extracted:', itemValue);
           setIsClosing(false);
           return;
         }
 
         // Add to cache immediately (synchronous)
         allItemsCacheRef.current.set(itemValue, createdItem as TData);
-        console.log('[Combobox] ✅ Added to cache. Cache size:', allItemsCacheRef.current.size);
 
         // Add to allAsyncOptions state FIRST so it's in the options when we select
         if (async) {
@@ -532,10 +517,8 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
             // Check if it already exists to avoid duplicates
             const exists = prev.some(item => getOptionValueRef.current(item) === itemValue);
             if (exists) {
-              console.log('[Combobox] ℹ️ Item already exists in options');
               return prev;
             }
-            console.log('[Combobox] ✅ Adding item to options');
             return [createdItem as TData, ...prev];
           });
         }
@@ -545,7 +528,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
           try {
             await Promise.all(queryKeysToInvalidate.map((key) => queryClient.invalidateQueries({ queryKey: key })));
           } catch (error) {
-            console.error('[Combobox] Error invalidating queries:', error);
+            // Query invalidation failed
           }
         }
 
@@ -554,15 +537,12 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Call onValueChange to update the form field
-        console.log('[Combobox] ✅ Calling onValueChange with value:', itemValue);
         onValueChange?.(itemValue);
-        console.log('[Combobox] ✅ onValueChange called');
 
         // Wait longer for React Hook Form to process the update and trigger re-renders
         await new Promise(resolve => setTimeout(resolve, 300));
 
         // Close the popover
-        console.log('[Combobox] ✅ Closing popover');
         setIsClosing(true);
 
         requestAnimationFrame(() => {
@@ -575,7 +555,6 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
         });
       }
     } catch (error) {
-      console.error('[Combobox] Error creating item:', error);
       setIsClosing(false);
     }
   }, [isClosing, onCreate, search, queryKeysToInvalidate, queryClient, async, onValueChange]);

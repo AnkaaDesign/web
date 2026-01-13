@@ -34,6 +34,21 @@ export interface Notification extends BaseEntity {
   scheduledAt: Date | null;
   sentAt: Date | null;
 
+  // Entity-based navigation fields
+  relatedEntityType?: string | null;
+  relatedEntityId?: string | null;
+
+  // Metadata for deep linking (contains webUrl, mobileUrl, universalLink, etc.)
+  metadata?: {
+    webUrl?: string;
+    mobileUrl?: string;
+    universalLink?: string;
+    taskId?: string;
+    taskStatus?: string;
+    orderId?: string;
+    [key: string]: unknown;
+  } | null;
+
   // Relations
   user?: User;
   seenBy?: SeenNotification[];
@@ -145,6 +160,7 @@ export interface UserNotificationPreference extends BaseEntity {
   eventType: string | null;
   enabled: boolean;
   channels: NOTIFICATION_CHANNEL[];
+  isMandatory: boolean;
   mandatoryChannels: NOTIFICATION_CHANNEL[];
 
   // Relations

@@ -1,7 +1,7 @@
 import { TaskHistoryList } from "@/components/production/task/history/task-history-list";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { PageHeader } from "@/components/ui/page-header";
-import { SECTOR_PRIVILEGES, routes } from "../../constants";
+import { SECTOR_PRIVILEGES, routes, FAVORITE_PAGES } from "../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { IconHistory } from "@tabler/icons-react";
 
@@ -20,6 +20,7 @@ export const TaskHistoryPage = () => {
           variant="default"
           title="Histórico de Tarefas"
           icon={IconHistory}
+          favoritePage={FAVORITE_PAGES.PRODUCAO_HISTORICO_LISTAR}
           breadcrumbs={[
             { label: "Início", href: routes.home },
             { label: "Produção", href: routes.production.root },

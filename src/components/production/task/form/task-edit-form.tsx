@@ -240,9 +240,6 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   // This shouldn't happen because backend auto-creates it, but it's a safety net
   useEffect(() => {
     if (!truckId && task.id) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn('[TaskEditForm] Task loaded without truck - backend should have created it. Task ID:', task.id);
-      }
       // The useTaskDetail query will handle refetching automatically
       // since the backend ensures truck exists in findById
     }
@@ -520,13 +517,6 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
       try {
         setIsSubmitting(true);
 
-        console.log('[TaskEditForm SUBMIT] ========================================');
-        console.log('[TaskEditForm SUBMIT] changedData keys:', Object.keys(changedData));
-        console.log('[TaskEditForm SUBMIT] pricing in changedData:', 'pricing' in changedData);
-        console.log('[TaskEditForm SUBMIT] pricing value:', changedData.pricing);
-        console.log('[TaskEditForm SUBMIT] ========================================');
-
-
         // Set entry date to 7:30 if provided (since the date picker only allows date selection)
         if (changedData.entryDate) {
           const entryDate = new Date(changedData.entryDate);
@@ -576,9 +566,6 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
         // Validate that all cuts have files attached
 
         if (cuts.length > 0 && cuts.some((cut) => !cut.file && !cut.fileId)) {
-          if (process.env.NODE_ENV !== 'production') {
-            console.error('[TaskEditForm] ❌ VALIDATION FAILED: Some cuts missing files');
-          }
           toast.error("Alguns cortes não possuem arquivos anexados. Adicione os arquivos antes de enviar o formulário.");
           return;
         }
@@ -664,11 +651,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           if (deletePromises.length > 0) {
             try {
               await Promise.all(deletePromises);
-              
             } catch (error) {
-              if (process.env.NODE_ENV !== 'production') {
-                console.error('[TaskEditForm SUBMIT] ❌ Error deleting layouts:', error);
-              }
+              // Layout deletion failed silently
             }
           }
 
@@ -846,15 +830,35 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           const dataForFormData: Record<string, any> = {};
           let fieldCount = 0;
           let excludedCount = 0;
+
+          // Fields that can be explicitly set to null (to clear their value)
+          const nullableFields = new Set([
+            'forecastDate',
+            'entryDate',
+            'term',
+            'startedAt',
+            'finishedAt',
+            'customerId',
+            'invoiceToId',
+            'sectorId',
+            'paintId',
+            'serialNumber',
+            'details',
+            'commission',
+            'negotiatingWith',
+            'observation',
+          ]);
+
           Object.entries(changedData).forEach(([key, value]) => {
             // Skip excluded fields (large arrays) - they should only be sent if explicitly updated
             if (excludedFields.has(key)) {
-              
+
               excludedCount++;
               return;
             }
 
-            if (value !== null && value !== undefined) {
+            // Include field if it has a value, OR if it's a nullable field being set to null
+            if (value !== undefined && (value !== null || nullableFields.has(key))) {
               dataForFormData[key] = value;
               fieldCount++;
             }
@@ -964,14 +968,6 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
             }
           );
 
-          for (const [key, value] of (formData as any).entries()) {
-            if (value instanceof File) {
-              
-            } else {
-              
-            }
-          }
-
           result = await updateAsync({
             id: task.id,
             data: formData as any,
@@ -1065,10 +1061,6 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           // CRITICAL: paintIds is already in changedData (not excluded in JSON path)
           // No need to add it separately like in FormData path
 
-          console.log('[TaskEditForm] 🚀 ABOUT TO SEND API REQUEST');
-          console.log('[TaskEditForm] submitData.pricing:', submitData.pricing);
-          console.log('[TaskEditForm] submitData keys:', Object.keys(submitData));
-
           result = await updateAsync({
             id: task.id,
             data: submitData,
@@ -1142,9 +1134,6 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                 
                 return { success: true, index, result, createdCount };
               } catch (error: any) {
-                if (process.env.NODE_ENV !== 'production') {
-                  console.error(`[TaskEditForm] Cut ${index}: ❌ creation failed:`, error);
-                }
                 const failedCount = cut.quantity || 1;
                 return { success: false, index, error: error?.message, failedCount };
               }
@@ -1164,15 +1153,12 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           // The backend handles them in the transaction at lines 683-728 of task.service.ts
 
           // Navigate to the task detail page
-
-          // Small delay to ensure state updates, then redirect
+          toast.success("Alterações salvas com sucesso!");
           await new Promise(resolve => setTimeout(resolve, 100));
           window.location.href = `/producao/cronograma/detalhes/${task.id}`;
         }
       } catch (error) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.error("🔴 Error updating task:", error);
-        }
+        // Error handled by form state
       } finally {
         setIsSubmitting(false);
       }
@@ -1340,20 +1326,6 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   const formFieldChanges = getChangedFields();
 
   // Debug: Log when formFieldChanges updates
-  useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[TaskEditForm] formFieldChanges updated:', Object.keys(formFieldChanges));
-      if ('serviceOrders' in formFieldChanges) {
-        console.log('[TaskEditForm] Service Orders changed:', formFieldChanges.serviceOrders);
-      }
-      if ('pricing' in formFieldChanges) {
-        console.log('[TaskEditForm] ✅ PRICING CHANGED:', formFieldChanges.pricing);
-      } else {
-        console.log('[TaskEditForm] ❌ PRICING NOT in formFieldChanges');
-      }
-    }
-  }, [formFieldChanges]);
-
   // Check if there are new cuts with files to create
   // Only count cuts with NEW files (not already uploaded)
   const hasCutsToCreate = useMemo(() => {
@@ -1368,18 +1340,6 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
 
   // Compute hasChanges including cuts to create
   const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasCutsToCreate;
-
-  // Debug: Log hasChanges calculation
-  useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[TaskEditForm] hasChanges calculation:');
-      console.log('  formFieldChanges keys:', Object.keys(formFieldChanges).length);
-      console.log('  hasLayoutChanges:', hasLayoutChanges);
-      console.log('  hasFileChanges:', hasFileChanges);
-      console.log('  hasCutsToCreate:', hasCutsToCreate);
-      console.log('  => hasChanges:', hasChanges);
-    }
-  }, [hasChanges, formFieldChanges, hasLayoutChanges, hasFileChanges, hasCutsToCreate]);
 
   // Check for validation errors that should prevent submission
   const hasCutsWithoutFiles = useMemo(() => {
@@ -1412,12 +1372,6 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   const hasIncompleteServices = useMemo(() => {
     const services = servicesValues as any[] || [];
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[TaskEditForm] hasIncompleteServices useMemo running');
-      console.log('  services count:', services.length);
-      console.log('  formFieldChanges has serviceOrders:', 'serviceOrders' in formFieldChanges);
-    }
-
     if (services.length === 0) return false;
 
     // Only validate services if they're being changed (in formFieldChanges)
@@ -1435,16 +1389,6 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
       const hasValidDescription = service.description.trim().length >= 3;
       return !hasValidDescription;
     });
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[TaskEditForm] hasIncompleteServices check:');
-      console.log('  areServicesBeingChanged:', areServicesBeingChanged);
-      console.log('  hasIncompleteItems:', hasIncompleteItems);
-      services.forEach((s: any, i: number) => {
-        console.log(`  service[${i}]:`, s.description, '(length:', s.description?.length || 0, ')');
-      });
-      console.log('  => returning:', hasIncompleteItems);
-    }
 
     return hasIncompleteItems;
   }, [servicesValues, formFieldChanges]);
@@ -1464,11 +1408,6 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   // Notify parent of form state changes
   // MUST come AFTER all validation variables are defined to avoid reference errors
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[TaskEditForm] onFormStateChange useEffect running');
-      console.log('  onFormStateChange exists?', !!onFormStateChange);
-    }
-
     if (onFormStateChange) {
       const changedFields = getChangedFields();
       const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges;
@@ -1478,30 +1417,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
       // (isDirty will handle whether there are changes)
       const isValid = !isSubmitting && !hasCutsWithoutFiles && !hasIncompletePricing && !hasIncompleteServices && !hasIncompleteObservation && !layoutWidthError;
 
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('[TaskEditForm] State check:', {
-          isDirty,
-          isValid,
-          'form.formState.isValid': form.formState.isValid,
-          prevIsDirty: prevIsDirtyRef.current,
-          prevIsValid: prevIsValidRef.current,
-          willNotify: prevIsDirtyRef.current !== isDirty || prevIsValidRef.current !== isValid,
-          validationErrors: form.formState.errors,
-        });
-      }
-
       // Only notify parent if isDirty OR isValid changed to avoid infinite loops
       if (prevIsDirtyRef.current !== isDirty || prevIsValidRef.current !== isValid) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('[TaskEditForm] ✅ Calling onFormStateChange:', {
-            isValid,
-            isDirty,
-            changedFieldsCount: Object.keys(changedFields).length,
-            isValidChanged: prevIsValidRef.current !== isValid,
-            isDirtyChanged: prevIsDirtyRef.current !== isDirty,
-          });
-        }
-
         prevIsDirtyRef.current = isDirty;
         prevIsValidRef.current = isValid;
 
@@ -1532,32 +1449,9 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
     // DO NOT add getChangedFields to dependencies - it would cause infinite loop
   ]);
 
-  // Log whenever hasChanges evaluation happens
-  useEffect(() => {
-
-    const isDisabled = isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompletePricing || hasIncompleteServices || hasIncompleteObservation || !!layoutWidthError;
-
-  }, [hasChanges, hasLayoutChanges, hasFileChanges, hasCutsToCreate, formFieldChanges, isSubmitting, hasCutsWithoutFiles, hasIncompletePricing, hasIncompleteServices, hasIncompleteObservation, layoutWidthError]);
-
   // Navigation actions - wrapped in useMemo to ensure re-renders when dependencies change
   const navigationActions = useMemo(() => {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[TaskEditForm] 🔄 navigationActions useMemo recalculating...');
-    }
-
     const isSubmitDisabled = isSubmitting || !hasChanges || hasCutsWithoutFiles || hasIncompletePricing || hasIncompleteServices || hasIncompleteObservation || !!layoutWidthError;
-
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[TaskEditForm] Submit button disabled calculation:');
-      console.log('  isSubmitting:', isSubmitting);
-      console.log('  hasChanges:', hasChanges);
-      console.log('  hasCutsWithoutFiles:', hasCutsWithoutFiles);
-      console.log('  hasIncompletePricing:', hasIncompletePricing);
-      console.log('  hasIncompleteServices:', hasIncompleteServices);
-      console.log('  hasIncompleteObservation:', hasIncompleteObservation);
-      console.log('  layoutWidthError:', layoutWidthError);
-      console.log('  => isSubmitDisabled:', isSubmitDisabled);
-    }
 
     return [
       {
@@ -1572,20 +1466,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
         key: "submit",
         label: "Salvar Alterações",
         icon: isSubmitting ? IconLoader2 : IconCheck,
-        onClick: handleSubmitChanges(
-          undefined,
-          (errors) => {
-            if (process.env.NODE_ENV !== 'production') {
-              console.error('[TaskEditForm] ❌ FORM VALIDATION FAILED');
-            }
-            if (process.env.NODE_ENV !== 'production') {
-              console.error('[TaskEditForm] Validation errors:', errors);
-            }
-            if (process.env.NODE_ENV !== 'production') {
-              console.error('[TaskEditForm] Detailed errors:', JSON.stringify(errors, null, 2));
-            }
-          }
-        ),
+        onClick: handleSubmitChanges(),
         variant: "default" as const,
         disabled: isSubmitDisabled,
         loading: isSubmitting,

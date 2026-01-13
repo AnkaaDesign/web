@@ -524,7 +524,7 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
         // Skip object transformation if data is FormData
         if (config.data && typeof config.data === "object" && !Array.isArray(config.data) && !(config.data instanceof FormData)) {
           // Known date fields that should never be empty objects
-          const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate', 'createdAt', 'updatedAt'];
+          const dateFields = ['startedAt', 'completedAt', 'entryDate', 'forecastDate', 'deliveryDate', 'createdAt', 'updatedAt', 'term', 'finishedAt'];
 
           // Recursively fix any array field that was serialized as an object with numeric keys
           // Also remove empty objects that should be dates
@@ -533,12 +533,20 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
             if (Array.isArray(obj)) {
               return obj.map(item => fixArrays(item));
             }
+            // CRITICAL: Check for Date BEFORE generic object handling
+            // Date objects have typeof === "object" but Object.keys() returns []
+            // We must preserve Date objects, not treat them as empty objects
+            if (obj instanceof Date) {
+              return obj; // Return Date as-is, let JSON.stringify handle it
+            }
             if (typeof obj === "object") {
               const keys = Object.keys(obj);
               const isNumericKeys = keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
               const isEmptyObject = keys.length === 0;
 
               // If this is an empty object and the parent key is a date field, return null
+              // Note: Actual Date objects are already handled above, so this only catches
+              // malformed empty objects like {} that were meant to be dates
               if (isEmptyObject && parentKey && dateFields.includes(parentKey)) {
                 return null;
               }

@@ -79,18 +79,15 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
 
     // Track connection status
     const handleConnect = () => {
-      console.log("[NotificationCenter] Socket connected");
       setIsConnected(true);
     };
 
     const handleDisconnect = () => {
-      console.log("[NotificationCenter] Socket disconnected");
       setIsConnected(false);
     };
 
     // Listen for new notifications
     const handleNewNotification = (notification: Notification) => {
-      console.log("[NotificationCenter] New notification received:", notification);
 
       // Invalidate ALL notification queries using partial key match
       // This ensures we catch the query regardless of the exact key structure
@@ -108,14 +105,11 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
 
     // Listen for notification count updates
     const handleNotificationCount = (data: { count: number }) => {
-      console.log("[NotificationCenter] Unread count update:", data.count);
       setUnreadCount(data.count);
     };
 
     // Listen for notification updates (e.g., marked as read)
     const handleNotificationUpdate = (updatedNotification: Notification) => {
-      console.log("[NotificationCenter] Notification updated:", updatedNotification);
-
       // Invalidate ALL notification queries
       queryClient.invalidateQueries({
         queryKey: ["notifications"],
@@ -125,8 +119,6 @@ export function useNotificationCenter(): UseNotificationCenterReturn {
 
     // Listen for notification deletions
     const handleNotificationDelete = (notificationId: string) => {
-      console.log("[NotificationCenter] Notification deleted:", notificationId);
-
       // Invalidate ALL notification queries
       queryClient.invalidateQueries({
         queryKey: ["notifications"],

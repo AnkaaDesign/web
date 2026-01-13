@@ -710,7 +710,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       const data = {
         description: description!.trim(),
         supplierId: supplierId || undefined,
-        forecast: forecast || undefined,
+        forecast: forecast, // Keep null to allow clearing the forecast date
         notes: notes?.trim() || undefined,
         items,
         paymentMethod: currentPaymentMethod || undefined,

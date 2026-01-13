@@ -67,9 +67,6 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
         hasMore: hasMore,
       };
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[CustomerSelector] Error fetching customers:', error);
-      }
       return { data: [], hasMore: false };
     }
   }, [processInput]);
@@ -81,9 +78,6 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
     try {
       // Build customer data based on CNPJ lookup result
       const customerData = buildCustomerData(searchText);
-
-      // Debug: Log the data being sent to the API
-      console.log('[CustomerSelector] Quick create with data:', JSON.stringify(customerData, null, 2));
 
       const result = await quickCreateCustomer(customerData);
 

@@ -84,9 +84,6 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
         hasMore: hasMore,
       };
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[LogoPaintsSelector] Error fetching paints:', error);
-      }
       return { data: [], hasMore: false };
     }
   };

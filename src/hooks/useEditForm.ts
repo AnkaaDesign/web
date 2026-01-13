@@ -167,7 +167,6 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
     const formData = form.getValues();
     const original = originalRef.current;
 
-
     if (!original) return {} as Partial<TFieldValues>;
 
     const changedFields: Partial<TFieldValues> = {} as Partial<TFieldValues>;
@@ -178,47 +177,15 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
       const currentValue = formData[typedKey];
       const originalValue = original[typedKey];
 
-      // Special debugging for services, paintIds and date fields
-      if (process.env.NODE_ENV !== 'production' && key === "services") {
-        console.log('[useEditForm] 🔧 Checking services:');
-        console.log('  Current:', currentValue);
-        console.log('  Original:', originalValue);
-        console.log('  deepCompare result:', deepCompare(currentValue, originalValue));
-        console.log('  In omit list?', fieldsToOmitIfUnchanged.includes(typedKey));
-      }
-
-      if (process.env.NODE_ENV !== 'production' && key === "paintIds") {
-        console.error('[useEditForm] 🎨 Checking paintIds:');
-        console.error('  Current:', currentValue);
-        console.error('  Original:', originalValue);
-        console.error('  deepCompare result:', deepCompare(currentValue, originalValue));
-        console.error('  In omit list?', fieldsToOmitIfUnchanged.includes(typedKey));
-      }
-
-      // Debug date fields
-      if (process.env.NODE_ENV !== 'production' && (key === "entryDate" || key === "term" || key === "startedAt" || key === "finishedAt")) {
-        console.error(`[useEditForm] 📅 Checking date field "${key}":`);
-        console.error('  Current:', currentValue, typeof currentValue, currentValue instanceof Date);
-        console.error('  Original:', originalValue, typeof originalValue, originalValue instanceof Date);
-        console.error('  deepCompare result:', deepCompare(currentValue, originalValue));
-      }
-
       // Skip if field is in omit list and hasn't changed
       if (fieldsToOmitIfUnchanged.includes(typedKey) && deepCompare(currentValue, originalValue)) {
-        if (process.env.NODE_ENV !== 'production' && key === "services") {
-          console.log('[useEditForm] 🔧 Skipping services - deepCompare says no change');
-        }
-        if (process.env.NODE_ENV !== 'production' && key === "paintIds") {
-          console.error('[useEditForm] 🎨 Skipping paintIds - no change detected');
-        }
         return;
       }
 
       // Check if value has changed
-      if (!deepCompare(currentValue, originalValue)) {
-        if (process.env.NODE_ENV !== 'production' && key === "paintIds") {
-          console.error('[useEditForm] 🎨 paintIds CHANGED - including in changedFields');
-        }
+      const isChanged = !deepCompare(currentValue, originalValue);
+
+      if (isChanged) {
         // Special handling for certain fields
         if (key === "services") {
           // Explicitly check if it's an array before using filter
@@ -230,33 +197,16 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
             const filteredCurrent = currentServices.filter((s: any) => s && s.description && s.description.trim() !== "");
             const filteredOriginal = originalServices.filter((s: any) => s && s.description && s.description.trim() !== "");
 
-            if (process.env.NODE_ENV !== 'production') {
-              console.log('[useEditForm] 🔧 Services special handling:');
-              console.log('  currentServices.length:', currentServices.length);
-              console.log('  originalServices.length:', originalServices.length);
-              console.log('  filteredCurrent.length:', filteredCurrent.length);
-              console.log('  filteredOriginal.length:', filteredOriginal.length);
-              console.log('  _.isEqual(filteredCurrent, filteredOriginal):', _.isEqual(filteredCurrent, filteredOriginal));
-            }
-
             // Include services if either:
             // 1. The filtered services are different
             // 2. The array lengths changed (even if all services are empty)
             if (!_.isEqual(filteredCurrent, filteredOriginal) || currentServices.length !== originalServices.length) {
-              if (process.env.NODE_ENV !== 'production') {
-                console.log('[useEditForm] 🔧 Adding services to changedFields');
-              }
               changedFields[typedKey] = filteredCurrent as any;
-            } else {
-              if (process.env.NODE_ENV !== 'production') {
-                console.log('[useEditForm] 🔧 NOT adding services to changedFields');
-              }
             }
           } else if (currentValue !== originalValue) {
             changedFields[typedKey] = currentValue;
           }
         } else {
-          // For other fields, include the new value
           changedFields[typedKey] = currentValue;
         }
       } else if (key === "services" && Array.isArray(currentValue) && Array.isArray(originalValue)) {
@@ -286,26 +236,25 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
   }, [form, fieldsToOmitIfUnchanged]);
 
   // Handle form submission
+  // CRITICAL: We return an async function that captures changedFields BEFORE validation starts.
+  // This prevents a race condition where originalData could be updated during async validation,
+  // causing getChangedFields() to return {} when called after validation completes.
   const handleSubmitChanges = (onValid?: (data: Partial<TFieldValues>) => unknown, onInvalid?: (errors: any) => unknown) => {
-    return form.handleSubmit(() => {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[useEditForm] ✅ Form validation PASSED - proceeding with submission');
-      }
-      const changedFields = getChangedFields();
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[useEditForm] Changed fields to submit:', changedFields);
-        console.error('[useEditForm] Number of changed fields:', Object.keys(changedFields).length);
-      }
+    return async (e?: React.BaseSyntheticEvent) => {
+      // CRITICAL: Capture changed fields NOW, before any async validation
+      // This ensures we have the correct snapshot even if originalData changes during validation
+      const changedFieldsSnapshot = getChangedFields();
 
-      // Call onSubmit with changed fields
-      const result = onSubmit(changedFields);
-      if (onValid) onValid(changedFields);
-      return result;
-    }, (errors) => {
-      console.error('[useEditForm] ❌ Form validation FAILED');
-      console.error('[useEditForm] Validation errors:', errors);
-      if (onInvalid) onInvalid(errors);
-    });
+      // Now run validation and submit with the captured snapshot
+      return form.handleSubmit(() => {
+        // Call onSubmit with the pre-captured changed fields
+        const result = onSubmit(changedFieldsSnapshot);
+        if (onValid) onValid(changedFieldsSnapshot);
+        return result;
+      }, (errors) => {
+        if (onInvalid) onInvalid(errors);
+      })(e);
+    };
   };
 
   return {

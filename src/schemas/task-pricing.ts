@@ -22,7 +22,7 @@ const taskPricingItemCreateSchema = z.object({
 });
 
 // Schema that allows optional pricing or validates pricing when items exist
-export const pricingCreateNestedSchema = z
+export const taskPricingCreateNestedSchema = z
   .object({
     expiresAt: z.coerce.date().optional().nullable(),
     status: taskPricingStatusSchema.optional().default('DRAFT'),
@@ -85,4 +85,4 @@ export const taskPricingSchema = z.object({
 
 export type TaskPricingFormData = z.infer<typeof taskPricingSchema>;
 export type TaskPricingItemFormData = z.infer<typeof taskPricingItemSchema>;
-export type PricingCreateNestedFormData = z.infer<typeof pricingCreateNestedSchema>;
+export type TaskPricingCreateNestedFormData = z.infer<typeof taskPricingCreateNestedSchema>;

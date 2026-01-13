@@ -67,7 +67,6 @@ class SocketService {
 
     // Connection successful
     this.socket.on('connect', () => {
-      console.log('[Socket] Connected successfully');
       this.setConnectionState('connected');
       this.reconnectAttempts = 0;
       this.reconnectDelay = 1000; // Reset delay
@@ -84,7 +83,6 @@ class SocketService {
 
     // Connection error
     this.socket.on('connect_error', (error) => {
-      console.error('[Socket] Connection error:', error.message);
       this.setConnectionState('error');
 
       // Check if it's an authentication error
@@ -97,7 +95,6 @@ class SocketService {
 
     // Disconnected
     this.socket.on('disconnect', (reason) => {
-      console.log('[Socket] Disconnected:', reason);
       this.setConnectionState('disconnected');
 
       // Auto-reconnect for certain disconnect reasons
@@ -113,26 +110,22 @@ class SocketService {
 
     // Reconnection attempt
     this.socket.on('reconnect_attempt', (attemptNumber) => {
-      console.log(`[Socket] Reconnection attempt ${attemptNumber}`);
       this.setConnectionState('reconnecting');
     });
 
     // Reconnection failed
     this.socket.on('reconnect_failed', () => {
-      console.error('[Socket] Reconnection failed after all attempts');
       this.setConnectionState('error');
       this.handleReconnectFailure();
     });
 
     // Error event
     this.socket.on('error', (error) => {
-      console.error('[Socket] Socket error:', error);
       this.setConnectionState('error');
     });
 
     // Authentication error
     this.socket.on('auth:error', (error) => {
-      console.error('[Socket] Authentication error:', error);
       this.handleAuthenticationError(error);
     });
   }
@@ -151,7 +144,6 @@ class SocketService {
    * Handle authentication errors
    */
   private handleAuthenticationError(error: Error): void {
-    console.error('[Socket] Authentication failed:', error.message);
     this.setConnectionState('error');
 
     // Disconnect socket
@@ -186,8 +178,6 @@ class SocketService {
       this.maxReconnectDelay
     );
 
-    console.log(`[Socket] Will attempt reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-
     // Clear any existing timer
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -195,7 +185,6 @@ class SocketService {
 
     this.reconnectTimer = setTimeout(() => {
       if (this.socket && !this.socket.connected && this.token) {
-        console.log('[Socket] Attempting manual reconnection');
         this.socket.connect();
       }
     }, delay);
@@ -205,7 +194,6 @@ class SocketService {
    * Handle complete reconnection failure
    */
   private handleReconnectFailure(): void {
-    console.error('[Socket] Max reconnection attempts reached. Please refresh the page.');
     this.setConnectionState('error');
 
     // Could emit a custom event here that the UI can listen to
@@ -283,8 +271,6 @@ class SocketService {
   emit(event: string, data?: unknown): void {
     if (this.socket?.connected) {
       this.socket.emit(event, data);
-    } else {
-      console.warn(`[Socket] Cannot emit "${event}" - socket not connected`);
     }
   }
 

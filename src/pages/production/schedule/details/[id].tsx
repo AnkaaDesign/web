@@ -1358,13 +1358,13 @@ export const TaskDetailsPage = () => {
                 </div>
 
                 {/* Forecast */}
-                {task.forecast && (
+                {sectionVisibility.isFieldVisible("forecast") && task.forecastDate && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-2.5">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <IconCalendarTime className="h-4 w-4" />
                       Previsão
                     </span>
-                    <span className="text-sm font-semibold text-foreground">{formatDateTime(task.forecast)}</span>
+                    <span className="text-sm font-semibold text-foreground">{formatDateTime(task.forecastDate)}</span>
                   </div>
                 )}
 

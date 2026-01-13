@@ -75,11 +75,6 @@ export function SupplierEditForm({ supplier, onSubmit, isSubmitting, onDirtyChan
     const original = originalValuesRef.current;
     const dirtyFields = __dirtyFields || {};
 
-    // Debug logging to understand what's being submitted
-    console.log('[SupplierEditForm] Form data received:', formData);
-    console.log('[SupplierEditForm] Dirty fields:', dirtyFields);
-    console.log('[SupplierEditForm] Original values:', original);
-
     // Check each field for changes
     Object.keys(formData).forEach((key) => {
       const typedKey = key as keyof SupplierUpdateFormData;
@@ -173,12 +168,8 @@ export function SupplierEditForm({ supplier, onSubmit, isSubmitting, onDirtyChan
     });
 
     // Only submit if there are changes
-    console.log('[SupplierEditForm] Changed fields to submit:', changedFields);
-
     if (Object.keys(changedFields).length > 0) {
       await onSubmit(changedFields);
-    } else {
-      console.log('[SupplierEditForm] No changes detected, skipping submit');
     }
   };
 

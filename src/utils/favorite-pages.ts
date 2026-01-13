@@ -5,6 +5,7 @@ import { FAVORITE_PAGES, FAVORITE_PAGES_LABELS } from "../constants";
  */
 const routeToFavoritePageMap: Record<string, FAVORITE_PAGES> = {
   // Production - List Pages
+  "/producao/agenda": FAVORITE_PAGES.PRODUCAO_AGENDA_LISTAR,
   "/producao/cronograma": FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR,
   "/producao/recorte": FAVORITE_PAGES.PRODUCAO_RECORTE_LISTAR,
   "/producao/servicos": FAVORITE_PAGES.PRODUCAO_SERVICOS_LISTAR,

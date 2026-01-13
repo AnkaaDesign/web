@@ -41,11 +41,8 @@ export function useNotificationSocket() {
       return;
     }
 
-    console.log('[useNotificationSocket] Setting up notification listeners');
-
     // Handler for new notifications
     const handleNewNotification = (notification: Notification) => {
-      console.log('[useNotificationSocket] New notification received:', notification);
 
       // Update React Query cache - add to beginning of list
       queryClient.setQueryData<{ data: Notification[] }>(
@@ -112,8 +109,6 @@ export function useNotificationSocket() {
 
     // Handler for notification updates
     const handleNotificationUpdate = (notification: Notification) => {
-      console.log('[useNotificationSocket] Notification updated:', notification.id);
-
       // Update notification in cache
       queryClient.setQueryData<{ data: Notification[] }>(
         notificationKeys.list(),
@@ -138,8 +133,6 @@ export function useNotificationSocket() {
 
     // Handler for notification deletion
     const handleNotificationDelete = (notificationId: string) => {
-      console.log('[useNotificationSocket] Notification deleted:', notificationId);
-
       // Remove notification from cache
       queryClient.setQueryData<{ data: Notification[] }>(
         notificationKeys.list(),
@@ -162,8 +155,6 @@ export function useNotificationSocket() {
 
     // Handler for mark as read
     const handleMarkAsRead = (data: { notificationId: string; userId: string }) => {
-      console.log('[useNotificationSocket] Notification marked as read:', data.notificationId);
-
       // Update notification in cache
       queryClient.setQueryData<{ data: Notification[] }>(
         notificationKeys.list(),
@@ -190,8 +181,6 @@ export function useNotificationSocket() {
 
     // Handler for mark all as read
     const handleMarkAllAsRead = () => {
-      console.log('[useNotificationSocket] All notifications marked as read');
-
       // Update all notifications in cache
       queryClient.setQueryData<{ data: Notification[] }>(
         notificationKeys.list(),
@@ -214,8 +203,6 @@ export function useNotificationSocket() {
 
     // Handler for sync response (when reconnecting)
     const handleSyncResponse = (data: { notifications: Notification[] }) => {
-      console.log('[useNotificationSocket] Sync response received, syncing notifications');
-
       // Invalidate all notification queries to refetch
       queryClient.invalidateQueries({
         queryKey: notificationKeys.all,
@@ -231,19 +218,17 @@ export function useNotificationSocket() {
 
     // Handler for notification count updates
     const handleNotificationCount = (data: { count: number }) => {
-      console.log('[useNotificationSocket] Notification count updated:', data.count);
       setUnreadCount(data.count);
     };
 
     // Handler for connection events
     const handleConnect = () => {
-      console.log('[useNotificationSocket] Socket connected');
       // Request initial notification count
       socketService.requestNotificationCount();
     };
 
     const handleDisconnect = (reason: string) => {
-      console.log('[useNotificationSocket] Socket disconnected:', reason);
+      // Socket disconnected
     };
 
     // Register event listeners
@@ -264,7 +249,6 @@ export function useNotificationSocket() {
 
     // Cleanup function - remove all listeners
     return () => {
-      console.log('[useNotificationSocket] Cleaning up notification listeners');
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('notification:new', handleNewNotification);
@@ -295,11 +279,9 @@ export function useNotificationSync(): () => void {
 
   return () => {
     if (!socket) {
-      console.warn('[useNotificationSync] Cannot sync - socket not connected');
       return;
     }
 
-    console.log('[useNotificationSync] Requesting notification sync');
     socket.emit('sync:request', { timestamp: Date.now() });
   };
 }

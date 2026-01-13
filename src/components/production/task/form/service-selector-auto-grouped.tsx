@@ -145,7 +145,6 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
       setCreatingServiceIndex(null); // Clear only on failure
       return undefined;
     } catch (error) {
-      console.error('[ServiceSelector] Error creating service:', error);
       setCreatingServiceIndex(null); // Clear on error
       throw error;
     }
@@ -343,9 +342,6 @@ function ServiceRow({
         hasMore: hasMore,
       };
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Error fetching services:', error);
-      }
       return { data: [], hasMore: false };
     }
   };
@@ -395,29 +391,19 @@ function ServiceRow({
               <Combobox<Service>
                 value={field.value}
                 onValueChange={(newValue) => {
-                  console.log('[ServiceRow] 📥 onValueChange received value:', newValue, 'Type:', typeof newValue);
-                  console.log('[ServiceRow] 📥 Current field.value before change:', field.value);
-
                   // Update the form field
                   field.onChange(newValue);
-                  console.log('[ServiceRow] 📥 field.onChange called');
 
                   // CRITICAL: DON'T clear creating state immediately
                   // Wait for much longer to ensure form value is fully propagated
                   // and the Combobox is displaying the correct value BEFORE re-grouping
                   setTimeout(() => {
-                    console.log('[ServiceRow] 📥 About to clear creating state');
-                    console.log('[ServiceRow] 📥 Current field.value:', field.value);
-
                     // Only clear if the field value is actually set
                     if (field.value && field.value === newValue) {
-                      console.log('[ServiceRow] ✅ Field value confirmed, clearing creating state');
                       clearCreatingState();
                     } else {
-                      console.error('[ServiceRow] ❌ Field value mismatch!', { expected: newValue, actual: field.value });
                       // Try again after a delay
                       setTimeout(() => {
-                        console.log('[ServiceRow] 🔄 Retry: Clearing creating state');
                         clearCreatingState();
                       }, 500);
                     }

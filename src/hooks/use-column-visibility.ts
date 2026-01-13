@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 /**
  * Hook to manage column visibility with localStorage persistence
@@ -16,6 +16,9 @@ import { useState, useEffect, useCallback } from "react";
  * ```
  */
 export function useColumnVisibility(storageKey: string, defaultColumns: Set<string>) {
+  // Track previous default columns to detect new additions
+  const prevDefaultColumnsRef = useRef<Set<string>>(defaultColumns);
+
   // Initialize state from localStorage or use defaults
   const [visibleColumns, setVisibleColumnsState] = useState<Set<string>>(() => {
     try {
@@ -61,9 +64,37 @@ export function useColumnVisibility(storageKey: string, defaultColumns: Set<stri
     [storageKey]
   );
 
-  // Note: The useEffect for syncing localStorage was removed to prevent infinite loops.
-  // Initial state (useState with lazy initialization) already handles loading from localStorage.
-  // If localStorage updates are needed from external sources, implement a storage event listener instead.
+  // Sync new default columns when defaultColumns changes (e.g., when user data loads)
+  // This ensures that columns added to defaults after initial load are included
+  useEffect(() => {
+    const prevDefaults = prevDefaultColumnsRef.current;
+
+    // Find columns that are in new defaults but weren't in previous defaults
+    const newDefaultColumns = Array.from(defaultColumns).filter(
+      col => !prevDefaults.has(col)
+    );
+
+    if (newDefaultColumns.length > 0) {
+      setVisibleColumnsState(current => {
+        const updated = new Set(current);
+        newDefaultColumns.forEach(col => updated.add(col));
+
+        // Also update localStorage
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(Array.from(updated)));
+        } catch (error) {
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to save column visibility to localStorage for key "${storageKey}":`, error);
+          }
+        }
+
+        return updated;
+      });
+    }
+
+    // Update ref for next comparison
+    prevDefaultColumnsRef.current = defaultColumns;
+  }, [defaultColumns, storageKey]);
 
   return {
     visibleColumns,

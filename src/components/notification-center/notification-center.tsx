@@ -12,6 +12,94 @@ import type { Notification } from "@/types";
 import { apiClient } from "@/api-client";
 import { toast } from "@/components/ui/sonner";
 
+/**
+ * Entity type to route mapping for notification navigation
+ * Maps API entity types (uppercase) to web application routes
+ */
+const ENTITY_ROUTE_MAP: Record<string, string> = {
+  // Task routes (default to agenda, user can navigate from there)
+  TASK: "/producao/agenda/detalhes",
+  Task: "/producao/agenda/detalhes",
+
+  // Order routes
+  ORDER: "/estoque/pedidos/detalhes",
+  Order: "/estoque/pedidos/detalhes",
+
+  // Item routes
+  ITEM: "/estoque/produtos/detalhes",
+  Item: "/estoque/produtos/detalhes",
+
+  // Service Order routes (redirect handled separately to Task)
+  SERVICE_ORDER: "/producao/ordens-de-servico/detalhes",
+  ServiceOrder: "/producao/ordens-de-servico/detalhes",
+  SERVICEORDER: "/producao/ordens-de-servico/detalhes",
+
+  // User routes
+  USER: "/administracao/usuarios/detalhes",
+  User: "/administracao/usuarios/detalhes",
+
+  // Employee routes
+  EMPLOYEE: "/recursos-humanos/funcionarios/detalhes",
+  Employee: "/recursos-humanos/funcionarios/detalhes",
+
+  // Customer routes
+  CUSTOMER: "/administracao/clientes/detalhes",
+  Customer: "/administracao/clientes/detalhes",
+
+  // Supplier routes
+  SUPPLIER: "/estoque/fornecedores/detalhes",
+  Supplier: "/estoque/fornecedores/detalhes",
+
+  // Warning routes
+  WARNING: "/recursos-humanos/advertencias/detalhes",
+  Warning: "/recursos-humanos/advertencias/detalhes",
+
+  // Bonus routes
+  BONUS: "/recursos-humanos/bonus/detalhes",
+  Bonus: "/recursos-humanos/bonus/detalhes",
+
+  // Vacation routes
+  VACATION: "/recursos-humanos/ferias/detalhes",
+  Vacation: "/recursos-humanos/ferias/detalhes",
+
+  // Financial routes
+  FINANCIAL: "/financeiro/transacoes/detalhes",
+  Financial: "/financeiro/transacoes/detalhes",
+
+  // PPE (Personal Protective Equipment) routes
+  PPE: "/estoque/epi/entregas",
+  Ppe: "/estoque/epi/entregas",
+  PPE_DELIVERY: "/estoque/epi/entregas",
+  PpeDelivery: "/estoque/epi/entregas",
+
+  // Cut routes (navigate to task since cuts are part of tasks)
+  CUT: "/producao/recorte/detalhes",
+  Cut: "/producao/recorte/detalhes",
+
+  // Stock routes
+  STOCK: "/estoque/produtos/detalhes",
+  Stock: "/estoque/produtos/detalhes",
+
+  // Activity/Movement routes
+  ACTIVITY: "/estoque/movimentacoes/detalhes",
+  Activity: "/estoque/movimentacoes/detalhes",
+
+  // Borrow routes
+  BORROW: "/estoque/emprestimos/detalhes",
+  Borrow: "/estoque/emprestimos/detalhes",
+};
+
+/**
+ * Get the route for a given entity type and ID
+ */
+function getRouteForEntity(entityType: string, entityId: string): string | null {
+  const basePath = ENTITY_ROUTE_MAP[entityType];
+  if (basePath) {
+    return `${basePath}/${entityId}`;
+  }
+  return null;
+}
+
 interface NotificationCenterProps {
   className?: string;
 }
@@ -33,23 +121,36 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
   } = useNotificationCenter();
 
   const handleNotificationClick = async (notification: Notification) => {
-    // Debug: log notification data to help diagnose navigation issues
-    console.log("[NotificationCenter] Clicked notification:", {
-      id: notification.id,
-      title: notification.title,
-      actionUrl: notification.actionUrl,
-      link: (notification as any).link,
-      type: notification.type,
-    });
-
     // Mark as read
     await markAsRead(notification.id);
 
-    // Navigate to notification target if available (using actionUrl field)
-    let targetUrl = (notification as any).link || notification.actionUrl;
+    let targetUrl: string | null = null;
 
-    // Debug: log resolved URL
-    console.log("[NotificationCenter] Target URL:", targetUrl);
+    // Priority 1: Use metadata.webUrl if available (most reliable, set by API)
+    if (notification.metadata?.webUrl) {
+      targetUrl = notification.metadata.webUrl;
+    }
+
+    // Priority 2: Use actionUrl field
+    if (!targetUrl) {
+      targetUrl = (notification as any).link || notification.actionUrl;
+    }
+
+    // Priority 3: Use relatedEntityType and relatedEntityId for entity-based navigation
+    if (!targetUrl && notification.relatedEntityType && notification.relatedEntityId) {
+      // Special handling for SERVICE_ORDER - navigate to parent Task instead
+      // ServiceOrders don't have their own detail page, they're viewed within Task
+      if (
+        (notification.relatedEntityType === "SERVICE_ORDER" ||
+          notification.relatedEntityType === "ServiceOrder" ||
+          notification.relatedEntityType === "SERVICEORDER") &&
+        notification.metadata?.taskId
+      ) {
+        targetUrl = getRouteForEntity("TASK", notification.metadata.taskId as string);
+      } else {
+        targetUrl = getRouteForEntity(notification.relatedEntityType, notification.relatedEntityId);
+      }
+    }
 
     if (targetUrl) {
       // Handle legacy /tasks/:id URLs - convert to new /producao/agenda/detalhes/:id
@@ -58,19 +159,27 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
         const taskId = targetUrl.replace("/tasks/", "");
         // Default to agenda for old URLs (user can navigate to correct page from there)
         targetUrl = `/producao/agenda/detalhes/${taskId}`;
-        console.log("[NotificationCenter] Converted legacy URL to:", targetUrl);
+      }
+
+      // Handle legacy /tarefas/:id URLs (from old DeepLinkService)
+      if (targetUrl.startsWith("/tarefas/")) {
+        const taskId = targetUrl.replace("/tarefas/", "");
+        targetUrl = `/producao/agenda/detalhes/${taskId}`;
+      }
+
+      // Handle legacy /pedidos/:id URLs (from old DeepLinkService)
+      if (targetUrl.startsWith("/pedidos/")) {
+        const orderId = targetUrl.replace("/pedidos/", "");
+        targetUrl = `/estoque/pedidos/detalhes/${orderId}`;
       }
 
       // Handle both internal routes and external URLs
       if (targetUrl.startsWith("http://") || targetUrl.startsWith("https://")) {
         window.open(targetUrl, "_blank");
       } else {
-        console.log("[NotificationCenter] Navigating to:", targetUrl);
         navigate(targetUrl);
       }
       setIsOpen(false);
-    } else {
-      console.warn("[NotificationCenter] No actionUrl found for notification:", notification.id);
     }
   };
 

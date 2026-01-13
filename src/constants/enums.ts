@@ -916,6 +916,7 @@ export enum ENTITY_TYPE {
   PAINT_FORMULA = "PAINT_FORMULA",
   PAINT_FORMULA_COMPONENT = "PAINT_FORMULA_COMPONENT",
   PAINT_PRODUCTION = "PAINT_PRODUCTION",
+  PARKING_SPOT = "PARKING_SPOT",
   PAYROLL = "PAYROLL",
   PIECE = "PIECE",
   POSITION = "POSITION",
@@ -1084,6 +1085,7 @@ export enum NOTIFICATION_TYPE {
   WARNING = "WARNING",
   STOCK = "STOCK",
   GENERAL = "GENERAL",
+  CUT = "CUT",
 }
 
 export enum NOTIFICATION_CHANNEL {
@@ -1606,6 +1608,7 @@ export enum NOTIFICATION_ACTION_TYPE {
   TASK_CREATED = "TASK_CREATED",
   TASK_UPDATED = "TASK_UPDATED",
   VIEW_ORDER = "VIEW_ORDER",
+  VIEW_SERVICE_ORDER = "VIEW_SERVICE_ORDER",
   VIEW_REPORT = "VIEW_REPORT",
   ACKNOWLEDGE = "ACKNOWLEDGE",
   DISMISS = "DISMISS",
@@ -1855,12 +1858,13 @@ export enum ITEM_CATEGORY_TYPE {
 
 export enum FAVORITE_PAGES {
   // Production - List Pages
+  PRODUCAO_AGENDA_LISTAR = "/producao/agenda",
   PRODUCAO_CRONOGRAMA_LISTAR = "/producao/cronograma",
   PRODUCAO_RECORTE_LISTAR = "/producao/recorte",
   PRODUCAO_SERVICOS_LISTAR = "/producao/servicos",
   PRODUCAO_OBSERVACOES_LISTAR = "/producao/observacoes",
   PRODUCAO_AEROGRAFIA_LISTAR = "/producao/aerografia/listar",
-  PRODUCAO_GARAGENS_LISTAR = "/producao/garagens",
+  PRODUCAO_GARAGENS_LISTAR = "/producao/barracoes",
   PRODUCAO_ORDENS_SERVICO_LISTAR = "/producao/ordens-de-servico",
   PRODUCAO_HISTORICO_LISTAR = "/producao/historico",
 
@@ -1870,7 +1874,7 @@ export enum FAVORITE_PAGES {
   PRODUCAO_SERVICOS_CADASTRAR = "/producao/servicos/cadastrar",
   PRODUCAO_OBSERVACOES_CADASTRAR = "/producao/observacoes/cadastrar",
   PRODUCAO_AEROGRAFIA_CADASTRAR = "/producao/aerografia/cadastrar",
-  PRODUCAO_GARAGENS_CADASTRAR = "/producao/garagens/cadastrar",
+  PRODUCAO_GARAGENS_CADASTRAR = "/producao/barracoes/cadastrar",
   PRODUCAO_ORDENS_SERVICO_CADASTRAR = "/producao/ordens-de-servico/cadastrar",
 
   // Inventory - List Pages
@@ -2091,6 +2095,17 @@ export enum PAYROLL_MONTH {
   OCTOBER = "OCTOBER",
   NOVEMBER = "NOVEMBER",
   DECEMBER = "DECEMBER",
+}
+
+// =====================
+// Task Pricing Enums
+// =====================
+
+export enum TASK_PRICING_STATUS {
+  DRAFT = "DRAFT",
+  APPROVED = "APPROVED",
+  REJECTED = "REJECTED",
+  CANCELLED = "CANCELLED",
 }
 
 // =====================

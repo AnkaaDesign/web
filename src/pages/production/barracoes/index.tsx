@@ -287,7 +287,7 @@ export function GaragesPage() {
               { label: 'Producao', href: routes.production.root },
               { label: 'Barracões' },
             ]}
-            favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
+            favoritePage={FAVORITE_PAGES.PRODUCAO_GARAGENS_LISTAR}
           />
           <div className="flex-1 overflow-y-auto pb-6">
             <div className="mt-4 space-y-4">
@@ -312,7 +312,7 @@ export function GaragesPage() {
               { label: 'Producao', href: routes.production.root },
               { label: 'Barracões' },
             ]}
-            favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
+            favoritePage={FAVORITE_PAGES.PRODUCAO_GARAGENS_LISTAR}
           />
           <div className="flex-1 overflow-y-auto pb-6">
             <div className="mt-4 space-y-4">
@@ -343,7 +343,7 @@ export function GaragesPage() {
             { label: 'Producao', href: routes.production.root },
             { label: 'Barracões' },
           ]}
-          favoritePage={FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR}
+          favoritePage={FAVORITE_PAGES.PRODUCAO_GARAGENS_LISTAR}
           actions={[
             // View mode selector as custom action with React element label
             {

@@ -38,9 +38,12 @@ import { FAVORITE_PAGES } from '@constants';
 // Map of page paths to icons and colors
 export const PAGE_ICON_MAP: Record<string, { icon: Icon; color: string }> = {
   // Produção
+  [FAVORITE_PAGES.PRODUCAO_AGENDA_LISTAR]: { icon: IconClipboardList, color: "bg-amber-500" },
   [FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR]: { icon: IconClipboardList, color: "bg-blue-500" },
   [FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_CADASTRAR]: { icon: IconClipboardList, color: "bg-blue-600" },
   // [FAVORITE_PAGES.PRODUCAO_EM_ESPERA_LISTAR]: { icon: IconHourglass, color: "bg-yellow-500" },
+  [FAVORITE_PAGES.PRODUCAO_GARAGENS_LISTAR]: { icon: IconBuildingWarehouse, color: "bg-slate-500" },
+  [FAVORITE_PAGES.PRODUCAO_GARAGENS_CADASTRAR]: { icon: IconBuildingWarehouse, color: "bg-slate-600" },
   [FAVORITE_PAGES.PRODUCAO_HISTORICO_LISTAR]: { icon: IconHistory, color: "bg-gray-500" },
   [FAVORITE_PAGES.PRODUCAO_RECORTE_LISTAR]: { icon: IconScissors, color: "bg-purple-500" },
   [FAVORITE_PAGES.PRODUCAO_OBSERVACOES_LISTAR]: { icon: IconNote, color: "bg-teal-500" },
@@ -159,6 +162,10 @@ for (const [, enumValue] of Object.entries(FAVORITE_PAGES)) {
   }
 }
 
+// Backward compatibility for old favorites that might have different paths stored
+PATH_TO_ICON_MAP["/producao/garagens"] = { icon: IconBuildingWarehouse, color: "bg-slate-500" };
+PATH_TO_ICON_MAP["/producao/garagens/cadastrar"] = { icon: IconBuildingWarehouse, color: "bg-slate-600" };
+
 // Get icon and color for a page
 export function getPageIconInfo(page: string): { icon: Icon; color: string } {
   // Try path-based mapping first
@@ -175,8 +182,13 @@ export function getPageIconName(path: string): string {
   // Direct path to icon mapping
   const pathIconMap: Record<string, string> = {
     // Produção
+    "/producao/agenda": "clipboard-list",
     "/producao/cronograma": "calendar-stats",
     "/producao/cronograma/cadastrar": "calendar-stats",
+    "/producao/barracoes": "warehouse",
+    "/producao/barracoes/cadastrar": "warehouse",
+    "/producao/garagens": "warehouse", // Backward compatibility
+    "/producao/garagens/cadastrar": "warehouse", // Backward compatibility
     "/producao/em-espera": "pause",
     "/producao/historico": "history",
     "/producao/recorte": "scissors",
@@ -308,8 +320,11 @@ export function getPageIconName(path: string): string {
   // Legacy enum-based mapping (updated to match navigation icons)
   const iconMap: Record<string, string> = {
     // Produção
+    [FAVORITE_PAGES.PRODUCAO_AGENDA_LISTAR]: "clipboard-list",
     [FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_LISTAR]: "calendar-stats",
     [FAVORITE_PAGES.PRODUCAO_CRONOGRAMA_CADASTRAR]: "calendar-stats",
+    [FAVORITE_PAGES.PRODUCAO_GARAGENS_LISTAR]: "warehouse",
+    [FAVORITE_PAGES.PRODUCAO_GARAGENS_CADASTRAR]: "warehouse",
     [FAVORITE_PAGES.PRODUCAO_HISTORICO_LISTAR]: "history",
     [FAVORITE_PAGES.PRODUCAO_RECORTE_LISTAR]: "scissors",
     [FAVORITE_PAGES.PRODUCAO_OBSERVACOES_LISTAR]: "note",

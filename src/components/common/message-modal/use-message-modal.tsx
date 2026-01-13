@@ -111,11 +111,6 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
     }
   }, []);
 
-  // Debug: Log user state
-  React.useEffect(() => {
-    console.log('[MessageModal] User state changed:', { userId: user?.id, userEmail: user?.email });
-  }, [user?.id]);
-
   // Fetch unviewed messages from API
   const {
     data: messagesData,
@@ -126,14 +121,11 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
   } = useQuery({
     queryKey: ["messages", "unviewed", user?.id],
     queryFn: async () => {
-      console.log('[MessageModal] Fetching unviewed messages for user:', user?.id);
       if (!user?.id) {
-        console.log('[MessageModal] No user ID, returning empty array');
         return [];
       }
       try {
         const messages = await messageService.getUnviewedMessages();
-        console.log('[MessageModal] Received messages from API:', messages.length);
         return messages;
       } catch (error) {
         console.error('[MessageModal] Failed to fetch unviewed messages:', error);
@@ -164,30 +156,15 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
 
       // Only track once per message per session
       if (currentMessage && !trackedViews.current.has(currentMessage.id)) {
-        console.log('[MessageModal] Auto-tracking view for message:', currentMessage.id);
         trackedViews.current.add(currentMessage.id);
         markAsViewedMutation.mutate(currentMessage.id);
       }
     }
   }, [open, unviewedMessages, markAsViewedMutation]);
 
-  // Debug: Log query state
-  React.useEffect(() => {
-    console.log('[MessageModal] Query state:', {
-      status,
-      isLoading,
-      hasUser: !!user?.id,
-      apiMessagesCount: messages.length,
-      unviewedMessagesCount: unviewedMessages.length,
-      dailyDismissedCount: Object.keys(dailyDismissed).length,
-    });
-  }, [status, isLoading, user?.id, messages.length, unviewedMessages.length, dailyDismissed]);
-
   // Dismiss for today only (mark as viewed in API + store locally, will show again tomorrow)
   const dismissForToday = React.useCallback(
     (messageId: string) => {
-      console.log('[MessageModal] Dismissing for today (marking as viewed):', messageId);
-
       // Mark as viewed in the API so it doesn't keep appearing on refresh
       // This is different from permanent dismissal - the message is just "viewed"
       if (!trackedViews.current.has(messageId)) {
@@ -210,7 +187,6 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
   // Don't show again (permanent - marks as dismissed in database)
   const dontShowAgain = React.useCallback(
     (messageId: string) => {
-      console.log('[MessageModal] Don\'t show again (permanent):', messageId);
       dismissMessageMutation.mutate(messageId);
       onMessageViewed?.(messageId); // Call callback for dismissed messages too
     },
@@ -219,29 +195,18 @@ export function useMessageModal(options: UseMessageModalOptions = {}): UseMessag
 
   // Auto-show modal when unviewed messages are available
   React.useEffect(() => {
-    console.log('[MessageModal] Auto-show check:', {
-      autoShow,
-      isLoading,
-      showOnMount,
-      hasShownOnMount: hasShownOnMount.current,
-      unviewedMessagesCount: unviewedMessages.length,
-      lastMessageCount: lastMessageCount.current,
-    });
-
     if (!autoShow || isLoading) {
       return;
     }
 
     // Show on mount if there are unviewed messages
     if (showOnMount && !hasShownOnMount.current && unviewedMessages.length > 0) {
-      console.log('[MessageModal] Opening modal on mount with', unviewedMessages.length, 'messages');
       hasShownOnMount.current = true;
       lastMessageCount.current = unviewedMessages.length;
       setOpen(true);
     }
     // Only auto-reopen if NEW messages arrived (count increased)
     else if (unviewedMessages.length > lastMessageCount.current && hasShownOnMount.current) {
-      console.log('[MessageModal] Opening modal for new messages');
       lastMessageCount.current = unviewedMessages.length;
       setOpen(true);
     }

@@ -79,9 +79,6 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
         hasMore: hasMore,
       };
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[GeneralPaintingSelector] Error fetching paints:', error);
-      }
       return { data: [], hasMore: false };
     }
   };

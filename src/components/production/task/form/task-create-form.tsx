@@ -8,17 +8,23 @@ import {
   IconCheck,
   IconClipboardList,
   IconInfoCircle,
+  IconCalendar,
+  IconTruck,
+  IconBox,
 } from "@tabler/icons-react";
 import type { TaskCreateFormData } from "../../../../schemas";
 import { taskCreateSchema } from "../../../../schemas";
-import { useTaskMutations } from "../../../../hooks";
-import { TASK_STATUS, TRUCK_CATEGORY, IMPLEMENT_TYPE, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS } from "../../../../constants";
+import { useTaskMutations, useServiceMutations } from "../../../../hooks";
+import { TASK_STATUS, TRUCK_CATEGORY, IMPLEMENT_TYPE, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../../../../constants";
+import { serviceService } from "../../../../api-client";
+import type { Service } from "../../../../types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Combobox } from "@/components/ui/combobox";
+import { DateTimeInput } from "@/components/ui/date-time-input";
 import { CustomerSelector } from "./customer-selector";
 import { PlateTagsInput } from "./plate-tags-input";
 import { SerialNumberRangeInput } from "./serial-number-range-input";
@@ -34,6 +40,8 @@ const taskCreateFormSchema = z.object({
   serialNumbers: z.array(z.number()).default([]),
   category: z.string().optional(),
   implementType: z.string().optional(),
+  forecastDate: z.date().nullable().optional(),
+  serviceOrderDescription: z.string().optional(),
 }).refine((data) => {
   // At least one of: plates, serialNumbers, name, or customerId must be provided
   return data.plates.length > 0 || data.serialNumbers.length > 0 || data.name || data.customerId;
@@ -46,6 +54,7 @@ type TaskCreateFormSchemaType = z.infer<typeof taskCreateFormSchema>;
 
 export const TaskCreateForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingService, setIsCreatingService] = useState(false);
 
   // Initialize form with simple default values
   const form = useForm<TaskCreateFormSchemaType>({
@@ -59,11 +68,14 @@ export const TaskCreateForm = () => {
       serialNumbers: [],
       category: "",
       implementType: "",
+      forecastDate: null,
+      serviceOrderDescription: "",
     },
   });
 
   // Mutations
   const { createAsync } = useTaskMutations();
+  const { createAsync: createServiceAsync } = useServiceMutations();
 
   // Watch form values for task count calculation
   const plates = useWatch({ control: form.control, name: "plates" }) || [];
@@ -91,7 +103,31 @@ export const TaskCreateForm = () => {
       try {
         setIsSubmitting(true);
 
-        const { plates, serialNumbers, name, customerId, status, category, implementType } = data;
+        const { plates, serialNumbers, name, customerId, status, category, implementType, forecastDate, serviceOrderDescription } = data;
+
+        // Build service order if description is provided (always NEGOTIATION type)
+        const serviceOrders = serviceOrderDescription && serviceOrderDescription.trim().length >= 3
+          ? [{
+              status: SERVICE_ORDER_STATUS.PENDING,
+              statusOrder: 1,
+              description: serviceOrderDescription.trim(),
+              type: SERVICE_ORDER_TYPE.NEGOTIATION,
+              assignedToId: null,
+            }]
+          : undefined;
+
+        // Build base task data with common fields
+        const buildTaskData = (additionalData: Partial<TaskCreateFormData>): TaskCreateFormData => {
+          const taskData: TaskCreateFormData = {
+            status,
+            name: name || undefined,
+            customerId: customerId || undefined,
+            forecastDate: forecastDate || undefined,
+            serviceOrders,
+            ...additionalData,
+          } as TaskCreateFormData;
+          return taskData;
+        };
 
         // Determine combinations
         let tasksToCreate: TaskCreateFormData[] = [];
@@ -100,40 +136,31 @@ export const TaskCreateForm = () => {
           // Create a task for each combination of plate and serial number
           for (const plate of plates) {
             for (const serialNumber of serialNumbers) {
-              tasksToCreate.push({
-                status,
-                name: name || undefined,
-                customerId: customerId || undefined,
+              tasksToCreate.push(buildTaskData({
                 serialNumber: serialNumber.toString(),
                 truck: {
                   plate,
                   category: category || undefined,
                   implementType: implementType || undefined,
                 },
-              } as TaskCreateFormData);
+              }));
             }
           }
         } else if (plates.length > 0) {
           // Create a task for each plate
           for (const plate of plates) {
-            tasksToCreate.push({
-              status,
-              name: name || undefined,
-              customerId: customerId || undefined,
+            tasksToCreate.push(buildTaskData({
               truck: {
                 plate,
                 category: category || undefined,
                 implementType: implementType || undefined,
               },
-            } as TaskCreateFormData);
+            }));
           }
         } else if (serialNumbers.length > 0) {
           // Create a task for each serial number
           for (const serialNumber of serialNumbers) {
-            tasksToCreate.push({
-              status,
-              name: name || undefined,
-              customerId: customerId || undefined,
+            tasksToCreate.push(buildTaskData({
               serialNumber: serialNumber.toString(),
               // Include truck data if category or implementType is provided
               ...(category || implementType ? {
@@ -142,14 +169,11 @@ export const TaskCreateForm = () => {
                   implementType: implementType || undefined,
                 },
               } : {}),
-            } as TaskCreateFormData);
+            }));
           }
         } else {
           // Create a single task with just name and/or customer
-          tasksToCreate.push({
-            status,
-            name: name || undefined,
-            customerId: customerId || undefined,
+          tasksToCreate.push(buildTaskData({
             // Include truck data if category or implementType is provided
             ...(category || implementType ? {
               truck: {
@@ -157,7 +181,7 @@ export const TaskCreateForm = () => {
                 implementType: implementType || undefined,
               },
             } : {}),
-          } as TaskCreateFormData);
+          }));
         }
 
         // Create all tasks
@@ -171,11 +195,9 @@ export const TaskCreateForm = () => {
               successCount++;
             } else {
               errorCount++;
-              console.error("Failed to create task:", result?.message);
             }
           } catch (error) {
             errorCount++;
-            console.error("Error creating task:", error);
           }
         }
 
@@ -198,7 +220,6 @@ export const TaskCreateForm = () => {
           toast.error("Erro ao criar tarefas");
         }
       } catch (error) {
-        console.error("Error creating tasks:", error);
         toast.error("Erro ao criar tarefas");
       } finally {
         setIsSubmitting(false);
@@ -270,6 +291,34 @@ export const TaskCreateForm = () => {
                 {/* Customer Selector */}
                 <CustomerSelector control={form.control} disabled={isSubmitting} />
 
+                {/* Forecast Date */}
+                <FormField
+                  control={form.control}
+                  name="forecastDate"
+                  render={({ field }) => (
+                    <DateTimeInput
+                      field={field}
+                      mode="date"
+                      label={
+                        <span className="flex items-center gap-2">
+                          <IconCalendar className="h-4 w-4" />
+                          Data de Previsão de Liberação
+                        </span>
+                      }
+                      disabled={isSubmitting}
+                    />
+                  )}
+                />
+
+                {/* Service Order - Simple combobox */}
+                <ServiceOrderCombobox
+                  control={form.control}
+                  disabled={isSubmitting}
+                  isCreatingService={isCreatingService}
+                  setIsCreatingService={setIsCreatingService}
+                  createServiceAsync={createServiceAsync}
+                />
+
                 {/* Truck Category and Implement Type - Side by Side */}
                 <div className="grid grid-cols-2 gap-4">
                   {/* Truck Category */}
@@ -278,7 +327,10 @@ export const TaskCreateForm = () => {
                     name="category"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
-                        <FormLabel>Categoria do Caminhão</FormLabel>
+                        <FormLabel className="flex items-center gap-2">
+                          <IconTruck className="h-4 w-4" />
+                          Categoria do Caminhão
+                        </FormLabel>
                         <Combobox
                           value={field.value || ""}
                           onValueChange={field.onChange}
@@ -305,7 +357,10 @@ export const TaskCreateForm = () => {
                     name="implementType"
                     render={({ field }) => (
                       <FormItem className="flex flex-col">
-                        <FormLabel>Tipo de Implemento</FormLabel>
+                        <FormLabel className="flex items-center gap-2">
+                          <IconBox className="h-4 w-4" />
+                          Tipo de Implemento
+                        </FormLabel>
                         <Combobox
                           value={field.value || ""}
                           onValueChange={field.onChange}
@@ -363,3 +418,115 @@ export const TaskCreateForm = () => {
     </>
   );
 };
+
+// Simple Service Order Combobox Component
+interface ServiceOrderComboboxProps {
+  control: any;
+  disabled?: boolean;
+  isCreatingService: boolean;
+  setIsCreatingService: (value: boolean) => void;
+  createServiceAsync: (data: { description: string; type: SERVICE_ORDER_TYPE }) => Promise<any>;
+}
+
+function ServiceOrderCombobox({
+  control,
+  disabled,
+  isCreatingService,
+  setIsCreatingService,
+  createServiceAsync,
+}: ServiceOrderComboboxProps) {
+  // Search function for Combobox - always filter by NEGOTIATION type
+  const searchServices = async (
+    search: string,
+    page: number = 1
+  ): Promise<{
+    data: Service[];
+    hasMore: boolean;
+  }> => {
+    const params: any = {
+      orderBy: { description: "asc" },
+      page: page,
+      take: 50,
+      type: SERVICE_ORDER_TYPE.NEGOTIATION,
+    };
+
+    if (search && search.trim()) {
+      params.searchingFor = search.trim();
+    }
+
+    try {
+      const response = await serviceService.getServices(params);
+      const services = response.data || [];
+      const hasMore = response.meta?.hasNextPage || false;
+
+      return {
+        data: services,
+        hasMore: hasMore,
+      };
+    } catch (error) {
+      return { data: [], hasMore: false };
+    }
+  };
+
+  const handleCreateService = async (description: string): Promise<Service | undefined> => {
+    try {
+      setIsCreatingService(true);
+
+      const result = await createServiceAsync({
+        description,
+        type: SERVICE_ORDER_TYPE.NEGOTIATION,
+      });
+
+      if (result && result.success && result.data) {
+        return result.data;
+      }
+      return undefined;
+    } catch (error) {
+      return undefined;
+    } finally {
+      setIsCreatingService(false);
+    }
+  };
+
+  return (
+    <FormField
+      control={control}
+      name="serviceOrderDescription"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel className="flex items-center gap-2">
+            <IconClipboardList className="h-4 w-4" />
+            Ordem de Serviço
+          </FormLabel>
+          <FormControl>
+            <Combobox<Service>
+              value={field.value}
+              onValueChange={field.onChange}
+              placeholder="Selecione ou crie uma ordem de serviço"
+              emptyText="Digite para criar"
+              searchPlaceholder="Pesquisar..."
+              disabled={disabled || isCreatingService}
+              async={true}
+              allowCreate={true}
+              createLabel={(value) => `Criar "${value}"`}
+              onCreate={handleCreateService}
+              isCreating={isCreatingService}
+              queryKey={["services", "search", SERVICE_ORDER_TYPE.NEGOTIATION]}
+              queryFn={searchServices}
+              getOptionLabel={(service) => service.description}
+              getOptionValue={(service) => service.description}
+              renderOption={(service) => <span>{service.description}</span>}
+              loadMoreText="Carregar mais"
+              loadingMoreText="Carregando..."
+              minSearchLength={0}
+              pageSize={50}
+              debounceMs={300}
+              className="w-full"
+            />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+}

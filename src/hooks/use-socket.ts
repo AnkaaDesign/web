@@ -32,7 +32,6 @@ export function useSocket(): Socket | null {
     isConnectingRef.current = true;
 
     try {
-      console.log('[useSocket] Initializing socket connection');
       const socket = socketService.connect(token);
       socketRef.current = socket;
     } catch (error) {
@@ -43,7 +42,6 @@ export function useSocket(): Socket | null {
 
     // Cleanup function
     return () => {
-      console.log('[useSocket] Cleaning up socket connection');
       socketService.disconnect();
       socketRef.current = null;
       isConnectingRef.current = false;
