@@ -705,6 +705,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     yPosition: "Posição Y",
     taskId: "Tarefa",
     garageId: "Garagem",
+    spot: "Localização",
     vehicle_movement: "Movimentação de Veículo",
     parking_position: "Posição de Estacionamento",
     // Related task fields
@@ -1226,14 +1227,19 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   }
 
   // Handle truck spot
-  if ((field === "spot" || field === "truck.spot") && typeof value === "string") {
-    if (value === "PATIO") return "Pátio";
-    // Parse B1_F1_V1 format -> "Garagem 1, Fila 1, Vaga 1"
-    const match = value.match(/B(\d)_F(\d)_V(\d)/);
-    if (match) {
-      return `Garagem ${match[1]}, Fila ${match[2]}, Vaga ${match[3]}`;
+  if (field === "spot" || field === "truck.spot") {
+    // Handle empty/null case
+    if (!value || value === "" || value === null) return "Pátio";
+
+    if (typeof value === "string") {
+      if (value === "PATIO") return "Pátio";
+      // Parse B1_F1_V1 format -> "Garagem 1 - Fila 1 - Vaga 1"
+      const match = value.match(/B(\d)_F(\d)_V(\d)/);
+      if (match) {
+        return `Garagem ${match[1]} - Fila ${match[2]} - Vaga ${match[3]}`;
+      }
+      return value;
     }
-    return value;
   }
 
   // Handle cut origin

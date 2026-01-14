@@ -29,7 +29,7 @@ import {
   TRUCK_MANUFACTURER_LABELS,
 } from "../../constants/enum-labels";
 import { ENTITY_BADGE_CONFIG, PAINT_FINISH } from "../../constants";
-import { formatRelativeTime, getFieldLabel, formatFieldValue, getActionLabel } from "../../utils";
+import { formatRelativeTime, formatDateTime, getFieldLabel, formatFieldValue, getActionLabel } from "../../utils";
 import { useChangeLogs } from "../../hooks";
 import { useEntityDetails } from "@/hooks/use-entity-details";
 import { cn } from "@/lib/utils";
@@ -224,33 +224,60 @@ const renderCutsCards = (cuts: any[]) => {
   );
 };
 
-// Render services as cards
+// Render services as cards - enhanced to match service order component
 const renderServicesCards = (services: any[]) => {
   if (!Array.isArray(services) || services.length === 0) {
-    return <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>;
+    return null;
   }
 
   const statusLabels: Record<string, string> = {
     PENDING: "Pendente",
     IN_PROGRESS: "Em Progresso",
+    WAITING_APPROVE: "Aguardando Aprovação",
     COMPLETED: "Concluído",
     CANCELLED: "Cancelado",
   };
 
+  const typeLabels: Record<string, string> = {
+    PRODUCTION: "Produção",
+    ART: "Arte",
+    AIRBRUSH: "Aerografia",
+    OTHER: "Outro",
+  };
+
   return (
-    <div className="space-y-2 mt-2">
+    <div className="space-y-3 mt-2">
       {services.map((service: any, index: number) => (
-        <div key={index} className="border rounded-lg px-2.5 py-1.5 bg-card">
-          <div className="flex items-center justify-between gap-2">
-            <h4 className="text-xs font-semibold truncate flex-1">
-              {service.description || "Serviço"}
-            </h4>
-            {service.status && (
-              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 flex-shrink-0">
-                {statusLabels[service.status] || service.status}
-              </Badge>
-            )}
-          </div>
+        <div key={index} className="border rounded-lg p-3 bg-card space-y-2">
+          {/* Description */}
+          {service.description && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Descrição: </span>
+              <span className="text-foreground font-medium">{service.description}</span>
+            </div>
+          )}
+
+          {/* Type */}
+          {service.type && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Tipo: </span>
+              <span className="text-foreground font-medium">
+                {typeLabels[service.type] || service.type}
+              </span>
+            </div>
+          )}
+
+          {/* Status - REMOVED as service orders have their own changelog */}
+
+          {/* Timestamps - REMOVED as service orders have their own changelog */}
+
+          {/* Assigned user */}
+          {service.assignedTo?.name && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Responsável: </span>
+              <span className="text-foreground">{service.assignedTo.name}</span>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -724,8 +751,13 @@ const ChangelogTimelineItem = ({
 
   // SERVICE_ORDER UPDATE - Special handling to group related changes
   if (entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER && firstChange.action === CHANGE_LOG_ACTION.UPDATE) {
+    // Get service order details from entityDetails
+    const serviceOrderDetails = entityDetails?.serviceOrders?.get(firstChange.entityId);
+
     // Group related field changes intelligently for service orders
     const statusChange = changelogGroup.find(c => c.field === 'status');
+    const descriptionChange = changelogGroup.find(c => c.field === 'description');
+    const typeChange = changelogGroup.find(c => c.field === 'type');
     const timestampChanges = changelogGroup.filter(c =>
       ['startedAt', 'finishedAt', 'approvedAt', 'completedAt'].includes(c.field || '')
     );
@@ -734,7 +766,7 @@ const ChangelogTimelineItem = ({
     );
     const otherChanges = changelogGroup.filter(c =>
       c.field &&
-      !['status', 'statusOrder', 'startedAt', 'finishedAt', 'approvedAt', 'completedAt', 'startedById', 'completedById', 'approvedById'].includes(c.field)
+      !['status', 'statusOrder', 'description', 'type', 'startedAt', 'finishedAt', 'approvedAt', 'completedAt', 'startedById', 'completedById', 'approvedById'].includes(c.field)
     );
 
     // Build a summary of the status change
@@ -759,8 +791,19 @@ const ChangelogTimelineItem = ({
         return false;
       });
       if (relevantTimestamp?.newValue) {
-        const date = new Date(relevantTimestamp.newValue);
-        statusSummary.timestamp = date.toLocaleDateString('pt-BR') + ' - ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        // Parse the value - handle both double-encoded (old data) and correct format (new data)
+        let dateValue = relevantTimestamp.newValue;
+
+        // If the value is a string that looks like a JSON-encoded string, parse it
+        if (typeof dateValue === 'string' && dateValue.startsWith('"') && dateValue.endsWith('"')) {
+          try {
+            dateValue = JSON.parse(dateValue);
+          } catch (e) {
+            // If parsing fails, use as-is
+          }
+        }
+
+        statusSummary.timestamp = formatDateTime(dateValue);
       }
 
       // Add user info if available
@@ -791,22 +834,32 @@ const ChangelogTimelineItem = ({
               <div className="text-sm text-muted-foreground">{formatRelativeTime(firstChange.createdAt)}</div>
             </div>
 
-            {/* Status change summary */}
+            {/* Service Order identification - show description and type */}
+            {(descriptionChange || typeChange || serviceOrderDetails) && (
+              <div className="mb-3 space-y-2">
+                {(descriptionChange?.newValue || serviceOrderDetails?.description) && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Descrição: </span>
+                    <span className="text-foreground font-medium">
+                      {descriptionChange?.newValue || serviceOrderDetails?.description}
+                    </span>
+                  </div>
+                )}
+                {(typeChange?.newValue || serviceOrderDetails?.type) && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Tipo: </span>
+                    <span className="text-foreground font-medium">
+                      {SERVICE_ORDER_TYPE_LABELS[(typeChange?.newValue || serviceOrderDetails?.type) as keyof typeof SERVICE_ORDER_TYPE_LABELS] || (typeChange?.newValue || serviceOrderDetails?.type)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Status change summary - WITHOUT redundant info */}
             {statusSummary && (
-              <div className="mb-3 p-3 bg-muted/50 rounded-lg">
+              <div className="mb-3">
                 <div className="font-medium text-foreground">{statusSummary.title}</div>
-                {statusSummary.timestamp && (
-                  <div className="text-sm text-muted-foreground mt-1">
-                    <IconClock className="inline h-3.5 w-3.5 mr-1" />
-                    {statusSummary.timestamp}
-                  </div>
-                )}
-                {statusSummary.user && (
-                  <div className="text-sm text-muted-foreground mt-1">
-                    <IconUser className="inline h-3.5 w-3.5 mr-1" />
-                    Por: {statusSummary.user}
-                  </div>
-                )}
               </div>
             )}
 
@@ -862,6 +915,32 @@ const ChangelogTimelineItem = ({
                 // Exclude internal/system fields from display
                 if (changelog.field === "statusOrder") return false;
                 if (changelog.field === "colorOrder") return false;
+
+                // For services field, only show if there's a meaningful change (count changed)
+                if (changelog.field === "services") {
+                  const parseValue = (val: any) => {
+                    if (!val) return null;
+                    if (typeof val === "string" && (val.trim().startsWith("[") || val.trim().startsWith("{"))) {
+                      try {
+                        return JSON.parse(val);
+                      } catch (e) {
+                        return null;
+                      }
+                    }
+                    return val;
+                  };
+
+                  const oldParsed = parseValue(changelog.oldValue);
+                  const newParsed = parseValue(changelog.newValue);
+                  const oldCount = Array.isArray(oldParsed) ? oldParsed.length : 0;
+                  const newCount = Array.isArray(newParsed) ? newParsed.length : 0;
+
+                  // Only show if count actually changed (services added or removed)
+                  if (oldCount === newCount) {
+                    return false;
+                  }
+                }
+
                 return true;
               })
               .map((changelog, index) => {
@@ -873,13 +952,15 @@ const ChangelogTimelineItem = ({
                   <div key={changelog.id}>
                     {index > 0 && <div className="my-3 border-t" />}
 
-                    {/* Field name */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-sm text-muted-foreground">
-                        <span className="text-muted-foreground">Campo: </span>
-                        <span className="text-foreground font-medium">{getFieldLabel(changelog.field, entityType)}</span>
+                    {/* Field name - Hide for services field as it renders as cards */}
+                    {changelog.field !== "services" && (
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm text-muted-foreground">
+                          <span className="text-muted-foreground">Campo: </span>
+                          <span className="text-foreground font-medium">{getFieldLabel(changelog.field, entityType)}</span>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Values */}
                     <div className="space-y-1">
@@ -929,16 +1010,32 @@ const ChangelogTimelineItem = ({
                               };
                               const oldParsed = parseValue(changelog.oldValue);
                               const newParsed = parseValue(changelog.newValue);
+
+                              // Check if services were actually added or removed (count changed)
+                              const oldCount = Array.isArray(oldParsed) ? oldParsed.length : 0;
+                              const newCount = Array.isArray(newParsed) ? newParsed.length : 0;
+
+                              // If count is the same, services weren't added/removed, just updated internally
+                              // This shouldn't happen since we filter it out, but just in case
+                              if (oldCount === newCount && oldCount > 0) {
+                                return null;
+                              }
+
+                              // ALWAYS show Antes/Depois when count changed (more clear for user)
                               return (
                                 <>
-                                  <div>
-                                    <span className="text-sm text-muted-foreground">Antes:</span>
-                                    {renderServicesCards(oldParsed)}
-                                  </div>
-                                  <div className="mt-3">
-                                    <span className="text-sm text-muted-foreground">Depois:</span>
-                                    {renderServicesCards(newParsed)}
-                                  </div>
+                                  {oldParsed && Array.isArray(oldParsed) && oldParsed.length > 0 && (
+                                    <div>
+                                      <span className="text-sm text-muted-foreground mb-2 block">Antes:</span>
+                                      {renderServicesCards(oldParsed)}
+                                    </div>
+                                  )}
+                                  {newParsed && Array.isArray(newParsed) && newParsed.length > 0 && (
+                                    <div className={oldParsed && Array.isArray(oldParsed) && oldParsed.length > 0 ? "mt-3" : ""}>
+                                      <span className="text-sm text-muted-foreground mb-2 block">Depois:</span>
+                                      {renderServicesCards(newParsed)}
+                                    </div>
+                                  )}
                                 </>
                               );
                             })()
@@ -1291,8 +1388,20 @@ export function TaskWithServiceOrdersChangelog({
     const userIds = new Set<string>();
     const invoiceToIds = new Set<string>();
     const truckIds = new Set<string>();
+    const serviceOrderIdsSet = new Set<string>();
 
     combinedChangelogs.forEach((changelog) => {
+      // Collect service order IDs from SERVICE_ORDER entity changelogs
+      if (changelog.entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER && changelog.entityId) {
+        serviceOrderIdsSet.add(changelog.entityId);
+      }
+
+      // Also collect user IDs from service order related fields
+      if (changelog.field === "startedById" || changelog.field === "completedById" || changelog.field === "approvedById" || changelog.field === "assignedToId") {
+        if (changelog.oldValue && typeof changelog.oldValue === "string") userIds.add(changelog.oldValue);
+        if (changelog.newValue && typeof changelog.newValue === "string") userIds.add(changelog.newValue);
+      }
+
       // Extract customer IDs
       if (changelog.field === "customerId") {
         if (changelog.oldValue && typeof changelog.oldValue === "string") customerIds.add(changelog.oldValue);
@@ -1380,6 +1489,7 @@ export function TaskWithServiceOrdersChangelog({
       userIds: Array.from(userIds),
       invoiceToIds: Array.from(invoiceToIds),
       truckIds: Array.from(truckIds),
+      serviceOrderIds: Array.from(serviceOrderIdsSet),
     };
   }, [combinedChangelogs]);
 

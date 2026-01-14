@@ -31,7 +31,7 @@ import {
 } from "@tabler/icons-react";
 import type { ChangeLog } from "../../types";
 import { CHANGE_LOG_ENTITY_TYPE, CHANGE_LOG_ACTION, CHANGE_TRIGGERED_BY, CHANGE_LOG_ENTITY_TYPE_LABELS } from "../../constants";
-import { formatRelativeTime, getFieldLabel, formatFieldValue, getActionLabel } from "../../utils";
+import { formatRelativeTime, formatDateTime, getFieldLabel, formatFieldValue, getActionLabel } from "../../utils";
 import { useChangeLogs } from "../../hooks";
 import { cn } from "@/lib/utils";
 import { useEntityDetails } from "@/hooks/use-entity-details";
@@ -339,33 +339,80 @@ const renderCutsCards = (cuts: any[]) => {
   );
 };
 
-// Render services as cards
+// Render services as cards - enhanced to match service order component
 const renderServicesCards = (services: any[]) => {
   if (!Array.isArray(services) || services.length === 0) {
-    return <span className="text-red-600 dark:text-red-400 font-medium ml-1">—</span>;
+    return null;
   }
 
   const statusLabels: Record<string, string> = {
     PENDING: "Pendente",
     IN_PROGRESS: "Em Progresso",
+    WAITING_APPROVE: "Aguardando Aprovação",
     COMPLETED: "Concluído",
     CANCELLED: "Cancelado",
   };
 
+  const typeLabels: Record<string, string> = {
+    PRODUCTION: "Produção",
+    ART: "Arte",
+    AIRBRUSH: "Aerografia",
+    OTHER: "Outro",
+  };
+
   return (
-    <div className="space-y-2 mt-2">
+    <div className="space-y-3 mt-2">
       {services.map((service: any, index: number) => (
-        <div key={index} className="border rounded-lg px-2.5 py-1.5 bg-card">
-          <div className="flex items-center justify-between gap-2">
-            <h4 className="text-xs font-semibold truncate flex-1">
-              {service.description || "Serviço"}
-            </h4>
-            {service.status && (
-              <Badge variant="secondary" className="text-[10px] h-4 px-1.5 flex-shrink-0">
+        <div key={index} className="border rounded-lg p-3 bg-card space-y-2">
+          {/* Description */}
+          {service.description && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Descrição: </span>
+              <span className="text-foreground font-medium">{service.description}</span>
+            </div>
+          )}
+
+          {/* Type */}
+          {service.type && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Tipo: </span>
+              <span className="text-foreground font-medium">
+                {typeLabels[service.type] || service.type}
+              </span>
+            </div>
+          )}
+
+          {/* Status */}
+          {service.status && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Status: </span>
+              <Badge variant="secondary" className="text-[10px] h-5 px-2">
                 {statusLabels[service.status] || service.status}
               </Badge>
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Timestamps */}
+          {service.startedAt && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Iniciado: </span>
+              <span className="text-foreground">{formatDateTime(service.startedAt)}</span>
+            </div>
+          )}
+          {service.finishedAt && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Finalizado: </span>
+              <span className="text-foreground">{formatDateTime(service.finishedAt)}</span>
+            </div>
+          )}
+
+          {/* Assigned user */}
+          {service.assignedTo?.name && (
+            <div className="text-sm">
+              <span className="text-muted-foreground">Responsável: </span>
+              <span className="text-foreground">{service.assignedTo.name}</span>
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -752,8 +799,13 @@ const ChangelogTimelineItem = ({
 
           {/* SERVICE_ORDER UPDATE - Special handling to group related changes */}
           {entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER && firstChange.action === CHANGE_LOG_ACTION.UPDATE && (() => {
+            // Get service order details from entityDetails
+            const serviceOrderDetails = entityDetails?.serviceOrders?.get(firstChange.entityId);
+
             // Group related field changes intelligently for service orders
             const statusChange = changelogGroup.find(c => c.field === 'status');
+            const descriptionChange = changelogGroup.find(c => c.field === 'description');
+            const typeChange = changelogGroup.find(c => c.field === 'type');
             const timestampChanges = changelogGroup.filter(c =>
               ['startedAt', 'finishedAt', 'approvedAt', 'completedAt'].includes(c.field || '')
             );
@@ -762,7 +814,7 @@ const ChangelogTimelineItem = ({
             );
             const otherChanges = changelogGroup.filter(c =>
               c.field &&
-              !['status', 'statusOrder', 'startedAt', 'finishedAt', 'approvedAt', 'completedAt', 'startedById', 'completedById', 'approvedById'].includes(c.field)
+              !['status', 'statusOrder', 'description', 'type', 'startedAt', 'finishedAt', 'approvedAt', 'completedAt', 'startedById', 'completedById', 'approvedById'].includes(c.field)
             );
 
             // Build a summary of the status change
@@ -787,8 +839,19 @@ const ChangelogTimelineItem = ({
                 return false;
               });
               if (relevantTimestamp?.newValue) {
-                const date = new Date(relevantTimestamp.newValue);
-                statusSummary.timestamp = date.toLocaleDateString('pt-BR') + ' - ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                // Parse the value - handle both double-encoded (old data) and correct format (new data)
+                let dateValue = relevantTimestamp.newValue;
+
+                // If the value is a string that looks like a JSON-encoded string, parse it
+                if (typeof dateValue === 'string' && dateValue.startsWith('"') && dateValue.endsWith('"')) {
+                  try {
+                    dateValue = JSON.parse(dateValue);
+                  } catch (e) {
+                    // If parsing fails, use as-is
+                  }
+                }
+
+                statusSummary.timestamp = formatDateTime(dateValue);
               }
 
               // Add user info if available
@@ -805,6 +868,28 @@ const ChangelogTimelineItem = ({
 
             return (
               <div className="space-y-3">
+                {/* Service Order identification - show description and type */}
+                {(descriptionChange || typeChange || serviceOrderDetails) && (
+                  <div className="mb-3 space-y-2">
+                    {(descriptionChange?.newValue || serviceOrderDetails?.description) && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Descrição: </span>
+                        <span className="text-foreground font-medium">
+                          {descriptionChange?.newValue || serviceOrderDetails?.description}
+                        </span>
+                      </div>
+                    )}
+                    {(typeChange?.newValue || serviceOrderDetails?.type) && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Tipo: </span>
+                        <span className="text-foreground font-medium">
+                          {SERVICE_ORDER_TYPE_LABELS[(typeChange?.newValue || serviceOrderDetails?.type) as keyof typeof SERVICE_ORDER_TYPE_LABELS] || (typeChange?.newValue || serviceOrderDetails?.type)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Status change summary */}
                 {statusSummary && (
                   <div className="mb-3 p-3 bg-muted/50 rounded-lg">
@@ -852,6 +937,32 @@ const ChangelogTimelineItem = ({
                 // Exclude internal/system fields from display
                 if (changelog.field === "statusOrder") return false;
                 if (changelog.field === "colorOrder") return false;
+
+                // Exclude services field when it's just internal updates (service orders have their own changelog)
+                if (changelog.field === "services") {
+                  const parseValue = (val: any) => {
+                    if (!val) return val;
+                    if (typeof val === "string" && (val.trim().startsWith("[") || val.trim().startsWith("{"))) {
+                      try {
+                        return JSON.parse(val);
+                      } catch (e) {
+                        return val;
+                      }
+                    }
+                    return val;
+                  };
+
+                  const oldParsed = parseValue(changelog.oldValue);
+                  const newParsed = parseValue(changelog.newValue);
+                  const oldCount = Array.isArray(oldParsed) ? oldParsed.length : 0;
+                  const newCount = Array.isArray(newParsed) ? newParsed.length : 0;
+
+                  // If count is the same, services weren't added/removed, just updated - don't show
+                  if (oldCount === newCount && oldCount > 0) {
+                    return false;
+                  }
+                }
+
                 return true;
               })
               .map((changelog, index) => {
@@ -865,40 +976,42 @@ const ChangelogTimelineItem = ({
                 <div key={changelog.id}>
                   {showSeparator && <Separator className="my-3" />}
 
-                  {/* Field name */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-sm text-muted-foreground">
-                      <span className="text-muted-foreground">Campo: </span>
-                      <span className="text-foreground font-medium">{getFieldLabel(changelog.field, entityType)}</span>
-                    </div>
+                  {/* Field name - Hide for services field as it renders as cards */}
+                  {changelog.field !== "services" && (
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm text-muted-foreground">
+                        <span className="text-muted-foreground">Campo: </span>
+                        <span className="text-foreground font-medium">{getFieldLabel(changelog.field, entityType)}</span>
+                      </div>
 
-                    {/* Rollback button */}
-                    {(firstChange.action === CHANGE_LOG_ACTION.UPDATE || firstChange.action === CHANGE_LOG_ACTION.ROLLBACK) &&
-                      changelog.field &&
-                      changelog.oldValue !== null &&
-                      onRollback &&
-                      entityType === CHANGE_LOG_ENTITY_TYPE.TASK && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => onRollback(changelog.id, getFieldLabel(changelog.field!, entityType))}
-                          disabled={rollbackLoading === changelog.id}
-                          className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        >
-                          {rollbackLoading === changelog.id ? (
-                            <>
-                              <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
-                              Revertendo...
-                            </>
-                          ) : (
-                            <>
-                              <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
-                              Reverter
-                            </>
-                          )}
-                        </Button>
-                      )}
-                  </div>
+                      {/* Rollback button */}
+                      {(firstChange.action === CHANGE_LOG_ACTION.UPDATE || firstChange.action === CHANGE_LOG_ACTION.ROLLBACK) &&
+                        changelog.field &&
+                        changelog.oldValue !== null &&
+                        onRollback &&
+                        entityType === CHANGE_LOG_ENTITY_TYPE.TASK && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onRollback(changelog.id, getFieldLabel(changelog.field!, entityType))}
+                            disabled={rollbackLoading === changelog.id}
+                            className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                          >
+                            {rollbackLoading === changelog.id ? (
+                              <>
+                                <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin mr-1" />
+                                Revertendo...
+                              </>
+                            ) : (
+                              <>
+                                <IconArrowBackUpDouble className="w-3 h-3 mr-1" />
+                                Reverter
+                              </>
+                            )}
+                          </Button>
+                        )}
+                    </div>
+                  )}
 
                   {/* Values */}
                   <div className="space-y-1">
@@ -937,7 +1050,7 @@ const ChangelogTimelineItem = ({
                             );
                           })()
                         ) : changelog.field === "services" ? (
-                          // Special handling for services - render as cards (handles all cases: add, remove, update)
+                          // Special handling for services - DON'T show for TASK since service orders have their own changelog
                           (() => {
                             const parseValue = (val: any) => {
                               if (!val) return val;
@@ -954,18 +1067,64 @@ const ChangelogTimelineItem = ({
                             const oldParsed = parseValue(changelog.oldValue);
                             const newParsed = parseValue(changelog.newValue);
 
-                            return (
-                              <>
+                            // Check if old or new is empty
+                            const hasOld = Array.isArray(oldParsed) && oldParsed.length > 0;
+                            const hasNew = Array.isArray(newParsed) && newParsed.length > 0;
+
+                            // Check if services were actually added or removed (count changed)
+                            const oldCount = Array.isArray(oldParsed) ? oldParsed.length : 0;
+                            const newCount = Array.isArray(newParsed) ? newParsed.length : 0;
+
+                            // If count is the same, services weren't added/removed, just updated internally
+                            // In this case, don't show anything - individual service order changelogs will show below
+                            if (oldCount === newCount && oldCount > 0) {
+                              return null;
+                            }
+
+                            // Only show services being added (no "Antes:/Depois:" labels)
+                            if (!hasOld && hasNew) {
+                              return renderServicesCards(newParsed);
+                            }
+
+                            // Only show services being removed
+                            if (hasOld && !hasNew) {
+                              return (
                                 <div>
-                                  <span className="text-sm text-muted-foreground">Antes:</span>
+                                  <span className="text-sm text-muted-foreground mb-2 block">Removidos:</span>
                                   {renderServicesCards(oldParsed)}
                                 </div>
-                                <div className="mt-3">
-                                  <span className="text-sm text-muted-foreground">Depois:</span>
-                                  {renderServicesCards(newParsed)}
-                                </div>
-                              </>
-                            );
+                              );
+                            }
+
+                            // Show added and removed services when count changed
+                            if (hasOld && hasNew && oldCount !== newCount) {
+                              // Find which services were added/removed by ID
+                              const oldIds = new Set(oldParsed.map((s: any) => s.id).filter(Boolean));
+                              const newIds = new Set(newParsed.map((s: any) => s.id).filter(Boolean));
+
+                              const addedServices = newParsed.filter((s: any) => s.id && !oldIds.has(s.id));
+                              const removedServices = oldParsed.filter((s: any) => s.id && !newIds.has(s.id));
+
+                              return (
+                                <>
+                                  {removedServices.length > 0 && (
+                                    <div className="mb-3">
+                                      <span className="text-sm text-muted-foreground mb-2 block">Removidos:</span>
+                                      {renderServicesCards(removedServices)}
+                                    </div>
+                                  )}
+                                  {addedServices.length > 0 && (
+                                    <div>
+                                      {removedServices.length > 0 && <span className="text-sm text-muted-foreground mb-2 block">Adicionados:</span>}
+                                      {renderServicesCards(addedServices)}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            }
+
+                            // Nothing to show
+                            return null;
                           })()
                         ) : changelog.field === "airbrushings" ? (
                           // Special handling for airbrushings - render as cards (handles all cases: add, remove, update)
@@ -1455,8 +1614,20 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
     const fileIds = new Set<string>();
     const observationIds = new Set<string>();
     const truckIds = new Set<string>();
+    const serviceOrderIds = new Set<string>();
 
     changelogs.forEach((changelog) => {
+      // Collect service order IDs from SERVICE_ORDER entity type changelogs
+      if (changelog.entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER && changelog.entityId) {
+        serviceOrderIds.add(changelog.entityId);
+      }
+
+      // Also collect user IDs from service order related fields
+      if (changelog.field === "startedById" || changelog.field === "completedById" || changelog.field === "approvedById" || changelog.field === "assignedToId") {
+        if (changelog.oldValue && typeof changelog.oldValue === "string") userIds.add(changelog.oldValue);
+        if (changelog.newValue && typeof changelog.newValue === "string") userIds.add(changelog.newValue);
+      }
+
       if (changelog.field === "categoryId") {
         if (changelog.oldValue && typeof changelog.oldValue === "string") categoryIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string") categoryIds.add(changelog.newValue);
@@ -1537,6 +1708,7 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
       fileIds: Array.from(fileIds),
       observationIds: Array.from(observationIds),
       truckIds: Array.from(truckIds),
+      serviceOrderIds: Array.from(serviceOrderIds),
     };
   }, [changelogs]);
 

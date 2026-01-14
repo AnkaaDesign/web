@@ -2125,7 +2125,9 @@ export const TaskDetailsPage = () => {
                   <div className="flex-1 space-y-3">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-base">{task.generalPainting?.name}</h3>
-                      <span className="text-xs font-mono text-muted-foreground">{task.generalPainting?.hex}</span>
+                      {task.generalPainting?.code && (
+                        <span className="text-xs font-mono text-muted-foreground">{task.generalPainting.code}</span>
+                      )}
                     </div>
 
                     {/* Badges - unified neutral style, no icons */}
@@ -2188,7 +2190,9 @@ export const TaskDetailsPage = () => {
                         {/* Paint info */}
                         <div className="flex-1 min-w-0 space-y-1">
                       <h6 className="font-medium text-sm truncate">{groundPaint.name}</h6>
-                      <code className="text-xs font-mono text-muted-foreground">{groundPaint.hex}</code>
+                      {groundPaint.code && (
+                        <code className="text-xs font-mono text-muted-foreground">{groundPaint.code}</code>
+                      )}
                       <div className="flex flex-wrap gap-1">
                         {groundPaint.paintType?.name && (
                           <Badge className={cn("text-xs", PAINT_BADGE_STYLE)}>
@@ -2258,7 +2262,9 @@ export const TaskDetailsPage = () => {
                       <div className="flex-1 space-y-3">
                     <div className="flex items-center gap-2">
                       <h3 className="font-semibold text-base">{paint.name}</h3>
-                      <span className="text-xs font-mono text-muted-foreground">{paint.hex}</span>
+                      {paint.code && (
+                        <span className="text-xs font-mono text-muted-foreground">{paint.code}</span>
+                      )}
                     </div>
 
                     {/* Badges - unified neutral style, no icons */}

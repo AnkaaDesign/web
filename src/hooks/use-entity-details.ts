@@ -12,13 +12,14 @@ import {
   getFileById,
   getObservationById,
   getTruckById,
+  getServiceOrderById,
 } from "../api-client";
 
 interface EntityDetails {
   categories: Map<string, string>;
   brands: Map<string, string>;
   suppliers: Map<string, string>;
-  users: Map<string, string>;
+  users: Map<string, { name: string; email?: string }>;
   customers: Map<string, string>;
   sectors: Map<string, string>;
   paints: Map<string, any>; // Changed to any to store full paint objects with hex, finish, brand, etc.
@@ -27,6 +28,7 @@ interface EntityDetails {
   files: Map<string, string>;
   observations: Map<string, string>;
   trucks: Map<string, string>;
+  serviceOrders: Map<string, any>; // Store full service order objects with description, type, status, etc.
 }
 
 export function useEntityDetails(entityIds: {
@@ -42,6 +44,7 @@ export function useEntityDetails(entityIds: {
   fileIds?: string[];
   observationIds?: string[];
   truckIds?: string[];
+  serviceOrderIds?: string[];
 }) {
   const uniqueCategoryIds = [...new Set(entityIds.categoryIds || [])].filter(Boolean);
   const uniqueBrandIds = [...new Set(entityIds.brandIds || [])].filter(Boolean);
@@ -55,6 +58,7 @@ export function useEntityDetails(entityIds: {
   const uniqueFileIds = [...new Set(entityIds.fileIds || [])].filter(Boolean);
   const uniqueObservationIds = [...new Set(entityIds.observationIds || [])].filter(Boolean);
   const uniqueTruckIds = [...new Set(entityIds.truckIds || [])].filter(Boolean);
+  const uniqueServiceOrderIds = [...new Set(entityIds.serviceOrderIds || [])].filter(Boolean);
 
   return useQuery({
     queryKey: [
@@ -71,6 +75,7 @@ export function useEntityDetails(entityIds: {
       uniqueFileIds,
       uniqueObservationIds,
       uniqueTruckIds,
+      uniqueServiceOrderIds,
     ],
     queryFn: async () => {
       const details: EntityDetails = {
@@ -86,6 +91,7 @@ export function useEntityDetails(entityIds: {
         files: new Map(),
         observations: new Map(),
         trucks: new Map(),
+        serviceOrders: new Map(),
       };
 
       // Fetch all categories
@@ -135,7 +141,11 @@ export function useEntityDetails(entityIds: {
         try {
           const response = await getUserById(id, {});
           if (response?.success && response.data) {
-            details.users.set(id, (response.data as any).name || `Usuário ${id.slice(0, 8)}`);
+            const userData = response.data as any;
+            details.users.set(id, {
+              name: userData.name || `Usuário ${id.slice(0, 8)}`,
+              email: userData.email,
+            });
           }
         } catch (error) {
           if (process.env.NODE_ENV !== 'production') {
@@ -262,6 +272,26 @@ export function useEntityDetails(entityIds: {
         }
       });
 
+      // Fetch all service orders with full details
+      const serviceOrderPromises = uniqueServiceOrderIds.map(async (id) => {
+        try {
+          const response = await getServiceOrderById({
+            id,
+            include: {
+              assignedTo: true,
+            },
+          });
+          if (response?.success && response.data) {
+            // Store the full service order object
+            details.serviceOrders.set(id, response.data);
+          }
+        } catch (error) {
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`Failed to fetch service order ${id}:`, error);
+          }
+        }
+      });
+
       await Promise.all([
         ...categoryPromises,
         ...brandPromises,
@@ -275,6 +305,7 @@ export function useEntityDetails(entityIds: {
         ...filePromises,
         ...observationPromises,
         ...truckPromises,
+        ...serviceOrderPromises,
       ]);
 
       return details;
@@ -291,7 +322,8 @@ export function useEntityDetails(entityIds: {
       uniqueItemIds.length > 0 ||
       uniqueFileIds.length > 0 ||
       uniqueObservationIds.length > 0 ||
-      uniqueTruckIds.length > 0,
+      uniqueTruckIds.length > 0 ||
+      uniqueServiceOrderIds.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }
