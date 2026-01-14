@@ -633,10 +633,10 @@ const taskTransform = (data: any): any => {
   }
 
   if (data.isOnHold === true) {
-    andConditions.push({ status: TASK_STATUS.ON_HOLD });
+    andConditions.push({ status: TASK_STATUS.PREPARATION });
     delete data.isOnHold;
   } else if (data.isOnHold === false) {
-    andConditions.push({ status: { not: TASK_STATUS.ON_HOLD } });
+    andConditions.push({ status: { not: TASK_STATUS.PREPARATION } });
     delete data.isOnHold;
   }
 
@@ -1505,7 +1505,8 @@ export const mapTaskToFormData = createMapToFormDataHelper<Task, TaskUpdateFormD
   receiptIds: task.receipts?.map((receipt) => receipt.id),
   reimbursementIds: task.reimbursements?.map((reimbursement) => reimbursement.id),
   reimbursementInvoiceIds: task.reimbursementInvoices?.map((reimbursementInvoice) => reimbursementInvoice.id),
-  artworkIds: task.artworks?.map((artwork) => artwork.id),
+  // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
+  artworkIds: task.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id),
   baseFileIds: task.baseFiles?.map((baseFile) => baseFile.id),
   paintIds: task.logoPaints?.map((paint) => paint.id),
   // Complex relations need to be handled separately

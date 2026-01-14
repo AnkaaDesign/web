@@ -559,7 +559,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
 
     return {
       name: taskData.name || "",
-      status: taskData.status || TASK_STATUS.PENDING,
+      status: taskData.status || TASK_STATUS.PREPARATION,
       serialNumber: taskData.serialNumber || null,
       details: taskData.details || null,
       commission: taskData.commission || null,
@@ -596,7 +596,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           startedAt: so.startedAt ? new Date(so.startedAt) : null,
           finishedAt: so.finishedAt ? new Date(so.finishedAt) : null,
         })) || [],
-      artworkIds: taskData.artworks?.map((f) => f.id) || [],
+      // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
+      artworkIds: taskData.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
       baseFileIds: taskData.baseFiles?.map((f) => f.id) || [],
       truck: {
         plate: taskData.truck?.plate || null,
@@ -1741,7 +1742,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                                 onBlur={field.onBlur}
                                 ref={field.ref}
                                 placeholder="Ex: Pintura completa do caminhão"
-                                disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isLogisticUser}
+                                disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser}
                                 className="bg-transparent"
                               />
                             </FormControl>
@@ -1773,7 +1774,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                               placeholder="Selecione o cliente para faturamento"
                               emptyText="Nenhum cliente encontrado"
                               searchPlaceholder="Pesquisar clientes..."
-                              disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser}
+                              disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isLogisticUser}
                               async={true}
                               queryKey={["customers", "search", "invoiceTo"]}
                               queryFn={async (search: string, page: number = 1) => {
@@ -2103,7 +2104,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                               <Combobox
                                 value={field.value}
                                 onValueChange={field.onChange}
-                                disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isLogisticUser}
+                                disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser}
                                 options={[
                                   TASK_STATUS.PREPARATION,
                                   TASK_STATUS.WAITING_PRODUCTION,
@@ -2138,7 +2139,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                               <Combobox
                                 value={field.value || ""}
                                 onValueChange={(value) => field.onChange(value || null)}
-                                disabled={isSubmitting || isFinancialUser || isDesignerUser}
+                                disabled={isSubmitting || isFinancialUser || isDesignerUser || isLogisticUser || isWarehouseUser}
                                 options={[
                                   { value: "", label: "Não definido" },
                                   ...Object.values(COMMISSION_STATUS).map((status) => ({

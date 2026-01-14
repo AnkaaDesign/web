@@ -109,7 +109,8 @@ export function PayrollCalculation({
         case TASK_STATUS.IN_PRODUCTION:
           acc.inProgress++;
           break;
-        case TASK_STATUS.PENDING:
+        case TASK_STATUS.WAITING_PRODUCTION:
+        case TASK_STATUS.PREPARATION:
           acc.pending++;
           break;
       }

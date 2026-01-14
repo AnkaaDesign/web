@@ -490,6 +490,32 @@ function ServiceRow({
     }
   };
 
+  // Determine which service order types the user can create based on their privilege
+  const allowedServiceOrderTypes = useMemo(() => {
+    if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) {
+      return [
+        SERVICE_ORDER_TYPE.PRODUCTION,
+        SERVICE_ORDER_TYPE.FINANCIAL,
+        SERVICE_ORDER_TYPE.NEGOTIATION,
+        SERVICE_ORDER_TYPE.ARTWORK,
+      ];
+    }
+    if (userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
+      return [SERVICE_ORDER_TYPE.NEGOTIATION];
+    }
+    if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
+      return [SERVICE_ORDER_TYPE.FINANCIAL];
+    }
+    if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
+      return [SERVICE_ORDER_TYPE.ARTWORK];
+    }
+    if (userPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
+      return [SERVICE_ORDER_TYPE.PRODUCTION];
+    }
+    // Default: only production for other sectors
+    return [SERVICE_ORDER_TYPE.PRODUCTION];
+  }, [userPrivilege]);
+
   // Grid layout: consistent proportions for both grouped and ungrouped
   // Using min-w-0 on children to prevent content from affecting column width
   // Grouped: [Description 2fr] [User 1fr] [Status 1fr] [Buttons 80px]
@@ -511,13 +537,8 @@ function ServiceRow({
                 <Combobox
                   value={field.value || SERVICE_ORDER_TYPE.PRODUCTION}
                   onValueChange={field.onChange}
-                  disabled={disabled}
-                  options={[
-                    SERVICE_ORDER_TYPE.PRODUCTION,
-                    SERVICE_ORDER_TYPE.FINANCIAL,
-                    SERVICE_ORDER_TYPE.NEGOTIATION,
-                    SERVICE_ORDER_TYPE.ARTWORK,
-                  ].map((type) => ({
+                  disabled={disabled || allowedServiceOrderTypes.length === 1}
+                  options={allowedServiceOrderTypes.map((type) => ({
                     value: type,
                     label: SERVICE_ORDER_TYPE_LABELS[type],
                   }))}

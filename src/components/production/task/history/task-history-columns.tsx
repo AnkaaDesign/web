@@ -434,8 +434,8 @@ export const createTaskHistoryColumns = (options?: {
         // Determine suspension reason based on task status or other attributes
         let suspensionReason = "Comissão suspensa";
 
-        if (row.status === TASK_STATUS.ON_HOLD) {
-          suspensionReason = "Tarefa em espera";
+        if (row.status === TASK_STATUS.PREPARATION) {
+          suspensionReason = "Tarefa em preparação";
         } else if (row.status === TASK_STATUS.CANCELLED) {
           suspensionReason = "Tarefa cancelada";
         } else if (!row.finishedAt && row.term && new Date(row.term) < new Date()) {

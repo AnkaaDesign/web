@@ -434,7 +434,8 @@ export function TaskHistoryList({
                 updateData.term = sourceTask.term;
                 break;
               case "artworkIds":
-                updateData.artworkIds = sourceTask.artworks?.map((f) => f.id) || [];
+                // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
+                updateData.artworkIds = sourceTask.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [];
                 break;
               case "budgetId":
                 updateData.budgetId = sourceTask.budgetId;

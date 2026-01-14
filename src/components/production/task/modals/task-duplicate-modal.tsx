@@ -83,7 +83,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
     return {
       // Basic fields
       name: task.name,
-      status: TASK_STATUS.PENDING,
+      status: TASK_STATUS.PREPARATION,
       // Sanitize serialNumber - remove invalid characters, keep only A-Z, 0-9, and -
       serialNumber: (copyData.serialNumber || String(task.serialNumber || "")).replace(/[^A-Z0-9-]/gi, "").toUpperCase() || null,
       details: task.details,
@@ -100,14 +100,16 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       receiptId: task.receiptId,
 
       // Relations - copy artwork and paint IDs
-      artworkIds: task.artworks?.map((file) => file.id),
+      // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
+      artworkIds: task.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id),
       paintIds: task.logoPaints?.map((paint) => paint.id),
 
       // Complex relations - copy nested data
+      // observation.artworkIds must also be File IDs
       observation: task.observation
         ? {
             description: task.observation.description,
-            artworkIds: task.observation.artworks?.map((file) => file.id) || [],
+            artworkIds: task.observation.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
           }
         : null,
 

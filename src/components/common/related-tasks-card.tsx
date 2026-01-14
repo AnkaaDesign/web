@@ -49,14 +49,14 @@ const TASK_STATUS_CONFIG: Record<
     icon: any;
   }
 > = {
-  [TASK_STATUS.PENDING]: {
+  [TASK_STATUS.PREPARATION]: {
+    icon: IconPlayerPause,
+  },
+  [TASK_STATUS.WAITING_PRODUCTION]: {
     icon: IconClock,
   },
   [TASK_STATUS.IN_PRODUCTION]: {
     icon: IconHourglass,
-  },
-  [TASK_STATUS.ON_HOLD]: {
-    icon: IconPlayerPause,
   },
   [TASK_STATUS.COMPLETED]: {
     icon: IconCircleCheckFilled,
@@ -160,8 +160,8 @@ export function RelatedTasksCard({
     return [...filteredTasks].sort((a, b) => {
       const statusPriority: Record<string, number> = {
         [TASK_STATUS.IN_PRODUCTION]: 1,
-        [TASK_STATUS.ON_HOLD]: 2,
-        [TASK_STATUS.PENDING]: 3,
+        [TASK_STATUS.WAITING_PRODUCTION]: 2,
+        [TASK_STATUS.PREPARATION]: 3,
         [TASK_STATUS.COMPLETED]: 4,
         [TASK_STATUS.CANCELLED]: 5,
       };
@@ -553,7 +553,7 @@ export function RelatedTasksCard({
               }
             )
           ) : (
-            [TASK_STATUS.PENDING, TASK_STATUS.IN_PRODUCTION, TASK_STATUS.ON_HOLD, TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED].map(
+            [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION, TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED].map(
               (status: string) => {
                 const count = statistics.statusCounts[status] || 0;
                 const variant = getBadgeVariantFromStatus(status, "TASK");

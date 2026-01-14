@@ -369,7 +369,7 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       switch (action) {
         case "start":
           for (const task of tasks) {
-            if (task.status === TASK_STATUS.PENDING) {
+            if (task.status === TASK_STATUS.WAITING_PRODUCTION || task.status === TASK_STATUS.PREPARATION) {
               await updateAsync({
                 id: task.id,
                 data: { status: TASK_STATUS.IN_PRODUCTION, startedAt: new Date() },
@@ -489,10 +489,12 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
     if (!taskToDuplicate || copies.length === 0) return;
 
     // Build task data for each copy
+    // NOTE: task.artworks are now Artwork entities with { id, fileId, status, file?: File }
+    // We need to extract File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
     const buildTaskData = (copyData: { serialNumber?: string; plate?: string }) => ({
       // Basic fields
       name: taskToDuplicate.name,
-      status: TASK_STATUS.PENDING,
+      status: TASK_STATUS.PREPARATION,
       serialNumber: copyData.serialNumber || null,
       plate: copyData.plate || null,
       details: taskToDuplicate.details,
@@ -511,7 +513,8 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       commission: taskToDuplicate.commission, // Required field
 
       // Relations - only IDs
-      artworkIds: taskToDuplicate.artworks?.map((file) => file.id) || [],
+      // artworkIds must be File IDs, not Artwork entity IDs
+      artworkIds: taskToDuplicate.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
       paintIds: taskToDuplicate.logoPaints?.map((paint) => paint.id) || [],
 
       // Services - ensure it's an array with only required fields
@@ -534,11 +537,11 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
           }
         : null,
 
-      // Observation (if exists)
+      // Observation (if exists) - artworkIds must also be File IDs
       observation: taskToDuplicate.observation
         ? {
             description: taskToDuplicate.observation.description,
-            artworkIds: taskToDuplicate.observation.artworks?.map((file) => file.id) || [],
+            artworkIds: taskToDuplicate.observation.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
           }
         : null,
     });

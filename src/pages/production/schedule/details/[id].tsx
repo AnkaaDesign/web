@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils";
 import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { canViewServiceOrderType, canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
+import { canViewPricing } from "@/utils/permissions/pricing-permissions";
 import { SERVICE_ORDER_TYPE } from "../../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import {
@@ -621,6 +622,14 @@ export const TaskDetailsPage = () => {
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER)
   );
 
+  // Check if user can view artwork badges and non-approved artworks (ADMIN, COMMERCIAL, LOGISTIC, DESIGNER only)
+  const canViewArtworkBadges = currentUser && (
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER)
+  );
+
   // Get visible service order types based on user's sector privilege
   const visibleServiceOrderTypes = useMemo(
     () => getVisibleServiceOrderTypes(userSectorPrivilege),
@@ -632,6 +641,13 @@ export const TaskDetailsPage = () => {
 
   // Check if user can view airbrushing financial data (FINANCIAL or ADMIN only)
   const canViewAirbrushingFinancials = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN));
+
+  // Check if user can access airbrushing details page (ADMIN, FINANCIAL, or COMMERCIAL only)
+  const canAccessAirbrushingDetails = currentUser && (
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL)
+  );
 
   // Check if user can edit tasks (PRODUCTION, LEADER, ADMIN)
   const canEdit = canEditTasks(currentUser);
@@ -1059,7 +1075,7 @@ export const TaskDetailsPage = () => {
                 { label: taskDisplayName },
               ]}
               actions={[
-              ...(canEdit && task.status === TASK_STATUS.PENDING
+              ...(canEdit && task.status === TASK_STATUS.WAITING_PRODUCTION
                 ? [
                     {
                       key: "start",
@@ -1081,7 +1097,7 @@ export const TaskDetailsPage = () => {
                     },
                   ]
                 : []),
-              ...(canEdit && task.status === TASK_STATUS.ON_HOLD
+              ...(canEdit && task.status === TASK_STATUS.PREPARATION
                 ? [
                     {
                       key: "resume",
@@ -1425,8 +1441,8 @@ export const TaskDetailsPage = () => {
               </Card>
               )}
 
-              {/* Pricing Card - Hidden for Warehouse sector users */}
-              {sectionVisibility.isSectionVisible("pricing") && !isWarehouseSector && task.pricing && task.pricing.items && task.pricing.items.length > 0 && (() => {
+              {/* Pricing Card - Only visible to ADMIN, FINANCIAL, and COMMERCIAL sectors */}
+              {sectionVisibility.isSectionVisible("pricing") && canViewPricing(currentUser?.sector?.privileges || '') && task.pricing && task.pricing.items && task.pricing.items.length > 0 && (() => {
                 const statusConfig = {
                   DRAFT: { label: 'Rascunho', icon: IconClock, className: 'bg-gray-100 text-gray-700' },
                   APPROVED: { label: 'Aprovado', icon: IconCheck, className: 'bg-green-100 text-green-700' },
@@ -1645,7 +1661,7 @@ export const TaskDetailsPage = () => {
                             return (
                               <Badge
                                 variant={variant}
-                                className="w-[200px] h-8 flex items-center justify-center text-sm font-medium"
+                                className="w-[200px] h-8 flex items-center justify-start pl-3 text-sm font-medium"
                               >
                                 {SERVICE_ORDER_STATUS_LABELS[serviceOrder.status as SERVICE_ORDER_STATUS]}
                               </Badge>
@@ -1943,37 +1959,44 @@ export const TaskDetailsPage = () => {
                     </div>
                   </CardHeader>
               <CardContent className="pt-0 flex-1">
-                {task.artworks?.filter(artwork => artwork.file).length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                    <IconFiles className="h-12 w-12 mb-2 opacity-50" />
-                    <p className="text-sm">Nenhuma arte disponível no momento</p>
-                    <p className="text-xs mt-1">As artes podem estar sendo processadas</p>
-                  </div>
-                ) : (
-                  <div className={cn(artworksViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                    {task.artworks?.filter(artwork => artwork.file).map((artwork) => (
-                      <div key={artwork.id} className="relative">
-                        <FileItem
-                          file={artwork.file!}
-                          viewMode={artworksViewMode}
-                          onPreview={handleArtworkFileClick}
-                          onDownload={handleDownload}
-                          showActions
-                        />
-                        {artwork.status && artwork.status !== 'DRAFT' && (
-                          <div className="absolute top-2 right-2">
-                            <Badge
-                              variant={artwork.status === 'APPROVED' ? 'approved' : 'rejected'}
-                              className="text-xs"
-                            >
-                              {artwork.status === 'APPROVED' ? 'Aprovado' : 'Reprovado'}
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {(() => {
+                  // Filter artworks: show all if user can view badges, otherwise only approved
+                  const filteredArtworks = task.artworks?.filter(artwork =>
+                    artwork.file && (canViewArtworkBadges || artwork.status === 'APPROVED')
+                  ) || [];
+
+                  return filteredArtworks.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                      <IconFiles className="h-12 w-12 mb-2 opacity-50" />
+                      <p className="text-sm">Nenhuma arte disponível no momento</p>
+                      <p className="text-xs mt-1">As artes podem estar sendo processadas</p>
+                    </div>
+                  ) : (
+                    <div className={cn(artworksViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                      {filteredArtworks.map((artwork) => (
+                        <div key={artwork.id} className="relative">
+                          <FileItem
+                            file={artwork.file!}
+                            viewMode={artworksViewMode}
+                            onPreview={handleArtworkFileClick}
+                            onDownload={handleDownload}
+                            showActions
+                          />
+                          {canViewArtworkBadges && artwork.status && (
+                            <div className="absolute top-2 right-2">
+                              <Badge
+                                variant={artwork.status === 'APPROVED' ? 'approved' : artwork.status === 'REJECTED' ? 'rejected' : 'secondary'}
+                                className="text-xs"
+                              >
+                                {artwork.status === 'APPROVED' ? 'Aprovado' : artwork.status === 'REJECTED' ? 'Reprovado' : 'Rascunho'}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </CardContent>
                 </Card>
               )}
@@ -2403,8 +2426,11 @@ export const TaskDetailsPage = () => {
                     return (
                       <div
                         key={airbrushing.id}
-                        className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => navigate(routes.production.airbrushings.details(airbrushing.id))}
+                        className={cn(
+                          "border rounded-lg p-4 transition-colors",
+                          canAccessAirbrushingDetails && "hover:bg-muted/50 cursor-pointer"
+                        )}
+                        onClick={canAccessAirbrushingDetails ? () => navigate(routes.production.airbrushings.details(airbrushing.id)) : undefined}
                       >
                         <div className="flex gap-4">
                           {/* Artwork thumbnail - clickable to open file viewer */}
@@ -2521,7 +2547,7 @@ export const TaskDetailsPage = () => {
 
             {/* Changelog History - Hidden for Financial and Warehouse sector users */}
             {sectionVisibility.isSectionVisible("changelog") && !isFinancialSector && !isWarehouseSector && (
-              <Card className="border flex flex-col animate-in fade-in-50 duration-1300">
+              <Card className="border flex flex-col animate-in fade-in-50 duration-1300 lg:w-1/2 h-[72rem] overflow-y-auto">
                 <TaskWithServiceOrdersChangelog
                   taskId={task.id}
                   taskName={taskDisplayName}

@@ -193,7 +193,8 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                 break;
               case "artworkIds":
                 // Reference existing artwork files
-                updateData.artworkIds = sourceTask.artworks?.map((f) => f.id) || [];
+                // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
+                updateData.artworkIds = sourceTask.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [];
                 break;
               case "budgetId":
                 updateData.budgetId = sourceTask.budgetId;

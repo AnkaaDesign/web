@@ -65,7 +65,6 @@ export function TaskHistoryContextMenu({
 
   // Check task statuses for status actions
   const hasInProgressTasks = tasks.some((t) => t.status === TASK_STATUS.IN_PRODUCTION);
-  const hasPendingTasks = tasks.some((t) => t.status === TASK_STATUS.PENDING);
   const hasPreparationTasks = tasks.some((t) => t.status === TASK_STATUS.PREPARATION);
   const hasWaitingProductionTasks = tasks.some((t) => t.status === TASK_STATUS.WAITING_PRODUCTION);
   const hasCompletedTasks = tasks.some((t) => t.status === TASK_STATUS.COMPLETED);
@@ -192,7 +191,7 @@ export function TaskHistoryContextMenu({
     setSetStatusModalOpen(true);
   };
 
-  const handleSetStatusConfirm = async (status: typeof TASK_STATUS.IN_PRODUCTION | typeof TASK_STATUS.COMPLETED | typeof TASK_STATUS.INVOICED | typeof TASK_STATUS.SETTLED) => {
+  const handleSetStatusConfirm = async (status: TASK_STATUS) => {
     if (process.env.NODE_ENV !== 'production') {
       console.log('[TaskHistoryContextMenu] handleSetStatusConfirm called with status:', status);
     }
@@ -305,8 +304,8 @@ export function TaskHistoryContextMenu({
             },
           });
         }
-        // WAITING_PRODUCTION and PENDING tasks go to IN_PRODUCTION
-        else if (t.status === TASK_STATUS.WAITING_PRODUCTION || t.status === TASK_STATUS.PENDING) {
+        // WAITING_PRODUCTION tasks go to IN_PRODUCTION
+        else if (t.status === TASK_STATUS.WAITING_PRODUCTION) {
           await update({
             id: t.id,
             data: {
@@ -390,10 +389,12 @@ export function TaskHistoryContextMenu({
 
     try {
       // Build task data for each copy
+      // NOTE: task.artworks are now Artwork entities with { id, fileId, status, file?: File }
+      // We need to extract File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
       const buildTaskData = (copyData: { serialNumber?: string; plate?: string }) => ({
         // Basic fields
         name: task.name,
-        status: TASK_STATUS.PENDING,
+        status: TASK_STATUS.PREPARATION,
         serialNumber: copyData.serialNumber || null,
         plate: copyData.plate || null,
         details: task.details,
@@ -412,7 +413,8 @@ export function TaskHistoryContextMenu({
         commission: task.commission,
 
         // Relations - only IDs
-        artworkIds: task.artworks?.map((file) => file.id) || [],
+        // artworkIds must be File IDs, not Artwork entity IDs
+        artworkIds: task.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
         paintIds: task.logoPaints?.map((paint) => paint.id) || [],
 
         // Services
@@ -435,11 +437,11 @@ export function TaskHistoryContextMenu({
             }
           : null,
 
-        // Observation
+        // Observation - artworkIds must also be File IDs
         observation: task.observation
           ? {
               description: task.observation.description,
-              artworkIds: task.observation.artworks?.map((file) => file.id) || [],
+              artworkIds: task.observation.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
             }
           : null,
       });
@@ -539,7 +541,7 @@ export function TaskHistoryContextMenu({
           )}
 
           {/* Status actions - Team leaders (sector match) and ADMIN only */}
-          {canManageStatus && (hasPendingTasks || hasPreparationTasks || hasWaitingProductionTasks) && (
+          {canManageStatus && (hasPreparationTasks || hasWaitingProductionTasks) && (
             <DropdownMenuItem onClick={handleStart} className="text-green-700 hover:text-white">
               <IconPlayerPlay className="mr-2 h-4 w-4" />
               Iniciar
@@ -554,7 +556,7 @@ export function TaskHistoryContextMenu({
           )}
 
           {/* Separator if we have status actions */}
-          {canManageStatus && (hasPendingTasks || hasInProgressTasks || hasPreparationTasks || hasWaitingProductionTasks) && <DropdownMenuSeparator />}
+          {canManageStatus && (hasInProgressTasks || hasPreparationTasks || hasWaitingProductionTasks) && <DropdownMenuSeparator />}
 
           {/* View action - single selection only */}
           {!isBulk && task && (
@@ -671,7 +673,7 @@ export function TaskHistoryContextMenu({
         }}
         tasks={tasks}
         onConfirm={handleSetStatusConfirm}
-        allowedStatuses={[TASK_STATUS.IN_PRODUCTION, TASK_STATUS.COMPLETED, TASK_STATUS.INVOICED, TASK_STATUS.SETTLED]}
+        allowedStatuses={[TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION, TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED]}
       />
 
       {/* Duplicate Task Modal */}

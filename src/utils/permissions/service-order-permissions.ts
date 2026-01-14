@@ -1,4 +1,4 @@
-import { SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE } from "@/constants";
+import { SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "@/constants";
 
 /**
  * Service Order Permission Utility
@@ -174,7 +174,14 @@ export function canCompleteArtworkServiceOrder(sectorPrivilege: SECTOR_PRIVILEGE
  * Get allowed status transitions for a user editing a specific service order
  * Returns array of statuses the user is allowed to set
  *
- * IMPORTANT: Only ADMIN can see/set CANCELLED status
+ * Status availability by service order type:
+ * - ARTWORK: PENDING, IN_PROGRESS, WAITING_APPROVE, COMPLETED (approval workflow)
+ * - PRODUCTION, FINANCIAL, NEGOTIATION: PENDING, IN_PROGRESS, COMPLETED (simple workflow)
+ *
+ * IMPORTANT:
+ * - Only ADMIN can see/set CANCELLED status
+ * - WAITING_APPROVE is ONLY for ARTWORK (designer → admin approval workflow)
+ * - DESIGNER can only set WAITING_APPROVE, not COMPLETED (admin approves)
  */
 export function getAllowedServiceOrderStatuses(
   sectorPrivilege: SECTOR_PRIVILEGES | undefined,
@@ -185,27 +192,43 @@ export function getAllowedServiceOrderStatuses(
   // Check if user can edit this type at all
   if (!canEditServiceOrderOfType(sectorPrivilege, serviceOrderType)) return [];
 
-  // Base statuses available to all authorized users (no CANCELLED)
-  const baseStatuses: SERVICE_ORDER_STATUS[] = [
+  const isAdmin = sectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
+
+  // ARTWORK has special approval workflow with WAITING_APPROVE status
+  if (serviceOrderType === SERVICE_ORDER_TYPE.ARTWORK) {
+    const artworkStatuses: SERVICE_ORDER_STATUS[] = [
+      SERVICE_ORDER_STATUS.PENDING,
+      SERVICE_ORDER_STATUS.IN_PROGRESS,
+      SERVICE_ORDER_STATUS.WAITING_APPROVE,
+      SERVICE_ORDER_STATUS.COMPLETED,
+    ];
+
+    // ADMIN can set any status including CANCELLED
+    if (isAdmin) {
+      return [...artworkStatuses, SERVICE_ORDER_STATUS.CANCELLED];
+    }
+
+    // DESIGNER cannot set COMPLETED (only WAITING_APPROVE for admin approval)
+    if (sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
+      return artworkStatuses.filter(s => s !== SERVICE_ORDER_STATUS.COMPLETED);
+    }
+
+    return artworkStatuses;
+  }
+
+  // PRODUCTION, FINANCIAL, NEGOTIATION: Simple workflow without WAITING_APPROVE
+  const simpleStatuses: SERVICE_ORDER_STATUS[] = [
     SERVICE_ORDER_STATUS.PENDING,
     SERVICE_ORDER_STATUS.IN_PROGRESS,
-    SERVICE_ORDER_STATUS.WAITING_APPROVE,
     SERVICE_ORDER_STATUS.COMPLETED,
   ];
 
   // ADMIN can set any status including CANCELLED
-  if (sectorPrivilege === SECTOR_PRIVILEGES.ADMIN) {
-    return [...baseStatuses, SERVICE_ORDER_STATUS.CANCELLED];
+  if (isAdmin) {
+    return [...simpleStatuses, SERVICE_ORDER_STATUS.CANCELLED];
   }
 
-  // For ARTWORK service orders, DESIGNER cannot set COMPLETED (only WAITING_APPROVE)
-  if (serviceOrderType === SERVICE_ORDER_TYPE.ARTWORK &&
-      sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
-    return baseStatuses.filter(s => s !== SERVICE_ORDER_STATUS.COMPLETED);
-  }
-
-  // All other authorized users: base statuses only (no CANCELLED, no restrictions)
-  return baseStatuses;
+  return simpleStatuses;
 }
 
 /**
@@ -239,22 +262,26 @@ export function getServiceOrderPermissions(
 
     case SERVICE_ORDER_TYPE.NEGOTIATION:
       // Visible to: Admin, Commercial, Logistic
+      // Editable by: Admin, Commercial only
       if (sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
         return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
       }
       if (sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
-        return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
+        // LOGISTIC can VIEW but NOT EDIT negotiation service orders
+        return { canView: true, canEdit: false, editOnlyOwnOrUnassigned: false };
       }
       // Not visible to other sectors
       return { canView: false, canEdit: false, editOnlyOwnOrUnassigned: false };
 
     case SERVICE_ORDER_TYPE.ARTWORK:
       // Visible to: Admin, Designer, Logistic
+      // Editable by: Admin, Designer only
       if (sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
         return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
       }
       if (sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
-        return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
+        // LOGISTIC can VIEW but NOT EDIT artwork service orders
+        return { canView: true, canEdit: false, editOnlyOwnOrUnassigned: false };
       }
       // Not visible to other sectors
       return { canView: false, canEdit: false, editOnlyOwnOrUnassigned: false };

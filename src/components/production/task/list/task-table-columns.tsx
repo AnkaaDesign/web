@@ -35,8 +35,10 @@ const renderStatusBadge = (status: TASK_STATUS) => {
         return <IconX className="h-3 w-3" />;
       case TASK_STATUS.IN_PRODUCTION:
         return <IconClock className="h-3 w-3" />;
-      case TASK_STATUS.ON_HOLD:
+      case TASK_STATUS.PREPARATION:
         return <IconAlertCircle className="h-3 w-3" />;
+      case TASK_STATUS.WAITING_PRODUCTION:
+        return <IconClock className="h-3 w-3" />;
       default:
         return null;
     }

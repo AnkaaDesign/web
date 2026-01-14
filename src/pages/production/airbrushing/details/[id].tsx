@@ -166,9 +166,7 @@ export const AirbrushingDetails = () => {
         />
         <div className="flex-1 overflow-y-auto pb-6">
           <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <AirbrushingInfoCard airbrushing={airbrushing as any} />
-            </div>
+            <AirbrushingInfoCard airbrushing={airbrushing as any} />
 
             {/* Changelog Section */}
             <Card className="border flex flex-col animate-in fade-in-50 duration-1000">

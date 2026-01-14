@@ -105,8 +105,9 @@ interface NotificationPreferences {
   service_order: {
     created: NotificationEventPreference;
     assigned: NotificationEventPreference;
-    "status.changed": NotificationEventPreference;
-    completed: NotificationEventPreference;
+    "assigned.updated": NotificationEventPreference;
+    "my.updated": NotificationEventPreference;
+    "my.completed": NotificationEventPreference;
   };
   stock: {
     low: NotificationEventPreference;
@@ -180,8 +181,9 @@ const notificationPreferencesSchema = z.object({
   service_order: z.object({
     created: channelSchema,
     assigned: channelSchema,
-    "status.changed": channelSchema,
-    completed: channelSchema,
+    "assigned.updated": channelSchema,
+    "my.updated": channelSchema,
+    "my.completed": channelSchema,
   }),
   stock: z.object({
     low: channelSchema,
@@ -365,12 +367,14 @@ const CATEGORY_ALLOWED_SECTORS: Record<string, SectorPrivilege[]> = {
   stock: ["ADMIN", "WAREHOUSE"],
   // CUT: ADMIN, PLOTTING, PRODUCTION
   cut: ["ADMIN", "PLOTTING", "PRODUCTION"],
-  // PPE: ADMIN, HUMAN_RESOURCES, WAREHOUSE + all users can receive their own PPE notifications
-  ppe: [],
+  // PPE: Only ADMIN, HUMAN_RESOURCES, WAREHOUSE can configure PPE preferences
+  // (other users still receive notifications about their own requests via backend)
+  ppe: ["ADMIN", "HUMAN_RESOURCES", "WAREHOUSE"],
   // SYSTEM: All users
   system: [],
-  // VACATION: All users (HR sees all, others see their own)
-  vacation: [],
+  // VACATION: Only ADMIN and HUMAN_RESOURCES can configure vacation preferences
+  // (other users still receive notifications about their own vacations via backend)
+  vacation: ["ADMIN", "HUMAN_RESOURCES"],
 };
 
 // Task event-specific sector restrictions (matches backend task-notification.config.ts FIELD_ALLOWED_ROLES)
@@ -409,6 +413,21 @@ const TASK_EVENT_ALLOWED_SECTORS: Record<string, SectorPrivilege[]> = {
   commission: ["ADMIN", "FINANCIAL", "PRODUCTION", "WAREHOUSE"],
 };
 
+// Service Order event-specific sector restrictions
+const SERVICE_ORDER_EVENT_ALLOWED_SECTORS: Record<string, SectorPrivilege[]> = {
+  // created: Only ADMIN should see all new service orders
+  created: ["ADMIN"],
+  // assigned: All sectors that can access service orders (when assigned to them)
+  assigned: [],
+  // assigned.updated: All sectors (when a service order assigned to them is updated)
+  "assigned.updated": [],
+  // status.changed: Removed - covered by assigned.updated and my.updated
+  // my.updated: All sectors (when a service order they created is updated)
+  "my.updated": [],
+  // my.completed: All sectors (when a service order they created is completed)
+  "my.completed": [],
+};
+
 /**
  * Check if a user can access a notification category
  */
@@ -431,6 +450,20 @@ function canAccessTaskEvent(eventKey: string, userPrivilege: SectorPrivilege | n
   if (userPrivilege === "ADMIN") return true;
 
   const allowedSectors = TASK_EVENT_ALLOWED_SECTORS[eventKey];
+  // Empty array means all sectors can access
+  if (!allowedSectors || allowedSectors.length === 0) return true;
+
+  return allowedSectors.includes(userPrivilege);
+}
+
+/**
+ * Check if a user can access a specific service order event
+ */
+function canAccessServiceOrderEvent(eventKey: string, userPrivilege: SectorPrivilege | null): boolean {
+  if (!userPrivilege) return false;
+  if (userPrivilege === "ADMIN") return true;
+
+  const allowedSectors = SERVICE_ORDER_EVENT_ALLOWED_SECTORS[eventKey];
   // Empty array means all sectors can access
   if (!allowedSectors || allowedSectors.length === 0) return true;
 
@@ -488,8 +521,9 @@ const notificationSections: NotificationSection[] = [
     events: [
       { key: "created", label: "Nova Ordem de Serviço", description: "Quando uma nova ordem de serviço é criada", mandatoryChannels: ["IN_APP", "PUSH"] },
       { key: "assigned", label: "Atribuída a Mim", description: "Quando uma ordem de serviço é atribuída a você", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
-      { key: "status.changed", label: "Mudança de Status", description: "Quando o status de uma ordem de serviço é alterado", mandatoryChannels: ["IN_APP", "PUSH"] },
-      { key: "completed", label: "Minha OS Concluída", description: "Quando uma ordem de serviço que você criou é concluída", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
+      { key: "assigned.updated", label: "Atribuída a Mim Atualizada", description: "Quando uma ordem de serviço atribuída a você é atualizada", mandatoryChannels: ["IN_APP", "PUSH"] },
+      { key: "my.updated", label: "Que Criei Atualizada", description: "Quando uma ordem de serviço que você criou é atualizada", mandatoryChannels: ["IN_APP", "PUSH"] },
+      { key: "my.completed", label: "Que Criei Concluída", description: "Quando uma ordem de serviço que você criou é concluída", mandatoryChannels: ["IN_APP", "PUSH", "WHATSAPP"] },
     ],
   },
   {
@@ -596,8 +630,9 @@ const defaultPreferences: NotificationPreferencesFormData = {
   service_order: {
     created: createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
     assigned: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
-    "status.changed": createDefaultPreference(["IN_APP", "PUSH"], ["IN_APP", "PUSH"]),
-    completed: createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
+    "assigned.updated": createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
+    "my.updated": createDefaultPreference(["IN_APP", "PUSH", "EMAIL"], ["IN_APP", "PUSH"]),
+    "my.completed": createDefaultPreference(["IN_APP", "PUSH", "WHATSAPP", "EMAIL"], ["IN_APP", "PUSH", "WHATSAPP"]),
   },
   stock: {
     low: createDefaultPreference(["IN_APP", "EMAIL"], []),
@@ -788,6 +823,15 @@ export function NotificationPreferencesPage() {
             ...section,
             events: section.events.filter((event) =>
               canAccessTaskEvent(event.key, userSectorPrivilege)
+            ),
+          };
+        }
+        // For service_order section, filter individual events based on sector
+        if (section.id === "service_order") {
+          return {
+            ...section,
+            events: section.events.filter((event) =>
+              canAccessServiceOrderEvent(event.key, userSectorPrivilege)
             ),
           };
         }

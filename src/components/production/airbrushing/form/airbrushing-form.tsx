@@ -163,7 +163,8 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
         taskId: airbrushing.taskId,
         receiptIds: airbrushing.receipts?.map((f) => f.id) || [],
         invoiceIds: airbrushing.invoices?.map((f) => f.id) || [],
-        artworkIds: airbrushing.artworks?.map((f) => f.id) || [],
+        // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
+        artworkIds: airbrushing.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
       });
 
       // Set selected task

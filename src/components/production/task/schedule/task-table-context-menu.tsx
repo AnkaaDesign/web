@@ -27,8 +27,8 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
   const { tasks } = contextMenu;
   const isMultiSelection = tasks.length > 1;
   const hasInProgressTasks = tasks.some((t) => t.status === TASK_STATUS.IN_PRODUCTION);
-  const hasPendingTasks = tasks.some((t) => t.status === TASK_STATUS.PENDING);
-  const hasCompletedTasks = tasks.some((t) => t.status === TASK_STATUS.COMPLETED);
+  const hasWaitingProductionTasks = tasks.some((t) => t.status === TASK_STATUS.WAITING_PRODUCTION);
+  const hasPreparationTasks = tasks.some((t) => t.status === TASK_STATUS.PREPARATION);
 
   // Permission checks
   const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
@@ -62,7 +62,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
         {isMultiSelection && <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">{tasks.length} tarefas selecionadas</div>}
 
         {/* Status actions - Team leaders (sector match) and ADMIN only */}
-        {canManageStatus && hasPendingTasks && (
+        {canManageStatus && (hasWaitingProductionTasks || hasPreparationTasks) && (
           <DropdownMenuItem onClick={() => handleAction("start")} className="text-green-700 hover:text-white">
             <IconPlayerPlay className="mr-2 h-4 w-4" />
             Iniciar
@@ -77,7 +77,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
         )}
 
         {/* Separator if we have status actions */}
-        {canManageStatus && (hasPendingTasks || hasInProgressTasks) && <DropdownMenuSeparator />}
+        {canManageStatus && (hasWaitingProductionTasks || hasPreparationTasks || hasInProgressTasks) && <DropdownMenuSeparator />}
 
         {/* Edit action - ADMIN, DESIGNER, FINANCIAL, LOGISTIC */}
         {canEdit && (
@@ -102,7 +102,7 @@ export function TaskTableContextMenu({ contextMenu, onClose, onAction }: TaskTab
           </DropdownMenuItem>
         )}
 
-        {isAdmin && hasCompletedTasks && (
+        {isAdmin && (
           <DropdownMenuItem onClick={() => handleAction("setStatus")}>
             <IconFileInvoice className="mr-2 h-4 w-4" />
             Alterar Status

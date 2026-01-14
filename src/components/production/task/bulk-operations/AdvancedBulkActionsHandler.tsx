@@ -191,19 +191,26 @@ export const AdvancedBulkActionsHandler = forwardRef<
           }
 
           // Find artworks that ALL tasks have in common (by filename, since each task may have different file IDs)
+          // NOTE: task.artworks are now Artwork entities with a nested file property
+          // Artwork entity: { id: artworkId, fileId, status, file?: { id, filename, originalName, thumbnailUrl, ... } }
           if (tasks.length > 0) {
             // Collect all unique filenames from all tasks
             const allFilenames = new Set<string>();
             tasks.forEach(task => {
-              (task.artworks || []).forEach((a: any) => {
-                const filename = a.originalName || a.filename;
+              (task.artworks || []).forEach((artwork: any) => {
+                // artwork.file contains the actual File data
+                const file = artwork.file || artwork;
+                const filename = file.originalName || file.filename;
                 if (filename) allFilenames.add(filename);
               });
             });
 
             // Filter to only filenames that exist in ALL tasks
             const commonFilenames = Array.from(allFilenames).filter(filename =>
-              tasks.every(task => (task.artworks || []).some((a: any) => (a.originalName || a.filename) === filename))
+              tasks.every(task => (task.artworks || []).some((artwork: any) => {
+                const file = artwork.file || artwork;
+                return (file.originalName || file.filename) === filename;
+              }))
             );
 
             // Find the first task that has artworks to use as reference
@@ -211,22 +218,29 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
             if (taskWithArtworks && commonFilenames.length > 0) {
               // For each common filename, use the reference task's file data
-              const commonArtworks = taskWithArtworks.artworks.filter((artwork: any) =>
-                commonFilenames.includes(artwork.originalName || artwork.filename)
-              );
+              const commonArtworks = taskWithArtworks.artworks.filter((artwork: any) => {
+                const file = artwork.file || artwork;
+                return commonFilenames.includes(file.originalName || file.filename);
+              });
 
-              computed.artworkFiles = commonArtworks.map((a: any) => ({
-                id: a.id,
-                name: a.filename || a.originalName || 'artwork',
-                originalName: a.originalName,
-                size: a.size || 0,
-                type: a.mimetype || 'application/octet-stream',
-                lastModified: a.createdAt ? new Date(a.createdAt).getTime() : Date.now(),
-                uploaded: true,
-                uploadProgress: 100,
-                uploadedFileId: a.id,
-                thumbnailUrl: a.thumbnailUrl,
-              }));
+              computed.artworkFiles = commonArtworks.map((artwork: any) => {
+                // Extract File data from Artwork entity
+                const file = artwork.file || artwork;
+                const fileId = artwork.fileId || file.id;
+                return {
+                  id: fileId, // File ID (not Artwork entity ID)
+                  name: file.filename || file.originalName || 'artwork',
+                  originalName: file.originalName,
+                  size: file.size || 0,
+                  type: file.mimetype || 'application/octet-stream',
+                  lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+                  uploaded: true,
+                  uploadProgress: 100,
+                  uploadedFileId: fileId, // File ID for form submission
+                  thumbnailUrl: file.thumbnailUrl,
+                  status: artwork.status || 'DRAFT', // Include artwork status
+                };
+              });
             }
           }
 
@@ -426,14 +440,19 @@ export const AdvancedBulkActionsHandler = forwardRef<
             .filter(f => !(f instanceof File))
             .map((f: any) => f.originalName || f.name);
 
-          // For each task, find the artwork IDs that match the kept filenames
+          // For each task, find the File IDs that match the kept filenames
           // This handles the case where each task has different file IDs for the same artwork
+          // NOTE: task.artworks are Artwork entities with { id, fileId, status, file?: File }
+          // We need to extract File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
           const perTaskArtworkIds: Record<string, string[]> = {};
           currentTasks.forEach(task => {
-            const taskArtworkIds = (task.artworks || [])
-              .filter((a: any) => keptFilenames.includes(a.originalName || a.filename))
-              .map((a: any) => a.id);
-            perTaskArtworkIds[task.id] = taskArtworkIds;
+            const taskArtworkFileIds = (task.artworks || [])
+              .filter((artwork: any) => {
+                const file = artwork.file || artwork;
+                return keptFilenames.includes(file.originalName || file.filename);
+              })
+              .map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id);
+            perTaskArtworkIds[task.id] = taskArtworkFileIds;
           });
 
           // Store per-task data - we'll use this when building the batch request

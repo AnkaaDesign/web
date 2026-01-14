@@ -141,7 +141,7 @@ export const TaskSelector = ({
       page: page - 1, // Convert from 1-based (UI) to 0-based (API)
       limit: currentPageSize,
       // Only show tasks that are not completed or cancelled
-      status: [TASK_STATUS.PENDING, TASK_STATUS.IN_PRODUCTION, TASK_STATUS.ON_HOLD],
+      status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION],
       include: {
         sector: true,
         customer: true,

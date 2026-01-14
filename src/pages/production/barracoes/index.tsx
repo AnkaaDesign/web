@@ -129,7 +129,7 @@ export function GaragesPage() {
       .filter((task) => {
         // Only include tasks with trucks and status IN_PRODUCTION or PENDING
         if (!task.truck) return false;
-        return task.status === TASK_STATUS.IN_PRODUCTION || task.status === TASK_STATUS.PENDING;
+        return task.status === TASK_STATUS.IN_PRODUCTION || task.status === TASK_STATUS.WAITING_PRODUCTION;
       })
       .map((task): GarageTruck => {
         const truck = task.truck as any;

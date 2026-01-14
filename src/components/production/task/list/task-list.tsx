@@ -293,14 +293,14 @@ export function TaskList({ className }: TaskListProps) {
   };
 
   const handleBulkStart = async (items: Task[]) => {
-    const pendingTasks = items.filter((task) => task.status === TASK_STATUS.PENDING);
+    const waitingTasks = items.filter((task) => task.status === TASK_STATUS.WAITING_PRODUCTION || task.status === TASK_STATUS.PREPARATION);
 
-    if (pendingTasks.length === 0) {
+    if (waitingTasks.length === 0) {
       return;
     }
 
     try {
-      const updates = pendingTasks.map((task) => ({
+      const updates = waitingTasks.map((task) => ({
         id: task.id,
         data: { status: TASK_STATUS.IN_PRODUCTION, startedAt: new Date() },
       }));
@@ -352,7 +352,7 @@ export function TaskList({ className }: TaskListProps) {
     try {
       const updates = activeTasks.map((task) => ({
         id: task.id,
-        data: { status: TASK_STATUS.ON_HOLD },
+        data: { status: TASK_STATUS.WAITING_PRODUCTION },
       }));
 
       if (updates.length === 1) {

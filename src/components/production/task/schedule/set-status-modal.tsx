@@ -10,7 +10,7 @@ import { TASK_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
 
 const setStatusSchema = z.object({
-  status: z.enum([TASK_STATUS.IN_PRODUCTION, TASK_STATUS.COMPLETED, TASK_STATUS.INVOICED, TASK_STATUS.SETTLED], {
+  status: z.enum([TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION, TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED], {
     required_error: "Selecione um status",
   }),
 });
@@ -21,8 +21,8 @@ interface SetStatusModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tasks: Task[];
-  onConfirm: (status: typeof TASK_STATUS.IN_PRODUCTION | typeof TASK_STATUS.COMPLETED | typeof TASK_STATUS.INVOICED | typeof TASK_STATUS.SETTLED) => void;
-  allowedStatuses?: Array<typeof TASK_STATUS.IN_PRODUCTION | typeof TASK_STATUS.COMPLETED | typeof TASK_STATUS.INVOICED | typeof TASK_STATUS.SETTLED>;
+  onConfirm: (status: TASK_STATUS) => void;
+  allowedStatuses?: TASK_STATUS[];
 }
 
 export function SetStatusModal({ open, onOpenChange, tasks, onConfirm, allowedStatuses }: SetStatusModalProps) {
@@ -70,14 +70,15 @@ export function SetStatusModal({ open, onOpenChange, tasks, onConfirm, allowedSt
     form.reset();
   };
 
-  // Default to invoiced/settled for schedule, but allow all statuses if specified
-  const statusesToShow = allowedStatuses || [TASK_STATUS.INVOICED, TASK_STATUS.SETTLED];
+  // Default to all statuses if not specified
+  const statusesToShow = allowedStatuses || [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION, TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED];
 
   const allStatusOptions: Record<string, ComboboxOption> = {
+    [TASK_STATUS.PREPARATION]: { value: TASK_STATUS.PREPARATION, label: "Em Preparação" },
+    [TASK_STATUS.WAITING_PRODUCTION]: { value: TASK_STATUS.WAITING_PRODUCTION, label: "Aguardando Produção" },
     [TASK_STATUS.IN_PRODUCTION]: { value: TASK_STATUS.IN_PRODUCTION, label: "Em Produção" },
     [TASK_STATUS.COMPLETED]: { value: TASK_STATUS.COMPLETED, label: "Concluído" },
-    [TASK_STATUS.INVOICED]: { value: TASK_STATUS.INVOICED, label: "Faturado" },
-    [TASK_STATUS.SETTLED]: { value: TASK_STATUS.SETTLED, label: "Liquidado" },
+    [TASK_STATUS.CANCELLED]: { value: TASK_STATUS.CANCELLED, label: "Cancelado" },
   };
 
   const statusOptions: ComboboxOption[] = statusesToShow.map(status => allStatusOptions[status]);

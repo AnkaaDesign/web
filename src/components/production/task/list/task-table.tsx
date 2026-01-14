@@ -684,7 +684,7 @@ export function TaskTable({
               <DropdownMenuSeparator />
 
               {/* Status change actions */}
-              {contextMenu?.items.some((task) => task.status === TASK_STATUS.PENDING) && (
+              {contextMenu?.items.some((task) => task.status === TASK_STATUS.WAITING_PRODUCTION || task.status === TASK_STATUS.PREPARATION) && (
                 <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.IN_PRODUCTION)}>
                   <IconPlayerPlay className="h-4 w-4 mr-2" />
                   Iniciar produção
@@ -697,14 +697,14 @@ export function TaskTable({
                     <IconCheck className="h-4 w-4 mr-2" />
                     Finalizar
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.ON_HOLD)}>
+                  <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.WAITING_PRODUCTION)}>
                     <IconPlayerPause className="h-4 w-4 mr-2" />
                     Colocar em espera
                   </DropdownMenuItem>
                 </>
               )}
 
-              {contextMenu?.items.some((task) => task.status === TASK_STATUS.ON_HOLD) && (
+              {contextMenu?.items.some((task) => task.status === TASK_STATUS.PREPARATION) && (
                 <DropdownMenuItem onClick={() => handleStatusChange(TASK_STATUS.IN_PRODUCTION)}>
                   <IconPlayerPlay className="h-4 w-4 mr-2" />
                   Retomar produção

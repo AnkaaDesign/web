@@ -408,16 +408,43 @@ const actionConfig: Record<CHANGE_LOG_ACTION, { icon: React.ElementType; color: 
 };
 
 // Group changelog fields by entity and time (matching ChangelogHistory)
+// CREATE actions for different entities are kept separate (each CREATE = own group)
+// UPDATE actions on the same entity within 1 second are grouped together
 const groupChangelogsByEntity = (changelogs: ChangeLog[]) => {
   const groups: ChangeLog[][] = [];
   let currentGroup: ChangeLog[] = [];
   let currentTime: number | null = null;
+  let currentEntityId: string | null = null;
+  let currentAction: string | null = null;
 
   changelogs.forEach((changelog) => {
     const time = new Date(changelog.createdAt).getTime();
+    const isCreateAction = changelog.action === CHANGE_LOG_ACTION.CREATE;
 
-    // Group changes that happened within 1 second of each other
-    if (!currentTime || Math.abs(time - currentTime) < 1000) {
+    // CREATE actions for different entities should always be separate groups
+    // This ensures each "Ordem de Serviço Criada" is displayed separately
+    if (isCreateAction) {
+      // Finish current group if exists
+      if (currentGroup.length > 0) {
+        groups.push(currentGroup);
+      }
+      // CREATE action gets its own group
+      groups.push([changelog]);
+      currentGroup = [];
+      currentTime = null;
+      currentEntityId = null;
+      currentAction = null;
+      return;
+    }
+
+    // For non-CREATE actions, group by time AND entity
+    const shouldGroup =
+      currentTime !== null &&
+      Math.abs(time - currentTime) < 1000 &&
+      currentEntityId === changelog.entityId &&
+      currentAction !== CHANGE_LOG_ACTION.CREATE;
+
+    if (shouldGroup) {
       currentGroup.push(changelog);
       currentTime = time;
     } else {
@@ -426,6 +453,8 @@ const groupChangelogsByEntity = (changelogs: ChangeLog[]) => {
       }
       currentGroup = [changelog];
       currentTime = time;
+      currentEntityId = changelog.entityId;
+      currentAction = changelog.action;
     }
   });
 
@@ -575,17 +604,22 @@ const ChangelogTimelineItem = ({
 
   // Check if this is a CREATE action
   if (firstChange.action === CHANGE_LOG_ACTION.CREATE) {
-    // Extract entity details from newValue
-    let entityDetails: any = null;
+    // Extract entity details from newValue (renamed to avoid shadowing the prop)
+    let createdEntityData: any = null;
     try {
       if (firstChange.newValue) {
-        entityDetails = typeof firstChange.newValue === 'string'
+        createdEntityData = typeof firstChange.newValue === 'string'
           ? JSON.parse(firstChange.newValue)
           : firstChange.newValue;
       }
     } catch (e) {
       // Failed to parse, will show basic info only
     }
+
+    // Resolve user name for assignedToId from the fetched entityDetails
+    const assignedUserName = createdEntityData?.assignedToId && entityDetails?.users
+      ? entityDetails.users.get(createdEntityData.assignedToId)?.name
+      : null;
 
     return (
       <div className="relative">
@@ -599,35 +633,45 @@ const ChangelogTimelineItem = ({
           <div className="flex-1 bg-card-nested rounded-xl p-4 border border-border">
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
-              <div className="text-lg font-semibold">{entityTypeLabel} {actionLabel}</div>
+              <div className="text-lg font-semibold">
+                {entityTypeLabel} {entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER ? "Criada" : actionLabel}
+              </div>
               <div className="text-sm text-muted-foreground">{formatRelativeTime(firstChange.createdAt)}</div>
             </div>
 
             {/* Entity Details */}
-            {entityDetails && (
+            {createdEntityData && (
               <div className="mb-3 space-y-1">
                 {/* Service Order Details */}
                 {entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER && (
                   <>
-                    {entityDetails.type && (
+                    {createdEntityData.description && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Descrição: </span>
+                        <span className="text-foreground font-medium">{createdEntityData.description}</span>
+                      </div>
+                    )}
+                    {createdEntityData.type && (
                       <div className="text-sm">
                         <span className="text-muted-foreground">Tipo: </span>
                         <span className="text-foreground font-medium">
-                          {SERVICE_ORDER_TYPE_LABELS[entityDetails.type as keyof typeof SERVICE_ORDER_TYPE_LABELS] || entityDetails.type}
+                          {SERVICE_ORDER_TYPE_LABELS[createdEntityData.type as keyof typeof SERVICE_ORDER_TYPE_LABELS] || createdEntityData.type}
                         </span>
                       </div>
                     )}
-                    {entityDetails.description && (
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Descrição: </span>
-                        <span className="text-foreground font-medium">{entityDetails.description}</span>
-                      </div>
-                    )}
-                    {entityDetails.status && (
+                    {createdEntityData.status && (
                       <div className="text-sm">
                         <span className="text-muted-foreground">Status: </span>
                         <span className="text-foreground font-medium">
-                          {SERVICE_ORDER_STATUS_LABELS[entityDetails.status as keyof typeof SERVICE_ORDER_STATUS_LABELS] || entityDetails.status}
+                          {SERVICE_ORDER_STATUS_LABELS[createdEntityData.status as keyof typeof SERVICE_ORDER_STATUS_LABELS] || createdEntityData.status}
+                        </span>
+                      </div>
+                    )}
+                    {createdEntityData.assignedToId && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Atribuído a: </span>
+                        <span className="text-foreground font-medium">
+                          {assignedUserName || "Usuário atribuído"}
                         </span>
                       </div>
                     )}
@@ -637,23 +681,23 @@ const ChangelogTimelineItem = ({
                 {/* Truck Details */}
                 {entityType === CHANGE_LOG_ENTITY_TYPE.TRUCK && (
                   <>
-                    {entityDetails.plate && (
+                    {createdEntityData.plate && (
                       <div className="text-sm">
                         <span className="text-muted-foreground">Placa: </span>
-                        <span className="text-foreground font-medium">{entityDetails.plate}</span>
+                        <span className="text-foreground font-medium">{createdEntityData.plate}</span>
                       </div>
                     )}
-                    {entityDetails.chassisNumber && (
+                    {createdEntityData.chassisNumber && (
                       <div className="text-sm">
                         <span className="text-muted-foreground">Chassi: </span>
-                        <span className="text-foreground font-medium">{entityDetails.chassisNumber}</span>
+                        <span className="text-foreground font-medium">{createdEntityData.chassisNumber}</span>
                       </div>
                     )}
-                    {entityDetails.spot && (
+                    {createdEntityData.spot && (
                       <div className="text-sm">
                         <span className="text-muted-foreground">Localização: </span>
                         <span className="text-foreground font-medium">
-                          {formatFieldValue(entityDetails.spot, 'spot', entityType)}
+                          {formatFieldValue(createdEntityData.spot, 'spot', entityType)}
                         </span>
                       </div>
                     )}
@@ -830,7 +874,7 @@ const ChangelogTimelineItem = ({
           <div className="flex-1 bg-card-nested rounded-xl p-4 border border-border">
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
-              <div className="text-lg font-semibold">{entityTypeLabel} {actionLabel}</div>
+              <div className="text-lg font-semibold">{entityTypeLabel} Atualizada</div>
               <div className="text-sm text-muted-foreground">{formatRelativeTime(firstChange.createdAt)}</div>
             </div>
 
@@ -856,27 +900,48 @@ const ChangelogTimelineItem = ({
               </div>
             )}
 
-            {/* Status change summary - WITHOUT redundant info */}
+            {/* Status change summary - matching CREATE style */}
             {statusSummary && (
-              <div className="mb-3">
-                <div className="font-medium text-foreground">{statusSummary.title}</div>
+              <div className="text-sm">
+                <span className="text-muted-foreground">Status: </span>
+                <span className="text-foreground font-medium">{statusSummary.title.replace('Status: ', '')}</span>
               </div>
             )}
 
-            {/* Other field changes (observation, description, type, assignedToId) */}
+            {/* Other field changes (observation, assignedToId, etc.) */}
             {otherChanges.length > 0 && (
-              <div className="space-y-2">
-                {otherChanges.map((changelog) => (
-                  <div key={changelog.id} className="text-sm">
-                    <span className="text-muted-foreground">{getFieldLabel(changelog.field, entityType)}: </span>
-                    <span className="text-red-600 dark:text-red-400 line-through mr-2">
-                      {formatValueWithEntity(changelog.oldValue, changelog.field, entityType, entityDetails) || 'Nenhum'}
-                    </span>
-                    <span className="text-green-600 dark:text-green-400">
-                      {formatValueWithEntity(changelog.newValue, changelog.field, entityType, entityDetails) || 'Nenhum'}
-                    </span>
-                  </div>
-                ))}
+              <div className="space-y-2 mt-2">
+                {otherChanges.map((changelog) => {
+                  // Special handling for assignedToId - show only new value with resolved user name
+                  if (changelog.field === 'assignedToId') {
+                    const newUserId = changelog.newValue;
+                    const newUserName = newUserId && entityDetails?.users
+                      ? entityDetails.users.get(newUserId)?.name
+                      : null;
+
+                    return (
+                      <div key={changelog.id} className="text-sm">
+                        <span className="text-muted-foreground">Atribuído a: </span>
+                        <span className="text-foreground font-medium">
+                          {newUserName || (newUserId ? 'Usuário' : 'Nenhum')}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  // Default rendering for other fields (with before/after)
+                  return (
+                    <div key={changelog.id} className="text-sm">
+                      <span className="text-muted-foreground">{getFieldLabel(changelog.field, entityType)}: </span>
+                      <span className="text-red-600 dark:text-red-400 line-through mr-2">
+                        {formatValueWithEntity(changelog.oldValue, changelog.field, entityType, entityDetails) || 'Nenhum'}
+                      </span>
+                      <span className="text-green-600 dark:text-green-400">
+                        {formatValueWithEntity(changelog.newValue, changelog.field, entityType, entityDetails) || 'Nenhum'}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -1400,6 +1465,22 @@ export function TaskWithServiceOrdersChangelog({
       if (changelog.field === "startedById" || changelog.field === "completedById" || changelog.field === "approvedById" || changelog.field === "assignedToId") {
         if (changelog.oldValue && typeof changelog.oldValue === "string") userIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string") userIds.add(changelog.newValue);
+      }
+
+      // Extract assignedToId from SERVICE_ORDER CREATE action newValue
+      if (changelog.entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER &&
+          changelog.action === CHANGE_LOG_ACTION.CREATE &&
+          changelog.newValue) {
+        try {
+          const createdData = typeof changelog.newValue === 'string'
+            ? JSON.parse(changelog.newValue)
+            : changelog.newValue;
+          if (createdData?.assignedToId && typeof createdData.assignedToId === "string") {
+            userIds.add(createdData.assignedToId);
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
       }
 
       // Extract customer IDs

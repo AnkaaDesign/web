@@ -26,7 +26,12 @@ const TASK_STATUS_CONFIG: Record<
     badgeClass: string;
   }
 > = {
-  [TASK_STATUS.PENDING]: {
+  [TASK_STATUS.PREPARATION]: {
+    icon: IconPlayerPause,
+    color: "text-yellow-500",
+    badgeClass: "bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500",
+  },
+  [TASK_STATUS.WAITING_PRODUCTION]: {
     icon: IconClock,
     color: "text-neutral-500",
     badgeClass: "bg-neutral-500 hover:bg-neutral-600 text-white border-neutral-500",
@@ -35,11 +40,6 @@ const TASK_STATUS_CONFIG: Record<
     icon: IconHourglass,
     color: "text-blue-500",
     badgeClass: "bg-blue-500 hover:bg-blue-600 text-white border-blue-500",
-  },
-  [TASK_STATUS.ON_HOLD]: {
-    icon: IconPlayerPause,
-    color: "text-yellow-500",
-    badgeClass: "bg-yellow-500 hover:bg-yellow-600 text-white border-yellow-500",
   },
   [TASK_STATUS.COMPLETED]: {
     icon: IconCircleCheckFilled,
@@ -68,8 +68,8 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
       // Priority for active statuses
       const statusPriority: Record<string, number> = {
         [TASK_STATUS.IN_PRODUCTION]: 1,
-        [TASK_STATUS.ON_HOLD]: 2,
-        [TASK_STATUS.PENDING]: 3,
+        [TASK_STATUS.WAITING_PRODUCTION]: 2,
+        [TASK_STATUS.PREPARATION]: 3,
         [TASK_STATUS.COMPLETED]: 4,
         [TASK_STATUS.CANCELLED]: 5,
       };
@@ -173,7 +173,7 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
 
         {/* Status Summary */}
         <div className="flex flex-wrap gap-2 mb-4">
-          {[TASK_STATUS.PENDING, TASK_STATUS.IN_PRODUCTION, TASK_STATUS.ON_HOLD, TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED].map((status: string) => {
+          {[TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION, TASK_STATUS.COMPLETED, TASK_STATUS.CANCELLED].map((status: string) => {
             const count = statistics.statusCounts[status] || 0;
             const config = TASK_STATUS_CONFIG[status];
             return (

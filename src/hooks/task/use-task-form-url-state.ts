@@ -555,7 +555,7 @@ export function useTaskFormUrlState(options: UseTaskFormUrlStateOptions = {}) {
     return {
       // Basic information
       name: name.trim(),
-      status: TASK_STATUS.PENDING,
+      status: TASK_STATUS.PREPARATION,
       customerId: customerId || undefined,
       sectorId: sectorId || undefined,
       serialNumber: serialNumber.trim() || undefined,

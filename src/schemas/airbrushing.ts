@@ -597,5 +597,6 @@ export const mapAirbrushingToFormData = createMapToFormDataHelper<Airbrushing, A
   taskId: airbrushing.taskId,
   receiptIds: airbrushing.receipts?.map((file) => file.id),
   invoiceIds: airbrushing.invoices?.map((file) => file.id),
-  artworkIds: airbrushing.artworks?.map((file) => file.id),
+  // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
+  artworkIds: airbrushing.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id),
 }));

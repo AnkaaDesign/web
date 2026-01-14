@@ -509,7 +509,7 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
                           case "status":
                             className = "text-center font-medium";
                             // Add status color classes
-                            if (task.status === TASK_STATUS.PENDING) className += " status-pending";
+                            if (task.status === TASK_STATUS.WAITING_PRODUCTION) className += " status-pending";
                             else if (task.status === TASK_STATUS.IN_PRODUCTION) className += " status-production";
                             else if (task.status === TASK_STATUS.COMPLETED) className += " status-completed";
                             else if (task.status === TASK_STATUS.CANCELLED) className += " status-cancelled";
