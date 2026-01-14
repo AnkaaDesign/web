@@ -6,6 +6,7 @@ export * from "./common";
 // Export entity interfaces
 export * from "./activity";
 export * from "./airbrushing";
+export * from "./artwork";
 export * from "./borrow";
 export * from "./changelog";
 export * from "./customer";

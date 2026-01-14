@@ -1905,9 +1905,9 @@ export const TaskDetailsPage = () => {
                             onClick={async () => {
                               const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
                               for (let i = 0; i < (task.artworks?.length ?? 0); i++) {
-                                const file = task.artworks?.[i];
-                                if (file) {
-                                  const downloadUrl = `${apiUrl}/files/${file.id}/download`;
+                                const artwork = task.artworks?.[i];
+                                if (artwork?.file) {
+                                  const downloadUrl = `${apiUrl}/files/${artwork.file.id}/download`;
                                   window.open(downloadUrl, "_blank");
                                 }
                                 if (i < (task.artworks?.length ?? 0) - 1) {
@@ -1943,18 +1943,37 @@ export const TaskDetailsPage = () => {
                     </div>
                   </CardHeader>
               <CardContent className="pt-0 flex-1">
-                <div className={cn(artworksViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                  {task.artworks?.map((file) => (
-                <FileItem
-                  key={file.id}
-                  file={file}
-                  viewMode={artworksViewMode}
-                  onPreview={handleArtworkFileClick}
-                  onDownload={handleDownload}
-                  showActions
-                />
-                  ))}
-                </div>
+                {task.artworks?.filter(artwork => artwork.file).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                    <IconFiles className="h-12 w-12 mb-2 opacity-50" />
+                    <p className="text-sm">Nenhuma arte disponível no momento</p>
+                    <p className="text-xs mt-1">As artes podem estar sendo processadas</p>
+                  </div>
+                ) : (
+                  <div className={cn(artworksViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                    {task.artworks?.filter(artwork => artwork.file).map((artwork) => (
+                      <div key={artwork.id} className="relative">
+                        <FileItem
+                          file={artwork.file!}
+                          viewMode={artworksViewMode}
+                          onPreview={handleArtworkFileClick}
+                          onDownload={handleDownload}
+                          showActions
+                        />
+                        {artwork.status && artwork.status !== 'DRAFT' && (
+                          <div className="absolute top-2 right-2">
+                            <Badge
+                              variant={artwork.status === 'APPROVED' ? 'approved' : 'rejected'}
+                              className="text-xs"
+                            >
+                              {artwork.status === 'APPROVED' ? 'Aprovado' : 'Reprovado'}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
                 </Card>
               )}

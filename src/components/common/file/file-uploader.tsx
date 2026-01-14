@@ -17,6 +17,7 @@ export interface FileWithPreview extends File {
   uploaded?: boolean;
   uploadedFileId?: string;
   thumbnailUrl?: string;
+  status?: 'DRAFT' | 'APPROVED' | 'REPROVED'; // Artwork approval status
 }
 
 export interface FileUploaderProps {

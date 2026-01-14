@@ -55,6 +55,7 @@ import { GeneralPaintingSelector } from "./general-painting-selector";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./multi-airbrushing-selector";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
+import { ArtworkFileUploadField } from "./artwork-file-upload-field";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
@@ -110,10 +111,22 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // TEMPORARY: Wrap updateAsync to prevent auto-invalidation during debugging
+  // Also inject artworkStatuses into form submission
   const updateAsync = async (params: any) => {
-    
+    console.log('[Task Update] 🚀 Submitting with params:', params);
+
+    // Add artworkStatuses to submission for artwork approval workflow
+    if (params.data instanceof FormData) {
+      console.log('[Task Update] 📦 FormData submission - adding artworkStatuses:', artworkStatuses);
+      params.data.append('artworkStatuses', JSON.stringify(artworkStatuses));
+    } else if (typeof params.data === 'object' && params.data !== null) {
+      console.log('[Task Update] 📄 JSON submission - adding artworkStatuses:', artworkStatuses);
+      console.log('[Task Update] 📄 Full submission data:', params.data);
+      params.data.artworkStatuses = artworkStatuses;
+    }
+
     const result = await taskMutations.updateAsync(params);
-    
+
     return result;
   };
 
@@ -143,20 +156,122 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   });
 
   // Initialize artwork files from existing task data
+  // NOTE: task.artworks are now Artwork entities with a nested file property
   const [uploadedFiles, setUploadedFiles] = useState<FileWithPreview[]>(
-    (task.artworks || []).map(file => ({
-      id: file.id,
-      name: file.filename || file.name || 'artwork',
-      size: file.size || 0,
-      type: file.mimetype || file.type || 'application/octet-stream',
-      lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
-      uploaded: true,
-      uploadProgress: 100,
-      uploadedFileId: file.id,
-      thumbnailUrl: file.thumbnailUrl,
-    } as FileWithPreview))
+    (task.artworks || []).map(artwork => {
+      // artwork is an Artwork entity with { id, fileId, status, file?: File }
+      const file = (artwork as any).file || artwork; // artwork.file if included, fallback to artwork for backward compat
+      return {
+        id: file.id, // File ID (not Artwork ID)
+        name: file.filename || file.name || 'artwork',
+        size: file.size || 0,
+        type: file.mimetype || file.type || 'application/octet-stream',
+        lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+        uploaded: true,
+        uploadProgress: 100,
+        uploadedFileId: file.id, // File ID for form submission
+        thumbnailUrl: file.thumbnailUrl,
+        status: (artwork as any).status || 'DRAFT', // Extract artwork status
+      } as FileWithPreview;
+    })
   );
-  const [uploadedFileIds, setUploadedFileIds] = useState<string[]>(task.artworks?.map((f) => f.id) || []);
+  // artworkIds should be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
+  const [uploadedFileIds, setUploadedFileIds] = useState<string[]>(
+    task.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || []
+  );
+
+  // Track artwork statuses for approval workflow (File ID → status)
+  const [artworkStatuses, setArtworkStatuses] = useState<Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>>(
+    task.artworks?.reduce((acc, artwork) => {
+      const fileId = (artwork as any).fileId || (artwork as any).file?.id;
+      if (fileId) {
+        acc[fileId] = (artwork as any).status || 'DRAFT';
+      }
+      return acc;
+    }, {} as Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>) || {}
+  );
+
+  // Track if artwork status has been changed (needs to be BEFORE useEffect that uses it)
+  const [hasArtworkStatusChanges, setHasArtworkStatusChanges] = useState(false);
+
+  // Sync uploadedFiles and artworkStatuses when task.artworks changes (after successful update)
+  useEffect(() => {
+    console.log('[Task Update] 🔄 useEffect triggered for task.artworks sync', {
+      taskArtworksLength: task.artworks?.length || 0,
+      taskId: task.id,
+      currentUploadedFilesLength: uploadedFiles.length,
+      hasArtworkStatusChanges,
+    });
+
+    // CRITICAL FIX: Don't sync if user has made changes that haven't been submitted yet
+    // This prevents the useEffect from clearing user changes when React Query refetches stale data
+    if (hasArtworkStatusChanges) {
+      console.log('[Task Update] 🔄 SKIPPING full sync - user has unsaved artwork status changes');
+      // IMPORTANT: Even when skipping, we need to ensure uploadedFiles structure is correct
+      // to prevent empty artworkIds during submission. Only sync the file list, not statuses.
+      if (task.artworks && uploadedFiles.length === 0) {
+        console.warn('[Task Update] ⚠️ CRITICAL: uploadedFiles is empty but task has artworks! Syncing file list only (preserving status changes)');
+        const newUploadedFiles = task.artworks.map(artwork => {
+          const file = (artwork as any).file || artwork;
+          const fileId = (artwork as any).fileId || file.id;
+          // Preserve user's pending status changes from artworkStatuses state
+          const pendingStatus = artworkStatuses[fileId];
+          return {
+            id: file.id,
+            name: file.filename || file.name || 'artwork',
+            size: file.size || 0,
+            type: file.mimetype || file.type || 'application/octet-stream',
+            lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+            uploaded: true,
+            uploadProgress: 100,
+            uploadedFileId: file.id,
+            thumbnailUrl: file.thumbnailUrl,
+            status: pendingStatus || (artwork as any).status || 'DRAFT', // Use pending status if exists
+          } as FileWithPreview;
+        });
+        console.log('[Task Update] 🔄 Emergency sync: Restored uploadedFiles structure while preserving status changes');
+        setUploadedFiles(newUploadedFiles);
+        setUploadedFileIds(task.artworks.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id));
+      }
+      return;
+    }
+
+    if (task.artworks) {
+      const newUploadedFiles = task.artworks.map(artwork => {
+        const file = (artwork as any).file || artwork;
+        return {
+          id: file.id,
+          name: file.filename || file.name || 'artwork',
+          size: file.size || 0,
+          type: file.mimetype || file.type || 'application/octet-stream',
+          lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+          uploaded: true,
+          uploadProgress: 100,
+          uploadedFileId: file.id,
+          thumbnailUrl: file.thumbnailUrl,
+          status: (artwork as any).status || 'DRAFT',
+        } as FileWithPreview;
+      });
+
+      console.log('[Task Update] 🔄 Setting new uploadedFiles:', newUploadedFiles);
+      setUploadedFiles(newUploadedFiles);
+      setUploadedFileIds(task.artworks.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id));
+
+      const newStatuses = task.artworks.reduce((acc, artwork) => {
+        const fileId = (artwork as any).fileId || (artwork as any).file?.id;
+        if (fileId) {
+          acc[fileId] = (artwork as any).status || 'DRAFT';
+        }
+        return acc;
+      }, {} as Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>);
+
+      console.log('[Task Update] 🔄 Setting new artworkStatuses:', newStatuses);
+      setArtworkStatuses(newStatuses);
+      setHasArtworkStatusChanges(false); // Reset the flag after sync
+      console.log('[Task Update] 🔄 Reset hasArtworkStatusChanges to false');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.artworks, task.id]); // Only re-run when task.artworks or task.id changes (reads from closure for other values)
 
   // Initialize base files from existing task data
   const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>(
@@ -196,6 +311,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   const [isLayoutOpen, setIsLayoutOpen] = useState(false);
   const [hasLayoutChanges, setHasLayoutChanges] = useState(false);
   const [hasFileChanges, setHasFileChanges] = useState(false);
+  // hasArtworkStatusChanges is now defined earlier (line 195) to avoid temporal dead zone
   const [isObservationOpen, setIsObservationOpen] = useState(!!task.observation?.description);
   const [isFinancialInfoOpen, setIsFinancialInfoOpen] = useState(
     () => budgetFile.length > 0 || nfeFile.length > 0 || receiptFile.length > 0
@@ -501,10 +617,12 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           status: a.status,
           receiptIds: a.receipts?.map((r) => r.id) || [],
           invoiceIds: a.invoices?.map((n) => n.id) || [],
-          artworkIds: a.artworks?.map((art) => art.id) || [],
+          // CRITICAL: artworkIds should be File IDs (artwork.fileId), not Artwork entity IDs
+          artworkIds: a.artworks?.map((art: any) => art.fileId || art.file?.id || art.id) || [],
           receipts: a.receipts || [],
           invoices: a.invoices || [],
-          artworks: a.artworks || [],
+          // Map Artwork entities to their File representation for display
+          artworks: a.artworks?.map((art: any) => art.file || art) || [],
         })) || [],
       observation: taskData.observation ? {
         description: taskData.observation.description || "",
@@ -558,9 +676,9 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
         const cuts = form.getValues('cuts') as any[] || [];
         const hasCutsToCreate = cuts.length > 0 && cuts.some((cut) => cut.file && cut.file instanceof File);
 
-        // Validate that we have changes (form, layout, file changes, or cuts to create)
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasCutsToCreate) {
-          
+        // Validate that we have changes (form, layout, file changes, artwork status changes, or cuts to create)
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate) {
+
           toast.info("Nenhuma alteração detectada");
           return;
         }
@@ -701,8 +819,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
         }
 
         // If only cuts exist (no other changes), we still need to update the task to trigger cut creation
-        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && hasCutsToCreate) {
-          
+        if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && hasCutsToCreate) {
+
           changedData._onlyCuts = true; // Marker field to prevent empty body
         }
 
@@ -877,11 +995,30 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
 
           // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
           // Extract IDs of uploaded (existing) files
-          const currentArtworkIds = uploadedFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          // CRITICAL: When hasArtworkStatusChanges is true, we MUST send artwork IDs
+          // Use task.artworks as source of truth since uploadedFiles state may be stale (useEffect blocked)
+          let currentArtworkIds: string[];
+          if (hasArtworkStatusChanges && task.artworks && task.artworks.length > 0) {
+            console.warn('[Task Update] ⚠️ hasArtworkStatusChanges=true - using task.artworks as source of truth');
+            currentArtworkIds = task.artworks
+              .map((artwork: any) => artwork.fileId || artwork.file?.id)
+              .filter(Boolean) as string[];
+          } else {
+            currentArtworkIds = uploadedFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+          }
+
           const currentBaseFileIds = baseFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentInvoiceIds = nfeFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentReceiptIds = receiptFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
+
+          console.log('[Task Update] 📦 FormData - File IDs being sent:', {
+            hasArtworkStatusChanges,
+            uploadedFilesLength: uploadedFiles.length,
+            taskArtworksLength: task.artworks?.length || 0,
+            currentArtworkIds,
+            artworkStatuses: Object.keys(artworkStatuses).length > 0 ? artworkStatuses : 'empty',
+          });
 
           // Always send file IDs arrays when any file operation occurs
           // Backend will replace all files with these IDs + newly uploaded files
@@ -891,6 +1028,9 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           dataForFormData.budgetIds = currentBudgetIds;
           dataForFormData.invoiceIds = currentInvoiceIds;
           dataForFormData.receiptIds = currentReceiptIds;
+
+          // Note: artworkStatuses will be added later (around line 1125) after processing
+          // This ensures we use the state variable directly, not a rebuilt version
 
           // CRITICAL: Clean up malformed data before creating FormData
           const fileIdFields = ['artworkIds', 'baseFileIds', 'budgetIds', 'invoiceIds', 'receiptIds'];
@@ -955,6 +1095,41 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
             
           }
 
+          // CRITICAL: Add artwork statuses for FormData submission
+          // Use the artworkStatuses state directly - it contains the user's status changes
+          // Don't rebuild from uploadedFiles as those file objects may have stale status values
+          const newArtworkStatuses: ('DRAFT' | 'APPROVED' | 'REPROVED')[] = [];
+
+          // Build newArtworkStatuses for NEW files being uploaded (array matching files order)
+          uploadedFiles.forEach((file) => {
+            if (!file.uploaded && !file.uploadedFileId) {
+              // New file being uploaded - get status from artworkStatuses state or default to DRAFT
+              const fileId = file.uploadedFileId || file.name; // Use name as fallback for new files
+              const status = artworkStatuses[fileId] || file.status || 'DRAFT';
+              newArtworkStatuses.push(status as 'DRAFT' | 'APPROVED' | 'REPROVED');
+            }
+          });
+
+          console.log('[Task Update] 📦 FormData - Artwork statuses debug:', {
+            uploadedFilesCount: uploadedFiles.length,
+            artworkStatusesFromState: artworkStatuses,
+            newFileStatuses: newArtworkStatuses,
+            hasArtworkStatusChanges,
+          });
+
+          // Send statuses for existing files (keyed by File ID) - use state directly
+          // This preserves user's status changes that were tracked in artworkStatuses state
+          if (hasArtworkStatusChanges || Object.keys(artworkStatuses).length > 0) {
+            dataForFormData.artworkStatuses = artworkStatuses;
+            console.log('[Task Update] 📦 FormData - Including artworkStatuses from STATE:', artworkStatuses);
+          }
+
+          // Send statuses for new files being uploaded (array matching files order)
+          if (newArtworkStatuses.length > 0) {
+            dataForFormData.newArtworkStatuses = newArtworkStatuses;
+            console.log('[Task Update] 📦 FormData - Including newArtworkStatuses:', newArtworkStatuses);
+          }
+
           // Use the helper to create FormData with proper context
           const formData = createFormDataWithContext(
             dataForFormData,
@@ -969,6 +1144,14 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
               } : undefined,
             }
           );
+
+          // DEBUG: Log what's actually in the FormData
+          console.log('[Task Update] 📤 FormData contents:');
+          for (const [key, value] of formData.entries()) {
+            if (key === 'artworkIds' || key.startsWith('artworkIds[') || key === 'artworkStatuses') {
+              console.log(`  ${key}: ${value}`);
+            }
+          }
 
           result = await updateAsync({
             id: task.id,
@@ -998,9 +1181,38 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
 
           // Send file IDs arrays when files exist
           // Backend uses these to replace all files via 'set' operation
-          // CRITICAL: Ensure these are always proper arrays, never objects (even when empty)
-          if (currentArtworkIds.length > 0) {
+          // CRITICAL: Always send artworkIds when artworkStatuses is present to prevent removal
+          // If only status changed (no file add/remove), we must send existing file IDs
+          console.log('[Task Update] 📊 Artwork Debug Info:', {
+            uploadedFiles: uploadedFiles,
+            uploadedFilesLength: uploadedFiles.length,
+            uploadedFilesWithFlag: uploadedFiles.filter(f => f.uploaded),
+            currentArtworkIds: currentArtworkIds,
+            hasArtworkStatusChanges,
+            artworkStatuses: Object.keys(artworkStatuses).length > 0 ? artworkStatuses : 'empty',
+            taskArtworks: task.artworks?.length || 0,
+          });
+
+          // DEFENSIVE: If hasArtworkStatusChanges is true but currentArtworkIds is empty,
+          // something is wrong with uploadedFiles state - use task.artworks as fallback
+          if (hasArtworkStatusChanges && currentArtworkIds.length === 0 && task.artworks && task.artworks.length > 0) {
+            console.warn('[Task Update] ⚠️ DEFENSIVE FALLBACK: hasArtworkStatusChanges is true but currentArtworkIds is empty. Using task.artworks as fallback.');
+            const fallbackIds = task.artworks.map((artwork: any) => artwork.fileId || artwork.file?.id).filter(Boolean) as string[];
+            currentArtworkIds.push(...fallbackIds);
+            console.log('[Task Update] 🛡️ Fallback artworkIds:', currentArtworkIds);
+          }
+
+          if (currentArtworkIds.length > 0 || hasArtworkStatusChanges) {
             submitData.artworkIds = [...currentArtworkIds]; // Spread to ensure it's an array
+            console.log('[Task Update] ✅ Including artworkIds:', submitData.artworkIds);
+          } else {
+            console.log('[Task Update] ⚠️ NOT including artworkIds');
+          }
+
+          // CRITICAL: Send artwork statuses for approval workflow
+          if (hasArtworkStatusChanges || Object.keys(artworkStatuses).length > 0) {
+            submitData.artworkStatuses = artworkStatuses;
+            console.log('[Task Update] ✅ Including artworkStatuses in JSON:', artworkStatuses);
           }
           if (currentBaseFileIds.length > 0) {
             submitData.baseFileIds = [...currentBaseFileIds];
@@ -1154,7 +1366,16 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
           // Layout photos are uploaded WITH the task update (not separately like cuts)
           // The backend handles them in the transaction at lines 683-728 of task.service.ts
 
-          // Navigate to the task detail page (toast is already shown by API client)
+          // DEBUG: Temporarily disable redirect to see logs
+          console.log('[Task Update] ✅ SUCCESS - Update completed, response:', result);
+          console.log('[Task Update] Artworks in response:', result?.data?.artworks);
+
+          // Reset artwork status changes flag after successful submission
+          if (hasArtworkStatusChanges) {
+            console.log('[Task Update] 🔄 Resetting hasArtworkStatusChanges flag after successful submission');
+            setHasArtworkStatusChanges(false);
+          }
+
           await new Promise(resolve => setTimeout(resolve, 100));
           window.location.href = `/producao/cronograma/detalhes/${task.id}`;
         }
@@ -1164,7 +1385,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
         setIsSubmitting(false);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, budgetFile, nfeFile, receiptFile, uploadedFiles, observationFiles, isObservationOpen, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
+    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, budgetFile, nfeFile, receiptFile, uploadedFiles, observationFiles, isObservationOpen, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
   );
 
   // Use the edit form hook with change detection
@@ -1339,8 +1560,8 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
     });
   }, [cutsValues]);
 
-  // Compute hasChanges including cuts to create
-  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasCutsToCreate;
+  // Compute hasChanges including cuts to create and artwork status changes
+  const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges || hasCutsToCreate;
 
   // Check for validation errors that should prevent submission
   const hasCutsWithoutFiles = useMemo(() => {
@@ -1411,7 +1632,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
   useEffect(() => {
     if (onFormStateChange) {
       const changedFields = getChangedFields();
-      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges;
+      const isDirty = Object.keys(changedFields).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges;
 
       // Check if form is valid (no blocking validation errors)
       // This matches the form's internal validation but WITHOUT the hasChanges check
@@ -1433,6 +1654,7 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
     form.formState.isValid,
     hasLayoutChanges,
     hasFileChanges,
+    hasArtworkStatusChanges,
     isSubmitting,
     hasCutsWithoutFiles,
     hasIncompletePricing,
@@ -2737,13 +2959,25 @@ export const TaskEditForm = ({ task, onFormStateChange }: TaskEditFormProps) => 
                   </CardHeader>
                   <CardContent className={`transition-all duration-200 ${!isArtworksOpen ? "p-2" : ""}`}>
                     {isArtworksOpen && (
-                      <FileUploadField
+                      <ArtworkFileUploadField
                         onFilesChange={handleFilesChange}
+                        onStatusChange={(fileId, status) => {
+                          console.log('[Task Update] 🎨 Status changed:', { fileId, status, hasArtworkStatusChanges });
+                          setArtworkStatuses(prev => {
+                            const newStatuses = {
+                              ...prev,
+                              [fileId]: status,
+                            };
+                            console.log('[Task Update] 🎨 New artworkStatuses:', newStatuses);
+                            return newStatuses;
+                          });
+                          setHasArtworkStatusChanges(true);
+                          console.log('[Task Update] 🎨 Set hasArtworkStatusChanges to true');
+                        }}
                         maxFiles={5}
                         disabled={isSubmitting}
                         showPreview={true}
                         existingFiles={uploadedFiles}
-                        variant="compact"
                         placeholder="Adicione artes relacionadas à tarefa"
                         label="Artes anexadas"
                       />

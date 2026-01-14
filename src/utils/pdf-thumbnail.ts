@@ -75,7 +75,8 @@ export const getPDFThumbnailUrl = (
 /**
  * Check if a file is a PDF
  */
-export const isPDFFile = (file: AnkaaFile): boolean => {
+export const isPDFFile = (file: AnkaaFile | undefined | null): boolean => {
+  if (!file) return false;
   return (
     file.mimetype?.toLowerCase() === "application/pdf" ||
     file.filename?.toLowerCase().endsWith(".pdf")

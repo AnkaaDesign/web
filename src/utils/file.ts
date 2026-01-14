@@ -42,17 +42,20 @@ export const kbToBytes = (kb: number): number => kb * 1024;
 // File Type Detection
 // =====================
 
-export const getFileExtension = (filename: string): string => {
+export const getFileExtension = (filename: string | undefined | null): string => {
+  if (!filename) return "";
   const lastDot = filename.lastIndexOf(".");
   return lastDot !== -1 ? filename.substring(lastDot + 1).toLowerCase() : "";
 };
 
-export const getFileNameWithoutExtension = (filename: string): string => {
+export const getFileNameWithoutExtension = (filename: string | undefined | null): string => {
+  if (!filename) return "";
   const lastDot = filename.lastIndexOf(".");
   return lastDot !== -1 ? filename.substring(0, lastDot) : filename;
 };
 
 export const getFileCategory = (file: File): string => {
+  if (!file || !file.filename) return "other";
   return getFileCategoryFromExtension(getFileExtension(file.filename));
 };
 
@@ -123,6 +126,7 @@ export const isFileSizeValid = (file: File, maxSizeMB: number = 10): boolean => 
 };
 
 export const isFileTypeAllowed = (file: File, allowedTypes: string[]): boolean => {
+  if (!file || !file.filename) return false;
   const extension = getFileExtension(file.filename);
   return allowedTypes.includes(extension);
 };
@@ -162,7 +166,8 @@ export const validateFileUpload = (
   };
 };
 
-export const sanitizeFilename = (filename: string): string => {
+export const sanitizeFilename = (filename: string | undefined | null): string => {
+  if (!filename) return "";
   // Remove or replace invalid characters
   return filename
     .replace(/[^\w\s.-]/gi, "") // Remove special characters except word chars, spaces, dots, and hyphens
@@ -218,6 +223,8 @@ export const normalizeThumbnailUrl = (thumbnailUrl: string | undefined | null): 
 };
 
 export const getFileUrl = (file: File, baseUrl?: string): string => {
+  if (!file || !file.id) return "";
+
   // Check if this is a remote storage file (path starts with http)
   if (file.path && file.path.startsWith("http")) {
     return file.path; // Use direct remote storage URL
@@ -257,26 +264,34 @@ export const getFileThumbnailUrl = (file: File, size: "small" | "medium" | "larg
 // =====================
 
 export const formatFileDisplay = (file: File): string => {
-  return `${file.filename} (${formatFileSize(file.size)})`;
+  if (!file) return "";
+  const filename = file.filename || "unnamed";
+  const size = file.size || 0;
+  return `${filename} (${formatFileSize(size)})`;
 };
 
 export const formatFileFullDisplay = (file: File): string => {
+  if (!file) return "";
   const category = getFileCategory(file);
   const icon = getFileIcon(file);
-  return `${icon} ${file.filename} - ${formatFileSize(file.size)} - ${category}`;
+  const filename = file.filename || "unnamed";
+  const size = file.size || 0;
+  return `${icon} ${filename} - ${formatFileSize(size)} - ${category}`;
 };
 
 export const formatFileInfo = (file: File): { name: string; size: string; type: string; category: string; icon: string } => {
+  if (!file) return { name: "unnamed", size: "0 Bytes", type: "unknown", category: "other", icon: "📎" };
   return {
-    name: file.filename,
-    size: formatFileSize(file.size),
-    type: file.mimetype,
+    name: file.filename || "unnamed",
+    size: formatFileSize(file.size || 0),
+    type: file.mimetype || "unknown",
     category: getFileCategory(file),
     icon: getFileIcon(file),
   };
 };
 
 export const getFileDisplayName = (file: File, maxLength: number = 50): string => {
+  if (!file || !file.filename) return "unnamed";
   if (file.filename.length <= maxLength) return file.filename;
   const extension = getFileExtension(file.filename);
   const nameWithoutExt = getFileNameWithoutExtension(file.filename);
@@ -288,7 +303,9 @@ export const getFileDisplayName = (file: File, maxLength: number = 50): string =
 // File Operations
 // =====================
 
-export const generateUniqueFilename = (filename: string, existingFilenames: string[]): string => {
+export const generateUniqueFilename = (filename: string | undefined | null, existingFilenames: string[]): string => {
+  if (!filename) return `unnamed_${Date.now()}`;
+
   if (!existingFilenames.includes(filename)) {
     return filename;
   }

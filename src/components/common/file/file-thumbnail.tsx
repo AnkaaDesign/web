@@ -31,6 +31,7 @@ export interface FileThumbnailProps {
 }
 
 const isEpsFile = (file: AnkaaFile): boolean => {
+  if (!file || !file.mimetype) return false;
   const epsMimeTypes = ["application/postscript", "application/x-eps", "application/eps", "image/eps", "image/x-eps"];
   return epsMimeTypes.includes(file.mimetype.toLowerCase());
 };

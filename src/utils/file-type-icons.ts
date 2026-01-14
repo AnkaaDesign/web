@@ -582,11 +582,13 @@ export const CATEGORY_TABLER_ICONS = {
 /**
  * Determines the file category based on extension or MIME type
  */
-export function getFileTypeCategory(filename: string, mimeType?: string): FileCategoryType {
+export function getFileTypeCategory(filename: string | undefined | null, mimeType?: string): FileCategoryType {
   // First try extension
-  const extension = filename.split(".").pop()?.toLowerCase();
-  if (extension && FILE_EXTENSION_TO_CATEGORY[extension]) {
-    return FILE_EXTENSION_TO_CATEGORY[extension];
+  if (filename) {
+    const extension = filename.split(".").pop()?.toLowerCase();
+    if (extension && FILE_EXTENSION_TO_CATEGORY[extension]) {
+      return FILE_EXTENSION_TO_CATEGORY[extension];
+    }
   }
 
   // Fallback to MIME type

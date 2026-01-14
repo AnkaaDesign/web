@@ -41,12 +41,14 @@ interface SwipeState {
 
 // EPS file detection utility
 const isEpsFile = (file: AnkaaFile): boolean => {
+  if (!file || !file.mimetype) return false;
   const epsMimeTypes = ["application/postscript", "application/x-eps", "application/eps", "image/eps", "image/x-eps"];
   return epsMimeTypes.includes(file.mimetype.toLowerCase());
 };
 
 // SVG file detection utility
 const isSvgFile = (file: AnkaaFile): boolean => {
+  if (!file || !file.mimetype || !file.filename) return false;
   return file.mimetype.toLowerCase() === "image/svg+xml" || getFileExtension(file.filename).toLowerCase() === "svg";
 };
 

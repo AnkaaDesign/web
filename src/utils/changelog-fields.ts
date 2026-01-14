@@ -1256,6 +1256,15 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
   }
 
   // Handle commission status
+  if (field === "commission" && entityType === CHANGE_LOG_ENTITY_TYPE.TASK && typeof value === "string") {
+    const commissionStatusLabels: Record<string, string> = {
+      NO_COMMISSION: "Sem Comissão",
+      PARTIAL_COMMISSION: "Comissão Parcial",
+      FULL_COMMISSION: "Comissão Integral",
+      SUSPENDED_COMMISSION: "Comissão Suspensa",
+    };
+    return commissionStatusLabels[value] || value;
+  }
 
   // Handle maintenance type
   if (field === "type" && entityType === CHANGE_LOG_ENTITY_TYPE.MAINTENANCE && typeof value === "string") {

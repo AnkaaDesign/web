@@ -104,6 +104,111 @@ export function canViewServiceOrderType(
 }
 
 /**
+ * Check if user can edit service orders of a specific type
+ *
+ * Edit Permission Matrix:
+ * | Sector          | PRODUCTION | NEGOTIATION | ARTWORK | FINANCIAL |
+ * |-----------------|------------|-------------|---------|-----------|
+ * | ADMIN           | ✓          | ✓           | ✓       | ✓         |
+ * | COMMERCIAL      | -          | ✓           | -       | -         |
+ * | DESIGNER        | -          | -           | ✓       | -         |
+ * | FINANCIAL       | -          | -           | -       | ✓         |
+ * | LOGISTIC        | ✓          | -           | -       | -         |
+ * | PRODUCTION      | ✓          | -           | -       | -         |
+ * | Others          | -          | -           | -       | -         |
+ */
+export function canEditServiceOrderOfType(
+  sectorPrivilege: SECTOR_PRIVILEGES | undefined,
+  serviceOrderType: SERVICE_ORDER_TYPE
+): boolean {
+  if (!sectorPrivilege) return false;
+
+  // ADMIN can edit all types
+  if (sectorPrivilege === SECTOR_PRIVILEGES.ADMIN) return true;
+
+  // Type-specific edit permissions
+  switch (serviceOrderType) {
+    case SERVICE_ORDER_TYPE.PRODUCTION:
+      // LOGISTIC and PRODUCTION can edit production service orders
+      return sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
+             sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION;
+
+    case SERVICE_ORDER_TYPE.NEGOTIATION:
+      // Only COMMERCIAL can edit negotiation service orders
+      return sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL;
+
+    case SERVICE_ORDER_TYPE.ARTWORK:
+      // Only DESIGNER can edit artwork service orders
+      return sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER;
+
+    case SERVICE_ORDER_TYPE.FINANCIAL:
+      // Only FINANCIAL can edit financial service orders
+      return sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL;
+
+    default:
+      return false;
+  }
+}
+
+/**
+ * Check if user can cancel any service order
+ * Only ADMIN can cancel service orders
+ * IMPORTANT: CANCELLED status should only be visible/selectable by ADMIN
+ */
+export function canCancelServiceOrder(sectorPrivilege: SECTOR_PRIVILEGES | undefined): boolean {
+  if (!sectorPrivilege) return false;
+  return sectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
+}
+
+/**
+ * Check if user can mark ARTWORK service orders as COMPLETED
+ * Only ADMIN can complete artwork service orders
+ * Designers can only mark them as WAITING_APPROVE
+ */
+export function canCompleteArtworkServiceOrder(sectorPrivilege: SECTOR_PRIVILEGES | undefined): boolean {
+  if (!sectorPrivilege) return false;
+  return sectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
+}
+
+/**
+ * Get allowed status transitions for a user editing a specific service order
+ * Returns array of statuses the user is allowed to set
+ *
+ * IMPORTANT: Only ADMIN can see/set CANCELLED status
+ */
+export function getAllowedServiceOrderStatuses(
+  sectorPrivilege: SECTOR_PRIVILEGES | undefined,
+  serviceOrderType: SERVICE_ORDER_TYPE
+): SERVICE_ORDER_STATUS[] {
+  if (!sectorPrivilege) return [];
+
+  // Check if user can edit this type at all
+  if (!canEditServiceOrderOfType(sectorPrivilege, serviceOrderType)) return [];
+
+  // Base statuses available to all authorized users (no CANCELLED)
+  const baseStatuses: SERVICE_ORDER_STATUS[] = [
+    SERVICE_ORDER_STATUS.PENDING,
+    SERVICE_ORDER_STATUS.IN_PROGRESS,
+    SERVICE_ORDER_STATUS.WAITING_APPROVE,
+    SERVICE_ORDER_STATUS.COMPLETED,
+  ];
+
+  // ADMIN can set any status including CANCELLED
+  if (sectorPrivilege === SECTOR_PRIVILEGES.ADMIN) {
+    return [...baseStatuses, SERVICE_ORDER_STATUS.CANCELLED];
+  }
+
+  // For ARTWORK service orders, DESIGNER cannot set COMPLETED (only WAITING_APPROVE)
+  if (serviceOrderType === SERVICE_ORDER_TYPE.ARTWORK &&
+      sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
+    return baseStatuses.filter(s => s !== SERVICE_ORDER_STATUS.COMPLETED);
+  }
+
+  // All other authorized users: base statuses only (no CANCELLED, no restrictions)
+  return baseStatuses;
+}
+
+/**
  * Get full permissions for a specific service order type and sector
  */
 export function getServiceOrderPermissions(
