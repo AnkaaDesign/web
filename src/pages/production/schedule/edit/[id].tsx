@@ -198,7 +198,7 @@ export const TaskEditPage = () => {
           />
         </div>
         <div className="flex-1 overflow-y-auto pb-6">
-          <TaskEditForm task={task} onFormStateChange={setFormState} />
+          <TaskEditForm task={task} onFormStateChange={setFormState} detailsRoute={breadcrumbConfig.detailsRoute} />
         </div>
       </div>
     </PrivilegeRoute>

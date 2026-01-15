@@ -544,7 +544,7 @@ export function TaskHistoryContextMenu({
           {canManageStatus && (hasPreparationTasks || hasWaitingProductionTasks) && (
             <DropdownMenuItem onClick={handleStart} className="text-green-700 hover:text-white">
               <IconPlayerPlay className="mr-2 h-4 w-4" />
-              Iniciar
+              {isPreparationRoute ? "Disponibilizar para produção" : "Iniciar"}
             </DropdownMenuItem>
           )}
 

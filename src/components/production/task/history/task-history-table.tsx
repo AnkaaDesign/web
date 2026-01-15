@@ -33,12 +33,11 @@ interface TaskHistoryTableProps {
 }
 
 /**
- * Get the appropriate color class for a task row based on its status and deadline
- * Following the cronograma's proven color scheme:
- * - Neutral gray: Non-production tasks or tasks without deadline
- * - Green: IN_PRODUCTION with more than 4 hours remaining
- * - Orange: IN_PRODUCTION with 0-4 hours remaining
- * - Red: Overdue tasks (past deadline)
+ * Get the appropriate color class for a task row based on its forecastDate
+ * For agenda (preparation) route only, using the same colors as cronograma:
+ * - Neutral gray: Tasks without forecastDate or > 7 days away
+ * - Yellow/Amber: forecastDate is 3-7 days away (warning zone)
+ * - Red: forecastDate is ≤ 3 days away or overdue (critical zone)
  */
 function getRowColorClass(task: Task, navigationRoute?: string): string {
   // Only apply color logic to preparation (agenda) route
@@ -46,29 +45,28 @@ function getRowColorClass(task: Task, navigationRoute?: string): string {
     return "";
   }
 
-  // Non-production tasks (PREPARATION tasks in agenda) - check deadline
-  if (task.status === TASK_STATUS.PREPARATION) {
-    // Tasks with no deadline - neutral
-    if (!task.term) {
-      return "bg-neutral-50 hover:bg-neutral-100 dark:bg-neutral-800 dark:hover:bg-neutral-700";
-    }
-
-    // Check if task is overdue
-    const isOverdue = isDateInPast(task.term);
-    if (isOverdue) {
-      return "bg-red-200 hover:bg-red-300 dark:bg-red-800 dark:hover:bg-red-700";
-    }
-
-    // Calculate hours remaining for preparation tasks
-    const hoursRemaining = getHoursBetween(new Date(), task.term);
-
-    if (hoursRemaining > 4) {
-      return "bg-green-200 hover:bg-green-300 dark:bg-green-800 dark:hover:bg-green-700";
-    } else {
-      return "bg-amber-200 hover:bg-amber-300 dark:bg-amber-700 dark:hover:bg-amber-600";
-    }
+  // Tasks without forecastDate - neutral
+  if (!task.forecastDate) {
+    return "";
   }
 
+  // Calculate days remaining until forecastDate
+  const now = new Date();
+  const forecast = new Date(task.forecastDate);
+  const diffMs = forecast.getTime() - now.getTime();
+  const daysRemaining = diffMs / (1000 * 60 * 60 * 24);
+
+  // Red zone: 3 days or less (including overdue)
+  if (daysRemaining <= 3) {
+    return "bg-red-200 hover:bg-red-300 dark:bg-red-800 dark:hover:bg-red-700";
+  }
+
+  // Yellow zone: between 3 and 7 days
+  if (daysRemaining <= 7) {
+    return "bg-amber-200 hover:bg-amber-300 dark:bg-amber-700 dark:hover:bg-amber-600";
+  }
+
+  // Safe zone: more than 7 days - neutral (no special color)
   return "";
 }
 
@@ -179,8 +177,9 @@ export function TaskHistoryTable({
         : filters.status;
 
     const params = {
-      // When showSelectedOnly is true, don't apply filters
-      ...(showSelectedOnly ? {} : { ...filters, ...(statusToUse && { status: statusToUse }) }),
+      // Always apply base filters to prevent showing unintended tasks
+      ...filters,
+      ...(statusToUse && { status: statusToUse }),
       page: page + 1, // Convert 0-based to 1-based for API
       limit: pageSize,
       include: includeConfig,
@@ -188,7 +187,7 @@ export function TaskHistoryTable({
       ...(sortConfigs.length > 0 && {
         orderBy: convertSortConfigsToOrderBy(sortConfigs),
       }),
-      // When showSelectedOnly is true, only show selected items
+      // When showSelectedOnly is true, add ID filter to restrict to selected items
       ...(showSelectedOnly &&
         selectedIds.length > 0 && {
           where: {
@@ -432,7 +431,7 @@ export function TaskHistoryTable({
                 const rowColorClass = getRowColorClass(task, navigationRoute);
 
                 return (
-                  <TableRow
+                  <tr
                     key={task.id}
                     data-state={taskIsSelected ? "selected" : undefined}
                     className={cn(
@@ -506,7 +505,7 @@ export function TaskHistoryTable({
                         </div>
                       </TableCell>
                     ))}
-                  </TableRow>
+                  </tr>
                 );
               })
             )}

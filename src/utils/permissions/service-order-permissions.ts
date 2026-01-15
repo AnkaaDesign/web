@@ -6,25 +6,26 @@ import { SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "@/c
  * Defines visibility and edit permissions for service order columns based on sector privileges.
  *
  * Permission Matrix (VISIBILITY):
- * | Sector          | PRODUCTION | NEGOTIATION | ARTWORK    | FINANCIAL  |
- * |-----------------|------------|-------------|------------|------------|
- * | ADMIN           | view+edit  | view+edit   | view+edit  | view+edit  |
- * | COMMERCIAL      | view only  | view+edit*  | -          | view only  |
- * | DESIGNER        | view only  | -           | view+edit* | -          |
- * | FINANCIAL       | view only  | -           | -          | view+edit* |
- * | LOGISTIC        | view+edit  | view+edit*  | view+edit* | -          |
- * | PRODUCTION      | view+edit  | -           | -          | -          |
- * | WAREHOUSE       | view only  | -           | -          | -          |
- * | HUMAN_RESOURCES | view only  | -           | -          | -          |
- * | Others          | view only  | -           | -          | -          |
+ * | Sector          | PRODUCTION | FINANCIAL  | COMMERCIAL | LOGISTIC   | ARTWORK    |
+ * |-----------------|------------|------------|------------|------------|------------|
+ * | ADMIN           | view+edit  | view+edit  | view+edit  | view+edit  | view+edit  |
+ * | COMMERCIAL      | view only  | view only  | view+edit* | -          | -          |
+ * | DESIGNER        | view only  | -          | -          | -          | view+edit* |
+ * | FINANCIAL       | view only  | view+edit* | -          | -          | -          |
+ * | LOGISTIC        | view+edit  | -          | -          | view+edit* | -          |
+ * | PRODUCTION      | view+edit  | -          | -          | -          | -          |
+ * | WAREHOUSE       | view only  | -          | -          | -          | -          |
+ * | HUMAN_RESOURCES | view only  | -          | -          | -          | -          |
+ * | Others          | view only  | -          | -          | -          | -          |
  *
  * * = edit only own/unassigned service orders
  *
  * Visibility Rules:
  * - PRODUCTION: Visible to ALL sectors, Editable by Admin/Logistic/Production only
- * - NEGOTIATION: Visible to Admin/Commercial/Logistic only
- * - ARTWORK: Visible to Admin/Designer/Logistic only
  * - FINANCIAL: Visible to Admin/Commercial/Financial only
+ * - COMMERCIAL: Visible to Admin/Commercial only
+ * - LOGISTIC: Visible to Admin/Logistic only
+ * - ARTWORK: Visible to Admin/Designer only
  */
 
 export interface ServiceOrderPermissions {
@@ -45,39 +46,39 @@ export function getVisibleServiceOrderTypes(sectorPrivilege: SECTOR_PRIVILEGES |
       // Admin sees all columns
       return [
         SERVICE_ORDER_TYPE.PRODUCTION,
-        SERVICE_ORDER_TYPE.NEGOTIATION,
-        SERVICE_ORDER_TYPE.ARTWORK,
         SERVICE_ORDER_TYPE.FINANCIAL,
+        SERVICE_ORDER_TYPE.COMMERCIAL,
+        SERVICE_ORDER_TYPE.LOGISTIC,
+        SERVICE_ORDER_TYPE.ARTWORK,
       ];
 
     case SECTOR_PRIVILEGES.COMMERCIAL:
-      // Commercial sees: production, negotiation, financial (NO artwork)
+      // Commercial sees: production, commercial, financial
       return [
         SERVICE_ORDER_TYPE.PRODUCTION,
-        SERVICE_ORDER_TYPE.NEGOTIATION,
         SERVICE_ORDER_TYPE.FINANCIAL,
+        SERVICE_ORDER_TYPE.COMMERCIAL,
       ];
 
     case SECTOR_PRIVILEGES.DESIGNER:
-      // Designer sees: production, artwork (NO negotiation, NO financial)
+      // Designer sees: production, artwork
       return [
         SERVICE_ORDER_TYPE.PRODUCTION,
         SERVICE_ORDER_TYPE.ARTWORK,
       ];
 
     case SECTOR_PRIVILEGES.FINANCIAL:
-      // Financial sees: production, financial (NO negotiation, NO artwork)
+      // Financial sees: production, financial
       return [
         SERVICE_ORDER_TYPE.PRODUCTION,
         SERVICE_ORDER_TYPE.FINANCIAL,
       ];
 
     case SECTOR_PRIVILEGES.LOGISTIC:
-      // Logistic sees: production, negotiation, artwork (NO financial)
+      // Logistic sees: production, logistic
       return [
         SERVICE_ORDER_TYPE.PRODUCTION,
-        SERVICE_ORDER_TYPE.NEGOTIATION,
-        SERVICE_ORDER_TYPE.ARTWORK,
+        SERVICE_ORDER_TYPE.LOGISTIC,
       ];
 
     case SECTOR_PRIVILEGES.HUMAN_RESOURCES:
@@ -107,15 +108,15 @@ export function canViewServiceOrderType(
  * Check if user can edit service orders of a specific type
  *
  * Edit Permission Matrix:
- * | Sector          | PRODUCTION | NEGOTIATION | ARTWORK | FINANCIAL |
- * |-----------------|------------|-------------|---------|-----------|
- * | ADMIN           | ✓          | ✓           | ✓       | ✓         |
- * | COMMERCIAL      | -          | ✓           | -       | -         |
- * | DESIGNER        | -          | -           | ✓       | -         |
- * | FINANCIAL       | -          | -           | -       | ✓         |
- * | LOGISTIC        | ✓          | -           | -       | -         |
- * | PRODUCTION      | ✓          | -           | -       | -         |
- * | Others          | -          | -           | -       | -         |
+ * | Sector          | PRODUCTION | FINANCIAL | COMMERCIAL | LOGISTIC | ARTWORK |
+ * |-----------------|------------|-----------|------------|----------|---------|
+ * | ADMIN           | ✓          | ✓         | ✓          | ✓        | ✓       |
+ * | COMMERCIAL      | -          | -         | ✓          | -        | -       |
+ * | DESIGNER        | -          | -         | -          | -        | ✓       |
+ * | FINANCIAL       | -          | ✓         | -          | -        | -       |
+ * | LOGISTIC        | ✓          | -         | -          | ✓        | -       |
+ * | PRODUCTION      | ✓          | -         | -          | -        | -       |
+ * | Others          | -          | -         | -          | -        | -       |
  */
 export function canEditServiceOrderOfType(
   sectorPrivilege: SECTOR_PRIVILEGES | undefined,
@@ -133,17 +134,21 @@ export function canEditServiceOrderOfType(
       return sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
              sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION;
 
-    case SERVICE_ORDER_TYPE.NEGOTIATION:
-      // Only COMMERCIAL can edit negotiation service orders
+    case SERVICE_ORDER_TYPE.FINANCIAL:
+      // Only FINANCIAL can edit financial service orders
+      return sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL;
+
+    case SERVICE_ORDER_TYPE.COMMERCIAL:
+      // Only COMMERCIAL can edit commercial service orders
       return sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL;
+
+    case SERVICE_ORDER_TYPE.LOGISTIC:
+      // Only LOGISTIC can edit logistic service orders
+      return sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC;
 
     case SERVICE_ORDER_TYPE.ARTWORK:
       // Only DESIGNER can edit artwork service orders
       return sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER;
-
-    case SERVICE_ORDER_TYPE.FINANCIAL:
-      // Only FINANCIAL can edit financial service orders
-      return sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL;
 
     default:
       return false;
@@ -176,7 +181,7 @@ export function canCompleteArtworkServiceOrder(sectorPrivilege: SECTOR_PRIVILEGE
  *
  * Status availability by service order type:
  * - ARTWORK: PENDING, IN_PROGRESS, WAITING_APPROVE, COMPLETED (approval workflow)
- * - PRODUCTION, FINANCIAL, NEGOTIATION: PENDING, IN_PROGRESS, COMPLETED (simple workflow)
+ * - PRODUCTION, FINANCIAL, COMMERCIAL, LOGISTIC: PENDING, IN_PROGRESS, COMPLETED (simple workflow)
  *
  * IMPORTANT:
  * - Only ADMIN can see/set CANCELLED status
@@ -216,7 +221,7 @@ export function getAllowedServiceOrderStatuses(
     return artworkStatuses;
   }
 
-  // PRODUCTION, FINANCIAL, NEGOTIATION: Simple workflow without WAITING_APPROVE
+  // PRODUCTION, FINANCIAL, COMMERCIAL, LOGISTIC: Simple workflow without WAITING_APPROVE
   const simpleStatuses: SERVICE_ORDER_STATUS[] = [
     SERVICE_ORDER_STATUS.PENDING,
     SERVICE_ORDER_STATUS.IN_PROGRESS,
@@ -260,39 +265,41 @@ export function getServiceOrderPermissions(
         editOnlyOwnOrUnassigned: false
       };
 
-    case SERVICE_ORDER_TYPE.NEGOTIATION:
-      // Visible to: Admin, Commercial, Logistic
-      // Editable by: Admin, Commercial only
-      if (sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
-        return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
-      }
-      if (sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
-        // LOGISTIC can VIEW but NOT EDIT negotiation service orders
-        return { canView: true, canEdit: false, editOnlyOwnOrUnassigned: false };
-      }
-      // Not visible to other sectors
-      return { canView: false, canEdit: false, editOnlyOwnOrUnassigned: false };
-
-    case SERVICE_ORDER_TYPE.ARTWORK:
-      // Visible to: Admin, Designer, Logistic
-      // Editable by: Admin, Designer only
-      if (sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
-        return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
-      }
-      if (sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
-        // LOGISTIC can VIEW but NOT EDIT artwork service orders
-        return { canView: true, canEdit: false, editOnlyOwnOrUnassigned: false };
-      }
-      // Not visible to other sectors
-      return { canView: false, canEdit: false, editOnlyOwnOrUnassigned: false };
-
     case SERVICE_ORDER_TYPE.FINANCIAL:
       // Visible to: Admin, Commercial, Financial
+      // Editable by: Admin, Financial only
       if (sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
         // Commercial can view but not edit financial
         return { canView: true, canEdit: false, editOnlyOwnOrUnassigned: false };
       }
       if (sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
+        return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
+      }
+      // Not visible to other sectors
+      return { canView: false, canEdit: false, editOnlyOwnOrUnassigned: false };
+
+    case SERVICE_ORDER_TYPE.COMMERCIAL:
+      // Visible to: Admin, Commercial
+      // Editable by: Admin, Commercial only
+      if (sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
+        return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
+      }
+      // Not visible to other sectors
+      return { canView: false, canEdit: false, editOnlyOwnOrUnassigned: false };
+
+    case SERVICE_ORDER_TYPE.LOGISTIC:
+      // Visible to: Admin, Logistic
+      // Editable by: Admin, Logistic only
+      if (sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
+        return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
+      }
+      // Not visible to other sectors
+      return { canView: false, canEdit: false, editOnlyOwnOrUnassigned: false };
+
+    case SERVICE_ORDER_TYPE.ARTWORK:
+      // Visible to: Admin, Designer
+      // Editable by: Admin, Designer only
+      if (sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
         return { canView: true, canEdit: true, editOnlyOwnOrUnassigned: true };
       }
       // Not visible to other sectors

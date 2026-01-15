@@ -41,7 +41,8 @@ export function ServiceSelectorGrouped({ control, disabled }: ServiceSelectorGro
     const groups: Record<SERVICE_ORDER_TYPE, number[]> = {
       [SERVICE_ORDER_TYPE.PRODUCTION]: [],
       [SERVICE_ORDER_TYPE.FINANCIAL]: [],
-      [SERVICE_ORDER_TYPE.NEGOTIATION]: [],
+      [SERVICE_ORDER_TYPE.COMMERCIAL]: [],
+      [SERVICE_ORDER_TYPE.LOGISTIC]: [],
       [SERVICE_ORDER_TYPE.ARTWORK]: [],
     };
 

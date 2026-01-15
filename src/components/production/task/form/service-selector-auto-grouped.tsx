@@ -30,7 +30,7 @@ interface ServiceSelectorProps {
 export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, userPrivilege }: ServiceSelectorProps) {
   const [creatingServiceIndex, setCreatingServiceIndex] = useState<number | null>(null);
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, prepend, remove } = useFieldArray({
     control,
     name: "serviceOrders",
   });
@@ -62,12 +62,16 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     // Check permissions based on sector and service order type
     switch (userPrivilege) {
       case SECTOR_PRIVILEGES.COMMERCIAL:
-        // Can edit NEGOTIATION service orders if not assigned or assigned to them
-        return type === SERVICE_ORDER_TYPE.NEGOTIATION && (isNotAssigned || isAssignedToCurrentUser);
+        // Can edit COMMERCIAL service orders if not assigned or assigned to them
+        return type === SERVICE_ORDER_TYPE.COMMERCIAL && (isNotAssigned || isAssignedToCurrentUser);
 
       case SECTOR_PRIVILEGES.FINANCIAL:
         // Can edit FINANCIAL service orders if not assigned or assigned to them
         return type === SERVICE_ORDER_TYPE.FINANCIAL && (isNotAssigned || isAssignedToCurrentUser);
+
+      case SECTOR_PRIVILEGES.LOGISTIC:
+        // Can edit LOGISTIC and PRODUCTION service orders if not assigned or assigned to them
+        return (type === SERVICE_ORDER_TYPE.LOGISTIC || type === SERVICE_ORDER_TYPE.PRODUCTION) && (isNotAssigned || isAssignedToCurrentUser);
 
       case SECTOR_PRIVILEGES.DESIGNER:
         // Can edit ARTWORK service orders if not assigned or assigned to them
@@ -92,7 +96,8 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     const groups: Record<SERVICE_ORDER_TYPE, number[]> = {
       [SERVICE_ORDER_TYPE.PRODUCTION]: [],
       [SERVICE_ORDER_TYPE.FINANCIAL]: [],
-      [SERVICE_ORDER_TYPE.NEGOTIATION]: [],
+      [SERVICE_ORDER_TYPE.COMMERCIAL]: [],
+      [SERVICE_ORDER_TYPE.LOGISTIC]: [],
       [SERVICE_ORDER_TYPE.ARTWORK]: [],
     };
     const ungrouped: number[] = [];
@@ -120,16 +125,19 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     let defaultType = SERVICE_ORDER_TYPE.PRODUCTION;
 
     if (userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
-      defaultType = SERVICE_ORDER_TYPE.NEGOTIATION;
+      defaultType = SERVICE_ORDER_TYPE.COMMERCIAL;
     } else if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
       defaultType = SERVICE_ORDER_TYPE.FINANCIAL;
+    } else if (userPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
+      defaultType = SERVICE_ORDER_TYPE.LOGISTIC;
     } else if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
       defaultType = SERVICE_ORDER_TYPE.ARTWORK;
     } else if (userPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
       defaultType = SERVICE_ORDER_TYPE.PRODUCTION;
     }
 
-    append({
+    // Use prepend to add new service at the beginning (top)
+    prepend({
       status: SERVICE_ORDER_STATUS.PENDING,
       statusOrder: 1,
       description: "",
@@ -163,7 +171,8 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
   const renderServiceGroup = (type: SERVICE_ORDER_TYPE) => {
     const serviceIndices = groupedServices[type];
 
-    if (serviceIndices.length === 0) {
+    // Skip if this type doesn't exist in our groups (e.g., old NEGOTIATION enum value)
+    if (!serviceIndices || serviceIndices.length === 0) {
       return null; // Don't show empty groups
     }
 
@@ -211,7 +220,20 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
 
   return (
     <div className="space-y-4">
-      <FormLabel>Serviços</FormLabel>
+      <div className="flex items-center justify-between">
+        <FormLabel>Serviços</FormLabel>
+        {/* Add Service Button - At the top */}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleAddService}
+          disabled={disabled}
+        >
+          <IconPlus className="h-4 w-4 mr-2" />
+          Adicionar Serviço
+        </Button>
+      </div>
 
       {/* Ungrouped services (being edited) - shown in a card for consistency */}
       {ungroupedIndices.length > 0 && (
@@ -260,19 +282,6 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
           renderServiceGroup(type as SERVICE_ORDER_TYPE)
         )}
       </div>
-
-      {/* Add Service Button */}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={handleAddService}
-        disabled={disabled}
-        className="w-full"
-      >
-        <IconPlus className="h-4 w-4 mr-2" />
-        Adicionar Serviço
-      </Button>
     </div>
   );
 }
@@ -496,12 +505,13 @@ function ServiceRow({
       return [
         SERVICE_ORDER_TYPE.PRODUCTION,
         SERVICE_ORDER_TYPE.FINANCIAL,
-        SERVICE_ORDER_TYPE.NEGOTIATION,
+        SERVICE_ORDER_TYPE.COMMERCIAL,
+        SERVICE_ORDER_TYPE.LOGISTIC,
         SERVICE_ORDER_TYPE.ARTWORK,
       ];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
-      return [SERVICE_ORDER_TYPE.NEGOTIATION];
+      return [SERVICE_ORDER_TYPE.COMMERCIAL];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
       return [SERVICE_ORDER_TYPE.FINANCIAL];
@@ -510,6 +520,9 @@ function ServiceRow({
       return [SERVICE_ORDER_TYPE.ARTWORK];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
+      return [SERVICE_ORDER_TYPE.PRODUCTION, SERVICE_ORDER_TYPE.LOGISTIC];
+    }
+    if (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION) {
       return [SERVICE_ORDER_TYPE.PRODUCTION];
     }
     // Default: only production for other sectors
@@ -518,11 +531,12 @@ function ServiceRow({
 
   // Grid layout: consistent proportions for both grouped and ungrouped
   // Using min-w-0 on children to prevent content from affecting column width
-  // Grouped: [Description 2fr] [User 1fr] [Status 1fr] [Buttons 80px]
-  // Ungrouped: [Type 120px] [Description 2fr] [User 1fr] [Buttons 80px]
+  // Grouped: [Description 2fr] [User 1fr] [Status 1fr] [Buttons 90px]
+  // Ungrouped: [Type 120px] [Description 2fr] [User 1fr] [Buttons 90px]
+  // Note: Buttons column now 90px to fit both observation and trash buttons (2 icons + gap)
   const gridClass = isGrouped
-    ? "grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_80px] gap-3 items-center"
-    : "grid grid-cols-1 md:grid-cols-[120px_2fr_1fr_80px] gap-3 items-center";
+    ? "grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_90px] gap-3 items-center"
+    : "grid grid-cols-1 md:grid-cols-[120px_2fr_1fr_90px] gap-3 items-center";
 
   return (
     <>
@@ -655,26 +669,24 @@ function ServiceRow({
 
         {/* Action Buttons - fixed width */}
         <div className="flex items-center justify-end gap-1">
-          {/* Observation Button - Only show for existing grouped service orders */}
-          {showStatusField && !isNewServiceOrder && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={handleOpenObservationModal}
-              disabled={disabled}
-              className="relative flex-shrink-0 h-9 w-9"
-              title={hasObservation ? "Ver/Editar observação" : "Adicionar observação"}
-            >
-              <IconNote className="h-4 w-4" />
-              {/* Red indicator when observation exists */}
-              {hasObservation && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
-                  !
-                </span>
-              )}
-            </Button>
-          )}
+          {/* Observation Button - Always available for all service orders */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleOpenObservationModal}
+            disabled={disabled}
+            className="relative flex-shrink-0 h-9 w-9"
+            title={hasObservation ? "Ver/Editar observação" : "Adicionar observação"}
+          >
+            <IconNote className="h-4 w-4" />
+            {/* Red indicator when observation exists */}
+            {hasObservation && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                !
+              </span>
+            )}
+          </Button>
 
           {/* Remove Button */}
           <Button

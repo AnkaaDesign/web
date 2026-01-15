@@ -139,8 +139,8 @@ export function CutItemTable({ filters = {}, className, onDataChange, visibleCol
   // Build query params
   const queryParams = React.useMemo(
     () => ({
-      // When showSelectedOnly is true, don't apply filters
-      ...(showSelectedOnly ? {} : filters),
+      // Always apply base filters to prevent showing unintended records
+      ...filters,
       page, // Already 1-based from useTableState
       limit: pageSize,
       include: includeConfig,
@@ -149,7 +149,7 @@ export function CutItemTable({ filters = {}, className, onDataChange, visibleCol
       orderBy: sortConfigs.length > 0
         ? convertSortConfigsToOrderBy(sortConfigs)
         : { statusOrder: 'asc' },
-      // When showSelectedOnly is true, only show selected items
+      // When showSelectedOnly is true, add ID filter to restrict to selected items
       ...(showSelectedOnly &&
         selectedIds.length > 0 && {
           where: {

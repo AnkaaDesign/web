@@ -42,8 +42,9 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
     const typeOrder: Record<string, number> = {
       [SERVICE_ORDER_TYPE.PRODUCTION]: 0,
       [SERVICE_ORDER_TYPE.FINANCIAL]: 1,
-      [SERVICE_ORDER_TYPE.NEGOTIATION]: 2,
-      [SERVICE_ORDER_TYPE.ARTWORK]: 3,
+      [SERVICE_ORDER_TYPE.COMMERCIAL]: 2,
+      [SERVICE_ORDER_TYPE.LOGISTIC]: 3,
+      [SERVICE_ORDER_TYPE.ARTWORK]: 4,
     };
 
     // Create array of indices with their types
@@ -303,7 +304,8 @@ function ServiceRow({
                   options={[
                     SERVICE_ORDER_TYPE.PRODUCTION,
                     SERVICE_ORDER_TYPE.FINANCIAL,
-                    SERVICE_ORDER_TYPE.NEGOTIATION,
+                    SERVICE_ORDER_TYPE.COMMERCIAL,
+                    SERVICE_ORDER_TYPE.LOGISTIC,
                     SERVICE_ORDER_TYPE.ARTWORK,
                   ].map((type) => ({
                     value: type,

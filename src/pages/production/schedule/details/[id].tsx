@@ -38,8 +38,12 @@ import { isTeamLeader } from "@/utils/user";
 import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { canViewServiceOrderType, canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { canViewPricing } from "@/utils/permissions/pricing-permissions";
+import { PricingStatusBadge } from "@/components/production/task/pricing/pricing-status-badge";
+import { BudgetPdfExportDialog } from "@/components/production/task/pricing/budget-pdf-export-dialog";
+import { exportBudgetPdf } from "@/utils/budget-pdf-generator";
 import { SERVICE_ORDER_TYPE } from "../../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
+import type { FileWithPreview } from "@/types/file";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -604,6 +608,8 @@ export const TaskDetailsPage = () => {
   const [baseFilesViewMode, setBaseFilesViewMode] = useState<FileViewMode>("list");
   const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("list");
   const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("list");
+  const [budgetPdfDialogOpen, setBudgetPdfDialogOpen] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   // Get user's sector privilege for service order permissions
   const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
@@ -907,6 +913,31 @@ export const TaskDetailsPage = () => {
     title: task ? `Tarefa: ${taskDisplayName}` : "Detalhes da Tarefa",
     icon: source === 'historico' ? "history" : "clipboard-list",
   });
+
+  // Budget PDF export handler
+  const handleBudgetPdfExport = async (notes: string, images: FileWithPreview[]) => {
+    if (!task) return;
+
+    setIsExportingPdf(true);
+    try {
+      await exportBudgetPdf({
+        task,
+        notes,
+        images,
+      });
+      toast.success("Orçamento exportado com sucesso!");
+      setBudgetPdfDialogOpen(false);
+    } catch (error) {
+      console.error("Error exporting budget PDF:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Erro ao exportar o orçamento. Tente novamente."
+      );
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   // Status change handlers
   const handleStatusChange = (newStatus: TASK_STATUS) => {
@@ -1443,14 +1474,6 @@ export const TaskDetailsPage = () => {
 
               {/* Pricing Card - Only visible to ADMIN, FINANCIAL, and COMMERCIAL sectors */}
               {sectionVisibility.isSectionVisible("pricing") && canViewPricing(currentUser?.sector?.privileges || '') && task.pricing && task.pricing.items && task.pricing.items.length > 0 && (() => {
-                const statusConfig = {
-                  DRAFT: { label: 'Rascunho', icon: IconClock, className: 'bg-gray-100 text-gray-700' },
-                  APPROVED: { label: 'Aprovado', icon: IconCheck, className: 'bg-green-100 text-green-700' },
-                  REJECTED: { label: 'Rejeitado', icon: IconX, className: 'bg-red-100 text-red-700' },
-                  CANCELLED: { label: 'Cancelado', icon: IconBan, className: 'bg-gray-50 text-gray-600' },
-                };
-                const { label, icon: StatusIcon, className: statusClass } = statusConfig[task.pricing.status] || statusConfig.DRAFT;
-
                 return (
                   <Card className="border flex flex-col animate-in fade-in-50 duration-825">
                     <CardHeader className="pb-6">
@@ -1459,10 +1482,18 @@ export const TaskDetailsPage = () => {
           <IconFileInvoice className="h-5 w-5 text-muted-foreground" />
           Precificação Detalhada
         </CardTitle>
-                        <Badge className={statusClass}>
-                          <StatusIcon className="w-3 h-3 mr-1" />
-                          {label}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setBudgetPdfDialogOpen(true)}
+                            className="gap-2"
+                          >
+                            <IconDownload className="h-4 w-4" />
+                            Exportar PDF
+                          </Button>
+                          <PricingStatusBadge status={task.pricing.status} />
+                        </div>
                       </div>
                     </CardHeader>
               <CardContent className="pt-0 flex-1">
@@ -1503,16 +1534,46 @@ export const TaskDetailsPage = () => {
                 </table>
                   </div>
 
-                  {/* Total row */}
-                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-base font-bold text-foreground">TOTAL</span>
-                  <span className="text-lg font-bold text-primary">
-                    {formatCurrency(
-                  typeof task.pricing.total === 'number' ? task.pricing.total : Number(task.pricing.total) || 0
+                  {/* Pricing Summary */}
+                  <div className="bg-muted/20 border rounded-lg p-4 space-y-3">
+                    {/* Subtotal */}
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="font-medium">
+                        {formatCurrency(
+                          typeof task.pricing.subtotal === 'number' ? task.pricing.subtotal : Number(task.pricing.subtotal) || 0
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Discount (if applicable) */}
+                    {task.pricing.discountType && task.pricing.discountType !== 'NONE' && task.pricing.discountValue && (
+                      <div className="flex items-center justify-between text-sm text-destructive">
+                        <span>
+                          Desconto
+                          {task.pricing.discountType === 'PERCENTAGE'
+                            ? ` (${task.pricing.discountValue}%)`
+                            : ' (Valor Fixo)'}
+                        </span>
+                        <span className="font-medium">
+                          - {formatCurrency(
+                            task.pricing.discountType === 'PERCENTAGE'
+                              ? (task.pricing.subtotal * task.pricing.discountValue) / 100
+                              : task.pricing.discountValue
+                          )}
+                        </span>
+                      </div>
                     )}
-                  </span>
-                </div>
+
+                    {/* Total */}
+                    <div className="flex items-center justify-between pt-3 border-t">
+                      <span className="text-base font-bold text-foreground">TOTAL</span>
+                      <span className="text-xl font-bold text-primary">
+                        {formatCurrency(
+                          typeof task.pricing.total === 'number' ? task.pricing.total : Number(task.pricing.total) || 0
+                        )}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -2632,6 +2693,14 @@ export const TaskDetailsPage = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Budget PDF Export Dialog */}
+        <BudgetPdfExportDialog
+          open={budgetPdfDialogOpen}
+          onOpenChange={setBudgetPdfDialogOpen}
+          onExport={handleBudgetPdfExport}
+          isExporting={isExportingPdf}
+        />
     </PrivilegeRoute>
   );
 };

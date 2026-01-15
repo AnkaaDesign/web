@@ -13,32 +13,28 @@ export function PricingStatusBadge({ status, className }: PricingStatusBadgeProp
       label: 'Rascunho',
       variant: 'secondary' as const,
       icon: IconClock,
-      className: 'bg-gray-100 text-gray-700',
     },
     APPROVED: {
       label: 'Aprovado',
-      variant: 'success' as const,
+      variant: 'approved' as const,
       icon: IconCheck,
-      className: 'bg-green-100 text-green-700',
     },
     REJECTED: {
       label: 'Rejeitado',
-      variant: 'destructive' as const,
+      variant: 'rejected' as const,
       icon: IconX,
-      className: 'bg-red-100 text-red-700',
     },
     CANCELLED: {
       label: 'Cancelado',
-      variant: 'outline' as const,
+      variant: 'cancelled' as const,
       icon: IconBan,
-      className: 'bg-gray-50 text-gray-600',
     },
   };
 
-  const { label, variant, icon: Icon, className: statusClass } = config[status];
+  const { label, variant, icon: Icon } = config[status];
 
   return (
-    <Badge variant={variant} className={`${statusClass} ${className}`}>
+    <Badge variant={variant} className={className}>
       <Icon className="w-3 h-3 mr-1" />
       {label}
     </Badge>

@@ -311,9 +311,10 @@ export function TaskHistoryList({
   // Get all columns for visibility manager
   // Columns are filtered based on user's sector privilege:
   // - ADMIN: sees all service order columns
-  // - DESIGNER: sees ARTWORK + PRODUCTION (view only)
-  // - FINANCIAL: sees FINANCIAL only
-  // - LOGISTIC: sees PRODUCTION + NEGOTIATION + ARTWORK
+  // - COMMERCIAL: sees PRODUCTION + FINANCIAL + COMMERCIAL
+  // - DESIGNER: sees PRODUCTION + ARTWORK (view only)
+  // - FINANCIAL: sees PRODUCTION + FINANCIAL only
+  // - LOGISTIC: sees PRODUCTION + LOGISTIC only
   // - PRODUCTION/WAREHOUSE/etc: sees PRODUCTION only
   // - HR: sees no service order columns
   const allColumns = React.useMemo(

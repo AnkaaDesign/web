@@ -101,25 +101,48 @@ export function CustomerExport({ className, filters = {}, currentCustomers = [],
   };
 
   const exportToExcel = async (items: Customer[], columns: ExportColumn<Customer>[]) => {
-    // Headers from visible columns
-    const headers = columns.map((col) => col.label);
+    try {
+      // Dynamically import xlsx library
+      const XLSX = await import("xlsx");
 
-    // Convert items to rows with only visible columns
-    const rows = items.map((item) => columns.map((col) => col.getValue(item)));
+      // Prepare data for Excel - create array of objects with column labels as keys
+      const data = items.map((item) => {
+        const row: Record<string, any> = {};
+        columns.forEach((column) => {
+          row[column.label] = column.getValue(item);
+        });
+        return row;
+      });
 
-    // Create tab-separated values for Excel
-    const excelContent = [headers.join("\t"), ...rows.map((row) => row.join("\t"))].join("\n");
+      // Create worksheet from data
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Clientes");
 
-    // Download as .xls file
-    const blob = new Blob(["\ufeff" + excelContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `clientes_${formatDate(new Date()).replace(/\//g, "-")}.xls`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      // Auto-size columns based on content
+      const maxWidth = 50;
+      const colWidths = columns.map((col) => {
+        const headerLength = col.label.length;
+        const maxContentLength = Math.max(
+          ...data.map((row) => String(row[col.label] || "").length),
+          0
+        );
+        const width = Math.max(headerLength, maxContentLength);
+        return { wch: Math.min(width + 2, maxWidth) };
+      });
+      ws["!cols"] = colWidths;
+
+      // Write file with proper .xlsx extension and UTF-8 encoding
+      XLSX.writeFile(wb, `clientes_${formatDate(new Date()).replace(/\//g, "-")}.xlsx`, {
+        bookType: 'xlsx',
+        bookSST: false,
+        type: 'binary'
+      });
+    } catch (error) {
+      console.error("Excel export error:", error);
+      // Fallback to CSV if XLSX fails
+      await exportToCSV(items, columns);
+    }
   };
 
   const exportToPDF = async (items: Customer[], columns: ExportColumn<Customer>[]) => {

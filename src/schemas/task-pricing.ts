@@ -8,6 +8,12 @@ export const taskPricingStatusSchema = z.enum([
   'CANCELLED',
 ]);
 
+export const discountTypeSchema = z.enum([
+  'NONE',
+  'PERCENTAGE',
+  'FIXED_VALUE',
+]);
+
 export const taskPricingItemSchema = z.object({
   id: z.string().uuid().optional(),
   description: z.string().min(1, 'Descrição é obrigatória').max(400),
@@ -27,6 +33,10 @@ export const taskPricingCreateNestedSchema = z
     expiresAt: z.coerce.date().optional().nullable(),
     status: taskPricingStatusSchema.optional().default('DRAFT'),
     items: z.array(taskPricingItemCreateSchema).optional().default([]),
+    subtotal: z.number().optional().nullable(),
+    discountType: discountTypeSchema.optional().default('NONE'),
+    discountValue: z.number().optional().nullable(),
+    total: z.number().optional().nullable(),
   })
   .optional()
   .superRefine((data, ctx) => {
@@ -56,14 +66,37 @@ export const taskPricingCreateNestedSchema = z
           });
         }
 
-        if (!item.amount || item.amount <= 0) {
+        if (item.amount === null || item.amount === undefined || item.amount < 0) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "Valor deve ser maior que zero",
+            message: "Valor deve ser maior ou igual a zero",
             path: ['items', index, 'amount'],
           });
         }
       });
+
+      // Validate discount fields
+      if (data.discountType && data.discountType !== 'NONE') {
+        if (data.discountValue === null || data.discountValue === undefined) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Valor do desconto é obrigatório quando o tipo não é 'Nenhum'",
+            path: ['discountValue'],
+          });
+        } else if (data.discountType === 'PERCENTAGE' && (data.discountValue < 0 || data.discountValue > 100)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Porcentagem de desconto deve estar entre 0 e 100",
+            path: ['discountValue'],
+          });
+        } else if (data.discountType === 'FIXED_VALUE' && data.discountValue < 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Valor do desconto deve ser maior ou igual a zero",
+            path: ['discountValue'],
+          });
+        }
+      }
     }
   })
   .transform((data) => {
@@ -76,11 +109,37 @@ export const taskPricingCreateNestedSchema = z
 
 export const taskPricingSchema = z.object({
   id: z.string().uuid().optional(),
+  subtotal: moneySchema,
+  discountType: discountTypeSchema.default('NONE'),
+  discountValue: z.number().optional().nullable(),
   total: moneySchema,
   expiresAt: z.coerce.date(),
   status: taskPricingStatusSchema,
   taskId: z.string().uuid(),
   items: z.array(taskPricingItemSchema).min(1, 'Pelo menos um item é obrigatório'),
+}).superRefine((data, ctx) => {
+  // Validate discount fields
+  if (data.discountType !== 'NONE') {
+    if (data.discountValue === null || data.discountValue === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Valor do desconto é obrigatório quando o tipo não é 'Nenhum'",
+        path: ['discountValue'],
+      });
+    } else if (data.discountType === 'PERCENTAGE' && (data.discountValue < 0 || data.discountValue > 100)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Porcentagem de desconto deve estar entre 0 e 100",
+        path: ['discountValue'],
+      });
+    } else if (data.discountType === 'FIXED_VALUE' && data.discountValue < 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Valor do desconto deve ser maior ou igual a zero",
+        path: ['discountValue'],
+      });
+    }
+  }
 });
 
 export type TaskPricingFormData = z.infer<typeof taskPricingSchema>;

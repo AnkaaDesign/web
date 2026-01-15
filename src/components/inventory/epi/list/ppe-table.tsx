@@ -83,7 +83,7 @@ export function PpeTable({ visibleColumns, className, onEdit, onActivate, onDeac
   // Prepare query parameters - explicitly remove page/limit from filters to avoid conflicts
   const { page: _removePage, limit: _removeLimit, ...cleanFilters } = filters;
   const queryFilters: Partial<ItemGetManyFormData> = {
-    // When showSelectedOnly is true, don't apply filters
+    // Always apply base filters to prevent showing unintended records
     ...(showSelectedOnly ? {} : cleanFilters),
     page: Math.max(1, page + 1), // Convert from 0-based (useTableState) to 1-based (API), ensure never 0
     limit: pageSize,

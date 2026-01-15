@@ -255,7 +255,9 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
       const colWidths = columns.map(() => ({ wch: 20 }));
       ws["!cols"] = colWidths;
 
-      XLSX.writeFile(wb, `${filename}_${formatDate(new Date()).replace(/\//g, "-")}.xlsx`);
+      XLSX.writeFile(wb, `${filename}_${formatDate(new Date()).replace(/\//g, "-")}.xlsx`, {
+        bookType: 'xlsx', bookSST: false, type: 'binary'
+      });
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error("Excel export error:", error);

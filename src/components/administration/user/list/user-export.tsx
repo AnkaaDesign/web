@@ -144,25 +144,39 @@ export function UserExport({ className, filters, currentUsers = [], totalRecords
   };
 
   const exportToExcel = async (items: User[], columns: ExportColumn<User>[]) => {
-    // Headers from visible columns
-    const headers = columns.map((col) => col.label);
+    try {
+      const XLSX = await import("xlsx");
 
-    // Convert items to rows with only visible columns
-    const rows = items.map((item) => columns.map((col) => col.getValue(item)));
+      const data = items.map((item) => {
+        const row: Record<string, any> = {};
+        columns.forEach((column) => {
+          row[column.label] = column.getValue(item);
+        });
+        return row;
+      });
 
-    // Create tab-separated values for Excel
-    const excelContent = [headers.join("\t"), ...rows.map((row) => row.join("\t"))].join("\n");
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Colaboradores");
 
-    // Download as .xls file
-    const blob = new Blob(["\ufeff" + excelContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `colaboradores_${formatDate(new Date()).replace(/\//g, "-")}.xls`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const maxWidth = 50;
+      const colWidths = columns.map((col) => {
+        const headerLength = col.label.length;
+        const maxContentLength = Math.max(...data.map((row) => String(row[col.label] || "").length), 0);
+        const width = Math.max(headerLength, maxContentLength);
+        return { wch: Math.min(width + 2, maxWidth) };
+      });
+      ws["!cols"] = colWidths;
+
+      XLSX.writeFile(wb, `colaboradores_${formatDate(new Date()).replace(/\//g, "-")}.xlsx`, {
+        bookType: 'xlsx',
+        bookSST: false,
+        type: 'binary'
+      });
+    } catch (error) {
+      console.error("Excel export error:", error);
+      await exportToCSV(items, columns);
+    }
   };
 
   const exportToPDF = async (items: User[], columns: ExportColumn<User>[]) => {

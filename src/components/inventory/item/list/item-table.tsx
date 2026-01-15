@@ -118,8 +118,8 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
   const queryParams = React.useMemo(() => {
     // Build params object
     const params = {
-      // When showSelectedOnly is true, don't apply filters
-      ...(showSelectedOnly ? {} : filters),
+      // Always apply base filters to prevent showing unintended records
+      ...filters,
       page: page + 1, // Convert 0-based to 1-based for API
       limit: pageSize,
       include: includeConfig,
@@ -127,7 +127,7 @@ export function ItemTable({ visibleColumns, className, onEdit, onActivate, onDea
       ...(sortConfigs.length > 0 && {
         orderBy: convertSortConfigsToOrderBy(sortConfigs),
       }),
-      // When showSelectedOnly is true, only show selected items
+      // When showSelectedOnly is true, add ID filter to restrict to selected items
       ...(showSelectedOnly &&
         selectedIds.length > 0 && {
           where: {

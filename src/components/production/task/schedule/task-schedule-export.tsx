@@ -139,25 +139,50 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
   };
 
   const exportToExcel = async (tasks: Task[], columns: ExportColumn<Task>[]) => {
-    // Headers from visible columns
-    const headers = columns.map((col) => col.label);
+    try {
+      // Dynamically import xlsx library
+      const XLSX = await import("xlsx");
 
-    // Convert tasks to rows with only visible columns
-    const rows = tasks.map((task) => columns.map((col) => col.getValue(task)));
+      // Prepare data for Excel - create array of objects with column labels as keys
+      const data = tasks.map((task) => {
+        const row: Record<string, any> = {};
+        columns.forEach((column) => {
+          row[column.label] = column.getValue(task);
+        });
+        return row;
+      });
 
-    // Create tab-separated values for Excel
-    const excelContent = [headers.join("\t"), ...rows.map((row) => row.join("\t"))].join("\n");
+      // Create worksheet from data
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Cronograma");
 
-    // Download as .xls file
-    const blob = new Blob(["\ufeff" + excelContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `cronograma_${formatDate(new Date()).replace(/\//g, "-")}.xls`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      // Auto-size columns based on content
+      const maxWidth = 50;
+      const colWidths = columns.map((col) => {
+        // Calculate max width based on header and content
+        const headerLength = col.label.length;
+        const maxContentLength = Math.max(
+          ...data.map((row) => String(row[col.label] || "").length),
+          0
+        );
+        const width = Math.max(headerLength, maxContentLength);
+        return { wch: Math.min(width + 2, maxWidth) };
+      });
+      ws["!cols"] = colWidths;
+
+      // Write file with proper .xlsx extension and options for UTF-8
+      XLSX.writeFile(wb, `cronograma_${formatDate(new Date()).replace(/\//g, "-")}.xlsx`, {
+        bookType: 'xlsx',
+        bookSST: false,
+        type: 'binary'
+      });
+    } catch (error) {
+      console.error("Excel export error:", error);
+      // Fallback to CSV if XLSX fails
+      await exportToCSV(tasks, columns);
+      toast.error("Erro ao exportar Excel, exportado como CSV");
+    }
   };
 
   const exportToPDF = async (tasks: Task[], columns: ExportColumn<Task>[]) => {

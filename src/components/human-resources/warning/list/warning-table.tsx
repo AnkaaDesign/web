@@ -90,7 +90,7 @@ export function WarningTable({ filters, onDataChange, className }: WarningTableP
     () => {
       const { _useMyWarningsEndpoint, ...restFilters } = filters as any;
       return {
-        // When showSelectedOnly is true, don't apply filters
+        // Always apply base filters to prevent showing unintended records
         ...(showSelectedOnly ? {} : restFilters),
         page: page + 1, // Convert 0-based to 1-based for API
         take: pageSize,

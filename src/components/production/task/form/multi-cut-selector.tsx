@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, forwardRef, useImperativeHandle } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
 import { IconScissors, IconPlus, IconTrash, IconFile, IconUpload, IconGripVertical } from "@tabler/icons-react";
 import { FormLabel } from "@/components/ui/form";
@@ -7,11 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { TaskCreateFormData, TaskUpdateFormData } from "../../../../schemas";
 import { CUT_TYPE, CUT_TYPE_LABELS, CUT_ORIGIN } from "../../../../constants";
 import { FileUploadField } from "@/components/common/file";
 import type { FileWithPreview } from "@/components/common/file";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { getApiBaseUrl } from "@/utils/file";
 
 // Helper function to convert database File entity to FileWithPreview
@@ -61,33 +61,30 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
   // The fields array from useFieldArray is NOT reactive to setValue calls
   const cutsValues = watch("cuts") as any[] || [];
 
-  const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [hasInitialized, setHasInitialized] = useState(false);
   const previousFieldsLength = useRef(0);
 
-  // Initialize expanded items when fields are first loaded
-  // In edit mode, start with all accordions CLOSED
+  // Initialize with one empty cut if none exist (for create mode or when section opens empty)
   useEffect(() => {
-    if (!hasInitialized && fields.length > 0) {
-      setExpandedItems([]); // Start with all closed in edit mode
+    if (!hasInitialized) {
+      if (fields.length === 0) {
+        // Add one empty cut to show the form immediately
+        const initialCut = {
+          id: `cut-initial`,
+          type: CUT_TYPE.VINYL,
+          quantity: 1,
+          origin: CUT_ORIGIN.PLAN,
+          fileId: undefined,
+          file: undefined,
+        };
+        append(initialCut);
+      }
       setHasInitialized(true);
       previousFieldsLength.current = fields.length;
     }
-  }, [fields, hasInitialized]);
+  }, [fields, hasInitialized, append]);
 
-  // When a new field is added (prepended), auto-expand it
-  useEffect(() => {
-    if (hasInitialized && fields.length > previousFieldsLength.current) {
-      // A new field was added (prepended at index 0)
-      const newFieldId = fields[0]?.id;
-      if (newFieldId) {
-        setExpandedItems([newFieldId]); // Open only the new cut
-      }
-    }
-    previousFieldsLength.current = fields.length;
-  }, [fields, hasInitialized]);
-
-  // Add new cut at the beginning and close all other accordions
+  // Add new cut at the beginning
   const addCut = useCallback(() => {
     const newCut = {
       id: `cut-${Date.now()}`,
@@ -98,7 +95,6 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
       file: undefined,
     };
     prepend(newCut); // Add at the beginning, not the end
-    // Expansion is handled by the useEffect above
   }, [prepend]);
 
   // Clear all cuts
@@ -107,7 +103,6 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
     for (let i = fields.length - 1; i >= 0; i--) {
       remove(i);
     }
-    setExpandedItems([]);
   }, [fields.length, remove]);
 
   // Expose methods to parent component using imperative handle
@@ -129,12 +124,8 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
 
   // Remove cut
   const removeCut = useCallback((index: number) => {
-    const cutId = fields[index]?.id;
     remove(index);
-    if (cutId) {
-      setExpandedItems((prev) => prev.filter((itemId) => itemId !== cutId));
-    }
-  }, [remove, fields]);
+  }, [remove]);
 
   // Update cut field using setValue to avoid re-mounting components
   const updateCutField = useCallback((index: number, fieldName: string, value: any) => {
@@ -161,44 +152,58 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
         updateCutField(index, 'fileId', undefined);
       }
     },
-    [updateCutField, fields, expandedItems, getValues],
+    [updateCutField],
   );
 
   // Check if there are cuts without files - use cutsValues for reactive check
-  const hasCutsWithoutFiles = cutsValues.length > 0 && cutsValues.some((cut: any) => !cut.file && !cut.fileId);
+  // Only show warning if:
+  // 1. There are multiple cuts, OR
+  // 2. The single cut has been meaningfully modified (different from default values)
+  const hasCutsWithoutFiles = useMemo(() => {
+    if (cutsValues.length === 0) return false;
+
+    // If there's only one cut, check if it's been modified from defaults
+    if (cutsValues.length === 1) {
+      const cut = cutsValues[0];
+      const isDefaultCut =
+        cut.type === CUT_TYPE.VINYL &&
+        cut.quantity === 1 &&
+        !cut.file &&
+        !cut.fileId;
+
+      // Don't show warning for unmodified default cut
+      if (isDefaultCut) return false;
+
+      // Show warning if the cut was modified but has no file
+      return !cut.file && !cut.fileId;
+    }
+
+    // For multiple cuts, check if any are missing files
+    return cutsValues.some((cut: any) => !cut.file && !cut.fileId);
+  }, [cutsValues]);
 
   return (
     <div className="space-y-4">
-      {fields.length > 0 && (
-        <Accordion
-          type="multiple"
-          value={expandedItems}
-          onValueChange={(value) => {
-            setExpandedItems(value);
-          }}
-          className="w-full space-y-2">
-          {fields.map((field: any, index) => {
+      <div className="space-y-3">
+        {fields.map((field: any, index) => {
             // Get current cut values from watched data for reactive updates
             const currentCut = cutsValues[index] || field;
 
             return (
-            <AccordionItem key={field.id} value={field.id} className="border rounded-lg">
-              <AccordionTrigger className="px-4 hover:no-underline">
-                <div className="flex items-center justify-between w-full pr-2">
+            <Card key={field.id} className="border rounded-lg">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <IconGripVertical className="h-4 w-4 text-muted-foreground" />
                     <IconScissors className="h-4 w-4" />
-                    <span className="font-medium">Corte #{index + 1}</span>
+                    <CardTitle className="text-base">Corte #{index + 1}</CardTitle>
                     <Badge variant="secondary">{CUT_TYPE_LABELS[currentCut.type as keyof typeof CUT_TYPE_LABELS] || currentCut.type}</Badge>
                     <Badge variant="outline">Quantidade: {currentCut.quantity}</Badge>
                     {currentCut.file && <Badge variant="success">Arquivo anexado</Badge>}
                   </div>
                   <Button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeCut(index);
-                    }}
+                    onClick={() => removeCut(index)}
                     disabled={disabled}
                     size="icon"
                     variant="ghost"
@@ -207,11 +212,11 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
                     <IconTrash className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pt-4">
+              </CardHeader>
+              <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Left Column - File Upload */}
-                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="space-y-2">
                     <FormLabel className="flex items-center gap-2">
                       <IconUpload className="h-4 w-4" />
                       Arquivo de Corte
@@ -240,7 +245,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
                   </div>
 
                   {/* Right Column - Type and Quantity */}
-                  <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
+                  <div className="space-y-4">
                     {/* Cut Type */}
                     <div className="space-y-2">
                       <FormLabel>Tipo de Corte</FormLabel>
@@ -277,26 +282,23 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
                     </div>
                   </div>
                 </div>
-              </AccordionContent>
-            </AccordionItem>
+              </CardContent>
+            </Card>
             );
           })}
-        </Accordion>
-      )}
+      </div>
 
-      {fields.length > 0 && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addCut}
-          disabled={disabled || fields.length >= 10}
-          className="w-full"
-        >
-          <IconPlus className="h-4 w-4 mr-2" />
-          Adicionar
-        </Button>
-      )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={addCut}
+        disabled={disabled || fields.length >= 10}
+        className="w-full"
+      >
+        <IconPlus className="h-4 w-4 mr-2" />
+        Adicionar Mais
+      </Button>
 
       {hasCutsWithoutFiles && (
         <Alert variant="destructive">

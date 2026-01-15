@@ -96,25 +96,29 @@ export function BorrowExport({ className, filters = {}, currentItems = [], total
   };
 
   const exportToExcel = async (items: Borrow[], columns: ExportColumn<Borrow>[]) => {
-    // Headers from visible columns
-    const headers = columns.map((col) => col.label);
-
-    // Convert items to rows with only visible columns
-    const rows = items.map((item) => columns.map((col) => col.getValue(item)));
-
-    // Create tab-separated values for Excel
-    const excelContent = [headers.join("\t"), ...rows.map((row) => row.join("\t"))].join("\n");
-
-    // Download as .xls file
-    const blob = new Blob(["\ufeff" + excelContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `emprestimos_${formatDate(new Date()).replace(/\//g, "-")}.xls`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const XLSX = await import("xlsx");
+      const data = items.map((item) => {
+        const row: Record<string, any> = {};
+        columns.forEach((column) => { row[column.label] = column.getValue(item); });
+        return row;
+      });
+      const ws = XLSX.utils.json_to_sheet(data);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Empréstimos");
+      const colWidths = columns.map((col) => {
+        const headerLength = col.label.length;
+        const maxContentLength = Math.max(...data.map((row) => String(row[col.label] || "").length), 0);
+        return { wch: Math.min(Math.max(headerLength, maxContentLength) + 2, 50) };
+      });
+      ws["!cols"] = colWidths;
+      XLSX.writeFile(wb, `emprestimos_${formatDate(new Date()).replace(/\//g, "-")}.xlsx`, {
+        bookType: 'xlsx', bookSST: false, type: 'binary'
+      });
+    } catch (error) {
+      console.error("Excel export error:", error);
+      await exportToCSV(items, columns);
+    }
   };
 
   const exportToPDF = async (items: Borrow[], columns: ExportColumn<Borrow>[]) => {

@@ -141,8 +141,8 @@ export function BorrowTable({ visibleColumns, className, onEdit, onReturn, onDel
   // Memoize query parameters to prevent infinite re-renders
   const queryParams = React.useMemo(
     () => ({
-      // When showSelectedOnly is true, don't apply filters
-      ...(showSelectedOnly ? {} : filters),
+      // Always apply base filters to prevent showing unintended records
+      ...filters,
       page: page + 1, // Convert 0-based to 1-based for API
       limit: pageSize,
       include: includeConfig,

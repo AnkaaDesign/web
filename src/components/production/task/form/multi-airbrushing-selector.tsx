@@ -7,13 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { FileUploadField } from "@/components/common/file";
 import type { FileWithPreview } from "@/components/common/file";
 import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
 import { formatCurrency, formatDate } from "../../../../utils";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
 
 interface MultiAirbrushingSelectorProps {
@@ -94,10 +94,21 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           artworkIds: airbrushing.artworkIds || [],
         }));
       }
-      return [];
+      // Initialize with one empty airbrushing to show the form immediately
+      return [{
+        id: `airbrushing-initial`,
+        status: AIRBRUSHING_STATUS.PENDING,
+        price: null,
+        startDate: null,
+        finishDate: null,
+        receiptFiles: [],
+        nfeFiles: [],
+        artworkFiles: [],
+        receiptIds: [],
+        invoiceIds: [],
+        artworkIds: [],
+      }];
     });
-
-    const [expandedItems, setExpandedItems] = useState<string[]>([]);
 
     // Track if we're syncing to prevent infinite loops
     const isSyncingToForm = useRef<boolean>(false);
@@ -148,14 +159,24 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           };
         });
         setAirbrushings(newAirbrushings);
-        // Only auto-expand all items on initial load (when transitioning from empty to populated)
-        if (wasEmpty) {
-          setExpandedItems(newAirbrushings.map((a) => a.id));
-        }
       } else if (!field.value || (Array.isArray(field.value) && field.value.length === 0)) {
-        // Clear airbrushings if field value is empty
-        setAirbrushings([]);
-        setExpandedItems([]);
+        // Don't clear airbrushings completely - maintain one initial empty item for better UX
+        // Only clear if we currently have more than one item (user explicitly removed all)
+        if (airbrushings.length > 1) {
+          setAirbrushings([{
+            id: `airbrushing-initial`,
+            status: AIRBRUSHING_STATUS.PENDING,
+            price: null,
+            startDate: null,
+            finishDate: null,
+            receiptFiles: [],
+            nfeFiles: [],
+            artworkFiles: [],
+            receiptIds: [],
+            invoiceIds: [],
+            artworkIds: [],
+          }]);
+        }
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [field.value]);
@@ -210,19 +231,15 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         artworkIds: [],
       };
       setAirbrushings((prev) => [...prev, newAirbrushing]);
-      // Auto-expand the new item
-      setExpandedItems((prev) => [...prev, newAirbrushing.id]);
     }, []);
 
     const removeAirbrushing = useCallback((id: string) => {
       setAirbrushings((prev) => prev.filter((airbrushing) => airbrushing.id !== id));
-      setExpandedItems((prev) => prev.filter((itemId) => itemId !== id));
     }, []);
 
     // Clear all airbrushings
     const clearAll = useCallback(() => {
       setAirbrushings([]);
-      setExpandedItems([]);
     }, []);
 
     const updateAirbrushing = useCallback((id: string, updates: Partial<AirbrushingItem>) => {
@@ -299,31 +316,32 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
     return (
       <div className="space-y-4">
         {/* Airbrushings List */}
-        {airbrushings.length > 0 && (
-          <Accordion type="multiple" value={expandedItems} onValueChange={setExpandedItems} className="space-y-2">
-            {airbrushings.map((airbrushing, index) => (
-              <AccordionItem key={airbrushing.id} value={airbrushing.id} className="border rounded-lg">
-                <AccordionTrigger className="px-4 hover:no-underline">
-                  <div className="flex items-center justify-between w-full pr-2">
+        <div className="space-y-3">
+          {airbrushings.map((airbrushing, index) => (
+              <Card key={airbrushing.id} className="border rounded-lg">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <IconGripVertical className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">Aerografia {index + 1}</span>
+                      <IconSpray className="h-4 w-4" />
+                      <CardTitle className="text-base">Aerografia {index + 1}</CardTitle>
                       <Badge variant={getStatusBadgeVariant(airbrushing.status)}>{AIRBRUSHING_STATUS_LABELS[airbrushing.status]}</Badge>
                       {airbrushing.price && <Badge variant="outline">{formatCurrency(airbrushing.price)}</Badge>}
                       {airbrushing.startDate && <span className="text-sm text-muted-foreground">{formatDate(airbrushing.startDate)}</span>}
                     </div>
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeAirbrushing(airbrushing.id);
-                      }}
-                      className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                    <Button
+                      type="button"
+                      onClick={() => removeAirbrushing(airbrushing.id)}
+                      disabled={disabled}
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8"
                     >
                       <IconTrash className="h-4 w-4 text-destructive" />
-                    </div>
+                    </Button>
                   </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4">
+                </CardHeader>
+                <CardContent>
                   <div className="space-y-4">
                     {/* Status, Price and Dates - All in one row */}
                     <div className={`grid grid-cols-1 gap-4 ${isEditMode ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
@@ -452,25 +470,22 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       </Alert>
                     )}
                   </div>
-                </AccordionContent>
-              </AccordionItem>
+                </CardContent>
+              </Card>
             ))}
-          </Accordion>
-        )}
+        </div>
 
-        {airbrushings.length > 0 && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={addAirbrushing}
-            disabled={disabled || airbrushings.length >= 10}
-            className="w-full"
-          >
-            <IconPlus className="h-4 w-4 mr-2" />
-            Adicionar
-          </Button>
-        )}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addAirbrushing}
+          disabled={disabled || airbrushings.length >= 10}
+          className="w-full"
+        >
+          <IconPlus className="h-4 w-4 mr-2" />
+          Adicionar Mais
+        </Button>
       </div>
     );
   },

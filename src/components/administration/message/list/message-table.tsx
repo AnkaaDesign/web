@@ -119,7 +119,7 @@ export function MessageTable({
   // Memoize query parameters
   const queryParams = useMemo(() => {
     const params: any = {
-      ...(showSelectedOnly ? {} : filters),
+      ...filters,
       page: page + 1,
       limit: pageSize,
       ...(sortConfigs.length > 0 && {

@@ -41,7 +41,7 @@ const taskCreateFormSchema = z.object({
   category: z.string().optional(),
   implementType: z.string().optional(),
   forecastDate: z.date().nullable().optional(),
-  serviceOrderDescription: z.string().optional(),
+  serviceOrderDescription: z.string().nullable().optional(),
 }).refine((data) => {
   // At least one of: plates, serialNumbers, name, or customerId must be provided
   return data.plates.length > 0 || data.serialNumbers.length > 0 || data.name || data.customerId;
@@ -105,13 +105,13 @@ export const TaskCreateForm = () => {
 
         const { plates, serialNumbers, name, customerId, status, category, implementType, forecastDate, serviceOrderDescription } = data;
 
-        // Build service order if description is provided (always NEGOTIATION type)
+        // Build service order if description is provided (always COMMERCIAL type)
         const serviceOrders = serviceOrderDescription && serviceOrderDescription.trim().length >= 3
           ? [{
               status: SERVICE_ORDER_STATUS.PENDING,
               statusOrder: 1,
               description: serviceOrderDescription.trim(),
-              type: SERVICE_ORDER_TYPE.NEGOTIATION,
+              type: SERVICE_ORDER_TYPE.COMMERCIAL,
               assignedToId: null,
             }]
           : undefined;
@@ -435,7 +435,7 @@ function ServiceOrderCombobox({
   setIsCreatingService,
   createServiceAsync,
 }: ServiceOrderComboboxProps) {
-  // Search function for Combobox - always filter by NEGOTIATION type
+  // Search function for Combobox - always filter by COMMERCIAL type
   const searchServices = async (
     search: string,
     page: number = 1
@@ -447,7 +447,7 @@ function ServiceOrderCombobox({
       orderBy: { description: "asc" },
       page: page,
       take: 50,
-      type: SERVICE_ORDER_TYPE.NEGOTIATION,
+      type: SERVICE_ORDER_TYPE.COMMERCIAL,
     };
 
     if (search && search.trim()) {
@@ -474,7 +474,7 @@ function ServiceOrderCombobox({
 
       const result = await createServiceAsync({
         description,
-        type: SERVICE_ORDER_TYPE.NEGOTIATION,
+        type: SERVICE_ORDER_TYPE.COMMERCIAL,
       });
 
       if (result && result.success && result.data) {
@@ -511,7 +511,7 @@ function ServiceOrderCombobox({
               createLabel={(value) => `Criar "${value}"`}
               onCreate={handleCreateService}
               isCreating={isCreatingService}
-              queryKey={["services", "search", SERVICE_ORDER_TYPE.NEGOTIATION]}
+              queryKey={["services", "search", SERVICE_ORDER_TYPE.COMMERCIAL]}
               queryFn={searchServices}
               getOptionLabel={(service) => service.description}
               getOptionValue={(service) => service.description}

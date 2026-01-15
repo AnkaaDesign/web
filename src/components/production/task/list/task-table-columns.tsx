@@ -260,25 +260,46 @@ export const createTaskColumns = (): TaskColumn[] => [
     formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.FINANCIAL} />,
   },
   {
-    id: "serviceOrders.negotiation",
+    id: "serviceOrders.commercial",
     header: (
       <Tooltip delayDuration={0}>
         <TooltipTrigger asChild>
-          <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.NEGOTIATION]}</span>
+          <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.COMMERCIAL]}</span>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs">
           <div className="text-sm">
-            Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.NEGOTIATION].toLowerCase()}
+            Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.COMMERCIAL].toLowerCase()}
           </div>
         </TooltipContent>
       </Tooltip>
     ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.NEGOTIATION).length || 0,
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.COMMERCIAL).length || 0,
     sortable: true,
     filterable: false,
     defaultVisible: true,
     width: "140px",
-    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.NEGOTIATION} />,
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.COMMERCIAL} />,
+  },
+  {
+    id: "serviceOrders.logistic",
+    header: (
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
+          <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.LOGISTIC]}</span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <div className="text-sm">
+            Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.LOGISTIC].toLowerCase()}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    ),
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.LOGISTIC).length || 0,
+    sortable: true,
+    filterable: false,
+    defaultVisible: true,
+    width: "140px",
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.LOGISTIC} />,
   },
   {
     id: "serviceOrders.artwork",

@@ -120,8 +120,8 @@ export function OrderTable({ visibleColumns, className, onEdit, filters = {}, on
   // Memoize query parameters to prevent infinite re-renders
   const queryParams = React.useMemo(
     () => ({
-      // When showSelectedOnly is true, don't apply filters
-      ...(showSelectedOnly ? {} : filters),
+      // Always apply base filters to prevent showing unintended records
+      ...filters,
       // Convert from 0-based component page to 1-based API page
       page: page + 1,
       limit: pageSize,

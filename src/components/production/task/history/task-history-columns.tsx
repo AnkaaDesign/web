@@ -316,25 +316,46 @@ export const createTaskHistoryColumns = (options?: {
     formatter: (_: any, row: Task) => renderServices(row),
   },
   {
-    id: "serviceOrders.negotiation",
+    id: "serviceOrders.commercial",
     header: (
       <Tooltip delayDuration={0}>
         <TooltipTrigger asChild>
-          <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.NEGOTIATION]}</span>
+          <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.COMMERCIAL]}</span>
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-xs">
           <div className="text-sm">
-            Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.NEGOTIATION].toLowerCase()}
+            Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.COMMERCIAL].toLowerCase()}
           </div>
         </TooltipContent>
       </Tooltip>
     ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.NEGOTIATION).length || 0,
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.COMMERCIAL).length || 0,
     sortable: true,
     filterable: false,
     defaultVisible: false,
     width: "140px",
-    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.NEGOTIATION} />,
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.COMMERCIAL} />,
+  },
+  {
+    id: "serviceOrders.logistic",
+    header: (
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
+          <span className="cursor-help">{SERVICE_ORDER_TYPE_COLUMN_LABELS[SERVICE_ORDER_TYPE.LOGISTIC]}</span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <div className="text-sm">
+            Total de ordens de serviço de {SERVICE_ORDER_TYPE_LABELS[SERVICE_ORDER_TYPE.LOGISTIC].toLowerCase()}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    ),
+    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.LOGISTIC).length || 0,
+    sortable: true,
+    filterable: false,
+    defaultVisible: false,
+    width: "140px",
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.LOGISTIC} />,
   },
   {
     id: "serviceOrders.artwork",
@@ -508,9 +529,10 @@ export const createTaskHistoryColumns = (options?: {
   // Filter service order columns based on sector privilege
   // Each sector has specific visibility for each service order type:
   // - ADMIN: sees all
-  // - DESIGNER: sees ARTWORK + PRODUCTION (view only)
-  // - FINANCIAL: sees FINANCIAL only
-  // - LOGISTIC: sees PRODUCTION + NEGOTIATION + ARTWORK
+  // - COMMERCIAL: sees PRODUCTION + FINANCIAL + COMMERCIAL
+  // - DESIGNER: sees PRODUCTION + ARTWORK (view only)
+  // - FINANCIAL: sees PRODUCTION + FINANCIAL only
+  // - LOGISTIC: sees PRODUCTION + LOGISTIC only
   // - PRODUCTION/WAREHOUSE/BASIC/EXTERNAL/MAINTENANCE: sees PRODUCTION only
   // - HR: sees none
   if (sectorPrivilege) {
@@ -519,14 +541,17 @@ export const createTaskHistoryColumns = (options?: {
       if (col.id === 'serviceOrders.production') {
         return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.PRODUCTION);
       }
-      if (col.id === 'serviceOrders.negotiation') {
-        return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.NEGOTIATION);
+      if (col.id === 'serviceOrders.financial') {
+        return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.FINANCIAL);
+      }
+      if (col.id === 'serviceOrders.commercial') {
+        return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.COMMERCIAL);
+      }
+      if (col.id === 'serviceOrders.logistic') {
+        return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.LOGISTIC);
       }
       if (col.id === 'serviceOrders.artwork') {
         return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.ARTWORK);
-      }
-      if (col.id === 'serviceOrders.financial') {
-        return canViewServiceOrderType(sectorPrivilege, SERVICE_ORDER_TYPE.FINANCIAL);
       }
       // Keep all other columns
       return true;
