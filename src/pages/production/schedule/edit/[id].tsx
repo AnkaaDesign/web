@@ -128,7 +128,7 @@ export const TaskEditPage = () => {
   if (error || !task) {
     return (
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <div className="container mx-auto max-w-5xl flex-shrink-0">
           <PageHeader
             variant="form"
             title="Editar Tarefa"
@@ -140,7 +140,7 @@ export const TaskEditPage = () => {
           />
         </div>
         <div className="flex-1 overflow-y-auto pb-6">
-          <div className="container mx-auto py-6 max-w-4xl">
+          <div className="container mx-auto py-6 max-w-5xl">
             <div className="text-center">
               <h2 className="text-2xl font-semibold mb-2">Tarefa não encontrada</h2>
               <p className="text-muted-foreground mb-4">A tarefa que você está procurando não existe ou foi removida.</p>
@@ -174,7 +174,13 @@ export const TaskEditPage = () => {
       key: "submit",
       label: "Salvar Alterações",
       icon: IconCheck,
-      onClick: () => document.getElementById("task-form-submit")?.click(),
+      onClick: () => {
+        console.log('[TaskEditPage] Submit button clicked');
+        const submitBtn = document.getElementById("task-form-submit");
+        console.log('[TaskEditPage] Found submit button:', !!submitBtn);
+        console.log('[TaskEditPage] Submit button disabled:', submitBtn?.getAttribute('disabled'));
+        submitBtn?.click();
+      },
       variant: "default" as const,
       disabled: isSubmitDisabled,
       loading: false,
@@ -184,7 +190,7 @@ export const TaskEditPage = () => {
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.PLOTTING, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <div className="container mx-auto max-w-4xl flex-shrink-0">
+        <div className="container mx-auto max-w-5xl flex-shrink-0">
           <PageHeader
             variant="form"
             title={`Editar ${getTaskDisplayName(task)}`}

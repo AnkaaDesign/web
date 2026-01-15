@@ -553,26 +553,26 @@ const taskTransform = (data: any): any => {
   }
 
   if (data.hasBudget === true) {
-    andConditions.push({ budgetId: { not: null } });
+    andConditions.push({ budgets: { some: {} } });
     delete data.hasBudget;
   } else if (data.hasBudget === false) {
-    andConditions.push({ budgetId: null });
+    andConditions.push({ budgets: { none: {} } });
     delete data.hasBudget;
   }
 
   if (data.hasNfe === true) {
-    andConditions.push({ nfeId: { not: null } });
+    andConditions.push({ invoices: { some: {} } });
     delete data.hasNfe;
   } else if (data.hasNfe === false) {
-    andConditions.push({ nfeId: null });
+    andConditions.push({ invoices: { none: {} } });
     delete data.hasNfe;
   }
 
   if (data.hasReceipt === true) {
-    andConditions.push({ receiptId: { not: null } });
+    andConditions.push({ receipts: { some: {} } });
     delete data.hasReceipt;
   } else if (data.hasReceipt === false) {
-    andConditions.push({ receiptId: null });
+    andConditions.push({ receipts: { none: {} } });
     delete data.hasReceipt;
   }
 
@@ -1118,6 +1118,19 @@ const taskServiceOrderCreateSchema = z.object({
   finishedAt: nullableDate.optional(),
 });
 
+// ServiceOrders array schema with preprocessing to filter out empty items
+// This allows the UI to have empty placeholder rows without failing validation
+const taskServiceOrdersArraySchema = z.preprocess(
+  (val) => {
+    // Filter out empty service orders (those without descriptions)
+    if (Array.isArray(val)) {
+      return val.filter((item: any) => item && item.description && item.description.trim() !== '');
+    }
+    return val;
+  },
+  z.array(taskServiceOrderCreateSchema).optional()
+);
+
 // Layout section schema for truck layouts
 const layoutSectionSchema = z.object({
   width: z.number().positive(),
@@ -1219,7 +1232,7 @@ export const taskCreateSchema = z
     baseFileIds: z.array(z.string().uuid("Arquivo base inválido")).optional(), // Maps to baseFiles
     paintIds: z.array(z.string().uuid("Paint inválida")).optional(), // Maps to logoPaints
     observation: taskObservationCreateSchema.nullable().optional(),
-    serviceOrders: z.array(taskServiceOrderCreateSchema).optional(),
+    serviceOrders: taskServiceOrdersArraySchema, // Uses preprocessing to filter empty items
     truck: taskTruckCreateSchema.nullable().optional(),
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts
@@ -1359,7 +1372,7 @@ export const taskUpdateSchema = z
     baseFileIds: z.array(z.string().uuid("Arquivo base inválido")).optional(), // Maps to baseFiles
     paintIds: z.array(z.string().uuid("Paint inválida")).optional(), // Maps to logoPaints
     observation: taskObservationCreateSchema.nullable().optional(),
-    serviceOrders: z.array(taskServiceOrderCreateSchema).optional(),
+    serviceOrders: taskServiceOrdersArraySchema, // Uses preprocessing to filter empty items
     truck: taskTruckCreateSchema.nullable().optional(),
     cut: cutCreateNestedSchema.nullable().optional(),
     cuts: z.array(cutCreateNestedSchema).optional(), // Support for multiple cuts

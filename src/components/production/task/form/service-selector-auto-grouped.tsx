@@ -384,6 +384,8 @@ function ServiceRow({
   const hasObservation = Boolean(currentObservation && currentObservation.trim());
 
   // Determine which status options are available based on type and user privilege
+  // IMPORTANT: WAITING_APPROVE status is ONLY available for ARTWORK service orders
+  // This is because only artwork has the designer → admin approval workflow
   const getAvailableStatuses = useMemo(() => {
     // For new service orders (no id), only PENDING is allowed
     const isNewServiceOrder = !serviceOrderId || (typeof serviceOrderId === 'string' && serviceOrderId.startsWith('temp-'));
@@ -391,33 +393,46 @@ function ServiceRow({
       return [SERVICE_ORDER_STATUS.PENDING];
     }
 
-    // Admin can set any status
+    const isArtworkType = selectedType === SERVICE_ORDER_TYPE.ARTWORK;
+
+    // Admin can set any status, but WAITING_APPROVE only for ARTWORK
     if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) {
-      return [
-        SERVICE_ORDER_STATUS.PENDING,
-        SERVICE_ORDER_STATUS.IN_PROGRESS,
-        SERVICE_ORDER_STATUS.WAITING_APPROVE,
-        SERVICE_ORDER_STATUS.COMPLETED,
-        SERVICE_ORDER_STATUS.CANCELLED,
-      ];
+      if (isArtworkType) {
+        // ARTWORK: All statuses including WAITING_APPROVE (approval workflow)
+        return [
+          SERVICE_ORDER_STATUS.PENDING,
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.WAITING_APPROVE,
+          SERVICE_ORDER_STATUS.COMPLETED,
+          SERVICE_ORDER_STATUS.CANCELLED,
+        ];
+      } else {
+        // Non-ARTWORK: All statuses EXCEPT WAITING_APPROVE (simple workflow)
+        return [
+          SERVICE_ORDER_STATUS.PENDING,
+          SERVICE_ORDER_STATUS.IN_PROGRESS,
+          SERVICE_ORDER_STATUS.COMPLETED,
+          SERVICE_ORDER_STATUS.CANCELLED,
+        ];
+      }
     }
 
     // ARTWORK type has special two-step approval - designer can only go to WAITING_APPROVE
-    if (selectedType === SERVICE_ORDER_TYPE.ARTWORK && userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
+    if (isArtworkType && userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
       return [
         SERVICE_ORDER_STATUS.PENDING,
         SERVICE_ORDER_STATUS.IN_PROGRESS,
         SERVICE_ORDER_STATUS.WAITING_APPROVE,
-        SERVICE_ORDER_STATUS.CANCELLED,
+        // Note: No COMPLETED - designer must submit for admin approval
+        // Note: No CANCELLED - only admin can cancel
       ];
     }
 
-    // For other users, return available statuses without WAITING_APPROVE (not needed for non-artwork)
+    // For other users/types, return simple workflow statuses (no WAITING_APPROVE, no CANCELLED)
     return [
       SERVICE_ORDER_STATUS.PENDING,
       SERVICE_ORDER_STATUS.IN_PROGRESS,
       SERVICE_ORDER_STATUS.COMPLETED,
-      SERVICE_ORDER_STATUS.CANCELLED,
     ];
   }, [serviceOrderId, userPrivilege, selectedType]);
 
@@ -532,11 +547,12 @@ function ServiceRow({
   // Grid layout: consistent proportions for both grouped and ungrouped
   // Using min-w-0 on children to prevent content from affecting column width
   // Grouped: [Description 2fr] [User 1fr] [Status 1fr] [Buttons 90px]
-  // Ungrouped: [Type 120px] [Description 2fr] [User 1fr] [Buttons 90px]
+  // Ungrouped: [Type 150px] [Description 2fr] [User 1fr] [Buttons 90px]
+  // Note: Type column needs 150px to fit "Comercial" without truncation
   // Note: Buttons column now 90px to fit both observation and trash buttons (2 icons + gap)
   const gridClass = isGrouped
     ? "grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_90px] gap-3 items-center"
-    : "grid grid-cols-1 md:grid-cols-[120px_2fr_1fr_90px] gap-3 items-center";
+    : "grid grid-cols-1 md:grid-cols-[150px_2fr_1fr_90px] gap-3 items-center";
 
   return (
     <>

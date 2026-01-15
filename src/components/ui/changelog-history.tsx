@@ -604,7 +604,7 @@ const ChangelogTimelineItem = ({
         if (field === "itemId" && entityDetails.items.has(value)) {
           return entityDetails.items.get(value) || "Item";
         }
-        if ((field === "budgetId" || field === "nfeId" || field === "receiptId") && entityDetails.files.has(value)) {
+        if ((field === "budgetIds" || field === "invoiceIds" || field === "receiptIds") && entityDetails.files.has(value)) {
           return entityDetails.files.get(value) || "Arquivo";
         }
         if (field === "observationId" && entityDetails.observations.has(value)) {
@@ -625,7 +625,7 @@ const ChangelogTimelineItem = ({
       if (field === "paintId") return "Tinta (carregando...)";
       if (field === "formulaId" || field === "formulaPaintId") return "Fórmula (carregando...)";
       if (field === "itemId") return "Item (carregando...)";
-      if (field === "budgetId" || field === "nfeId" || field === "receiptId") return "Arquivo (carregando...)";
+      if (field === "budgetIds" || field === "invoiceIds" || field === "receiptIds") return "Arquivo (carregando...)";
       if (field === "observationId") return "Observação (carregando...)";
       if (field === "truckId") return "Caminhão (carregando...)";
     }
@@ -736,34 +736,54 @@ const ChangelogTimelineItem = ({
               </div>
             )}
 
-            {/* Layout Details with SVG Visualization */}
-            {entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT && entityDetails && (
-              <div className="space-y-3 mb-3">
-                {/* Basic Layout Info */}
-                <div className="space-y-2">
-                  {entityDetails.height && (
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Altura: </span>
-                      <span className="text-foreground font-medium">{(entityDetails.height * 100).toFixed(0)} cm</span>
-                    </div>
-                  )}
-                  {entityDetails.layoutSections && entityDetails.layoutSections.length > 0 && (
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Seções: </span>
-                      <span className="text-foreground font-medium">{entityDetails.layoutSections.length}</span>
-                    </div>
-                  )}
-                </div>
+            {/* Layout Details with SVG Visualization - Show all layouts in group horizontally */}
+            {entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT && (
+              <div className="flex flex-row flex-wrap gap-3 mb-3">
+                {changelogGroup
+                  .map((layoutChange) => {
+                    let layoutDetails: any = null;
+                    try {
+                      if (layoutChange.newValue) {
+                        layoutDetails = typeof layoutChange.newValue === 'string'
+                          ? JSON.parse(layoutChange.newValue)
+                          : layoutChange.newValue;
+                      }
+                    } catch (e) {
+                      return null;
+                    }
 
-                {/* SVG Visualization */}
-                {entityDetails.layoutSections && entityDetails.layoutSections.length > 0 && (
-                  <div className="bg-muted/30 rounded-lg p-4 border border-border">
-                    <div
-                      className="flex justify-center [&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[280px] [&>svg]:max-h-[100px]"
-                      dangerouslySetInnerHTML={{ __html: generateLayoutSVG(entityDetails) }}
-                    />
-                  </div>
-                )}
+                    if (!layoutDetails?.layoutSections || layoutDetails.layoutSections.length === 0) {
+                      return null;
+                    }
+
+                    // Detect side from reason - backend uses "lado left/right/back" format
+                    const reason = layoutChange.reason?.toLowerCase() || '';
+                    const sideName = reason.includes('lado left') || reason.includes('leftside') ? 'Lado Motorista' :
+                                    reason.includes('lado right') || reason.includes('rightside') ? 'Lado Sapo' :
+                                    reason.includes('lado back') || reason.includes('backside') || reason.includes('traseira') ? 'Traseira' : 'Layout';
+
+                    // Determine sort order: left=1, right=2, back=3, other=4
+                    const sortOrder = reason.includes('lado left') || reason.includes('leftside') ? 1 :
+                                     reason.includes('lado right') || reason.includes('rightside') ? 2 :
+                                     reason.includes('lado back') || reason.includes('backside') || reason.includes('traseira') ? 3 : 4;
+
+                    return { layoutChange, layoutDetails, sideName, sortOrder };
+                  })
+                  .filter(Boolean)
+                  .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
+                  .map(({ layoutChange, layoutDetails, sideName }: any) => (
+                    <div key={layoutChange.id} className="flex-shrink-0">
+                      <div className="text-xs font-medium text-muted-foreground mb-1 text-center">{sideName}</div>
+                      <div className="border rounded-lg bg-white/50 dark:bg-muted/30 backdrop-blur-sm p-1.5">
+                        <div
+                          dangerouslySetInnerHTML={{
+                            __html: generateLayoutSVG(layoutDetails)
+                          }}
+                          className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[140px] [&>svg]:max-h-[60px]"
+                        />
+                      </div>
+                    </div>
+                  ))}
               </div>
             )}
 
@@ -1317,16 +1337,16 @@ const ChangelogTimelineItem = ({
                                            changelog.field.includes("backSide") ? "Traseira" : "Layout";
 
                             return (
-                              <div className="space-y-3">
+                              <div className="space-y-2">
                                 <div className="text-xs font-medium text-muted-foreground">{sideName}</div>
 
                                 {oldLayout && oldLayout.layoutSections && oldLayout.layoutSections.length > 0 && (
                                   <div>
-                                    <span className="text-sm text-muted-foreground mb-2 block">Antes:</span>
-                                    <div className="border rounded-lg bg-white/50 backdrop-blur-sm p-2">
+                                    <span className="text-sm text-muted-foreground mb-1 block">Antes:</span>
+                                    <div className="border rounded-lg bg-white/50 dark:bg-muted/30 backdrop-blur-sm p-1.5">
                                       <div
                                         dangerouslySetInnerHTML={{ __html: generateLayoutSVG(oldLayout) }}
-                                        className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[280px] [&>svg]:max-h-[100px]"
+                                        className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[140px] [&>svg]:max-h-[60px]"
                                       />
                                     </div>
                                   </div>
@@ -1334,11 +1354,11 @@ const ChangelogTimelineItem = ({
 
                                 {newLayout && newLayout.layoutSections && newLayout.layoutSections.length > 0 && (
                                   <div>
-                                    <span className="text-sm text-muted-foreground mb-2 block">Depois:</span>
-                                    <div className="border rounded-lg bg-white/50 backdrop-blur-sm p-2">
+                                    <span className="text-sm text-muted-foreground mb-1 block">Depois:</span>
+                                    <div className="border rounded-lg bg-white/50 dark:bg-muted/30 backdrop-blur-sm p-1.5">
                                       <div
                                         dangerouslySetInnerHTML={{ __html: generateLayoutSVG(newLayout) }}
-                                        className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[280px] [&>svg]:max-h-[100px]"
+                                        className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[140px] [&>svg]:max-h-[60px]"
                                       />
                                     </div>
                                   </div>
@@ -1546,7 +1566,7 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
     const sensitiveFields = ["sessionToken", "verificationCode", "verificationExpiresAt", "verificationType", "password", "token", "apiKey", "secret"];
 
     // Define financial/document fields that should only be visible to FINANCIAL and ADMIN
-    const financialFields = ["budgetId", "nfeId", "receiptId", "price", "cost", "value", "totalPrice", "totalCost", "discount", "profit", "commission"];
+    const financialFields = ["budgetIds", "invoiceIds", "receiptIds", "price", "cost", "value", "totalPrice", "totalCost", "discount", "profit", "commission"];
 
     // Filter out sensitive field changes and financial fields for non-privileged users
     const filteredLogs = logs.filter((log) => {

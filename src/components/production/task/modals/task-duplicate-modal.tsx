@@ -95,9 +95,9 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
       customerId: task.customerId,
       sectorId: task.sectorId,
       commission: task.commission, // Required field
-      budgetId: task.budgetId,
-      nfeId: task.nfeId,
-      receiptId: task.receiptId,
+      budgetIds: task.budgets?.map((b: any) => b.id) || [],
+      invoiceIds: task.invoices?.map((i: any) => i.id) || [],
+      receiptIds: task.receipts?.map((r: any) => r.id) || [],
 
       // Relations - copy artwork and paint IDs
       // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs

@@ -788,7 +788,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
           setInternalValue(formatted);
           setDisplayValue(naturalTyping ? displayValue : formatted);
-          onChange?.(realValue > 0 ? realValue : undefined);
+          onChange?.(realValue);
 
           // Set cursor to end after paste
           setTimeout(() => {
@@ -928,7 +928,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         }
 
         if (onChange) {
-          onChange(realValue > 0 ? realValue : undefined);
+          onChange(realValue);
         }
         return;
       }

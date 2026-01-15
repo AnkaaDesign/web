@@ -16,14 +16,16 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { IconPlus, IconTrash, IconCalendar, IconCurrencyReal } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconCalendar, IconCurrencyReal, IconPhoto, IconX } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Combobox } from "@/components/ui/combobox";
+import { FileUploadField } from "@/components/common/file/file-upload-field";
 import { formatCurrency } from "../../../../utils";
 import { DISCOUNT_TYPE, SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
 import { serviceService } from "../../../../api-client";
+import type { FileWithPreview } from "@/components/common/file/file-uploader";
 
 interface PricingSelectorProps {
   control: any;
@@ -31,6 +33,8 @@ interface PricingSelectorProps {
   userRole?: string;
   readOnly?: boolean;
   onItemCountChange?: (count: number) => void;
+  layoutFiles?: FileWithPreview[];
+  onLayoutFilesChange?: (files: FileWithPreview[]) => void;
 }
 
 export interface PricingSelectorRef {
@@ -44,83 +48,142 @@ interface Service {
   type: string;
 }
 
+// Payment condition options (simplified - maps directly to PaymentCondition enum)
+// Labels show cumulative payment dates: "Entrada + 20/40" = payment on day 0 (entrada), day 20, day 40
+const PAYMENT_CONDITIONS = [
+  { value: "CASH", label: "À vista" },
+  { value: "INSTALLMENTS_2", label: "Entrada + 20" },
+  { value: "INSTALLMENTS_3", label: "Entrada + 20/40" },
+  { value: "INSTALLMENTS_4", label: "Entrada + 20/40/60" },
+  { value: "INSTALLMENTS_5", label: "Entrada + 20/40/60/80" },
+  { value: "INSTALLMENTS_6", label: "Entrada + 20/40/60/80/100" },
+  { value: "INSTALLMENTS_7", label: "Entrada + 20/40/60/80/100/120" },
+  { value: "CUSTOM", label: "Personalizado" },
+] as const;
+
+// Guarantee options
+const GUARANTEE_OPTIONS = [
+  { value: "5", label: "5 anos" },
+  { value: "10", label: "10 anos" },
+  { value: "15", label: "15 anos" },
+  { value: "CUSTOM", label: "Personalizado" },
+] as const;
+
 export const PricingSelector = forwardRef<
   PricingSelectorRef,
   PricingSelectorProps
->(({ control, disabled, userRole, readOnly, onItemCountChange }, ref) => {
+>(({ control, disabled, userRole, readOnly, onItemCountChange, layoutFiles: externalLayoutFiles, onLayoutFilesChange }, ref) => {
   const [initialized, setInitialized] = useState(false);
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
+  const [showCustomPayment, setShowCustomPayment] = useState(false);
+  const [showCustomGuarantee, setShowCustomGuarantee] = useState(false);
+  // Use external layout files if provided, otherwise use local state
+  const [localLayoutFiles, setLocalLayoutFiles] = useState<FileWithPreview[]>([]);
+  const layoutFiles = externalLayoutFiles ?? localLayoutFiles;
+  const setLayoutFiles = onLayoutFilesChange ?? setLocalLayoutFiles;
   const lastRowRef = useRef<HTMLDivElement>(null);
-  const { setValue, clearErrors } = useFormContext();
+  const { setValue, clearErrors, getValues } = useFormContext();
 
   const { fields, append, remove } = useFieldArray({
     control,
     name: "pricing.items",
   });
 
-  // Watch pricing values to check for incomplete entries and calculate total
-  const pricingItems = useWatch({
-    control,
-    name: "pricing.items",
-  });
+  // Watch pricing values
+  const pricingItems = useWatch({ control, name: "pricing.items" });
+  const pricingStatus = useWatch({ control, name: "pricing.status" }) || 'DRAFT';
+  const pricingExpiresAt = useWatch({ control, name: "pricing.expiresAt" });
+  const discountType = useWatch({ control, name: "pricing.discountType" }) || DISCOUNT_TYPE.NONE;
+  const discountValue = useWatch({ control, name: "pricing.discountValue" });
+  const paymentCondition = useWatch({ control, name: "pricing.paymentCondition" });
+  const customPaymentText = useWatch({ control, name: "pricing.customPaymentText" });
+  const guaranteeYears = useWatch({ control, name: "pricing.guaranteeYears" });
+  const customGuaranteeText = useWatch({ control, name: "pricing.customGuaranteeText" });
+  const layoutFileId = useWatch({ control, name: "pricing.layoutFileId" });
 
-  const pricingStatus = useWatch({
-    control,
-    name: "pricing.status",
-  }) || 'DRAFT';
+  // Current payment condition - directly from stored value or CUSTOM if has custom text
+  const currentPaymentCondition = useMemo(() => {
+    if (customPaymentText) return "CUSTOM";
+    return paymentCondition || "";
+  }, [paymentCondition, customPaymentText]);
 
-  const pricingExpiresAt = useWatch({
-    control,
-    name: "pricing.expiresAt",
-  });
+  // Derive current guarantee option from stored values
+  const currentGuaranteeOption = useMemo(() => {
+    if (customGuaranteeText) return "CUSTOM";
+    if (guaranteeYears) return guaranteeYears.toString();
+    return "";
+  }, [guaranteeYears, customGuaranteeText]);
 
-  const discountType = useWatch({
-    control,
-    name: "pricing.discountType",
-  }) || DISCOUNT_TYPE.NONE;
-
-  const discountValue = useWatch({
-    control,
-    name: "pricing.discountValue",
-  });
-
-  // Search function for service combobox with pagination
-  const searchServices = useCallback(async (
-    search: string,
-    page: number = 1,
-  ): Promise<{
-    data: Service[];
-    hasMore: boolean;
-  }> => {
-    try {
-      const params: any = {
-        type: SERVICE_ORDER_TYPE.PRODUCTION,
-        orderBy: { description: "asc" },
-        page: page,
-        take: 50,
-      };
-
-      if (search && search.trim()) {
-        params.searchingFor = search.trim();
-      }
-
-      const response = await serviceService.getServices(params);
-      const services = response.data || [];
-      const hasMore = response.meta?.hasNextPage || false;
-
-      return {
-        data: services,
-        hasMore,
-      };
-    } catch (error) {
-      console.error("Failed to search services:", error);
-      return { data: [], hasMore: false };
+  // Initialize custom states from existing data
+  useEffect(() => {
+    if (customPaymentText && !showCustomPayment) {
+      setShowCustomPayment(true);
     }
+    if (customGuaranteeText && !showCustomGuarantee) {
+      setShowCustomGuarantee(true);
+    }
+  }, [customPaymentText, customGuaranteeText, showCustomPayment, showCustomGuarantee]);
+
+  // Note: Layout files initialization is now handled by the parent component (task-edit-form)
+  // which passes the actual file data from the API including correct size information.
+  // The layoutFileId is only used for tracking changes, not for creating placeholder files.
+
+  // Handle layout file change
+  const handleLayoutFileChange = useCallback((files: FileWithPreview[]) => {
+    setLayoutFiles(files);
+    if (files.length > 0 && files[0].uploadedFileId) {
+      setValue("pricing.layoutFileId", files[0].uploadedFileId);
+    } else if (files.length === 0) {
+      setValue("pricing.layoutFileId", null);
+    }
+  }, [setValue]);
+
+  // Factory function that creates a search function for service combobox
+  const createSearchServices = useCallback((existingDescription?: string) => {
+    return async (
+      search: string,
+      page: number = 1,
+    ): Promise<{ data: Service[]; hasMore: boolean }> => {
+      try {
+        const params: any = {
+          type: SERVICE_ORDER_TYPE.PRODUCTION,
+          orderBy: { description: "asc" },
+          page: page,
+          take: 50,
+        };
+
+        if (search && search.trim()) {
+          params.searchingFor = search.trim();
+        }
+
+        const response = await serviceService.getServices(params);
+        const services = response.data || [];
+        const hasMore = response.meta?.hasNextPage || false;
+
+        if (page === 1 && (!search || !search.trim()) && existingDescription && existingDescription.trim()) {
+          const existsInResults = services.some((s: Service) => s.description === existingDescription);
+          if (!existsInResults) {
+            const existingService: Service = {
+              id: `temp-${existingDescription}`,
+              description: existingDescription,
+              type: SERVICE_ORDER_TYPE.PRODUCTION,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+            return { data: [existingService, ...services], hasMore };
+          }
+        }
+
+        return { data: services, hasMore };
+      } catch (error) {
+        console.error("Failed to search services:", error);
+        return { data: [], hasMore: false };
+      }
+    };
   }, []);
 
-  // Helper functions for Combobox async mode
   const getOptionLabel = useCallback((service: Service) => service.description, []);
-  const getOptionValue = useCallback((service: Service) => service.id, []);
+  const getOptionValue = useCallback((service: Service) => service.description, []);
 
   // Calculate subtotal from all pricing items
   const subtotal = useMemo(() => {
@@ -131,7 +194,7 @@ export const PricingSelector = forwardRef<
     }, 0);
   }, [pricingItems]);
 
-  // Calculate discount amount based on type and value
+  // Calculate discount amount
   const discountAmount = useMemo(() => {
     if (discountType === DISCOUNT_TYPE.NONE || !discountValue) return 0;
     if (discountType === DISCOUNT_TYPE.PERCENTAGE) {
@@ -148,120 +211,98 @@ export const PricingSelector = forwardRef<
     return Math.max(0, Math.round((subtotal - discountAmount) * 100) / 100);
   }, [subtotal, discountAmount]);
 
-  // Check if any pricing item is incomplete (skip first item as it's always available)
+  // Check if any pricing item is incomplete
   const hasIncompletePricing = useMemo(() => {
     if (!pricingItems || pricingItems.length === 0) return false;
-
-    // Only check items beyond the first one
-    // If there's only one item and it's empty, it's okay (like cuts)
     if (pricingItems.length === 1) {
       const item = pricingItems[0];
-      const isEmpty = !item.serviceId && (item.amount === null || item.amount === undefined || item.amount === 0);
-      // Don't show error for the default empty first item
+      const isEmpty = !item.description && (item.amount === null || item.amount === undefined || item.amount === 0);
       if (isEmpty) return false;
-
-      // Show error if partially filled
-      return !item.serviceId || item.amount === null || item.amount === undefined;
+      return !item.description;
     }
-
-    // For multiple items, check if any are incomplete
-    return pricingItems.some((item: any) =>
-      !item.serviceId ||
-      item.amount === null || item.amount === undefined
-    );
+    return pricingItems.some((item: any) => !item.description);
   }, [pricingItems]);
 
-  // Initialize with one empty row by default for better UX
+  // Initialize local state from form data
   useEffect(() => {
-    if (!initialized && fields.length === 0) {
-      // Auto-add first row if no pricing items exist
-      append({
-        serviceId: "",
-        amount: undefined,
-      });
+    if (!initialized) {
+      const expiresAt = getValues("pricing.expiresAt");
+      if (expiresAt) {
+        const today = new Date();
+        const diffTime = new Date(expiresAt).getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays > 0 && diffDays <= 90) {
+          setValidityPeriod(diffDays);
+        } else {
+          setValidityPeriod(30);
+        }
+      } else {
+        setValidityPeriod(30);
+      }
+      setInitialized(true);
+    }
+  }, [initialized, getValues]);
 
-      // Set default validity period to 30 days
+  // Notify parent about count changes
+  useEffect(() => {
+    if (onItemCountChange) {
+      const count = pricingItems && pricingItems.length > 0 ? 1 : 0;
+      onItemCountChange(count);
+    }
+  }, [pricingItems, onItemCountChange]);
+
+  // Update subtotal and total in form
+  useEffect(() => {
+    if (pricingItems && pricingItems.length > 0) {
+      const currentSubtotal = getValues("pricing.subtotal");
+      const currentTotal = getValues("pricing.total");
+      if (currentSubtotal !== subtotal) {
+        setValue("pricing.subtotal", subtotal, { shouldDirty: false });
+      }
+      if (currentTotal !== calculatedTotal) {
+        setValue("pricing.total", calculatedTotal, { shouldDirty: false });
+      }
+    }
+  }, [subtotal, calculatedTotal, pricingItems, setValue, getValues]);
+
+  const handleAddItem = useCallback(() => {
+    clearErrors("pricing");
+    if (fields.length === 0) {
       const defaultPeriod = 30;
       setValidityPeriod(defaultPeriod);
       const expiryDate = new Date();
       expiryDate.setDate(expiryDate.getDate() + defaultPeriod);
       expiryDate.setHours(23, 59, 59, 999);
       setValue("pricing.expiresAt", expiryDate);
-
-      // Initialize pricing fields
       setValue("pricing.status", "DRAFT");
       setValue("pricing.discountType", DISCOUNT_TYPE.NONE);
       setValue("pricing.discountValue", null);
       setValue("pricing.subtotal", 0);
       setValue("pricing.total", 0);
-
-      setInitialized(true);
-    } else if (!initialized) {
-      setInitialized(true);
     }
-  }, [initialized, fields.length, append, setValue]);
-
-  // Notify parent about count changes
-  useEffect(() => {
-    if (onItemCountChange) {
-      // Count pricing items or 1 if there's pricing data (to show the pricing card)
-      const count = pricingItems && pricingItems.length > 0 ? 1 : 0;
-      onItemCountChange(count);
-    }
-  }, [pricingItems, onItemCountChange]);
-
-  // Update subtotal and total in form whenever they change
-  useEffect(() => {
-    if (pricingItems && pricingItems.length > 0) {
-      setValue("pricing.subtotal", subtotal);
-      setValue("pricing.total", calculatedTotal);
-    }
-  }, [subtotal, calculatedTotal, pricingItems, setValue]);
-
-  const handleAddItem = useCallback(() => {
-    // Clear any existing pricing errors before adding
-    clearErrors("pricing");
-
-    append({
-      serviceId: "",
-      amount: undefined,
-    });
-
-    // Focus on the new input after adding
+    append({ description: "", amount: undefined });
     setTimeout(() => {
-      const serviceInput = lastRowRef.current?.querySelector(
-        '[role="combobox"]',
-      ) as HTMLElement;
+      const serviceInput = lastRowRef.current?.querySelector('[role="combobox"]') as HTMLElement;
       serviceInput?.focus();
     }, 100);
-  }, [append, clearErrors]);
+  }, [append, clearErrors, fields.length, setValue]);
 
-  // Clear all pricing items
   const clearAll = useCallback(() => {
-    // Remove all items from the end to the beginning
     for (let i = fields.length - 1; i >= 0; i--) {
       remove(i);
     }
-    // Set pricing to undefined entirely so the optional schema validation works
     setValue("pricing", undefined);
     clearErrors("pricing");
-    // Reset validity period
     setValidityPeriod(null);
+    setShowCustomPayment(false);
+    setShowCustomGuarantee(false);
+    setLayoutFiles([]);
   }, [fields.length, remove, setValue, clearErrors]);
 
-  // Expose methods via ref
-  useImperativeHandle(
-    ref,
-    () => ({
-      addItem: handleAddItem,
-      clearAll,
-    }),
-    [handleAddItem, clearAll],
-  );
+  useImperativeHandle(ref, () => ({ addItem: handleAddItem, clearAll }), [handleAddItem, clearAll]);
 
   const canEditStatus = userRole === 'ADMIN' || userRole === 'FINANCIAL' || userRole === 'COMMERCIAL';
 
-  // Status options for Combobox
   const statusOptions = [
     { label: 'Rascunho', value: 'DRAFT' },
     { label: 'Aprovado', value: 'APPROVED' },
@@ -269,41 +310,31 @@ export const PricingSelector = forwardRef<
     { label: 'Cancelado', value: 'CANCELLED' },
   ];
 
-  // Validity period options (in days)
   const validityPeriodOptions = [
-    { label: '7 dias', value: '7' },
+    { label: '15 dias', value: '15' },
     { label: '30 dias', value: '30' },
     { label: '60 dias', value: '60' },
     { label: '90 dias', value: '90' },
   ];
 
-  // Calculate expiresAt date from validity period
   const handleValidityPeriodChange = useCallback((period: string) => {
     const days = Number(period);
     setValidityPeriod(days);
-
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + days);
-    // Set to end of day
     expiryDate.setHours(23, 59, 59, 999);
-
     setValue("pricing.expiresAt", expiryDate);
   }, [setValue]);
 
-  // Detect validity period from existing expiresAt date (for edit form)
   useEffect(() => {
     if (!pricingExpiresAt || validityPeriod !== null) return;
-
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const expiryDate = new Date(pricingExpiresAt);
     expiryDate.setHours(0, 0, 0, 0);
-
     const diffInMs = expiryDate.getTime() - now.getTime();
     const diffInDays = Math.round(diffInMs / (1000 * 60 * 60 * 24));
-
-    // Check if the difference matches one of our predefined periods (with ±1 day tolerance)
-    const periods = [7, 30, 60, 90];
+    const periods = [15, 30, 60, 90];
     for (const period of periods) {
       if (Math.abs(diffInDays - period) <= 1) {
         setValidityPeriod(period);
@@ -312,12 +343,35 @@ export const PricingSelector = forwardRef<
     }
   }, [pricingExpiresAt, validityPeriod]);
 
+  const handlePaymentConditionChange = useCallback((value: string) => {
+    if (value === "CUSTOM") {
+      setShowCustomPayment(true);
+      setValue("pricing.paymentCondition", "CUSTOM");
+    } else {
+      setShowCustomPayment(false);
+      setValue("pricing.customPaymentText", null);
+      setValue("pricing.paymentCondition", value);
+    }
+  }, [setValue]);
+
+  const handleGuaranteeOptionChange = useCallback((value: string) => {
+    if (value === "CUSTOM") {
+      setShowCustomGuarantee(true);
+      setValue("pricing.guaranteeYears", null);
+    } else {
+      setShowCustomGuarantee(false);
+      setValue("pricing.customGuaranteeText", null);
+      setValue("pricing.guaranteeYears", value ? Number(value) : null);
+    }
+  }, [setValue]);
+
+  const hasPricingItems = pricingItems && pricingItems.length > 0;
+
   return (
-    <div className="space-y-4">
-      {/* Status and Validity Period - Side by side at top */}
-      {pricingItems && pricingItems.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(300px,1fr)_minmax(250px,1fr)] gap-4">
-          {/* Status Selector - Only shown when user has permission */}
+    <div className="space-y-6">
+      {/* Status and Validity Period - Top Row */}
+      {hasPricingItems && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {canEditStatus && !readOnly ? (
             <FormField
               control={control}
@@ -342,7 +396,6 @@ export const PricingSelector = forwardRef<
             <div />
           )}
 
-          {/* Validity Period Field */}
           <FormField
             control={control}
             name="pricing.expiresAt"
@@ -370,35 +423,147 @@ export const PricingSelector = forwardRef<
         </div>
       )}
 
-      {/* Services List */}
+      {/* Payment, Date, and Guarantee - Before Services */}
+      {hasPricingItems && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Payment Condition */}
+          <FormItem>
+            <FormLabel>Condição de Pagamento</FormLabel>
+            <FormControl>
+              <Combobox
+                value={currentPaymentCondition}
+                onValueChange={handlePaymentConditionChange}
+                disabled={disabled || readOnly}
+                options={PAYMENT_CONDITIONS.map((opt) => ({
+                  value: opt.value,
+                  label: opt.label,
+                }))}
+                placeholder="Selecione"
+                emptyMessage="Nenhuma opção"
+              />
+            </FormControl>
+          </FormItem>
+
+          {/* Down Payment Date */}
+          <FormField
+            control={control}
+            name="pricing.downPaymentDate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Data da Entrada</FormLabel>
+                <FormControl>
+                  <Input
+                    type="date"
+                    value={field.value ? new Date(field.value).toISOString().split("T")[0] : ""}
+                    onChange={(value: string | number | null) => {
+                      // Input component passes value directly, not event
+                      // Parse the date string to a Date object, or null if empty
+                      const dateValue = value ? new Date(String(value) + "T12:00:00") : null;
+                      // Call field.onChange to properly update React Hook Form state
+                      field.onChange(dateValue);
+                    }}
+                    onBlur={field.onBlur}
+                    disabled={disabled || readOnly}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Guarantee */}
+          <FormItem>
+            <FormLabel>Período de Garantia</FormLabel>
+            <FormControl>
+              <Combobox
+                value={currentGuaranteeOption}
+                onValueChange={handleGuaranteeOptionChange}
+                disabled={disabled || readOnly}
+                options={GUARANTEE_OPTIONS.map((opt) => ({
+                  value: opt.value,
+                  label: opt.label,
+                }))}
+                placeholder="Selecione"
+                emptyMessage="Nenhuma opção"
+              />
+            </FormControl>
+          </FormItem>
+        </div>
+      )}
+
+      {/* Custom Payment Text */}
+      {hasPricingItems && showCustomPayment && (
+        <FormField
+          control={control}
+          name="pricing.customPaymentText"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Texto Personalizado de Pagamento</FormLabel>
+              <FormControl>
+                <textarea
+                  {...field}
+                  value={field.value || ""}
+                  placeholder="Descreva as condições de pagamento personalizadas..."
+                  disabled={disabled || readOnly}
+                  rows={3}
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      )}
+
+      {/* Custom Guarantee Text */}
+      {hasPricingItems && showCustomGuarantee && (
+        <FormField
+          control={control}
+          name="pricing.customGuaranteeText"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Texto Personalizado de Garantia</FormLabel>
+              <FormControl>
+                <textarea
+                  {...field}
+                  value={field.value || ""}
+                  placeholder="Descreva as condições de garantia personalizadas..."
+                  disabled={disabled || readOnly}
+                  rows={3}
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      )}
+
+      {/* Services List - Main Section */}
       {fields.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-3 pt-4 border-t">
+          <h4 className="font-medium text-sm text-muted-foreground">Serviços</h4>
           {fields.map((field, index) => {
             const isLastRow = index === fields.length - 1;
             return (
               <div
                 key={field.id}
                 ref={isLastRow ? lastRowRef : null}
-                className="grid grid-cols-1 md:grid-cols-[minmax(300px,1fr)_minmax(250px,1fr)] gap-4 items-end"
+                className="grid grid-cols-1 sm:grid-cols-[1fr_180px] gap-4 items-end"
               >
-                {/* Service Selector */}
                 <FormField
                   control={control}
-                  name={`pricing.items.${index}.serviceId`}
+                  name={`pricing.items.${index}.description`}
                   render={({ field: serviceField }) => (
                     <FormItem>
-                      {index === 0 && (
-                        <FormLabel className="flex items-center gap-2">
-                          Serviço
-                        </FormLabel>
-                      )}
+                      {index === 0 && <FormLabel>Serviço</FormLabel>}
                       <FormControl>
                         <Combobox<Service>
                           value={serviceField.value || ""}
                           onValueChange={serviceField.onChange}
                           async={true}
-                          queryKey={["pricing", "services", "PRODUCTION", index]}
-                          queryFn={searchServices}
+                          queryKey={["pricing", "services", "PRODUCTION", index, serviceField.value]}
+                          queryFn={createSearchServices(serviceField.value)}
                           getOptionLabel={getOptionLabel}
                           getOptionValue={getOptionValue}
                           renderOption={(service) => <span>{service.description}</span>}
@@ -418,7 +583,6 @@ export const PricingSelector = forwardRef<
                   )}
                 />
 
-                {/* Amount Field with embedded action buttons */}
                 <FormField
                   control={control}
                   name={`pricing.items.${index}.amount`}
@@ -441,7 +605,6 @@ export const PricingSelector = forwardRef<
                           />
                           {!readOnly && !disabled && (
                             <div className="absolute right-1 flex items-center gap-1">
-                              {/* Remove Button */}
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -453,8 +616,6 @@ export const PricingSelector = forwardRef<
                               >
                                 <IconTrash className="h-4 w-4" />
                               </Button>
-
-                              {/* Add Button - Only show on last row */}
                               {isLastRow && (
                                 <Button
                                   type="button"
@@ -482,24 +643,29 @@ export const PricingSelector = forwardRef<
         </div>
       )}
 
-      {/* Discount and Summary Section - Always shown when there are pricing items */}
-      {pricingItems && pricingItems.length > 0 && (
+      {/* Discount and Summary Section */}
+      {hasPricingItems && (
         <div className="space-y-4 pt-4 border-t">
-          {/* Discount Type and Discount Value */}
-          <div className="grid grid-cols-1 md:grid-cols-[minmax(300px,1fr)_minmax(250px,1fr)] gap-4">
-            {/* Discount Type Field */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField
               control={control}
               name="pricing.discountType"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    Tipo de Desconto
-                  </FormLabel>
+                  <FormLabel>Tipo de Desconto</FormLabel>
                   <FormControl>
                     <Combobox
                       value={field.value || DISCOUNT_TYPE.NONE}
-                      onValueChange={field.onChange}
+                      onValueChange={(newType) => {
+                        const safeType = newType || DISCOUNT_TYPE.NONE;
+                        const previousType = field.value || DISCOUNT_TYPE.NONE;
+                        field.onChange(safeType);
+                        if (safeType === DISCOUNT_TYPE.NONE) {
+                          setValue("pricing.discountValue", null);
+                        } else if (previousType !== safeType && previousType !== DISCOUNT_TYPE.NONE) {
+                          setValue("pricing.discountValue", null);
+                        }
+                      }}
                       disabled={disabled || readOnly}
                       options={[
                         DISCOUNT_TYPE.NONE,
@@ -518,7 +684,6 @@ export const PricingSelector = forwardRef<
               )}
             />
 
-            {/* Discount Value Field - Only enabled when type is not NONE */}
             <FormField
               control={control}
               name="pricing.discountValue"
@@ -537,14 +702,15 @@ export const PricingSelector = forwardRef<
                     <Input
                       type={discountType === DISCOUNT_TYPE.FIXED_VALUE ? "currency" : "number"}
                       {...field}
-                      value={field.value || ""}
+                      value={field.value ?? ""}
                       onChange={(value) => {
-                        // Currency Input passes value directly, number input passes event
-                        if (discountType === DISCOUNT_TYPE.FIXED_VALUE) {
+                        if (value === null || value === undefined || value === "") {
+                          field.onChange(null);
+                        } else if (typeof value === "number") {
                           field.onChange(value);
                         } else {
-                          const e = value as any;
-                          field.onChange(e.target?.value ? Number(e.target.value) : null);
+                          const num = Number(value);
+                          field.onChange(isNaN(num) ? null : num);
                         }
                       }}
                       disabled={disabled || readOnly || discountType === DISCOUNT_TYPE.NONE}
@@ -560,53 +726,82 @@ export const PricingSelector = forwardRef<
             />
           </div>
 
-          {/* Subtotal and Total - Stacked in right column */}
-          <div className="grid grid-cols-1 md:grid-cols-[minmax(300px,1fr)_minmax(250px,1fr)] gap-4">
-            {/* Empty spacer to push to right column */}
-            <div className="hidden md:block" />
+          {/* Totals */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <FormItem>
+              <FormLabel className="flex items-center gap-2">
+                <IconCurrencyReal className="h-4 w-4" />
+                Subtotal
+              </FormLabel>
+              <FormControl>
+                <Input
+                  value={formatCurrency(subtotal)}
+                  readOnly
+                  className="bg-muted cursor-not-allowed font-medium"
+                />
+              </FormControl>
+            </FormItem>
 
-            {/* Subtotal and Total container */}
-            <div className="space-y-3">
-              {/* Subtotal Field - Read-only */}
+            {discountAmount > 0 && (
               <FormItem>
-                <FormLabel className="flex items-center gap-2">
+                <FormLabel className="flex items-center gap-2 text-destructive">
                   <IconCurrencyReal className="h-4 w-4" />
-                  Subtotal
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    value={formatCurrency(subtotal)}
-                    readOnly
-                    className="bg-muted cursor-not-allowed font-medium"
-                  />
-                </FormControl>
-              </FormItem>
-
-              {/* Total Field - Read-only */}
-              <FormItem>
-                <FormLabel className="flex items-center gap-2">
-                  <IconCurrencyReal className="h-4 w-4" />
-                  Valor Total
-                  {discountAmount > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      (Desconto: -{formatCurrency(discountAmount)})
-                    </span>
+                  Desconto
+                  {discountType === DISCOUNT_TYPE.PERCENTAGE && (
+                    <span className="text-xs">({discountValue}%)</span>
                   )}
                 </FormLabel>
                 <FormControl>
                   <Input
-                    value={formatCurrency(calculatedTotal)}
+                    value={`- ${formatCurrency(discountAmount)}`}
                     readOnly
-                    className="bg-transparent font-bold text-lg text-primary cursor-not-allowed"
+                    className="bg-muted cursor-not-allowed font-medium text-destructive"
                   />
                 </FormControl>
               </FormItem>
-            </div>
+            )}
+
+            <FormItem>
+              <FormLabel className="flex items-center gap-2">
+                <IconCurrencyReal className="h-4 w-4" />
+                Valor Total
+              </FormLabel>
+              <FormControl>
+                <Input
+                  value={formatCurrency(calculatedTotal)}
+                  readOnly
+                  className="bg-transparent font-bold text-lg text-primary cursor-not-allowed"
+                />
+              </FormControl>
+            </FormItem>
           </div>
         </div>
       )}
 
-      {/* Validation Alert - Only for incomplete items */}
+      {/* Layout File Upload */}
+      {hasPricingItems && (
+        <div className="space-y-3 pt-4 border-t">
+          <h4 className="font-medium text-sm flex items-center gap-2">
+            <IconPhoto className="h-4 w-4" />
+            Layout Aprovado
+          </h4>
+          <FileUploadField
+            onFilesChange={handleLayoutFileChange}
+            existingFiles={layoutFiles}
+            maxFiles={1}
+            maxSize={10 * 1024 * 1024}
+            acceptedFileTypes={{
+              "image/*": [".jpeg", ".jpg", ".png", ".gif", ".webp"],
+            }}
+            disabled={disabled || readOnly}
+            variant="compact"
+            placeholder="Arraste ou clique para selecionar o layout"
+            showPreview={true}
+          />
+        </div>
+      )}
+
+      {/* Validation Alert */}
       {hasIncompletePricing && (
         <Alert variant="destructive">
           <AlertDescription>

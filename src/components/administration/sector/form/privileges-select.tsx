@@ -17,13 +17,14 @@ export function PrivilegesSelect({ control, disabled, required }: PrivilegesSele
     [SECTOR_PRIVILEGES.EXTERNAL]: { order: 2, description: "Acesso para colaboradores externos" },
     [SECTOR_PRIVILEGES.WAREHOUSE]: { order: 3, description: "Controle de estoque e almoxarifado" },
     [SECTOR_PRIVILEGES.DESIGNER]: { order: 4, description: "Design e criação de artes" },
-    [SECTOR_PRIVILEGES.PRODUCTION]: { order: 5, description: "Gestão de produção e tarefas" },
-    [SECTOR_PRIVILEGES.MAINTENANCE]: { order: 6, description: "Manutenção e equipamentos" },
-    [SECTOR_PRIVILEGES.LOGISTIC]: { order: 7, description: "Logística e transporte" },
-    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: { order: 8, description: "Recursos humanos e pessoal" },
-    [SECTOR_PRIVILEGES.FINANCIAL]: { order: 9, description: "Controle financeiro e orçamentário" },
-    [SECTOR_PRIVILEGES.ADMIN]: { order: 10, description: "Administração completa do sistema" },
-    [SECTOR_PRIVILEGES.TEAM_LEADER]: { order: 11, description: "Liderança de equipe do setor" },
+    [SECTOR_PRIVILEGES.PLOTTING]: { order: 5, description: "Plotagem e impressão de materiais" },
+    [SECTOR_PRIVILEGES.PRODUCTION]: { order: 6, description: "Gestão de produção e tarefas" },
+    [SECTOR_PRIVILEGES.MAINTENANCE]: { order: 7, description: "Manutenção e equipamentos" },
+    [SECTOR_PRIVILEGES.LOGISTIC]: { order: 8, description: "Logística e transporte" },
+    [SECTOR_PRIVILEGES.COMMERCIAL]: { order: 9, description: "Atividades comerciais e vendas" },
+    [SECTOR_PRIVILEGES.HUMAN_RESOURCES]: { order: 10, description: "Recursos humanos e pessoal" },
+    [SECTOR_PRIVILEGES.FINANCIAL]: { order: 11, description: "Controle financeiro e orçamentário" },
+    [SECTOR_PRIVILEGES.ADMIN]: { order: 12, description: "Administração completa do sistema" },
   };
 
   // Sort privileges by order (with fallback for any missing entries)

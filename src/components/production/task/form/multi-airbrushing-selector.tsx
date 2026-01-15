@@ -1,20 +1,15 @@
 import { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { useController } from "react-hook-form";
-import { IconSpray, IconPlus, IconTrash, IconPhoto, IconPaperclip, IconFileInvoice, IconGripVertical } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconPhoto, IconPaperclip, IconFileInvoice } from "@tabler/icons-react";
 import { FormLabel } from "@/components/ui/form";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { FileUploadField } from "@/components/common/file";
 import type { FileWithPreview } from "@/components/common/file";
 import { AIRBRUSHING_STATUS, AIRBRUSHING_STATUS_LABELS } from "../../../../constants";
-import { formatCurrency, formatDate } from "../../../../utils";
-import { toast } from "sonner";
 
 interface MultiAirbrushingSelectorProps {
   control: any;
@@ -68,47 +63,37 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
     };
 
     // Initialize airbrushings from form field value
+    // Defaults are now set in mapDataToForm, so field.value should always have data
     const [airbrushings, setAirbrushings] = useState<AirbrushingItem[]>(() => {
-      if (field.value && Array.isArray(field.value) && field.value.length > 0) {
-        return field.value.map((airbrushing: any, index: number) => ({
-          id: airbrushing.id || `airbrushing-${Date.now()}-${index}`,
-          status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
-          price: airbrushing.price || null,
-          startDate: airbrushing.startDate || null,
-          finishDate: airbrushing.finishDate || null,
-          // Merge existing uploaded files (from API as 'receipts') and newly selected files (as 'receiptFiles')
-          receiptFiles: [
-            ...convertFilesToFileWithPreview(airbrushing.receipts || []),
-            ...(airbrushing.receiptFiles || [])
-          ],
-          nfeFiles: [
-            ...convertFilesToFileWithPreview(airbrushing.invoices || []),
-            ...(airbrushing.nfeFiles || [])
-          ],
-          artworkFiles: [
-            ...convertFilesToFileWithPreview(airbrushing.artworks || []),
-            ...(airbrushing.artworkFiles || [])
-          ],
-          receiptIds: airbrushing.receiptIds || [],
-          invoiceIds: airbrushing.invoiceIds || [],
-          artworkIds: airbrushing.artworkIds || [],
-        }));
-      }
-      // Initialize with one empty airbrushing to show the form immediately
-      return [{
-        id: `airbrushing-initial`,
-        status: AIRBRUSHING_STATUS.PENDING,
-        price: null,
-        startDate: null,
-        finishDate: null,
-        receiptFiles: [],
-        nfeFiles: [],
-        artworkFiles: [],
-        receiptIds: [],
-        invoiceIds: [],
-        artworkIds: [],
-      }];
+      // Always map from field.value - defaults are now provided by mapDataToForm
+      const data = field.value && Array.isArray(field.value) ? field.value : [];
+      return data.map((airbrushing: any, index: number) => ({
+        id: airbrushing.id || `airbrushing-${Date.now()}-${index}`,
+        status: airbrushing.status || AIRBRUSHING_STATUS.PENDING,
+        price: airbrushing.price || null,
+        startDate: airbrushing.startDate || null,
+        finishDate: airbrushing.finishDate || null,
+        // Merge existing uploaded files (from API as 'receipts') and newly selected files (as 'receiptFiles')
+        receiptFiles: [
+          ...convertFilesToFileWithPreview(airbrushing.receipts || []),
+          ...(airbrushing.receiptFiles || [])
+        ],
+        nfeFiles: [
+          ...convertFilesToFileWithPreview(airbrushing.invoices || []),
+          ...(airbrushing.nfeFiles || [])
+        ],
+        artworkFiles: [
+          ...convertFilesToFileWithPreview(airbrushing.artworks || []),
+          ...(airbrushing.artworkFiles || [])
+        ],
+        receiptIds: airbrushing.receiptIds || [],
+        invoiceIds: airbrushing.invoiceIds || [],
+        artworkIds: airbrushing.artworkIds || [],
+      }));
     });
+
+    // Track if initial sync has been done to prevent marking form dirty on mount
+    const hasInitialSynced = useRef(false);
 
     // Track if we're syncing to prevent infinite loops
     const isSyncingToForm = useRef<boolean>(false);
@@ -130,9 +115,8 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
 
       lastFieldValueRef.current = fieldValueStr;
 
+      // Always map from field.value - mapDataToForm now provides defaults
       if (field.value && Array.isArray(field.value) && field.value.length > 0) {
-        const wasEmpty = airbrushings.length === 0;
-
         const newAirbrushings = field.value.map((airbrushing: any, index: number) => {
           return {
             id: airbrushing.id || `airbrushing-${Date.now()}-${index}`, // Preserve ID from form data
@@ -159,30 +143,23 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           };
         });
         setAirbrushings(newAirbrushings);
-      } else if (!field.value || (Array.isArray(field.value) && field.value.length === 0)) {
-        // Don't clear airbrushings completely - maintain one initial empty item for better UX
-        // Only clear if we currently have more than one item (user explicitly removed all)
-        if (airbrushings.length > 1) {
-          setAirbrushings([{
-            id: `airbrushing-initial`,
-            status: AIRBRUSHING_STATUS.PENDING,
-            price: null,
-            startDate: null,
-            finishDate: null,
-            receiptFiles: [],
-            nfeFiles: [],
-            artworkFiles: [],
-            receiptIds: [],
-            invoiceIds: [],
-            artworkIds: [],
-          }]);
-        }
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [field.value]);
 
     // Sync FROM local state TO form field when airbrushings change (local → form)
     useEffect(() => {
+      // Skip initial sync to avoid marking form dirty on mount
+      // The form already has the correct initial value from mapDataToForm
+      if (!hasInitialSynced.current) {
+        hasInitialSynced.current = true;
+        // Still notify parent about count on initial render
+        if (onAirbrushingsCountChange) {
+          onAirbrushingsCountChange(airbrushings.length);
+        }
+        return;
+      }
+
       // Mark that we're syncing
       isSyncingToForm.current = true;
 
@@ -298,36 +275,28 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
       [addAirbrushing, clearAll],
     );
 
-    const getStatusBadgeVariant = (status: string) => {
-      switch (status) {
-        case AIRBRUSHING_STATUS.PENDING:
-          return "secondary";
-        case AIRBRUSHING_STATUS.IN_PRODUCTION:
-          return "default";
-        case AIRBRUSHING_STATUS.COMPLETED:
-          return "success";
-        case AIRBRUSHING_STATUS.CANCELLED:
-          return "destructive";
-        default:
-          return "secondary";
-      }
-    };
-
     return (
       <div className="space-y-4">
         {/* Airbrushings List */}
         <div className="space-y-3">
-          {airbrushings.map((airbrushing, index) => (
-              <Card key={airbrushing.id} className="border rounded-lg">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <IconGripVertical className="h-4 w-4 text-muted-foreground" />
-                      <IconSpray className="h-4 w-4" />
-                      <CardTitle className="text-base">Aerografia {index + 1}</CardTitle>
-                      <Badge variant={getStatusBadgeVariant(airbrushing.status)}>{AIRBRUSHING_STATUS_LABELS[airbrushing.status]}</Badge>
-                      {airbrushing.price && <Badge variant="outline">{formatCurrency(airbrushing.price)}</Badge>}
-                      {airbrushing.startDate && <span className="text-sm text-muted-foreground">{formatDate(airbrushing.startDate)}</span>}
+          {airbrushings.map((airbrushing) => (
+              <div key={airbrushing.id} className="border rounded-lg p-4 space-y-4">
+                {/* Status row (only in edit mode) */}
+                {isEditMode && (
+                  <div className="flex gap-4 items-end">
+                    <div className="space-y-2 flex-1">
+                      <FormLabel>Status</FormLabel>
+                      <Combobox
+                        value={airbrushing.status}
+                        onValueChange={(value) => updateAirbrushing(airbrushing.id, { status: value })}
+                        disabled={disabled}
+                        options={Object.values(AIRBRUSHING_STATUS).map((status) => ({
+                          value: status,
+                          label: AIRBRUSHING_STATUS_LABELS[status],
+                        }))}
+                        placeholder="Status"
+                        searchable={false}
+                      />
                     </div>
                     <Button
                       type="button"
@@ -335,143 +304,137 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
                       disabled={disabled}
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8"
+                      className="h-9 w-9 flex-shrink-0"
                     >
                       <IconTrash className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Status, Price and Dates - All in one row */}
-                    <div className={`grid grid-cols-1 gap-4 ${isEditMode ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
-                      {isEditMode && (
-                        <div className="space-y-2">
-                          <FormLabel>Status</FormLabel>
-                          <Combobox
-                            value={airbrushing.status}
-                            onValueChange={(value) => updateAirbrushing(airbrushing.id, { status: value })}
-                            disabled={disabled}
-                            options={Object.values(AIRBRUSHING_STATUS).map((status) => ({
-                              value: status,
-                              label: AIRBRUSHING_STATUS_LABELS[status],
-                            }))}
-                            placeholder="Selecione o status"
-                            searchable={false}
-                          />
-                        </div>
-                      )}
+                )}
 
-                      <div className="space-y-2">
-                        <FormLabel>Preço</FormLabel>
-                        <Input
-                          type="currency"
-                          value={airbrushing.price || undefined}
-                          onChange={(value) => {
-                            // Currency Input passes value directly, not an event object
-                            updateAirbrushing(airbrushing.id, {
-                              price: value,
-                            });
-                          }}
-                          disabled={disabled}
-                          placeholder="R$ 0,00"
-                          className="bg-transparent"
-                        />
-                      </div>
+                {/* Price, Dates aligned with File Uploads below */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Preço - aligns with Recibos */}
+                  <div className="space-y-2">
+                    <FormLabel>Preço</FormLabel>
+                    <Input
+                      type="currency"
+                      value={airbrushing.price || undefined}
+                      onChange={(value) => {
+                        updateAirbrushing(airbrushing.id, {
+                          price: value,
+                        });
+                      }}
+                      disabled={disabled}
+                      placeholder="R$ 0,00"
+                      className="bg-transparent"
+                    />
+                  </div>
 
-                      <div className="space-y-2">
-                        <FormLabel>Data de Início</FormLabel>
-                        <DateTimeInput
-                          field={{
-                            value: airbrushing.startDate,
-                            onChange: (date) => updateAirbrushing(airbrushing.id, { startDate: date }),
-                          }}
-                          mode="date"
-                          context="start"
-                          disabled={disabled}
-                        />
-                      </div>
+                  {/* Início - aligns with Notas Fiscais */}
+                  <div className="space-y-2">
+                    <FormLabel>Início</FormLabel>
+                    <DateTimeInput
+                      field={{
+                        value: airbrushing.startDate,
+                        onChange: (date) => updateAirbrushing(airbrushing.id, { startDate: date }),
+                      }}
+                      mode="date"
+                      context="start"
+                      disabled={disabled}
+                    />
+                  </div>
 
-                      <div className="space-y-2">
-                        <FormLabel>Data de Conclusão</FormLabel>
-                        <DateTimeInput
-                          field={{
-                            value: airbrushing.finishDate,
-                            onChange: (date) => updateAirbrushing(airbrushing.id, { finishDate: date }),
-                          }}
-                          mode="date"
-                          context="end"
-                          disabled={disabled}
-                        />
-                      </div>
+                  {/* Conclusão + Trash - aligns with Artes */}
+                  <div className="flex gap-2 items-end">
+                    <div className="space-y-2 flex-1">
+                      <FormLabel>Conclusão</FormLabel>
+                      <DateTimeInput
+                        field={{
+                          value: airbrushing.finishDate,
+                          onChange: (date) => updateAirbrushing(airbrushing.id, { finishDate: date }),
+                        }}
+                        mode="date"
+                        context="end"
+                        disabled={disabled}
+                      />
                     </div>
-
-                    <Separator />
-
-                    {/* File Uploads */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Receipts */}
-                      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                        <FormLabel className="flex items-center gap-2">
-                          <IconPaperclip className="h-4 w-4" />
-                          Recibos
-                        </FormLabel>
-                        <FileUploadField
-                          onFilesChange={(files) => handleReceiptFilesChange(airbrushing.id, files)}
-                          existingFiles={airbrushing.receiptFiles}
-                          maxFiles={10}
-                          showPreview={true}
-                          variant="compact"
-                          placeholder="Adicione recibos"
-                          disabled={disabled || airbrushing.uploading}
-                        />
-                      </div>
-
-                      {/* NFEs */}
-                      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                        <FormLabel className="flex items-center gap-2">
-                          <IconFileInvoice className="h-4 w-4" />
-                          Notas Fiscais
-                        </FormLabel>
-                        <FileUploadField
-                          onFilesChange={(files) => handleNfeFilesChange(airbrushing.id, files)}
-                          existingFiles={airbrushing.nfeFiles}
-                          maxFiles={10}
-                          showPreview={true}
-                          variant="compact"
-                          placeholder="Adicione NFes"
-                          disabled={disabled || airbrushing.uploading}
-                        />
-                      </div>
-
-                      {/* Artworks */}
-                      <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                        <FormLabel className="flex items-center gap-2">
-                          <IconPhoto className="h-4 w-4" />
-                          Artes
-                        </FormLabel>
-                        <FileUploadField
-                          onFilesChange={(files) => handleArtworkFilesChange(airbrushing.id, files)}
-                          existingFiles={airbrushing.artworkFiles}
-                          maxFiles={20}
-                          showPreview={true}
-                          variant="compact"
-                          placeholder="Adicione artes"
-                          accept="image/*"
-                          disabled={disabled || airbrushing.uploading}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Error Message */}
-                    {airbrushing.error && (
-                      <Alert variant="destructive">
-                        <AlertDescription>{airbrushing.error}</AlertDescription>
-                      </Alert>
+                    {!isEditMode && (
+                      <Button
+                        type="button"
+                        onClick={() => removeAirbrushing(airbrushing.id)}
+                        disabled={disabled}
+                        size="icon"
+                        variant="ghost"
+                        className="h-9 w-9 flex-shrink-0"
+                      >
+                        <IconTrash className="h-4 w-4 text-destructive" />
+                      </Button>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+
+                {/* File Uploads - 3 equal columns */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Receipts - aligns with Preço */}
+                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                    <FormLabel className="flex items-center gap-2">
+                      <IconPaperclip className="h-4 w-4" />
+                      Recibos
+                    </FormLabel>
+                    <FileUploadField
+                      onFilesChange={(files) => handleReceiptFilesChange(airbrushing.id, files)}
+                      existingFiles={airbrushing.receiptFiles}
+                      maxFiles={10}
+                      showPreview={true}
+                      variant="compact"
+                      placeholder="Adicione recibos"
+                      disabled={disabled || airbrushing.uploading}
+                    />
+                  </div>
+
+                  {/* NFEs - aligns with Início */}
+                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                    <FormLabel className="flex items-center gap-2">
+                      <IconFileInvoice className="h-4 w-4" />
+                      Notas Fiscais
+                    </FormLabel>
+                    <FileUploadField
+                      onFilesChange={(files) => handleNfeFilesChange(airbrushing.id, files)}
+                      existingFiles={airbrushing.nfeFiles}
+                      maxFiles={10}
+                      showPreview={true}
+                      variant="compact"
+                      placeholder="Adicione NFes"
+                      disabled={disabled || airbrushing.uploading}
+                    />
+                  </div>
+
+                  {/* Artworks - aligns with Conclusão */}
+                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                    <FormLabel className="flex items-center gap-2">
+                      <IconPhoto className="h-4 w-4" />
+                      Artes
+                    </FormLabel>
+                    <FileUploadField
+                      onFilesChange={(files) => handleArtworkFilesChange(airbrushing.id, files)}
+                      existingFiles={airbrushing.artworkFiles}
+                      maxFiles={20}
+                      showPreview={true}
+                      variant="compact"
+                      placeholder="Adicione artes"
+                      accept="image/*"
+                      disabled={disabled || airbrushing.uploading}
+                    />
+                  </div>
+                </div>
+
+                {/* Error Message */}
+                {airbrushing.error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{airbrushing.error}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
             ))}
         </div>
 
@@ -484,7 +447,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
           className="w-full"
         >
           <IconPlus className="h-4 w-4 mr-2" />
-          Adicionar Mais
+          Adicionar Aerografia
         </Button>
       </div>
     );

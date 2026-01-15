@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { routes } from "./constants";
 import { ThemeProvider } from "@/contexts/theme-context";
 import { AuthProvider } from "@/contexts/auth-context";
+import { SidebarProvider } from "@/contexts/sidebar-context";
 import { FavoritesProvider } from "@/contexts/favorites-context";
 import { FileViewerProvider } from "@/components/common/file/file-viewer";
 import { MessageModalProvider } from "@/components/common/message-modal";
@@ -315,12 +316,13 @@ function App() {
       <ThemeProvider defaultTheme="light" storageKey="ankaa-ui-theme">
         <TooltipProvider>
           <AuthProvider>
-            <SocketNotificationsListener />
-            <SocketReconnectHandler />
-            <FavoritesProvider>
-              <FileViewerProvider>
-                <MessageModalProvider>
-                  <Toaster />
+            <SidebarProvider>
+              <SocketNotificationsListener />
+              <SocketReconnectHandler />
+              <FavoritesProvider>
+                <FileViewerProvider>
+                  <MessageModalProvider>
+                    <Toaster />
                   <PushNotificationSetup />
                   <Routes>
               {/* Auth routes */}
@@ -2216,10 +2218,11 @@ function App() {
               {/* 404 Not Found route */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-              </MessageModalProvider>
-            </FileViewerProvider>
-          </FavoritesProvider>
-        </AuthProvider>
+                  </MessageModalProvider>
+                </FileViewerProvider>
+              </FavoritesProvider>
+            </SidebarProvider>
+          </AuthProvider>
       </TooltipProvider>
       </ThemeProvider>
     </Router>

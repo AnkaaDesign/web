@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 import { DeadlineCountdown } from "./deadline-countdown";
 import { getRowColorClass } from "./task-table-utils";
 import { IconChevronUp, IconChevronDown, IconSelector } from "@tabler/icons-react";
-import { PAINT_FINISH, PAINT_FINISH_LABELS, PAINT_BRAND_LABELS, TRUCK_MANUFACTURER_LABELS, SERVICE_ORDER_TYPE } from "../../../../constants";
+import { PAINT_FINISH, PAINT_FINISH_LABELS, PAINT_BRAND_LABELS, TRUCK_MANUFACTURER_LABELS, SERVICE_ORDER_TYPE, SECTOR_PRIVILEGES } from "../../../../constants";
+import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
@@ -186,25 +187,44 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
   // Create column config map for sorting
   const columnConfigMap = useMemo(() => createColumnConfigMap(sortableColumns), [sortableColumns]);
 
+  // Get user's sector privilege for service order column visibility
+  const userSectorPrivilege = user?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
+  const visibleServiceOrderTypes = useMemo(() => getVisibleServiceOrderTypes(userSectorPrivilege), [userSectorPrivilege]);
+
   // Define display columns (includes select and non-sortable columns)
   const allColumns = useMemo(
-    () => [
-      { id: "select", header: "", width: TABLE_LAYOUT.checkbox.className, sortable: false },
-      { id: "name", header: "LOGOMARCA", width: "w-[180px]", sortable: true },
-      { id: "customer.fantasyName", header: "CLIENTE", width: "w-[150px]", sortable: true },
-      { id: "measures", header: "MEDIDAS", width: "w-[110px]", sortable: true },
-      { id: "generalPainting", header: "PINTURA", width: "w-[100px]", sortable: true },
-      { id: "serviceOrders.production", header: "PRODUÇÃO", width: "w-[120px]", sortable: true },
-      { id: "serialNumberOrPlate", header: "IDENTIFICADOR", width: "w-[140px]", sortable: true },
-      { id: "spot", header: "LOCAL", width: "w-[120px]", sortable: true },
-      { id: "chassisNumber", header: "Nº CHASSI", width: "w-[140px]", sortable: true },
-      { id: "sector.name", header: "SETOR", width: "w-[120px]", sortable: true },
-      { id: "entryDate", header: "ENTRADA", width: "w-[110px]", sortable: true },
-      { id: "startedAt", header: "INICIADO EM", width: "w-[110px]", sortable: true },
-      { id: "term", header: "PRAZO", width: "w-[110px]", sortable: true },
-      { id: "remainingTime", header: "TEMPO RESTANTE", width: "w-[130px]", sortable: true },
-    ],
-    [],
+    () => {
+      const baseColumns = [
+        { id: "select", header: "", width: TABLE_LAYOUT.checkbox.className, sortable: false },
+        { id: "name", header: "LOGOMARCA", width: "w-[180px]", sortable: true },
+        { id: "customer.fantasyName", header: "CLIENTE", width: "w-[150px]", sortable: true },
+        { id: "measures", header: "MEDIDAS", width: "w-[110px]", sortable: true },
+        { id: "generalPainting", header: "PINTURA", width: "w-[100px]", sortable: true },
+      ];
+
+      // Add service order columns based on user privilege
+      const serviceOrderColumns = [
+        { id: "serviceOrders.production", header: "OS PRODUÇÃO", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.PRODUCTION },
+        { id: "serviceOrders.financial", header: "OS FINANCEIRO", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.FINANCIAL },
+        { id: "serviceOrders.commercial", header: "OS COMERCIAL", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.COMMERCIAL },
+        { id: "serviceOrders.logistic", header: "OS LOGÍSTICA", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.LOGISTIC },
+        { id: "serviceOrders.artwork", header: "OS ARTE", width: "w-[120px]", sortable: true, type: SERVICE_ORDER_TYPE.ARTWORK },
+      ].filter(col => visibleServiceOrderTypes.includes(col.type));
+
+      const remainingColumns = [
+        { id: "serialNumberOrPlate", header: "IDENTIFICADOR", width: "w-[140px]", sortable: true },
+        { id: "spot", header: "LOCAL", width: "w-[120px]", sortable: true },
+        { id: "chassisNumber", header: "Nº CHASSI", width: "w-[140px]", sortable: true },
+        { id: "sector.name", header: "SETOR", width: "w-[120px]", sortable: true },
+        { id: "entryDate", header: "ENTRADA", width: "w-[110px]", sortable: true },
+        { id: "startedAt", header: "INICIADO EM", width: "w-[110px]", sortable: true },
+        { id: "term", header: "PRAZO", width: "w-[110px]", sortable: true },
+        { id: "remainingTime", header: "TEMPO RESTANTE", width: "w-[130px]", sortable: true },
+      ];
+
+      return [...baseColumns, ...serviceOrderColumns, ...remainingColumns];
+    },
+    [visibleServiceOrderTypes],
   );
 
   // All columns are visible by default
@@ -507,9 +527,9 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       paintId: taskToDuplicate.paintId,
       customerId: taskToDuplicate.customerId,
       sectorId: taskToDuplicate.sectorId,
-      budgetId: taskToDuplicate.budgetId,
-      nfeId: taskToDuplicate.nfeId,
-      receiptId: taskToDuplicate.receiptId,
+      budgetIds: taskToDuplicate.budgets?.map((b: any) => b.id) || [],
+      invoiceIds: taskToDuplicate.invoices?.map((i: any) => i.id) || [],
+      receiptIds: taskToDuplicate.receipts?.map((r: any) => r.id) || [],
       commission: taskToDuplicate.commission, // Required field
 
       // Relations - only IDs
@@ -768,6 +788,10 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
                           })()
                         : "-")}
                     {column.id === "serviceOrders.production" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} />}
+                    {column.id === "serviceOrders.financial" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.FINANCIAL} />}
+                    {column.id === "serviceOrders.commercial" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.COMMERCIAL} />}
+                    {column.id === "serviceOrders.logistic" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.LOGISTIC} />}
+                    {column.id === "serviceOrders.artwork" && <ServiceOrderCell task={task} serviceOrderType={SERVICE_ORDER_TYPE.ARTWORK} />}
                     {column.id === "serialNumberOrPlate" && <span className="truncate block">{task.serialNumber || task.truck?.plate || "-"}</span>}
                     {column.id === "spot" && (
                       task.truck?.spot ? (

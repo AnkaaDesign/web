@@ -12,7 +12,7 @@ import type { User, UserIncludes, UserOrderBy } from "./user";
 export interface ServiceOrder extends BaseEntity {
   status: SERVICE_ORDER_STATUS | null;
   statusOrder: number; // 1=Pendente, 2=Em Andamento, 3=Aguardando Aprovação, 4=Concluído, 5=Cancelado
-  type: SERVICE_ORDER_TYPE;
+  type: SERVICE_ORDER_TYPE | null;
   description: string;
   observation: string | null;
   taskId: string;

@@ -33,13 +33,16 @@ interface TaskHistoryTableProps {
 }
 
 /**
- * Get the appropriate color class for a task row based on its forecastDate
- * For agenda (preparation) route only, using the same colors as cronograma:
- * - Neutral gray: Tasks without forecastDate or > 7 days away
- * - Yellow/Amber: forecastDate is 3-7 days away (warning zone)
- * - Red: forecastDate is ≤ 3 days away or overdue (critical zone)
+ * Get the appropriate color class for the commercial service order cell based on:
+ * 1. Task's forecastDate proximity (must be within 7 days)
+ * 2. Having at least one incomplete commercial service order
+ *
+ * For agenda (preparation) route only:
+ * - Neutral: No forecastDate, > 7 days away, or no incomplete commercial service orders
+ * - Yellow/Amber: forecastDate is 3-7 days away AND has incomplete commercial service order
+ * - Red: forecastDate is ≤ 3 days away (or overdue) AND has incomplete commercial service order
  */
-function getRowColorClass(task: Task, navigationRoute?: string): string {
+function getCommercialServiceOrderCellColorClass(task: Task, navigationRoute?: string): string {
   // Only apply color logic to preparation (agenda) route
   if (navigationRoute !== 'preparation') {
     return "";
@@ -50,20 +53,40 @@ function getRowColorClass(task: Task, navigationRoute?: string): string {
     return "";
   }
 
+  // Check if task has at least one incomplete commercial service order
+  const commercialServiceOrders = task.services?.filter(
+    (so) => so.type === 'COMMERCIAL'
+  ) || [];
+
+  // No commercial service orders - no coloring
+  if (commercialServiceOrders.length === 0) {
+    return "";
+  }
+
+  // Check if there's at least one incomplete (not COMPLETED or CANCELLED) commercial service order
+  const hasIncompleteCommercial = commercialServiceOrders.some(
+    (so) => so.status !== SERVICE_ORDER_STATUS.COMPLETED && so.status !== SERVICE_ORDER_STATUS.CANCELLED
+  );
+
+  // All commercial service orders are completed - no coloring
+  if (!hasIncompleteCommercial) {
+    return "";
+  }
+
   // Calculate days remaining until forecastDate
   const now = new Date();
   const forecast = new Date(task.forecastDate);
   const diffMs = forecast.getTime() - now.getTime();
   const daysRemaining = diffMs / (1000 * 60 * 60 * 24);
 
-  // Red zone: 3 days or less (including overdue)
+  // Red zone: 3 days or less (including overdue) AND has incomplete commercial service order
   if (daysRemaining <= 3) {
-    return "bg-red-200 hover:bg-red-300 dark:bg-red-800 dark:hover:bg-red-700";
+    return "bg-red-200 dark:bg-red-800";
   }
 
-  // Yellow zone: between 3 and 7 days
+  // Yellow zone: between 3 and 7 days AND has incomplete commercial service order
   if (daysRemaining <= 7) {
-    return "bg-amber-200 hover:bg-amber-300 dark:bg-amber-700 dark:hover:bg-amber-600";
+    return "bg-amber-200 dark:bg-amber-700";
   }
 
   // Safe zone: more than 7 days - neutral (no special color)
@@ -427,8 +450,8 @@ export function TaskHistoryTable({
                 const hasNoServiceOrders = !task.services || task.services.length === 0;
                 const shouldShowRedBorder = navigationRoute === 'preparation' && hasNoServiceOrders;
 
-                // Get row color based on deadline (only for agenda)
-                const rowColorClass = getRowColorClass(task, navigationRoute);
+                // Get cell color for commercial service order column based on deadline and incomplete status
+                const commercialCellColorClass = getCommercialServiceOrderCellColorClass(task, navigationRoute);
 
                 return (
                   <tr
@@ -436,12 +459,10 @@ export function TaskHistoryTable({
                     data-state={taskIsSelected ? "selected" : undefined}
                     className={cn(
                       "cursor-pointer transition-colors border-b border-border",
-                      // Row color based on deadline (agenda only)
-                      rowColorClass,
-                      // Alternating row colors (only when no deadline color is applied)
-                      !rowColorClass && index % 2 === 1 && "bg-muted/10",
-                      // Hover state that works with alternating colors
-                      !rowColorClass && "hover:bg-muted/20",
+                      // Alternating row colors
+                      index % 2 === 1 && "bg-muted/10",
+                      // Hover state
+                      "hover:bg-muted/20",
                       // Selected state overrides alternating colors
                       taskIsSelected && "bg-muted/30 hover:bg-muted/40",
                       // Source selection mode highlight
@@ -489,6 +510,9 @@ export function TaskHistoryTable({
                         className={cn(
                           column.className,
                           "p-0 !border-r-0",
+                          // Apply cell-level coloring only to commercial service order column
+                          // Colors indicate deadline proximity + incomplete commercial service orders
+                          column.id === "serviceOrders.commercial" && commercialCellColorClass,
                         )}
                       >
                         <div className="px-4 py-2">

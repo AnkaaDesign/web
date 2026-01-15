@@ -651,7 +651,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
         </PopoverTrigger>
 
         <PopoverContent
-          className="w-[var(--radix-popover-trigger-width)] p-0"
+          className="w-[var(--radix-popover-trigger-width)] min-w-[200px] p-0"
           align="start"
           onOpenAutoFocus={(e) => e.preventDefault()}
           onWheel={(e) => {

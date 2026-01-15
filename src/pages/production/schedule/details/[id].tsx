@@ -39,11 +39,9 @@ import { canEditTasks } from "@/utils/permissions/entity-permissions";
 import { canViewServiceOrderType, canEditServiceOrder, getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import { canViewPricing } from "@/utils/permissions/pricing-permissions";
 import { PricingStatusBadge } from "@/components/production/task/pricing/pricing-status-badge";
-import { BudgetPdfExportDialog } from "@/components/production/task/pricing/budget-pdf-export-dialog";
 import { exportBudgetPdf } from "@/utils/budget-pdf-generator";
 import { SERVICE_ORDER_TYPE } from "../../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
-import type { FileWithPreview } from "@/types/file";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -111,6 +109,7 @@ import {
   IconCalendarTime,
   IconBrandWhatsapp,
   IconNote,
+  IconRuler,
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
@@ -311,37 +310,56 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
     URL.revokeObjectURL(url);
   };
 
+  // Calculate dimensions from current layout
+  const getDimensions = () => {
+    if (currentLayout?.height && currentLayout?.layoutSections?.length > 0) {
+      const totalWidth = currentLayout.layoutSections.reduce((sum: number, section: any) => sum + (section.width || 0), 0);
+      return { width: totalWidth, height: currentLayout.height };
+    }
+    return null;
+  };
+  const dimensions = getDimensions();
+
   return (
     <div className="space-y-4">
-      {/* Side selector */}
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant={selectedSide === 'left' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setSelectedSide('left')}
-          disabled={!layouts.leftSideLayout}
-        >
-          Motorista
-        </Button>
-        <Button
-          type="button"
-          variant={selectedSide === 'right' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setSelectedSide('right')}
-          disabled={!layouts.rightSideLayout}
-        >
-          Sapo
-        </Button>
-        <Button
-          type="button"
-          variant={selectedSide === 'back' ? 'default' : 'outline'}
-          size="sm"
-          onClick={() => setSelectedSide('back')}
-          disabled={!layouts.backSideLayout}
-        >
-          Traseira
-        </Button>
+      {/* Side selector and dimensions */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={selectedSide === 'left' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSelectedSide('left')}
+            disabled={!layouts.leftSideLayout}
+          >
+            Motorista
+          </Button>
+          <Button
+            type="button"
+            variant={selectedSide === 'right' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSelectedSide('right')}
+            disabled={!layouts.rightSideLayout}
+          >
+            Sapo
+          </Button>
+          <Button
+            type="button"
+            variant={selectedSide === 'back' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSelectedSide('back')}
+            disabled={!layouts.backSideLayout}
+          >
+            Traseira
+          </Button>
+        </div>
+        {/* Dimensions */}
+        {dimensions && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <IconRuler className="h-4 w-4" />
+            <span>Medidas: <span className="font-medium text-foreground">{dimensions.width.toFixed(2).replace('.', ',')} x {dimensions.height.toFixed(2).replace('.', ',')} m</span></span>
+          </div>
+        )}
       </div>
 
       {/* SVG Preview */}
@@ -608,7 +626,6 @@ export const TaskDetailsPage = () => {
   const [baseFilesViewMode, setBaseFilesViewMode] = useState<FileViewMode>("list");
   const [artworksViewMode, setArtworksViewMode] = useState<FileViewMode>("list");
   const [documentsViewMode, setDocumentsViewMode] = useState<FileViewMode>("list");
-  const [budgetPdfDialogOpen, setBudgetPdfDialogOpen] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   // Get user's sector privilege for service order permissions
@@ -658,10 +675,25 @@ export const TaskDetailsPage = () => {
   // Check if user can edit tasks (PRODUCTION, LEADER, ADMIN)
   const canEdit = canEditTasks(currentUser);
 
-  // Initialize section visibility hook
+  // Check if user can view pricing and documents (ADMIN, FINANCIAL, COMMERCIAL only)
+  const canViewPricingSection = canViewPricing(currentUser?.sector?.privileges || '');
+  const canViewDocumentsSection = canViewPricing(currentUser?.sector?.privileges || ''); // Same permissions as pricing
+
+  // Filter sections based on user privileges
+  const filteredSections = useMemo(() => {
+    return TASK_SECTIONS.filter(section => {
+      // Hide pricing section for users without permission
+      if (section.id === 'pricing' && !canViewPricingSection) return false;
+      // Hide documents section for users without permission
+      if (section.id === 'documents' && !canViewDocumentsSection) return false;
+      return true;
+    });
+  }, [canViewPricingSection, canViewDocumentsSection]);
+
+  // Initialize section visibility hook with filtered sections
   const sectionVisibility = useSectionVisibility(
     "task-detail-visibility",
-    TASK_SECTIONS
+    filteredSections
   );
 
   // Try to get file viewer context (optional)
@@ -695,7 +727,8 @@ export const TaskDetailsPage = () => {
   // Handler for artworks collection viewing
   const handleArtworkFileClick = (file: any) => {
     if (!fileViewerContext) return;
-    const artworkFiles = task?.artworks || [];
+    // Extract actual file objects from artworks (artworks have nested file property)
+    const artworkFiles = (task?.artworks || []).map(artwork => artwork.file).filter(Boolean);
     const index = artworkFiles.findIndex(f => f.id === file.id);
     fileViewerContext.actions.viewFiles(artworkFiles, index);
   };
@@ -775,7 +808,25 @@ export const TaskDetailsPage = () => {
           paintBrand: true,
         },
       },
-      truck: true,
+      truck: {
+        include: {
+          leftSideLayout: {
+            include: {
+              layoutSections: true,
+            },
+          },
+          rightSideLayout: {
+            include: {
+              layoutSections: true,
+            },
+          },
+          backSideLayout: {
+            include: {
+              layoutSections: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -915,18 +966,13 @@ export const TaskDetailsPage = () => {
   });
 
   // Budget PDF export handler
-  const handleBudgetPdfExport = async (notes: string, images: FileWithPreview[]) => {
+  const handleBudgetPdfExport = async () => {
     if (!task) return;
 
     setIsExportingPdf(true);
     try {
-      await exportBudgetPdf({
-        task,
-        notes,
-        images,
-      });
+      await exportBudgetPdf({ task });
       toast.success("Orçamento exportado com sucesso!");
-      setBudgetPdfDialogOpen(false);
     } catch (error) {
       console.error("Error exporting budget PDF:", error);
       toast.error(
@@ -1473,7 +1519,7 @@ export const TaskDetailsPage = () => {
               )}
 
               {/* Pricing Card - Only visible to ADMIN, FINANCIAL, and COMMERCIAL sectors */}
-              {sectionVisibility.isSectionVisible("pricing") && canViewPricing(currentUser?.sector?.privileges || '') && task.pricing && task.pricing.items && task.pricing.items.length > 0 && (() => {
+              {sectionVisibility.isSectionVisible("pricing") && canViewPricingSection && task.pricing && task.pricing.items && task.pricing.items.length > 0 && (() => {
                 return (
                   <Card className="border flex flex-col animate-in fade-in-50 duration-825">
                     <CardHeader className="pb-6">
@@ -1486,13 +1532,14 @@ export const TaskDetailsPage = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setBudgetPdfDialogOpen(true)}
+                            onClick={handleBudgetPdfExport}
+                            disabled={isExportingPdf}
                             className="gap-2"
                           >
                             <IconDownload className="h-4 w-4" />
-                            Exportar PDF
+                            {isExportingPdf ? "Exportando..." : "Exportar PDF"}
                           </Button>
-                          <PricingStatusBadge status={task.pricing.status} />
+                          <PricingStatusBadge status={task.pricing.status} size="lg" />
                         </div>
                       </div>
                     </CardHeader>
@@ -1586,26 +1633,9 @@ export const TaskDetailsPage = () => {
                 <Card className="border flex flex-col animate-in fade-in-50 duration-850">
                   <CardHeader className="pb-6">
                     <CardTitle className="flex items-center gap-2">
-          <IconLayoutGrid className="h-5 w-5 text-muted-foreground" />
-          Layout do Caminhão
-        </CardTitle>
-                    {/* Display truck dimensions from layout */}
-                    {(() => {
-                      const layouts = [task.truck.leftSideLayout, task.truck.rightSideLayout, task.truck.backSideLayout].filter(Boolean);
-                      if (layouts.length > 0 && layouts[0]) {
-                        const layout = layouts[0];
-                        if (layout.height && layout.layoutSections && layout.layoutSections.length > 0) {
-                          const totalWidth = layout.layoutSections.reduce((sum: number, section: any) => sum + (section.width || 0), 0);
-                          return (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
-                              <IconRuler className="h-4 w-4" />
-                              <span>Medidas: <span className="font-medium text-foreground">{totalWidth.toFixed(2).replace('.', ',')} x {layout.height.toFixed(2).replace('.', ',')} m</span></span>
-                            </div>
-                          );
-                        }
-                      }
-                      return null;
-                    })()}
+                      <IconLayoutGrid className="h-5 w-5 text-muted-foreground" />
+                      Layout do Caminhão
+                    </CardTitle>
                   </CardHeader>
               <CardContent className="pt-0">
                 <TruckLayoutPreview truckId={task.truck.id} taskName={taskDisplayName} />
@@ -1734,17 +1764,20 @@ export const TaskDetailsPage = () => {
                           const isDesignerUser = userSectorPrivilege === SECTOR_PRIVILEGES.DESIGNER;
                           const isAdminUser = userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
 
-                          // Build status options:
-                          // - ARTWORK + DESIGNER: PENDING, IN_PROGRESS, WAITING_APPROVE (no COMPLETED - must go through admin approval)
-                          // - ADMIN: All statuses including CANCELLED
-                          // - Others: PENDING, IN_PROGRESS, WAITING_APPROVE, COMPLETED (no CANCELLED)
+                          // Build status options based on service order type:
+                          // - ARTWORK: PENDING, IN_PROGRESS, WAITING_APPROVE, COMPLETED (approval workflow)
+                          //   - DESIGNER can only set up to WAITING_APPROVE (admin must approve to COMPLETED)
+                          // - OTHER TYPES (PRODUCTION, FINANCIAL, COMMERCIAL, LOGISTIC): PENDING, IN_PROGRESS, COMPLETED
+                          //   - NO WAITING_APPROVE (simple workflow without approval step)
+                          // - CANCELLED: Only available to ADMIN for any type
                           const statusOptions: ComboboxOption[] = [
                             { value: SERVICE_ORDER_STATUS.PENDING, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.PENDING] },
                             { value: SERVICE_ORDER_STATUS.IN_PROGRESS, label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.IN_PROGRESS] },
                           ];
 
-                          // Add WAITING_APPROVE for ARTWORK service orders (or always for admin)
-                          if (isArtworkServiceOrder || isAdminUser) {
+                          // Add WAITING_APPROVE ONLY for ARTWORK service orders (approval workflow)
+                          // This status is NOT available for PRODUCTION, FINANCIAL, COMMERCIAL, or LOGISTIC
+                          if (isArtworkServiceOrder) {
                             statusOptions.push({
                               value: SERVICE_ORDER_STATUS.WAITING_APPROVE,
                               label: SERVICE_ORDER_STATUS_LABELS[SERVICE_ORDER_STATUS.WAITING_APPROVE],
@@ -1752,6 +1785,7 @@ export const TaskDetailsPage = () => {
                           }
 
                           // Add COMPLETED - but NOT for DESIGNER on ARTWORK service orders
+                          // (designers must use WAITING_APPROVE and admin must approve to COMPLETED)
                           if (!(isArtworkServiceOrder && isDesignerUser)) {
                             statusOptions.push({
                               value: SERVICE_ORDER_STATUS.COMPLETED,
@@ -1759,7 +1793,7 @@ export const TaskDetailsPage = () => {
                             });
                           }
 
-                          // Add CANCELLED only for ADMIN
+                          // Add CANCELLED only for ADMIN (for any service order type)
                           if (isAdminUser) {
                             statusOptions.push({
                               value: SERVICE_ORDER_STATUS.CANCELLED,
@@ -2062,8 +2096,8 @@ export const TaskDetailsPage = () => {
                 </Card>
               )}
 
-              {/* Documents Card - Budget, NFE, Receipt - Hidden for Warehouse sector users */}
-              {sectionVisibility.isSectionVisible("documents") && !isWarehouseSector && ((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0)) && (
+              {/* Documents Card - Budget, NFE, Receipt - Only visible to ADMIN, FINANCIAL, and COMMERCIAL sectors */}
+              {sectionVisibility.isSectionVisible("documents") && canViewDocumentsSection && ((task.budgets && task.budgets.length > 0) || (task.invoices && task.invoices.length > 0) || (task.receipts && task.receipts.length > 0)) && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1050">
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
@@ -2608,21 +2642,20 @@ export const TaskDetailsPage = () => {
 
             {/* Changelog History - Hidden for Financial and Warehouse sector users */}
             {sectionVisibility.isSectionVisible("changelog") && !isFinancialSector && !isWarehouseSector && (
-              <Card className="border flex flex-col animate-in fade-in-50 duration-1300 lg:w-1/2 h-[72rem] overflow-y-auto">
-                <TaskWithServiceOrdersChangelog
-                  taskId={task.id}
-                  taskName={taskDisplayName}
-                  taskCreatedAt={task.createdAt}
-                  serviceOrderIds={task.services?.map(s => s.id) || []}
-                  truckId={task.truck?.id}
-                  layoutIds={[
-                    task.truck?.leftSideLayoutId,
-                    task.truck?.rightSideLayoutId,
-                    task.truck?.backSideLayoutId,
-                  ].filter(Boolean) as string[]}
-                  className="h-full"
-                />
-              </Card>
+              <TaskWithServiceOrdersChangelog
+                taskId={task.id}
+                taskName={taskDisplayName}
+                taskCreatedAt={task.createdAt}
+                serviceOrderIds={task.services?.map(s => s.id) || []}
+                truckId={task.truck?.id}
+                layoutIds={[
+                  task.truck?.leftSideLayoutId,
+                  task.truck?.rightSideLayoutId,
+                  task.truck?.backSideLayoutId,
+                ].filter(Boolean) as string[]}
+                className="lg:w-1/2 animate-in fade-in-50 duration-1300"
+                maxHeight="45rem"
+              />
             )}
           </div>
         </div>
@@ -2693,14 +2726,6 @@ export const TaskDetailsPage = () => {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        {/* Budget PDF Export Dialog */}
-        <BudgetPdfExportDialog
-          open={budgetPdfDialogOpen}
-          onOpenChange={setBudgetPdfDialogOpen}
-          onExport={handleBudgetPdfExport}
-          isExporting={isExportingPdf}
-        />
     </PrivilegeRoute>
   );
 };

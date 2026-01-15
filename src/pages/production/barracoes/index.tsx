@@ -166,6 +166,8 @@ export function GaragesPage() {
           originalLength: sectionsSum > 0 ? sectionsSum : undefined, // Original length without cabin
           entryDate: (task as any).entryDate || null,
           term: (task as any).term || null,
+          forecastDate: (task as any).forecastDate || null,
+          finishedAt: (task as any).finishedAt || null,
           layoutInfo: layoutSections.length > 0 ? `${layoutSections.length} seções` : null,
           artworkInfo: null, // Can be enhanced later with artwork file count
         };

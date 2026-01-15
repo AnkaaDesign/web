@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconBriefcase, IconBuilding, IconUserCog, IconCalendarTime, IconCalendarShare, IconCalendarCheck, IconCalendarCancel } from "@tabler/icons-react";
+import { IconBriefcase, IconBuilding, IconUserCog, IconCalendarTime, IconCalendarShare, IconCalendarCheck, IconCalendarCancel, IconHash } from "@tabler/icons-react";
 import type { User } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { formatDate } from "../../../../utils";
@@ -24,6 +24,16 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
           <div>
             <h3 className="text-base font-semibold mb-4 text-foreground">Dados Funcionais</h3>
             <div className="space-y-4">
+              {user.payrollNumber && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconHash className="h-4 w-4" />
+                    Número da Folha
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{user.payrollNumber}</span>
+                </div>
+              )}
+
               {user.position && (
                 <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">

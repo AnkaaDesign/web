@@ -13,7 +13,7 @@ export type CopyableField =
   | "details"
   | "term"
   | "artworkIds"
-  | "budgetId"
+  | "budgetIds"
   | "paintId"
   | "paintIds"
   | "services"
@@ -30,7 +30,7 @@ const FIELD_CATEGORIES: FieldCategory[] = [
   { id: "details", label: "Detalhes", description: "Descrição/detalhes da tarefa" },
   { id: "term", label: "Prazo", description: "Data limite para conclusão" },
   { id: "artworkIds", label: "Artes", description: "Arquivos de arte anexados" },
-  { id: "budgetId", label: "Orçamento", description: "Orçamento associado" },
+  { id: "budgetIds", label: "Orçamentos", description: "Orçamentos associados" },
   { id: "paintId", label: "Pintura Geral", description: "Cor de pintura geral" },
   { id: "paintIds", label: "Tintas do Logo", description: "Tintas utilizadas no logo" },
   { id: "services", label: "Ordens de Serviço", description: "Criar novas ordens de serviço baseadas na origem" },
@@ -185,8 +185,8 @@ export function CopyFromTaskModal({
         return sourceTask.term ? formatDate(sourceTask.term) : "Sem prazo";
       case "artworkIds":
         return sourceTask.artworks?.length ? `${sourceTask.artworks.length} arquivo(s)` : "Nenhuma arte";
-      case "budgetId":
-        return sourceTask.budgetId ? "Orçamento vinculado" : "Sem orçamento";
+      case "budgetIds":
+        return sourceTask.budgets?.length ? `${sourceTask.budgets.length} orçamento(s)` : "Sem orçamento";
       case "paintId":
         return sourceTask.generalPainting?.name || "Sem pintura";
       case "paintIds":
@@ -220,8 +220,8 @@ export function CopyFromTaskModal({
         return !!sourceTask.term;
       case "artworkIds":
         return (sourceTask.artworks?.length || 0) > 0;
-      case "budgetId":
-        return !!sourceTask.budgetId;
+      case "budgetIds":
+        return (sourceTask.budgets?.length || 0) > 0;
       case "paintId":
         return !!sourceTask.paintId;
       case "paintIds":

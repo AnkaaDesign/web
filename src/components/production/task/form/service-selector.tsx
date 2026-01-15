@@ -34,9 +34,18 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
     name: "serviceOrders",
   }) as any[] || [];
 
-  // Auto-sort services by type whenever they change
+  // Track if this is the initial mount to skip auto-sort on first render
+  const isInitialMount = useRef(true);
+
+  // Auto-sort services by type whenever they change (but NOT on initial mount)
   useEffect(() => {
     if (!initialized || fields.length === 0) return;
+
+    // Skip auto-sort on initial mount - data is pre-sorted in mapDataToForm
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
 
     // Create a mapping of type to sort order
     const typeOrder: Record<string, number> = {
@@ -81,21 +90,13 @@ export function ServiceSelectorFixed({ control, disabled }: ServiceSelectorProps
   const getOptionLabel = useCallback((service: Service) => service.description, []);
   const getOptionValue = useCallback((service: Service) => service.description, []);
 
-  // Initialize with one empty row if no services exist (create mode)
+  // Mark as initialized when component mounts
+  // Defaults are now set in mapDataToForm, so no form mutations needed here
   useEffect(() => {
-    if (!initialized && fields.length === 0) {
-      append({
-        status: SERVICE_ORDER_STATUS.PENDING,
-        statusOrder: 1,
-        description: "",
-        type: SERVICE_ORDER_TYPE.PRODUCTION,
-        assignedToId: null,
-      });
-      setInitialized(true);
-    } else if (!initialized && fields.length > 0) {
+    if (!initialized) {
       setInitialized(true);
     }
-  }, [fields.length, append, initialized]);
+  }, [initialized]);
 
   const handleAddService = () => {
     append({
@@ -288,7 +289,7 @@ function ServiceRow({
   return (
     <div ref={lastRowRef} className="border rounded-lg p-4 space-y-3">
       {/* Row with 3 comboboxes: Type, Description, Assignment */}
-      <div className="grid grid-cols-1 md:grid-cols-[200px_1fr_200px_auto] gap-3 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-[130px_1fr_240px_auto] gap-3 items-start">
         {/* Type Field - First */}
         <FormField
           control={control}

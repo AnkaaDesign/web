@@ -32,7 +32,7 @@ import type { Task } from "../../../../types";
 import { taskUpdateSchema, type TaskUpdateFormData } from "../../../../schemas";
 import { useTaskMutations, useCutsByTask, useCutMutations } from "../../../../hooks";
 import { cutService } from "../../../../api-client/cut";
-import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS } from "../../../../constants";
+import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { useAuth } from "../../../../contexts/auth-context";
 import { Button } from "@/components/ui/button";
@@ -317,6 +317,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const [observationFiles, setObservationFiles] = useState<FileWithPreview[]>(
     convertToFileWithPreview(task.observation?.files)
   );
+  // Pricing layout file state
+  const [pricingLayoutFiles, setPricingLayoutFiles] = useState<FileWithPreview[]>(
+    task.pricing?.layoutFile ? convertToFileWithPreview([task.pricing.layoutFile]) : []
+  );
 
   // Track current layout state during editing (not saved yet)
   // Initialize with default values to support validation before user edits
@@ -343,6 +347,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
   // Track which sides were actually modified by the user
   const [modifiedLayoutSides, setModifiedLayoutSides] = useState<Set<'left' | 'right' | 'back'>>(new Set());
+
+  // Track which sides have emitted their initial state (to avoid marking as "modified" on first render)
+  const initialLayoutStateEmittedRef = useRef<Set<'left' | 'right' | 'back'>>(new Set());
 
   // Get truck ID from task - with safety check
   const truckId = task.truck?.id || task.truckId;
@@ -518,6 +525,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             type,
             quantity: 1,
             file: convertedFile,
+            // fileName is used for change detection (file objects get stripped during comparison)
+            fileName: convertedFile?.name || cut.file?.filename || cut.file?.name || undefined,
             origin: cut.origin || CUT_ORIGIN.PLAN,
           });
         }
@@ -544,6 +553,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       negotiatingWith: taskData.negotiatingWith || { name: null, phone: null },
       sectorId: taskData.sectorId || null,
       paintId: taskData.paintId || null,
+      // Initialize pricing with default structure - default row is part of initial state, not a change
       pricing: taskData.pricing ? {
         expiresAt: taskData.pricing.expiresAt ? new Date(taskData.pricing.expiresAt) : null,
         status: taskData.pricing.status || 'DRAFT',
@@ -551,26 +561,90 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         discountType: taskData.pricing.discountType || 'NONE',
         discountValue: taskData.pricing.discountValue || null,
         total: taskData.pricing.total || 0,
-        items: taskData.pricing.items?.map((item) => ({
-          id: item.id,
-          description: item.description || "",
-          amount: typeof item.amount === 'number' ? item.amount : (item.amount ? Number(item.amount) : 0),
-        })) || [],
-      } : undefined,  // Schema expects optional (undefined), not null
+        // Payment Terms (simplified)
+        paymentCondition: taskData.pricing.paymentCondition || null,
+        downPaymentDate: taskData.pricing.downPaymentDate ? new Date(taskData.pricing.downPaymentDate) : null,
+        customPaymentText: taskData.pricing.customPaymentText || null,
+        // Guarantee Terms
+        guaranteeYears: taskData.pricing.guaranteeYears || null,
+        customGuaranteeText: taskData.pricing.customGuaranteeText || null,
+        // Layout File
+        layoutFileId: taskData.pricing.layoutFileId || null,
+        items: taskData.pricing.items?.length > 0
+          ? taskData.pricing.items.map((item) => ({
+              id: item.id,
+              description: item.description || "",
+              amount: typeof item.amount === 'number' ? item.amount : (item.amount ? Number(item.amount) : 0),
+            }))
+          : [{ description: "", amount: null }], // Default empty row
+      } : {
+        // Default pricing structure when no pricing exists
+        expiresAt: (() => {
+          const date = new Date();
+          date.setDate(date.getDate() + 30);
+          date.setHours(23, 59, 59, 999);
+          return date;
+        })(),
+        status: 'DRAFT',
+        subtotal: 0,
+        discountType: 'NONE',
+        discountValue: null,
+        total: 0,
+        // Payment Terms (simplified defaults)
+        paymentCondition: null,
+        downPaymentDate: null,
+        customPaymentText: null,
+        // Guarantee Terms (defaults)
+        guaranteeYears: null,
+        customGuaranteeText: null,
+        // Layout File (defaults)
+        layoutFileId: null,
+        items: [{ description: "", amount: null }], // Default empty row
+      },
       nfeId: taskData.nfeId || null,
       receiptId: taskData.receiptId || null,
-      serviceOrders:
-        taskData.services?.map((so) => ({
-          id: so.id, // Include the ID to identify existing service orders
-          description: so.description || "",
-          type: so.type,
-          status: so.status,
-          statusOrder: so.statusOrder,
-          assignedToId: so.assignedToId || null,
-          observation: so.observation || null, // Include observation field
-          startedAt: so.startedAt ? new Date(so.startedAt) : null,
-          finishedAt: so.finishedAt ? new Date(so.finishedAt) : null,
-        })) || [],
+      // Initialize serviceOrders with default row - part of initial state
+      // PRE-SORT by type to avoid auto-sort triggering dirty state on mount
+      serviceOrders: (() => {
+        const typeOrder: Record<string, number> = {
+          [SERVICE_ORDER_TYPE.PRODUCTION]: 0,
+          [SERVICE_ORDER_TYPE.FINANCIAL]: 1,
+          [SERVICE_ORDER_TYPE.COMMERCIAL]: 2,
+          [SERVICE_ORDER_TYPE.LOGISTIC]: 3,
+          [SERVICE_ORDER_TYPE.ARTWORK]: 4,
+        };
+
+        if (taskData.services && taskData.services.length > 0) {
+          return taskData.services
+            .map((so) => ({
+              id: so.id, // Include the ID to identify existing service orders
+              description: so.description || "",
+              type: so.type,
+              status: so.status,
+              statusOrder: so.statusOrder,
+              assignedToId: so.assignedToId || null,
+              observation: so.observation || null, // Include observation field
+              startedAt: so.startedAt ? new Date(so.startedAt) : null,
+              finishedAt: so.finishedAt ? new Date(so.finishedAt) : null,
+            }))
+            .sort((a, b) => {
+              const typeCompare = (typeOrder[a.type] || 0) - (typeOrder[b.type] || 0);
+              if (typeCompare !== 0) return typeCompare;
+              return (a.description || '').localeCompare(b.description || '');
+            });
+        }
+        return [{
+          // Default empty service order row - MUST include ALL fields used by ServiceRow
+          status: SERVICE_ORDER_STATUS.PENDING,
+          statusOrder: 1,
+          description: "",
+          type: SERVICE_ORDER_TYPE.PRODUCTION,
+          assignedToId: null,
+          observation: null, // Include observation to prevent useController from adding it
+          startedAt: null,
+          finishedAt: null,
+        }];
+      })(),
       // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
       artworkIds: taskData.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [],
       baseFileIds: taskData.baseFiles?.map((f) => f.id) || [],
@@ -583,23 +657,51 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         implementType: taskData.truck?.implementType || null,
         spot: taskData.truck?.spot || null,
       },
-      cuts: groupedCuts,
+      // Initialize cuts with default row - part of initial state
+      cuts: groupedCuts.length > 0
+        ? groupedCuts
+        : [{
+            id: `cut-initial`,
+            type: CUT_TYPE.VINYL,
+            quantity: 1,
+            origin: CUT_ORIGIN.PLAN,
+            fileId: undefined,
+            file: undefined,
+            fileName: undefined,
+          }],
       paintIds: taskData.logoPaints?.map((lp) => lp.id) || [],
-      airbrushings:
-        taskData.airbrushings?.map((a) => ({
-          startDate: a.startDate ? new Date(a.startDate) : null,
-          finishDate: a.finishDate ? new Date(a.finishDate) : null,
-          price: a.price,
-          status: a.status,
-          receiptIds: a.receipts?.map((r) => r.id) || [],
-          invoiceIds: a.invoices?.map((n) => n.id) || [],
-          // CRITICAL: artworkIds should be File IDs (artwork.fileId), not Artwork entity IDs
-          artworkIds: a.artworks?.map((art: any) => art.fileId || art.file?.id || art.id) || [],
-          receipts: a.receipts || [],
-          invoices: a.invoices || [],
-          // Map Artwork entities to their File representation for display
-          artworks: a.artworks?.map((art: any) => art.file || art) || [],
-        })) || [],
+      // Initialize airbrushings with default row - part of initial state
+      // CRITICAL: Include 'id' field to preserve existing airbrushings during updates
+      airbrushings: taskData.airbrushings && taskData.airbrushings.length > 0
+        ? taskData.airbrushings.map((a) => ({
+            id: a.id, // Preserve original airbrushing ID
+            startDate: a.startDate ? new Date(a.startDate) : null,
+            finishDate: a.finishDate ? new Date(a.finishDate) : null,
+            price: a.price,
+            status: a.status,
+            receiptIds: a.receipts?.map((r: any) => r.id) || [],
+            invoiceIds: a.invoices?.map((n: any) => n.id) || [],
+            // CRITICAL: artworkIds should be File IDs (artwork.fileId), not Artwork entity IDs
+            artworkIds: a.artworks?.map((art: any) => art.fileId || art.file?.id || art.id) || [],
+            receipts: a.receipts || [],
+            invoices: a.invoices || [],
+            // Map Artwork entities to their File representation for display
+            artworks: a.artworks?.map((art: any) => art.file || art) || [],
+          }))
+        : [{
+            // Default empty airbrushing row
+            id: `airbrushing-initial`,
+            status: AIRBRUSHING_STATUS.PENDING,
+            price: null,
+            startDate: null,
+            finishDate: null,
+            receiptIds: [],
+            invoiceIds: [],
+            artworkIds: [],
+            receipts: [],
+            invoices: [],
+            artworks: [],
+          }],
       observation: taskData.observation ? {
         description: taskData.observation.description || "",
         fileIds: taskData.observation.files?.map((f: any) => f.id) || [],
@@ -610,6 +712,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   // Handle form submission with only changed fields
   const handleFormSubmit = useCallback(
     async (changedData: Partial<TaskUpdateFormData>) => {
+      console.log('[TaskEditForm] handleFormSubmit called');
+      console.log('[TaskEditForm] changedData:', JSON.stringify(changedData, null, 2));
       try {
         setIsSubmitting(true);
 
@@ -635,65 +739,207 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
         }
 
-        // Filter out empty services (services with no description)
-        if (changedData.services && Array.isArray(changedData.services)) {
-          changedData.services = changedData.services.filter(
-            (service) => service.description && service.description.trim().length >= 3
-          );
-          // If no valid services remain, remove the services array entirely
-          if (changedData.services.length === 0) {
-            delete (changedData as any).services;
+        // =====================
+        // NORMALIZE DATA TYPES AND FIX ARRAY SERIALIZATION
+        // This ensures proper types before submission to API
+        // =====================
+
+        // Helper: Convert objects with numeric keys to arrays
+        const ensureArray = (value: any): any[] => {
+          if (Array.isArray(value)) return value;
+          if (value && typeof value === 'object' && !Array.isArray(value)) {
+            // Check if it's an object with numeric keys (like {0: {...}, 1: {...}})
+            const keys = Object.keys(value);
+            if (keys.length > 0 && keys.every(k => /^\d+$/.test(k))) {
+              // Convert to array, sorted by numeric key
+              return keys.sort((a, b) => Number(a) - Number(b)).map(k => value[k]);
+            }
+          }
+          return [];
+        };
+
+        // Helper: Convert string numbers to actual numbers
+        const ensureNumber = (value: any): number | null => {
+          if (value === null || value === undefined || value === '') return null;
+          if (typeof value === 'number') return value;
+          if (typeof value === 'string') {
+            const num = parseFloat(value.replace(',', '.'));
+            return isNaN(num) ? null : num;
+          }
+          return null;
+        };
+
+        // Fix pricing.discountValue and ensure pricing arrays are actual arrays
+        if (changedData.pricing) {
+          const pricing = changedData.pricing as any;
+
+          // Convert discountValue string to number
+          if (pricing.discountValue !== undefined) {
+            pricing.discountValue = ensureNumber(pricing.discountValue);
+          }
+
+          // Ensure items is an array
+          if (pricing.items) {
+            pricing.items = ensureArray(pricing.items).map((item: any) => ({
+              ...item,
+              amount: ensureNumber(item.amount) ?? 0,
+            }));
           }
         }
 
-        // DEBUG: Log what fields are in changedData
+        // Ensure serviceOrders is an array
+        if (changedData.serviceOrders) {
+          changedData.serviceOrders = ensureArray(changedData.serviceOrders);
+        }
+
+        // Ensure paintIds is an array
+        if (changedData.paintIds) {
+          changedData.paintIds = ensureArray(changedData.paintIds);
+        }
+
+        // Ensure artworkIds is an array
+        if (changedData.artworkIds) {
+          changedData.artworkIds = ensureArray(changedData.artworkIds);
+        }
+
+        // Ensure baseFileIds is an array
+        if (changedData.baseFileIds) {
+          changedData.baseFileIds = ensureArray(changedData.baseFileIds);
+        }
+
+        // Ensure cuts is an array
+        if (changedData.cuts) {
+          changedData.cuts = ensureArray(changedData.cuts);
+        }
+
+        // Ensure airbrushings is an array
+        if (changedData.airbrushings) {
+          changedData.airbrushings = ensureArray(changedData.airbrushings);
+        }
+
+        // Ensure truck layoutSections are arrays
+        if (changedData.truck) {
+          const truck = changedData.truck as any;
+          if (truck.leftSideLayout?.layoutSections) {
+            truck.leftSideLayout.layoutSections = ensureArray(truck.leftSideLayout.layoutSections);
+          }
+          if (truck.rightSideLayout?.layoutSections) {
+            truck.rightSideLayout.layoutSections = ensureArray(truck.rightSideLayout.layoutSections);
+          }
+          if (truck.backSideLayout?.layoutSections) {
+            truck.backSideLayout.layoutSections = ensureArray(truck.backSideLayout.layoutSections);
+          }
+        }
+
+        console.log('[TaskEditForm] Normalized changedData:', JSON.stringify(changedData, null, 2));
+
+        // =====================
+        // FILTER EMPTY DEFAULT ITEMS BEFORE CHANGE DETECTION
+        // This ensures empty default rows don't count as "changes"
+        // =====================
+
+        // Filter out empty services (services with no description)
+        // Note: form uses 'serviceOrders', changedData might use 'serviceOrders' or 'services'
+        const serviceKey = changedData.serviceOrders ? 'serviceOrders' : 'services';
+        if (changedData[serviceKey] && Array.isArray(changedData[serviceKey])) {
+          changedData[serviceKey] = changedData[serviceKey].filter(
+            (service: any) => service.description && service.description.trim().length >= 3
+          );
+          // If no valid services remain, remove the services array entirely
+          if (changedData[serviceKey].length === 0) {
+            delete changedData[serviceKey];
+          }
+        }
+
+        // Filter and validate pricing (if it exists in changedData)
+        // Empty items (no description) are filtered out
+        if (changedData.pricing && changedData.pricing.items && changedData.pricing.items.length > 0) {
+          // Filter out items without description (empty items)
+          const validItems = changedData.pricing.items.filter((item: any) => {
+            const hasDescription = item.description && item.description.trim() !== "";
+            return hasDescription;
+          });
+
+          // Update changedData with filtered items
+          if (validItems.length > 0) {
+            // Normalize amounts - empty/null becomes 0 (courtesy)
+            changedData.pricing = {
+              ...changedData.pricing,
+              items: validItems.map((item: any) => ({
+                ...item,
+                amount: item.amount ?? 0,
+              })),
+            };
+
+            // Check if expiry date is missing (only if there are valid items)
+            if (!changedData.pricing.expiresAt) {
+              console.log('[TaskEditForm] ❌ Early return: pricing.expiresAt missing');
+              toast.error("A data de validade da precificação é obrigatória.");
+              return;
+            }
+          } else {
+            // No valid items - remove pricing from changedData entirely
+            delete changedData.pricing;
+          }
+        }
+
+        // Filter out empty airbrushings (airbrushings with no meaningful data)
+        if (changedData.airbrushings && Array.isArray(changedData.airbrushings)) {
+          changedData.airbrushings = changedData.airbrushings.filter((airbrushing: any) => {
+            const hasPrice = airbrushing.price !== null && airbrushing.price !== undefined;
+            const hasStartDate = airbrushing.startDate !== null && airbrushing.startDate !== undefined;
+            const hasFinishDate = airbrushing.finishDate !== null && airbrushing.finishDate !== undefined;
+            const hasReceiptFiles = airbrushing.receiptIds && airbrushing.receiptIds.length > 0;
+            const hasInvoiceFiles = airbrushing.invoiceIds && airbrushing.invoiceIds.length > 0;
+            const hasArtworkFiles = airbrushing.artworkIds && airbrushing.artworkIds.length > 0;
+            const hasNewReceiptFiles = airbrushing.receiptFiles && airbrushing.receiptFiles.some((f: any) => f instanceof File);
+            const hasNewInvoiceFiles = airbrushing.nfeFiles && airbrushing.nfeFiles.some((f: any) => f instanceof File);
+            const hasNewArtworkFiles = airbrushing.artworkFiles && airbrushing.artworkFiles.some((f: any) => f instanceof File);
+
+            return hasPrice || hasStartDate || hasFinishDate || hasReceiptFiles || hasInvoiceFiles || hasArtworkFiles || hasNewReceiptFiles || hasNewInvoiceFiles || hasNewArtworkFiles;
+          });
+
+          // If no valid airbrushings remain, remove entirely
+          if (changedData.airbrushings.length === 0) {
+            delete changedData.airbrushings;
+          }
+        }
+
+        // =====================
+        // CHECK FOR CHANGES AFTER FILTERING
+        // =====================
 
         // Check if there are cuts to create (counts as changes)
         const cuts = form.getValues('cuts') as any[] || [];
         const hasCutsToCreate = cuts.length > 0 && cuts.some((cut) => cut.file && cut.file instanceof File);
 
         // Validate that we have changes (form, layout, file changes, artwork status changes, or cuts to create)
+        console.log('[TaskEditForm] Change detection:', {
+          changedDataKeys: Object.keys(changedData),
+          changedDataLength: Object.keys(changedData).length,
+          hasLayoutChanges,
+          hasFileChanges,
+          hasArtworkStatusChanges,
+          hasCutsToCreate,
+        });
         if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate) {
-
+          console.log('[TaskEditForm] ❌ Early return: no changes detected');
           toast.info("Nenhuma alteração detectada");
           return;
         }
 
-        // Validate that all cuts have files attached
+        // Filter out cuts without files (empty/default cuts)
+        // Only cuts with files will be submitted
+        const validCuts = cuts.filter((cut) => cut.file || cut.fileId);
 
-        if (cuts.length > 0 && cuts.some((cut) => !cut.file && !cut.fileId)) {
-          toast.error("Alguns cortes não possuem arquivos anexados. Adicione os arquivos antes de enviar o formulário.");
-          return;
-        }
-
-        if (cuts.length > 0) {
-          
-        }
-
-        // Validate that pricing is complete (if it exists)
-        const pricing = form.getValues('pricing') as any;
-        if (pricing && pricing.items && pricing.items.length > 0) {
-          // Check if any item is incomplete
-          const hasIncompleteItems = pricing.items.some((item: any) => {
-            const hasDescription = item.description && item.description.trim() !== "";
-            const hasAmount = item.amount !== null && item.amount !== undefined && item.amount !== 0;
-            return !hasDescription || !hasAmount;
-          });
-
-          if (hasIncompleteItems) {
-            toast.error("Alguns itens do precificação estão incompletos. Preencha a descrição e o valor antes de enviar o formulário.");
-            return;
-          }
-
-          // Check if expiry date is missing
-          if (!pricing.expiresAt) {
-            toast.error("A data de validade do precificação é obrigatória.");
-            return;
-          }
+        // Update the form with filtered cuts
+        if (validCuts.length !== cuts.length) {
+          form.setValue('cuts', validCuts);
         }
 
         // Check if there's a layout width error
         if (layoutWidthError) {
+          console.log('[TaskEditForm] ❌ Early return: layoutWidthError =', layoutWidthError);
           toast.error("Corrija os erros de layout antes de enviar o formulário.");
           return;
         }
@@ -707,11 +953,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           const hasFiles = (observation?.fileIds && observation.fileIds.length > 0) || observationFiles.length > 0;
 
           if (!hasDescription) {
+            console.log('[TaskEditForm] ❌ Early return: observation has data but no description');
             toast.error("A observação está incompleta. Preencha a descrição antes de enviar o formulário.");
             return;
           }
 
           if (!hasFiles) {
+            console.log('[TaskEditForm] ❌ Early return: observation has data but no files');
             toast.error("A observação está incompleta. Adicione pelo menos um arquivo antes de enviar o formulário.");
             return;
           }
@@ -804,6 +1052,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         const newArtworkFiles = uploadedFiles.filter(f => !f.uploaded);
         const newBaseFiles = baseFiles.filter(f => !f.uploaded);
         const newObservationFiles = observationFiles.filter(f => !f.uploaded);
+        const newPricingLayoutFiles = pricingLayoutFiles.filter(f => !f.uploaded);
 
         // Check for cut files
         const changedCuts = changedData.cuts as any[] || [];
@@ -820,9 +1069,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         const hasNewFiles = newBudgetFiles.length > 0 || newNnvoiceFiles.length > 0 ||
                            newReceiptFiles.length > 0 || newArtworkFiles.length > 0 ||
                            newBaseFiles.length > 0 || hasCutFiles || hasAirbrushingFiles ||
-                           newObservationFiles.length > 0 || layoutPhotoFiles.length > 0;
+                           newObservationFiles.length > 0 || layoutPhotoFiles.length > 0 ||
+                           newPricingLayoutFiles.length > 0;
 
         let result;
+
+        console.log('[TaskEditForm] ✅ All validations passed, preparing submission');
+        console.log('[TaskEditForm] hasNewFiles:', hasNewFiles);
 
         if (hasNewFiles) {
           // Get customer data for file organization context
@@ -847,9 +1100,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             files.baseFiles = newBaseFiles.filter(f => f instanceof File) as File[];
           }
           if (newObservationFiles.length > 0) {
-            
+
             files.observationFiles = newObservationFiles.filter(f => f instanceof File) as File[];
-            
+
+          }
+          if (newPricingLayoutFiles.length > 0) {
+            files.pricingLayoutFile = newPricingLayoutFiles.filter(f => f instanceof File) as File[];
           }
 
           // Add layout photo files if any (sent WITH task update, backend handles them)
@@ -865,38 +1121,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // DON'T send cuts with task update - they'll be created separately
           // Remove cuts from changedData to avoid sending them with the task
           if (changedData.cuts) {
-            
             delete changedData.cuts;
           }
 
-          // Handle airbrushing files if airbrushings were changed
-          let airbrushings = changedData.airbrushings as any[] || [];
-
-          // Filter out empty/default airbrushings that have no meaningful data
-          // An airbrushing should only be submitted if it has at least one of:
-          // - price, startDate, finishDate, or files
-          airbrushings = airbrushings.filter((airbrushing) => {
-            const hasPrice = airbrushing.price !== null && airbrushing.price !== undefined;
-            const hasStartDate = airbrushing.startDate !== null && airbrushing.startDate !== undefined;
-            const hasFinishDate = airbrushing.finishDate !== null && airbrushing.finishDate !== undefined;
-            const hasReceiptFiles = airbrushing.receiptIds && airbrushing.receiptIds.length > 0;
-            const hasInvoiceFiles = airbrushing.invoiceIds && airbrushing.invoiceIds.length > 0;
-            const hasArtworkFiles = airbrushing.artworkIds && airbrushing.artworkIds.length > 0;
-            const hasNewReceiptFiles = airbrushing.receiptFiles && airbrushing.receiptFiles.some((f: any) => f instanceof File);
-            const hasNewInvoiceFiles = airbrushing.nfeFiles && airbrushing.nfeFiles.some((f: any) => f instanceof File);
-            const hasNewArtworkFiles = airbrushing.artworkFiles && airbrushing.artworkFiles.some((f: any) => f instanceof File);
-
-            return hasPrice || hasStartDate || hasFinishDate || hasReceiptFiles || hasInvoiceFiles || hasArtworkFiles || hasNewReceiptFiles || hasNewInvoiceFiles || hasNewArtworkFiles;
-          });
-
-          // Update changedData with filtered airbrushings
-          if (airbrushings.length > 0) {
-            changedData.airbrushings = airbrushings;
-          } else {
-            // Remove airbrushings field entirely if no meaningful airbrushings remain
-            delete changedData.airbrushings;
-          }
-
+          // Extract files from airbrushing objects (filtering was done earlier)
+          const airbrushings = changedData.airbrushings as any[] || [];
           if (airbrushings.length > 0) {
             airbrushings.forEach((airbrushing, index) => {
               // Extract files from airbrushing objects
@@ -931,10 +1160,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // These are large arrays that bloat the payload size
           // MUST MATCH fieldsToOmitIfUnchanged in useEditForm config
           // NOTE: 'cuts' are excluded - created separately via POST /cuts
-          // NOTE: 'airbrushings' are NOT excluded - they can be sent with task
+          // NOTE: 'airbrushings', 'pricing', 'serviceOrders' are NOT excluded - they use filtering logic
           const excludedFields = new Set([
             'cuts',
-            'serviceOrders',
             'paintIds',
             'artworkIds',
             'budgetIds',
@@ -988,7 +1216,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // This prevents the body from being undefined, which causes multer to hang
           if (fieldCount === 0) {
             dataForFormData._hasFiles = true;
-            
+
           }
 
           // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
@@ -1167,6 +1395,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         } else {
           // Use regular JSON when no files are present
           const submitData = { ...changedData };
+
+          // CRITICAL: Exclude cuts from JSON submission - cuts are created separately via POST /cuts
+          // Sending cuts here would cause backend to deleteMany + create, losing existing cut statuses
+          delete submitData.cuts;
 
           // Even if no new files, check for deleted files
           // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
@@ -1379,12 +1611,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           window.location.href = redirectUrl;
         }
       } catch (error) {
-        // Error handled by form state
+        console.error('[TaskEditForm] ❌ Error during form submission:', error);
+        toast.error("Erro ao salvar alterações. Tente novamente.");
       } finally {
         setIsSubmitting(false);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, budgetFile, nfeFile, receiptFile, uploadedFiles, observationFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
+    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, budgetFile, nfeFile, receiptFile, uploadedFiles, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
   );
 
   // Use the edit form hook with change detection
@@ -1401,9 +1634,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     // Don't send these large arrays if they haven't changed (reduces payload size)
     // This must match the excludedFields Set in handleFormSubmit for consistency
     // NOTE: 'cuts' are omitted - created separately via POST /cuts
+    // NOTE: 'airbrushings', 'pricing', 'serviceOrders' are NOT omitted - they need filtering logic
     fieldsToOmitIfUnchanged: [
       "cuts",
-      "serviceOrders",
       "paintIds",
       "artworkIds",
       "budgetIds",
@@ -1547,7 +1780,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   // This will be recalculated on every form value change thanks to form.watch() above
   const formFieldChanges = getChangedFields();
 
-  // Debug: Log when formFieldChanges updates
   // Check if there are new cuts with files to create
   // Only count cuts with NEW files (not already uploaded)
   const hasCutsToCreate = useMemo(() => {
@@ -1564,31 +1796,32 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const hasChanges = Object.keys(formFieldChanges).length > 0 || hasLayoutChanges || hasFileChanges || hasArtworkStatusChanges || hasCutsToCreate;
 
   // Check for validation errors that should prevent submission
-  // Only consider cuts without files as blocking if:
-  // 1. There are multiple cuts, OR
-  // 2. The single cut has been meaningfully modified (different from default values)
+  // Cuts without files will be filtered out on submit, not blocked
+  // Only block if user explicitly modified a cut but forgot to add a file
   const hasCutsWithoutFiles = useMemo(() => {
     const cuts = cutsValues as any[] || [];
     if (cuts.length === 0) return false;
 
-    // If there's only one cut, check if it's been modified from defaults
-    if (cuts.length === 1) {
-      const cut = cuts[0];
+    // Filter to only cuts that have been meaningfully modified
+    // A cut is meaningful if it has a file OR if it was modified from defaults
+    const meaningfulCuts = cuts.filter((cut) => {
+      // Has file - it's meaningful
+      if (cut.file || cut.fileId) return true;
+
+      // Check if it's the default unmodified cut
       const isDefaultCut =
         cut.type === CUT_TYPE.VINYL &&
         cut.quantity === 1 &&
         !cut.file &&
         !cut.fileId;
 
-      // Don't block submission for unmodified default cut
-      if (isDefaultCut) return false;
+      // Only meaningful if NOT default (user changed something)
+      return !isDefaultCut;
+    });
 
-      // Block if the cut was modified but has no file
-      return !cut.file && !cut.fileId;
-    }
-
-    // For multiple cuts, block if any are missing files
-    return cuts.some((cut) => !cut.file && !cut.fileId);
+    // Block only if there are meaningful cuts without files
+    // (user changed settings but forgot the file)
+    return meaningfulCuts.some((cut) => !cut.file && !cut.fileId);
   }, [cutsValues]);
 
   const hasIncompletePricing = useMemo(() => {
@@ -1600,17 +1833,20 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     const isPricingBeingChanged = 'pricing' in formFieldChanges;
     if (!isPricingBeingChanged) return false;
 
-    // Check if any item is incomplete
-    const hasIncompleteItems = pricing.items.some((item: any) => {
-      const hasDescription = item.description && item.description.trim() !== "";
-      const hasAmount = item.amount !== null && item.amount !== undefined && item.amount !== 0;
-      return !hasDescription || !hasAmount;
-    });
+    // Filter to only items with descriptions (empty items will be filtered out on submit)
+    const itemsWithDescription = pricing.items.filter((item: any) =>
+      item.description && item.description.trim() !== ""
+    );
 
-    // Check if expiry date is missing
-    const missingExpiryDate = !pricing.expiresAt;
+    // If there are items with descriptions, check if expiry date is missing
+    if (itemsWithDescription.length > 0 && !pricing.expiresAt) {
+      return true; // Missing expiry date
+    }
 
-    return hasIncompleteItems || missingExpiryDate;
+    // Note: Amount is optional (0 = courtesy), so we don't check it
+    // Empty items (no description) will be filtered out on submit, not blocked
+
+    return false;
   }, [pricingValues, formFieldChanges]);
 
   const hasIncompleteServices = useMemo(() => {
@@ -1725,11 +1961,22 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     <Form {...form}>
       <form
         id="task-form"
-        className="container mx-auto max-w-4xl"
-        onSubmit={handleSubmitChanges()}
+        className="container mx-auto max-w-5xl"
+        onSubmit={(e) => {
+          console.log('[TaskEditForm] Form onSubmit triggered');
+          console.log('[TaskEditForm] Form isValid:', form.formState.isValid);
+          console.log('[TaskEditForm] Form errors:', form.formState.errors);
+          return handleSubmitChanges()(e);
+        }}
       >
         {/* Hidden submit button for programmatic form submission */}
-        <button id="task-form-submit" type="submit" className="hidden" disabled={isSubmitting}>
+        <button
+          id="task-form-submit"
+          type="submit"
+          className="hidden"
+          disabled={isSubmitting}
+          onClick={() => console.log('[TaskEditForm] Hidden submit button clicked')}
+        >
           Submit
         </button>
 
@@ -2445,29 +2692,59 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         {/* Layout Form - Read-only for Financial and Designer users */}
                         <LayoutForm
                           selectedSide={selectedLayoutSide}
-                          layout={
-                            selectedLayoutSide === "left"
+                          layout={(() => {
+                            // CRITICAL FIX: Use currentLayoutStates when the side has been modified
+                            // This preserves user edits when accordion collapses and reopens
+                            const savedLayout = selectedLayoutSide === "left"
                               ? layoutsData?.leftSideLayout
                               : selectedLayoutSide === "right"
                                 ? layoutsData?.rightSideLayout
-                                : layoutsData?.backSideLayout
-                          }
+                                : layoutsData?.backSideLayout;
+
+                            // If user has modified this side, use the edited state
+                            // This ensures user edits are not lost when accordion collapses
+                            if (modifiedLayoutSides.has(selectedLayoutSide) && currentLayoutStates[selectedLayoutSide]) {
+                              return currentLayoutStates[selectedLayoutSide];
+                            }
+
+                            // Otherwise use the saved layout from backend
+                            return savedLayout;
+                          })()}
                           validationError={layoutWidthError}
                           onChange={(side, layoutData) => {
+                            // Check if this is an initial state emission (not a real user change)
+                            // Initial emission happens when LayoutForm mounts without saved data
+                            const savedLayout = side === "left"
+                              ? layoutsData?.leftSideLayout
+                              : side === "right"
+                                ? layoutsData?.rightSideLayout
+                                : layoutsData?.backSideLayout;
 
-                            // Mark this side as modified
+                            const hasSavedLayout = savedLayout?.layoutSections && savedLayout.layoutSections.length > 0;
+                            const isFirstEmitForSide = !initialLayoutStateEmittedRef.current.has(side);
+
+                            // If no saved layout and this is the first emit, it's just initial state - don't mark as modified
+                            if (!hasSavedLayout && isFirstEmitForSide) {
+                              initialLayoutStateEmittedRef.current.add(side);
+                              // Still track the state for display purposes, but don't mark as modified
+                              setCurrentLayoutStates(prev => ({
+                                ...prev,
+                                [side]: layoutData,
+                              }));
+                              return; // Don't mark as modified or enable submit
+                            }
+
+                            // Mark this side's initial state as emitted
+                            initialLayoutStateEmittedRef.current.add(side);
+
+                            // Mark this side as modified (actual user change)
                             setModifiedLayoutSides(prev => {
-
                               const newSet = new Set(prev);
                               newSet.add(side);
-
                               return newSet;
                             });
 
-                            // CRITICAL FIX: Mark as having layout changes to enable submit button
-                            // This was missing - onChange was not setting hasLayoutChanges!
-                            // Without this, door removal and photo uploads don't enable the submit button
-                            
+                            // Mark as having layout changes to enable submit button
                             setHasLayoutChanges(true);
 
                             // Track current editing state for real-time updates
@@ -2552,6 +2829,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         disabled={isSubmitting}
                         userRole={user?.sector?.privileges}
                         onItemCountChange={setPricingItemCount}
+                        layoutFiles={pricingLayoutFiles}
+                        onLayoutFilesChange={setPricingLayoutFiles}
                       />
                     </CardContent>
                   </AccordionContent>

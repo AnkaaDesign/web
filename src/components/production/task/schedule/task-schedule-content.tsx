@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { TaskScheduleTable } from "./task-schedule-table";
 import { TaskScheduleEmptyState } from "./task-schedule-empty-state";
 import { TaskScheduleFilters } from "./task-schedule-filters";
-import { ColumnVisibilityManager, getDefaultVisibleColumns } from "./column-visibility-manager";
+import { ColumnVisibilityManager, getDefaultVisibleColumns, getAvailableColumns } from "./column-visibility-manager";
 import { TaskScheduleExport } from "./task-schedule-export";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
 import { CopyFromTaskModal, type CopyableField } from "./copy-from-task-modal";
@@ -60,8 +60,14 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   // Check if user can export (Admin or Financial only)
   const canExport = currentUser && (hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL));
 
-  // Default visible columns - use shared function to ensure consistency with ColumnVisibilityManager
-  const defaultVisibleColumns = useMemo(() => getDefaultVisibleColumns(), []);
+  // Get user's sector privilege for column visibility
+  const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
+
+  // Available columns based on user's sector privilege
+  const availableColumns = useMemo(() => getAvailableColumns(userSectorPrivilege), [userSectorPrivilege]);
+
+  // Default visible columns - use shared function with user's sector privilege
+  const defaultVisibleColumns = useMemo(() => getDefaultVisibleColumns(userSectorPrivilege), [userSectorPrivilege]);
 
   // Visible columns state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility("task-schedule-visible-columns", defaultVisibleColumns);
@@ -196,8 +202,8 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                 // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
                 updateData.artworkIds = sourceTask.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [];
                 break;
-              case "budgetId":
-                updateData.budgetId = sourceTask.budgetId;
+              case "budgetIds":
+                updateData.budgetIds = sourceTask.budgets?.map((b: any) => b.id) || [];
                 break;
               case "paintId":
                 updateData.paintId = sourceTask.paintId;
@@ -512,7 +518,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
               <IconFilter className="h-4 w-4 mr-2" />
               Filtros{hasActiveFilters ? ` (${activeFiltersCount})` : ""}
             </Button>
-            <ColumnVisibilityManager visibleColumns={visibleColumns} onColumnVisibilityChange={setVisibleColumns} />
+            <ColumnVisibilityManager columns={availableColumns} visibleColumns={visibleColumns} onColumnVisibilityChange={setVisibleColumns} />
             {canExport && <TaskScheduleExport tasks={filteredTasks} visibleColumns={visibleColumns} />}
           </div>
         </div>

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useTheme } from "@/contexts/theme-context";
+import { useSidebar } from "@/contexts/sidebar-context";
 import { Toaster as Sonner, toast as sonnerToast } from "sonner";
 import { IconCircleCheck, IconCircleX, IconAlertCircle, IconInfoCircle } from "@tabler/icons-react";
 
@@ -83,16 +84,25 @@ if (typeof window !== "undefined") {
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme();
+  const { isOpen: isSidebarOpen } = useSidebar();
+
+  // Sidebar widths: 288px (w-72) when open, 64px (w-16) when minimized
+  // Add 16px padding from sidebar edge
+  const rightOffset = isSidebarOpen ? 304 : 80;
 
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
       position="top-right"
+      visibleToasts={1}
       expand={true}
       richColors={true}
       closeButton={true}
       duration={5000}
+      style={{
+        '--toast-right-offset': `${rightOffset}px`,
+      } as React.CSSProperties}
       toastOptions={{
         classNames: {
           toast:

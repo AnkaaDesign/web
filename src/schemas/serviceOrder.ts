@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { createMapToFormDataHelper, orderByDirectionSchema, normalizeOrderBy, nullableDate } from "./common";
 import type { ServiceOrder } from "../types";
-import { SERVICE_ORDER_STATUS } from "../constants";
+import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../constants";
 
 // =====================
 // ServiceOrder Include Schema Based on Prisma Schema (Second Level Only)
@@ -19,8 +19,8 @@ export const serviceOrderIncludeSchema = z
             .object({
               sector: z.boolean().optional(),
               customer: z.boolean().optional(),
-              budget: z.boolean().optional(),
-              nfe: z.boolean().optional(),
+              budgets: z.boolean().optional(),
+              invoices: z.boolean().optional(),
               observation: z.boolean().optional(),
               generalPainting: z.boolean().optional(),
               createdBy: z.boolean().optional(),
@@ -154,6 +154,18 @@ export const serviceOrderWhereSchema: z.ZodSchema = z.lazy(() =>
             not: z.nativeEnum(SERVICE_ORDER_STATUS).optional(),
             in: z.array(z.nativeEnum(SERVICE_ORDER_STATUS)).optional(),
             notIn: z.array(z.nativeEnum(SERVICE_ORDER_STATUS)).optional(),
+          }),
+        ])
+        .optional(),
+
+      type: z
+        .union([
+          z.nativeEnum(SERVICE_ORDER_TYPE),
+          z.object({
+            equals: z.nativeEnum(SERVICE_ORDER_TYPE).optional(),
+            not: z.nativeEnum(SERVICE_ORDER_TYPE).optional(),
+            in: z.array(z.nativeEnum(SERVICE_ORDER_TYPE)).optional(),
+            notIn: z.array(z.nativeEnum(SERVICE_ORDER_TYPE)).optional(),
           }),
         ])
         .optional(),
@@ -469,6 +481,12 @@ export const serviceOrderCreateSchema = z.object({
       errorMap: () => ({ message: "status inválido" }),
     })
     .default(SERVICE_ORDER_STATUS.PENDING),
+  type: z
+    .enum(Object.values(SERVICE_ORDER_TYPE) as [string, ...string[]], {
+      errorMap: () => ({ message: "tipo inválido" }),
+    })
+    .nullable()
+    .optional(),
   description: z.string().min(3, { message: "Minímo de 3 caracteres" }).max(400, { message: "Maxímo de 400 caracteres atingido" }),
   observation: z.string().max(2000, { message: "Maxímo de 2000 caracteres atingido" }).nullable().optional(),
   taskId: z.string().uuid("Tarefa inválida"),
@@ -483,6 +501,12 @@ export const serviceOrderUpdateSchema = z.object({
     .enum(Object.values(SERVICE_ORDER_STATUS) as [string, ...string[]], {
       errorMap: () => ({ message: "status inválido" }),
     })
+    .optional(),
+  type: z
+    .enum(Object.values(SERVICE_ORDER_TYPE) as [string, ...string[]], {
+      errorMap: () => ({ message: "tipo inválido" }),
+    })
+    .nullable()
     .optional(),
   description: z.string().min(3, { message: "Minímo de 3 caracteres" }).max(400, { message: "Maxímo de 400 caracteres atingido" }).optional(),
   observation: z.string().max(2000, { message: "Maxímo de 2000 caracteres atingido" }).nullable().optional(),
@@ -562,6 +586,7 @@ export type ServiceOrderInclude = z.infer<typeof serviceOrderIncludeSchema>;
 
 export const mapServiceOrderToFormData = createMapToFormDataHelper<ServiceOrder, ServiceOrderUpdateFormData>((serviceOrder) => ({
   status: serviceOrder.status || undefined,
+  type: serviceOrder.type || undefined,
   statusOrder: serviceOrder.statusOrder,
   description: serviceOrder.description,
   observation: serviceOrder.observation,

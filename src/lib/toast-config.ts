@@ -11,8 +11,8 @@ export const toastConfig = {
     info: 5000,
   },
 
-  // Max toasts
-  maxToasts: 5,
+  // Max toasts visible at once (others are queued)
+  maxToasts: 1,
 
   // Styling
   className: "font-medium",

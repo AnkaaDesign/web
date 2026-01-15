@@ -109,6 +109,8 @@ export interface GarageTruck {
   originalLength?: number; // Original length without cabin (for display)
   entryDate?: string | null; // Task entry date
   term?: string | null; // Task deadline
+  forecastDate?: string | null; // Forecast date - when truck is expected to arrive at company
+  finishedAt?: string | null; // Task completion date - null if not complete
   layoutInfo?: string | null; // Layout description
   artworkInfo?: string | null; // Artwork description
 }
@@ -1197,8 +1199,8 @@ interface AllGaragesViewProps {
 }
 
 function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts, viewMode = 'all', onTruckMove, onTruckSwap, readOnly = false }: AllGaragesViewProps) {
-  // Show all 4 areas in Grade view, only garages (no PATIO) in Calendar view
-  const areasToShow = viewMode === 'week' ? (['B1', 'B2', 'B3'] as const) : AREAS;
+  // Show all 4 areas (including PATIO/yard) in both Grade and Calendar views
+  const areasToShow = AREAS;
 
   // Calculate patio columns dynamically based on truck count (same logic as dimensions calculation)
   // Target: ~3-4 trucks per column for optimal layout
@@ -2329,43 +2331,65 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
   const inGarages = garageCounts.B1 + garageCounts.B2 + garageCounts.B3;
   const inPatio = garageCounts.PATIO;
 
-  // Filter trucks by selected date if in week view
+  // Filter trucks based on view mode, forecastDate, and completion status
+  // WORKFLOW:
+  // - forecastDate: The date when the truck is expected to arrive at the company (REQUIRED)
+  // - term: The deadline for completing the work
+  // - finishedAt: When the task was completed (null if still in progress)
+  //
+  // Grade View: Show trucks where forecastDate <= today AND not complete
+  // Calendar View: Show trucks where forecastDate <= selectedDate <= term AND not complete
   const filteredTrucks = useMemo(() => {
-    if (viewMode !== 'week' || !selectedDate) return trucksWithLocalPositions;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    const checkDate = new Date(selectedDate);
-    checkDate.setHours(0, 0, 0, 0);
+    if (viewMode === 'week' && selectedDate) {
+      // Calendar view: Show trucks from forecastDate until term date
+      const checkDate = new Date(selectedDate);
+      checkDate.setHours(0, 0, 0, 0);
 
-    const filtered = trucksWithLocalPositions.filter(truck => {
-      // If truck doesn't have a spot, don't show it in calendar view
-      if (!truck.spot) return false;
+      return trucksWithLocalPositions.filter(truck => {
+        // MUST have forecastDate - tasks without forecast date are not displayed
+        if (!truck.forecastDate) return false;
 
-      // If truck doesn't have dates, show it by default (it's currently in production)
-      if (!truck.entryDate || !truck.term) {
-        
+        // MUST not be complete
+        if (truck.finishedAt) return false;
+
+        const forecastDate = new Date(truck.forecastDate);
+        forecastDate.setHours(0, 0, 0, 0);
+
+        // Truck must have arrived by the selected date (forecastDate <= selectedDate)
+        if (checkDate < forecastDate) return false;
+
+        // If term exists, selected date must be before or on the term (selectedDate <= term)
+        // If no term, show the truck (no end date constraint)
+        if (truck.term) {
+          const term = new Date(truck.term);
+          term.setHours(0, 0, 0, 0);
+          if (checkDate > term) return false;
+        }
+
         return true;
-      }
+      });
+    }
 
-      const entry = new Date(truck.entryDate);
-      const term = new Date(truck.term);
+    // Grade view (all): Show trucks where forecastDate <= today AND not complete
+    return trucksWithLocalPositions.filter(truck => {
+      // MUST have forecastDate - tasks without forecast date are not displayed
+      if (!truck.forecastDate) return false;
 
-      entry.setHours(0, 0, 0, 0);
-      term.setHours(0, 0, 0, 0);
+      // MUST not be complete
+      if (truck.finishedAt) return false;
 
-      // Show truck if selected date is within the production period (entry to term)
-      const shouldShow = checkDate >= entry && checkDate <= term;
+      const forecastDate = new Date(truck.forecastDate);
+      forecastDate.setHours(0, 0, 0, 0);
 
-      if (!shouldShow) {
-        
-      }
-
-      return shouldShow;
+      // Show truck only if forecastDate <= today (truck has arrived or expected today)
+      return forecastDate <= today;
     });
-
-    return filtered;
   }, [viewMode, selectedDate, trucksWithLocalPositions]);
 
-  const displayTrucks = viewMode === 'week' ? filteredTrucks : trucksWithLocalPositions;
+  const displayTrucks = filteredTrucks;
 
   return (
     <div className={cn('flex flex-col h-full w-full', className)}>

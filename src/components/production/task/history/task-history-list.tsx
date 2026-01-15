@@ -438,8 +438,8 @@ export function TaskHistoryList({
                 // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
                 updateData.artworkIds = sourceTask.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [];
                 break;
-              case "budgetId":
-                updateData.budgetId = sourceTask.budgetId;
+              case "budgetIds":
+                updateData.budgetIds = sourceTask.budgets?.map((b: any) => b.id) || [];
                 break;
               case "paintId":
                 updateData.paintId = sourceTask.paintId;

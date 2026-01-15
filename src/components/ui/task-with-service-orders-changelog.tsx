@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { FilePreviewCard } from "@/components/common/file";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
@@ -17,7 +16,9 @@ import {
   IconUser,
 } from "@tabler/icons-react";
 import type { ChangeLog } from "../../types";
-import { CHANGE_LOG_ENTITY_TYPE, CHANGE_LOG_ACTION, CHANGE_TRIGGERED_BY } from "../../constants";
+import { CHANGE_LOG_ENTITY_TYPE, CHANGE_LOG_ACTION, CHANGE_TRIGGERED_BY, SERVICE_ORDER_TYPE, SECTOR_PRIVILEGES } from "../../constants";
+import { useCurrentUser } from "../../hooks";
+import { getVisibleServiceOrderTypes } from "@/utils/permissions/service-order-permissions";
 import {
   SERVICE_ORDER_TYPE_LABELS,
   SERVICE_ORDER_STATUS_LABELS,
@@ -409,6 +410,7 @@ const actionConfig: Record<CHANGE_LOG_ACTION, { icon: React.ElementType; color: 
 
 // Group changelog fields by entity and time (matching ChangelogHistory)
 // CREATE actions for different entities are kept separate (each CREATE = own group)
+// EXCEPT for LAYOUT CREATE actions which are grouped by time (to show all sides together)
 // UPDATE actions on the same entity within 1 second are grouped together
 const groupChangelogsByEntity = (changelogs: ChangeLog[]) => {
   const groups: ChangeLog[][] = [];
@@ -416,12 +418,40 @@ const groupChangelogsByEntity = (changelogs: ChangeLog[]) => {
   let currentTime: number | null = null;
   let currentEntityId: string | null = null;
   let currentAction: string | null = null;
+  let currentEntityType: string | null = null;
 
   changelogs.forEach((changelog) => {
     const time = new Date(changelog.createdAt).getTime();
     const isCreateAction = changelog.action === CHANGE_LOG_ACTION.CREATE;
+    const isLayoutEntity = changelog.entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT;
 
-    // CREATE actions for different entities should always be separate groups
+    // For LAYOUT CREATE actions, group by time (within 1 second) to combine all sides
+    if (isCreateAction && isLayoutEntity) {
+      // Check if we can add to current group (same entity type, within 1 second)
+      const canGroupWithCurrent =
+        currentEntityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT &&
+        currentAction === CHANGE_LOG_ACTION.CREATE &&
+        currentTime !== null &&
+        Math.abs(time - currentTime) < 1000;
+
+      if (canGroupWithCurrent) {
+        currentGroup.push(changelog);
+        currentTime = time;
+      } else {
+        // Start a new group
+        if (currentGroup.length > 0) {
+          groups.push(currentGroup);
+        }
+        currentGroup = [changelog];
+        currentTime = time;
+        currentEntityId = changelog.entityId;
+        currentAction = changelog.action;
+        currentEntityType = changelog.entityType;
+      }
+      return;
+    }
+
+    // CREATE actions for non-LAYOUT entities should always be separate groups
     // This ensures each "Ordem de Serviço Criada" is displayed separately
     if (isCreateAction) {
       // Finish current group if exists
@@ -434,6 +464,7 @@ const groupChangelogsByEntity = (changelogs: ChangeLog[]) => {
       currentTime = null;
       currentEntityId = null;
       currentAction = null;
+      currentEntityType = null;
       return;
     }
 
@@ -455,6 +486,7 @@ const groupChangelogsByEntity = (changelogs: ChangeLog[]) => {
       currentTime = time;
       currentEntityId = changelog.entityId;
       currentAction = changelog.action;
+      currentEntityType = changelog.entityType;
     }
   });
 
@@ -704,9 +736,9 @@ const ChangelogTimelineItem = ({
                   </>
                 )}
 
-                {/* Layout Details - Show all layouts in group */}
+                {/* Layout Details - Show all layouts in group horizontally */}
                 {entityType === CHANGE_LOG_ENTITY_TYPE.LAYOUT && (
-                  <div className="flex flex-wrap gap-4 my-2">
+                  <div className="flex flex-row flex-wrap gap-3 my-2">
                     {changelogGroup
                       .map((layoutChange) => {
                         let layoutDetails: any = null;
@@ -724,14 +756,16 @@ const ChangelogTimelineItem = ({
                           return null;
                         }
 
-                        const sideName = layoutChange.reason?.includes('leftSideLayoutId') ? 'Lado Motorista' :
-                                        layoutChange.reason?.includes('rightSideLayoutId') ? 'Lado Sapo' :
-                                        layoutChange.reason?.includes('backSideLayoutId') ? 'Traseira' : 'Layout';
+                        // Detect side from reason - backend uses "lado left/right/back" format
+                        const reason = layoutChange.reason?.toLowerCase() || '';
+                        const sideName = reason.includes('lado left') || reason.includes('leftside') ? 'Lado Motorista' :
+                                        reason.includes('lado right') || reason.includes('rightside') ? 'Lado Sapo' :
+                                        reason.includes('lado back') || reason.includes('backside') || reason.includes('traseira') ? 'Traseira' : 'Layout';
 
                         // Determine sort order: left=1, right=2, back=3, other=4
-                        const sortOrder = layoutChange.reason?.includes('leftSideLayoutId') ? 1 :
-                                         layoutChange.reason?.includes('rightSideLayoutId') ? 2 :
-                                         layoutChange.reason?.includes('backSideLayoutId') ? 3 : 4;
+                        const sortOrder = reason.includes('lado left') || reason.includes('leftside') ? 1 :
+                                         reason.includes('lado right') || reason.includes('rightside') ? 2 :
+                                         reason.includes('lado back') || reason.includes('backside') || reason.includes('traseira') ? 3 : 4;
 
                         return { layoutChange, layoutDetails, sideName, sortOrder };
                       })
@@ -739,13 +773,13 @@ const ChangelogTimelineItem = ({
                       .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
                       .map(({ layoutChange, layoutDetails, sideName }: any) => (
                         <div key={layoutChange.id} className="flex-shrink-0">
-                          <div className="text-xs font-medium text-muted-foreground mb-1">{sideName}</div>
-                          <div className="border rounded-lg bg-white/50 backdrop-blur-sm p-2">
+                          <div className="text-xs font-medium text-muted-foreground mb-1 text-center">{sideName}</div>
+                          <div className="border rounded-lg bg-white/50 dark:bg-muted/30 backdrop-blur-sm p-1.5">
                             <div
                               dangerouslySetInnerHTML={{
                                 __html: generateLayoutSVG(layoutDetails)
                               }}
-                              className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[280px] [&>svg]:max-h-[100px]"
+                              className="[&>svg]:block [&>svg]:w-auto [&>svg]:h-auto [&>svg]:max-w-[140px] [&>svg]:max-h-[60px]"
                             />
                           </div>
                         </div>
@@ -1343,6 +1377,14 @@ export function TaskWithServiceOrdersChangelog({
   maxHeight,
   limit = 100,
 }: TaskWithServiceOrdersChangelogProps) {
+  // Get current user for permission checks
+  const { data: currentUser } = useCurrentUser();
+  const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
+  const visibleServiceOrderTypes = useMemo(
+    () => getVisibleServiceOrderTypes(userSectorPrivilege),
+    [userSectorPrivilege]
+  );
+
   // Fetch task changelogs
   const {
     data: taskChangelogsResponse,
@@ -1434,8 +1476,40 @@ export function TaskWithServiceOrdersChangelog({
     // Only include layout logs if the query is enabled (has layout IDs)
     const layoutLogs = layoutIds.length > 0 ? (layoutChangelogsResponse?.data || []) : [];
 
+    // Build a map of service order entityId -> type from CREATE actions
+    const serviceOrderTypeMap = new Map<string, SERVICE_ORDER_TYPE>();
+    serviceLogs.forEach((log) => {
+      if (log.entityType === CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER &&
+          log.action === CHANGE_LOG_ACTION.CREATE &&
+          log.newValue &&
+          log.entityId) {
+        try {
+          const data = typeof log.newValue === 'string' ? JSON.parse(log.newValue) : log.newValue;
+          if (data?.type) {
+            serviceOrderTypeMap.set(log.entityId, data.type as SERVICE_ORDER_TYPE);
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    });
+
+    // Filter service order logs based on user permissions
+    const filteredServiceLogs = serviceLogs.filter((log) => {
+      if (log.entityType !== CHANGE_LOG_ENTITY_TYPE.SERVICE_ORDER) return true;
+
+      // Get the service order type from our map (built from CREATE actions)
+      const serviceOrderType = serviceOrderTypeMap.get(log.entityId);
+
+      // If we can't determine the type, hide it by default for security
+      if (!serviceOrderType) return false;
+
+      // Check if user has permission to view this service order type
+      return visibleServiceOrderTypes.includes(serviceOrderType);
+    });
+
     // Merge all changelogs
-    const allLogs = [...taskLogs, ...serviceLogs, ...truckLogs, ...layoutLogs];
+    const allLogs = [...taskLogs, ...filteredServiceLogs, ...truckLogs, ...layoutLogs];
 
     // Sort by createdAt descending (newest first)
     allLogs.sort((a, b) => {
@@ -1443,7 +1517,7 @@ export function TaskWithServiceOrdersChangelog({
     });
 
     return allLogs;
-  }, [taskChangelogsResponse, serviceOrderChangelogsResponse, truckChangelogsResponse, layoutChangelogsResponse, serviceOrderIds, truckId, layoutIds]);
+  }, [taskChangelogsResponse, serviceOrderChangelogsResponse, truckChangelogsResponse, layoutChangelogsResponse, serviceOrderIds, truckId, layoutIds, visibleServiceOrderTypes]);
 
   // Extract all entity IDs that need to be fetched for resolution
   const entityIds = useMemo(() => {
@@ -1661,8 +1735,8 @@ export function TaskWithServiceOrdersChangelog({
 
   return (
     <Card
-      className={cn("shadow-sm border border-border flex flex-col overflow-hidden", className)}
-      style={maxHeight ? { maxHeight, height: maxHeight } : undefined}
+      className={cn("shadow-sm border border-border flex flex-col", className)}
+      style={maxHeight ? { maxHeight } : undefined}
     >
       <CardHeader className="pb-4 flex-shrink-0">
         <CardTitle className="flex items-center gap-2">
@@ -1713,7 +1787,7 @@ export function TaskWithServiceOrdersChangelog({
         )}
       </CardHeader>
 
-      <CardContent className="pt-0 flex-1 flex flex-col min-h-0 overflow-hidden">
+      <CardContent className="pt-0 flex-1 min-h-0 overflow-y-auto">
         {isLoading ? (
           <ChangelogSkeleton />
         ) : combinedChangelogs.length === 0 ? (
@@ -1725,7 +1799,7 @@ export function TaskWithServiceOrdersChangelog({
             </p>
           </div>
         ) : (
-          <ScrollArea className="pr-4 h-full">
+          <div className="pr-4">
             <div className="space-y-6">
               {groupedChangelogs.map(([date, dayChangelogGroups], groupIndex) => {
                 const isLastGroup = groupIndex === groupedChangelogs.length - 1;
@@ -1772,7 +1846,7 @@ export function TaskWithServiceOrdersChangelog({
                 );
               })}
             </div>
-          </ScrollArea>
+          </div>
         )}
       </CardContent>
     </Card>

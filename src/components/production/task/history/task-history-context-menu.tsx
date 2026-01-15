@@ -407,9 +407,9 @@ export function TaskHistoryContextMenu({
         paintId: task.paintId,
         customerId: task.customerId,
         sectorId: task.sectorId,
-        budgetId: task.budgetId,
-        nfeId: task.nfeId,
-        receiptId: task.receiptId,
+        budgetIds: task.budgets?.map((b: any) => b.id) || [],
+        invoiceIds: task.invoices?.map((i: any) => i.id) || [],
+        receiptIds: task.receipts?.map((r: any) => r.id) || [],
         commission: task.commission,
 
         // Relations - only IDs

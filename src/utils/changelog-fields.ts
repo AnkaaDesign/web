@@ -141,9 +141,9 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     status: "Status",
     status_transition: "Status",
     statusOrder: "Ordem do Status",
-    budgetId: "Orçamento",
-    nfeId: "Nota Fiscal",
-    receiptId: "Recibo",
+    budgetIds: "Orçamentos",
+    invoiceIds: "Notas Fiscais",
+    receiptIds: "Recibos",
     supplierId: "Fornecedor",
     orderScheduleId: "Agendamento do Pedido",
     orderRuleId: "Regra do Pedido",
@@ -263,9 +263,9 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     invoiceToId: "Faturar Para",
     sectorId: "Setor",
     createdById: "Criado por",
-    budgetId: "Orçamento",
-    nfeId: "Nota Fiscal",
-    receiptId: "Recibo",
+    budgetIds: "Orçamentos",
+    invoiceIds: "Notas Fiscais",
+    receiptIds: "Recibos",
     generalPainting: "Pintura Geral",
     observationId: "Observação",
     truckId: "Caminhão",
@@ -448,9 +448,9 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     status: "Status",
     status_transition: "Status",
     statusOrder: "Ordem do Status",
-    nfeId: "Nota Fiscal Eletrônica",
-    receiptId: "Recibo",
-    budgetId: "Orçamento",
+    invoiceIds: "Notas Fiscais Eletrônicas",
+    receiptIds: "Recibos",
+    budgetIds: "Orçamentos",
     notes: "Observações",
     totalPrice: "Valor Total",
     withdrawalDate: "Data da Retirada",
@@ -706,6 +706,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     taskId: "Tarefa",
     garageId: "Garagem",
     spot: "Localização",
+    category: "Categoria",
+    implementType: "Tipo de Implemento",
     vehicle_movement: "Movimentação de Veículo",
     parking_position: "Posição de Estacionamento",
     // Related task fields
@@ -1744,9 +1746,9 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
         field === "customerId" ||
         field === "sectorId" ||
         field === "paintId" ||
-        field === "budgetId" ||
-        field === "nfeId" ||
-        field === "receiptId" ||
+        field === "budgetIds" ||
+        field === "invoiceIds" ||
+        field === "receiptIds" ||
         field === "observationId" ||
         field === "truckId" ||
         field === "userId" ||
