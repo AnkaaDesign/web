@@ -546,6 +546,12 @@ export const routes = {
   // Profile - User profile page
   profile: "/perfil",
   profileNotifications: "/perfil/notificacoes",
+
+  // Customer routes (public, no authentication required)
+  customer: {
+    budget: (customerId: string, budgetId: string) => `/cliente/${customerId}/orcamento/${budgetId}`,
+    root: "/cliente",
+  },
 } as const;
 
 // Export types for type safety

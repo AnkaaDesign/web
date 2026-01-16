@@ -5,20 +5,26 @@ import { Combobox } from "@/components/ui/combobox";
 import { getPaints } from "../../../../api-client";
 import type { Paint } from "../../../../types";
 import { PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, PAINT_FINISH } from "../../../../constants";
-import { IconX, IconFlask } from "@tabler/icons-react";
+import { IconX, IconFlask, IconBriefcase } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
+import { DesignarServiceOrderDialog, type ServiceOrderData } from "./designar-service-order-dialog";
 
 interface GeneralPaintingSelectorProps {
   control: any;
   disabled?: boolean;
   initialPaint?: Paint;
+  onDesignarServiceOrder?: (serviceOrder: ServiceOrderData) => void;
+  userPrivilege?: string;
 }
 
-export function GeneralPaintingSelector({ control, disabled, initialPaint }: GeneralPaintingSelectorProps) {
+export function GeneralPaintingSelector({ control, disabled, initialPaint, onDesignarServiceOrder, userPrivilege }: GeneralPaintingSelectorProps) {
   // Cache of selected paint to display details
   const [selectedPaint, setSelectedPaint] = useState<Paint | null>(initialPaint || null);
   const paintsCache = useRef<Map<string, Paint>>(new Map());
+
+  // State for Designar Service Order dialog
+  const [designarDialogOpen, setDesignarDialogOpen] = useState(false);
 
   // Memoize initialOptions to prevent infinite loop
   const initialOptions = useMemo(() => initialPaint ? [initialPaint] : [], [initialPaint?.id]);
@@ -141,6 +147,7 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
   };
 
   return (
+    <>
     <FormField
       control={control}
       name="paintId"
@@ -183,6 +190,13 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
                   debounceMs={300}
                   clearable={true}
                   initialOptions={initialOptions}
+                  customEmptyAction={onDesignarServiceOrder ? {
+                    label: "Designar Ordem de Serviço",
+                    icon: <IconBriefcase className="mr-2 h-4 w-4" />,
+                    onClick: () => {
+                      setDesignarDialogOpen(true);
+                    },
+                  } : undefined}
                 />
 
                 {/* Selected paint display with improved design */}
@@ -227,5 +241,16 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint }: Gen
         );
       }}
     />
+
+    {/* Designar Service Order Dialog */}
+    {onDesignarServiceOrder && (
+      <DesignarServiceOrderDialog
+        open={designarDialogOpen}
+        onOpenChange={setDesignarDialogOpen}
+        onServiceOrderCreated={onDesignarServiceOrder}
+        userPrivilege={userPrivilege}
+      />
+    )}
+    </>
   );
 }

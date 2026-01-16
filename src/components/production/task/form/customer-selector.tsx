@@ -13,9 +13,12 @@ interface CustomerSelectorProps {
   disabled?: boolean;
   required?: boolean;
   initialCustomer?: Customer;
+  name?: string;
+  label?: string;
+  placeholder?: string;
 }
 
-export function CustomerSelector({ control, disabled, required, initialCustomer }: CustomerSelectorProps) {
+export function CustomerSelector({ control, disabled, required, initialCustomer, name = "customerId", label = "Cliente", placeholder = "Selecione um cliente" }: CustomerSelectorProps) {
   const [isCreating, setIsCreating] = useState(false);
 
   // CNPJ autocomplete integration - detects CNPJ input and fetches company data from Brasil API
@@ -103,12 +106,12 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
   return (
     <FormField
       control={control}
-      name="customerId"
+      name={name}
       render={({ field }) => (
         <FormItem>
           <FormLabel className="flex items-center gap-2">
             <IconUser className="h-4 w-4" />
-            Cliente
+            {label}
             {required && <span className="text-destructive ml-1">*</span>}
           </FormLabel>
           <FormControl>
@@ -121,7 +124,7 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
                   resetCnpjState();
                 }
               }}
-              placeholder="Selecione um cliente"
+              placeholder={placeholder}
               emptyText={isLookingUp ? "Buscando CNPJ..." : "Nenhum cliente encontrado"}
               searchPlaceholder="Pesquisar por nome ou CNPJ..."
               disabled={disabled || isCreating}
@@ -130,7 +133,7 @@ export function CustomerSelector({ control, disabled, required, initialCustomer 
               createLabel={dynamicCreateLabel}
               onCreate={handleCreateCustomer}
               isCreating={isCreating || isLookingUp}
-              queryKey={["customers", "search"]}
+              queryKey={["customers", "search", name]}
               queryFn={searchCustomers}
               initialOptions={initialOptions}
               getOptionLabel={getOptionLabel}

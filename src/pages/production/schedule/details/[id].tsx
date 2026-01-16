@@ -40,6 +40,8 @@ import { canViewServiceOrderType, canEditServiceOrder, getVisibleServiceOrderTyp
 import { canViewPricing } from "@/utils/permissions/pricing-permissions";
 import { PricingStatusBadge } from "@/components/production/task/pricing/pricing-status-badge";
 import { exportBudgetPdf } from "@/utils/budget-pdf-generator";
+import { generatePaymentText, generateGuaranteeText } from "@/utils/pricing-text-generators";
+import { getApiBaseUrl } from "@/utils/file";
 import { SERVICE_ORDER_TYPE } from "../../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import {
@@ -110,6 +112,11 @@ import {
   IconBrandWhatsapp,
   IconNote,
   IconRuler,
+  IconCreditCard,
+  IconShieldCheck,
+  IconPhoto,
+  IconWriting,
+  IconReceipt,
 } from "@tabler/icons-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
@@ -727,8 +734,8 @@ export const TaskDetailsPage = () => {
   // Handler for artworks collection viewing
   const handleArtworkFileClick = (file: any) => {
     if (!fileViewerContext) return;
-    // Extract actual file objects from artworks (artworks have nested file property)
-    const artworkFiles = (task?.artworks || []).map(artwork => artwork.file).filter(Boolean);
+    // Extract file objects from artworks - file data can be nested in .file or directly on artwork
+    const artworkFiles = (task?.artworks || []).map(artwork => artwork.file || artwork).filter(Boolean);
     const index = artworkFiles.findIndex(f => f.id === file.id);
     fileViewerContext.actions.viewFiles(artworkFiles, index);
   };
@@ -1539,19 +1546,36 @@ export const TaskDetailsPage = () => {
                             <IconDownload className="h-4 w-4" />
                             {isExportingPdf ? "Exportando..." : "Exportar PDF"}
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`/cliente/${task.customer?.id || 'c'}/orcamento/${task.pricing?.id}`, '_blank')}
+                            className="gap-2"
+                          >
+                            <IconLayoutGrid className="h-4 w-4" />
+                            Visualizar
+                          </Button>
                           <PricingStatusBadge status={task.pricing.status} size="lg" />
                         </div>
                       </div>
                     </CardHeader>
               <CardContent className="pt-0 flex-1">
                 <div className="space-y-4">
-                  {/* Pricing validity date */}
-                  {task.pricing.expiresAt && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
-                  <IconCalendar className="h-4 w-4" />
-                  <span>Validade: <span className="font-medium text-foreground">{formatDate(task.pricing.expiresAt)}</span></span>
-                </div>
-                  )}
+                  {/* Budget Number and Validity */}
+                  <div className="flex flex-wrap gap-3">
+                    {task.pricing.budgetNumber && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+                        <IconReceipt className="h-4 w-4" />
+                        <span>Orçamento Nº: <span className="font-medium text-foreground">{String(task.pricing.budgetNumber).padStart(4, '0')}</span></span>
+                      </div>
+                    )}
+                    {task.pricing.expiresAt && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+                        <IconCalendar className="h-4 w-4" />
+                        <span>Validade: <span className="font-medium text-foreground">{formatDate(task.pricing.expiresAt)}</span></span>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Pricing items table */}
                   <div className="border rounded-lg overflow-hidden">
@@ -1622,6 +1646,68 @@ export const TaskDetailsPage = () => {
                       </span>
                     </div>
                   </div>
+
+                  {/* Payment Conditions */}
+                  {(() => {
+                    const paymentText = generatePaymentText(task.pricing);
+                    return paymentText ? (
+                      <div className="bg-muted/30 rounded-lg p-4">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
+                          <IconCreditCard className="h-4 w-4 text-muted-foreground" />
+                          Condições de Pagamento
+                        </div>
+                        <p className="text-sm text-muted-foreground">{paymentText}</p>
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {/* Guarantee */}
+                  {(() => {
+                    const guaranteeText = generateGuaranteeText(task.pricing);
+                    return guaranteeText ? (
+                      <div className="bg-muted/30 rounded-lg p-4">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
+                          <IconShieldCheck className="h-4 w-4 text-muted-foreground" />
+                          Garantia
+                        </div>
+                        <p className="text-sm text-muted-foreground">{guaranteeText}</p>
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {/* Layout File Preview */}
+                  {task.pricing.layoutFile && (
+                    <div className="bg-muted/30 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+                        <IconPhoto className="h-4 w-4 text-muted-foreground" />
+                        Layout Aprovado
+                      </div>
+                      <div className="flex justify-start">
+                        <img
+                          src={`${getApiBaseUrl()}/files/thumbnail/${task.pricing.layoutFile.id}`}
+                          alt="Layout aprovado"
+                          className="max-h-48 rounded-lg shadow-sm object-contain"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Customer Signature */}
+                  {task.pricing.customerSignature && (
+                    <div className="bg-muted/30 rounded-lg p-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+                        <IconWriting className="h-4 w-4 text-muted-foreground" />
+                        Assinatura do Cliente
+                      </div>
+                      <div className="flex justify-center">
+                        <img
+                          src={`${getApiBaseUrl()}/files/serve/${task.pricing.customerSignature.id}`}
+                          alt="Assinatura do cliente"
+                          className="max-h-24 object-contain"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
                 </Card>
@@ -2017,8 +2103,10 @@ export const TaskDetailsPage = () => {
                               const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
                               for (let i = 0; i < (task.artworks?.length ?? 0); i++) {
                                 const artwork = task.artworks?.[i];
-                                if (artwork?.file) {
-                                  const downloadUrl = `${apiUrl}/files/${artwork.file.id}/download`;
+                                // File data can be nested in .file or directly on artwork
+                                const fileId = artwork?.file?.id || artwork?.id;
+                                if (fileId) {
+                                  const downloadUrl = `${apiUrl}/files/${fileId}/download`;
                                   window.open(downloadUrl, "_blank");
                                 }
                                 if (i < (task.artworks?.length ?? 0) - 1) {
@@ -2056,9 +2144,11 @@ export const TaskDetailsPage = () => {
               <CardContent className="pt-0 flex-1">
                 {(() => {
                   // Filter artworks: show all if user can view badges, otherwise only approved
-                  const filteredArtworks = task.artworks?.filter(artwork =>
-                    artwork.file && (canViewArtworkBadges || artwork.status === 'APPROVED')
-                  ) || [];
+                  // Note: artwork can have file data nested in .file OR directly on artwork object
+                  const filteredArtworks = task.artworks?.filter(artwork => {
+                    const hasFileData = artwork.file || (artwork as any).filename || (artwork as any).path;
+                    return hasFileData && (canViewArtworkBadges || artwork.status === 'APPROVED');
+                  }) || [];
 
                   return filteredArtworks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
@@ -2068,10 +2158,13 @@ export const TaskDetailsPage = () => {
                     </div>
                   ) : (
                     <div className={cn(artworksViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                      {filteredArtworks.map((artwork) => (
+                      {filteredArtworks.map((artwork) => {
+                        // File data can be nested in .file or directly on artwork
+                        const fileData = artwork.file || artwork;
+                        return (
                         <div key={artwork.id} className="relative">
                           <FileItem
-                            file={artwork.file!}
+                            file={fileData as any}
                             viewMode={artworksViewMode}
                             onPreview={handleArtworkFileClick}
                             onDownload={handleDownload}
@@ -2088,7 +2181,8 @@ export const TaskDetailsPage = () => {
                             </div>
                           )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   );
                 })()}

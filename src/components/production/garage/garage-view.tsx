@@ -393,14 +393,18 @@ interface TruckElementProps {
   truck: PositionedTruck;
   scale: number;
   isDragging?: boolean;
+  onClick?: () => void;
 }
 
-function TruckElement({ truck, scale, isDragging }: TruckElementProps) {
+function TruckElement({ truck, scale, isDragging, onClick }: TruckElementProps) {
   const width = COMMON_CONFIG.TRUCK_WIDTH_TOP_VIEW * scale;
   const height = truck.length * scale;
   const x = truck.xPosition * scale;
   const y = truck.yPosition * scale;
   const bgColor = truck.paintHex || '#ffffff';
+
+  // Generate unique ID for clip path
+  const clipId = `truck-clip-${truck.id}`;
 
   // Determine text color based on background brightness
   const getBrightness = (hex: string) => {
@@ -412,8 +416,9 @@ function TruckElement({ truck, scale, isDragging }: TruckElementProps) {
   };
   const textColor = getBrightness(bgColor) > 128 ? '#000000' : '#ffffff';
 
-  // Truncate task name to fit
-  const maxChars = Math.floor(height / 8);
+  // Truncate task name to fit within truck height (accounting for rotation)
+  // The rotated text width becomes the height constraint
+  const maxChars = Math.max(3, Math.floor((height - 24) / 7)); // Leave space for top/bottom labels
   const displayName = truck.taskName
     ? truck.taskName.length > maxChars
       ? truck.taskName.slice(0, maxChars - 2) + '..'
@@ -423,12 +428,23 @@ function TruckElement({ truck, scale, isDragging }: TruckElementProps) {
   // Display original length (without cabin) if available
   const displayLength = truck.originalLength ?? truck.length;
 
+  // Only show serial number if there's enough height
+  const showSerialNumber = height > 50 && truck.serialNumber;
+
   return (
     <g
       transform={`translate(${x}, ${y})`}
-      className="cursor-grab"
+      className={onClick ? 'cursor-pointer' : 'cursor-grab'}
       style={{ opacity: isDragging ? 0 : 1 }}
+      onClick={onClick}
     >
+      {/* Define clip path to prevent text overflow */}
+      <defs>
+        <clipPath id={clipId}>
+          <rect width={width} height={height} rx={3} />
+        </clipPath>
+      </defs>
+
       {/* Truck body */}
       <rect
         width={width}
@@ -438,44 +454,48 @@ function TruckElement({ truck, scale, isDragging }: TruckElementProps) {
         strokeWidth={1.5}
         rx={3}
       />
-      {/* Task name (rotated 90deg) */}
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fill={textColor}
-        fontSize={10}
-        fontWeight="bold"
-        transform={`rotate(-90, ${width / 2}, ${height / 2})`}
-        style={{ pointerEvents: 'none' }}
-      >
-        {displayName}
-      </text>
-      {/* Length label at top - show original length */}
-      <text
-        x={width / 2}
-        y={10}
-        textAnchor="middle"
-        fill={textColor}
-        fontSize={8}
-        style={{ pointerEvents: 'none' }}
-      >
-        {displayLength.toFixed(1).replace('.', ',')}m
-      </text>
-      {/* Serial number label at bottom */}
-      {truck.serialNumber && (
+
+      {/* Content group with clipping */}
+      <g clipPath={`url(#${clipId})`}>
+        {/* Task name (rotated 90deg) */}
         <text
           x={width / 2}
-          y={height - 4}
+          y={height / 2}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill={textColor}
+          fontSize={10}
+          fontWeight="bold"
+          transform={`rotate(-90, ${width / 2}, ${height / 2})`}
+          style={{ pointerEvents: 'none' }}
+        >
+          {displayName}
+        </text>
+        {/* Length label at top - show original length */}
+        <text
+          x={width / 2}
+          y={12}
           textAnchor="middle"
           fill={textColor}
           fontSize={8}
           style={{ pointerEvents: 'none' }}
         >
-          {truck.serialNumber}
+          {displayLength.toFixed(1).replace('.', ',')}m
         </text>
-      )}
+        {/* Serial number label at bottom - only if enough space */}
+        {showSerialNumber && (
+          <text
+            x={width / 2}
+            y={height - 6}
+            textAnchor="middle"
+            fill={textColor}
+            fontSize={8}
+            style={{ pointerEvents: 'none' }}
+          >
+            {truck.serialNumber}
+          </text>
+        )}
+      </g>
     </g>
   );
 }
@@ -566,9 +586,10 @@ interface DraggableTruckProps {
   truck: PositionedTruck;
   scale: number;
   disabled?: boolean;
+  onClick?: () => void;
 }
 
-function DraggableTruck({ truck, scale, disabled = false }: DraggableTruckProps) {
+function DraggableTruck({ truck, scale, disabled = false, onClick }: DraggableTruckProps) {
   const [isHovering, setIsHovering] = useState(false);
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: truck.id,
@@ -588,14 +609,23 @@ function DraggableTruck({ truck, scale, disabled = false }: DraggableTruckProps)
     }
   }, [isHovering, isDragging, truck, scale]);
 
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    // Only trigger click if not currently dragging
+    if (!isDragging && onClick) {
+      e.stopPropagation();
+      onClick();
+    }
+  }, [isDragging, onClick]);
+
   return (
     <g
       ref={setNodeRef}
       {...(disabled ? {} : listeners)}
       {...attributes}
-      style={{ cursor: disabled ? 'default' : 'grab' }}
+      style={{ cursor: disabled ? 'default' : onClick ? 'pointer' : 'grab' }}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
+      onClick={handleClick}
     >
       <TruckElement truck={truck} scale={scale} isDragging={isDragging} />
       {/* Invisible larger hitbox for better tooltip activation */}
@@ -1195,10 +1225,11 @@ interface AllGaragesViewProps {
   viewMode?: 'all' | 'week';
   onTruckMove?: (truckId: string, newSpot: string) => void;
   onTruckSwap?: (truck1Id: string, spot1: string, truck2Id: string, spot2: string) => void;
+  onTruckClick?: (taskId: string) => void;
   readOnly?: boolean;
 }
 
-function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts, viewMode = 'all', onTruckMove, onTruckSwap, readOnly = false }: AllGaragesViewProps) {
+function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts, viewMode = 'all', onTruckMove, onTruckSwap, onTruckClick, readOnly = false }: AllGaragesViewProps) {
   // Show all 4 areas (including PATIO/yard) in both Grade and Calendar views
   const areasToShow = AREAS;
 
@@ -1209,6 +1240,8 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
 
   // Drag-and-drop state
   const [activeTruck, setActiveTruck] = useState<PositionedTruck | null>(null);
+  const [activeDropTarget, setActiveDropTarget] = useState<{ garageId: GarageId; laneId: LaneId } | null>(null);
+  const lastDragPositionRef = useRef<{ x: number; y: number } | null>(null);
 
   // Enable drag-and-drop only when viewMode === 'all' and onTruckMove is provided
   const enableDragDrop = viewMode === 'all' && !readOnly && !!onTruckMove;
@@ -1338,12 +1371,45 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
 
   const handleDragCancel = useCallback(() => {
     setActiveTruck(null);
+    setActiveDropTarget(null);
+    lastDragPositionRef.current = null;
+  }, []);
+
+  // Track drag position for determining drop location within lane
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    const { over, activatorEvent, delta } = event;
+
+    // Calculate CURRENT mouse position: original position + delta
+    // activatorEvent gives the original position, delta gives how much we've moved
+    if (activatorEvent && 'clientY' in activatorEvent && delta) {
+      const originalY = (activatorEvent as PointerEvent).clientY;
+      const originalX = (activatorEvent as PointerEvent).clientX;
+      lastDragPositionRef.current = {
+        x: originalX + delta.x,
+        y: originalY + delta.y,
+      };
+    }
+
+    // Track current drop target
+    if (over) {
+      const dropData = over.data.current as { garageId?: GarageId; laneId?: LaneId; isPatio?: boolean } | undefined;
+      if (dropData?.garageId && dropData?.laneId) {
+        setActiveDropTarget({ garageId: dropData.garageId, laneId: dropData.laneId });
+      } else {
+        setActiveDropTarget(null);
+      }
+    } else {
+      setActiveDropTarget(null);
+    }
   }, []);
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
       const { active, over } = event;
+      const lastPosition = lastDragPositionRef.current;
       setActiveTruck(null);
+      setActiveDropTarget(null);
+      lastDragPositionRef.current = null;
 
       if (!over || !onTruckMove) return;
 
@@ -1380,18 +1446,40 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
         }
       });
 
-      // Determine preferred spot based on which spots are occupied
-      // If V1 is empty, prefer V1. Otherwise, prefer V2.
+      // Determine preferred spot based on DROP POSITION within the lane
+      // Use the dragged element's translated position to determine where user wants to drop
       const v1Truck = spotToTruck.get(1);
       const v2Truck = spotToTruck.get(2);
-      const v3Truck = spotToTruck.get(3);
 
-      let preferredSpotNum = 1;
-      if (v1Truck) {
-        preferredSpotNum = 2; // V1 occupied, try V2
-        if (v2Truck) {
-          preferredSpotNum = 3; // V1 and V2 occupied, try V3
-        }
+      // Calculate drop position relative to lane
+      // Use active.rect.current.translated for the dragged truck's current position
+      // Use over.rect for the lane's position
+      let isDroppedInTopHalf = true; // Default to top (V1)
+
+      const activeRect = active.rect?.current?.translated;
+      const overRect = over.rect;
+
+      if (activeRect && overRect) {
+        // Calculate where the CENTER of the dragged truck is relative to the lane
+        const truckCenterY = activeRect.top + activeRect.height / 2;
+        const laneCenterY = overRect.top + overRect.height / 2;
+        isDroppedInTopHalf = truckCenterY < laneCenterY;
+      } else if (lastPosition && overRect) {
+        // Fallback: use tracked mouse position
+        const dropY = lastPosition.y;
+        const laneCenterY = overRect.top + overRect.height / 2;
+        isDroppedInTopHalf = dropY < laneCenterY;
+      }
+
+      // Determine preferred spot: V1 (top) or V2 (bottom)
+      // Only use 2 spots for regular trucks
+      let preferredSpotNum: number;
+      if (isDroppedInTopHalf) {
+        // User dropped in top half - prefer V1, fallback to V2
+        preferredSpotNum = !v1Truck ? 1 : 2;
+      } else {
+        // User dropped in bottom half - prefer V2, fallback to V1
+        preferredSpotNum = !v2Truck ? 2 : 1;
       }
 
       // Check if dragged truck is already at the target lane
@@ -1522,12 +1610,14 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
                           truck={truck}
                           scale={uniformScale}
                           disabled={false}
+                          onClick={onTruckClick ? () => onTruckClick(truck.id) : undefined}
                         />
                       ) : (
                         <TruckElement
                           key={truck.id}
                           truck={truck}
                           scale={uniformScale}
+                          onClick={onTruckClick ? () => onTruckClick(truck.id) : undefined}
                         />
                       )
                     ))}
@@ -1575,6 +1665,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
                                   truck={truck}
                                   scale={uniformScale}
                                   disabled={false}
+                                  onClick={onTruckClick ? () => onTruckClick(truck.id) : undefined}
                                 />
                               ))}
                             </DroppableLane>
@@ -1598,6 +1689,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
                                     key={truck.id}
                                     truck={truck}
                                     scale={uniformScale}
+                                    onClick={onTruckClick ? () => onTruckClick(truck.id) : undefined}
                                   />
                                 ))}
                               </g>
@@ -1624,6 +1716,7 @@ function AllGaragesView({ trucks, containerWidth, containerHeight, garageCounts,
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
@@ -1655,13 +1748,14 @@ interface GarageViewProps {
   trucks: GarageTruck[];
   onTruckMove?: (truckId: string, newSpot: string) => void;
   onTruckSwap?: (truck1Id: string, spot1: string, truck2Id: string, spot2: string) => void;
+  onTruckClick?: (taskId: string) => void;
   className?: string;
   readOnly?: boolean;
   viewMode?: 'all' | 'week';
   selectedDate?: Date; // For week view - filter trucks by this date
 }
 
-export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOnly = false, viewMode = 'all', selectedDate }: GarageViewProps) {
+export function GarageView({ trucks, onTruckMove, onTruckSwap, onTruckClick, className, readOnly = false, viewMode = 'all', selectedDate }: GarageViewProps) {
   const [currentAreaIndex, setCurrentAreaIndex] = useState(0);
   const [activeTruck, setActiveTruck] = useState<PositionedTruck | null>(null);
   const [activeTruckSourceArea, setActiveTruckSourceArea] = useState<AreaId | null>(null);
@@ -2312,10 +2406,48 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
     setCurrentAreaIndex((prev) => (prev < AREAS.length - 1 ? prev + 1 : 0));
   }, []);
 
-  // Count trucks per garage
+  // Display logic is handled by the parent component (barracoes/index.tsx):
+  // - Has spot → display in that spot (garage)
+  // - No spot AND forecastDate <= today → display in patio
+  // - Must have a layout defined
+  //
+  // For Calendar view, we add additional filtering based on selectedDate
+  const filteredTrucks = useMemo(() => {
+    if (viewMode === 'week' && selectedDate) {
+      // Calendar view: Filter trucks that should be visible on the selected date
+      const checkDate = new Date(selectedDate);
+      checkDate.setHours(0, 0, 0, 0);
+
+      return trucksWithLocalPositions.filter(truck => {
+        // For calendar view, check if truck is within forecastDate to term range
+        if (truck.forecastDate) {
+          const forecastDate = new Date(truck.forecastDate);
+          forecastDate.setHours(0, 0, 0, 0);
+
+          // Truck must have arrived by the selected date
+          if (checkDate < forecastDate) return false;
+
+          // If term exists, selected date must be before or on the term
+          if (truck.term) {
+            const term = new Date(truck.term);
+            term.setHours(0, 0, 0, 0);
+            if (checkDate > term) return false;
+          }
+        }
+        return true;
+      });
+    }
+
+    // Grade view: Show all trucks passed from parent (already filtered)
+    return trucksWithLocalPositions;
+  }, [viewMode, selectedDate, trucksWithLocalPositions]);
+
+  const displayTrucks = filteredTrucks;
+
+  // Count trucks per garage based on displayed trucks (ensures counts match rendered trucks)
   const garageCounts = useMemo(() => {
     const counts: Record<string, number> = { B1: 0, B2: 0, B3: 0, PATIO: 0 };
-    trucks.forEach((t) => {
+    displayTrucks.forEach((t) => {
       if (!t.spot || t.spot === 'PATIO') {
         counts.PATIO++;
       } else {
@@ -2326,70 +2458,7 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
       }
     });
     return counts;
-  }, [trucks]);
-
-  const inGarages = garageCounts.B1 + garageCounts.B2 + garageCounts.B3;
-  const inPatio = garageCounts.PATIO;
-
-  // Filter trucks based on view mode, forecastDate, and completion status
-  // WORKFLOW:
-  // - forecastDate: The date when the truck is expected to arrive at the company (REQUIRED)
-  // - term: The deadline for completing the work
-  // - finishedAt: When the task was completed (null if still in progress)
-  //
-  // Grade View: Show trucks where forecastDate <= today AND not complete
-  // Calendar View: Show trucks where forecastDate <= selectedDate <= term AND not complete
-  const filteredTrucks = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (viewMode === 'week' && selectedDate) {
-      // Calendar view: Show trucks from forecastDate until term date
-      const checkDate = new Date(selectedDate);
-      checkDate.setHours(0, 0, 0, 0);
-
-      return trucksWithLocalPositions.filter(truck => {
-        // MUST have forecastDate - tasks without forecast date are not displayed
-        if (!truck.forecastDate) return false;
-
-        // MUST not be complete
-        if (truck.finishedAt) return false;
-
-        const forecastDate = new Date(truck.forecastDate);
-        forecastDate.setHours(0, 0, 0, 0);
-
-        // Truck must have arrived by the selected date (forecastDate <= selectedDate)
-        if (checkDate < forecastDate) return false;
-
-        // If term exists, selected date must be before or on the term (selectedDate <= term)
-        // If no term, show the truck (no end date constraint)
-        if (truck.term) {
-          const term = new Date(truck.term);
-          term.setHours(0, 0, 0, 0);
-          if (checkDate > term) return false;
-        }
-
-        return true;
-      });
-    }
-
-    // Grade view (all): Show trucks where forecastDate <= today AND not complete
-    return trucksWithLocalPositions.filter(truck => {
-      // MUST have forecastDate - tasks without forecast date are not displayed
-      if (!truck.forecastDate) return false;
-
-      // MUST not be complete
-      if (truck.finishedAt) return false;
-
-      const forecastDate = new Date(truck.forecastDate);
-      forecastDate.setHours(0, 0, 0, 0);
-
-      // Show truck only if forecastDate <= today (truck has arrived or expected today)
-      return forecastDate <= today;
-    });
-  }, [viewMode, selectedDate, trucksWithLocalPositions]);
-
-  const displayTrucks = filteredTrucks;
+  }, [displayTrucks]);
 
   return (
     <div className={cn('flex flex-col h-full w-full', className)}>
@@ -2407,6 +2476,7 @@ export function GarageView({ trucks, onTruckMove, onTruckSwap, className, readOn
           viewMode={viewMode}
           onTruckMove={onTruckMove}
           onTruckSwap={onTruckSwap}
+          onTruckClick={onTruckClick}
           readOnly={readOnly}
         />
       </div>

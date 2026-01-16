@@ -120,28 +120,31 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     return { groupedServices: groups, ungroupedIndices: ungrouped };
   }, [fields, servicesValues, creatingServiceIndex]);
 
-  const handleAddService = () => {
-    // Set default service order type based on user's sector privilege
-    let defaultType = SERVICE_ORDER_TYPE.PRODUCTION;
-
-    if (userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
-      defaultType = SERVICE_ORDER_TYPE.COMMERCIAL;
-    } else if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
-      defaultType = SERVICE_ORDER_TYPE.FINANCIAL;
-    } else if (userPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
-      defaultType = SERVICE_ORDER_TYPE.LOGISTIC;
-    } else if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
-      defaultType = SERVICE_ORDER_TYPE.ARTWORK;
-    } else if (userPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
-      defaultType = SERVICE_ORDER_TYPE.PRODUCTION;
+  // Get the default type for the user's sector (the type they work with most)
+  const getDefaultTypeForSector = useCallback(() => {
+    switch (userPrivilege) {
+      case SECTOR_PRIVILEGES.COMMERCIAL:
+        return SERVICE_ORDER_TYPE.COMMERCIAL;
+      case SECTOR_PRIVILEGES.FINANCIAL:
+        return SERVICE_ORDER_TYPE.FINANCIAL;
+      case SECTOR_PRIVILEGES.LOGISTIC:
+        return SERVICE_ORDER_TYPE.LOGISTIC;
+      case SECTOR_PRIVILEGES.DESIGNER:
+        return SERVICE_ORDER_TYPE.ARTWORK;
+      case SECTOR_PRIVILEGES.PRODUCTION:
+      case SECTOR_PRIVILEGES.ADMIN:
+      default:
+        return SERVICE_ORDER_TYPE.PRODUCTION;
     }
+  }, [userPrivilege]);
 
+  const handleAddService = () => {
     // Use prepend to add new service at the beginning (top)
     prepend({
       status: SERVICE_ORDER_STATUS.PENDING,
       statusOrder: 1,
       description: "",
-      type: defaultType,
+      type: getDefaultTypeForSector(),
       assignedToId: null,
     });
   };
@@ -514,7 +517,9 @@ function ServiceRow({
     }
   };
 
-  // Determine which service order types the user can create based on their privilege
+  // Determine which service order types the user can CREATE based on their privilege
+  // Note: This is separate from what they can UPDATE (handled by canEditServiceOrder)
+  // Creating is more permissive than updating
   const allowedServiceOrderTypes = useMemo(() => {
     if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) {
       return [
@@ -526,16 +531,32 @@ function ServiceRow({
       ];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL) {
-      return [SERVICE_ORDER_TYPE.COMMERCIAL];
+      // Commercial can CREATE all types, but can only UPDATE commercial
+      return [
+        SERVICE_ORDER_TYPE.PRODUCTION,
+        SERVICE_ORDER_TYPE.FINANCIAL,
+        SERVICE_ORDER_TYPE.COMMERCIAL,
+        SERVICE_ORDER_TYPE.LOGISTIC,
+        SERVICE_ORDER_TYPE.ARTWORK,
+      ];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.FINANCIAL) {
+      // Financial can CREATE financial, but can only UPDATE financial
       return [SERVICE_ORDER_TYPE.FINANCIAL];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
+      // Designer can CREATE artwork, but can only UPDATE artwork
       return [SERVICE_ORDER_TYPE.ARTWORK];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.LOGISTIC) {
-      return [SERVICE_ORDER_TYPE.PRODUCTION, SERVICE_ORDER_TYPE.LOGISTIC];
+      // Logistic can CREATE production, artwork, commercial, logistic
+      // but can only UPDATE logistic and production
+      return [
+        SERVICE_ORDER_TYPE.PRODUCTION,
+        SERVICE_ORDER_TYPE.COMMERCIAL,
+        SERVICE_ORDER_TYPE.LOGISTIC,
+        SERVICE_ORDER_TYPE.ARTWORK,
+      ];
     }
     if (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION) {
       return [SERVICE_ORDER_TYPE.PRODUCTION];
@@ -574,6 +595,7 @@ function ServiceRow({
                   }))}
                   placeholder="Tipo"
                   searchable={false}
+                  clearable={false}
                   className="w-full"
                 />
               )}

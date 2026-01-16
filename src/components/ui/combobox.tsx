@@ -49,6 +49,13 @@ interface ComboboxProps<TData = ComboboxOption> {
   isCreating?: boolean;
   queryKeysToInvalidate?: unknown[][];
 
+  // Custom empty action (shown when no results, alternative to allowCreate)
+  customEmptyAction?: {
+    label: string;
+    icon?: React.ReactNode;
+    onClick: () => void;
+  };
+
   // Display customization
   placeholder?: string;
   emptyText?: string;
@@ -104,6 +111,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   createLabel = (value) => `Criar "${value}"`,
   isCreating = false,
   queryKeysToInvalidate = [],
+  customEmptyAction,
   placeholder = "Selecione uma opção",
   emptyText = "Nenhuma opção encontrada",
   searchPlaceholder = "Pesquisar...",
@@ -232,19 +240,24 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
     refetchOnWindowFocus: false,
   });
 
-  // Initialize with initialOptions on mount
+  // Track if we've done initial mount
+  const hasInitializedRef = useRef(false);
+
+  // Initialize with initialOptions on mount ONLY (not when options become empty during search)
   useEffect(() => {
     const currentInitialOptions = initialOptionsRef.current;
-    if (async && currentInitialOptions && currentInitialOptions.length > 0 && allAsyncOptions.length === 0) {
+    if (!hasInitializedRef.current && async && currentInitialOptions && currentInitialOptions.length > 0) {
+      hasInitializedRef.current = true;
       setAllAsyncOptions(currentInitialOptions);
     }
-  }, [async, allAsyncOptions.length]); // Using ref for initialOptions
+  }, [async]);
 
   // Reset pagination when search changes
   useEffect(() => {
     // console.log('[Combobox] Search changed, resetting pagination. debouncedSearch:', debouncedSearch);
     setCurrentPage(1);
     // Clear options for new search to show loading state
+    // Don't re-add initialOptions here - let the async query handle it
     if (debouncedSearch !== '') {
       setAllAsyncOptions([]);
     }
@@ -278,16 +291,19 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
       const currentSelectedValues = Array.isArray(value) ? value : (value ? [value] : []);
 
       // Merge in selected items from cache that aren't in the current response
-      // This ensures selected items persist even when they don't match the current filter
-      const fetchedValues = new Set(newOptions.map(item => getOptionValueRef.current(item)));
-      currentSelectedValues.forEach(selectedValue => {
-        if (!fetchedValues.has(selectedValue) && allItemsCacheRef.current.has(selectedValue)) {
-          const cachedItem = allItemsCacheRef.current.get(selectedValue);
-          if (cachedItem) {
-            newOptions = [cachedItem, ...newOptions];
+      // ONLY when there's no active search - this ensures selected items show when dropdown opens
+      // but don't pollute search results when user is searching for something else
+      if (!debouncedSearch || debouncedSearch.trim() === '') {
+        const fetchedValues = new Set(newOptions.map(item => getOptionValueRef.current(item)));
+        currentSelectedValues.forEach(selectedValue => {
+          if (!fetchedValues.has(selectedValue) && allItemsCacheRef.current.has(selectedValue)) {
+            const cachedItem = allItemsCacheRef.current.get(selectedValue);
+            if (cachedItem) {
+              newOptions = [cachedItem, ...newOptions];
+            }
           }
-        }
-      });
+        });
+      }
 
       // Deduplicate items based on their value to prevent duplicate key warnings
       const deduplicatedData = newOptions.filter(
@@ -562,7 +578,7 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
   const handleClear = useCallback(
     (e?: React.MouseEvent) => {
       e?.stopPropagation();
-      onValueChange?.(isMultiple ? [] : null);
+      onValueChange?.(isMultiple ? [] : undefined);
       setSearch("");
     },
     [isMultiple, onValueChange],
@@ -646,7 +662,30 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
             type="button"
           >
             <span className="truncate flex-1 text-left">{triggerContent}</span>
-            <IconChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            <div className="flex items-center ml-2 gap-1">
+              {clearable && !isMultiple && selectedValues.length > 0 && !disabled && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className="h-4 w-4 shrink-0 opacity-50 hover:opacity-100 rounded-sm hover:bg-destructive/20"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClear(e);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleClear();
+                    }
+                  }}
+                  aria-label="Limpar seleção"
+                >
+                  <IconX className="h-4 w-4" />
+                </span>
+              )}
+              <IconChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+            </div>
           </Button>
         </PopoverTrigger>
 
@@ -769,12 +808,34 @@ export const Combobox = React.memo(function Combobox<TData = ComboboxOption>({
                   </div>
                 )}
 
+                {/* Custom empty action button */}
+                {customEmptyAction && filteredOptions.length === 0 && !loading && (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className="w-full flex items-center px-2 py-2 text-sm rounded-sm cursor-pointer hover:bg-accent hover:text-accent-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      customEmptyAction.onClick();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        customEmptyAction.onClick();
+                      }
+                    }}
+                  >
+                    {customEmptyAction.icon || <IconPlus className="mr-2 h-4 w-4" />}
+                    <span className="truncate">{customEmptyAction.label}</span>
+                  </div>
+                )}
+
                 {loading ? (
                   <div className="px-2 py-8 text-center text-sm text-muted-foreground">
                     <IconLoader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
                     {loadingText}
                   </div>
-                ) : filteredOptions.length === 0 && !showCreateOption ? (
+                ) : filteredOptions.length === 0 && !showCreateOption && !customEmptyAction ? (
                   <div className="px-2 py-8 text-center text-sm text-muted-foreground">{emptyText}</div>
                 ) : (
                   filteredOptions.map((option) => {

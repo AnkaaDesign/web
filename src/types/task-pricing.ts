@@ -21,6 +21,7 @@ export interface TaskPricingItem extends BaseEntity {
 }
 
 export interface TaskPricing extends BaseEntity {
+  budgetNumber: number; // Auto-generated sequential number for display
   subtotal: number;
   discountType: DISCOUNT_TYPE;
   discountValue: number | null;
@@ -41,6 +42,10 @@ export interface TaskPricing extends BaseEntity {
   // Layout File
   layoutFileId: string | null;
   layoutFile?: File;
+
+  // Customer Signature (uploaded by customer on public page)
+  customerSignatureId: string | null;
+  customerSignature?: File;
 
   task?: any;  // Task type
   items?: TaskPricingItem[];

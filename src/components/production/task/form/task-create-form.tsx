@@ -35,7 +35,7 @@ import { toast } from "sonner";
 const taskCreateFormSchema = z.object({
   status: z.string(),
   name: z.string(),
-  customerId: z.string(),
+  customerId: z.string().optional(),
   plates: z.array(z.string()).default([]),
   serialNumbers: z.array(z.number()).default([]),
   category: z.string().optional(),

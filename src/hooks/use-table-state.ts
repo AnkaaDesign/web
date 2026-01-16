@@ -295,6 +295,11 @@ export function useTableState(options: UseTableStateOptions = {}) {
         } else {
           params.set("selected", serialized);
         }
+        // If selection is now empty and showSelectedOnly is active, disable it
+        // to prevent showing an empty table
+        if (selectedIds.length === 0 && params.get("showSelectedOnly") === "true") {
+          params.delete("showSelectedOnly");
+        }
       });
     },
     [updateUrl],

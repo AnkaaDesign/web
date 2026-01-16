@@ -93,6 +93,9 @@ const AdministrationChangeLogsDetails = lazy(() => import("@/pages/administratio
 // Under Construction Page
 const UnderConstruction = lazy(() => import("@/pages/under-construction"));
 
+// Public Pages (no authentication required)
+const PublicBudgetPage = lazy(() => import("@/pages/public/budget/[id]").then((module) => ({ default: module.PublicBudgetPage })));
+
 // Inventory
 const Inventory = lazy(() => import("@/pages/inventory/root").then((module) => ({ default: module.InventoryRootPage })));
 const InventoryLoans = lazy(() => import("@/pages/inventory/loans/list").then((module) => ({ default: module.default })));
@@ -315,27 +318,42 @@ function App() {
     <Router>
       <ThemeProvider defaultTheme="light" storageKey="ankaa-ui-theme">
         <TooltipProvider>
-          <AuthProvider>
-            <SidebarProvider>
-              <SocketNotificationsListener />
-              <SocketReconnectHandler />
-              <FavoritesProvider>
-                <FileViewerProvider>
-                  <MessageModalProvider>
-                    <Toaster />
-                  <PushNotificationSetup />
-                  <Routes>
-              {/* Auth routes */}
-              <Route element={<AuthLayout />}>
-                <Route path={routes.authentication.login} element={<LoginPage />} />
-                <Route path={routes.authentication.register} element={<RegisterPage />} />
-                <Route path={routes.authentication.recoverPassword} element={<RecoverPasswordPage />} />
-                <Route path={routes.authentication.verifyCode} element={<VerifyCodePage />} />
-                <Route path={routes.authentication.verifyPasswordReset} element={<VerifyPasswordResetPage />} />
-                <Route path={routes.authentication.resetPassword(":token")} element={<ResetPasswordPage />} />
-              </Route>
+          <Routes>
+            {/* Customer routes (no authentication, no notifications) - MUST be first */}
+            <Route
+              path={routes.customer.budget(":customerId", ":id")}
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <PublicBudgetPage />
+                </Suspense>
+              }
+            />
 
-              {/* Protected routes with automatic privilege checking */}
+            {/* All other routes wrapped in auth and notification providers */}
+            <Route
+              path="*"
+              element={
+                <AuthProvider>
+                  <SidebarProvider>
+                    <SocketNotificationsListener />
+                    <SocketReconnectHandler />
+                    <FavoritesProvider>
+                      <FileViewerProvider>
+                        <MessageModalProvider>
+                          <Toaster />
+                          <PushNotificationSetup />
+                          <Routes>
+                            {/* Auth routes */}
+                            <Route element={<AuthLayout />}>
+                              <Route path={routes.authentication.login} element={<LoginPage />} />
+                              <Route path={routes.authentication.register} element={<RegisterPage />} />
+                              <Route path={routes.authentication.recoverPassword} element={<RecoverPasswordPage />} />
+                              <Route path={routes.authentication.verifyCode} element={<VerifyCodePage />} />
+                              <Route path={routes.authentication.verifyPasswordReset} element={<VerifyPasswordResetPage />} />
+                              <Route path={routes.authentication.resetPassword(":token")} element={<ResetPasswordPage />} />
+                            </Route>
+
+                            {/* Protected routes with automatic privilege checking */}
               <Route
                 element={
                   <AutoPrivilegeRoute>
@@ -2215,15 +2233,18 @@ function App() {
                 />
               </Route>
 
-              {/* 404 Not Found route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-                  </MessageModalProvider>
-                </FileViewerProvider>
-              </FavoritesProvider>
-            </SidebarProvider>
-          </AuthProvider>
-      </TooltipProvider>
+                            {/* 404 Not Found route */}
+                            <Route path="*" element={<NotFound />} />
+                          </Routes>
+                        </MessageModalProvider>
+                      </FileViewerProvider>
+                    </FavoritesProvider>
+                  </SidebarProvider>
+                </AuthProvider>
+              }
+            />
+          </Routes>
+        </TooltipProvider>
       </ThemeProvider>
     </Router>
   );

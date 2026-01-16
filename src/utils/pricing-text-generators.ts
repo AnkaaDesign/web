@@ -77,11 +77,11 @@ export function generatePaymentText(pricing: TaskPricing): string {
 
   // Two payments (Entrada + 20)
   if (installmentCount === 2) {
-    return `Fica acertado o pagamento em 2 (${word}) parcelas de ${formatCurrency(installmentValue)}, a primeira${dateText} e a segunda em 20 dias a contar após a finalização dos serviços.`;
+    return `Fica acertado o pagamento em 2 (${word}) parcelas de ${formatCurrency(installmentValue)}, a primeira${dateText} e a segunda em 20 dias a contar da primeira parcela.`;
   }
 
   // Multiple payments - build the payment schedule description
-  return `Fica acertado o pagamento em ${installmentCount} (${word}) parcelas de ${formatCurrency(installmentValue)}, a primeira${dateText} e as demais a cada 20 dias a contar após a finalização dos serviços.`;
+  return `Fica acertado o pagamento em ${installmentCount} (${word}) parcelas de ${formatCurrency(installmentValue)}, a primeira${dateText} e as demais a cada 20 dias a contar da primeira parcela.`;
 }
 
 /**

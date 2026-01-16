@@ -7,9 +7,9 @@ import { usePageTracker } from '@/hooks/use-page-tracker';
 import { usePrivileges } from '@/hooks/usePrivileges';
 import { useTasks } from '@/hooks/useTask';
 import { truckService } from '@/api-client';
-import { GarageView } from '@/components/production/garage';
+import { GarageView, TruckDetailModal } from '@/components/production/garage';
 import type { GarageTruck } from '@/components/production/garage';
-import { IconRefresh, IconDeviceFloppy, IconRestore } from '@tabler/icons-react';
+import { IconDeviceFloppy, IconRestore } from '@tabler/icons-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -22,11 +22,12 @@ interface PendingChange {
 }
 
 export function GaragesPage() {
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<Map<string, PendingChange>>(new Map());
   const [viewMode, setViewMode] = useState<'all' | 'week'>('all');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const datePickerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const queryClient = useQueryClient();
 
@@ -119,17 +120,45 @@ export function GaragesPage() {
   });
 
   // Transform tasks to garage trucks format with CORRECT length calculation
-  // Filter only tasks that are IN_PRODUCTION or PENDING and have a truck
+  // Filter tasks that have a truck with a layout defined
+  // Display logic:
+  // - Has spot → display in that spot (garage) - can be completed or not
+  // - No spot AND forecastDate <= today AND not completed → display in patio
   const garageTrucks = useMemo(() => {
     if (!tasksResponse?.data) {
       return [];
     }
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     return tasksResponse.data
       .filter((task) => {
-        // Only include tasks with trucks and status IN_PRODUCTION or PENDING
+        // Must have a truck
         if (!task.truck) return false;
-        return task.status === TASK_STATUS.IN_PRODUCTION || task.status === TASK_STATUS.WAITING_PRODUCTION;
+
+        const truck = task.truck as any;
+
+        // Must have a layout defined (for dimensions)
+        const layout = truck?.leftSideLayout || truck?.rightSideLayout;
+        const layoutSections = layout?.layoutSections || [];
+        if (layoutSections.length === 0) return false;
+
+        // If truck has a spot assigned in a garage, always include it (even if completed)
+        if (truck?.spot && truck.spot !== 'PATIO') {
+          return true;
+        }
+
+        // For patio: only include if forecastDate <= today AND status is not COMPLETED
+        const forecastDate = (task as any).forecastDate;
+        if (!forecastDate) return false;
+
+        // Must not have COMPLETED status for patio display
+        if (task.status === TASK_STATUS.COMPLETED) return false;
+
+        const forecast = new Date(forecastDate);
+        forecast.setHours(0, 0, 0, 0);
+        return forecast <= today;
       })
       .map((task): GarageTruck => {
         const truck = task.truck as any;
@@ -267,13 +296,11 @@ export function GaragesPage() {
     setPendingChanges(new Map());
   }, []);
 
-  // Handle refresh
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    setPendingChanges(new Map()); // Clear pending changes on refresh
-    await refetch();
-    setIsRefreshing(false);
-  };
+  // Handle truck click to open detail modal
+  const handleTruckClick = useCallback((taskId: string) => {
+    setSelectedTaskId(taskId);
+    setIsDetailModalOpen(true);
+  }, []);
 
   const hasPendingChanges = pendingChanges.size > 0;
   const isUpdating = updateTruckMutation.isPending;
@@ -441,14 +468,6 @@ export function GaragesPage() {
                   },
                 ]
               : []),
-            {
-              key: 'refresh',
-              label: 'Atualizar',
-              icon: IconRefresh,
-              onClick: handleRefresh,
-              variant: 'outline' as const,
-              disabled: isRefreshing || isUpdating,
-            },
           ]}
         />
 
@@ -460,6 +479,7 @@ export function GaragesPage() {
                 trucks={garageTrucks}
                 onTruckMove={canEditGaragePositions ? handleTruckMove : undefined}
                 onTruckSwap={canEditGaragePositions ? handleTruckSwap : undefined}
+                onTruckClick={handleTruckClick}
                 className={isUpdating ? 'opacity-50 pointer-events-none' : ''}
                 readOnly={!canEditGaragePositions}
                 viewMode={viewMode}
@@ -468,6 +488,13 @@ export function GaragesPage() {
             </div>
           </div>
         </div>
+
+        {/* Truck Detail Modal */}
+        <TruckDetailModal
+          taskId={selectedTaskId}
+          open={isDetailModalOpen}
+          onOpenChange={setIsDetailModalOpen}
+        />
       </div>
     </PrivilegeRoute>
   );

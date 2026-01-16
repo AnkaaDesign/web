@@ -53,6 +53,7 @@ import { ServiceSelectorAutoGrouped } from "./service-selector-auto-grouped";
 import { PricingSelector, type PricingSelectorRef } from "../pricing/pricing-selector";
 import { MultiCutSelector, type MultiCutSelectorRef } from "./multi-cut-selector";
 import { GeneralPaintingSelector } from "./general-painting-selector";
+import type { ServiceOrderData } from "./designar-service-order-dialog";
 import { LogoPaintsSelector } from "./logo-paints-selector";
 import { MultiAirbrushingSelector, type MultiAirbrushingSelectorRef } from "./multi-airbrushing-selector";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
@@ -927,7 +928,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         });
         if (Object.keys(changedData).length === 0 && !hasLayoutChanges && !hasFileChanges && !hasArtworkStatusChanges && !hasCutsToCreate) {
           console.log('[TaskEditForm] ❌ Early return: no changes detected');
-          toast.info("Nenhuma alteração detectada");
           return;
         }
 
@@ -1720,6 +1720,17 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     window.location.href = redirectUrl;
   }, [task.id, detailsRoute]);
 
+  // Handle adding a service order from the Designar dialog in GeneralPaintingSelector
+  const handleDesignarServiceOrder = useCallback((serviceOrder: ServiceOrderData) => {
+    const currentServiceOrders = form.getValues("serviceOrders") || [];
+    // Prepend the new service order to the beginning of the array so it appears at the top
+    form.setValue("serviceOrders", [serviceOrder, ...currentServiceOrders], {
+      shouldDirty: true,
+      shouldTouch: true,
+      shouldValidate: true,
+    });
+  }, [form]);
+
   // Watch all form values to trigger re-renders on any change
   // This is CRITICAL - without this, getChangedFields() won't be recalculated
   const formValues = form.watch();
@@ -2038,96 +2049,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                       <CustomerSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} initialCustomer={task.customer} />
                     </div>
 
-                    {/* Invoice To - Custom Customer Selector */}
-                    <FormField
+                    {/* Invoice To - Customer Selector */}
+                    <CustomerSelector
                       control={form.control}
                       name="invoiceToId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-2">
-                            <IconUser className="h-4 w-4" />
-                            Faturar Para
-                          </FormLabel>
-                          <FormControl>
-                            <Combobox
-                              value={field.value || ""}
-                              onValueChange={(value) => {
-                                field.onChange(value);
-                              }}
-                              placeholder="Selecione o cliente para faturamento"
-                              emptyText="Nenhum cliente encontrado"
-                              searchPlaceholder="Pesquisar clientes..."
-                              disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isLogisticUser}
-                              async={true}
-                              queryKey={["customers", "search", "invoiceTo"]}
-                              queryFn={async (search: string, page: number = 1) => {
-                                const params: any = {
-                                  orderBy: { fantasyName: "asc" },
-                                  page: page,
-                                  take: 50,
-                                  include: { logo: true },
-                                };
-                                if (search && search.trim()) {
-                                  params.searchingFor = search.trim();
-                                }
-                                try {
-                                  const { getCustomers } = await import("../../../../api-client");
-                                  const response = await getCustomers(params);
-                                  const customers = response.data || [];
-
-                                  // Format customers with logo icons
-                                  const formattedOptions = customers.map((customer: any) => {
-                                    let description = "";
-                                    if (customer.cnpj) {
-                                      description = `CNPJ: ${formatCNPJ(customer.cnpj)}`;
-                                    } else if (customer.cpf) {
-                                      description = `CPF: ${formatCPF(customer.cpf)}`;
-                                    }
-
-                                    return {
-                                      value: customer.id,
-                                      label: customer.fantasyName,
-                                      description,
-                                      icon: (
-                                        <CustomerLogoDisplay
-                                          logo={customer.logo}
-                                          customerName={customer.fantasyName}
-                                          size="xs"
-                                          shape="rounded"
-                                        />
-                                      ),
-                                    };
-                                  });
-
-                                  return {
-                                    data: formattedOptions,
-                                    hasMore: response.meta?.hasNextPage || false,
-                                  };
-                                } catch (error) {
-                                  return { data: [], hasMore: false };
-                                }
-                              }}
-                              initialOptions={task.invoiceTo ? [{
-                                value: task.invoiceTo.id,
-                                label: task.invoiceTo.fantasyName,
-                                description: task.invoiceTo.cnpj ? `CNPJ: ${task.invoiceTo.cnpj}` : (task.invoiceTo.cpf ? `CPF: ${task.invoiceTo.cpf}` : ""),
-                                icon: (
-                                  <CustomerLogoDisplay
-                                    logo={task.invoiceTo.logo}
-                                    customerName={task.invoiceTo.fantasyName}
-                                    size="xs"
-                                    shape="rounded"
-                                  />
-                                ),
-                              }] : []}
-                              minSearchLength={0}
-                              pageSize={50}
-                              debounceMs={300}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      label="Faturar Para"
+                      placeholder="Selecione o cliente para faturamento"
+                      disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isLogisticUser}
+                      initialCustomer={task.invoiceTo}
                     />
 
                     {/* Negotiating With - Name and Phone */}
@@ -2593,8 +2522,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
                 )}
 
-                {/* Paint Selection (Tintas) - Hidden for Warehouse, Financial, Logistic, and Commercial users, Disabled for Designer */}
-                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && !isCommercialUser && (
+                {/* Paint Selection (Tintas) - Hidden for Warehouse, Financial, and Logistic users, Disabled for Designer */}
+                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
           <AccordionItem value="paint" className="border rounded-lg">
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
@@ -2612,14 +2541,18 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                       control={form.control}
                       disabled={isSubmitting || isWarehouseUser || isDesignerUser}
                       initialPaint={task.generalPainting}
+                      onDesignarServiceOrder={handleDesignarServiceOrder}
+                      userPrivilege={user?.sector?.privileges}
                     />
 
-                    {/* Logo Paints Multi-selector */}
-                    <LogoPaintsSelector
-                      control={form.control}
-                      disabled={isSubmitting || isWarehouseUser || isDesignerUser}
-                      initialPaints={task.logoPaints}
-                    />
+                    {/* Logo Paints Multi-selector - Hidden for Commercial users */}
+                    {!isCommercialUser && (
+                      <LogoPaintsSelector
+                        control={form.control}
+                        disabled={isSubmitting || isWarehouseUser || isDesignerUser}
+                        initialPaints={task.logoPaints}
+                      />
+                    )}
                     </CardContent>
                   </AccordionContent>
                 </Card>

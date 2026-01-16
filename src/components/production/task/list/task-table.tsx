@@ -420,25 +420,6 @@ export function TaskTable({
 
   return (
     <div className={cn("rounded-lg flex flex-col overflow-hidden", className)}>
-      <button
-        onClick={() => {
-          // Event handler placeholder
-        }}
-        style={{
-          position: 'fixed',
-          top: '10px',
-          right: '10px',
-          zIndex: 9999,
-          background: 'red',
-          color: 'white',
-          padding: '10px',
-          border: 'none',
-          borderRadius: '5px'
-        }}
-      >
-        TEST CLICK
-      </button>
-
       {/* Fixed Header Table */}
       <div className="border-l border-r border-t border-border rounded-t-lg overflow-hidden">
         <Table className={cn("w-full [&>div]:border-0 [&>div]:rounded-none", TABLE_LAYOUT.tableLayout)}>
