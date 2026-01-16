@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { File as AnkaaFile } from "../../../types";
-import { isImageFile, isVideoFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension } from "../../../utils/file";
+import { isImageFile, isVideoFile, getFileUrl, getFileThumbnailUrl, formatFileSize, getFileExtension, getApiBaseUrl } from "../../../utils/file";
 import { InlinePdfViewer, type InlinePdfViewerRef } from "./inline-pdf-viewer";
 import { IconChevronLeft, IconChevronRight } from "@tabler/icons-react";
 
@@ -478,7 +478,8 @@ export function FilePreviewModal({
   const handleDownload = React.useCallback(() => {
     if (!currentFile) return;
 
-    const downloadUrl = `${baseUrl}/files/${currentFile.id}/download`;
+    const apiUrl = baseUrl || getApiBaseUrl();
+    const downloadUrl = `${apiUrl}/files/${currentFile.id}/download`;
     window.open(downloadUrl, "_blank");
   }, [currentFile, baseUrl]);
 
