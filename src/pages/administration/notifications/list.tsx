@@ -89,9 +89,17 @@ const WhatsAppQRCard = () => {
     enabled: !!isAdmin,
     refetchInterval: (query) => {
       const actualData = query?.state?.data;
-      return actualData?.data?.status === "QR_READY" ? 30000 : false;
+      const status = actualData?.data?.status;
+      // Poll every 2 seconds when CONNECTING to detect when QR becomes available
+      // Poll every 30 seconds when QR_READY to refresh the QR before it expires
+      if (status === "CONNECTING") return 2000;
+      if (status === "QR_READY") return 30000;
+      return false;
     },
   });
+
+  // Determine if we should fetch QR code
+  const shouldFetchQR = statusData?.data?.status === "QR_READY" || statusData?.data?.status === "CONNECTING";
 
   const {
     data: qrData,
@@ -103,7 +111,16 @@ const WhatsAppQRCard = () => {
       const response = await whatsAppService.getWhatsAppQR();
       return response.data;
     },
-    enabled: statusData?.data?.status === "QR_READY",
+    enabled: shouldFetchQR,
+    // Poll for QR code every 3 seconds when connecting (until QR is available)
+    refetchInterval: (query) => {
+      const status = statusData?.data?.status;
+      const hasQR = query?.state?.data?.data?.qr;
+      // Keep polling if we're connecting and don't have a QR code yet
+      if (status === "CONNECTING" && !hasQR) return 3000;
+      // Stop polling once we have the QR code
+      return false;
+    },
   });
 
   const reconnectMutation = useMutation({
@@ -192,24 +209,41 @@ const WhatsAppQRCard = () => {
         </div>
       ) : statusData?.data?.status === "QR_READY" || statusData?.data?.status === "CONNECTING" ? (
         <div className="flex flex-col items-center gap-3 py-2">
-          {qrLoading || !qrData?.data?.qr ? (
-            <Skeleton className="h-40 w-40" />
-          ) : (
-            <div className="p-2 bg-white rounded border">
-              <img
-                src={qrData.data.qr.startsWith("data:") ? qrData.data.qr : `data:image/png;base64,${qrData.data.qr}`}
-                alt="QR Code"
-                className="h-40 w-40"
-              />
+          {qrLoading ? (
+            <div className="flex flex-col items-center gap-2">
+              <Skeleton className="h-40 w-40" />
+              <p className="text-sm text-muted-foreground">Carregando QR Code...</p>
             </div>
+          ) : !qrData?.data?.qr ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-40 w-40 flex items-center justify-center border rounded bg-muted/30">
+                <div className="flex flex-col items-center gap-2">
+                  <IconRefresh className="h-8 w-8 text-muted-foreground animate-spin" />
+                  <p className="text-xs text-muted-foreground text-center">Gerando QR Code...</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                Aguarde enquanto o QR Code é gerado
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="p-2 bg-white rounded border">
+                <img
+                  src={qrData.data.qr.startsWith("data:") ? qrData.data.qr : `data:image/png;base64,${qrData.data.qr}`}
+                  alt="QR Code"
+                  className="h-40 w-40"
+                />
+              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                Escaneie o QR Code com o WhatsApp
+              </p>
+              <Button size="sm" variant="outline" onClick={() => regenerateMutation.mutate()} disabled={regenerateMutation.isPending}>
+                <IconRefresh className="h-3 w-3 mr-1" />
+                Atualizar QR
+              </Button>
+            </>
           )}
-          <p className="text-sm text-muted-foreground text-center">
-            Escaneie o QR Code com o WhatsApp
-          </p>
-          <Button size="sm" variant="outline" onClick={() => regenerateMutation.mutate()} disabled={regenerateMutation.isPending}>
-            <IconRefresh className="h-3 w-3 mr-1" />
-            Atualizar QR
-          </Button>
         </div>
       ) : statusData?.data?.status === "READY" || statusData?.data?.status === "AUTHENTICATED" ? (
         <div className="flex flex-col items-center gap-3 py-4">
