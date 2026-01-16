@@ -1031,6 +1031,41 @@ export const TaskDetailsPage = () => {
     }
   };
 
+  // Handle "Disponibilizar para Produção" with artwork service order validation
+  const handleReleaseToProduction = () => {
+    if (!task) return;
+
+    const taskName = task.name || task.serialNumber || task.plate || 'Tarefa';
+
+    // Get all ARTWORK service orders for this task
+    const artworkServiceOrders = task.services?.filter(
+      (service) => service && service.type === SERVICE_ORDER_TYPE.ARTWORK
+    ) || [];
+
+    // REQUIREMENT 1: Task MUST have at least one artwork service order
+    if (artworkServiceOrders.length === 0) {
+      toast.error("Não é possível iniciar", {
+        description: `${taskName}: A tarefa deve ter pelo menos uma ordem de serviço de arte antes de mover para o cronograma.`,
+      });
+      return;
+    }
+
+    // REQUIREMENT 2: ALL artwork service orders must be COMPLETED
+    const hasIncompleteArtwork = artworkServiceOrders.some(
+      (service) => !service.status || service.status !== SERVICE_ORDER_STATUS.COMPLETED
+    );
+
+    if (hasIncompleteArtwork) {
+      toast.error("Não é possível iniciar", {
+        description: `${taskName}: Todas as ordens de serviço de arte devem estar concluídas antes de mover para o cronograma.`,
+      });
+      return;
+    }
+
+    // Validation passed, proceed with status change to WAITING_PRODUCTION
+    handleStatusChange(TASK_STATUS.WAITING_PRODUCTION);
+  };
+
   // Handle service order status change
   const handleServiceOrderStatusChange = async (serviceOrderId: string, newStatus: SERVICE_ORDER_STATUS) => {
     const serviceOrder = task?.services?.find((s) => s.id === serviceOrderId);
@@ -1189,7 +1224,7 @@ export const TaskDetailsPage = () => {
                       key: "resume",
                       label: "Disponibilizar para Produção",
                       icon: IconPlayerPlay,
-                      onClick: () => handleStatusChange(TASK_STATUS.IN_PRODUCTION),
+                      onClick: handleReleaseToProduction,
                       variant: "default" as const,
                     },
                   ]

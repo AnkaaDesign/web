@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import type { User, Position } from "../../../types";
 import { formatCurrency } from "../../../utils";
+import { calculateBonusForPosition } from "../../../utils/bonus";
 import { Input } from "../../ui/input";
 import {
   Select,
@@ -12,140 +13,11 @@ import {
 import { Button } from "../../ui/button";
 import { IconCheck, IconX, IconEdit } from "@tabler/icons-react";
 
-// === CORRECT BONUS CALCULATION FROM DB SEED ===
-// Performance multipliers (exactly as in seed database)
-const performanceMultipliers: Record<number, number> = {
-  1: 1.0,       // Base value
-  2: 2.0,       // Exactly 2x base
-  3: 3.0,       // Exactly 3x base
-  4: 3.5,       // Exactly 3.5x base
-  5: 4.0,       // Exactly 4x base (corrected from Excel)
-};
-
-/**
- * Get detailed position level (1-12) from position name (exactly as in seed database)
- */
-function getDetailedPositionLevel(positionName: string): number {
-  const normalized = positionName.toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/iv/g, 'iv')  // Normalize IV variations
-    .replace(/iii/g, 'iii')  // Normalize III variations
-    .replace(/ii/g, 'ii')  // Normalize II variations
-    .replace(/i(?!i|v)/g, 'i');  // Normalize I (not followed by i or v)
-
-  // Junior positions (1-4)
-  if (normalized.includes('junior iv') || normalized.includes('júnior iv') ||
-      normalized.includes('junior4') || normalized.includes('júnior4')) return 4;
-  if (normalized.includes('junior iii') || normalized.includes('júnior iii') ||
-      normalized.includes('junior3') || normalized.includes('júnior3')) return 3;
-  if (normalized.includes('junior ii') || normalized.includes('júnior ii') ||
-      normalized.includes('junior2') || normalized.includes('júnior2')) return 2;
-  if (normalized.includes('junior i') || normalized.includes('júnior i') ||
-      normalized.includes('junior1') || normalized.includes('júnior1') ||
-      normalized.includes('junior') || normalized.includes('júnior')) return 1;
-
-  // Pleno positions (5-8)
-  if (normalized.includes('pleno iv') || normalized.includes('pleno4')) return 8;
-  if (normalized.includes('pleno iii') || normalized.includes('pleno3')) return 7;
-  if (normalized.includes('pleno ii') || normalized.includes('pleno2')) return 6;
-  if (normalized.includes('pleno i') || normalized.includes('pleno1') ||
-      normalized.includes('pleno')) return 5;
-
-  // Senior positions (9-12)
-  if (normalized.includes('senior iv') || normalized.includes('sênior iv') ||
-      normalized.includes('senior4') || normalized.includes('sênior4')) return 12;
-  if (normalized.includes('senior iii') || normalized.includes('sênior iii') ||
-      normalized.includes('senior3') || normalized.includes('sênior3')) return 11;
-  if (normalized.includes('senior ii') || normalized.includes('sênior ii') ||
-      normalized.includes('senior2') || normalized.includes('sênior2')) return 10;
-  if (normalized.includes('senior i') || normalized.includes('sênior i') ||
-      normalized.includes('senior1') || normalized.includes('sênior1') ||
-      normalized.includes('senior') || normalized.includes('sênior')) return 9;
-
-  // Default mappings
-  if (normalized.includes('auxiliar') || normalized.includes('estagiário')) return 1;
-
-  return 5; // Default to Pleno I
-}
-
-/**
- * Calculate position 11 base using polynomial (exactly as in seed database)
- */
-function calculatePosition11Base(averageTasksPerUser: number): number {
-  const b1 = averageTasksPerUser;
-  const polynomial = (
-    3.31 * Math.pow(b1, 5) -
-    61.07 * Math.pow(b1, 4) +
-    364.82 * Math.pow(b1, 3) -
-    719.54 * Math.pow(b1, 2) +
-    465.16 * b1 -
-    3.24
-  );
-  return polynomial * 0.4; // 40% as per Excel formula
-}
-
-/**
- * EXACT position factors from Position 9 (as percentages)
- * These are the exact values from the Excel spreadsheet
- */
-const positionFactorsFromPosition9: Record<number, number> = {
-  1: 0.0972,  // Position 1: 9.72% of Position 9
-  2: 0.1932,  // Position 2: 19.32% of Position 9
-  3: 0.3220,  // Position 3: 32.20% of Position 9
-  4: 0.4609,  // Position 4: 46.09% of Position 9
-  5: 0.5985,  // Position 5: 59.85% of Position 9
-  6: 0.7210,  // Position 6: 72.10% of Position 9
-  7: 0.8283,  // Position 7: 82.83% of Position 9
-  8: 0.9205,  // Position 8: 92.05% of Position 9
-};
-
-/**
- * Calculate cascade values for all positions based on EXACT Excel formulas
- */
-function calculateCascadeValues(position11Base: number): Map<number, number> {
-  const values = new Map<number, number>();
-
-  values.set(11, position11Base); // Position 11: Base
-  values.set(12, position11Base * 1.05); // Position 12: +5%
-  values.set(10, position11Base * (1 - 0.0413)); // Position 10: -4.13%
-
-  const position10 = values.get(10)!;
-  const position9 = position10 * (1 - 0.055); // Position 9: Position 10 - 5.5%
-  values.set(9, position9);
-
-  // Positions 1-8 are calculated as EXACT percentages of Position 9
-  for (let excelPos = 1; excelPos <= 8; excelPos++) {
-    values.set(excelPos, position9 * positionFactorsFromPosition9[excelPos]);
-  }
-
-  return values;
-}
-
-/**
- * Calculate bonus value using the correct polynomial-based algorithm from seed database
- */
-function calculateCorrectBonusValue(positionName: string, performanceLevel: number, averageTasksPerUser: number): number {
-  const positionLevel = getDetailedPositionLevel(positionName);
-
-  // Clamp performance level to valid range (1-5)
-  const clampedPerformanceLevel = Math.max(1, Math.min(5, performanceLevel));
-
-  // Step 1: Calculate position 11 base value using polynomial
-  const position11Base = calculatePosition11Base(averageTasksPerUser);
-
-  // Step 2: Get cascade values for all positions
-  const cascadeValues = calculateCascadeValues(position11Base);
-
-  // Step 3: Get base value for position (direct mapping)
-  const positionBase = cascadeValues.get(positionLevel) || 0;
-
-  // Step 4: Apply performance multiplier
-  const performanceMultiplier = performanceMultipliers[clampedPerformanceLevel] || 1.0;
-  const finalValue = positionBase * performanceMultiplier;
-
-  return Math.round(finalValue * 100) / 100;
-}
+// =====================
+// SINGLE SOURCE OF TRUTH: All bonus calculations are done by the API
+// For simulation purposes, we use the centralized calculateBonusForPosition from utils/bonus.ts
+// This ensures consistency across web, mobile, and API calculations
+// =====================
 
 // Extended User interface for bonus simulation with editable fields
 export interface BonusSimulationRow extends User {
@@ -430,8 +302,9 @@ export const createBonusSimulationColumns = (): BonusSimulationColumn[] => [
         );
       }
 
-      // Calculate using the correct polynomial-based algorithm from db seed
-      const bonusAmount = calculateCorrectBonusValue(
+      // Calculate using the centralized polynomial-based algorithm
+      // This ensures consistency with API calculations
+      const bonusAmount = calculateBonusForPosition(
         currentPosition?.name || "",
         performanceLevel,
         averageTasksPerUser

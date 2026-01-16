@@ -197,7 +197,7 @@ export function NotificationTable({
       key: "importance",
       header: "IMPORTÂNCIA",
       sortable: true,
-      className: "w-24",
+      className: "w-36",
       align: "left",
       accessor: (notification) => {
         const variant = notification.importance === "HIGH"
@@ -232,7 +232,7 @@ export function NotificationTable({
       key: "sentAt",
       header: "STATUS",
       sortable: true,
-      className: "w-24",
+      className: "w-28",
       align: "left",
       accessor: (notification) => (
         notification.sentAt ? (

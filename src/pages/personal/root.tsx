@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import { useCurrentUser } from "@/hooks/useAuth";
-import { useBorrows, usePpeDeliveries, useVacations, useActivities } from "../../hooks";
+import { useBorrows, usePpeDeliveries, useMyVacations, useActivities } from "../../hooks";
 import { useNavigate } from "react-router-dom";
 import { routes, PPE_DELIVERY_STATUS, BORROW_STATUS, USER_STATUS_LABELS } from "../../constants";
 import { formatDate, getFileUrl } from "../../utils";
@@ -72,13 +72,12 @@ export function Personal() {
     enabled: !!user?.id,
   });
 
-  // Fetch user's vacations
-  const { data: vacationsData } = useVacations({
-    where: {
-      userId: user?.id,
+  // Fetch user's vacations (uses /vacations/my-vacations endpoint)
+  const { data: vacationsData } = useMyVacations({
+    filters: {
+      take: 5,
+      orderBy: { startAt: "desc" },
     },
-    take: 5,
-    orderBy: { startAt: "desc" },
   }, {
     enabled: !!user?.id,
   });

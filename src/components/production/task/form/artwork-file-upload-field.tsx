@@ -99,6 +99,11 @@ export function ArtworkFileUploadField({
   const [files, setFiles] = useState<FileWithPreview[]>(existingFiles);
   const [thumbnailErrors, setThumbnailErrors] = useState<Record<string, boolean>>({});
 
+  // Sync with external file changes (important for parent components managing file state)
+  React.useEffect(() => {
+    setFiles(existingFiles);
+  }, [existingFiles]);
+
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       if (disabled) return;
@@ -288,9 +293,20 @@ export function ArtworkFileUploadField({
                     value={file.status || 'DRAFT'}
                     onChange={(newStatus) => {
                       // Update file status in local state
-                      setFiles(prev => prev.map(f =>
-                        f.id === file.id ? { ...f, status: newStatus as any } : f
-                      ));
+                      setFiles(prev => prev.map(f => {
+                        if (f.id !== file.id) return f;
+
+                        // For File objects (new uploads), use Object.assign to preserve the File instance
+                        // This is important because form submission uses `instanceof File` to filter files
+                        if (f instanceof File) {
+                          return Object.assign(f, { status: newStatus }) as FileWithPreview;
+                        }
+
+                        // For plain objects (existing files from server), create new object with
+                        // explicit name/size/type properties. These properties are normally getters
+                        // on File prototype and wouldn't be copied by spread operator alone.
+                        return { ...f, name: f.name, size: f.size, type: f.type, status: newStatus as any };
+                      }));
 
                       // Notify parent of status change
                       // Use uploadedFileId for existing files, or id for new uploads

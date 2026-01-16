@@ -113,23 +113,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const { createAsync: createCutAsync } = useCutMutations();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // TEMPORARY: Wrap updateAsync to prevent auto-invalidation during debugging
-  // Also inject artworkStatuses into form submission
+  // Wrap updateAsync for debugging/logging
   const updateAsync = async (params: any) => {
     console.log('[Task Update] 🚀 Submitting with params:', params);
-
-    // Add artworkStatuses to submission for artwork approval workflow
-    if (params.data instanceof FormData) {
-      console.log('[Task Update] 📦 FormData submission - adding artworkStatuses:', artworkStatuses);
-      params.data.append('artworkStatuses', JSON.stringify(artworkStatuses));
-    } else if (typeof params.data === 'object' && params.data !== null) {
-      console.log('[Task Update] 📄 JSON submission - adding artworkStatuses:', artworkStatuses);
-      console.log('[Task Update] 📄 Full submission data:', params.data);
-      params.data.artworkStatuses = artworkStatuses;
-    }
-
+    // NOTE: artworkStatuses is now added in the FormData/JSON preparation sections
+    // to avoid duplicates and to properly filter temp IDs vs real UUIDs
     const result = await taskMutations.updateAsync(params);
-
     return result;
   };
 
@@ -196,6 +185,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
   // Track if artwork status has been changed (needs to be BEFORE useEffect that uses it)
   const [hasArtworkStatusChanges, setHasArtworkStatusChanges] = useState(false);
+
+  // Track if artworks have been modified (added or removed) - separate from status changes
+  const [hasArtworkFileChanges, setHasArtworkFileChanges] = useState(false);
 
   // Sync uploadedFiles and artworkStatuses when task.artworks changes (after successful update)
   useEffect(() => {
@@ -271,7 +263,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       console.log('[Task Update] 🔄 Setting new artworkStatuses:', newStatuses);
       setArtworkStatuses(newStatuses);
       setHasArtworkStatusChanges(false); // Reset the flag after sync
-      console.log('[Task Update] 🔄 Reset hasArtworkStatusChanges to false');
+      setHasArtworkFileChanges(false); // Reset the file changes flag after sync
+      console.log('[Task Update] 🔄 Reset hasArtworkStatusChanges and hasArtworkFileChanges to false');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task.artworks, task.id]); // Only re-run when task.artworks or task.id changes (reads from closure for other values)
@@ -1223,18 +1216,21 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           }
 
           // Send the IDs of files to KEEP (backend uses 'set' to replace all files)
-          // Extract IDs of uploaded (existing) files
-          // CRITICAL: When hasArtworkStatusChanges is true, we MUST send artwork IDs
-          // Use task.artworks as source of truth since uploadedFiles state may be stale (useEffect blocked)
-          let currentArtworkIds: string[];
-          if (hasArtworkStatusChanges && task.artworks && task.artworks.length > 0) {
-            console.warn('[Task Update] ⚠️ hasArtworkStatusChanges=true - using task.artworks as source of truth');
-            currentArtworkIds = task.artworks
-              .map((artwork: any) => artwork.fileId || artwork.file?.id)
-              .filter(Boolean) as string[];
-          } else {
-            currentArtworkIds = uploadedFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
-          }
+          // Extract IDs of uploaded (existing) files from uploadedFiles state
+          // IMPORTANT: Always use uploadedFiles as source of truth - it reflects user's current selection
+          // including any files they removed. We no longer fall back to task.artworks because
+          // that would restore files the user intentionally deleted.
+          const currentArtworkIds = uploadedFiles
+            .filter(f => f.uploaded)
+            .map(f => f.uploadedFileId || f.id)
+            .filter(Boolean) as string[];
+
+          console.log('[Task Update] 📦 FormData - Using uploadedFiles as source of truth:', {
+            uploadedFilesCount: uploadedFiles.length,
+            uploadedFilesUploaded: uploadedFiles.filter(f => f.uploaded).length,
+            currentArtworkIds,
+            hasArtworkStatusChanges,
+          });
 
           const currentBaseFileIds = baseFiles.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
           const currentBudgetIds = budgetFile.filter(f => f.uploaded).map(f => f.uploadedFileId || f.id).filter(Boolean) as string[];
@@ -1243,6 +1239,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
           console.log('[Task Update] 📦 FormData - File IDs being sent:', {
             hasArtworkStatusChanges,
+            hasArtworkFileChanges,
             uploadedFilesLength: uploadedFiles.length,
             taskArtworksLength: task.artworks?.length || 0,
             currentArtworkIds,
@@ -1348,9 +1345,21 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
           // Send statuses for existing files (keyed by File ID) - use state directly
           // This preserves user's status changes that were tracked in artworkStatuses state
-          if (hasArtworkStatusChanges || Object.keys(artworkStatuses).length > 0) {
-            dataForFormData.artworkStatuses = artworkStatuses;
-            console.log('[Task Update] 📦 FormData - Including artworkStatuses from STATE:', artworkStatuses);
+          // IMPORTANT: Filter to only include valid UUIDs - temp IDs for new files should NOT be sent here
+          // Temp IDs look like "1768585572338-et3sdl7u6", UUIDs look like "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          const filteredArtworkStatuses: Record<string, string> = {};
+          for (const [fileId, status] of Object.entries(artworkStatuses)) {
+            if (uuidRegex.test(fileId)) {
+              filteredArtworkStatuses[fileId] = status;
+            } else {
+              console.log('[Task Update] ⏭️ Skipping non-UUID artworkStatus key (temp ID for new file):', fileId);
+            }
+          }
+
+          if (Object.keys(filteredArtworkStatuses).length > 0) {
+            dataForFormData.artworkStatuses = filteredArtworkStatuses;
+            console.log('[Task Update] 📦 FormData - Including artworkStatuses (filtered UUIDs only):', filteredArtworkStatuses);
           }
 
           // Send statuses for new files being uploaded (array matching files order)
@@ -1422,30 +1431,49 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             uploadedFilesWithFlag: uploadedFiles.filter(f => f.uploaded),
             currentArtworkIds: currentArtworkIds,
             hasArtworkStatusChanges,
+            hasArtworkFileChanges,
             artworkStatuses: Object.keys(artworkStatuses).length > 0 ? artworkStatuses : 'empty',
             taskArtworks: task.artworks?.length || 0,
           });
 
-          // DEFENSIVE: If hasArtworkStatusChanges is true but currentArtworkIds is empty,
-          // something is wrong with uploadedFiles state - use task.artworks as fallback
-          if (hasArtworkStatusChanges && currentArtworkIds.length === 0 && task.artworks && task.artworks.length > 0) {
-            console.warn('[Task Update] ⚠️ DEFENSIVE FALLBACK: hasArtworkStatusChanges is true but currentArtworkIds is empty. Using task.artworks as fallback.');
-            const fallbackIds = task.artworks.map((artwork: any) => artwork.fileId || artwork.file?.id).filter(Boolean) as string[];
-            currentArtworkIds.push(...fallbackIds);
-            console.log('[Task Update] 🛡️ Fallback artworkIds:', currentArtworkIds);
-          }
+          // CRITICAL: Always send artworkIds when:
+          // 1. There are artwork IDs to send (keeping some artworks)
+          // 2. Status changes were made
+          // 3. Artwork files were modified (added or removed) - even if resulting in empty array
+          // 4. Task originally had artworks (to handle removal case)
+          const taskHadArtworks = task.artworks && task.artworks.length > 0;
+          const shouldSendArtworkIds = currentArtworkIds.length > 0 || hasArtworkStatusChanges || hasArtworkFileChanges || taskHadArtworks;
 
-          if (currentArtworkIds.length > 0 || hasArtworkStatusChanges) {
-            submitData.artworkIds = [...currentArtworkIds]; // Spread to ensure it's an array
-            console.log('[Task Update] ✅ Including artworkIds:', submitData.artworkIds);
+          if (shouldSendArtworkIds) {
+            submitData.artworkIds = [...currentArtworkIds]; // Spread to ensure it's an array (may be empty for removal)
+            console.log('[Task Update] ✅ Including artworkIds:', submitData.artworkIds, {
+              reason: {
+                hasIds: currentArtworkIds.length > 0,
+                hasStatusChanges: hasArtworkStatusChanges,
+                hasFileChanges: hasArtworkFileChanges,
+                taskHadArtworks,
+              }
+            });
           } else {
-            console.log('[Task Update] ⚠️ NOT including artworkIds');
+            console.log('[Task Update] ⚠️ NOT including artworkIds (task had no artworks and no changes)');
           }
 
-          // CRITICAL: Send artwork statuses for approval workflow
-          if (hasArtworkStatusChanges || Object.keys(artworkStatuses).length > 0) {
-            submitData.artworkStatuses = artworkStatuses;
-            console.log('[Task Update] ✅ Including artworkStatuses in JSON:', artworkStatuses);
+          // Send artwork statuses for approval workflow
+          // Always send if there were artwork-related changes
+          // IMPORTANT: Filter to only include valid UUIDs - temp IDs for new files should NOT be sent
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          const filteredArtworkStatusesJson: Record<string, string> = {};
+          for (const [fileId, status] of Object.entries(artworkStatuses)) {
+            if (uuidRegex.test(fileId)) {
+              filteredArtworkStatusesJson[fileId] = status;
+            } else {
+              console.log('[Task Update] ⏭️ Skipping non-UUID artworkStatus key (temp ID):', fileId);
+            }
+          }
+
+          if (Object.keys(filteredArtworkStatusesJson).length > 0) {
+            submitData.artworkStatuses = filteredArtworkStatusesJson;
+            console.log('[Task Update] ✅ Including artworkStatuses in JSON (filtered UUIDs only):', filteredArtworkStatusesJson);
           }
           if (currentBaseFileIds.length > 0) {
             submitData.baseFileIds = [...currentBaseFileIds];
@@ -1603,10 +1631,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           console.log('[Task Update] ✅ SUCCESS - Update completed, response:', result);
           console.log('[Task Update] Artworks in response:', result?.data?.artworks);
 
-          // Reset artwork status changes flag after successful submission
-          if (hasArtworkStatusChanges) {
-            console.log('[Task Update] 🔄 Resetting hasArtworkStatusChanges flag after successful submission');
+          // Reset artwork changes flags after successful submission
+          if (hasArtworkStatusChanges || hasArtworkFileChanges) {
+            console.log('[Task Update] 🔄 Resetting artwork flags after successful submission');
             setHasArtworkStatusChanges(false);
+            setHasArtworkFileChanges(false);
           }
 
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -1685,8 +1714,27 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
   // Handle artwork files change (no longer uploads immediately)
   const handleFilesChange = (files: FileWithPreview[]) => {
+    // Get IDs of files that are being kept
+    const keptFileIds = new Set(files.map(f => f.uploadedFileId || f.id).filter(Boolean));
+
+    // Clean up artworkStatuses to remove entries for files that were removed
+    setArtworkStatuses(prev => {
+      const cleaned = { ...prev };
+      for (const fileId of Object.keys(cleaned)) {
+        if (!keptFileIds.has(fileId)) {
+          console.log('[Task Update] 🗑️ Removing artworkStatus for deleted file:', fileId);
+          delete cleaned[fileId];
+        }
+      }
+      return cleaned;
+    });
+
     setUploadedFiles(files);
     setHasFileChanges(true);
+    // Mark that artwork files have been modified (added or removed)
+    // This ensures artworkIds is always sent when artworks change, even if empty
+    setHasArtworkFileChanges(true);
+    console.log('[Task Update] 📁 Artwork files changed, count:', files.length);
     // Files will be submitted with the form, not uploaded separately
   };
 

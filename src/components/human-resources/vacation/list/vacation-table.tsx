@@ -120,9 +120,10 @@ export function VacationTable({ filters, onDataChange, className, mode = 'hr' }:
   );
 
   // Select the appropriate hook based on mode
-  const hrQuery = useVacations(mode === 'hr' ? queryParams : undefined);
-  const personalQuery = useMyVacations({ filters: mode === 'personal' ? queryParams : undefined });
-  const teamQuery = useTeamVacations({ filters: mode === 'team' ? queryParams : undefined });
+  // IMPORTANT: Only enable the hook that matches the current mode to avoid 403 errors
+  const hrQuery = useVacations(mode === 'hr' ? queryParams : undefined, { enabled: mode === 'hr' });
+  const personalQuery = useMyVacations({ filters: mode === 'personal' ? queryParams : undefined }, { enabled: mode === 'personal' });
+  const teamQuery = useTeamVacations({ filters: mode === 'team' ? queryParams : undefined }, { enabled: mode === 'team' });
 
   // Get the active query based on mode
   const { data: response, isLoading, error, refetch } =

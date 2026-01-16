@@ -58,8 +58,9 @@ export function createFormDataWithContext(
         // For arrays, use indexed keys instead of JSON.stringify
         // This ensures the backend parses them as arrays, not objects
         if (value.length === 0) {
-          // For empty arrays, send a marker to indicate it's an empty array
-          formData.append(`${key}[]`, '');
+          // For empty arrays, send the key with _empty suffix to indicate intentional empty
+          // This avoids sending [''] which would fail UUID validation for ID arrays
+          formData.append(`${key}_empty`, 'true');
         } else {
           value.forEach((item, index) => {
             if (item !== null && item !== undefined) {
