@@ -14,13 +14,14 @@ import { hasAnyPrivilege, isTeamLeader } from '@/utils';
 
 /**
  * Can user create tasks?
- * ADMIN and COMMERCIAL can create new tasks
+ * ADMIN, COMMERCIAL, and LOGISTIC can create new tasks
  */
 export function canCreateTasks(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
     SECTOR_PRIVILEGES.COMMERCIAL,
+    SECTOR_PRIVILEGES.LOGISTIC,
   ]);
 }
 
