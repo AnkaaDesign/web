@@ -136,6 +136,7 @@ export function PpeExport({ className, filters = {}, currentItems = [], totalRec
     } catch (error) {
       console.error("Excel export error:", error);
       await exportToCSV(items, columns);
+    }
   };
 
   const exportToPDF = async (items: Item[], columns: ExportColumn<Item>[]) => {

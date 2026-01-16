@@ -97,7 +97,7 @@ export const CreateNotificationPage = () => {
     defaultValues: {
       type: "SYSTEM", // SYSTEM type is mandatory - users cannot hide these
       importance: "NORMAL",
-      channels: ["IN_APP", "EMAIL"],
+      channels: ["IN_APP", "PUSH"], // In-app and push mobile enabled by default, email disabled
       targetType: "all",
       targetSectors: [],
       targetUsers: [],
@@ -157,39 +157,41 @@ export const CreateNotificationPage = () => {
   return (
     <FormProvider {...form}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
-        <PageHeader
-          title="Nova Notificação Manual"
-          icon={IconBell}
-          favoritePage={FAVORITE_PAGES.ADMINISTRACAO_NOTIFICACOES_CADASTRAR}
-          breadcrumbs={[
-            { label: "Início", href: "/" },
-            { label: "Administração", href: "/administracao" },
-            { label: "Notificações", href: "/administracao/notificacoes" },
-            { label: "Nova Notificação" },
-          ]}
-          className="flex-shrink-0"
-          actions={[
-            {
-              key: "cancel",
-              label: "Cancelar",
-              icon: IconX,
-              onClick: handleCancel,
-              variant: "outline",
-              disabled: isSending,
-            },
-            {
-              key: "submit",
-              label: scheduleLater ? "Agendar" : "Enviar Agora",
-              icon: scheduleLater ? IconClock : IconSend,
-              onClick: handleSubmit,
-              variant: "default",
-              disabled: isSending,
-            },
-          ]}
-        />
+        <div className="container mx-auto max-w-3xl flex-shrink-0">
+          <PageHeader
+            title="Nova Notificação Manual"
+            icon={IconBell}
+            favoritePage={FAVORITE_PAGES.ADMINISTRACAO_NOTIFICACOES_CADASTRAR}
+            breadcrumbs={[
+              { label: "Início", href: "/" },
+              { label: "Administração", href: "/administracao" },
+              { label: "Notificações", href: "/administracao/notificacoes" },
+              { label: "Nova Notificação" },
+            ]}
+            variant="form"
+            actions={[
+              {
+                key: "cancel",
+                label: "Cancelar",
+                icon: IconX,
+                onClick: handleCancel,
+                variant: "outline",
+                disabled: isSending,
+              },
+              {
+                key: "submit",
+                label: scheduleLater ? "Agendar" : "Enviar Agora",
+                icon: scheduleLater ? IconClock : IconSend,
+                onClick: handleSubmit,
+                variant: "default",
+                disabled: isSending,
+              },
+            ]}
+          />
+        </div>
 
         <div className="flex-1 overflow-y-auto pb-6">
-          <div className="space-y-6">
+          <div className="container mx-auto max-w-3xl space-y-4">
           {/* Basic Information */}
           <Card>
             <CardHeader>
@@ -200,7 +202,9 @@ export const CreateNotificationPage = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="title">Título *</Label>
+                <Label htmlFor="title">
+                  Título <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="title"
                   placeholder="Ex: Atualização Importante do Sistema"
@@ -212,7 +216,9 @@ export const CreateNotificationPage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="body">Mensagem *</Label>
+                <Label htmlFor="body">
+                  Mensagem <span className="text-destructive">*</span>
+                </Label>
                 <Textarea
                   id="body"
                   rows={5}

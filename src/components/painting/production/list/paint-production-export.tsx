@@ -117,6 +117,7 @@ export function PaintProductionExport({ className, filters = {}, currentItems = 
     } catch (error) {
       console.error("Excel export error:", error);
       await exportToCSV(items, columns);
+    }
   };
 
   const exportToPDF = async (items: PaintProduction[], columns: ExportColumn<PaintProduction>[]) => {

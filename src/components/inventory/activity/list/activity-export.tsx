@@ -153,7 +153,7 @@ export function ActivityExport({ className, filters, currentActivities = [], tot
     } catch (error) {
       console.error("Excel export error:", error);
       await exportToCSV(items, columns);
-    URL.revokeObjectURL(url);
+    }
   };
 
   const exportToPDF = async (items: Activity[], columns: ExportColumn<Activity>[]) => {

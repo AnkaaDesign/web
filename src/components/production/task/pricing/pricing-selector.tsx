@@ -22,10 +22,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Combobox } from "@/components/ui/combobox";
 import { FileUploadField } from "@/components/common/file/file-upload-field";
 import { formatCurrency } from "../../../../utils";
-import { DISCOUNT_TYPE, SERVICE_ORDER_TYPE } from "@/constants/enums";
+import { DISCOUNT_TYPE } from "@/constants/enums";
 import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
-import { serviceService } from "../../../../api-client";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
+import { ServiceAutocomplete } from "../form/service-autocomplete";
 
 interface PricingSelectorProps {
   control: any;
@@ -40,12 +40,6 @@ interface PricingSelectorProps {
 export interface PricingSelectorRef {
   addItem: () => void;
   clearAll: () => void;
-}
-
-interface Service {
-  id: string;
-  description: string;
-  type: string;
 }
 
 // Payment condition options (simplified - maps directly to PaymentCondition enum)
@@ -138,52 +132,6 @@ export const PricingSelector = forwardRef<
     }
   }, [setValue]);
 
-  // Factory function that creates a search function for service combobox
-  const createSearchServices = useCallback((existingDescription?: string) => {
-    return async (
-      search: string,
-      page: number = 1,
-    ): Promise<{ data: Service[]; hasMore: boolean }> => {
-      try {
-        const params: any = {
-          type: SERVICE_ORDER_TYPE.PRODUCTION,
-          orderBy: { description: "asc" },
-          page: page,
-          take: 50,
-        };
-
-        if (search && search.trim()) {
-          params.searchingFor = search.trim();
-        }
-
-        const response = await serviceService.getServices(params);
-        const services = response.data || [];
-        const hasMore = response.meta?.hasNextPage || false;
-
-        if (page === 1 && (!search || !search.trim()) && existingDescription && existingDescription.trim()) {
-          const existsInResults = services.some((s: Service) => s.description === existingDescription);
-          if (!existsInResults) {
-            const existingService: Service = {
-              id: `temp-${existingDescription}`,
-              description: existingDescription,
-              type: SERVICE_ORDER_TYPE.PRODUCTION,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            };
-            return { data: [existingService, ...services], hasMore };
-          }
-        }
-
-        return { data: services, hasMore };
-      } catch (error) {
-        console.error("Failed to search services:", error);
-        return { data: [], hasMore: false };
-      }
-    };
-  }, []);
-
-  const getOptionLabel = useCallback((service: Service) => service.description, []);
-  const getOptionValue = useCallback((service: Service) => service.description, []);
 
   // Calculate subtotal from all pricing items
   const subtotal = useMemo(() => {
@@ -551,36 +499,13 @@ export const PricingSelector = forwardRef<
                 ref={isLastRow ? lastRowRef : null}
                 className="grid grid-cols-1 sm:grid-cols-[1fr_180px] gap-4 items-end"
               >
-                <FormField
+                <ServiceAutocomplete
                   control={control}
                   name={`pricing.items.${index}.description`}
-                  render={({ field: serviceField }) => (
-                    <FormItem>
-                      {index === 0 && <FormLabel>Serviço</FormLabel>}
-                      <FormControl>
-                        <Combobox<Service>
-                          value={serviceField.value || ""}
-                          onValueChange={serviceField.onChange}
-                          async={true}
-                          queryKey={["pricing", "services", "PRODUCTION", index, serviceField.value]}
-                          queryFn={createSearchServices(serviceField.value)}
-                          getOptionLabel={getOptionLabel}
-                          getOptionValue={getOptionValue}
-                          renderOption={(service) => <span>{service.description}</span>}
-                          pageSize={50}
-                          minSearchLength={0}
-                          debounceMs={300}
-                          placeholder="Selecione um serviço"
-                          emptyText="Nenhum serviço encontrado"
-                          searchPlaceholder="Buscar serviço..."
-                          disabled={disabled || readOnly}
-                          loadMoreText="Carregar mais serviços"
-                          loadingMoreText="Carregando..."
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  disabled={disabled || readOnly}
+                  label="Serviço"
+                  placeholder="Selecione ou digite um serviço"
+                  showLabel={index === 0}
                 />
 
                 <FormField

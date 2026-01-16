@@ -1178,7 +1178,7 @@ export const TaskDetailsPage = () => {
                 ? [
                     {
                       key: "resume",
-                      label: "Retomar Produção",
+                      label: "Disponibilizar para Produção",
                       icon: IconPlayerPlay,
                       onClick: () => handleStatusChange(TASK_STATUS.IN_PRODUCTION),
                       variant: "default" as const,

@@ -136,6 +136,7 @@ export function ItemExport({ className, filters = {}, currentItems = [], totalRe
     } catch (error) {
       console.error("Excel export error:", error);
       await exportToCSV(items, columns);
+    }
   };
 
   const exportToPDF = async (items: Item[], columns: ExportColumn<Item>[]) => {

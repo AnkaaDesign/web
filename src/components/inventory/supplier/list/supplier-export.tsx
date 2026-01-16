@@ -125,6 +125,7 @@ export function SupplierExport({ className, filters = {}, currentSuppliers = [],
     } catch (error) {
       console.error("Excel export error:", error);
       await exportToCSV(suppliers, columns);
+    }
   };
 
   const exportToPDF = async (suppliers: Supplier[], columns: ExportColumn<Supplier>[]) => {

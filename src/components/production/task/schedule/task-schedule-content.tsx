@@ -63,11 +63,11 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
   // Get user's sector privilege for column visibility
   const userSectorPrivilege = currentUser?.sector?.privileges as SECTOR_PRIVILEGES | undefined;
 
-  // Available columns based on user's sector privilege
-  const availableColumns = useMemo(() => getAvailableColumns(userSectorPrivilege), [userSectorPrivilege]);
+  // Available columns based on user's sector privilege - cronograma should NOT include service order columns
+  const availableColumns = useMemo(() => getAvailableColumns(userSectorPrivilege, false), [userSectorPrivilege]);
 
-  // Default visible columns - use shared function with user's sector privilege
-  const defaultVisibleColumns = useMemo(() => getDefaultVisibleColumns(userSectorPrivilege), [userSectorPrivilege]);
+  // Default visible columns - cronograma should NOT include service order columns by default
+  const defaultVisibleColumns = useMemo(() => getDefaultVisibleColumns(userSectorPrivilege, false), [userSectorPrivilege]);
 
   // Visible columns state with localStorage persistence
   const { visibleColumns, setVisibleColumns } = useColumnVisibility("task-schedule-visible-columns", defaultVisibleColumns);
@@ -518,7 +518,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
               <IconFilter className="h-4 w-4 mr-2" />
               Filtros{hasActiveFilters ? ` (${activeFiltersCount})` : ""}
             </Button>
-            <ColumnVisibilityManager columns={availableColumns} visibleColumns={visibleColumns} onColumnVisibilityChange={setVisibleColumns} />
+            <ColumnVisibilityManager columns={availableColumns} visibleColumns={visibleColumns} onColumnVisibilityChange={setVisibleColumns} sectorPrivilege={userSectorPrivilege} includeServiceOrdersInDefaults={false} />
             {canExport && <TaskScheduleExport tasks={filteredTasks} visibleColumns={visibleColumns} />}
           </div>
         </div>

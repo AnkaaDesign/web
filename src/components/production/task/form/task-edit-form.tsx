@@ -322,6 +322,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     task.pricing?.layoutFile ? convertToFileWithPreview([task.pricing.layoutFile]) : []
   );
 
+  // Accordion state - track which section is open (only one at a time)
+  const [openAccordion, setOpenAccordion] = useState<string | undefined>("basic-information");
+
   // Track current layout state during editing (not saved yet)
   // Initialize with default values to support validation before user edits
   const [currentLayoutStates, setCurrentLayoutStates] = useState<Record<'left' | 'right' | 'back', any>>(() => {
@@ -1981,8 +1984,10 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         </button>
 
         <Accordion
-          type="multiple"
-          defaultValue={["basic-information"]}
+          type="single"
+          collapsible
+          value={openAccordion}
+          onValueChange={setOpenAccordion}
           className="space-y-4"
         >
           {/* Basic Information Card */}

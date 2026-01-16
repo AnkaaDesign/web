@@ -1,8 +1,10 @@
 import { useCurrentUser } from "@/hooks/useAuth";
 import type { Task } from "@/types";
 import type { SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "@/constants";
-import { SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS as SO_STATUS } from "@/constants";
+import { SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS as SO_STATUS, SERVICE_ORDER_STATUS_LABELS } from "@/constants";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { getServiceOrderStatusColor } from "@/utils/serviceOrder";
 
 interface ServiceOrderCellProps {
   task: Task;
@@ -126,50 +128,29 @@ export function ServiceOrderCell({ task, serviceOrderType }: ServiceOrderCellPro
             )}
           </div>
         </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs">
-          <div className="text-sm space-y-1">
+        <TooltipContent side="top" className="max-w-md">
+          <div className="text-sm space-y-2">
             <div className="font-medium mb-2">
-              Ordens de serviço de {typeLabel.toLowerCase()}
+              Ordens de serviço de {typeLabel.toLowerCase()} ({completedCount}/{totalCount})
             </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-green-700 ring-1 ring-green-800" />
-                <span>Concluído:</span>
-              </div>
-              <span className="text-right font-medium">{completedCount}</span>
 
-              {waitingApproveCount > 0 && (
-                <>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-purple-600 ring-1 ring-purple-700" />
-                    <span>Aguardando aprovação:</span>
-                  </div>
-                  <span className="text-right font-medium">{waitingApproveCount}</span>
-                </>
-              )}
-
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-blue-700 ring-1 ring-blue-800" />
-                <span>Em andamento:</span>
-              </div>
-              <span className="text-right font-medium">{inProgressCount}</span>
-
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-neutral-500 ring-1 ring-neutral-600" />
-                <span>Pendente:</span>
-              </div>
-              <span className="text-right font-medium">{pendingCount}</span>
-
-              {cancelledCount > 0 && (
-                <>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-700 ring-1 ring-red-800" />
-                    <span>Cancelado:</span>
-                  </div>
-                  <span className="text-right font-medium">{cancelledCount}</span>
-                </>
-              )}
+            {/* List of service orders with their statuses */}
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {serviceOrders.map((serviceOrder, index) => (
+                <div key={serviceOrder.id || index} className="flex items-start justify-between gap-2 py-1 border-b border-border/30 last:border-0">
+                  <span className="text-xs flex-1 break-words">
+                    {serviceOrder.description || <span className="text-muted-foreground italic">Sem descrição</span>}
+                  </span>
+                  <Badge
+                    variant={getServiceOrderStatusColor(serviceOrder.status)}
+                    className="text-[10px] px-1.5 py-0 h-5 flex-shrink-0"
+                  >
+                    {SERVICE_ORDER_STATUS_LABELS[serviceOrder.status]}
+                  </Badge>
+                </div>
+              ))}
             </div>
+
             {incompleteAssignedCount > 0 && (
               <div className="mt-2 pt-2 border-t border-border/50">
                 <div className="flex items-center gap-2 text-red-500 font-medium">
