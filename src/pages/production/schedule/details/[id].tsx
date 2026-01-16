@@ -783,6 +783,8 @@ export const TaskDetailsPage = () => {
       pricing: {
         include: {
           items: true,
+          layoutFile: true,
+          customerSignature: true,
         },
       },
       budgets: true,
@@ -1686,7 +1688,12 @@ export const TaskDetailsPage = () => {
                         <img
                           src={`${getApiBaseUrl()}/files/thumbnail/${task.pricing.layoutFile.id}`}
                           alt="Layout aprovado"
-                          className="max-h-48 rounded-lg shadow-sm object-contain"
+                          className="max-h-48 rounded-lg shadow-sm object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => {
+                            if (fileViewerContext && task.pricing?.layoutFile) {
+                              fileViewerContext.actions.viewFile(task.pricing.layoutFile);
+                            }
+                          }}
                         />
                       </div>
                     </div>
@@ -1703,7 +1710,12 @@ export const TaskDetailsPage = () => {
                         <img
                           src={`${getApiBaseUrl()}/files/serve/${task.pricing.customerSignature.id}`}
                           alt="Assinatura do cliente"
-                          className="max-h-24 object-contain"
+                          className="max-h-24 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => {
+                            if (fileViewerContext && task.pricing?.customerSignature) {
+                              fileViewerContext.actions.viewFile(task.pricing.customerSignature);
+                            }
+                          }}
                         />
                       </div>
                     </div>

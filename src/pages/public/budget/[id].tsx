@@ -23,14 +23,7 @@ const COMPANY = {
   directorTitle: "Diretor Comercial",
 };
 
-// Helper to get file thumbnail URL (may lose transparency - use for layout images)
-const getFileThumbnailUrl = (file: { id: string; thumbnailUrl?: string | null; path?: string } | null | undefined): string => {
-  if (!file?.id) return "";
-  const apiBaseUrl = getApiBaseUrl();
-  return `${apiBaseUrl}/files/thumbnail/${file.id}`;
-};
-
-// Helper to get original file URL (preserves transparency - use for signatures/PNGs)
+// Helper to get original file URL (full quality, preserves transparency)
 const getFileServeUrl = (file: { id: string } | null | undefined): string => {
   if (!file?.id) return "";
   const apiBaseUrl = getApiBaseUrl();
@@ -193,7 +186,8 @@ export function PublicBudgetPage() {
 
   const whatsappLink = `https://wa.me/${COMPANY.phoneClean}`;
   const hasExistingSignature = !!pricing.customerSignature?.id;
-  const layoutImageUrl = pricing.layoutFile?.id ? getFileThumbnailUrl(pricing.layoutFile) : null;
+  // Use serve endpoint for full quality images
+  const layoutImageUrl = pricing.layoutFile?.id ? getFileServeUrl(pricing.layoutFile) : null;
   // Use serve endpoint for signature to preserve PNG transparency
   const signatureImageUrl = pricing.customerSignature?.id ? getFileServeUrl(pricing.customerSignature) : null;
 

@@ -1,6 +1,7 @@
 import { formatCurrency, formatDate } from "./index";
 import type { Task } from "../types/task";
 import { generatePaymentText, generateGuaranteeText } from "./pricing-text-generators";
+import { getApiBaseUrl } from "./file";
 
 interface BudgetPdfOptions {
   task: Task;
@@ -125,35 +126,17 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
   const paymentText = generatePaymentText(task.pricing);
   const guaranteeText = generateGuaranteeText(task.pricing);
 
-  // Get layout file URL if available
-  let layoutImageDataUrl: string | null = null;
-  if (task.pricing.layoutFile?.thumbnailUrl || task.pricing.layoutFile?.path) {
-    try {
-      const layoutUrl = task.pricing.layoutFile.thumbnailUrl || task.pricing.layoutFile.path;
-      if (layoutUrl) {
-        const response = await fetch(layoutUrl);
-        const blob = await response.blob();
-        layoutImageDataUrl = await blobToDataUrl(blob);
-      }
-    } catch (error) {
-      console.error("Failed to load layout image:", error);
-    }
-  }
+  // Get layout file URL if available - use direct URL (no fetch needed)
+  // The <img> tag in the print window will load the image directly without CORS restrictions
+  const apiBaseUrl = getApiBaseUrl();
+  const layoutImageUrl: string | null = task.pricing.layoutFile?.id
+    ? `${apiBaseUrl}/files/serve/${task.pricing.layoutFile.id}`
+    : null;
 
-  // Get customer signature if available
-  let signatureImageDataUrl: string | null = null;
-  if (task.pricing.customerSignature?.path) {
-    try {
-      const signatureUrl = task.pricing.customerSignature.thumbnailUrl || task.pricing.customerSignature.path;
-      if (signatureUrl) {
-        const response = await fetch(signatureUrl);
-        const blob = await response.blob();
-        signatureImageDataUrl = await blobToDataUrl(blob);
-      }
-    } catch (error) {
-      console.error("Failed to load signature image:", error);
-    }
-  }
+  // Get customer signature URL if available - use direct URL (no fetch needed)
+  const signatureImageUrl: string | null = task.pricing.customerSignature?.id
+    ? `${apiBaseUrl}/files/serve/${task.pricing.customerSignature.id}`
+    : null;
 
   const htmlContent = generateBudgetHtml({
     corporateName,
@@ -169,8 +152,8 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
     termDate,
     paymentText,
     guaranteeText,
-    layoutImageUrl: layoutImageDataUrl,
-    customerSignatureUrl: signatureImageDataUrl,
+    layoutImageUrl,
+    customerSignatureUrl: signatureImageUrl,
   });
 
   // Open print window
@@ -192,18 +175,6 @@ export async function exportBudgetPdf({ task }: BudgetPdfOptions): Promise<void>
       printWindow.close();
     };
   };
-}
-
-/**
- * Converts a Blob to a data URL
- */
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
 }
 
 interface BudgetHtmlData {
