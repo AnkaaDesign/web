@@ -37,8 +37,8 @@ export function PaintProductionCard({ production }: PaintProductionCardProps) {
   if (!hasPaintData) {
     return (
       <Card className="overflow-hidden h-full flex flex-col opacity-75">
-        <div className="flex items-center gap-3 p-4 border-b border-neutral-200 dark:border-neutral-700">
-          <div className="w-12 h-12 rounded-full border-2 border-neutral-300 dark:border-neutral-600 flex-shrink-0 bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+        <div className="flex items-center gap-3 p-4 border-b border-border">
+          <div className="w-12 h-12 rounded-full border-2 border-border flex-shrink-0 bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
             <IconAlertTriangle className="h-6 w-6 text-gray-500" />
           </div>
           <div className="flex-1 min-w-0">
@@ -69,7 +69,7 @@ export function PaintProductionCard({ production }: PaintProductionCardProps) {
   return (
     <Card className="overflow-hidden hover:shadow-sm transition-shadow cursor-pointer h-full flex flex-col" onClick={handleClick}>
       {/* Header with paint color preview */}
-      <div className="flex items-center gap-3 p-4 border-b border-neutral-200 dark:border-neutral-700">
+      <div className="flex items-center gap-3 p-4 border-b border-border">
         {/* Color preview - prefer colorPreview image */}
         <div className="w-12 h-12 rounded-md ring-1 ring-border shadow-sm flex-shrink-0 overflow-hidden">
           {paint?.colorPreview ? (

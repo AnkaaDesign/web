@@ -6,8 +6,7 @@ import { z } from "zod";
 import { useObservation, useObservationMutations, useTasks } from "../../../../hooks";
 import type { ObservationCreateFormData, ObservationUpdateFormData } from "../../../../schemas";
 import { observationCreateSchema, observationUpdateSchema } from "../../../../schemas";
-import { routes, FAVORITE_PAGES } from "../../../../constants";
-import { PageHeader } from "@/components/ui/page-header";
+import { routes } from "../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
@@ -20,7 +19,7 @@ import { TaskSelector } from "./task-selector";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { IconAlertCircle, IconPaperclip, IconCheck, IconX, IconFile, IconUser, IconBuildingFactory, IconHash } from "@tabler/icons-react";
+import { IconAlertCircle, IconX, IconFile, IconUser, IconBuildingFactory, IconHash } from "@tabler/icons-react";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { cn, backendFileToFileWithPreview } from "@/lib/utils";
 import { toast } from "sonner";
@@ -393,7 +392,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
         <div className="space-y-6">
           {/* Task Display for Edit Mode */}
           {observation?.task && (
-            <div className="border rounded-lg p-4 bg-muted/30">
+            <div className="border border-border/40 rounded-lg p-4 bg-muted/30">
               <Label className="text-sm font-medium text-muted-foreground mb-3 block">Tarefa Relacionada</Label>
               <div className="space-y-3">
                 {/* Task Name */}
@@ -493,7 +492,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
             <div className="space-y-4">
               {/* File Upload Area */}
-              <div className="border-2 border-dashed rounded-lg p-4 bg-muted/10 hover:bg-muted/20 transition-colors">
+              <div className="border-2 border-dashed border-border/40 rounded-lg p-4 bg-muted/10 hover:bg-muted/20 transition-colors">
                 <FormItem>
                   <FormControl>
                     <FileUploadField
@@ -521,7 +520,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
                     {uploadedFiles.map((file, index) => (
                       <div
                         key={file.id || `file-${index}`}
-                        className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border hover:bg-muted/70 transition-colors"
+                        className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border/40 hover:bg-muted/70 transition-colors"
                       >
                         <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center">
                           <IconFile className="h-5 w-5 text-primary" />
@@ -619,7 +618,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
 
                   <div className="space-y-4">
                     {/* File Upload Area */}
-                    <div className="border-2 border-dashed rounded-lg p-4 bg-muted/10 hover:bg-muted/20 transition-colors">
+                    <div className="border-2 border-dashed border-border/40 rounded-lg p-4 bg-muted/10 hover:bg-muted/20 transition-colors">
                       <FormItem>
                         <FormControl>
                           <FileUploadField
@@ -647,7 +646,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
                           {uploadedFiles.map((file, index) => (
                             <div
                               key={file.id || `file-${index}`}
-                              className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border hover:bg-muted/70 transition-colors"
+                              className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border/40 hover:bg-muted/70 transition-colors"
                             >
                               <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-md flex items-center justify-center">
                                 <IconFile className="h-5 w-5 text-primary" />
@@ -787,87 +786,47 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
   };
 
   return (
-    <>
-      <PageHeader
-        title={mode === "create" ? "Nova Observação" : "Editar Observação"}
-        icon={IconAlertCircle}
-        favoritePage={mode === "create" ? FAVORITE_PAGES.PRODUCAO_OBSERVACOES_CADASTRAR : undefined}
-        breadcrumbs={[
-          { label: "Início", href: routes.home },
-          { label: "Produção", href: routes.production.root },
-          { label: "Observações", href: routes.production.observations.root },
-          { label: mode === "create" ? "Criar" : "Editar" },
-        ]}
-        actions={[
-          {
-            key: "cancel",
-            label: "Cancelar",
-            onClick: onCancel || (() => navigate(routes.production.observations.root)),
-            variant: "outline",
-          },
-          // Show different actions based on mode and step
-          ...(mode === "create"
-            ? [
-                // Next/Submit button
-                {
-                  key: isLastStep ? "submit" : "next",
-                  label: isLastStep ? "Cadastrar" : "Próximo",
-                  icon: isLastStep ? IconCheck : undefined,
-                  onClick: isLastStep ? form.handleSubmit(handleSubmit) : handleNext,
-                  variant: "default" as const,
-                  disabled: form.formState.isSubmitting,
-                },
-              ]
-            : [
-                // Edit mode: just show submit button
-                {
-                  key: "submit",
-                  label: "Salvar",
-                  icon: IconCheck,
-                  onClick: form.handleSubmit(handleSubmit),
-                  variant: "default" as const,
-                  disabled: form.formState.isSubmitting || !form.watch("description"),
-                },
-              ]),
-        ]}
-        className="flex-shrink-0"
-      />
-      <div className="flex-1 overflow-y-auto pb-6">
-        <Form {...form}>
-          <form
-            id="observation-form"
-            onSubmit={form.handleSubmit(handleSubmit)}
-            className={cn(
-              mode === "create" && currentStep === 2 ? "h-full flex flex-col" : ""
-            )}
-          >
-            {/* Hidden submit button */}
-            <button id="observation-form-submit" type="submit" className="hidden" disabled={form.formState.isSubmitting}>
-              Submit
-            </button>
+    <Form {...form}>
+      <form
+        id="observation-form"
+        onSubmit={form.handleSubmit(handleSubmit)}
+        className={cn(
+          mode === "create" && currentStep === 2 ? "h-full flex flex-col" : ""
+        )}
+      >
+        {/* Hidden submit button */}
+        <button id="observation-form-submit" type="submit" className="hidden" disabled={form.formState.isSubmitting}>
+          Submit
+        </button>
 
-            <div className="space-y-4">
-              {/* Form Steps Indicator (only show in create mode) */}
-              {mode === "create" && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <FormSteps steps={steps} currentStep={currentStep} />
-                  </CardContent>
-                </Card>
-              )}
+        <div className="space-y-4">
+          {/* Form Steps Indicator (only show in create mode) */}
+          {mode === "create" && (
+            <Card>
+              <CardContent className="pt-6">
+                <FormSteps steps={steps} currentStep={currentStep} />
+              </CardContent>
+            </Card>
+          )}
 
-              {/* Step Content */}
-              <div
-                className={cn(
-                  mode === "create" && currentStep === 2 ? "flex-1 flex flex-col min-h-0" : ""
-                )}
-              >
+          {/* Wrap edit mode content in Card */}
+          {mode === "edit" ? (
+            <Card>
+              <CardContent className="p-6 space-y-6">
                 {renderStepContent()}
-              </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div
+              className={cn(
+                currentStep === 2 ? "flex-1 flex flex-col min-h-0" : ""
+              )}
+            >
+              {renderStepContent()}
             </div>
-          </form>
-        </Form>
-      </div>
-    </>
+          )}
+        </div>
+      </form>
+    </Form>
   );
 }

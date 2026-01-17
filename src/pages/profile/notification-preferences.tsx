@@ -685,6 +685,34 @@ export function NotificationPreferencesPage() {
   }, []);
 
   /**
+   * Clean channel data from API - removes invalid channels and converts legacy values
+   * IMPORTANT: Only 4 channels are valid in preferences: IN_APP, PUSH, EMAIL, WHATSAPP
+   * MOBILE_PUSH, DESKTOP_PUSH, and SMS are NOT valid in preferences
+   */
+  const cleanChannelData = (channels: string[]): NotificationChannel[] => {
+    if (!Array.isArray(channels)) return [];
+
+    return channels
+      .map((ch): NotificationChannel | null => {
+        // Convert legacy MOBILE_PUSH/DESKTOP_PUSH to unified PUSH
+        if (ch === 'MOBILE_PUSH' || ch === 'DESKTOP_PUSH') {
+          return 'PUSH';
+        }
+        // Remove SMS completely (only used for password recovery)
+        if (ch === 'SMS') {
+          return null;
+        }
+        // Validate against allowed channels
+        if (['IN_APP', 'EMAIL', 'PUSH', 'WHATSAPP'].includes(ch)) {
+          return ch as NotificationChannel;
+        }
+        return null;
+      })
+      .filter((ch): ch is NotificationChannel => ch !== null)
+      .filter((ch, idx, arr) => arr.indexOf(ch) === idx); // Remove duplicates
+  };
+
+  /**
    * Transform API preferences to form format
    */
   const transformPreferencesToForm = (
@@ -698,8 +726,8 @@ export function NotificationPreferencesPage() {
 
       if (formData[section] && eventKey in (formData[section] as Record<string, NotificationEventPreference>)) {
         (formData[section] as Record<string, NotificationEventPreference>)[eventKey] = {
-          channels: pref.channels as NotificationChannel[],
-          mandatoryChannels: pref.mandatoryChannels as NotificationChannel[],
+          channels: cleanChannelData(pref.channels as string[]),
+          mandatoryChannels: cleanChannelData(pref.mandatoryChannels as string[]),
         };
       }
     }
@@ -801,8 +829,14 @@ export function NotificationPreferencesPage() {
     }
   };
 
-  const handleSave = () => {
-    form.handleSubmit(onSubmit)();
+  const handleSave = async () => {
+    await form.handleSubmit(
+      (data) => onSubmit(data),
+      (errors) => {
+        console.error('Form validation failed:', errors);
+        toast.error('Erro de validação. Por favor, verifique os campos e tente novamente.');
+      }
+    )();
   };
 
   const handleReset = () => {

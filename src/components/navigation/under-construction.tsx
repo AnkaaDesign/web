@@ -7,7 +7,7 @@ interface UnderConstructionProps {
 export const UnderConstruction = ({ title }: UnderConstructionProps) => {
   return (
     <Card className="h-full flex flex-col">
-      <CardHeader className="px-8 py-6 flex-shrink-0 border-b border-neutral-200 dark:border-neutral-700">
+      <CardHeader className="px-8 py-6 flex-shrink-0 border-b border-border">
         <CardTitle className="text-2xl font-bold">{title}</CardTitle>
         <p className="text-muted-foreground">Esta página está em desenvolvimento.</p>
       </CardHeader>

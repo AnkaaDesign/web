@@ -630,19 +630,82 @@ export function TaskHistoryList({
           </div>
         )}
 
-        {/* Table */}
-        <div className="flex-1 min-h-0">
-          <TaskHistoryTable
-            filters={queryFilters}
-            visibleColumns={visibleColumns}
-            onDataChange={handleTableDataChange}
-            className="h-full"
-            navigationRoute={navigationRoute}
-            advancedActionsRef={advancedActionsRef}
-            onStartCopyFromTask={handleStartCopyFromTask}
-            isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
-            onSourceTaskSelect={handleSourceTaskSelected}
-          />
+        {/* Tables - separated by status for preparation route */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {navigationRoute === 'preparation' ? (
+            <div className="space-y-8 h-full">
+              {/* Group 1: Em Preparação + Aguardando Produção */}
+              <div>
+                <TaskHistoryTable
+                  filters={{
+                    ...queryFilters,
+                    status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION],
+                  }}
+                  visibleColumns={visibleColumns}
+                  onDataChange={handleTableDataChange}
+                  navigationRoute={navigationRoute}
+                  advancedActionsRef={advancedActionsRef}
+                  onStartCopyFromTask={handleStartCopyFromTask}
+                  isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+                  onSourceTaskSelect={handleSourceTaskSelected}
+                  disablePagination={true}
+                />
+              </div>
+
+              {/* Divider */}
+              <div className="border-t-2 border-border" />
+
+              {/* Group 2: Em Produção */}
+              <div>
+                <TaskHistoryTable
+                  filters={{
+                    ...queryFilters,
+                    status: [TASK_STATUS.IN_PRODUCTION],
+                  }}
+                  visibleColumns={visibleColumns}
+                  navigationRoute={navigationRoute}
+                  advancedActionsRef={advancedActionsRef}
+                  onStartCopyFromTask={handleStartCopyFromTask}
+                  isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+                  onSourceTaskSelect={handleSourceTaskSelected}
+                  disablePagination={true}
+                />
+              </div>
+
+              {/* Divider */}
+              <div className="border-t-2 border-border" />
+
+              {/* Group 3: Concluído */}
+              <div>
+                <TaskHistoryTable
+                  filters={{
+                    ...queryFilters,
+                    status: [TASK_STATUS.COMPLETED],
+                  }}
+                  visibleColumns={visibleColumns}
+                  navigationRoute={navigationRoute}
+                  advancedActionsRef={advancedActionsRef}
+                  onStartCopyFromTask={handleStartCopyFromTask}
+                  isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+                  onSourceTaskSelect={handleSourceTaskSelected}
+                  disablePagination={true}
+                />
+              </div>
+            </div>
+          ) : (
+            // Single table for non-preparation routes
+            <TaskHistoryTable
+              filters={queryFilters}
+              visibleColumns={visibleColumns}
+              onDataChange={handleTableDataChange}
+              className="h-full"
+              navigationRoute={navigationRoute}
+              advancedActionsRef={advancedActionsRef}
+              onStartCopyFromTask={handleStartCopyFromTask}
+              isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
+              onSourceTaskSelect={handleSourceTaskSelected}
+            />
+          )}
         </div>
 
         {/* Filter Modal */}

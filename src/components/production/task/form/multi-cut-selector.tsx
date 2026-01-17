@@ -348,7 +348,7 @@ export const MultiCutSelector = forwardRef<MultiCutSelectorRef, MultiCutSelector
             const fileForDisplay = getFileForCut(currentCut, cutId);
 
             return (
-            <div key={cutId} className="border rounded-lg p-4">
+            <div key={cutId} className="border border-border/40 rounded-lg p-4">
               {/* Two column layout: File on left, Type+Quantity on right */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Left Column - File Upload (takes full height) */}

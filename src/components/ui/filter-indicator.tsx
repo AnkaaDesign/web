@@ -20,9 +20,9 @@ export function FilterIndicator({ label, value, onRemove, icon, className }: Fil
     <Badge
       className={cn(
         "inline-flex items-center gap-2 px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
-        "bg-neutral-400/20 text-neutral-600 border-neutral-300",
+        "bg-neutral-400/20 text-neutral-600 border-border",
         "hover:bg-red-700 hover:text-white hover:border-red-700",
-        "dark:bg-neutral-600 dark:text-neutral-300 dark:border-neutral-600",
+        "dark:bg-neutral-600 dark:text-neutral-300 dark:border-border",
         "dark:hover:bg-red-700 dark:hover:text-white dark:hover:border-red-700",
         className,
       )}

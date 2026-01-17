@@ -242,7 +242,7 @@ input[type="time"]::-moz-calendar-picker-indicator {
     --accent-foreground: 0 0% 98%; /* neutral-50 */
     --destructive: 0 40% 45%; /* less saturated red */
     --destructive-foreground: 0 0% 98%; /* neutral-50 */
-    --border: 0 0% 27%; /* neutral-725 - slightly darker borders */
+    --border: 0 0% 22%; /* subtle but visible borders - balanced contrast */
     --input: 0 0% 13%; /* slightly darker than card */
     --ring: 142 72% 29%; /* green-700 for focus */
 
@@ -263,7 +263,7 @@ input[type="time"]::-moz-calendar-picker-indicator {
     --sidebar-primary-foreground: 0 0% 98%;
     --sidebar-accent: 0 0% 18%;
     --sidebar-accent-foreground: 0 0% 80%;
-    --sidebar-border: 0 0% 20%;
+    --sidebar-border: 0 0% 20%; /* subtle sidebar borders */
     --sidebar-ring: 142 25% 45%;
   }
 }

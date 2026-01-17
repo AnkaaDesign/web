@@ -360,6 +360,34 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     }
   }, [truckId, task.id]);
 
+  // Scroll to the opened accordion item
+  useEffect(() => {
+    if (openAccordion) {
+      // Use setTimeout to wait for accordion animation to start
+      setTimeout(() => {
+        // Find the accordion item by ID
+        const element = document.getElementById(`accordion-item-${openAccordion}`);
+        if (!element) {
+          console.log('Element not found for:', openAccordion);
+          return;
+        }
+
+        // Get the element's position
+        const rect = element.getBoundingClientRect();
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+
+        // Calculate position with offset (add 100px space from top for header)
+        const targetPosition = rect.top + scrollTop - 100;
+
+        // Smooth scroll to the calculated position
+        window.scrollTo({
+          top: targetPosition,
+          behavior: 'smooth'
+        });
+      }, 150); // Increased timeout to ensure accordion animation completes
+    }
+  }, [openAccordion]);
+
   const { data: layoutsData } = useLayoutsByTruck(truckId || "", !!truckId);
 
   // Calculate truck length from layout sections for spot selector
@@ -2042,15 +2070,20 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           Submit
         </button>
 
-        <Accordion
-          type="single"
-          collapsible
-          value={openAccordion}
-          onValueChange={setOpenAccordion}
-          className="space-y-4"
-        >
+        <div className={openAccordion === 'base-files' || openAccordion === 'artworks' ? 'pb-64' : ''}>
+          <Accordion
+            type="single"
+            collapsible
+            value={openAccordion}
+            onValueChange={setOpenAccordion}
+            className="space-y-4"
+          >
           {/* Basic Information Card */}
-          <AccordionItem value="basic-information" className="border rounded-lg">
+          <AccordionItem
+            value="basic-information"
+            id="accordion-item-basic-information"
+            className="border border-border/40 rounded-lg"
+          >
             <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
@@ -2441,7 +2474,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 {/* Dates Card - Hidden for Warehouse, Logistic, and Commercial users, Disabled for Financial and Designer users */}
                 {!isWarehouseUser && !isLogisticUser && !isCommercialUser && (
-          <AccordionItem value="dates" className="border rounded-lg">
+          <AccordionItem
+            value="dates"
+            id="accordion-item-dates"
+            className="border border-border/40 rounded-lg"
+          >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
@@ -2537,7 +2574,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 {/* Services Card - Visible for Admin, Financial, Designer, Commercial, and Logistic users */}
                 {!isWarehouseUser && !isPlottingUser && (
-          <AccordionItem value="services" className="border rounded-lg">
+          <AccordionItem
+            value="services"
+            id="accordion-item-services"
+            className="border border-border/40 rounded-lg"
+          >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
@@ -2572,7 +2613,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 {/* Paint Selection (Tintas) - Hidden for Warehouse, Financial, and Logistic users, Disabled for Designer */}
                 {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
-          <AccordionItem value="paint" className="border rounded-lg">
+          <AccordionItem
+            value="paint"
+            id="accordion-item-paint"
+            className="border border-border/40 rounded-lg"
+          >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
@@ -2609,7 +2654,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 {/* Layout Section - Hidden for Warehouse, Financial, Designer, and Commercial users, EDITABLE for Logistic users */}
                 {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isCommercialUser && (
-          <AccordionItem value="layout" className="border rounded-lg">
+          <AccordionItem
+            value="layout"
+            id="accordion-item-layout"
+            className="border border-border/40 rounded-lg"
+          >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
@@ -2763,7 +2812,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 {/* Truck Spot Selector - Only visible to ADMIN and LOGISTIC users */}
                 {truckId && (isAdminUser || isLogisticUser) && (
-          <AccordionItem value="spot" className="border rounded-lg">
+          <AccordionItem
+            value="spot"
+            id="accordion-item-spot"
+            className="border border-border/40 rounded-lg"
+          >
                   <Card className="border-0">
                     <AccordionTrigger className="px-0 hover:no-underline">
                       <CardHeader className="flex-1 py-4">
@@ -2792,7 +2845,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 {/* Pricing Card - Visible to ADMIN, FINANCIAL, and COMMERCIAL users */}
                 {canViewPricingSections && (
-          <AccordionItem value="pricing" className="border rounded-lg">
+          <AccordionItem
+            value="pricing"
+            id="accordion-item-pricing"
+            className="border border-border/40 rounded-lg"
+          >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
@@ -2826,7 +2883,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 {/* Cut Plans Section - Multiple Cuts Support - EDITABLE for Designer, Hidden for Financial, Logistic, and Commercial users */}
                 {!isFinancialUser && !isLogisticUser && !isCommercialUser && (
-          <AccordionItem value="cuts" className="border rounded-lg">
+          <AccordionItem
+            value="cuts"
+            id="accordion-item-cuts"
+            className="border border-border/40 rounded-lg"
+          >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
@@ -2852,7 +2913,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 {/* Airbrushing Section - Multiple Airbrushings Support - Hidden for Warehouse, Financial, Designer, Logistic, and Commercial users */}
                 {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && !isCommercialUser && (
-          <AccordionItem value="airbrushing" className="border rounded-lg">
+          <AccordionItem
+            value="airbrushing"
+            id="accordion-item-airbrushing"
+            className="border border-border/40 rounded-lg"
+          >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
@@ -2878,7 +2943,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 {/* Financial Information Card - Only visible to ADMIN and FINANCIAL users */}
                 {canViewFinancialSections && (
-          <AccordionItem value="financial" className="border rounded-lg">
+          <AccordionItem
+            value="financial"
+            id="accordion-item-financial"
+            className="border border-border/40 rounded-lg"
+          >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
@@ -2955,7 +3024,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 {/* Observation Section - Hidden for Warehouse, Financial, Designer, Logistic, and Commercial users */}
                 {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isLogisticUser && !isCommercialUser && (
-          <AccordionItem value="observation" className="border rounded-lg">
+          <AccordionItem
+            value="observation"
+            id="accordion-item-observation"
+            className="border border-border/40 rounded-lg"
+          >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
@@ -3031,7 +3104,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 {/* Base Files Card (optional) - EDITABLE for Designer and Commercial, Hidden for Warehouse, Financial, and Logistic users */}
                 {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
-          <AccordionItem value="base-files" className="border rounded-lg">
+          <AccordionItem
+            value="base-files"
+            id="accordion-item-base-files"
+            className="border border-border/40 rounded-lg"
+          >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
@@ -3061,7 +3138,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
                 {/* Artworks Card (optional) - EDITABLE for Designer and Commercial, Hidden for Warehouse, Financial, and Logistic users */}
                 {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
-          <AccordionItem value="artworks" className="border rounded-lg">
+          <AccordionItem
+            value="artworks"
+            id="accordion-item-artworks"
+            className="border border-border/40 rounded-lg"
+          >
                 <Card className="border-0">
                   <AccordionTrigger className="px-0 hover:no-underline">
                     <CardHeader className="flex-1 py-4">
@@ -3101,6 +3182,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
           )}
         </Accordion>
+        </div>
       </form>
     </Form>
   );

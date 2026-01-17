@@ -227,7 +227,7 @@ export function getTableColumnAlignment(align?: "left" | "center" | "right"): st
 export function getTableStyles() {
   return {
     container: "rounded-lg flex flex-col",
-    wrapper: "border-l border-r border-t border-neutral-600 dark:border-neutral-700 rounded-t-lg overflow-hidden",
+    wrapper: "border-l border-r border-t border-neutral-600 dark:border-border rounded-t-lg overflow-hidden",
     table: "table-fixed w-full [&>div]:border-0 [&>div]:rounded-none",
     header: "[&_tr]:border-b-0 [&_tr]:hover:!bg-neutral-300 [&_tr]:dark:hover:!bg-neutral-950",
     headerRow: "[&]:!bg-neutral-300 [&]:dark:!bg-neutral-800 [&]:hover:!bg-neutral-300 [&]:dark:hover:!bg-neutral-800 [&]:even:!bg-neutral-300 [&]:dark:even:!bg-neutral-800",
@@ -236,9 +236,9 @@ export function getTableStyles() {
     bodyRowSelected: "bg-primary/10 dark:bg-primary/20",
     bodyCell: "px-4 py-2",
     footer: "p-4 border-l border-r border-b border-neutral-600 rounded-b-lg bg-neutral-50 dark:bg-neutral-800",
-    emptyState: "border border-neutral-200 dark:border-neutral-700 rounded-lg p-8 text-center text-muted-foreground bg-white dark:bg-neutral-800",
-    loadingState: "border border-neutral-200 dark:border-neutral-700 rounded-lg p-8 text-center text-muted-foreground bg-white dark:bg-neutral-800",
-    errorState: "border border-neutral-200 dark:border-neutral-700 rounded-lg p-8 text-center text-destructive bg-white dark:bg-neutral-800",
+    emptyState: "border border-neutral-200 dark:border-border rounded-lg p-8 text-center text-muted-foreground bg-white dark:bg-neutral-800",
+    loadingState: "border border-neutral-200 dark:border-border rounded-lg p-8 text-center text-muted-foreground bg-white dark:bg-neutral-800",
+    errorState: "border border-neutral-200 dark:border-border rounded-lg p-8 text-center text-destructive bg-white dark:bg-neutral-800",
   };
 }
 

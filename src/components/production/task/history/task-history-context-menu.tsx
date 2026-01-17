@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy } from "@tabler/icons-react";
+import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
@@ -376,6 +376,37 @@ export function TaskHistoryContextMenu({
     setDropdownOpen(false);
   };
 
+  const handleLiberar = async () => {
+    try {
+      // Update all PREPARATION tasks to set forecast date to today
+      for (const t of tasks) {
+        if (t.status === TASK_STATUS.PREPARATION) {
+          await update({
+            id: t.id,
+            data: { forecastDate: new Date() },
+          });
+        }
+      }
+
+      toast.success(
+        isBulk ? "Tarefas liberadas" : "Tarefa liberada",
+        {
+          description: isBulk
+            ? `${tasks.length} tarefa(s) com previsão atualizada para hoje`
+            : "Previsão atualizada para hoje",
+        }
+      );
+    } catch (error) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error releasing task(s):", error);
+      }
+      toast.error("Erro ao liberar tarefa(s)", {
+        description: "Não foi possível atualizar a previsão. Tente novamente.",
+      });
+    }
+    setDropdownOpen(false);
+  };
+
   const handleDuplicate = () => {
     if (process.env.NODE_ENV !== 'production') {
       console.log('[TaskHistoryContextMenu] handleDuplicate called');
@@ -540,6 +571,14 @@ export function TaskHistoryContextMenu({
             </div>
           )}
 
+          {/* Liberar action - Only for PREPARATION status tasks */}
+          {hasPreparationTasks && (
+            <DropdownMenuItem onClick={handleLiberar} className="text-blue-600 hover:text-white">
+              <IconCalendarCheck className="mr-2 h-4 w-4" />
+              Liberar
+            </DropdownMenuItem>
+          )}
+
           {/* Status actions - Team leaders (sector match) and ADMIN only */}
           {canManageStatus && (hasPreparationTasks || hasWaitingProductionTasks) && (
             <DropdownMenuItem onClick={handleStart} className="text-green-700 hover:text-white">
@@ -556,7 +595,7 @@ export function TaskHistoryContextMenu({
           )}
 
           {/* Separator if we have status actions */}
-          {canManageStatus && (hasInProgressTasks || hasPreparationTasks || hasWaitingProductionTasks) && <DropdownMenuSeparator />}
+          {(hasPreparationTasks || (canManageStatus && (hasInProgressTasks || hasPreparationTasks || hasWaitingProductionTasks))) && <DropdownMenuSeparator />}
 
           {/* View action - single selection only */}
           {!isBulk && task && (

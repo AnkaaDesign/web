@@ -116,7 +116,7 @@ export function HomePage() {
           {adminQuickAccess.map((item) => (
             <Card
               key={item.path}
-              className="cursor-pointer hover:shadow-sm shadow-[#fff] transition-shadow duration-200 rounded-md border border-neutral-300 dark:border-neutral-700"
+              className="cursor-pointer hover:shadow-sm shadow-[#fff] transition-shadow duration-200 rounded-md border border-border"
               onClick={() => navigate(item.path)}
             >
               <CardContent className="p-4">

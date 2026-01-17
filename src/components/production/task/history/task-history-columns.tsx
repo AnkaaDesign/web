@@ -8,6 +8,7 @@ import {
   PAINT_FINISH_LABELS,
   PAINT_BRAND_LABELS,
   TRUCK_MANUFACTURER_LABELS,
+  TRUCK_CATEGORY_LABELS,
   COMMISSION_STATUS,
   COMMISSION_STATUS_LABELS,
   TASK_STATUS,
@@ -23,6 +24,7 @@ import { canViewServiceOrderType } from "../../../../utils/permissions/service-o
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { CanvasNormalMapRenderer } from "@/components/painting/effects/canvas-normal-map-renderer";
 import { ServiceOrderCell } from "./service-order-cell";
+import { IconCheck, IconAlertTriangle } from "@tabler/icons-react";
 
 // Helper function to render date without icon
 const renderDate = (date: Date | null) => {
@@ -35,6 +37,83 @@ const renderDate = (date: Date | null) => {
     <span className="truncate" title={dateTime}>
       {formatted}
     </span>
+  );
+};
+
+// Helper function to check if a date is today
+const isToday = (date: Date): boolean => {
+  const today = new Date();
+  return date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear();
+};
+
+// Helper function to check if a date is in the past
+const isPast = (date: Date): boolean => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const checkDate = new Date(date);
+  checkDate.setHours(0, 0, 0, 0);
+  return checkDate < today;
+};
+
+// Helper function to render forecast date with indicators (only for preparation route)
+const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: string) => {
+  if (!date) return <span className="text-muted-foreground">-</span>;
+
+  const formatted = formatDate(date);
+  const dateTime = formatDateTime(date);
+  const forecastDate = new Date(date);
+
+  // Only show indicators for preparation route
+  const showIndicators = navigationRoute === 'preparation';
+
+  // Blue triangle with check icon when forecast is today
+  const showBlueIndicator = showIndicators && isToday(forecastDate);
+
+  // Red triangle with alert icon when forecast is past AND entry date is not filled
+  const showRedIndicator = showIndicators && isPast(forecastDate) && !task.entryDate;
+
+  return (
+    <>
+      <span className="truncate" title={dateTime}>
+        {formatted}
+      </span>
+
+      {/* Blue indicator for today - positioned flush with cell corner */}
+      {showBlueIndicator && (
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-blue-500 pointer-events-auto cursor-help">
+              <IconCheck className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="left" className="max-w-xs">
+            <div className="text-sm">
+              <div className="font-medium">Previsão para hoje</div>
+              <div className="text-muted-foreground">A data de liberação é hoje ({formatted})</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      )}
+
+      {/* Red indicator for overdue without entry date - positioned flush with cell corner */}
+      {showRedIndicator && !showBlueIndicator && (
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
+              <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="left" className="max-w-xs">
+            <div className="text-sm">
+              <div className="font-medium text-red-500">Liberação atrasada</div>
+              <div className="text-muted-foreground">A liberação ({formatted}) já passou e a data de entrada ainda não foi preenchida</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      )}
+    </>
   );
 };
 
@@ -243,6 +322,33 @@ export const createTaskHistoryColumns = (options?: {
     },
   },
   {
+    id: "truckCategory",
+    header: "CATEGORIA DO CAMINHÃO",
+    accessorFn: (row) => row.truck?.category || "",
+    sortable: true,
+    filterable: true,
+    defaultVisible: false,
+    width: "160px",
+    formatter: (value: string | null, row: Task) => {
+      if (!row.truck?.category) return <span className="text-muted-foreground">-</span>;
+      return (
+        <Badge variant="outline" className="truncate">
+          {TRUCK_CATEGORY_LABELS[row.truck.category]}
+        </Badge>
+      );
+    },
+  },
+  {
+    id: "forecastDate",
+    header: "PREVISÃO",
+    accessorKey: "forecastDate",
+    sortable: true,
+    filterable: true,
+    defaultVisible: false,
+    width: "120px",
+    formatter: (value: Date | null, row: Task) => renderForecastDate(value, row, navigationRoute),
+  },
+  {
     id: "entryDate",
     header: "ENTRADA",
     accessorKey: "entryDate",
@@ -276,16 +382,6 @@ export const createTaskHistoryColumns = (options?: {
     id: "term",
     header: "PRAZO",
     accessorKey: "term",
-    sortable: true,
-    filterable: true,
-    defaultVisible: false,
-    width: "120px",
-    formatter: (value: Date | null) => renderDate(value),
-  },
-  {
-    id: "forecastDate",
-    header: "PREVISÃO",
-    accessorKey: "forecastDate",
     sortable: true,
     filterable: true,
     defaultVisible: false,
@@ -334,7 +430,7 @@ export const createTaskHistoryColumns = (options?: {
     filterable: false,
     defaultVisible: false,
     width: "140px",
-    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.COMMERCIAL} />,
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.COMMERCIAL} navigationRoute={navigationRoute} />,
   },
   {
     id: "serviceOrders.logistic",
@@ -355,7 +451,7 @@ export const createTaskHistoryColumns = (options?: {
     filterable: false,
     defaultVisible: false,
     width: "140px",
-    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.LOGISTIC} />,
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.LOGISTIC} navigationRoute={navigationRoute} />,
   },
   {
     id: "serviceOrders.artwork",
@@ -376,7 +472,7 @@ export const createTaskHistoryColumns = (options?: {
     filterable: false,
     defaultVisible: false,
     width: "100px",
-    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.ARTWORK} />,
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.ARTWORK} navigationRoute={navigationRoute} />,
   },
   {
     id: "serviceOrders.production",
@@ -397,7 +493,7 @@ export const createTaskHistoryColumns = (options?: {
     filterable: false,
     defaultVisible: false,
     width: "120px",
-    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} />,
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.PRODUCTION} navigationRoute={navigationRoute} />,
   },
   {
     id: "serviceOrders.financial",
@@ -418,7 +514,7 @@ export const createTaskHistoryColumns = (options?: {
     filterable: false,
     defaultVisible: false,
     width: "120px",
-    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.FINANCIAL} />,
+    formatter: (_: any, row: Task) => <ServiceOrderCell task={row} serviceOrderType={SERVICE_ORDER_TYPE.FINANCIAL} navigationRoute={navigationRoute} />,
   },
   {
     id: "price",

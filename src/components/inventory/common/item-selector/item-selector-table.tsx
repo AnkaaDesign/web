@@ -639,7 +639,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
                                 "h-4 w-4 shrink-0 rounded-sm border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                                 itemIsSelected
                                   ? "bg-primary border-primary text-primary-foreground"
-                                  : "border-neutral-400 dark:border-neutral-600 bg-transparent hover:border-primary/50"
+                                  : "border-border bg-transparent hover:border-primary/50"
                               )}
                               aria-label={`Select ${item.name}`}
                               role="checkbox"

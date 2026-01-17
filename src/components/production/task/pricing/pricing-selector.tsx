@@ -489,7 +489,7 @@ export const PricingSelector = forwardRef<
 
       {/* Services List - Main Section */}
       {fields.length > 0 && (
-        <div className="space-y-3 pt-4 border-t">
+        <div className="space-y-3 pt-4 border-t border-border/30">
           <h4 className="font-medium text-sm text-muted-foreground">Serviços</h4>
           {fields.map((field, index) => {
             const isLastRow = index === fields.length - 1;
@@ -570,7 +570,7 @@ export const PricingSelector = forwardRef<
 
       {/* Discount and Summary Section */}
       {hasPricingItems && (
-        <div className="space-y-4 pt-4 border-t">
+        <div className="space-y-4 pt-4 border-t border-border/30">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField
               control={control}
@@ -705,7 +705,7 @@ export const PricingSelector = forwardRef<
 
       {/* Layout File Upload */}
       {hasPricingItems && (
-        <div className="space-y-3 pt-4 border-t">
+        <div className="space-y-3 pt-4 border-t border-border/30">
           <h4 className="font-medium text-sm flex items-center gap-2">
             <IconPhoto className="h-4 w-4" />
             Layout Aprovado

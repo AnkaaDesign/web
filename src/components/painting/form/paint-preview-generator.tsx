@@ -746,7 +746,7 @@ export const PaintPreviewGenerator = forwardRef<
               )}
 
               {settings.lights.map((light, index) => (
-                <div key={light.id} className="border rounded-lg p-3 space-y-3">
+                <div key={light.id} className="border border-border/40 rounded-lg p-3 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {light.type === "BEAM" ? (

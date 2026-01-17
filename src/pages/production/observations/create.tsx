@@ -5,14 +5,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import type { Observation } from "../../../types";
-import { IconCheck, IconLoader2, IconNotebook } from "@tabler/icons-react";
-import { useState } from "react";
+import { IconCheck, IconNotebook } from "@tabler/icons-react";
 
 export const ObservationCreate = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [formState, setFormState] = useState({ isValid: false, isDirty: false });
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get task ID from URL params if provided
   const taskId = searchParams.get("taskId");
@@ -34,16 +31,13 @@ export const ObservationCreate = () => {
       label: "Cancelar",
       onClick: handleCancel,
       variant: "outline" as const,
-      disabled: isSubmitting,
     },
     {
       key: "submit",
       label: "Cadastrar",
-      icon: isSubmitting ? IconLoader2 : IconCheck,
+      icon: IconCheck,
       onClick: () => document.getElementById("observation-form-submit")?.click(),
       variant: "default" as const,
-      disabled: isSubmitting || !formState.isValid,
-      loading: isSubmitting,
     },
   ];
 
@@ -67,8 +61,6 @@ export const ObservationCreate = () => {
             initialTaskId={taskId || undefined}
             onSuccess={handleSuccess}
             onCancel={handleCancel}
-            onFormStateChange={setFormState}
-            onSubmittingChange={setIsSubmitting}
           />
         </div>
       </div>

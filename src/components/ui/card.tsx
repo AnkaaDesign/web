@@ -11,7 +11,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(({ className, nested, l
   // For backward compatibility, nested=true means level 2
   const cardLevel = level !== undefined ? level : nested ? 2 : 1;
 
-  return <div ref={ref} className={cn("text-card-foreground rounded-xl shadow-sm border border-border/50 transition-colors", getCardLevel(cardLevel), className)} {...props} />;
+  return <div ref={ref} className={cn("text-card-foreground rounded-xl shadow-sm border border-border transition-colors", getCardLevel(cardLevel), className)} {...props} />;
 });
 Card.displayName = "Card";
 

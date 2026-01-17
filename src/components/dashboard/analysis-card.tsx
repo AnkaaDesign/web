@@ -93,7 +93,7 @@ export function AnalysisCard({ title, type, data, icon: Icon, className, onDetai
           </div>
 
           {/* Summary */}
-          <div className="mt-3 pt-3 border-t border-neutral-200 dark:border-neutral-700">
+          <div className="mt-3 pt-3 border-t border-border">
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">Total</span>
               <span className="font-semibold">

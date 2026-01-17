@@ -88,7 +88,7 @@ export function FavoritesPage() {
                   key={favorite.id}
                   className={cn(
                     "cursor-pointer transition-shadow duration-200",
-                    "rounded-md border border-neutral-300 dark:border-neutral-700",
+                    "rounded-md border border-border",
                     "hover:shadow-sm hover:shadow-neutral-200 dark:hover:shadow-neutral-900",
                   )}
                   onClick={() => handleNavigate(favorite.path)}

@@ -19,6 +19,8 @@ import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-to
 import { IconChevronUp, IconChevronDown, IconSelector, IconAlertTriangle, IconHistory } from "@tabler/icons-react";
 import { TaskHistoryTableSkeleton } from "./task-history-table-skeleton";
 import { useNavigate } from "react-router-dom";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatDate } from "@/utils";
 
 interface TaskHistoryTableProps {
   visibleColumns: Set<string>;
@@ -30,27 +32,28 @@ interface TaskHistoryTableProps {
   onStartCopyFromTask?: (targetTasks: Task[]) => void;
   isSelectingSourceTask?: boolean;
   onSourceTaskSelect?: (task: Task) => void;
+  disablePagination?: boolean;
 }
 
 /**
- * Get the appropriate color class for the commercial service order cell based on:
+ * Get the appropriate indicator type for the commercial service order cell based on:
  * 1. Task's forecastDate proximity (must be within 7 days)
  * 2. Having at least one incomplete commercial service order
  *
  * For agenda (preparation) route only:
- * - Neutral: No forecastDate, > 7 days away, or no incomplete commercial service orders
- * - Yellow/Amber: forecastDate is 3-7 days away AND has incomplete commercial service order
- * - Red: forecastDate is ≤ 3 days away (or overdue) AND has incomplete commercial service order
+ * - null: No forecastDate, > 7 days away, or no incomplete commercial service orders
+ * - "yellow": forecastDate is 3-7 days away AND has incomplete commercial service order
+ * - "red": forecastDate is ≤ 3 days away (or overdue) AND has incomplete commercial service order
  */
-function getCommercialServiceOrderCellColorClass(task: Task, navigationRoute?: string): string {
-  // Only apply color logic to preparation (agenda) route
+function getCommercialServiceOrderIndicator(task: Task, navigationRoute?: string): "red" | "yellow" | null {
+  // Only apply indicator logic to preparation (agenda) route
   if (navigationRoute !== 'preparation') {
-    return "";
+    return null;
   }
 
-  // Tasks without forecastDate - neutral
+  // Tasks without forecastDate - no indicator
   if (!task.forecastDate) {
-    return "";
+    return null;
   }
 
   // Check if task has at least one incomplete commercial service order
@@ -58,9 +61,9 @@ function getCommercialServiceOrderCellColorClass(task: Task, navigationRoute?: s
     (so) => so.type === 'COMMERCIAL'
   ) || [];
 
-  // No commercial service orders - no coloring
+  // No commercial service orders - no indicator
   if (commercialServiceOrders.length === 0) {
-    return "";
+    return null;
   }
 
   // Check if there's at least one incomplete (not COMPLETED or CANCELLED) commercial service order
@@ -68,9 +71,9 @@ function getCommercialServiceOrderCellColorClass(task: Task, navigationRoute?: s
     (so) => so.status !== SERVICE_ORDER_STATUS.COMPLETED && so.status !== SERVICE_ORDER_STATUS.CANCELLED
   );
 
-  // All commercial service orders are completed - no coloring
+  // All commercial service orders are completed - no indicator
   if (!hasIncompleteCommercial) {
-    return "";
+    return null;
   }
 
   // Calculate days remaining until forecastDate
@@ -81,16 +84,16 @@ function getCommercialServiceOrderCellColorClass(task: Task, navigationRoute?: s
 
   // Red zone: 3 days or less (including overdue) AND has incomplete commercial service order
   if (daysRemaining <= 3) {
-    return "bg-red-200 dark:bg-red-800";
+    return "red";
   }
 
   // Yellow zone: between 3 and 7 days AND has incomplete commercial service order
   if (daysRemaining <= 7) {
-    return "bg-amber-200 dark:bg-amber-700";
+    return "yellow";
   }
 
-  // Safe zone: more than 7 days - neutral (no special color)
-  return "";
+  // Safe zone: more than 7 days - no indicator
+  return null;
 }
 
 export function TaskHistoryTable({
@@ -103,6 +106,7 @@ export function TaskHistoryTable({
   onStartCopyFromTask,
   isSelectingSourceTask,
   onSourceTaskSelect,
+  disablePagination = false,
 }: TaskHistoryTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -203,8 +207,9 @@ export function TaskHistoryTable({
       // Always apply base filters to prevent showing unintended tasks
       ...filters,
       ...(statusToUse && { status: statusToUse }),
-      page: page + 1, // Convert 0-based to 1-based for API
-      limit: pageSize,
+      // If pagination is disabled, fetch all records
+      page: disablePagination ? 1 : page + 1, // Convert 0-based to 1-based for API
+      limit: disablePagination ? 1000 : pageSize,
       include: includeConfig,
       // Convert sortConfigs to orderBy format for API
       ...(sortConfigs.length > 0 && {
@@ -220,7 +225,7 @@ export function TaskHistoryTable({
     };
 
     return params;
-  }, [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds]);
+  }, [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds, disablePagination]);
 
   // Fetch data
   const { data: response, isLoading, error } = useTasks(queryParams);
@@ -446,12 +451,13 @@ export function TaskHistoryTable({
               tasks.map((task, index) => {
                 const taskIsSelected = isSelected(task.id);
 
-                // Check if task has NO service orders (only for agenda)
-                const hasNoServiceOrders = !task.services || task.services.length === 0;
-                const shouldShowRedBorder = navigationRoute === 'preparation' && hasNoServiceOrders;
+                // Get indicator type for commercial service order column based on deadline and incomplete status
+                const commercialIndicator = getCommercialServiceOrderIndicator(task, navigationRoute);
 
-                // Get cell color for commercial service order column based on deadline and incomplete status
-                const commercialCellColorClass = getCommercialServiceOrderCellColorClass(task, navigationRoute);
+                // Calculate days remaining for tooltip
+                const daysRemaining = task.forecastDate
+                  ? Math.ceil((new Date(task.forecastDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                  : null;
 
                 return (
                   <tr
@@ -467,8 +473,6 @@ export function TaskHistoryTable({
                       taskIsSelected && "bg-muted/30 hover:bg-muted/40",
                       // Source selection mode highlight
                       isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary",
-                      // Red border for tasks with NO service orders (agenda only)
-                      shouldShowRedBorder && "border-l-4 border-l-red-500",
                     )}
                     onClick={(e) => {
                       // Don't navigate if clicking checkbox
@@ -510,12 +514,9 @@ export function TaskHistoryTable({
                         className={cn(
                           column.className,
                           "p-0 !border-r-0",
-                          // Apply cell-level coloring only to commercial service order column
-                          // Colors indicate deadline proximity + incomplete commercial service orders
-                          column.id === "serviceOrders.commercial" && commercialCellColorClass,
                         )}
                       >
-                        <div className="px-4 py-2">
+                        <div className="px-4 py-2 relative">
                           {column.formatter
                             ? column.formatter(
                                 column.accessorFn
@@ -526,6 +527,34 @@ export function TaskHistoryTable({
                             : column.accessorFn
                             ? column.accessorFn(task)
                             : task[column.accessorKey as keyof Task]}
+
+                          {/* Corner triangle indicator for commercial service order column */}
+                          {column.id === "serviceOrders.commercial" && commercialIndicator && (
+                            <Tooltip delayDuration={0}>
+                              <TooltipTrigger asChild>
+                                <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent pointer-events-auto cursor-help" style={{
+                                  borderTopColor: commercialIndicator === "red" ? "rgb(239 68 68)" : "rgb(251 191 36)"
+                                }}>
+                                  <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="left" className="max-w-xs">
+                                <div className="text-sm">
+                                  <div className={cn("font-medium", commercialIndicator === "red" ? "text-red-500" : "text-amber-500")}>
+                                    {commercialIndicator === "red" ? "Prazo crítico" : "Prazo próximo"}
+                                  </div>
+                                  <div className="text-muted-foreground">
+                                    {daysRemaining !== null && daysRemaining <= 0
+                                      ? `Liberação atrasada (${formatDate(task.forecastDate!)}) e ordem comercial incompleta`
+                                      : daysRemaining === 1
+                                      ? `Falta ${daysRemaining} dia para a liberação e ordem comercial incompleta`
+                                      : `Faltam ${daysRemaining} dias para a liberação e ordem comercial incompleta`
+                                    }
+                                  </div>
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                         </div>
                       </TableCell>
                     ))}
@@ -537,25 +566,27 @@ export function TaskHistoryTable({
         </Table>
       </div>
 
-      {/* Pagination Footer */}
-      <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50">
-        <SimplePaginationAdvanced
-          currentPage={page}
-          totalPages={totalPages}
-          onPageChange={(newPage) => {
-            setPage(newPage);
-          }}
-          pageSize={pageSize}
-          totalItems={totalRecords}
-          pageSizeOptions={[20, 40, 60, 100]}
-          onPageSizeChange={(newPageSize) => {
-            setPageSize(newPageSize);
-          }}
-          showPageSizeSelector={true}
-          showGoToPage={true}
-          showPageInfo={true}
-        />
-      </div>
+      {/* Pagination Footer - hidden when pagination is disabled */}
+      {!disablePagination && (
+        <div className="px-4 border-l border-r border-b border-border rounded-b-lg bg-muted/50">
+          <SimplePaginationAdvanced
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={(newPage) => {
+              setPage(newPage);
+            }}
+            pageSize={pageSize}
+            totalItems={totalRecords}
+            pageSizeOptions={[20, 40, 60, 100]}
+            onPageSizeChange={(newPageSize) => {
+              setPageSize(newPageSize);
+            }}
+            showPageSizeSelector={true}
+            showGoToPage={true}
+            showPageInfo={true}
+          />
+        </div>
+      )}
 
       {/* Context Menu */}
       {contextMenu && (

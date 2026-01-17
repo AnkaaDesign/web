@@ -184,7 +184,7 @@ export function ArtworkFileUploadField({
       <div
         {...getRootProps()}
         className={cn(
-          "relative border-2 border-dashed rounded-lg p-4 text-center transition-colors",
+          "relative border-2 border-dashed border-border/40 rounded-lg p-4 text-center transition-colors",
           !isAtLimit && !disabled && "cursor-pointer hover:border-primary/50 hover:bg-muted/30",
           isDragActive && !isAtLimit && "border-primary bg-primary/5",
           (disabled || isAtLimit) && "cursor-not-allowed opacity-50 bg-muted/10",

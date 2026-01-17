@@ -283,7 +283,7 @@ export const CreateNotificationPage = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center space-x-3 border rounded-lg p-4">
+                <div className="flex items-center space-x-3 border border-border/40 rounded-lg p-4">
                   <Checkbox
                     id="channel-in-app"
                     checked={selectedChannels.includes("IN_APP")}
@@ -304,7 +304,7 @@ export const CreateNotificationPage = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3 border rounded-lg p-4">
+                <div className="flex items-center space-x-3 border border-border/40 rounded-lg p-4">
                   <Checkbox
                     id="channel-email"
                     checked={selectedChannels.includes("EMAIL")}
@@ -325,7 +325,7 @@ export const CreateNotificationPage = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3 border rounded-lg p-4">
+                <div className="flex items-center space-x-3 border border-border/40 rounded-lg p-4">
                   <Checkbox
                     id="channel-push"
                     checked={selectedChannels.includes("PUSH")}
@@ -346,7 +346,7 @@ export const CreateNotificationPage = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-3 border rounded-lg p-4">
+                <div className="flex items-center space-x-3 border border-border/40 rounded-lg p-4">
                   <Checkbox
                     id="channel-whatsapp"
                     checked={selectedChannels.includes("WHATSAPP")}

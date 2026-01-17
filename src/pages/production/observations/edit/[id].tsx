@@ -140,6 +140,18 @@ export const ObservationEdit = () => {
               onClick: handleCancel,
               variant: "outline" as const,
             },
+            {
+              key: "submit",
+              label: "Salvar",
+              onClick: () => {
+                // Trigger form submit by clicking the hidden submit button
+                const submitButton = document.getElementById("observation-form-submit");
+                if (submitButton) {
+                  submitButton.click();
+                }
+              },
+              variant: "default" as const,
+            },
           ]}
           className="flex-shrink-0"
         />

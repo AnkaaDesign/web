@@ -18,7 +18,7 @@ export function VerifiedSwitch({ disabled }: VerifiedSwitchProps) {
       control={form.control}
       name="verified"
       render={({ field }) => (
-        <FormItem className="flex flex-row items-center justify-between rounded-lg border bg-card p-4 shadow-sm">
+        <FormItem className="flex flex-row items-center justify-between rounded-lg border border-border/40 bg-card p-4 shadow-sm">
           <div className="space-y-0.5">
             <FormLabel className="text-base font-medium flex items-center gap-2">
               <IconShieldCheck className="h-4 w-4 text-muted-foreground" />

@@ -1177,7 +1177,7 @@ export const OrderCreateForm = () => {
                               >
                                 <label
                                   htmlFor="mode-inventory"
-                                  className="flex flex-col space-y-0.5 rounded-md border p-3 hover:bg-accent cursor-pointer transition-colors group"
+                                  className="flex flex-col space-y-0.5 rounded-md border border-border/40 p-3 hover:bg-accent cursor-pointer transition-colors group"
                                 >
                                   <div className="flex items-center gap-2 font-medium group-hover:text-white">
                                     <RadioGroupItem value="inventory" id="mode-inventory" />
@@ -1190,7 +1190,7 @@ export const OrderCreateForm = () => {
                                 </label>
                                 <label
                                   htmlFor="mode-temporary"
-                                  className="flex flex-col space-y-0.5 rounded-md border p-3 hover:bg-accent cursor-pointer transition-colors group"
+                                  className="flex flex-col space-y-0.5 rounded-md border border-border/40 p-3 hover:bg-accent cursor-pointer transition-colors group"
                                 >
                                   <div className="flex items-center gap-2 font-medium group-hover:text-white">
                                     <RadioGroupItem value="temporary" id="mode-temporary" />

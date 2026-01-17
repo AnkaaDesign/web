@@ -141,7 +141,7 @@ export const BADGE_COLORS: Record<
     bg: "bg-transparent",
     text: "text-neutral-900 dark:text-neutral-100",
     hover: "hover:bg-neutral-100 dark:hover:bg-neutral-800",
-    border: "border border-neutral-300 dark:border-neutral-600",
+    border: "border border-border",
   },
   inactive: {
     bg: "bg-gray-500",

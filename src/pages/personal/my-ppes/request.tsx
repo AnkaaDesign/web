@@ -198,7 +198,7 @@ export const PersonalMyPpesRequest = () => {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
       {/* Left side: Available PPEs */}
       <Card className="flex flex-col rounded-md">
-        <CardHeader className="px-8 py-3 flex-shrink-0 border-b border-neutral-200 dark:border-neutral-700">
+        <CardHeader className="px-8 py-3 flex-shrink-0 border-b border-border">
           <CardTitle className="text-xl font-bold">EPIs Disponíveis</CardTitle>
           <CardDescription>Selecione os EPIs que deseja solicitar</CardDescription>
         </CardHeader>
@@ -288,7 +288,7 @@ export const PersonalMyPpesRequest = () => {
 
       {/* Right side: Request Cart */}
       <Card className="flex flex-col rounded-md">
-        <CardHeader className="px-8 py-3 flex-shrink-0 border-b border-neutral-200 dark:border-neutral-700">
+        <CardHeader className="px-8 py-3 flex-shrink-0 border-b border-border">
           <div className="flex items-start justify-between">
             <div className="flex flex-col gap-2">
               <CardTitle className="text-xl font-bold">Minha Solicitação</CardTitle>

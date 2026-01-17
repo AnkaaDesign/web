@@ -280,7 +280,7 @@ export const MultiAirbrushingSelector = forwardRef<MultiAirbrushingSelectorRef, 
         {/* Airbrushings List */}
         <div className="space-y-3">
           {airbrushings.map((airbrushing) => (
-              <div key={airbrushing.id} className="border rounded-lg p-4 space-y-4">
+              <div key={airbrushing.id} className="border border-border/40 rounded-lg p-4 space-y-4">
                 {/* Status row (only in edit mode) */}
                 {isEditMode && (
                   <div className="flex gap-4 items-end">

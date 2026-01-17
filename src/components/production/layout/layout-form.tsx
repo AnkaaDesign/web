@@ -1168,7 +1168,7 @@ export const LayoutForm = ({
   // Early return if no current state
   if (!currentState) {
     return (
-      <div className="space-y-4 p-4 border rounded-lg bg-background/50">
+      <div className="space-y-4 p-4 border border-border/40 rounded-lg bg-background/50">
         <p className="text-muted-foreground">Carregando layout...</p>
       </div>
     );
@@ -1177,7 +1177,7 @@ export const LayoutForm = ({
   return (
     <div className="space-y-4">
       {/* Preview Container with centered content */}
-      <div className="p-4 border rounded-lg bg-background/50">
+      <div className="p-4 border border-border/40 rounded-lg bg-background/50">
         {/* Centered Layout Container */}
         <div className="flex flex-col items-center">
           {/* Main Layout with Height Input and Width Inputs */}
@@ -1224,7 +1224,7 @@ export const LayoutForm = ({
 
               {/* Main Layout Rectangle */}
               <div
-                className="border-2 border-foreground/50 bg-muted/10 relative overflow-hidden"
+                className="border-2 border-border/40 bg-muted/10 relative overflow-hidden"
                 style={{
                   width: `${currentState.totalWidth * scale}px`,
                   height: `${currentState.height * scale}px`
@@ -1247,7 +1247,7 @@ export const LayoutForm = ({
                     <div key={door.id}>
                       {/* Door vertical lines - only below the door top line */}
                       <div
-                        className="absolute border-l-2 border-r-2 border-foreground/50 pointer-events-none"
+                        className="absolute border-l-2 border-r-2 border-border/40 pointer-events-none"
                         style={{
                           left: `${door.position * scale}px`,
                           top: `${doorTopPosition * scale}px`,
@@ -1258,7 +1258,7 @@ export const LayoutForm = ({
 
                       {/* Door top line */}
                       <div
-                        className="absolute border-t-2 border-foreground/50 pointer-events-none"
+                        className="absolute border-t-2 border-border/40 pointer-events-none"
                         style={{
                           left: `${door.position * scale}px`,
                           top: `${doorTopPosition * scale}px`,
@@ -1322,7 +1322,7 @@ export const LayoutForm = ({
         </div>
 
         {/* Controls at the bottom */}
-        <div className="mt-12 pt-4 border-t">
+        <div className="mt-12 pt-4 border-t border-border/30">
           {/* Control Buttons - All in single row */}
           <div className="flex gap-2">
             {/* Editing controls - hidden in preview mode */}

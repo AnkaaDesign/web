@@ -1804,7 +1804,7 @@ export const TaskDetailsPage = () => {
                     {Object.entries(groupedServiceOrders).map(([type, orders]) => (
                       <div key={type} className="space-y-2">
                         {/* Group Header */}
-                        <div className="flex items-center gap-2 pb-2 border-b">
+                        <div className="flex items-center gap-2 pb-2 border-b border-border/30">
                           <h3 className="text-sm font-semibold text-foreground">
                             {SERVICE_ORDER_TYPE_LABELS[type as SERVICE_ORDER_TYPE]}
                           </h3>

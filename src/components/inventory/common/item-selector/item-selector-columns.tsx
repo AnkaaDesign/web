@@ -368,7 +368,7 @@ export const createItemSelectorColumns = (
               }
             }}
             disabled={!isSelected}
-            className="w-20 h-8 bg-transparent border-neutral-400 dark:border-neutral-600"
+            className="w-20 h-8 bg-transparent border-border"
           />
         );
       },
@@ -398,7 +398,7 @@ export const createItemSelectorColumns = (
               ctx?.onPriceChange?.(item.id, numValue);
             }}
             disabled={!isSelected}
-            className="w-28 h-8 bg-transparent border-neutral-400 dark:border-neutral-600"
+            className="w-28 h-8 bg-transparent border-border"
           />
         );
       },
@@ -433,7 +433,7 @@ export const createItemSelectorColumns = (
               }
             }}
             disabled={!isSelected}
-            className="w-20 h-8 bg-transparent border-neutral-400 dark:border-neutral-600"
+            className="w-20 h-8 bg-transparent border-border"
           />
         );
       },
@@ -466,7 +466,7 @@ export const createItemSelectorColumns = (
               }
             }}
             disabled={!isSelected}
-            className="w-20 h-8 bg-transparent border-neutral-400 dark:border-neutral-600"
+            className="w-20 h-8 bg-transparent border-border"
           />
         );
       },

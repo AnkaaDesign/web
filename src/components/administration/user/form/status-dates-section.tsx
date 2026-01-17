@@ -158,7 +158,7 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
   }
 
   return (
-    <div className="space-y-6 border-t pt-6">
+    <div className="space-y-6 border-t border-border/30 pt-6">
         {/* Experience Period 1 */}
         {showExp1Dates && (
           <div className="space-y-4">

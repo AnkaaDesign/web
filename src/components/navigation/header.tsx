@@ -13,8 +13,7 @@ export const Header: React.FC = () => {
   return (
     <header
       className={cn(
-        "border-b px-4 py-3 w-full h-16 flex items-center justify-between transition-colors bg-card",
-        isDark ? "border-neutral-700" : "border-neutral-300",
+        "border-b border-border px-4 py-3 w-full h-16 flex items-center justify-between transition-colors bg-card",
       )}
     >
       {/* Left side - App title */}

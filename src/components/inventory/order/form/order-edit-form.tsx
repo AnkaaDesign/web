@@ -1351,7 +1351,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                               disabled={true}
                               className="flex flex-col gap-2 opacity-60 pointer-events-none"
                             >
-                              <div className="flex items-start space-x-3 space-y-0 rounded-md border p-3 group">
+                              <div className="flex items-start space-x-3 space-y-0 rounded-md border border-border/40 p-3 group">
                                 <RadioGroupItem value="inventory" id="edit-mode-inventory" className="mt-0.5" />
                                 <div className="flex-1 space-y-0.5">
                                   <Label htmlFor="edit-mode-inventory" className="flex items-center gap-2 font-medium group-hover:text-white">
@@ -1363,7 +1363,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-start space-x-3 space-y-0 rounded-md border p-3 group">
+                              <div className="flex items-start space-x-3 space-y-0 rounded-md border border-border/40 p-3 group">
                                 <RadioGroupItem value="temporary" id="edit-mode-temporary" className="mt-0.5" />
                                 <div className="flex-1 space-y-0.5">
                                   <Label htmlFor="edit-mode-temporary" className="flex items-center gap-2 font-medium group-hover:text-white">

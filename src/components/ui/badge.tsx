@@ -13,7 +13,7 @@ const badgeVariants = cva(
         default: "border-transparent bg-neutral-500 text-white hover:bg-neutral-600",
         secondary: "border-transparent bg-neutral-200 text-neutral-900 hover:bg-neutral-300 dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600",
         muted: "border-transparent bg-neutral-400 text-white hover:bg-neutral-500",
-        outline: "bg-transparent text-neutral-900 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-300 dark:border-neutral-600",
+        outline: "bg-transparent text-neutral-900 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-border",
 
         // ===== CORE SEMANTIC VARIANTS =====
         // Green status variants (use green-700)
