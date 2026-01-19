@@ -120,6 +120,29 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     loadMore,
   } = useNotificationCenter();
 
+  /**
+   * Parse actionUrl which may be a JSON string containing web, mobile, and universalLink URLs
+   * Returns the web URL if it's a JSON object, otherwise returns the original string
+   */
+  const parseActionUrl = (actionUrl: string | null | undefined): string | null => {
+    if (!actionUrl) return null;
+
+    // Check if it looks like a JSON string (starts with '{')
+    if (actionUrl.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(actionUrl);
+        // Return the web URL from the parsed object
+        if (parsed && typeof parsed === 'object' && parsed.web) {
+          return parsed.web;
+        }
+      } catch {
+        // Not valid JSON, continue with original value
+      }
+    }
+
+    return actionUrl;
+  };
+
   const handleNotificationClick = async (notification: Notification) => {
     // Mark as read
     await markAsRead(notification.id);
@@ -131,9 +154,10 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
       targetUrl = notification.metadata.webUrl;
     }
 
-    // Priority 2: Use actionUrl field
+    // Priority 2: Use actionUrl field (parse JSON if needed)
     if (!targetUrl) {
-      targetUrl = (notification as any).link || notification.actionUrl;
+      const rawUrl = (notification as any).link || notification.actionUrl;
+      targetUrl = parseActionUrl(rawUrl);
     }
 
     // Priority 3: Use relatedEntityType and relatedEntityId for entity-based navigation

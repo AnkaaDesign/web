@@ -246,13 +246,13 @@ export function extractActiveFilters(
     });
   }
 
-  if (filters.hasServices) {
+  if (filters.hasServiceOrders) {
     activeFilters.push({
-      key: "hasServices",
+      key: "hasServiceOrders",
       label: "Tem Serviços",
       value: "Sim",
       iconType: "tool",
-      onRemove: () => onRemoveFilter("hasServices"),
+      onRemove: () => onRemoveFilter("hasServiceOrders"),
     });
   }
 
@@ -363,8 +363,8 @@ export function createFilterRemover(currentFilters: Partial<TaskGetManyFormData>
       case "hasCommissions":
         delete newFilters.hasCommissions;
         break;
-      case "hasServices":
-        delete newFilters.hasServices;
+      case "hasServiceOrders":
+        delete newFilters.hasServiceOrders;
         break;
     }
 

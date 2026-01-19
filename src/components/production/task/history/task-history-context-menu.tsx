@@ -81,6 +81,11 @@ export function TaskHistoryContextMenu({
   // FINANCIAL users should only see View and Edit options
   const isFinancialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
 
+  // Users who can use "Liberar" action: ADMIN, LOGISTIC, and COMMERCIAL only
+  const canLiberar = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN ||
+                     user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC ||
+                     user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
+
   // Check if we're on the preparation/agenda route (to hide Definir Setor)
   const isPreparationRoute = navigationRoute === 'preparation';
 
@@ -264,7 +269,7 @@ export function TaskHistoryContextMenu({
           const taskName = t.name || t.serialNumber || t.plate || 'Tarefa';
 
           // Get all ARTWORK service orders for this task
-          const artworkServiceOrders = t.services?.filter(
+          const artworkServiceOrders = t.serviceOrders?.filter(
             (service) => service && service.type === SERVICE_ORDER_TYPE.ARTWORK
           ) || [];
 
@@ -331,7 +336,7 @@ export function TaskHistoryContextMenu({
           const taskName = t.name || t.serialNumber || t.plate || 'Tarefa';
 
           // Get all PRODUCTION service orders for this task
-          const productionServiceOrders = t.services?.filter(
+          const productionServiceOrders = t.serviceOrders?.filter(
             (service) => service && service.type === SERVICE_ORDER_TYPE.PRODUCTION
           ) || [];
 
@@ -449,8 +454,8 @@ export function TaskHistoryContextMenu({
         paintIds: task.logoPaints?.map((paint) => paint.id) || [],
 
         // Services
-        services: Array.isArray(task.services)
-          ? task.services.map((service) => ({
+        services: Array.isArray(task.serviceOrders)
+          ? task.serviceOrders.map((service) => ({
               status: service.status,
               statusOrder: service.statusOrder,
               description: service.description,
@@ -571,8 +576,8 @@ export function TaskHistoryContextMenu({
             </div>
           )}
 
-          {/* Liberar action - Only for PREPARATION status tasks */}
-          {hasPreparationTasks && (
+          {/* Liberar action - Only for PREPARATION status tasks and ADMIN/LOGISTIC/COMMERCIAL users */}
+          {hasPreparationTasks && canLiberar && (
             <DropdownMenuItem onClick={handleLiberar} className="text-blue-600 hover:text-white">
               <IconCalendarCheck className="mr-2 h-4 w-4" />
               Liberar

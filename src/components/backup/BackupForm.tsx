@@ -243,7 +243,7 @@ export function BackupForm({ open, onClose, onSuccess }: BackupFormProps) {
             />
           </div>
 
-          <div className="border rounded-lg p-4 space-y-4 bg-muted/50">
+          <div className="border dark:border-border/40 rounded-lg p-4 space-y-4 bg-muted/50">
             <div className="flex items-center justify-between">
               <Label htmlFor="autoDelete" className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />

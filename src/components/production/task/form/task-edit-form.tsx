@@ -639,8 +639,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           [SERVICE_ORDER_TYPE.ARTWORK]: 4,
         };
 
-        if (taskData.services && taskData.services.length > 0) {
-          return taskData.services
+        if (taskData.serviceOrders && taskData.serviceOrders.length > 0) {
+          return taskData.serviceOrders
             .map((so) => ({
               id: so.id, // Include the ID to identify existing service orders
               description: so.description || "",
@@ -863,16 +863,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         // This ensures empty default rows don't count as "changes"
         // =====================
 
-        // Filter out empty services (services with no description)
-        // Note: form uses 'serviceOrders', changedData might use 'serviceOrders' or 'services'
-        const serviceKey = changedData.serviceOrders ? 'serviceOrders' : 'services';
-        if (changedData[serviceKey] && Array.isArray(changedData[serviceKey])) {
-          changedData[serviceKey] = changedData[serviceKey].filter(
+        // Filter out empty service orders (service orders with no description)
+        if (changedData.serviceOrders && Array.isArray(changedData.serviceOrders)) {
+          changedData.serviceOrders = changedData.serviceOrders.filter(
             (service: any) => service.description && service.description.trim().length >= 3
           );
-          // If no valid services remain, remove the services array entirely
-          if (changedData[serviceKey].length === 0) {
-            delete changedData[serviceKey];
+          // If no valid service orders remain, remove the serviceOrders array entirely
+          if (changedData.serviceOrders.length === 0) {
+            delete changedData.serviceOrders;
           }
         }
 
@@ -1349,16 +1347,30 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             
           }
 
-          // CRITICAL: Add artwork statuses for FormData submission
-          // Use the artworkStatuses state directly - it contains the user's status changes
-          // Don't rebuild from uploadedFiles as those file objects may have stale status values
-          const newArtworkStatuses: ('DRAFT' | 'APPROVED' | 'REPROVED')[] = [];
+          // CRITICAL: Build artworkStatuses as a UUID-keyed OBJECT
+          // Backend schema expects: z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED']))
+          // For FormData: wrap in array so it gets sent as artworkStatuses[0]=JSON.stringify(object)
+          // Backend preprocess will parse the JSON and merge into proper record format
+          const existingArtworkStatusesMap: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
+          currentArtworkIds.forEach(fileId => {
+            // Get status from state first (user's pending changes take priority)
+            const statusFromState = artworkStatuses[fileId];
+            if (statusFromState) {
+              existingArtworkStatusesMap[fileId] = statusFromState;
+            } else {
+              // Try to find the file and get its status
+              const file = uploadedFiles.find(f => (f.uploadedFileId || f.id) === fileId);
+              const statusFromFile = file?.status;
+              existingArtworkStatusesMap[fileId] = (statusFromFile as 'DRAFT' | 'APPROVED' | 'REPROVED') || 'DRAFT';
+            }
+          });
 
-          // Build newArtworkStatuses for NEW files being uploaded (array matching files order)
+          // Build newArtworkStatuses for NEW files being uploaded (array matching new files order)
+          const newArtworkStatuses: ('DRAFT' | 'APPROVED' | 'REPROVED')[] = [];
           uploadedFiles.forEach((file) => {
             if (!file.uploaded && !file.uploadedFileId) {
               // New file being uploaded - get status from artworkStatuses state or default to DRAFT
-              const fileId = file.uploadedFileId || file.name; // Use name as fallback for new files
+              const fileId = file.uploadedFileId || file.name || file.id; // Use name or id as fallback for new files
               const status = artworkStatuses[fileId] || file.status || 'DRAFT';
               newArtworkStatuses.push(status as 'DRAFT' | 'APPROVED' | 'REPROVED');
             }
@@ -1367,30 +1379,21 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           console.log('[Task Update] 📦 FormData - Artwork statuses debug:', {
             uploadedFilesCount: uploadedFiles.length,
             artworkStatusesFromState: artworkStatuses,
+            currentArtworkIds,
+            existingArtworkStatusesMap,
             newFileStatuses: newArtworkStatuses,
             hasArtworkStatusChanges,
           });
 
-          // Send statuses for existing files (keyed by File ID) - use state directly
-          // This preserves user's status changes that were tracked in artworkStatuses state
-          // IMPORTANT: Filter to only include valid UUIDs - temp IDs for new files should NOT be sent here
-          // Temp IDs look like "1768585572338-et3sdl7u6", UUIDs look like "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-          const filteredArtworkStatuses: Record<string, string> = {};
-          for (const [fileId, status] of Object.entries(artworkStatuses)) {
-            if (uuidRegex.test(fileId)) {
-              filteredArtworkStatuses[fileId] = status;
-            } else {
-              console.log('[Task Update] ⏭️ Skipping non-UUID artworkStatus key (temp ID for new file):', fileId);
-            }
+          // Send statuses for existing files as UUID-keyed object wrapped in array for FormData
+          // FormData helper will send: artworkStatuses[0]=JSON.stringify({uuid1: status1, uuid2: status2})
+          // Backend preprocess expects array-like with JSON string values to parse and merge
+          if (Object.keys(existingArtworkStatusesMap).length > 0) {
+            dataForFormData.artworkStatuses = [existingArtworkStatusesMap];
+            console.log('[Task Update] 📦 FormData - Including artworkStatuses (UUID-keyed object in array):', existingArtworkStatusesMap);
           }
 
-          if (Object.keys(filteredArtworkStatuses).length > 0) {
-            dataForFormData.artworkStatuses = filteredArtworkStatuses;
-            console.log('[Task Update] 📦 FormData - Including artworkStatuses (filtered UUIDs only):', filteredArtworkStatuses);
-          }
-
-          // Send statuses for new files being uploaded (array matching files order)
+          // Send statuses for new files being uploaded (array matching new files order)
           if (newArtworkStatuses.length > 0) {
             dataForFormData.newArtworkStatuses = newArtworkStatuses;
             console.log('[Task Update] 📦 FormData - Including newArtworkStatuses:', newArtworkStatuses);
@@ -1486,22 +1489,25 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             console.log('[Task Update] ⚠️ NOT including artworkIds (task had no artworks and no changes)');
           }
 
-          // Send artwork statuses for approval workflow
-          // Always send if there were artwork-related changes
-          // IMPORTANT: Filter to only include valid UUIDs - temp IDs for new files should NOT be sent
-          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-          const filteredArtworkStatusesJson: Record<string, string> = {};
-          for (const [fileId, status] of Object.entries(artworkStatuses)) {
-            if (uuidRegex.test(fileId)) {
-              filteredArtworkStatusesJson[fileId] = status;
+          // Send artwork statuses for approval workflow as UUID-keyed object
+          // Backend schema expects: z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED']))
+          const existingArtworkStatusesJson: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
+          currentArtworkIds.forEach(fileId => {
+            // Get status from state first (user's pending changes take priority)
+            const statusFromState = artworkStatuses[fileId];
+            if (statusFromState) {
+              existingArtworkStatusesJson[fileId] = statusFromState;
             } else {
-              console.log('[Task Update] ⏭️ Skipping non-UUID artworkStatus key (temp ID):', fileId);
+              // Try to find the file and get its status
+              const file = uploadedFiles.find(f => (f.uploadedFileId || f.id) === fileId);
+              const statusFromFile = file?.status;
+              existingArtworkStatusesJson[fileId] = (statusFromFile as 'DRAFT' | 'APPROVED' | 'REPROVED') || 'DRAFT';
             }
-          }
+          });
 
-          if (Object.keys(filteredArtworkStatusesJson).length > 0) {
-            submitData.artworkStatuses = filteredArtworkStatusesJson;
-            console.log('[Task Update] ✅ Including artworkStatuses in JSON (filtered UUIDs only):', filteredArtworkStatusesJson);
+          if (Object.keys(existingArtworkStatusesJson).length > 0) {
+            submitData.artworkStatuses = existingArtworkStatusesJson;
+            console.log('[Task Update] ✅ Including artworkStatuses in JSON (UUID-keyed object):', existingArtworkStatusesJson);
           }
           if (currentBaseFileIds.length > 0) {
             submitData.baseFileIds = [...currentBaseFileIds];
@@ -2575,8 +2581,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 {/* Services Card - Visible for Admin, Financial, Designer, Commercial, and Logistic users */}
                 {!isWarehouseUser && !isPlottingUser && (
           <AccordionItem
-            value="services"
-            id="accordion-item-services"
+            value="serviceOrders"
+            id="accordion-item-serviceOrders"
             className="border border-border/40 rounded-lg"
           >
                 <Card className="border-0">
@@ -2592,7 +2598,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                     <CardContent className="pt-0">
                     <FormField
                       control={form.control}
-                      name="services"
+                      name="serviceOrders"
                       render={() => (
                         <FormItem>
                           <ServiceSelectorAutoGrouped

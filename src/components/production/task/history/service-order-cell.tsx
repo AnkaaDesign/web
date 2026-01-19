@@ -31,7 +31,7 @@ export function ServiceOrderCell({ task, serviceOrderType, navigationRoute }: Se
   const cancelledCount = serviceOrders.filter(so => so.status === SO_STATUS.CANCELLED).length;
   const pendingCount = serviceOrders.filter(so => so.status === SO_STATUS.PENDING).length;
 
-  // Count pending orders assigned to current user
+  // Count pending orders assigned to current user - this takes priority over other indicators
   const pendingAssignedCount = serviceOrders.filter(
     (serviceOrder) =>
       serviceOrder.assignedToId === currentUser?.id &&
@@ -40,9 +40,14 @@ export function ServiceOrderCell({ task, serviceOrderType, navigationRoute }: Se
 
   const typeLabel = SERVICE_ORDER_TYPE_LABELS[serviceOrderType];
 
+  // PRIORITY: If user has pending orders assigned to them, show only that indicator
+  // This takes precedence over "missing service order" and other conditions
+  const hasPendingAssignedOrders = pendingAssignedCount > 0;
+
   // If no service orders of this type, show dash with red corner indicator for preparation route
+  // BUT only if the user doesn't have pending assigned orders (which takes priority)
   if (totalCount === 0) {
-    if (navigationRoute === 'preparation') {
+    if (navigationRoute === 'preparation' && !hasPendingAssignedOrders) {
       return (
         <>
           <span className="text-muted-foreground">-</span>

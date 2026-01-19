@@ -549,7 +549,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
 
   if (!order.items || order.items.length === 0) {
     return (
-      <Card className={cn("shadow-sm border border-border", className)}>
+      <Card className={cn("shadow-sm", className)}>
         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
           <IconPackage className="h-12 w-12 text-muted-foreground/50 mb-4" />
           <p className="text-muted-foreground">Nenhum item encontrado</p>
@@ -559,7 +559,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
   }
 
   return (
-    <Card className={cn("shadow-sm border border-border flex flex-col", className)}>
+    <Card className={cn("shadow-sm flex flex-col", className)}>
       <CardHeader className="pb-6">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
@@ -653,7 +653,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
         </div>
 
         {/* Items Table */}
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border dark:border-border/40 rounded-lg overflow-hidden">
           <Table>
             <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
               <TableRow className="bg-muted hover:bg-muted even:bg-muted">
@@ -745,7 +745,7 @@ export function OrderItemsCard({ order, className, onOrderUpdate }: OrderItemsCa
                             max={item.orderedQuantity}
                             step="0.01"
                             className={cn(
-                              "flex h-8 w-20 rounded-md border border-border bg-input px-2 py-2 text-sm text-center",
+                              "flex h-8 w-20 rounded-md border border-border dark:border-border/40 bg-input px-2 py-2 text-sm text-center",
                               "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                               "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
                               "disabled:cursor-not-allowed disabled:opacity-50",

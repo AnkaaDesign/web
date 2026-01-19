@@ -18,7 +18,7 @@ import {
   IconPaperclip,
 } from "@tabler/icons-react";
 import type { FileWithPreview } from "@/components/common/file";
-import { ArtworkStatusBadge, ArtworkStatusSelector } from "../artwork";
+import { ArtworkStatusSelector } from "../artwork";
 
 export interface ArtworkFileUploadFieldProps {
   onFilesChange: (files: FileWithPreview[]) => void;
@@ -284,9 +284,6 @@ export function ArtworkFileUploadField({
                     </p>
                     <p className="text-[10px] text-muted-foreground">{formatFileSize(file.size || 0)}</p>
                   </div>
-
-                  {/* Status Badge */}
-                  <ArtworkStatusBadge status={file.status} size="sm" />
 
                   {/* Status Selector */}
                   <ArtworkStatusSelector

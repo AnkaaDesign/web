@@ -538,8 +538,8 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
       paintIds: taskToDuplicate.logoPaints?.map((paint) => paint.id) || [],
 
       // Services - ensure it's an array with only required fields
-      services: Array.isArray(taskToDuplicate.services)
-        ? taskToDuplicate.services.map((service) => ({
+      services: Array.isArray(taskToDuplicate.serviceOrders)
+        ? taskToDuplicate.serviceOrders.map((service) => ({
             status: service.status,
             statusOrder: service.statusOrder,
             description: service.description,

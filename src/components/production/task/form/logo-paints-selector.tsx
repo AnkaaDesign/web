@@ -155,20 +155,29 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
           if (field.value && Array.isArray(field.value)) {
             const newSelectedPaints = new Map<string, Paint>();
             field.value.forEach((paintId: string) => {
+              // First check cache, then fall back to initialPaints
               const cachedPaint = paintsCache.current.get(paintId);
               if (cachedPaint) {
                 newSelectedPaints.set(paintId, cachedPaint);
+              } else {
+                // Fallback to initialPaints if not in cache
+                const initialPaint = initialPaints?.find(p => p.id === paintId);
+                if (initialPaint) {
+                  newSelectedPaints.set(paintId, initialPaint);
+                  // Also add to cache for future lookups
+                  paintsCache.current.set(paintId, initialPaint);
+                }
               }
             });
             setSelectedPaints(newSelectedPaints);
           } else {
             setSelectedPaints(new Map());
           }
-        }, [field.value]);
+        }, [field.value, initialPaints]);
 
         return (
           <FormItem>
-            <FormLabel>Tintas do Logo</FormLabel>
+            <FormLabel>Tintas da Logomarca</FormLabel>
             <FormControl>
               <div className="space-y-3">
                 <Combobox<Paint>
@@ -177,7 +186,7 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
                     field.onChange(value);
                   }}
                   mode="multiple"
-                  placeholder="Selecione as tintas do logo..."
+                  placeholder="Selecione as tintas da logomarca..."
                   emptyText="Nenhuma tinta encontrada"
                   searchPlaceholder="Pesquisar por código ou nome da tinta..."
                   disabled={disabled}
@@ -207,8 +216,11 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
                         <Badge
                           key={paint.id}
                           variant="secondary"
-                          className="pl-2.5 pr-2.5 py-1.5 flex items-center gap-2 border cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                          onClick={(e) => {
+                          className={cn(
+                            "pl-2.5 pr-2.5 py-1.5 flex items-center gap-2 border transition-colors",
+                            !disabled && "cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
+                          )}
+                          onClick={disabled ? undefined : (e) => {
                             e.preventDefault();
                             const currentValue = field.value || [];
                             field.onChange(currentValue.filter((id: string) => id !== paint.id));
@@ -227,7 +239,7 @@ export function LogoPaintsSelector({ control, disabled, initialPaints }: LogoPai
                           )}
                           <span className="text-xs font-medium">{paint.name}</span>
                           {paint.paintType?.name && <span className="text-xs opacity-70">({paint.paintType.name})</span>}
-                          <IconX className="h-3 w-3 ml-1" />
+                          {!disabled && <IconX className="h-3 w-3 ml-1" />}
                         </Badge>
                       );
                     })}

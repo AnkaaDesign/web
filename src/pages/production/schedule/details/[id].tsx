@@ -921,7 +921,7 @@ export const TaskDetailsPage = () => {
         return visibleServiceOrderTypes.includes(serviceType);
       })
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [task?.services, visibleServiceOrderTypes]);
+  }, [task?.serviceOrders, visibleServiceOrderTypes]);
 
   // Determine the source section from the URL path
   // /producao/cronograma/detalhes/123 → 'cronograma'
@@ -1068,7 +1068,7 @@ export const TaskDetailsPage = () => {
 
   // Handle service order status change
   const handleServiceOrderStatusChange = async (serviceOrderId: string, newStatus: SERVICE_ORDER_STATUS) => {
-    const serviceOrder = task?.services?.find((s) => s.id === serviceOrderId);
+    const serviceOrder = task?.serviceOrders?.find((s) => s.id === serviceOrderId);
     if (!serviceOrder) return;
 
     try {
@@ -1086,7 +1086,7 @@ export const TaskDetailsPage = () => {
 
       // If completing a service order, check if there's a next one to start
       if (newStatus === SERVICE_ORDER_STATUS.COMPLETED) {
-        const allServiceOrders = task?.services?.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        const allServiceOrders = task?.serviceOrders?.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
         const currentIndex = allServiceOrders?.findIndex((s) => s.id === serviceOrderId) ?? -1;
         const nextServiceOrder = allServiceOrders?.[currentIndex + 1];
 
@@ -2485,7 +2485,7 @@ export const TaskDetailsPage = () => {
                 <div>
                   <div className="flex items-center gap-2 mb-3">
                     <IconPaint className="h-4 w-4 text-muted-foreground" />
-                    <h4 className="text-sm font-semibold">Tintas da Logo</h4>
+                    <h4 className="text-sm font-semibold">Tintas da Logomarca</h4>
                     <Badge variant="secondary" className="text-xs">
                   {task.logoPaints.length} cores
                     </Badge>

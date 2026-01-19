@@ -97,6 +97,9 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
   const [_nfeFileIds, setNfeFileIds] = useState<string[]>([]);
   const [_artworkFileIds, setArtworkFileIds] = useState<string[]>([]);
 
+  // State for artwork statuses (keyed by file ID)
+  const [artworkStatuses, setArtworkStatuses] = useState<Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'>>({});
+
   // Fetch existing airbrushing if editing
   const { data: airbrushingResponse, isLoading: isLoadingAirbrushing } = useAirbrushing(airbrushingId || "", {
     include: {
@@ -205,22 +208,37 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
           return fileObj;
         }) || [];
 
+      // artworks are Artwork entities with fileId, status, and nested file data
       const artworks: FileWithPreview[] =
-        airbrushing.artworks?.map((file) => {
+        airbrushing.artworks?.map((artwork: any) => {
+          // Get file data from nested file relation or use artwork properties as fallback
+          const file = artwork.file || artwork;
+          const fileId = artwork.fileId || file.id;
           const fileObj = Object.assign(
             new File([new ArrayBuffer(0)], file.filename || file.originalName || "file", {
               type: file.mimetype || "application/octet-stream",
               lastModified: new Date(file.createdAt || Date.now()).getTime(),
             }),
             {
-              id: file.id,
+              id: fileId,
               uploaded: true,
-              uploadedFileId: file.id,
+              uploadedFileId: fileId,
               thumbnailUrl: file.thumbnailUrl,
+              status: artwork.status || 'DRAFT', // Include artwork status
             },
           ) as FileWithPreview;
           return fileObj;
         }) || [];
+
+      // Initialize artwork statuses from existing artworks
+      const initialStatuses: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
+      airbrushing.artworks?.forEach((artwork: any) => {
+        const fileId = artwork.fileId || artwork.file?.id || artwork.id;
+        if (fileId && artwork.status) {
+          initialStatuses[fileId] = artwork.status;
+        }
+      });
+      setArtworkStatuses(initialStatuses);
 
       setReceiptFiles(receipts);
       setNfeFiles(invoices);
@@ -391,6 +409,26 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       .filter(Boolean);
     setArtworkFileIds(fileIds);
     form.setValue("artworkIds", fileIds);
+
+    // Clean up artworkStatuses: remove statuses for files that have been removed
+    setArtworkStatuses(prev => {
+      const currentFileIds = new Set(files.map(f => f.uploadedFileId || f.id));
+      const newStatuses: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
+      for (const [fileId, status] of Object.entries(prev)) {
+        if (currentFileIds.has(fileId)) {
+          newStatuses[fileId] = status;
+        }
+      }
+      return newStatuses;
+    });
+  };
+
+  // Handle artwork status change
+  const handleArtworkStatusChange = (fileId: string, status: 'DRAFT' | 'APPROVED' | 'REPROVED') => {
+    setArtworkStatuses(prev => ({
+      ...prev,
+      [fileId]: status,
+    }));
   };
 
   // Handle form submission
@@ -421,18 +459,34 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
       let result;
 
+      // Build artworkStatuses map for existing files
+      // Merges state with file status properties for completeness
+      const existingArtworkStatusesMap: Record<string, 'DRAFT' | 'APPROVED' | 'REPROVED'> = {};
+      existingArtworkIds.forEach(fileId => {
+        const statusFromState = artworkStatuses[fileId];
+        if (statusFromState) {
+          existingArtworkStatusesMap[fileId] = statusFromState;
+        } else {
+          const file = artworkFiles.find(f => (f.uploadedFileId || f.id) === fileId);
+          const statusFromFile = file?.status;
+          existingArtworkStatusesMap[fileId] = (statusFromFile as 'DRAFT' | 'APPROVED' | 'REPROVED') || 'DRAFT';
+        }
+      });
+
       if (hasNewFiles) {
         const customerInfo = selectedTask?.data?.customer ? {
           id: selectedTask.data.customer.id,
           name: selectedTask.data.customer.fantasyName || selectedTask.data.customer.name,
         } : undefined;
 
-        // Prepare data with existing file IDs
+        // Prepare data with existing file IDs and artwork statuses
         const submitData = {
           ...data,
           receiptIds: existingReceiptIds,
           invoiceIds: existingNfeIds,
           artworkIds: existingArtworkIds,
+          // Wrap artworkStatuses in array for FormData serialization (backend preprocess handles it)
+          artworkStatuses: Object.keys(existingArtworkStatusesMap).length > 0 ? [existingArtworkStatusesMap] : undefined,
         };
 
         const formData = createAirbrushingFormData(
@@ -460,6 +514,8 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
           receiptIds: existingReceiptIds,
           invoiceIds: existingNfeIds,
           artworkIds: existingArtworkIds,
+          // Include artworkStatuses as a plain object for JSON submission
+          artworkStatuses: Object.keys(existingArtworkStatusesMap).length > 0 ? existingArtworkStatusesMap : undefined,
         };
 
         if (mode === "create") {
@@ -474,6 +530,20 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
 
       // Success toast is handled automatically by API client
 
+      // Reset form state after successful creation
+      if (mode === "create") {
+        form.reset();
+        setReceiptFiles([]);
+        setNfeFiles([]);
+        setArtworkFiles([]);
+        setReceiptFileIds([]);
+        setNfeFileIds([]);
+        setArtworkFileIds([]);
+        setArtworkStatuses({});
+        setSelectedTasks(new Set());
+        setCurrentStep(1);
+      }
+
       if (onSuccess && result?.data) {
         onSuccess(result.data);
       } else if (result?.data?.id) {
@@ -487,7 +557,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
       }
       throw error; // Rethrow so parent can handle
     }
-  }, [validateCurrentStep, form, mode, create, update, airbrushingId, onSuccess, navigate, receiptFiles, nfeFiles, artworkFiles, selectedTask, selectedTasks, currentStep]);
+  }, [validateCurrentStep, form, mode, create, update, airbrushingId, onSuccess, navigate, receiptFiles, nfeFiles, artworkFiles, artworkStatuses, selectedTask, selectedTasks, currentStep]);
 
   const isLastStep = currentStep === steps.length;
   const isFirstStep = currentStep === 1;
@@ -632,6 +702,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
                         onReceiptFilesChange={handleReceiptFilesChange}
                         onNfeFilesChange={handleNfeFilesChange}
                         onArtworkFilesChange={handleArtworkFilesChange}
+                        onArtworkStatusChange={handleArtworkStatusChange}
                         errors={form.formState.errors}
                       />
                     </CardContent>

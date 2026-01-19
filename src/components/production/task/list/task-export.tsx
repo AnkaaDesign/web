@@ -60,7 +60,7 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
             case "createdBy.name":
               row[column.header] = task.createdBy?.name || "";
               break;
-            case "services":
+            case "serviceOrders":
               row[column.header] = task.serviceOrders?.length || 0;
               break;
             case "hasArtworks":
@@ -172,7 +172,7 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
             case "createdBy.name":
               row[column.header] = task.createdBy?.name || "";
               break;
-            case "services":
+            case "serviceOrders":
               row[column.header] = task.serviceOrders?.length || 0;
               break;
             case "hasArtworks":

@@ -212,10 +212,10 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                 // Reference existing paint IDs
                 updateData.paintIds = sourceTask.logoPaints?.map((p) => p.id) || [];
                 break;
-              case "services":
+              case "serviceOrders":
                 // Create NEW service orders (independent entities) with reset dates
                 if (sourceTask.serviceOrders && sourceTask.serviceOrders.length > 0) {
-                  updateData.services = sourceTask.serviceOrders.map((service) => ({
+                  updateData.serviceOrders = sourceTask.serviceOrders.map((service) => ({
                     status: service.status,
                     statusOrder: service.statusOrder,
                     description: service.description,

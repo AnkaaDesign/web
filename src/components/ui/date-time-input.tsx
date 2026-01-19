@@ -8,6 +8,7 @@ import { FormControl, FormItem, FormLabel, FormMessage, useFormField } from "@/c
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { NaturalDateTimeInput } from "@/components/ui/natural-datetime-input";
 import { cn } from "@/lib/utils";
 
 // Types
@@ -19,6 +20,42 @@ export interface DateConstraints {
   disabledDates?: (date: Date) => boolean;
   onlyBusinessDays?: boolean;
 }
+
+// Context types for auto-applying constraints
+export type DateTimeContext = "birth" | "general";
+
+// Reasonable year bounds for validation
+const MIN_REASONABLE_YEAR = 1900;
+const MAX_REASONABLE_YEAR = 2100;
+
+// Validate if a year is within reasonable bounds
+const isReasonableYear = (date: Date, context?: DateTimeContext): boolean => {
+  const year = date.getFullYear();
+  const currentYear = new Date().getFullYear();
+
+  if (context === "birth") {
+    // Birth dates: between 1900 and current year (can't be born in the future)
+    return year >= MIN_REASONABLE_YEAR && year <= currentYear;
+  }
+
+  // General dates: between 1900 and 2100
+  return year >= MIN_REASONABLE_YEAR && year <= MAX_REASONABLE_YEAR;
+};
+
+// Get auto constraints based on context
+const getContextConstraints = (context?: DateTimeContext): DateConstraints | undefined => {
+  if (context === "birth") {
+    const today = new Date();
+    const minBirthDate = new Date();
+    minBirthDate.setFullYear(minBirthDate.getFullYear() - 120); // Max 120 years old
+
+    return {
+      minDate: minBirthDate,
+      maxDate: today,
+    };
+  }
+  return undefined;
+};
 
 export interface DateTimeInputProps<TFieldValues extends FieldValues = FieldValues, TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>> {
   field?: {
@@ -48,6 +85,10 @@ export interface DateTimeInputProps<TFieldValues extends FieldValues = FieldValu
   showClearButton?: boolean;
   buttonClassName?: string;
   hideIcon?: boolean;
+  /** Context for auto-applying constraints (e.g., "birth" for birth dates) */
+  context?: DateTimeContext;
+  /** Whether the field is required */
+  required?: boolean;
 }
 
 // Format date for HTML input
@@ -151,12 +192,27 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
   showClearButton = true,
   buttonClassName,
   hideIcon = false,
+  context,
+  required = false,
 }: DateTimeInputProps<TFieldValues, TName>) => {
   // State
   const [isOpen, setIsOpen] = React.useState(false);
 
   // Check if we're inside a form context - if field is provided, we assume we're in a form
   const isInFormContext = !!field;
+
+  // Merge context constraints with explicit constraints
+  const mergedConstraints = React.useMemo(() => {
+    const contextConstraints = getContextConstraints(context);
+    if (!contextConstraints) return constraints;
+    if (!constraints) return contextConstraints;
+
+    // Explicit constraints override context constraints
+    return {
+      ...contextConstraints,
+      ...constraints,
+    };
+  }, [context, constraints]);
 
   // Get current value and normalize to Date object if it's a string
   const rawValue = field?.value || value;
@@ -184,13 +240,42 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
     }
   };
 
+  // Get min/max date attributes for HTML input (helps prevent unreasonable dates)
+  const getDateInputConstraints = () => {
+    if (mode === "time") return {};
+
+    const attrs: { min?: string; max?: string } = {};
+
+    if (mergedConstraints?.minDate) {
+      attrs.min = format(mergedConstraints.minDate, "yyyy-MM-dd");
+    }
+    if (mergedConstraints?.maxDate) {
+      attrs.max = format(mergedConstraints.maxDate, "yyyy-MM-dd");
+    }
+
+    return attrs;
+  };
+
   // Format current value for HTML input
   const htmlInputValue = formatForHTMLInput(currentValue, mode);
 
-  // Handle HTML input changes
+  // Handle HTML input changes with year validation
   const handleHTMLInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     const parsed = parseFromHTMLInput(inputValue, mode);
+
+    // Validate year is within reasonable bounds
+    if (parsed && !isReasonableYear(parsed, context)) {
+      // Don't update with unreasonable date - the form validation will catch it
+      // but we can prevent obviously wrong values from being set
+      const changeHandler = field?.onChange || onChange;
+      if (changeHandler) {
+        // Set to null to trigger validation error
+        changeHandler(null);
+      }
+      field?.onBlur();
+      return;
+    }
 
     const changeHandler = field?.onChange || onChange;
     if (changeHandler) {
@@ -203,12 +288,12 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
   // Date constraint validation
   const isDateDisabled = React.useCallback(
     (date: Date) => {
-      if (constraints?.minDate && date < startOfDay(constraints.minDate)) return true;
-      if (constraints?.maxDate && date > endOfDay(constraints.maxDate)) return true;
-      if (constraints?.disabledDates) return constraints.disabledDates(date);
+      if (mergedConstraints?.minDate && date < startOfDay(mergedConstraints.minDate)) return true;
+      if (mergedConstraints?.maxDate && date > endOfDay(mergedConstraints.maxDate)) return true;
+      if (mergedConstraints?.disabledDates) return mergedConstraints.disabledDates(date);
       return false;
     },
-    [constraints],
+    [mergedConstraints],
   );
 
   // Enhanced calendar from the original component
@@ -943,90 +1028,66 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
 
   const Icon = getIcon();
 
+  // Handle change from NaturalDateTimeInput
+  const handleNaturalInputChange = React.useCallback((date: Date | null) => {
+    // Validate year is within reasonable bounds for birth context
+    if (date && context === "birth" && !isReasonableYear(date, context)) {
+      return; // Don't accept unreasonable dates
+    }
+
+    const changeHandler = field?.onChange || onChange;
+    if (changeHandler) {
+      changeHandler(date);
+    }
+  }, [field?.onChange, onChange, context]);
+
   const inputContent = mode === "date-range" ? (
     <div className="relative">
       {/* Date range mode - two separate input fields */}
       <div className="flex items-center gap-2">
         {/* From date input */}
-        <div
-          className={cn(
-            "flex h-10 flex-1 rounded-md border border-border bg-transparent transition-all duration-200 ease-in-out",
-            disabled && "opacity-50 cursor-not-allowed",
-            className,
-          )}
-        >
-          <input
-            type="date"
-            value={currentValue && (currentValue as DateRange)?.from ? formatForHTMLInput((currentValue as DateRange).from, "date") : ""}
-            onChange={(e) => {
-              const inputValue = e.target.value;
-              const parsed = parseFromHTMLInput(inputValue, "date");
-              const range = currentValue as DateRange;
-              const changeHandler = field?.onChange || onChange;
-              if (changeHandler) {
-                changeHandler({ from: parsed, to: range?.to } as DateRange);
-              }
-              // Mark field as touched/dirty for React Hook Form
-              field?.onBlur();
-            }}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            placeholder="Data inicial"
-            disabled={disabled}
-            readOnly={readOnly}
-            className="hide-date-picker flex-1 bg-transparent px-2 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed border-0 outline-none"
-            style={{
-              WebkitAppearance: "none",
-              MozAppearance: "textfield",
-              appearance: "none",
-            }}
-          />
-        </div>
+        <NaturalDateTimeInput
+          value={(currentValue as DateRange)?.from}
+          onChange={(date) => {
+            const range = currentValue as DateRange;
+            const changeHandler = field?.onChange || onChange;
+            if (changeHandler) {
+              changeHandler({ from: date, to: range?.to } as unknown as Date);
+            }
+          }}
+          mode="date"
+          disabled={disabled}
+          className={cn("flex-1 rounded-lg", className)}
+          placeholder="dd/mm/aaaa"
+        />
 
         {/* Separator */}
         <span className="text-muted-foreground">-</span>
 
         {/* To date input */}
-        <div
-          className={cn(
-            "flex h-10 flex-1 rounded-md border border-border bg-transparent transition-all duration-200 ease-in-out",
-            disabled && "opacity-50 cursor-not-allowed",
-            className,
-          )}
-        >
-          <input
-            type="date"
-            value={currentValue && (currentValue as DateRange)?.to ? formatForHTMLInput((currentValue as DateRange).to, "date") : ""}
-            onChange={(e) => {
-              const inputValue = e.target.value;
-              const parsed = parseFromHTMLInput(inputValue, "date");
-              const range = currentValue as DateRange;
-              const changeHandler = field?.onChange || onChange;
-              if (changeHandler) {
-                changeHandler({ from: range?.from, to: parsed } as DateRange);
-              }
-              // Mark field as touched/dirty for React Hook Form
-              field?.onBlur();
-            }}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            placeholder="Data final"
-            disabled={disabled}
-            readOnly={readOnly}
-            className="hide-date-picker flex-1 bg-transparent px-2 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed border-0 outline-none"
-            style={{
-              WebkitAppearance: "none",
-              MozAppearance: "textfield",
-              appearance: "none",
-            }}
-          />
-        </div>
+        <NaturalDateTimeInput
+          value={(currentValue as DateRange)?.to}
+          onChange={(date) => {
+            const range = currentValue as DateRange;
+            const changeHandler = field?.onChange || onChange;
+            if (changeHandler) {
+              changeHandler({ from: range?.from, to: date } as unknown as Date);
+            }
+          }}
+          mode="date"
+          disabled={disabled}
+          className={cn("flex-1 rounded-lg", className)}
+          placeholder="dd/mm/aaaa"
+        />
 
         {/* Integrated calendar icon */}
         {!hideIcon && (
           <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
-              <div className={cn("h-10 w-10 flex items-center justify-center cursor-pointer transition-colors border border-border rounded-md", disabled && "cursor-not-allowed opacity-50")}>
+              <div className={cn(
+                "h-10 w-10 flex items-center justify-center cursor-pointer transition-colors border border-border rounded-lg bg-input",
+                disabled && "cursor-not-allowed opacity-50"
+              )}>
                 <Icon className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
               </div>
             </PopoverTrigger>
@@ -1039,59 +1100,33 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
     </div>
   ) : (
     <div className="relative">
-      {/* Single date/time mode - one input field */}
-      <div
-        className={cn(
-          "flex h-10 w-full rounded-md border border-border bg-transparent transition-all duration-200 ease-in-out relative overflow-hidden",
-          disabled && "opacity-50 cursor-not-allowed",
-          className,
-        )}
-      >
-        {/* Overlay to display formatted date - clickable to open popover */}
-        {!hideIcon && currentValue && (
-          <div
-            className="absolute inset-0 flex items-center px-2 pointer-events-none z-10"
-            style={{ marginRight: '28px' }}
-          >
-            <span className="text-sm text-foreground">
-              {formatDateTime(currentValue, mode)}
-            </span>
-          </div>
-        )}
-
-        {/* Input wrapper with clipping to hide native icons */}
-        <div className="flex-1 relative overflow-hidden">
-          <input
-            type={getHTMLInputType()}
-            value={htmlInputValue}
-            onChange={handleHTMLInputChange}
-            onFocus={onFocus}
-            onBlur={onBlur}
-            placeholder={placeholder}
-            disabled={disabled}
-            readOnly={readOnly}
-            className={cn(
-              "hide-date-picker w-full bg-transparent px-2 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed border-0 outline-none",
-              currentValue && !hideIcon && "opacity-0"
-            )}
-            style={{
-              // Comprehensive CSS to hide all browser date/time picker indicators
-              WebkitAppearance: "none",
-              MozAppearance: "textfield",
-              appearance: "none",
-              colorScheme: "light dark",
-              // Clip off any native icons by extending beyond container
-              width: 'calc(100% + 30px)',
-              marginRight: '-30px',
-            }}
-          />
-        </div>
+      {/* Single date/time mode - using NaturalDateTimeInput */}
+      <div className={cn(
+        "flex items-center h-10 rounded-lg border border-border bg-input overflow-hidden",
+        disabled && "opacity-50 cursor-not-allowed",
+      )}>
+        <NaturalDateTimeInput
+          value={currentValue}
+          onChange={handleNaturalInputChange}
+          mode={mode === "datetime" ? "datetime" : mode === "time" ? "time" : "date"}
+          disabled={disabled}
+          transparent
+          className={cn(
+            "flex-1 border-0 rounded-none h-full",
+            className
+          )}
+          format24Hours={format24Hours}
+          showSeconds={showSeconds}
+        />
 
         {/* Integrated calendar/clock icon */}
         {!hideIcon && (
           <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
-              <div className={cn("h-10 w-7 flex items-center justify-center cursor-pointer transition-colors -mt-0.5 z-20 relative", disabled && "cursor-not-allowed opacity-50")}>
+              <div className={cn(
+                "h-10 w-10 flex items-center justify-center cursor-pointer transition-colors",
+                disabled && "cursor-not-allowed"
+              )}>
                 <Icon className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
               </div>
             </PopoverTrigger>
@@ -1105,12 +1140,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
                       value={formatForHTMLInput(currentValue, "time")}
                       onChange={(e) => {
                         const parsed = parseFromHTMLInput(e.target.value, "time");
-                        const changeHandler = field?.onChange || onChange;
-                        if (changeHandler) {
-                          changeHandler(parsed);
-                        }
-                        // Mark field as touched/dirty for React Hook Form
-                        field?.onBlur();
+                        handleNaturalInputChange(parsed);
                       }}
                       className="hide-date-picker rounded border px-2 py-1 text-sm"
                     />
@@ -1134,7 +1164,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
         <div className="relative">
           <FormControl>{inputContent}</FormControl>
         </div>
-        {error && <FormMessage>{error}</FormMessage>}
+        <FormMessage />
       </FormItem>
     );
   }

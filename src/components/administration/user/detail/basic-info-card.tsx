@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, getBadgeVariantFromStatus } from "@/components/ui/badge";
-import { IconUser, IconMail, IconPhone, IconBrandWhatsapp, IconId, IconShieldCheck } from "@tabler/icons-react";
+import { IconUser, IconMail, IconPhone, IconBrandWhatsapp, IconId, IconShieldCheck, IconCake } from "@tabler/icons-react";
 import type { User } from "../../../../types";
 import { cn } from "@/lib/utils";
-import { formatBrazilianPhone, getUserStatusBadgeText } from "../../../../utils";
+import { formatBrazilianPhone, getUserStatusBadgeText, formatDate } from "../../../../utils";
 import { UserAvatarDisplay } from "@/components/ui/avatar-display";
 
 interface BasicInfoCardProps {
@@ -79,6 +79,18 @@ export function BasicInfoCard({ user, className }: BasicInfoCardProps) {
                       <IconBrandWhatsapp className="h-5 w-5" />
                     </a>
                   </div>
+                </div>
+              )}
+
+              {user.birth && (
+                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <IconCake className="h-4 w-4" />
+                    Data de Nascimento
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {formatDate(new Date(user.birth))}
+                  </span>
                 </div>
               )}
 

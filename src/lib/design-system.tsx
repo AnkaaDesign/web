@@ -12,7 +12,7 @@ export const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 focus-visible:ring-primary/30",
         destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 focus-visible:ring-destructive/30",
-        outline: "border border-border bg-background shadow-sm hover:bg-accent hover:text-accent-foreground focus-visible:ring-primary/30",
+        outline: "border border-border dark:border-border/40 bg-background shadow-sm hover:bg-accent hover:text-accent-foreground focus-visible:ring-primary/30",
         secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 focus-visible:ring-secondary/30",
         ghost: "hover:bg-accent hover:text-accent-foreground focus-visible:ring-primary/30",
         link: "text-primary underline-offset-4 hover:underline focus-visible:ring-primary/30",
@@ -33,7 +33,7 @@ export const buttonVariants = cva(
 
 // Enhanced Input Variants
 export const inputVariants = cva(
-  "flex w-full rounded-lg border border-border bg-white dark:bg-neutral-800 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 transition-all",
+  "flex w-full rounded-lg border border-border dark:border-border/40 bg-white dark:bg-neutral-800 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 transition-all",
   {
     variants: {
       size: {
@@ -42,7 +42,7 @@ export const inputVariants = cva(
         lg: "h-12 px-4 text-base",
       },
       state: {
-        default: "border-border focus:ring-ring/30 focus:ring-offset-1",
+        default: "border-border dark:border-border/40 focus:ring-ring/30 focus:ring-offset-1",
         error: "border-destructive focus-visible:ring-destructive/30",
         success: "border-green-500 focus-visible:ring-green-500/30",
       },
@@ -58,9 +58,9 @@ export const inputVariants = cva(
 export const cardVariants = cva("rounded-xl border bg-card text-card-foreground shadow-sm transition-all", {
   variants: {
     variant: {
-      default: "border-border shadow-sm",
+      default: "border-border dark:border-border/40 shadow-sm",
       elevated: "border-transparent shadow-sm hover:shadow-sm",
-      outline: "border-border bg-transparent shadow-none",
+      outline: "border-border dark:border-border/40 bg-transparent shadow-none",
     },
     padding: {
       none: "p-0",
@@ -110,7 +110,7 @@ export const authCardVariants = cva("w-full mx-auto rounded-xl border bg-card sh
 export const verificationCodeInputVariants = cva("w-12 h-12 text-center text-xl font-bold rounded-lg border transition-all focus:outline-none focus:ring-2", {
   variants: {
     state: {
-      default: "border-border bg-background focus:border-ring focus:ring-ring focus:ring-offset-2",
+      default: "border-border dark:border-border/40 bg-background focus:border-ring focus:ring-ring focus:ring-offset-2",
       filled: "border-primary bg-primary/10 focus:border-primary focus:ring-primary/30",
       error: "border-destructive bg-destructive/10 focus:border-destructive focus:ring-destructive/30",
     },
@@ -227,7 +227,7 @@ export function getTableColumnAlignment(align?: "left" | "center" | "right"): st
 export function getTableStyles() {
   return {
     container: "rounded-lg flex flex-col",
-    wrapper: "border-l border-r border-t border-neutral-600 dark:border-border rounded-t-lg overflow-hidden",
+    wrapper: "border-l border-r border-t border-neutral-600 dark:border-border/40 rounded-t-lg overflow-hidden",
     table: "table-fixed w-full [&>div]:border-0 [&>div]:rounded-none",
     header: "[&_tr]:border-b-0 [&_tr]:hover:!bg-neutral-300 [&_tr]:dark:hover:!bg-neutral-950",
     headerRow: "[&]:!bg-neutral-300 [&]:dark:!bg-neutral-800 [&]:hover:!bg-neutral-300 [&]:dark:hover:!bg-neutral-800 [&]:even:!bg-neutral-300 [&]:dark:even:!bg-neutral-800",
@@ -235,10 +235,10 @@ export function getTableStyles() {
     bodyRow: "hover:bg-neutral-50 dark:hover:bg-gray-800 transition-colors cursor-pointer",
     bodyRowSelected: "bg-primary/10 dark:bg-primary/20",
     bodyCell: "px-4 py-2",
-    footer: "p-4 border-l border-r border-b border-neutral-600 rounded-b-lg bg-neutral-50 dark:bg-neutral-800",
-    emptyState: "border border-neutral-200 dark:border-border rounded-lg p-8 text-center text-muted-foreground bg-white dark:bg-neutral-800",
-    loadingState: "border border-neutral-200 dark:border-border rounded-lg p-8 text-center text-muted-foreground bg-white dark:bg-neutral-800",
-    errorState: "border border-neutral-200 dark:border-border rounded-lg p-8 text-center text-destructive bg-white dark:bg-neutral-800",
+    footer: "p-4 border-l border-r border-b border-neutral-600 dark:border-border/40 rounded-b-lg bg-neutral-50 dark:bg-neutral-800",
+    emptyState: "border border-neutral-200 dark:border-border/40 rounded-lg p-8 text-center text-muted-foreground bg-white dark:bg-neutral-800",
+    loadingState: "border border-neutral-200 dark:border-border/40 rounded-lg p-8 text-center text-muted-foreground bg-white dark:bg-neutral-800",
+    errorState: "border border-neutral-200 dark:border-border/40 rounded-lg p-8 text-center text-destructive bg-white dark:bg-neutral-800",
   };
 }
 

@@ -155,14 +155,19 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint, onDes
         // Update selected paint when field value changes
         useEffect(() => {
           if (field.value) {
+            // First check cache, then fall back to initialPaint
             const cachedPaint = paintsCache.current.get(field.value);
             if (cachedPaint) {
               setSelectedPaint(cachedPaint);
+            } else if (initialPaint && initialPaint.id === field.value) {
+              // Fallback to initialPaint if not in cache
+              setSelectedPaint(initialPaint);
+              paintsCache.current.set(field.value, initialPaint);
             }
           } else {
             setSelectedPaint(null);
           }
-        }, [field.value]);
+        }, [field.value, initialPaint]);
 
         return (
           <FormItem>
@@ -204,8 +209,11 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint, onDes
                   <div className="flex flex-wrap gap-2 mt-3">
                     <Badge
                       variant="secondary"
-                      className="pl-2.5 pr-2.5 py-1.5 flex items-center gap-2 border cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                      onClick={() => field.onChange(null)}
+                      className={cn(
+                        "pl-2.5 pr-2.5 py-1.5 flex items-center gap-2 border transition-colors",
+                        !disabled && "cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
+                      )}
+                      onClick={disabled ? undefined : () => field.onChange(null)}
                     >
                       {selectedPaint.colorPreview ? (
                         <div className="w-4 h-4 rounded ring-1 ring-border shadow-sm overflow-hidden">
@@ -230,7 +238,7 @@ export function GeneralPaintingSelector({ control, disabled, initialPaint, onDes
                       )}
                       <span className="text-xs font-medium">{selectedPaint.name}</span>
                       {selectedPaint.paintType?.name && <span className="text-xs opacity-70">({selectedPaint.paintType.name})</span>}
-                      <IconX className="h-3 w-3 ml-1" />
+                      {!disabled && <IconX className="h-3 w-3 ml-1" />}
                     </Badge>
                   </div>
                 )}

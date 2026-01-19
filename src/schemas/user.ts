@@ -1014,16 +1014,42 @@ export const userCreateSchema = z
       message: "URL inválida"
     }),
 
-    // Additional dates - birth is required
+    // Additional dates - birth is required with comprehensive validation
     birth: z.coerce
-      .date()
+      .date({ errorMap: () => ({ message: "Data de nascimento inválida" }) })
       .refine(
         (date) => {
+          // Validate year is within reasonable range (1900 to current year)
+          const year = date.getFullYear();
+          const currentYear = new Date().getFullYear();
+          return year >= 1900 && year <= currentYear;
+        },
+        { message: "Ano de nascimento deve estar entre 1900 e o ano atual" }
+      )
+      .refine(
+        (date) => {
+          // Must not be a future date
+          return date <= new Date();
+        },
+        { message: "Data de nascimento não pode ser no futuro" }
+      )
+      .refine(
+        (date) => {
+          // Must be at least 18 years old
           const eighteenYearsAgo = new Date();
           eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
           return date <= eighteenYearsAgo;
         },
         { message: "O colaborador deve ter pelo menos 18 anos" }
+      )
+      .refine(
+        (date) => {
+          // Cannot be more than 120 years old
+          const maxAge = new Date();
+          maxAge.setFullYear(maxAge.getFullYear() - 120);
+          return date >= maxAge;
+        },
+        { message: "Idade não pode exceder 120 anos" }
       ),
 
     // Status timestamp tracking
@@ -1086,16 +1112,42 @@ export const userUpdateSchema = z
       message: "URL inválida"
     }),
 
-    // Additional dates
+    // Additional dates with comprehensive validation
     birth: z.coerce
-      .date()
+      .date({ errorMap: () => ({ message: "Data de nascimento inválida" }) })
       .refine(
         (date) => {
+          // Validate year is within reasonable range (1900 to current year)
+          const year = date.getFullYear();
+          const currentYear = new Date().getFullYear();
+          return year >= 1900 && year <= currentYear;
+        },
+        { message: "Ano de nascimento deve estar entre 1900 e o ano atual" }
+      )
+      .refine(
+        (date) => {
+          // Must not be a future date
+          return date <= new Date();
+        },
+        { message: "Data de nascimento não pode ser no futuro" }
+      )
+      .refine(
+        (date) => {
+          // Must be at least 18 years old
           const eighteenYearsAgo = new Date();
           eighteenYearsAgo.setFullYear(eighteenYearsAgo.getFullYear() - 18);
           return date <= eighteenYearsAgo;
         },
         { message: "O colaborador deve ter pelo menos 18 anos" }
+      )
+      .refine(
+        (date) => {
+          // Cannot be more than 120 years old
+          const maxAge = new Date();
+          maxAge.setFullYear(maxAge.getFullYear() - 120);
+          return date >= maxAge;
+        },
+        { message: "Idade não pode exceder 120 anos" }
       )
       .optional(),
 

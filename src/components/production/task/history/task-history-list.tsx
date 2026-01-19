@@ -174,7 +174,7 @@ export function TaskHistoryList({
       if (params.get("hasArtworks") === "true") filters.hasArtworks = true;
       if (params.get("hasPaints") === "true") filters.hasPaints = true;
       if (params.get("hasCommissions") === "true") filters.hasCommissions = true;
-      if (params.get("hasServices") === "true") filters.hasServices = true;
+      if (params.get("hasServiceOrders") === "true") filters.hasServiceOrders = true;
 
       return filters;
     },
@@ -218,7 +218,7 @@ export function TaskHistoryList({
     if (filters.hasArtworks) params.hasArtworks = "true";
     if (filters.hasPaints) params.hasPaints = "true";
     if (filters.hasCommissions) params.hasCommissions = "true";
-    if (filters.hasServices) params.hasServices = "true";
+    if (filters.hasServiceOrders) params.hasServiceOrders = "true";
 
     return params;
   }, []);
@@ -447,9 +447,9 @@ export function TaskHistoryList({
               case "paintIds":
                 updateData.paintIds = sourceTask.logoPaints?.map((p) => p.id) || [];
                 break;
-              case "services":
-                if (sourceTask.services && sourceTask.services.length > 0) {
-                  updateData.services = sourceTask.services.map((service) => ({
+              case "serviceOrders":
+                if (sourceTask.serviceOrders && sourceTask.serviceOrders.length > 0) {
+                  updateData.serviceOrders = sourceTask.serviceOrders.map((service) => ({
                     status: service.status,
                     statusOrder: service.statusOrder,
                     description: service.description,
@@ -633,7 +633,7 @@ export function TaskHistoryList({
         {/* Tables - separated by status for preparation route */}
         <div className="flex-1 min-h-0 overflow-y-auto">
           {navigationRoute === 'preparation' ? (
-            <div className="space-y-8 h-full">
+            <div className="space-y-12 h-full">
               {/* Group 1: Em Preparação + Aguardando Produção */}
               <div>
                 <TaskHistoryTable
@@ -652,9 +652,6 @@ export function TaskHistoryList({
                 />
               </div>
 
-              {/* Divider */}
-              <div className="border-t-2 border-border" />
-
               {/* Group 2: Em Produção */}
               <div>
                 <TaskHistoryTable
@@ -671,9 +668,6 @@ export function TaskHistoryList({
                   disablePagination={true}
                 />
               </div>
-
-              {/* Divider */}
-              <div className="border-t-2 border-border" />
 
               {/* Group 3: Concluído */}
               <div>

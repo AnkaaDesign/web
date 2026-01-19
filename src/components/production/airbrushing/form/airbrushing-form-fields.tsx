@@ -2,6 +2,7 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 import { Input } from "@/components/ui/input";
 import { DateTimeInput } from "@/components/ui/date-time-input";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
+import { ArtworkFileUploadField } from "@/components/production/task/form/artwork-file-upload-field";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import type { AirbrushingCreateFormData, AirbrushingUpdateFormData } from "../../../../schemas";
 import type { FieldErrors } from "react-hook-form";
@@ -17,6 +18,7 @@ interface AirbrushingFormFieldsProps {
   onReceiptFilesChange: (files: FileWithPreview[]) => void;
   onNfeFilesChange: (files: FileWithPreview[]) => void;
   onArtworkFilesChange: (files: FileWithPreview[]) => void;
+  onArtworkStatusChange: (fileId: string, status: 'DRAFT' | 'APPROVED' | 'REPROVED') => void;
   errors?: FieldErrors<AirbrushingCreateFormData | AirbrushingUpdateFormData>;
 }
 
@@ -29,6 +31,7 @@ export function AirbrushingFormFields({
   onReceiptFilesChange,
   onNfeFilesChange,
   onArtworkFilesChange,
+  onArtworkStatusChange,
 }: AirbrushingFormFieldsProps) {
   const statusOptions: ComboboxOption[] = [
     { value: AIRBRUSHING_STATUS.PENDING, label: AIRBRUSHING_STATUS_LABELS.PENDING },
@@ -152,22 +155,21 @@ export function AirbrushingFormFields({
           </FormControl>
         </FormItem>
 
-        {/* Artwork Files */}
+        {/* Artwork Files with Status Selector */}
         <FormItem className="flex flex-col">
           <FormLabel className="flex items-center gap-2">
             <IconPhoto className="h-4 w-4" />
             Artes da Aerografia
           </FormLabel>
           <FormControl>
-            <FileUploadField
+            <ArtworkFileUploadField
               onFilesChange={onArtworkFilesChange}
+              onStatusChange={onArtworkStatusChange}
               existingFiles={artworkFiles}
               maxFiles={20}
               showPreview={true}
-              variant="compact"
               placeholder="Adicione as artes da aerografia"
               label="Artes anexadas"
-              accept="image/*"
             />
           </FormControl>
         </FormItem>

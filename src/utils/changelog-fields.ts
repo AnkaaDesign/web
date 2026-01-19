@@ -11,7 +11,7 @@ import {
   GLOVES_SIZE_LABELS,
   RAIN_BOOTS_SIZE_LABELS,
 } from '@constants';
-import { formatDateTime } from "./date";
+import { formatDateTime, formatDate } from "./date";
 import { formatCurrency } from "./number";
 import { formatBrazilianPhone, formatCPF, formatCNPJ, formatChassis } from "./formatters";
 
@@ -286,7 +286,8 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     paints: "Tintas da logomarca",
     groundPaints: "Fundos da Tinta",
     commissions: "Comissões",
-    services: "Serviços",
+    services: "Serviços", // Legacy - for historical changelog records
+    serviceOrders: "Ordens de Serviço",
     airbrushings: "Aerografias",
     cuts: "Recortes",
     cutRequest: "Solicitações de Corte",
@@ -1858,20 +1859,8 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     return value.toLocaleString("pt-BR");
   }
 
-  // Generic ISO date string detection - catches any value that looks like an ISO date
-  if (typeof value === "string") {
-    // Check if the string matches ISO 8601 format (e.g., "2025-10-30T14:35:59.569Z")
-    const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
-    if (isoDateRegex.test(value)) {
-      const date = new Date(value);
-      if (!isNaN(date.getTime())) {
-        return formatDateTime(date);
-      }
-    }
-  }
-
   // Handle date formatting for known date fields
-  // Date-only fields (no time component needed)
+  // Date-only fields (no time component needed) - check BEFORE generic ISO date detection
   if (
     field === "expirationDate" ||
     field === "manufacturingDate" ||
@@ -1893,7 +1882,9 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     field === "exp1StartAt" ||
     field === "exp1EndAt" ||
     field === "exp2StartAt" ||
-    field === "exp2EndAt"
+    field === "exp2EndAt" ||
+    field === "effectedAt" ||
+    field === "dismissedAt"
   ) {
     const date = new Date(value as any);
     if (!isNaN(date.getTime())) {
@@ -1919,13 +1910,23 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     field === "cancelledAt" ||
     field === "sentAt" ||
     field === "scheduledAt" ||
-    field === "seenAt" ||
-    field === "effectedAt" ||
-    field === "dismissedAt"
+    field === "seenAt"
   ) {
     const date = new Date(value as any);
     if (!isNaN(date.getTime())) {
       return formatDateTime(date);
+    }
+  }
+
+  // Generic ISO date string detection - catches any value that looks like an ISO date (fallback)
+  if (typeof value === "string") {
+    // Check if the string matches ISO 8601 format (e.g., "2025-10-30T14:35:59.569Z")
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
+    if (isoDateRegex.test(value)) {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        return formatDateTime(date);
+      }
     }
   }
 
