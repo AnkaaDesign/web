@@ -24,6 +24,7 @@ export interface NotificationListFilters {
   limit?: number;
   orderBy?: string;
   order?: 'asc' | 'desc';
+  searchingFor?: string;
 }
 
 export interface NotificationStats {

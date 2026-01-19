@@ -13,6 +13,7 @@ import { LogoPaintsSelector } from "../form/logo-paints-selector";
 import { MultiCutSelector, type MultiCutSelectorRef } from "../form/multi-cut-selector";
 import { useTaskBatchMutations } from "../../../../hooks";
 import { taskService } from "../../../../api-client/task";
+import { fileService } from "../../../../api-client/file";
 import { IconPhoto, IconFileText, IconPalette, IconCut, IconLoader2, IconAlertTriangle, IconPlus, IconFile, IconFileInvoice, IconReceipt } from "@tabler/icons-react";
 import { CUT_TYPE, CUT_ORIGIN } from "../../../../constants";
 import { useForm, FormProvider } from "react-hook-form";
@@ -146,7 +147,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
               id: { in: taskIds },
             },
             include: {
-              artworks: true,
+              artworks: { include: { file: true } },
               budgets: true,
               invoices: true,
               receipts: true,
@@ -424,50 +425,130 @@ export const AdvancedBulkActionsHandler = forwardRef<
     setIsSubmitting(true);
 
     try {
-      const formData = new FormData();
       const updateData: any = {};
 
       switch (operationType) {
         case "arts":
-          // Add new artwork files
-          const newArtworkFiles = artworkFiles.filter(f => f instanceof File);
-          newArtworkFiles.forEach((file) => {
-            formData.append('artworks', file as File);
-          });
+          // Get new artwork files that need to be uploaded
+          const newArtworkFiles = artworkFiles.filter(f => f instanceof File) as File[];
 
-          // Get filenames that should be kept (from existing files)
-          const keptFilenames = artworkFiles
+          // Get filenames that should be kept (from existing files in artworkFiles state)
+          // These are the COMMON artworks that the user chose to keep
+          const keptCommonFilenames = artworkFiles
             .filter(f => !(f instanceof File))
             .map((f: any) => f.originalName || f.name);
 
-          // For each task, find the File IDs that match the kept filenames
-          // This handles the case where each task has different file IDs for the same artwork
+          // Get filenames of COMMON artworks (files that were shown in the UI)
+          // These were pre-populated from commonValues.artworkFiles
+          const commonFilenames = commonValues.artworkFiles.map(
+            (f: any) => f.originalName || f.name
+          );
+
+          // Upload new files FIRST to get their IDs
+          let uploadedFileIds: string[] = [];
+          if (newArtworkFiles.length > 0) {
+            try {
+              const uploadResponse = await fileService.uploadFiles(newArtworkFiles, {
+                fileContext: 'artwork',
+                entityType: 'task',
+              });
+
+              if (uploadResponse.success && uploadResponse.data?.successful) {
+                uploadedFileIds = uploadResponse.data.successful.map(f => f.id);
+              } else {
+                // Some files failed to upload
+                console.error('[BulkArtwork] File upload failed:', uploadResponse);
+                throw new Error(uploadResponse.message || 'Falha ao enviar arquivos');
+              }
+            } catch (uploadError) {
+              console.error('[BulkArtwork] Error uploading files:', uploadError);
+              throw uploadError;
+            }
+          }
+
+          // For each task, compute the final artworkIds:
+          // 1. Keep ALL non-common artworks (unique to this task) - user couldn't remove them
+          // 2. Keep common artworks only if user kept them in keptCommonFilenames
+          // 3. ADD newly uploaded file IDs
           // NOTE: task.artworks are Artwork entities with { id, fileId, status, file?: File }
-          // We need to extract File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
           const perTaskArtworkIds: Record<string, string[]> = {};
           currentTasks.forEach(task => {
-            const taskArtworkFileIds = (task.artworks || [])
-              .filter((artwork: any) => {
-                const file = artwork.file || artwork;
-                return keptFilenames.includes(file.originalName || file.filename);
-              })
-              .map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id);
+            const taskArtworkFileIds: string[] = [];
+
+            (task.artworks || []).forEach((artwork: any) => {
+              const file = artwork.file || artwork;
+              const filename = file.originalName || file.filename;
+              const fileId = artwork.fileId || artwork.file?.id || artwork.id;
+
+              if (!fileId) return;
+
+              // Check if this is a common artwork (was shown in UI)
+              const isCommon = commonFilenames.includes(filename);
+
+              if (isCommon) {
+                // Only keep if user kept it in the UI
+                if (keptCommonFilenames.includes(filename)) {
+                  taskArtworkFileIds.push(fileId);
+                }
+              } else {
+                // Non-common artwork - always keep (user couldn't modify it)
+                taskArtworkFileIds.push(fileId);
+              }
+            });
+
+            // Add newly uploaded file IDs - these go to ALL tasks
+            taskArtworkFileIds.push(...uploadedFileIds);
+
             perTaskArtworkIds[task.id] = taskArtworkFileIds;
           });
 
           // Store per-task data - we'll use this when building the batch request
-          updateData._perTaskArtworkIds = perTaskArtworkIds;
+          // Only set if we have changes (uploaded files or common artworks to manage)
+          if (uploadedFileIds.length > 0 || commonFilenames.length > 0) {
+            updateData._perTaskArtworkIds = perTaskArtworkIds;
+          }
           break;
 
         case "documents":
-          // Add new document files
-          const newBudgets = budgetFiles.filter(f => f instanceof File);
-          const newInvoices = invoiceFiles.filter(f => f instanceof File);
-          const newReceipts = receiptFiles.filter(f => f instanceof File);
+          // Get new document files
+          const newBudgets = budgetFiles.filter(f => f instanceof File) as File[];
+          const newInvoices = invoiceFiles.filter(f => f instanceof File) as File[];
+          const newReceipts = receiptFiles.filter(f => f instanceof File) as File[];
 
-          newBudgets.forEach((file) => formData.append('budgets', file as File));
-          newInvoices.forEach((file) => formData.append('invoices', file as File));
-          newReceipts.forEach((file) => formData.append('receipts', file as File));
+          // Upload new files FIRST to get their IDs
+          let uploadedBudgetIds: string[] = [];
+          let uploadedInvoiceIds: string[] = [];
+          let uploadedReceiptIds: string[] = [];
+
+          if (newBudgets.length > 0) {
+            const uploadResponse = await fileService.uploadFiles(newBudgets, {
+              fileContext: 'budget',
+              entityType: 'task',
+            });
+            if (uploadResponse.success && uploadResponse.data?.successful) {
+              uploadedBudgetIds = uploadResponse.data.successful.map(f => f.id);
+            }
+          }
+
+          if (newInvoices.length > 0) {
+            const uploadResponse = await fileService.uploadFiles(newInvoices, {
+              fileContext: 'invoice',
+              entityType: 'task',
+            });
+            if (uploadResponse.success && uploadResponse.data?.successful) {
+              uploadedInvoiceIds = uploadResponse.data.successful.map(f => f.id);
+            }
+          }
+
+          if (newReceipts.length > 0) {
+            const uploadResponse = await fileService.uploadFiles(newReceipts, {
+              fileContext: 'receipt',
+              entityType: 'task',
+            });
+            if (uploadResponse.success && uploadResponse.data?.successful) {
+              uploadedReceiptIds = uploadResponse.data.successful.map(f => f.id);
+            }
+          }
 
           // Get filenames that should be kept (from existing files)
           const keptBudgetFilenames = budgetFiles
@@ -480,21 +561,31 @@ export const AdvancedBulkActionsHandler = forwardRef<
             .filter(f => !(f instanceof File))
             .map((f: any) => f.originalName || f.name);
 
-          // For each task, find the file IDs that match the kept filenames
+          // For each task, compute final file IDs (existing + newly uploaded)
           const perTaskBudgetIds: Record<string, string[]> = {};
           const perTaskInvoiceIds: Record<string, string[]> = {};
           const perTaskReceiptIds: Record<string, string[]> = {};
 
           currentTasks.forEach(task => {
-            perTaskBudgetIds[task.id] = (task.budgets || [])
-              .filter((b: any) => keptBudgetFilenames.includes(b.originalName || b.filename))
-              .map((b: any) => b.id);
-            perTaskInvoiceIds[task.id] = (task.invoices || [])
-              .filter((i: any) => keptInvoiceFilenames.includes(i.originalName || i.filename))
-              .map((i: any) => i.id);
-            perTaskReceiptIds[task.id] = (task.receipts || [])
-              .filter((r: any) => keptReceiptFilenames.includes(r.originalName || r.filename))
-              .map((r: any) => r.id);
+            // Keep existing files that match kept filenames + add uploaded files
+            perTaskBudgetIds[task.id] = [
+              ...(task.budgets || [])
+                .filter((b: any) => keptBudgetFilenames.includes(b.originalName || b.filename))
+                .map((b: any) => b.id),
+              ...uploadedBudgetIds,
+            ];
+            perTaskInvoiceIds[task.id] = [
+              ...(task.invoices || [])
+                .filter((i: any) => keptInvoiceFilenames.includes(i.originalName || i.filename))
+                .map((i: any) => i.id),
+              ...uploadedInvoiceIds,
+            ];
+            perTaskReceiptIds[task.id] = [
+              ...(task.receipts || [])
+                .filter((r: any) => keptReceiptFilenames.includes(r.originalName || r.filename))
+                .map((r: any) => r.id),
+              ...uploadedReceiptIds,
+            ];
           });
 
           // Store per-task data
@@ -535,9 +626,10 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
           if (cutsChanged) {
             if (cuts && cuts.length > 0) {
-              const cutFiles: File[] = [];
+              // Upload cut files FIRST to get their IDs
+              const cutsWithFileIds: any[] = [];
 
-              updateData.cuts = cuts.map((cut) => {
+              for (const cut of cuts) {
                 const cutData: any = {
                   type: cut.type,
                   quantity: cut.quantity || 1,
@@ -545,16 +637,22 @@ export const AdvancedBulkActionsHandler = forwardRef<
                 };
 
                 if (cut.file && cut.file instanceof File) {
-                  cutFiles.push(cut.file);
-                  cutData._fileIndex = cutFiles.length - 1;
+                  // Upload the file
+                  const uploadResponse = await fileService.uploadFiles([cut.file], {
+                    fileContext: 'cut',
+                    entityType: 'task',
+                  });
+                  if (uploadResponse.success && uploadResponse.data?.successful?.[0]) {
+                    cutData.fileId = uploadResponse.data.successful[0].id;
+                  }
                 } else if (cut.file && (cut.file.id || cut.file.uploadedFileId)) {
                   cutData.fileId = cut.file.id || cut.file.uploadedFileId;
                 }
 
-                return cutData;
-              });
+                cutsWithFileIds.push(cutData);
+              }
 
-              cutFiles.forEach((file) => formData.append('cutFiles', file));
+              updateData.cuts = cutsWithFileIds;
             } else {
               // All cuts removed
               const allCutIds = commonValues.cuts.map((c: any) => c.id).filter(Boolean);
@@ -566,8 +664,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
           break;
       }
 
-      // Check if we need to add data or just files
-      const hasFiles = Array.from(formData.entries()).length > 0;
+      // Files are now uploaded separately, so we only send JSON
+      // (FormData is no longer used for file uploads in bulk operations)
 
       // Extract per-task data
       const perTaskArtworkIds = updateData._perTaskArtworkIds;
@@ -583,7 +681,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       const hasPerTaskData = perTaskArtworkIds || perTaskBudgetIds || perTaskInvoiceIds || perTaskReceiptIds;
       const hasData = Object.keys(updateData).length > 0 || hasPerTaskData;
 
-      if (!hasFiles && !hasData) {
+      if (!hasData) {
         handleClose();
         return; // Nothing to update
       }
@@ -594,19 +692,23 @@ export const AdvancedBulkActionsHandler = forwardRef<
           const taskData = { ...updateData };
 
           // Add per-task artworkIds if available
-          if (perTaskArtworkIds && perTaskArtworkIds[id]) {
-            taskData.artworkIds = perTaskArtworkIds[id];
+          // Always send artworkIds when perTaskArtworkIds is set (even if empty for some tasks)
+          // because we need to tell backend the final state of artworks
+          if (perTaskArtworkIds) {
+            const ids = perTaskArtworkIds[id] || [];
+            // Always include the array - this tells backend what files to keep/set
+            taskData.artworkIds = ids;
           }
 
           // Add per-task document IDs if available
-          if (perTaskBudgetIds && perTaskBudgetIds[id]) {
-            taskData.budgetIds = perTaskBudgetIds[id];
+          if (perTaskBudgetIds) {
+            taskData.budgetIds = perTaskBudgetIds[id] || [];
           }
-          if (perTaskInvoiceIds && perTaskInvoiceIds[id]) {
-            taskData.invoiceIds = perTaskInvoiceIds[id];
+          if (perTaskInvoiceIds) {
+            taskData.invoiceIds = perTaskInvoiceIds[id] || [];
           }
-          if (perTaskReceiptIds && perTaskReceiptIds[id]) {
-            taskData.receiptIds = perTaskReceiptIds[id];
+          if (perTaskReceiptIds) {
+            taskData.receiptIds = perTaskReceiptIds[id] || [];
           }
 
           return {
@@ -616,25 +718,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
         }),
       };
 
-      // If we have files, send as FormData, otherwise send as JSON
-      if (hasFiles) {
-        // Add batch request data to FormData
-        // The ArrayFixPipe expects arrays to be serialized with numeric indices
-        batchRequest.tasks.forEach((task, index) => {
-          // Add task ID
-          formData.append(`tasks[${index}][id]`, task.id);
-
-          // Serialize the data object as JSON (even if empty)
-          // The ArrayFixPipe will parse JSON strings automatically
-          // Empty data is fine - backend will still process file uploads
-          formData.append(`tasks[${index}][data]`, JSON.stringify(task.data || {}));
-        });
-
-        await batchUpdateAsync(formData as any);
-      } else {
-        // Send as regular JSON
-        await batchUpdateAsync(batchRequest);
-      }
+      // Send as regular JSON (files were uploaded separately)
+      await batchUpdateAsync(batchRequest);
 
       handleClose();
       onClearSelection();

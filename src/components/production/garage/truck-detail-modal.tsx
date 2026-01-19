@@ -419,7 +419,7 @@ export function TruckDetailModal({ taskId, open, onOpenChange }: TruckDetailModa
                     )}
                     {currentLayout && (
                       <span className="text-xs text-muted-foreground">
-                        {currentLayout.totalLength.toFixed(2).replace('.', ',')} x {currentLayout.height.toFixed(2).replace('.', ',')} m
+                        {Math.round(currentLayout.totalLength * 100)} x {Math.round(currentLayout.height * 100)} cm
                       </span>
                     )}
                   </div>

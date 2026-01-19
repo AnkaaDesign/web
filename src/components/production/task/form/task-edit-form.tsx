@@ -739,6 +739,16 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     async (changedData: Partial<TaskUpdateFormData>) => {
       console.log('[TaskEditForm] handleFormSubmit called');
       console.log('[TaskEditForm] changedData:', JSON.stringify(changedData, null, 2));
+      // DEBUG: Log current form values for date fields
+      const currentFormValues = form.getValues();
+      console.log('[TaskEditForm] DEBUG - Current form values for dates:', {
+        forecastDate: currentFormValues.forecastDate,
+        forecastDateType: typeof currentFormValues.forecastDate,
+        forecastDateIsNull: currentFormValues.forecastDate === null,
+        forecastDateIsUndefined: currentFormValues.forecastDate === undefined,
+        entryDate: currentFormValues.entryDate,
+        term: currentFormValues.term,
+      });
       try {
         setIsSubmitting(true);
 
@@ -1225,8 +1235,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
               return;
             }
 
-            // Include field if it has a value, OR if it's a nullable field being set to null
-            if (value !== undefined && (value !== null || nullableFields.has(key))) {
+            // For nullable fields, always include them (treat undefined as null for clearing)
+            if (nullableFields.has(key)) {
+              // Convert undefined to null for nullable fields (clearing the field)
+              dataForFormData[key] = value ?? null;
+              fieldCount++;
+            } else if (value !== undefined && value !== null) {
+              // For non-nullable fields, only include if has actual value
               dataForFormData[key] = value;
               fieldCount++;
             }
@@ -1439,6 +1454,43 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // Use regular JSON when no files are present
           const submitData = { ...changedData };
 
+          // DEBUG: Log submitData immediately after creation
+          console.log('[TaskEditForm] JSON path - changedData received:', JSON.stringify(changedData, (key, value) => {
+            if (value instanceof Date) return `Date(${value.toISOString()})`;
+            return value;
+          }, 2));
+          console.log('[TaskEditForm] JSON path - changedData.forecastDate:', changedData.forecastDate, 'isNull:', changedData.forecastDate === null);
+          console.log('[TaskEditForm] JSON path - submitData after spread:', JSON.stringify(submitData, (key, value) => {
+            if (value instanceof Date) return `Date(${value.toISOString()})`;
+            return value;
+          }, 2));
+
+          // CRITICAL: Convert undefined to null for nullable fields (clearing the field)
+          // This ensures the backend receives explicit null values to clear these fields
+          const nullableFields = new Set([
+            'forecastDate',
+            'entryDate',
+            'term',
+            'startedAt',
+            'finishedAt',
+            'customerId',
+            'invoiceToId',
+            'sectorId',
+            'paintId',
+            'serialNumber',
+            'details',
+            'commission',
+            'negotiatingWith',
+            'observation',
+          ]);
+
+          // Convert undefined to null for nullable fields that are in changedData
+          for (const field of nullableFields) {
+            if (field in submitData && submitData[field] === undefined) {
+              submitData[field] = null;
+            }
+          }
+
           // CRITICAL: Exclude cuts from JSON submission - cuts are created separately via POST /cuts
           // Sending cuts here would cause backend to deleteMany + create, losing existing cut statuses
           delete submitData.cuts;
@@ -1569,6 +1621,14 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
 
           // CRITICAL: paintIds is already in changedData (not excluded in JSON path)
           // No need to add it separately like in FormData path
+
+          // DEBUG: Log submitData right before API call
+          console.log('[TaskEditForm] JSON path - submitData before API call:', JSON.stringify(submitData, (key, value) => {
+            if (value instanceof Date) return `Date(${value.toISOString()})`;
+            return value;
+          }, 2));
+          console.log('[TaskEditForm] JSON path - submitData keys:', Object.keys(submitData));
+          console.log('[TaskEditForm] JSON path - submitData.forecastDate:', submitData.forecastDate, 'isNull:', submitData.forecastDate === null);
 
           result = await updateAsync({
             id: task.id,

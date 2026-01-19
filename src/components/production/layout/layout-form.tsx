@@ -968,11 +968,7 @@ export const LayoutForm = ({
 
     let svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${svgWidth}mm" height="${svgHeight}mm" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">
-  <!-- Title text - left aligned with layout -->
-  ${taskName ? `<text x="${margin}" y="25" text-anchor="start" font-size="16" font-weight="bold" fill="#000">${taskName}</text>` : ''}
-  <text x="${margin}" y="${taskName ? 45 : 25}" text-anchor="start" font-size="14" fill="#666">${getSideLabel(selectedSide)}</text>
-
-  <!-- Main container -->
+  <text x="${margin}" y="25" text-anchor="start" font-size="14" font-weight="bold" fill="#000">${getSideLabel(selectedSide)}</text>
   <rect x="${margin}" y="${margin}" width="${currentState.totalWidth}" height="${currentState.height}" fill="none" stroke="#000" stroke-width="1"/>`;
 
     // Add doors - doorHeight is measured from bottom of layout to top of door opening

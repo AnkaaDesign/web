@@ -63,19 +63,18 @@ export function getTaskDimensions(task: Task): { width: number; height: number }
 }
 
 /**
- * Formats the measures for display as "W x H".
+ * Formats the measures for display as "W x H" in centimeters.
  *
  * @param task - The task object with truck and layout data
- * @param decimals - Number of decimal places (default: 2)
- * @returns Formatted string (e.g., "7,50 x 2,50")
+ * @returns Formatted string (e.g., "850 x 244")
  */
-export function formatTaskMeasures(task: Task, decimals: number = 2): string {
+export function formatTaskMeasures(task: Task): string {
   const dimensions = getTaskDimensions(task);
 
   if (!dimensions) return "-";
 
-  const width = dimensions.width.toFixed(decimals).replace('.', ',');
-  const height = dimensions.height.toFixed(decimals).replace('.', ',');
+  const widthCm = Math.round(dimensions.width * 100);
+  const heightCm = Math.round(dimensions.height * 100);
 
-  return `${width} x ${height}`;
+  return `${widthCm} x ${heightCm}`;
 }

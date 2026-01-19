@@ -1085,7 +1085,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
           <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
               <div className={cn(
-                "h-10 w-10 flex items-center justify-center cursor-pointer transition-colors border border-border rounded-lg bg-input",
+                "h-10 w-10 flex items-center justify-center cursor-pointer transition-colors border border-border rounded-lg bg-transparent",
                 disabled && "cursor-not-allowed opacity-50"
               )}>
                 <Icon className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
@@ -1102,7 +1102,7 @@ export const DateTimeInput = <TFieldValues extends FieldValues = FieldValues, TN
     <div className="relative">
       {/* Single date/time mode - using NaturalDateTimeInput */}
       <div className={cn(
-        "flex items-center h-10 rounded-lg border border-border bg-input overflow-hidden",
+        "flex items-center h-10 rounded-lg border border-border bg-transparent overflow-hidden",
         disabled && "opacity-50 cursor-not-allowed",
       )}>
         <NaturalDateTimeInput

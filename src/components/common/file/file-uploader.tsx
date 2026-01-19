@@ -362,7 +362,7 @@ export function FileUploader({
     return (
       <div className="flex flex-col w-48 min-w-0">
         {/* File card with fixed width */}
-        <div className="relative flex flex-col items-center p-2 border border-border/50 rounded-lg bg-card overflow-hidden">
+        <div className="relative flex flex-col items-center p-2 border border-border/30 rounded-lg bg-card overflow-hidden">
           {/* Integrated progress overlay */}
           <CardProgressOverlay
             progress={file.uploadProgress || 0}

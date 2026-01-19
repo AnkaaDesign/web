@@ -260,9 +260,9 @@ export function ArtworkFileUploadField({
               };
 
               return (
-                <div key={file.id} className="flex items-center gap-1.5 p-2.5 min-h-14 border rounded-lg bg-card hover:bg-muted/30 transition-colors">
+                <div key={file.id} className="flex items-center gap-1.5 p-2.5 min-h-14 border border-border/30 rounded-lg bg-card hover:bg-muted/30 transition-colors">
                   {/* Thumbnail or Icon */}
-                  <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded border bg-muted overflow-hidden">
+                  <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded border border-border/20 bg-muted/50 overflow-hidden">
                     {isUploading ? (
                       <div className="w-4 h-4 border border-primary/30 border-t-primary animate-spin rounded-full" />
                     ) : shouldShowThumbnail ? (

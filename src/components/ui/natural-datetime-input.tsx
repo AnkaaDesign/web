@@ -309,12 +309,27 @@ const NaturalDateTimeInput = React.forwardRef<HTMLInputElement, NaturalDateTimeI
       }
     }, [getSegmentPosition]);
 
-    // Notify parent of value change (only when we have a complete valid date)
+    // Notify parent of value change (when we have a complete valid date OR when clearing)
     const notifyChange = React.useCallback((segs: SegmentedValue) => {
       if (!onChange) return;
 
       const date = segmentsToDate(segs, mode, showSeconds);
-      if (date && !datesEqual(date, lastExternalValueRef.current)) {
+
+      // Check if relevant segments are empty based on mode (user is clearing the field)
+      const dateEmpty = !segs.day && !segs.month && !segs.year;
+      const timeEmpty = !segs.hour && !segs.minute && (!showSeconds || !segs.second);
+      const allRelevantEmpty = mode === "date" ? dateEmpty :
+                               mode === "time" ? timeEmpty :
+                               dateEmpty && timeEmpty;
+
+      if (allRelevantEmpty) {
+        // User cleared the field - notify with null
+        if (lastExternalValueRef.current !== null) {
+          lastExternalValueRef.current = null;
+          onChange(null);
+        }
+      } else if (date && !datesEqual(date, lastExternalValueRef.current)) {
+        // User entered a complete valid date
         lastExternalValueRef.current = date;
         onChange(date);
       }

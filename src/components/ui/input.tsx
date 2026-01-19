@@ -846,8 +846,13 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         setCursorPosition(null);
 
         if (onChange) {
-          // Pass the value directly (consistent with all other input types like cpf, phone, etc.)
-          (onChange as any)(rawValue);
+          // If name prop is provided (e.g., from react-hook-form's register()),
+          // pass the event for compatibility. Otherwise pass value directly.
+          if (nameProp !== undefined) {
+            (onChange as React.ChangeEventHandler<HTMLInputElement>)(e);
+          } else {
+            (onChange as (value: string | number | null) => void)(rawValue);
+          }
         }
         return;
       }

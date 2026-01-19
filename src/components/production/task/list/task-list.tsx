@@ -325,9 +325,10 @@ export function TaskList({ className }: TaskListProps) {
     }
 
     try {
+      // Note: finishedAt is auto-filled by the backend when status changes to COMPLETED
       const updates = inProductionTasks.map((task) => ({
         id: task.id,
-        data: { status: TASK_STATUS.COMPLETED, finishedAt: new Date() },
+        data: { status: TASK_STATUS.COMPLETED },
       }));
 
       if (updates.length === 1) {

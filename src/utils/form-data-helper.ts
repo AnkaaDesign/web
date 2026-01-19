@@ -51,7 +51,13 @@ export function createFormDataWithContext(
 
   // Add regular form data
   Object.entries(data).forEach(([key, value]) => {
-    if (value !== null && value !== undefined) {
+    // Explicitly handle null values - send empty string to indicate field should be cleared
+    if (value === null) {
+      formData.append(key, '');
+      return;
+    }
+
+    if (value !== undefined) {
       if (value instanceof Date) {
         formData.append(key, value.toISOString());
       } else if (Array.isArray(value)) {

@@ -134,7 +134,7 @@ export default function CatalogDetailsPage() {
             {/* Mobile: Single column */}
             <div className="block lg:hidden space-y-4">
               <PaintSpecificationsCard paint={paint} className="h-auto" />
-              <PaintFormulasCard paint={paint} className="h-auto" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
+              <PaintFormulasCard paint={paint} className="h-auto" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} onFormulaDeleted={refetch} />
               {paint.paintGrounds && paint.paintGrounds.length > 0 && (
                 <GroundPaintsCard paint={paint} className="h-auto" />
               )}
@@ -148,7 +148,7 @@ export default function CatalogDetailsPage() {
 
                 {/* Column 2: Formulas + Fundos Recomendados */}
                 <div className="flex flex-col gap-4 h-full">
-                  <PaintFormulasCard paint={paint} className="flex-1 min-h-0" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} />
+                  <PaintFormulasCard paint={paint} className="flex-1 min-h-0" isLoading={formulasLoadingState.isLoading} error={formulasLoadingState.error} onRetry={refetch} onFormulaDeleted={refetch} />
                   {paint.paintGrounds && paint.paintGrounds.length > 0 && (
                     <GroundPaintsCard paint={paint} className="h-[200px] flex-shrink-0" />
                   )}

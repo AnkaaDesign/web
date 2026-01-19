@@ -560,10 +560,8 @@ const createApiClient = (config: Partial<ApiClientConfig> = {}): ExtendedAxiosIn
               const fixed: any = {};
               for (const key of keys) {
                 const value = fixArrays(obj[key], key);
-                // Skip null values for date fields (they'll be handled by backend as optional)
-                if (value !== null || !dateFields.includes(key)) {
-                  fixed[key] = value;
-                }
+                // Include all values, including null for date fields (needed to clear dates)
+                fixed[key] = value;
               }
               return fixed;
             }

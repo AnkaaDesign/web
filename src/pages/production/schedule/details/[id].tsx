@@ -146,7 +146,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
 
   if (!currentLayout) return null;
 
-  // Generate SVG for preview
+  // Generate SVG preview - uses <path> instead of <line> to prevent CorelDRAW locking
   const generatePreviewSVG = (layout: any, side: string, includeLabels: boolean = false) => {
     const getSideLabel = (s: string) => {
       switch (s) {
@@ -157,133 +157,243 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
       }
     };
 
-    const height = layout.height * 100; // Convert to cm
+    const height = layout.height * 100;
     const sections = layout.layoutSections;
     const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
     const margin = 50;
-    // Reduce extra space when not including labels
     const extraSpace = includeLabels ? 100 : 50;
     const svgWidth = totalWidth + margin * 2 + extraSpace;
     const svgHeight = height + margin * 2 + extraSpace;
 
-    let svg = `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
+    let svg = includeLabels
+      ? `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${svgWidth}mm" height="${svgHeight}mm" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg">`
+      : `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
 
-    // Only add title text when downloading (includeLabels = true)
     if (includeLabels) {
       svg += `
-      <!-- Title text -->
-      ${taskName ? `<text x="${margin}" y="25" text-anchor="start" font-size="16" font-weight="bold" fill="#000">${taskName}</text>` : ''}
-      <text x="${margin}" y="${taskName ? 45 : 25}" text-anchor="start" font-size="14" fill="#666">${getSideLabel(side)}</text>`;
+  <text x="${margin}" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#000000">${getSideLabel(side)}</text>`;
     }
 
     svg += `
-      <!-- Main container -->
-      <rect x="${margin}" y="${margin}" width="${totalWidth}" height="${height}" fill="none" stroke="#000" stroke-width="1"/>`;
+  <rect x="${margin}" y="${margin}" width="${totalWidth}" height="${height}" fill="none" stroke="#000000" stroke-width="1"/>`;
 
-    // Add section dividers (vertical lines between non-door sections)
+    // Section dividers using path
     let currentPos = 0;
     sections.forEach((section: any, index: number) => {
       const sectionWidth = section.width * 100;
-
-      // Only draw vertical divider lines between regular sections (not for doors)
-      // Check if this is not the first section, current section is not a door, and previous section is not a door
       if (index > 0) {
         const prevSection = sections[index - 1];
         if (!section.isDoor && !prevSection.isDoor) {
           const lineX = margin + currentPos;
           svg += `
-          <line x1="${lineX}" y1="${margin}" x2="${lineX}" y2="${margin + height}"
-                stroke="#333" stroke-width="0.5"/>`;
+  <path d="M${lineX},${margin} L${lineX},${margin + height}" fill="none" stroke="#333333" stroke-width="0.5"/>`;
         }
       }
-
       currentPos += sectionWidth;
     });
 
-    // Add doors (check if layout has doors array or convert from sections)
+    // Doors using path
     if (layout.doors && layout.doors.length > 0) {
-      // New format with doors array
       layout.doors.forEach((door: any) => {
         const doorX = margin + (door.position || 0) * 100;
         const doorWidth = (door.width || 0) * 100;
         const doorOffsetTop = (door.offsetTop || door.topOffset || 0) * 100;
         const doorY = margin + doorOffsetTop;
-
-        // Left vertical line of door
+        const doorBottomY = margin + height;
         svg += `
-        <line x1="${doorX}" y1="${doorY}" x2="${doorX}" y2="${margin + height}"
-              stroke="#000" stroke-width="1"/>`;
-
-        // Right vertical line of door
-        svg += `
-        <line x1="${doorX + doorWidth}" y1="${doorY}" x2="${doorX + doorWidth}" y2="${margin + height}"
-              stroke="#000" stroke-width="1"/>`;
-
-        // Top horizontal line of door
-        svg += `
-        <line x1="${doorX}" y1="${doorY}" x2="${doorX + doorWidth}" y2="${doorY}"
-              stroke="#000" stroke-width="1"/>`;
+  <path d="M${doorX},${doorY} L${doorX},${doorBottomY}" fill="none" stroke="#000000" stroke-width="1"/>
+  <path d="M${doorX + doorWidth},${doorY} L${doorX + doorWidth},${doorBottomY}" fill="none" stroke="#000000" stroke-width="1"/>
+  <path d="M${doorX},${doorY} L${doorX + doorWidth},${doorY}" fill="none" stroke="#000000" stroke-width="1"/>`;
       });
     } else if (layout.layoutSections) {
-      // Handle LayoutSection entity format with doorHeight
-      const sections = layout.layoutSections;
       let currentPos = 0;
-      sections.forEach((section: any, index: number) => {
+      layout.layoutSections.forEach((section: any) => {
         const sectionWidth = section.width * 100;
         const sectionX = margin + currentPos;
-
-        // Check if this section is a door
-        // doorHeight is measured from bottom of layout to top of door opening
         if (section.isDoor && section.doorHeight !== null && section.doorHeight !== undefined) {
           const doorHeightCm = section.doorHeight * 100;
           const doorTopY = margin + (height - doorHeightCm);
-
-          // Left vertical line of door
+          const doorBottomY = margin + height;
           svg += `
-          <line x1="${sectionX}" y1="${doorTopY}" x2="${sectionX}" y2="${margin + height}"
-                stroke="#000" stroke-width="1"/>`;
-
-          // Right vertical line of door
-          svg += `
-          <line x1="${sectionX + sectionWidth}" y1="${doorTopY}" x2="${sectionX + sectionWidth}" y2="${margin + height}"
-                stroke="#000" stroke-width="1"/>`;
-
-          // Top horizontal line of door
-          svg += `
-          <line x1="${sectionX}" y1="${doorTopY}" x2="${sectionX + sectionWidth}" y2="${doorTopY}"
-                stroke="#000" stroke-width="1"/>`;
+  <path d="M${sectionX},${doorTopY} L${sectionX},${doorBottomY}" fill="none" stroke="#000000" stroke-width="1"/>
+  <path d="M${sectionX + sectionWidth},${doorTopY} L${sectionX + sectionWidth},${doorBottomY}" fill="none" stroke="#000000" stroke-width="1"/>
+  <path d="M${sectionX},${doorTopY} L${sectionX + sectionWidth},${doorTopY}" fill="none" stroke="#000000" stroke-width="1"/>`;
         }
-
         currentPos += sectionWidth;
       });
     }
 
-    // Add dimensions with arrows
+    // Width dimensions using path
     currentPos = 0;
-    sections.forEach((section: any, index: number) => {
+    sections.forEach((section: any) => {
       const sectionWidth = section.width * 100;
       const startX = margin + currentPos;
       const endX = margin + currentPos + sectionWidth;
       const centerX = startX + sectionWidth / 2;
       const dimY = margin + height + 20;
-
       svg += `
-      <line x1="${startX}" y1="${dimY}" x2="${endX}" y2="${dimY}" stroke="#0066cc" stroke-width="1"/>
-      <polygon points="${startX},${dimY} ${startX + 5},${dimY - 3} ${startX + 5},${dimY + 3}" fill="#0066cc"/>
-      <polygon points="${endX},${dimY} ${endX - 5},${dimY - 3} ${endX - 5},${dimY + 3}" fill="#0066cc"/>
-      <text x="${centerX}" y="${dimY + 15}" text-anchor="middle" font-size="12" fill="#0066cc">${Math.round(sectionWidth)}</text>`;
-
+  <path d="M${startX},${dimY} L${endX},${dimY}" fill="none" stroke="#0066cc" stroke-width="1"/>
+  <path d="M${startX},${dimY} L${startX + 5},${dimY - 3} L${startX + 5},${dimY + 3} Z" fill="#0066cc" stroke="none"/>
+  <path d="M${endX},${dimY} L${endX - 5},${dimY - 3} L${endX - 5},${dimY + 3} Z" fill="#0066cc" stroke="none"/>
+  <text x="${centerX}" y="${dimY + 15}" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#0066cc">${Math.round(sectionWidth)}</text>`;
       currentPos += sectionWidth;
     });
 
-    // Height dimension
+    // Height dimension using path (no transform)
     const dimX = margin - 20;
     svg += `
-    <line x1="${dimX}" y1="${margin}" x2="${dimX}" y2="${margin + height}" stroke="#0066cc" stroke-width="1"/>
-    <polygon points="${dimX},${margin} ${dimX - 3},${margin + 5} ${dimX + 3},${margin + 5}" fill="#0066cc"/>
-    <polygon points="${dimX},${margin + height} ${dimX - 3},${margin + height - 5} ${dimX + 3},${margin + height - 5}" fill="#0066cc"/>
-    <text x="${dimX - 10}" y="${margin + height / 2}" text-anchor="middle" font-size="12" fill="#0066cc" transform="rotate(-90, ${dimX - 10}, ${margin + height / 2})">${Math.round(height)}</text>
-    </svg>`;
+  <path d="M${dimX},${margin} L${dimX},${margin + height}" fill="none" stroke="#0066cc" stroke-width="1"/>
+  <path d="M${dimX},${margin} L${dimX - 3},${margin + 5} L${dimX + 3},${margin + 5} Z" fill="#0066cc" stroke="none"/>
+  <path d="M${dimX},${margin + height} L${dimX - 3},${margin + height - 5} L${dimX + 3},${margin + height - 5} Z" fill="#0066cc" stroke="none"/>
+  <text x="${dimX - 15}" y="${margin + height / 2 + 4}" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#0066cc" writing-mode="tb">${Math.round(height)}</text>
+</svg>`;
+
+    return svg;
+  };
+
+  // Generate a single SVG element for one layout (used in combined SVG)
+  // Uses <path> instead of <line> and avoids transforms to prevent CorelDRAW locking
+  const generateLayoutElement = (layout: any, side: string, offsetX: number, offsetY: number) => {
+    const getSideLabel = (s: string) => {
+      switch (s) {
+        case 'left': return 'Motorista';
+        case 'right': return 'Sapo';
+        case 'back': return 'Traseira';
+        default: return s;
+      }
+    };
+
+    const height = layout.height * 100;
+    const sections = layout.layoutSections;
+    const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
+    const margin = 50;
+
+    const ox = offsetX;
+    const oy = offsetY;
+
+    let svg = `
+  <text x="${ox + margin}" y="${oy + 25}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#000000">${getSideLabel(side)}</text>
+  <rect x="${ox + margin}" y="${oy + margin}" width="${totalWidth}" height="${height}" fill="none" stroke="#000000" stroke-width="1"/>`;
+
+    // Add section dividers using path
+    let currentPos = 0;
+    sections.forEach((section: any, index: number) => {
+      const sectionWidth = section.width * 100;
+      if (index > 0) {
+        const prevSection = sections[index - 1];
+        if (!section.isDoor && !prevSection.isDoor) {
+          const lineX = ox + margin + currentPos;
+          svg += `
+  <path d="M${lineX},${oy + margin} L${lineX},${oy + margin + height}" fill="none" stroke="#333333" stroke-width="0.5"/>`;
+        }
+      }
+      currentPos += sectionWidth;
+    });
+
+    // Add doors using path
+    currentPos = 0;
+    sections.forEach((section: any) => {
+      const sectionWidth = section.width * 100;
+      const sectionX = ox + margin + currentPos;
+      if (section.isDoor && section.doorHeight !== null && section.doorHeight !== undefined) {
+        const doorHeightCm = section.doorHeight * 100;
+        const doorTopY = oy + margin + (height - doorHeightCm);
+        const doorBottomY = oy + margin + height;
+        svg += `
+  <path d="M${sectionX},${doorTopY} L${sectionX},${doorBottomY}" fill="none" stroke="#000000" stroke-width="1"/>
+  <path d="M${sectionX + sectionWidth},${doorTopY} L${sectionX + sectionWidth},${doorBottomY}" fill="none" stroke="#000000" stroke-width="1"/>
+  <path d="M${sectionX},${doorTopY} L${sectionX + sectionWidth},${doorTopY}" fill="none" stroke="#000000" stroke-width="1"/>`;
+      }
+      currentPos += sectionWidth;
+    });
+
+    // Add width dimensions using path
+    currentPos = 0;
+    sections.forEach((section: any) => {
+      const sectionWidth = section.width * 100;
+      const startX = ox + margin + currentPos;
+      const endX = ox + margin + currentPos + sectionWidth;
+      const centerX = startX + sectionWidth / 2;
+      const dimY = oy + margin + height + 20;
+      svg += `
+  <path d="M${startX},${dimY} L${endX},${dimY}" fill="none" stroke="#0066cc" stroke-width="1"/>
+  <path d="M${startX},${dimY} L${startX + 5},${dimY - 3} L${startX + 5},${dimY + 3} Z" fill="#0066cc" stroke="none"/>
+  <path d="M${endX},${dimY} L${endX - 5},${dimY - 3} L${endX - 5},${dimY + 3} Z" fill="#0066cc" stroke="none"/>
+  <text x="${centerX}" y="${dimY + 15}" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#0066cc">${Math.round(sectionWidth)}</text>`;
+      currentPos += sectionWidth;
+    });
+
+    // Height dimension using path (no rotate transform - draw text manually positioned)
+    const dimX = ox + margin - 20;
+    const dimTopY = oy + margin;
+    const dimBottomY = oy + margin + height;
+    svg += `
+  <path d="M${dimX},${dimTopY} L${dimX},${dimBottomY}" fill="none" stroke="#0066cc" stroke-width="1"/>
+  <path d="M${dimX},${dimTopY} L${dimX - 3},${dimTopY + 5} L${dimX + 3},${dimTopY + 5} Z" fill="#0066cc" stroke="none"/>
+  <path d="M${dimX},${dimBottomY} L${dimX - 3},${dimBottomY - 5} L${dimX + 3},${dimBottomY - 5} Z" fill="#0066cc" stroke="none"/>
+  <text x="${dimX - 15}" y="${oy + margin + height / 2 + 4}" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#0066cc" writing-mode="tb">${Math.round(height)}</text>`;
+
+    return svg;
+  };
+
+  // Calculate dimensions for a layout element
+  const getLayoutDimensions = (layout: any) => {
+    const height = layout.height * 100;
+    const sections = layout.layoutSections;
+    const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
+    const margin = 50;
+    const extraSpace = 50; // Space for dimensions
+    return {
+      width: totalWidth + margin * 2 + extraSpace,
+      height: height + margin * 2 + extraSpace
+    };
+  };
+
+  // Generate combined SVG with all layouts
+  const generateCombinedSVG = () => {
+    const gap = 50; // Gap between layouts
+    const margin = 30; // Overall margin
+
+    // Calculate dimensions for each layout
+    const leftDims = layouts.leftSideLayout ? getLayoutDimensions(layouts.leftSideLayout) : null;
+    const rightDims = layouts.rightSideLayout ? getLayoutDimensions(layouts.rightSideLayout) : null;
+    const backDims = layouts.backSideLayout ? getLayoutDimensions(layouts.backSideLayout) : null;
+
+    // Calculate total SVG dimensions
+    // Left column: Motorista on top, Sapo below
+    const leftColumnWidth = Math.max(leftDims?.width || 0, rightDims?.width || 0);
+    const leftColumnHeight = (leftDims?.height || 0) + (rightDims ? gap + (rightDims?.height || 0) : 0);
+
+    // Right column: Traseira aligned with top
+    const rightColumnWidth = backDims?.width || 0;
+    const rightColumnHeight = backDims?.height || 0;
+
+    const totalWidth = margin * 2 + leftColumnWidth + (backDims ? gap + rightColumnWidth : 0);
+    const totalHeight = margin * 2 + Math.max(leftColumnHeight, rightColumnHeight);
+
+    let svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${totalWidth}mm" height="${totalHeight}mm" viewBox="0 0 ${totalWidth} ${totalHeight}" xmlns="http://www.w3.org/2000/svg">`;
+
+    // Add Motorista (left side) at top-left
+    if (layouts.leftSideLayout) {
+      svg += generateLayoutElement(layouts.leftSideLayout, 'left', margin, margin);
+    }
+
+    // Add Sapo (right side) below Motorista, left-aligned
+    if (layouts.rightSideLayout) {
+      const offsetY = margin + (leftDims?.height || 0) + gap;
+      svg += generateLayoutElement(layouts.rightSideLayout, 'right', margin, offsetY);
+    }
+
+    // Add Traseira (back side) next to Motorista, top-aligned
+    if (layouts.backSideLayout) {
+      const offsetX = margin + leftColumnWidth + gap;
+      svg += generateLayoutElement(layouts.backSideLayout, 'back', offsetX, margin);
+    }
+
+    svg += `
+</svg>`;
 
     return svg;
   };
@@ -364,7 +474,7 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
         {dimensions && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <IconRuler className="h-4 w-4" />
-            <span>Medidas: <span className="font-medium text-foreground">{dimensions.width.toFixed(2).replace('.', ',')} x {dimensions.height.toFixed(2).replace('.', ',')} m</span></span>
+            <span>Medidas: <span className="font-medium text-foreground">{Math.round(dimensions.width * 100)} x {Math.round(dimensions.height * 100)} cm</span></span>
           </div>
         )}
       </div>
@@ -385,74 +495,61 @@ const TruckLayoutPreview = ({ truckId, taskName }: { truckId: string; taskName?:
 
       {/* Download buttons */}
       <div className="flex gap-2 justify-end">
-        {/* Download all layouts as zip */}
+        {/* Download all layouts - combined SVG or ZIP with photo */}
         <Button
           onClick={async () => {
             const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
             const taskPrefix = taskName ? `${taskName}-` : '';
-            const zipFileName = `${taskPrefix}layouts.zip`;
 
-            const JSZip = (await import('jszip')).default;
-            const zip = new JSZip();
+            // Generate combined SVG with all layouts
+            const combinedSvgContent = generateCombinedSVG();
 
-            const getSideLabel = (s: string) => {
-              switch (s) {
-                case 'left': return 'motorista';
-                case 'right': return 'sapo';
-                case 'back': return 'traseira';
-                default: return s;
-              }
-            };
+            // Check if backside has a photo
+            const hasBacksidePhoto = layouts.backSideLayout?.photo;
 
-            // Add left side layout SVG if exists
-            if (layouts.leftSideLayout) {
-              const svgContent = generatePreviewSVG(layouts.leftSideLayout, 'left', true);
-              const sections = layouts.leftSideLayout.layoutSections;
-              const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-              zip.file(`${taskPrefix}layout-${getSideLabel('left')}-${Math.round(totalWidth)}mm.svg`, svgContent);
-            }
+            if (hasBacksidePhoto) {
+              // Create ZIP with combined SVG + backside photo
+              const JSZip = (await import('jszip')).default;
+              const zip = new JSZip();
 
-            // Add right side layout SVG if exists
-            if (layouts.rightSideLayout) {
-              const svgContent = generatePreviewSVG(layouts.rightSideLayout, 'right', true);
-              const sections = layouts.rightSideLayout.layoutSections;
-              const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-              zip.file(`${taskPrefix}layout-${getSideLabel('right')}-${Math.round(totalWidth)}mm.svg`, svgContent);
-            }
+              // Add combined SVG
+              zip.file(`${taskPrefix}layouts.svg`, combinedSvgContent);
 
-            // Add back side layout SVG if exists
-            if (layouts.backSideLayout) {
-              const svgContent = generatePreviewSVG(layouts.backSideLayout, 'back', true);
-              const sections = layouts.backSideLayout.layoutSections;
-              const totalWidth = sections.reduce((sum: number, s: any) => sum + s.width * 100, 0);
-              zip.file(`${taskPrefix}layout-${getSideLabel('back')}-${Math.round(totalWidth)}mm.svg`, svgContent);
-
-              // Add backside photo if exists
-              if (layouts.backSideLayout.photo) {
-                try {
-                  const photoUrl = `${apiUrl}/files/${layouts.backSideLayout.photo.id}/download`;
-                  const response = await fetch(photoUrl);
-                  if (response.ok) {
-                    const blob = await response.blob();
-                    const extension = layouts.backSideLayout.photo.mimeType?.split('/')[1] || 'jpg';
-                    zip.file(`${taskPrefix}layout-traseira-foto.${extension}`, blob);
-                  }
-                } catch (error) {
-                  console.error('Error downloading backside photo:', error);
+              // Add backside photo
+              try {
+                const photoUrl = `${apiUrl}/files/${layouts.backSideLayout.photo.id}/download`;
+                const response = await fetch(photoUrl);
+                if (response.ok) {
+                  const blob = await response.blob();
+                  const extension = layouts.backSideLayout.photo.mimeType?.split('/')[1] || 'jpg';
+                  zip.file(`${taskPrefix}layout-traseira-foto.${extension}`, blob);
                 }
+              } catch (error) {
+                console.error('Error downloading backside photo:', error);
               }
-            }
 
-            // Generate zip and download
-            const content = await zip.generateAsync({ type: 'blob' });
-            const url = URL.createObjectURL(content);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = zipFileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+              // Generate zip and download
+              const content = await zip.generateAsync({ type: 'blob' });
+              const url = URL.createObjectURL(content);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `${taskPrefix}layouts.zip`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+            } else {
+              // No backside photo - download combined SVG directly
+              const blob = new Blob([combinedSvgContent], { type: 'image/svg+xml' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `${taskPrefix}layouts.svg`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+            }
           }}
           size="sm"
           variant="default"
@@ -1012,15 +1109,9 @@ export const TaskDetailsPage = () => {
 
     setIsUpdating(true);
     try {
+      // Note: startedAt and finishedAt are auto-filled by the backend when status changes
+      // to IN_PRODUCTION or COMPLETED respectively
       const updateData: any = { id: task.id, data: { status: pendingStatus } };
-
-      // Add required dates based on status
-      if (pendingStatus === TASK_STATUS.IN_PRODUCTION && !task.startedAt) {
-        updateData.data.startedAt = new Date();
-      }
-      if (pendingStatus === TASK_STATUS.COMPLETED && !task.finishedAt) {
-        updateData.data.finishedAt = new Date();
-      }
 
       await update(updateData);
       setStatusChangeDialogOpen(false);
@@ -1615,7 +1706,7 @@ export const TaskDetailsPage = () => {
                   </div>
 
                   {/* Pricing items table */}
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="border border-border/50 dark:border-border/30 rounded-lg overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-muted/50">
                     <tr>
@@ -1627,7 +1718,7 @@ export const TaskDetailsPage = () => {
                   </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-border/50 dark:divide-border/30">
                     {task.pricing.items.map((item, index) => (
                   <tr key={item.id || index} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 text-sm">{item.description}</td>
@@ -1643,7 +1734,7 @@ export const TaskDetailsPage = () => {
                   </div>
 
                   {/* Pricing Summary */}
-                  <div className="bg-muted/20 border rounded-lg p-4 space-y-3">
+                  <div className="bg-muted/20 border border-border/50 dark:border-border/30 rounded-lg p-4 space-y-3">
                     {/* Subtotal */}
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal</span>
@@ -1674,7 +1765,7 @@ export const TaskDetailsPage = () => {
                     )}
 
                     {/* Total */}
-                    <div className="flex items-center justify-between pt-3 border-t">
+                    <div className="flex items-center justify-between pt-3 border-t border-border/50 dark:border-border/30">
                       <span className="text-base font-bold text-foreground">TOTAL</span>
                       <span className="text-xl font-bold text-primary">
                         {formatCurrency(
@@ -2663,7 +2754,7 @@ export const TaskDetailsPage = () => {
                       <div
                         key={airbrushing.id}
                         className={cn(
-                          "border rounded-lg p-4 transition-colors",
+                          "border border-border/50 dark:border-border/30 rounded-lg p-4 transition-colors",
                           canAccessAirbrushingDetails && "hover:bg-muted/50 cursor-pointer"
                         )}
                         onClick={canAccessAirbrushingDetails ? () => navigate(routes.production.airbrushings.details(airbrushing.id)) : undefined}

@@ -57,16 +57,7 @@ const isPast = (date: Date): boolean => {
   return checkDate < today;
 };
 
-// Helper function to check if user has pending service orders assigned to them
-const hasPendingAssignedServiceOrders = (task: Task, currentUserId?: string): boolean => {
-  if (!currentUserId || !task.serviceOrders) return false;
-  return task.serviceOrders.some(
-    (so) => so.assignedToId === currentUserId && so.status === SERVICE_ORDER_STATUS.PENDING
-  );
-};
-
 // Helper function to render forecast date with indicators (only for preparation route)
-// PRIORITY: Indicators are suppressed when user has pending service orders assigned to them
 const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: string, currentUserId?: string) => {
   if (!date) return <span className="text-muted-foreground">-</span>;
 
@@ -74,12 +65,8 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
   const dateTime = formatDateTime(date);
   const forecastDate = new Date(date);
 
-  // PRIORITY: If user has pending service orders assigned, don't show forecast indicators
-  // This gives priority to the "assigned to me" count indicator in service order cells
-  const userHasPendingAssigned = hasPendingAssignedServiceOrders(task, currentUserId);
-
-  // Only show indicators for preparation route AND when user doesn't have pending assigned orders
-  const showIndicators = navigationRoute === 'preparation' && !userHasPendingAssigned;
+  // Only show indicators for preparation route
+  const showIndicators = navigationRoute === 'preparation';
 
   // Blue triangle with check icon when forecast is today
   const showBlueIndicator = showIndicators && isToday(forecastDate);

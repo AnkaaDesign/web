@@ -1278,22 +1278,8 @@ export const taskCreateSchema = z
       });
     }
 
-    // Validate status-based requirements
-    if (data.status === TASK_STATUS.IN_PRODUCTION && !data.startedAt) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Data de início é obrigatória para tarefas em produção",
-        path: ["startedAt"],
-      });
-    }
-
-    if (data.status === TASK_STATUS.COMPLETED && !data.finishedAt) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Data de conclusão é obrigatória para tarefas concluídas",
-        path: ["finishedAt"],
-      });
-    }
+    // Note: startedAt and finishedAt are no longer required as they are auto-filled by the backend
+    // when task status changes to IN_PRODUCTION or COMPLETED respectively
 
     // Validate serial number range fields
     const hasSerialNumberFrom = data.serialNumberFrom !== undefined;

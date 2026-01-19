@@ -33,9 +33,10 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { Notification } from "@/types";
 import type { NotificationGetManyFormData } from "@/schemas";
-import { useNotifications, useNotificationMutations, useSendNotification } from "@/hooks";
+import { useNotificationMutations, useSendNotification } from "@/hooks";
+import { useNotifications } from "@/hooks/useNotificationAdmin";
 import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
-import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
+import { useTableState } from "@/hooks/use-table-state";
 import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { TABLE_LAYOUT } from "@/components/ui/table-constants";
 import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-tooltip";
@@ -107,51 +108,28 @@ export function NotificationTable({
     isBulk: boolean;
   } | null>(null);
 
-  // Memoize include configuration
-  const includeConfig = useMemo(
-    () => ({
-      user: true,
-      seenBy: {
-        include: {
-          user: true,
-        },
-      },
-    }),
-    []
-  );
-
-  // Memoize query parameters
+  // Memoize query parameters for admin API
   const queryParams = useMemo(() => {
+    // Get the first sort config (admin API supports single column sort)
+    const sortConfig = sortConfigs.length > 0 ? sortConfigs[0] : null;
+
     const params: any = {
       ...filters,
       page: page + 1,
       limit: pageSize,
-      include: includeConfig,
-      ...(sortConfigs.length > 0 && {
-        orderBy: convertSortConfigsToOrderBy(sortConfigs),
-      }),
-      ...(showSelectedOnly &&
-        selectedIds.length > 0 && {
-          where: {
-            id: { in: selectedIds },
-          },
-        }),
+      orderBy: sortConfig?.column || "createdAt",
+      order: sortConfig?.direction || "desc",
     };
 
-    // Default sort by createdAt desc if no sort specified
-    if (!params.orderBy) {
-      params.orderBy = { createdAt: "desc" };
-    }
-
     return params;
-  }, [filters, page, pageSize, includeConfig, sortConfigs, showSelectedOnly, selectedIds]);
+  }, [filters, page, pageSize, sortConfigs]);
 
   // Fetch notifications
   const { data: response, isLoading, error } = useNotifications(queryParams);
 
   const notifications = response?.data || [];
-  const totalPages = response?.meta ? Math.ceil(response.meta.totalRecords / pageSize) : 1;
-  const totalRecords = response?.meta?.totalRecords || 0;
+  const totalPages = response?.meta?.totalPages || 1;
+  const totalRecords = response?.meta?.total || 0;
 
   // Notify parent component of data changes
   const lastNotifiedDataRef = React.useRef<string>("");

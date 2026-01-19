@@ -299,19 +299,10 @@ export function TaskTable({
           continue;
         }
 
-        const updateData: any = { status: newStatus };
-
-        // Add required dates based on status
-        if (newStatus === TASK_STATUS.IN_PRODUCTION && !task.startedAt) {
-          updateData.startedAt = new Date();
-        }
-        if (newStatus === TASK_STATUS.COMPLETED && !task.finishedAt) {
-          updateData.finishedAt = new Date();
-        }
-
+        // Note: startedAt and finishedAt are auto-filled by the backend when status changes
         updates.push({
           id: task.id,
-          data: updateData,
+          data: { status: newStatus },
         });
       }
 

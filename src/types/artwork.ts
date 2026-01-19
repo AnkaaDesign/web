@@ -21,12 +21,11 @@ import type { ORDER_BY_DIRECTION } from '@constants';
 export interface Artwork extends BaseEntity {
   fileId: string;
   status: 'DRAFT' | 'APPROVED' | 'REPROVED';
-  taskId?: string | null;
   airbrushingId?: string | null;
 
-  // Relations
+  // Relations (Many-to-Many: Artwork can be shared across multiple Tasks)
   file?: File;
-  task?: Task | null;
+  tasks?: Task[]; // Artwork is SHARED across tasks - status changes affect all
   airbrushing?: Airbrushing | null;
 
   // Index signature for compatibility
@@ -39,7 +38,7 @@ export interface Artwork extends BaseEntity {
 
 export interface ArtworkIncludes {
   file?: boolean | { include?: FileIncludes };
-  task?: boolean | { include?: TaskIncludes };
+  tasks?: boolean | { include?: TaskIncludes }; // Many-to-many with Task
   airbrushing?: boolean | { include?: AirbrushingIncludes };
 }
 
@@ -53,7 +52,6 @@ export interface ArtworkOrderBy {
   id?: ORDER_BY_DIRECTION;
   fileId?: ORDER_BY_DIRECTION;
   status?: ORDER_BY_DIRECTION;
-  taskId?: ORDER_BY_DIRECTION;
   airbrushingId?: ORDER_BY_DIRECTION;
   createdAt?: ORDER_BY_DIRECTION;
   updatedAt?: ORDER_BY_DIRECTION;
@@ -67,8 +65,9 @@ export interface ArtworkWhere {
   id?: string;
   fileId?: string;
   status?: 'DRAFT' | 'APPROVED' | 'REPROVED';
-  taskId?: string | null;
   airbrushingId?: string | null;
+  // For many-to-many, use tasks: { some: { id: taskId } } to filter by task
+  tasks?: { some?: { id?: string }; every?: { id?: string }; none?: { id?: string } };
   AND?: ArtworkWhere[];
   OR?: ArtworkWhere[];
   NOT?: ArtworkWhere[];
@@ -81,15 +80,17 @@ export interface ArtworkWhere {
 export interface ArtworkCreateFormData {
   fileId: string;
   status?: 'DRAFT' | 'APPROVED' | 'REPROVED';
-  taskId?: string | null;
   airbrushingId?: string | null;
+  // Tasks are connected via the many-to-many junction table, not directly here
+  taskIds?: string[]; // Optional: IDs of tasks to connect this artwork to
 }
 
 export interface ArtworkUpdateFormData {
   fileId?: string;
   status?: 'DRAFT' | 'APPROVED' | 'REPROVED';
-  taskId?: string | null;
   airbrushingId?: string | null;
+  // For updating task connections, use connect/disconnect operations
+  taskIds?: string[]; // Optional: IDs of tasks to set for this artwork
 }
 
 export interface ArtworkQueryFormData {

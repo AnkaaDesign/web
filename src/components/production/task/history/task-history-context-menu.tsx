@@ -202,35 +202,16 @@ export function TaskHistoryContextMenu({
     }
     try {
       if (taskIds.length === 1) {
+        // Note: startedAt and finishedAt are auto-filled by the backend when status changes
         const updateData: any = { status };
-
-        // Set startedAt when changing to IN_PRODUCTION
-        if (status === TASK_STATUS.IN_PRODUCTION) {
-          updateData.startedAt = task?.startedAt || new Date();
-        }
-        // Set finishedAt when changing to COMPLETED
-        else if (status === TASK_STATUS.COMPLETED) {
-          updateData.finishedAt = task?.finishedAt || new Date();
-          updateData.startedAt = task?.startedAt || new Date();
-        }
 
         await update({
           id: taskIds[0],
           data: updateData
         });
       } else {
-        const updates = taskIds.map(id => {
-          const updateData: any = { status };
-
-          if (status === TASK_STATUS.IN_PRODUCTION) {
-            updateData.startedAt = new Date();
-          } else if (status === TASK_STATUS.COMPLETED) {
-            updateData.finishedAt = new Date();
-            updateData.startedAt = new Date();
-          }
-
-          return { id, data: updateData };
-        });
+        // Note: startedAt and finishedAt are auto-filled by the backend when status changes
+        const updates = taskIds.map(id => ({ id, data: { status } }));
         await batchUpdate({ items: updates });
       }
     } catch (error) {

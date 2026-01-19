@@ -314,8 +314,6 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
   // causing getChangedFields() to return {} when called after validation completes.
   const handleSubmitChanges = useCallback((onValid?: (data: Partial<TFieldValues>) => unknown, onInvalid?: (errors: any) => unknown) => {
     return async (e?: React.BaseSyntheticEvent) => {
-      console.log('[useEditForm] handleSubmitChanges handler called');
-
       // Prevent default form submission immediately
       if (e) {
         e.preventDefault();
@@ -325,22 +323,18 @@ export function useEditForm<TFieldValues extends FieldValues = FieldValues, TCon
       // CRITICAL: Capture changed fields NOW, before any async validation
       // This ensures we have the correct snapshot even if originalData changes during validation
       const changedFieldsSnapshot = getChangedFields();
-      console.log('[useEditForm] changedFieldsSnapshot:', JSON.stringify(changedFieldsSnapshot, null, 2));
 
       // Now run validation and submit with the captured snapshot
       try {
         return await form.handleSubmit(async () => {
-          console.log('[useEditForm] form.handleSubmit onValid callback');
           // Call onSubmit with the pre-captured changed fields
           const result = await onSubmit(changedFieldsSnapshot);
           if (onValid) onValid(changedFieldsSnapshot);
           return result;
         }, (errors) => {
-          console.log('[useEditForm] form.handleSubmit onInvalid callback, errors:', errors);
           if (onInvalid) onInvalid(errors);
         })(e);
       } catch (error) {
-        console.error('[useEditForm] Error during form submission:', error);
         throw error;
       }
     };

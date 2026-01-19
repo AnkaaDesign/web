@@ -388,22 +388,24 @@ export function TaskScheduleTable({ tasks, visibleColumns, selectedTaskIds: exte
     async (action: TaskAction, tasks: Task[]) => {
       switch (action) {
         case "start":
+          // Note: startedAt is auto-filled by the backend when status changes to IN_PRODUCTION
           for (const task of tasks) {
             if (task.status === TASK_STATUS.WAITING_PRODUCTION || task.status === TASK_STATUS.PREPARATION) {
               await updateAsync({
                 id: task.id,
-                data: { status: TASK_STATUS.IN_PRODUCTION, startedAt: new Date() },
+                data: { status: TASK_STATUS.IN_PRODUCTION },
               });
             }
           }
           break;
 
         case "finish":
+          // Note: finishedAt is auto-filled by the backend when status changes to COMPLETED
           for (const task of tasks) {
             if (task.status === TASK_STATUS.IN_PRODUCTION) {
               await updateAsync({
                 id: task.id,
-                data: { status: TASK_STATUS.COMPLETED, finishedAt: new Date() },
+                data: { status: TASK_STATUS.COMPLETED },
               });
             }
           }

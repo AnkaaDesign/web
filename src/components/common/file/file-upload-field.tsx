@@ -343,9 +343,9 @@ export function FileUploadField({
                 };
 
                 return (
-                  <div key={file.id} className="flex items-center gap-1.5 p-2.5 min-h-14 border rounded-lg bg-card hover:bg-muted/30 transition-colors">
+                  <div key={file.id} className="flex items-center gap-1.5 p-2.5 min-h-14 border border-border/30 rounded-lg bg-card hover:bg-muted/30 transition-colors">
                     {/* Thumbnail or Icon */}
-                    <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded border bg-muted overflow-hidden">
+                    <div className="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded border border-border/20 bg-muted/50 overflow-hidden">
                       {isUploading ? (
                         <div className="w-4 h-4 border border-primary/30 border-t-primary animate-spin rounded-full" />
                       ) : shouldShowThumbnail ? (
@@ -471,9 +471,9 @@ export function FileUploadField({
                 return (
                   <div key={file.id} className="flex flex-col min-w-0 w-full">
                     {/* File card */}
-                    <div className="flex flex-col items-center p-3 border border-border/50 rounded-lg bg-card">
+                    <div className="flex flex-col items-center p-3 border border-border/30 rounded-lg bg-card">
                       {/* Thumbnail or Icon */}
-                      <div className="relative w-full h-24 mb-2 overflow-hidden rounded border flex-shrink-0">
+                      <div className="relative w-full h-24 mb-2 overflow-hidden rounded border border-border/20 flex-shrink-0">
                         {isUploading ? (
                           <div className="w-full h-full flex items-center justify-center bg-primary/5">
                             <div className="w-6 h-6 border-2 border-primary/30 border-t-primary animate-spin rounded-full" />

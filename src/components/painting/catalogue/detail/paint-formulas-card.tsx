@@ -1,16 +1,30 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { IconFlask, IconPlus, IconCurrencyDollar, IconWeight, IconCalculator, IconAlertCircle, IconList } from "@tabler/icons-react";
+import { IconFlask, IconPlus, IconCurrencyDollar, IconWeight, IconCalculator, IconAlertCircle, IconList, IconTrash, IconExternalLink } from "@tabler/icons-react";
 
-import type { Paint } from "../../../../types";
+import type { Paint, PaintFormula } from "../../../../types";
 import { formatCurrency } from "../../../../utils";
 import { routes, SECTOR_PRIVILEGES } from "../../../../constants";
 import { useAuth } from "@/contexts/auth-context";
+import { deletePaintFormula } from "@/api-client/paint";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { FormulaCardSkeleton } from "@/components/ui/formula-card-skeleton";
+import { DropdownMenu, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 interface PaintFormulasCardProps {
@@ -19,15 +33,23 @@ interface PaintFormulasCardProps {
   isLoading?: boolean;
   error?: Error | null;
   onRetry?: () => void;
+  onFormulaDeleted?: () => void;
 }
 
-export function PaintFormulasCard({ paint, className, isLoading = false, error = null, onRetry }: PaintFormulasCardProps) {
+export function PaintFormulasCard({ paint, className, isLoading = false, error = null, onRetry, onFormulaDeleted }: PaintFormulasCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Hide prices for warehouse users
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; formula: PaintFormula } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<PaintFormula | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Permission checks
   const isWarehouseUser = user?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
+  const isAdmin = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
   const showPrices = !isWarehouseUser;
+  const canDelete = isAdmin;
 
   const handleCreateFormula = () => {
     // Navigate to paint edit page starting at step 2 (formulation)
@@ -37,6 +59,41 @@ export function PaintFormulasCard({ paint, className, isLoading = false, error =
   const handleFormulaClick = (formulaId: string) => {
     // Navigate to formula calculator page
     navigate(routes.painting.catalog.formulaDetails(paint.id, formulaId));
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, formula: PaintFormula) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, formula });
+  };
+
+  const handleOpenInNewTab = () => {
+    if (contextMenu) {
+      window.open(routes.painting.catalog.formulaDetails(paint.id, contextMenu.formula.id), "_blank");
+      setContextMenu(null);
+    }
+  };
+
+  const handleDeleteClick = () => {
+    if (contextMenu) {
+      setDeleteDialog(contextMenu.formula);
+      setContextMenu(null);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteDialog) return;
+
+    setIsDeleting(true);
+    try {
+      await deletePaintFormula(deleteDialog.id);
+      setDeleteDialog(null);
+      onFormulaDeleted?.();
+    } catch (error) {
+      console.error("Failed to delete formula:", error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const hasFormulas = paint.formulas && paint.formulas.length > 0;
@@ -86,11 +143,12 @@ export function PaintFormulasCard({ paint, className, isLoading = false, error =
       <CardContent className="pt-0 space-y-4 flex-1 overflow-y-auto">
         {hasFormulas ? (
           <>
-            {paint.formulas!.map((formula, index) => (
+            {[...paint.formulas!].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((formula, index) => (
               <div key={formula.id}>
                 <div
                   className="bg-muted/50 rounded-lg p-4 hover:bg-muted/70 transition-all duration-200 cursor-pointer"
                   onClick={() => handleFormulaClick(formula.id)}
+                  onContextMenu={(e) => handleContextMenu(e, formula)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="space-y-2 flex-1">
@@ -157,6 +215,49 @@ export function PaintFormulasCard({ paint, className, isLoading = false, error =
           </div>
         )}
       </CardContent>
+
+      {/* Context Menu */}
+      <DropdownMenu open={!!contextMenu} onOpenChange={(open) => !open && setContextMenu(null)}>
+        <PositionedDropdownMenuContent
+          position={contextMenu}
+          isOpen={!!contextMenu}
+          className="w-48"
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
+          <DropdownMenuItem onClick={handleOpenInNewTab}>
+            <IconExternalLink className="mr-2 h-4 w-4" />
+            Abrir em nova aba
+          </DropdownMenuItem>
+          {canDelete && (
+            <DropdownMenuItem onClick={handleDeleteClick} className="text-destructive focus:text-destructive">
+              <IconTrash className="mr-2 h-4 w-4" />
+              Excluir
+            </DropdownMenuItem>
+          )}
+        </PositionedDropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteDialog} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a fórmula "{deleteDialog?.description}"? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
