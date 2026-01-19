@@ -57,7 +57,7 @@ function getCommercialServiceOrderIndicator(task: Task, navigationRoute?: string
   }
 
   // Check if task has at least one incomplete commercial service order
-  const commercialServiceOrders = task.services?.filter(
+  const commercialServiceOrders = task.serviceOrders?.filter(
     (so) => so.type === 'COMMERCIAL'
   ) || [];
 
@@ -153,7 +153,7 @@ export function TaskHistoryTable({
     () => ({
       customer: true,
       sector: true,
-      services: {
+      serviceOrders: {
         include: {
           service: true,
           assignedTo: true,

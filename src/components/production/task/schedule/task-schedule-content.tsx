@@ -102,7 +102,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
       sector: true,
       customer: true,
       createdBy: true,
-      services: true,
+      serviceOrders: true,
       generalPainting: {
         include: {
           paintType: true,
@@ -214,8 +214,8 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
                 break;
               case "services":
                 // Create NEW service orders (independent entities) with reset dates
-                if (sourceTask.services && sourceTask.services.length > 0) {
-                  updateData.services = sourceTask.services.map((service) => ({
+                if (sourceTask.serviceOrders && sourceTask.serviceOrders.length > 0) {
+                  updateData.services = sourceTask.serviceOrders.map((service) => ({
                     status: service.status,
                     statusOrder: service.statusOrder,
                     description: service.description,

@@ -161,7 +161,7 @@ export const suggestionBuilders: Record<string, SuggestionBuilder> = {
         task.customer?.fantasyName || "",
         task.user?.name || "",
         task.sector?.name || "",
-        ...(task.services?.map((s) => s.name) || []),
+        ...(task.serviceOrders?.map((s) => s.name) || []),
       ].filter(Boolean),
     createSuggestion: (task: Task, query: string) => ({
       id: `task-${task.id}`,

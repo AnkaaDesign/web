@@ -18,7 +18,7 @@ export const EditCustomerPage = () => {
     tasks: {
       include: {
         user: true,
-        services: true,
+        serviceOrders: true,
       },
       orderBy: { createdAt: "desc" },
       take: 10,

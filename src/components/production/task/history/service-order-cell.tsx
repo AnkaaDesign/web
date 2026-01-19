@@ -17,7 +17,7 @@ export function ServiceOrderCell({ task, serviceOrderType, navigationRoute }: Se
   const { data: currentUser } = useCurrentUser();
 
   // Filter service orders by the specified type
-  const serviceOrders = task.services?.filter(
+  const serviceOrders = task.serviceOrders?.filter(
     (serviceOrder) => serviceOrder.type === serviceOrderType
   ) || [];
 

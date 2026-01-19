@@ -158,7 +158,7 @@ export const TaskSelector = ({
         sector: true,
         customer: true,
         createdBy: true,
-        services: true,
+        serviceOrders: true,
         files: true,
         observation: true,
         commissions: true,

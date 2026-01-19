@@ -69,7 +69,7 @@ export default function PaintDetailsPage() {
           customer: true,
           createdBy: true,
           sector: true,
-          services: true,
+          serviceOrders: true,
         },
       },
       logoTasks: {
@@ -77,7 +77,7 @@ export default function PaintDetailsPage() {
           customer: true,
           createdBy: true,
           sector: true,
-          services: true,
+          serviceOrders: true,
         },
       },
     },

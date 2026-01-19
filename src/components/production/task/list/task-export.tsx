@@ -61,7 +61,7 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
               row[column.header] = task.createdBy?.name || "";
               break;
             case "services":
-              row[column.header] = task.services?.length || 0;
+              row[column.header] = task.serviceOrders?.length || 0;
               break;
             case "hasArtworks":
               row[column.header] = (task.artworks?.length || 0) > 0 ? "Sim" : "Não";
@@ -124,7 +124,7 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
             sector: true,
             customer: true,
             createdBy: true,
-            services: true,
+            serviceOrders: true,
             files: true,
             observation: true,
           },
@@ -173,7 +173,7 @@ export function TaskExport({ filters, currentItems, totalRecords, visibleColumns
               row[column.header] = task.createdBy?.name || "";
               break;
             case "services":
-              row[column.header] = task.services?.length || 0;
+              row[column.header] = task.serviceOrders?.length || 0;
               break;
             case "hasArtworks":
               row[column.header] = (task.artworks?.length || 0) > 0 ? "Sim" : "Não";

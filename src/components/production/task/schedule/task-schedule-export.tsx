@@ -108,7 +108,7 @@ export function TaskScheduleExport({ className, filters = {}, currentTasks = [],
         sector: true,
         customer: true,
         createdBy: true,
-        services: true,
+        serviceOrders: true,
         generalPainting: true,
       },
     });

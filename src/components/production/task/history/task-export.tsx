@@ -25,7 +25,7 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
   {
     id: "services",
     label: "Serviços",
-    getValue: (task: Task) => task.services?.map((s) => s.service?.name || s.description || "").join(", ") || "",
+    getValue: (task: Task) => task.serviceOrders?.map((s) => s.service?.name || s.description || "").join(", ") || "",
   },
   { id: "entryDate", label: "Data de Entrada", getValue: (task: Task) => (task.entryDate ? formatDate(new Date(task.entryDate)) : "") },
   { id: "forecastDate", label: "Previsão", getValue: (task: Task) => (task.forecastDate ? formatDate(new Date(task.forecastDate)) : "") },
@@ -79,7 +79,7 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
           createdBy: true,
           generalPainting: true,
           truck: true,
-          services: {
+          serviceOrders: {
             include: {
               service: true,
             },

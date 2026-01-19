@@ -88,7 +88,7 @@ export function PayrollCalculation({
       ]
     },
     include: {
-      services: true,
+      serviceOrders: true,
       customer: true,
     }
   });
@@ -117,7 +117,7 @@ export function PayrollCalculation({
 
       // Calculate weighted count (this should match bonus calculation logic)
       if (task.status === TASK_STATUS.COMPLETED) {
-        const weight = task.services?.reduce((sum, service) =>
+        const weight = task.serviceOrders?.reduce((sum, service) =>
           sum + (service.weight || 1), 0) || 1;
         acc.weightedCount += weight;
       }

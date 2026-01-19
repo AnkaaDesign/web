@@ -69,7 +69,7 @@ const renderDateWithIcon = (date: Date | null) => {
 
 // Helper to render service count
 const renderServiceCount = (task: Task) => {
-  const count = task.services?.length || 0;
+  const count = task.serviceOrders?.length || 0;
   if (count === 0) return <span className="text-muted-foreground">-</span>;
 
   return (
@@ -231,7 +231,7 @@ export const createTaskColumns = (): TaskColumn[] => [
         </TooltipContent>
       </Tooltip>
     ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.PRODUCTION).length || 0,
+    accessorFn: (row) => row.serviceOrders?.filter((so) => so.type === SERVICE_ORDER_TYPE.PRODUCTION).length || 0,
     sortable: true,
     filterable: false,
     defaultVisible: true,
@@ -252,7 +252,7 @@ export const createTaskColumns = (): TaskColumn[] => [
         </TooltipContent>
       </Tooltip>
     ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.FINANCIAL).length || 0,
+    accessorFn: (row) => row.serviceOrders?.filter((so) => so.type === SERVICE_ORDER_TYPE.FINANCIAL).length || 0,
     sortable: true,
     filterable: false,
     defaultVisible: true,
@@ -273,7 +273,7 @@ export const createTaskColumns = (): TaskColumn[] => [
         </TooltipContent>
       </Tooltip>
     ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.COMMERCIAL).length || 0,
+    accessorFn: (row) => row.serviceOrders?.filter((so) => so.type === SERVICE_ORDER_TYPE.COMMERCIAL).length || 0,
     sortable: true,
     filterable: false,
     defaultVisible: true,
@@ -294,7 +294,7 @@ export const createTaskColumns = (): TaskColumn[] => [
         </TooltipContent>
       </Tooltip>
     ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.LOGISTIC).length || 0,
+    accessorFn: (row) => row.serviceOrders?.filter((so) => so.type === SERVICE_ORDER_TYPE.LOGISTIC).length || 0,
     sortable: true,
     filterable: false,
     defaultVisible: true,
@@ -315,7 +315,7 @@ export const createTaskColumns = (): TaskColumn[] => [
         </TooltipContent>
       </Tooltip>
     ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.ARTWORK).length || 0,
+    accessorFn: (row) => row.serviceOrders?.filter((so) => so.type === SERVICE_ORDER_TYPE.ARTWORK).length || 0,
     sortable: true,
     filterable: false,
     defaultVisible: true,

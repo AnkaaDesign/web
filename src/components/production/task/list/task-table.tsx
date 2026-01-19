@@ -100,7 +100,7 @@ export function TaskTable({
       sector: true,
       customer: true,
       createdBy: true,
-      services: true,
+      serviceOrders: true,
       files: true,
       observation: true,
       generalPainting: true,

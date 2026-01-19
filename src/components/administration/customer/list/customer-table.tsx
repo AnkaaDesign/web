@@ -80,7 +80,6 @@ export function CustomerTable({ visibleColumns, className, onEdit, onDelete, onM
       _count: {
         tasks: true,
         serviceOrders: true,
-        services: true,
       },
     }),
     [],

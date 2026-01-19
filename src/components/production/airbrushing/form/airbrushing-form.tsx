@@ -127,7 +127,7 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
     include: {
       customer: true,
       sector: true,
-      services: true,
+      serviceOrders: true,
     },
     enabled: !!selectedTaskId,
   });
@@ -760,13 +760,13 @@ export const AirbrushingForm = forwardRef<AirbrushingFormHandle, AirbrushingForm
                         </div>
 
                         {/* Services */}
-                        {selectedTask?.data?.services && selectedTask.data.services.length > 0 && (
+                        {selectedTask?.data?.serviceOrders && selectedTask.data.serviceOrders.length > 0 && (
                           <>
                             <Separator className="my-4" />
                             <div>
                               <p className="text-xs font-medium text-muted-foreground mb-2">SERVIÇOS</p>
                               <div className="flex flex-wrap gap-2">
-                                {selectedTask.data.services.map((service: any) => (
+                                {selectedTask.data.serviceOrders.map((service: any) => (
                                   <Badge key={service.id} variant="secondary">
                                     {service.description}
                                   </Badge>

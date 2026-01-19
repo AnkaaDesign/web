@@ -773,7 +773,7 @@ export const TaskDetailsPage = () => {
         },
       },
       createdBy: true,
-      services: {
+      serviceOrders: {
         include: {
           assignedTo: true,
         },
@@ -906,8 +906,8 @@ export const TaskDetailsPage = () => {
   // 1. Status: only PENDING, IN_PROGRESS, WAITING_APPROVE, and COMPLETED (not CANCELLED)
   // 2. Type: only types the user has permission to view based on sector privilege
   const filteredServiceOrders = useMemo(() => {
-    if (!task?.services) return [];
-    return task.services
+    if (!task?.serviceOrders) return [];
+    return task.serviceOrders
       .filter((service) => {
         // Filter by status - exclude only CANCELLED
         const hasValidStatus = service.status === SERVICE_ORDER_STATUS.PENDING ||
@@ -1038,7 +1038,7 @@ export const TaskDetailsPage = () => {
     const taskName = task.name || task.serialNumber || task.plate || 'Tarefa';
 
     // Get all ARTWORK service orders for this task
-    const artworkServiceOrders = task.services?.filter(
+    const artworkServiceOrders = task.serviceOrders?.filter(
       (service) => service && service.type === SERVICE_ORDER_TYPE.ARTWORK
     ) || [];
 
@@ -2787,7 +2787,7 @@ export const TaskDetailsPage = () => {
                 taskId={task.id}
                 taskName={taskDisplayName}
                 taskCreatedAt={task.createdAt}
-                serviceOrderIds={task.services?.map(s => s.id) || []}
+                serviceOrderIds={task.serviceOrders?.map(s => s.id) || []}
                 truckId={task.truck?.id}
                 layoutIds={[
                   task.truck?.leftSideLayoutId,

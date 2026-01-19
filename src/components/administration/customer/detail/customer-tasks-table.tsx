@@ -72,7 +72,7 @@ export function CustomerTasksTable({
     () => ({
       customer: true,
       sector: true,
-      services: {
+      serviceOrders: {
         include: {
           service: true,
         },
