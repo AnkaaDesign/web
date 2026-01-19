@@ -377,7 +377,7 @@ export function TaskQuickCreateDialog({ open, onOpenChange, onSuccess }: TaskQui
                         value={field.value || ""}
                         placeholder="Ex: ABC1234"
                         className="uppercase bg-transparent"
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        onChange={(value: string) => field.onChange(value.toUpperCase())}
                         disabled={isSubmitting}
                       />
                     </FormControl>

@@ -27,7 +27,7 @@ export function CorporateNameInput({ disabled }: CorporateNameInputProps) {
             <Input
               {...field}
               value={field.value || ""}
-              onChange={(e) => field.onChange(e.target.value || null)}
+              onChange={(value: string) => field.onChange(value || null)}
               placeholder="Ex: Fornecedor ABC Comercial Ltda"
               disabled={disabled}
               className="transition-all duration-200"

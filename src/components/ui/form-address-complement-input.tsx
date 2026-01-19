@@ -25,9 +25,8 @@ export function AddressComplementInput({ disabled, name = "addressComplement" }:
             <Input
               {...field}
               value={field.value ?? ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                field.onChange(val === "" ? null : val);
+              onChange={(value: string) => {
+                field.onChange(value === "" ? null : value);
               }}
               placeholder="Ex: Apto 101, Bloco A"
               disabled={disabled}

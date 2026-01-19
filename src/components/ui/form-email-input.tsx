@@ -37,7 +37,7 @@ export function FormEmailInput({
             <Input
               {...field}
               value={field.value || ""}
-              onChange={(e) => field.onChange(e.target.value || null)}
+              onChange={(value: string) => field.onChange(value || null)}
               type="email"
               placeholder={placeholder}
               disabled={disabled}

@@ -68,7 +68,7 @@ export function PhonesManager({ disabled }: PhonesManagerProps) {
         <div className="flex gap-2">
           <Input
             value={newPhone}
-            onChange={(e) => handlePhoneInputChange(e.target.value)}
+            onChange={(value: string) => handlePhoneInputChange(value)}
             onKeyDown={handleKeyPress}
             placeholder="(11) 99999-9999"
             disabled={disabled}

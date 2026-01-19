@@ -255,7 +255,7 @@ export function BonusForm({
                           min="0"
                           placeholder="0,00"
                           {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
+                          onChange={(value: string) => field.onChange(Number(value))}
                           value={field.value || ""}
                         />
                       </FormControl>
