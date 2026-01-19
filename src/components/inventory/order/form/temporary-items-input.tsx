@@ -197,7 +197,7 @@ export const TemporaryItemsInput = forwardRef<
                           {...field}
                           type="number"
                           value={field.value ?? 0}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          onChange={(value: string) => field.onChange(parseFloat(value) || 0)}
                           min={0}
                           max={100}
                           step={0.01}
@@ -225,7 +225,7 @@ export const TemporaryItemsInput = forwardRef<
                           {...field}
                           type="number"
                           value={field.value ?? 0}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          onChange={(value: string) => field.onChange(parseFloat(value) || 0)}
                           min={0}
                           max={100}
                           step={0.01}

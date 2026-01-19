@@ -214,7 +214,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                               value={field.value || ""}
                               placeholder="Ex: ABC-12345"
                               className="uppercase"
-                              onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                              onChange={(value: string) => field.onChange(value.toUpperCase())}
                               disabled={isSubmitting}
                               autoFocus={index === 0}
                             />
@@ -237,7 +237,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                               value={field.value || ""}
                               placeholder="Ex: ABC1D23"
                               className="uppercase"
-                              onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                              onChange={(value: string) => field.onChange(value.toUpperCase())}
                               disabled={isSubmitting}
                             />
                           </FormControl>
@@ -259,7 +259,7 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                               value={field.value || ""}
                               placeholder="Ex: 9BWZZZ377VT004251"
                               className="uppercase"
-                              onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                              onChange={(value: string) => field.onChange(value.toUpperCase())}
                               disabled={isSubmitting}
                             />
                           </FormControl>

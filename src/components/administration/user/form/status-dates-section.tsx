@@ -35,6 +35,7 @@ function adjustToFridayIfWeekend(date: Date): Date {
  * Calculates all status-related dates based on exp1StartAt
  * Each experience period is 45 days
  * End dates are adjusted to Friday if they fall on weekends
+ * Effective hire date (effectedAt) is 1 day after exp2EndAt
  */
 function calculateStatusDates(exp1StartAt: Date | null) {
   if (!exp1StartAt) {
@@ -42,6 +43,7 @@ function calculateStatusDates(exp1StartAt: Date | null) {
       exp1EndAt: null,
       exp2StartAt: null,
       exp2EndAt: null,
+      effectedAt: null,
     };
   }
 
@@ -59,10 +61,14 @@ function calculateStatusDates(exp1StartAt: Date | null) {
   const rawExp2EndAt = addDays(exp2StartAt, 45);
   const exp2EndAt = adjustToFridayIfWeekend(rawExp2EndAt);
 
+  // Effective hire date is 1 day after exp2 ends
+  const effectedAt = addDays(exp2EndAt, 1);
+
   return {
     exp1EndAt,
     exp2StartAt,
     exp2EndAt,
+    effectedAt,
   };
 }
 
@@ -95,15 +101,18 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
     if (exp1StartAt) {
       const dates = calculateStatusDates(exp1StartAt);
 
-      // Recalculate these read-only fields when user changes exp1StartAt
+      // Recalculate these fields when user changes exp1StartAt
       form.setValue("exp1EndAt", dates.exp1EndAt, { shouldValidate: false, shouldDirty: true });
       form.setValue("exp2StartAt", dates.exp2StartAt, { shouldValidate: false, shouldDirty: true });
       form.setValue("exp2EndAt", dates.exp2EndAt, { shouldValidate: false, shouldDirty: true });
+      // Effective hire date is 1 day after exp2 ends
+      form.setValue("effectedAt", dates.effectedAt, { shouldValidate: false, shouldDirty: true });
     } else {
       // Clear dates if exp1StartAt is cleared
       form.setValue("exp1EndAt", null, { shouldValidate: false, shouldDirty: true });
       form.setValue("exp2StartAt", null, { shouldValidate: false, shouldDirty: true });
       form.setValue("exp2EndAt", null, { shouldValidate: false, shouldDirty: true });
+      form.setValue("effectedAt", null, { shouldValidate: false, shouldDirty: true });
     }
   }, [exp1StartAt, form]);
 
@@ -262,10 +271,10 @@ export function StatusDatesSection({ disabled }: StatusDatesSectionProps) {
                         <span className="text-destructive ml-0.5">*</span>
                       </span>
                     }
-                    disabled={disabled}
+                    disabled={true}
                     mode="date"
                     required
-                    helperText="Data em que o colaborador foi efetivado (padrão: hoje)"
+                    helperText="Calculado automaticamente (1 dia após o fim da Exp. 2)"
                   />
                 )}
               />

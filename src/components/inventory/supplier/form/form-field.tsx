@@ -60,7 +60,7 @@ export function FormField({ name, label, icon, type = "text", placeholder, disab
         disabled={disabled}
         {...fieldProps}
         value={fieldProps.value || ""}
-        onChange={(e) => fieldProps.onChange(e.target.value)}
+        onChange={(value: string) => fieldProps.onChange(value)}
         onBlur={handleBlur}
       />
       {showError && <p className="text-sm text-destructive">{errors[name]}</p>}

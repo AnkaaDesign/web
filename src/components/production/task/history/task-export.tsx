@@ -23,7 +23,7 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
   { id: "identificador", label: "Identificador", getValue: (task: Task) => task.serialNumber || task.truck?.plate || "" },
   { id: "sector.name", label: "Setor", getValue: (task: Task) => task.sector?.name || "" },
   {
-    id: "services",
+    id: "serviceOrders",
     label: "Serviços",
     getValue: (task: Task) => task.serviceOrders?.map((s) => s.service?.name || s.description || "").join(", ") || "",
   },
@@ -59,7 +59,7 @@ const EXPORT_COLUMNS: ExportColumn<Task>[] = [
 ];
 
 // Default visible columns for agenda
-const DEFAULT_VISIBLE_COLUMNS = new Set(["name", "customer.fantasyName", "identificador", "forecastDate", "services"]);
+const DEFAULT_VISIBLE_COLUMNS = new Set(["name", "customer.fantasyName", "identificador", "forecastDate", "serviceOrders"]);
 
 export function TaskExport({ className, filters = {}, currentItems = [], totalRecords = 0, visibleColumns, selectedItems }: TaskExportProps) {
   const fetchAllItems = async (): Promise<Task[]> => {
@@ -372,7 +372,7 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
                 case "sector.name":
                   width = "100px";
                   break;
-                case "services":
+                case "serviceOrders":
                   width = columnCount <= 6 ? "200px" : "150px";
                   break;
                 case "entryDate":
@@ -520,7 +520,7 @@ export function TaskExport({ className, filters = {}, currentItems = [], totalRe
                           case "sector.name":
                             className = "text-left";
                             break;
-                          case "services":
+                          case "serviceOrders":
                             className = "text-left text-muted";
                             break;
                           case "entryDate":

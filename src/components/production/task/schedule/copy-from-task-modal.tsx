@@ -16,7 +16,7 @@ export type CopyableField =
   | "budgetIds"
   | "paintId"
   | "paintIds"
-  | "services"
+  | "serviceOrders"
   | "cuts"
   | "layout";
 
@@ -32,8 +32,8 @@ const FIELD_CATEGORIES: FieldCategory[] = [
   { id: "artworkIds", label: "Artes", description: "Arquivos de arte anexados" },
   { id: "budgetIds", label: "Orçamentos", description: "Orçamentos associados" },
   { id: "paintId", label: "Pintura Geral", description: "Cor de pintura geral" },
-  { id: "paintIds", label: "Tintas do Logo", description: "Tintas utilizadas no logo" },
-  { id: "services", label: "Ordens de Serviço", description: "Criar novas ordens de serviço baseadas na origem" },
+  { id: "paintIds", label: "Tintas da Logomarca", description: "Tintas utilizadas na logomarca" },
+  { id: "serviceOrders", label: "Ordens de Serviço", description: "Criar novas ordens de serviço baseadas na origem" },
   { id: "cuts", label: "Cortes", description: "Criar novos cortes baseados na origem" },
   { id: "layout", label: "Layout do Caminhão", description: "Layout e seções do caminhão" },
 ];
@@ -191,8 +191,8 @@ export function CopyFromTaskModal({
         return sourceTask.generalPainting?.name || "Sem pintura";
       case "paintIds":
         return sourceTask.logoPaints?.length ? `${sourceTask.logoPaints.length} tinta(s)` : "Nenhuma tinta";
-      case "services":
-        return sourceTask.services?.length ? `${sourceTask.services.length} serviço(s)` : "Nenhum serviço";
+      case "serviceOrders":
+        return sourceTask.serviceOrders?.length ? `${sourceTask.serviceOrders.length} serviço(s)` : "Nenhum serviço";
       case "cuts":
         return sourceTask.cuts?.length ? `${sourceTask.cuts.length} corte(s)` : "Nenhum corte";
       case "layout":
@@ -226,8 +226,8 @@ export function CopyFromTaskModal({
         return !!sourceTask.paintId;
       case "paintIds":
         return (sourceTask.logoPaints?.length || 0) > 0;
-      case "services":
-        return (sourceTask.services?.length || 0) > 0;
+      case "serviceOrders":
+        return (sourceTask.serviceOrders?.length || 0) > 0;
       case "cuts":
         return (sourceTask.cuts?.length || 0) > 0;
       case "layout":
@@ -332,8 +332,8 @@ export function CopyFromTaskModal({
               </ScrollArea>
             </div>
 
-            {/* Warning for services/cuts */}
-            {(selectedFields.has("services") || selectedFields.has("cuts")) && (
+            {/* Warning for serviceOrders/cuts */}
+            {(selectedFields.has("serviceOrders") || selectedFields.has("cuts")) && (
               <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900">
                 <p className="text-xs text-amber-700 dark:text-amber-400">
                   <strong>Nota:</strong> Ordens de serviço e cortes serão criados como novas entidades independentes nas

@@ -25,9 +25,8 @@ export function AddressNumberInput({ disabled, name = "addressNumber" }: Address
             <Input
               {...field}
               value={field.value ?? ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                field.onChange(val === "" ? null : val);
+              onChange={(value: string) => {
+                field.onChange(value === "" ? null : value);
               }}
               placeholder="Ex: 123"
               disabled={disabled}

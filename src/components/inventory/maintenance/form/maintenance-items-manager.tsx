@@ -106,7 +106,7 @@ export function MaintenanceItemsManager({ control, fieldArray, disabled = false 
                           disabled={disabled}
                           {...field}
                           value={field.value || ""}
-                          onChange={(e) => field.onChange(Number(e.target.value) || 1)}
+                          onChange={(value: string) => field.onChange(Number(value) || 1)}
                         />
                       </FormControl>
                       <FormMessage />

@@ -108,7 +108,7 @@ export function TaskList({ className }: TaskListProps) {
     }
 
     // Parse has* filters
-    const booleanFilters = ["hasSector", "hasCustomer", "hasTruck", "hasObservation", "hasArtworks", "hasPaints", "hasServices", "hasAirbrushing"];
+    const booleanFilters = ["hasSector", "hasCustomer", "hasTruck", "hasObservation", "hasArtworks", "hasPaints", "hasServiceOrders", "hasAirbrushing"];
 
     booleanFilters.forEach((key) => {
       const value = params.get(key);
@@ -168,7 +168,7 @@ export function TaskList({ className }: TaskListProps) {
     if (typeof filters.isCompleted === "boolean") params.isCompleted = String(filters.isCompleted);
 
     // Has* filters
-    const booleanFilters = ["hasSector", "hasCustomer", "hasTruck", "hasObservation", "hasArtworks", "hasPaints", "hasServices", "hasAirbrushing"];
+    const booleanFilters = ["hasSector", "hasCustomer", "hasTruck", "hasObservation", "hasArtworks", "hasPaints", "hasServiceOrders", "hasAirbrushing"];
     booleanFilters.forEach((key) => {
       const value = (filters as any)[key];
       if (typeof value === "boolean") {

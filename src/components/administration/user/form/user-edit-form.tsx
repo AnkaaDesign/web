@@ -113,7 +113,7 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
           changedFields.password = newValue;
         }
       }
-      // Special handling for dates
+      // Special handling for dates - compare only date parts (year, month, day)
       else if (
         typedKey === "birth" ||
         typedKey === "dismissedAt" ||
@@ -121,12 +121,29 @@ export function UserEditForm({ user, onSubmit, isSubmitting, onDirtyChange, onFo
         typedKey === "exp1EndAt" ||
         typedKey === "exp2StartAt" ||
         typedKey === "exp2EndAt" ||
-        typedKey === "effectedAt" ||
-        typedKey === "dismissedAt"
+        typedKey === "effectedAt"
       ) {
-        const newDate = newValue instanceof Date ? newValue.toISOString() : newValue;
-        const oldDate = oldValue instanceof Date ? oldValue.toISOString() : oldValue;
-        if (newDate !== oldDate) {
+        // Helper to get date-only string (YYYY-MM-DD) for comparison
+        const getDateString = (val: unknown): string | null => {
+          if (!val) return null;
+          if (val instanceof Date) {
+            // Use local date parts to avoid timezone issues
+            const y = val.getFullYear();
+            const m = String(val.getMonth() + 1).padStart(2, '0');
+            const d = String(val.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+          }
+          if (typeof val === 'string') {
+            // Extract date part from ISO string
+            return val.split('T')[0];
+          }
+          return null;
+        };
+
+        const newDateStr = getDateString(newValue);
+        const oldDateStr = getDateString(oldValue);
+
+        if (newDateStr !== oldDateStr) {
           changedFields[typedKey] = newValue as any;
         }
       }

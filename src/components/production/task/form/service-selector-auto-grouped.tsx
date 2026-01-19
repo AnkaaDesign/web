@@ -50,14 +50,21 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     // Admin can edit all service orders
     if (userPrivilege === SECTOR_PRIVILEGES.ADMIN) return true;
 
-    // Allow editing of new service orders (ones without an id) so users can set type and description
-    const isNewServiceOrder = !serviceOrder.id || (typeof serviceOrder.id === 'string' && serviceOrder.id.startsWith('temp-'));
-    if (isNewServiceOrder) return true;
-
     // Get the service order type and assignment
     const { type, assignedToId } = serviceOrder;
     const isNotAssigned = !assignedToId || assignedToId === null || assignedToId === "";
     const isAssignedToCurrentUser = assignedToId === currentUserId;
+
+    // Allow editing of new service orders (ones without an id) so users can set type and description
+    // EXCEPT for DESIGNER users who can only edit ARTWORK service orders
+    const isNewServiceOrder = !serviceOrder.id || (typeof serviceOrder.id === 'string' && serviceOrder.id.startsWith('temp-'));
+    if (isNewServiceOrder) {
+      // DESIGNER users can only edit new service orders if they're ARTWORK type
+      if (userPrivilege === SECTOR_PRIVILEGES.DESIGNER) {
+        return type === SERVICE_ORDER_TYPE.ARTWORK;
+      }
+      return true;
+    }
 
     // Check permissions based on sector and service order type
     switch (userPrivilege) {
@@ -76,10 +83,6 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
       case SECTOR_PRIVILEGES.DESIGNER:
         // Can edit ARTWORK service orders if not assigned or assigned to them
         return type === SERVICE_ORDER_TYPE.ARTWORK && (isNotAssigned || isAssignedToCurrentUser);
-
-      case SECTOR_PRIVILEGES.LOGISTIC:
-        // Can edit PRODUCTION service orders if not assigned or assigned to them
-        return type === SERVICE_ORDER_TYPE.PRODUCTION && (isNotAssigned || isAssignedToCurrentUser);
 
       default:
         // Other sectors cannot edit any service orders
@@ -225,13 +228,13 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <FormLabel>Serviços</FormLabel>
-        {/* Add Service Button - At the top */}
+        {/* Add Service Button - At the top - Disabled for DESIGNER users */}
         <Button
           type="button"
           variant="outline"
           size="sm"
           onClick={handleAddService}
-          disabled={disabled}
+          disabled={disabled || userPrivilege === SECTOR_PRIVILEGES.DESIGNER}
         >
           <IconPlus className="h-4 w-4 mr-2" />
           Adicionar Serviço

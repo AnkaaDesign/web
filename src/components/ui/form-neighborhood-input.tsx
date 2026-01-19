@@ -25,9 +25,8 @@ export function NeighborhoodInput({ disabled, name = "neighborhood" }: Neighborh
             <Input
               {...field}
               value={field.value ?? ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                field.onChange(val === "" ? null : val);
+              onChange={(value: string) => {
+                field.onChange(value === "" ? null : value);
               }}
               placeholder="Ex: Centro"
               disabled={disabled}

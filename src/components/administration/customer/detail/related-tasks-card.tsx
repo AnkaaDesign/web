@@ -199,8 +199,8 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
                 if (task.details) {
                   return task.details;
                 }
-                if (task.services && task.services.length > 0) {
-                  return task.services.map((service: any) => service.description).join(", ");
+                if (task.serviceOrders && task.serviceOrders.length > 0) {
+                  return task.serviceOrders.map((service: any) => service.description).join(", ");
                 }
                 return `Tarefa #${task.id.slice(-8).toUpperCase()}`;
               };
@@ -231,9 +231,9 @@ export function RelatedTasksCard({ customer, className }: RelatedTasksCardProps)
                               <span className="font-medium">Setor:</span> {task.sector.name}
                             </p>
                           )}
-                          {task.services && task.services.length > 0 && (
+                          {task.serviceOrders && task.serviceOrders.length > 0 && (
                             <p className="text-xs text-muted-foreground truncate">
-                              <span className="font-medium">Serviços:</span> {task.services.map((s: any) => s.description).join(", ")}
+                              <span className="font-medium">Serviços:</span> {task.serviceOrders.map((s: any) => s.description).join(", ")}
                             </p>
                           )}
                         </div>

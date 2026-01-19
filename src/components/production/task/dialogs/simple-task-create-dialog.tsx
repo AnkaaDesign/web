@@ -266,7 +266,7 @@ export function SimpleTaskCreateDialog({ open, onOpenChange, onSuccess }: Simple
                         value={field.value || ""}
                         placeholder="Ex: ABC-123456"
                         className="uppercase bg-transparent"
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        onChange={(value: string) => field.onChange(value.toUpperCase())}
                         disabled={isSubmitting}
                       />
                     </FormControl>
@@ -290,7 +290,7 @@ export function SimpleTaskCreateDialog({ open, onOpenChange, onSuccess }: Simple
                         value={field.value || ""}
                         placeholder="Ex: ABC1234"
                         className="uppercase bg-transparent"
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        onChange={(value: string) => field.onChange(value.toUpperCase())}
                         disabled={isSubmitting}
                       />
                     </FormControl>

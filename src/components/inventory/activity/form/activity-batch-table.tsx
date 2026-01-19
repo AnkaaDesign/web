@@ -82,7 +82,7 @@ const ActivityBatchTableRow = ({
             max="999999"
             step="0.01"
             value={(field.quantity || 0).toString()}
-            onChange={(e) => handleQuantityChange(e.target.value)}
+            onChange={(value: string) => handleQuantityChange(value)}
             className="w-full h-8"
           />
         </div>

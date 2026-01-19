@@ -483,6 +483,11 @@ export const airbrushingCreateSchema = z
     receiptIds: z.array(z.string().uuid()).optional(),
     invoiceIds: z.array(z.string().uuid()).optional(),
     artworkIds: z.array(z.string().uuid()).optional(),
+    // artworkStatuses can be a plain object or array with object (for FormData serialization)
+    artworkStatuses: z.union([
+      z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED'])),
+      z.array(z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED']))),
+    ]).optional(),
   })
   .transform(toFormData);
 
@@ -502,6 +507,11 @@ export const airbrushingUpdateSchema = z
     receiptIds: z.array(z.string().uuid()).optional(),
     invoiceIds: z.array(z.string().uuid()).optional(),
     artworkIds: z.array(z.string().uuid()).optional(),
+    // artworkStatuses can be a plain object or array with object (for FormData serialization)
+    artworkStatuses: z.union([
+      z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED'])),
+      z.array(z.record(z.string().uuid(), z.enum(['DRAFT', 'APPROVED', 'REPROVED']))),
+    ]).optional(),
   })
   .transform(toFormData);
 

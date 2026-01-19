@@ -161,7 +161,7 @@ export function BackupList({ className, onViewDetails }: BackupListProps) {
 
   return (
     <>
-      <div className={cn('rounded-md border', className)}>
+      <div className={cn('rounded-md border dark:border-border/40', className)}>
         <Table>
           <TableHeader>
             <TableRow>

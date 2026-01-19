@@ -871,7 +871,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                             <Input
                               placeholder="Digite o nome da pessoa que está retirando"
                               value={withdrawerName}
-                              onChange={(e) => updateWithdrawerName(e.target.value)}
+                              onChange={(value: string) => updateWithdrawerName(value)}
                               className="h-10 bg-transparent"
                               maxLength={200}
                             />

@@ -27,7 +27,7 @@ export function CityInput({ disabled }: CityInputProps) {
             <Input
               {...field}
               value={field.value || ""}
-              onChange={(e) => field.onChange(e.target.value || null)}
+              onChange={(value: string) => field.onChange(value || null)}
               placeholder="Ex: São Paulo"
               disabled={disabled}
               className="transition-all duration-200"

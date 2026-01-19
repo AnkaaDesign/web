@@ -125,7 +125,7 @@ const InlinePerformanceEditor = ({
         min="1"
         max="5"
         value={performanceLevel}
-        onChange={(e) => setPerformanceLevel(e.target.value)}
+        onChange={(value: string) => setPerformanceLevel(value)}
         onKeyDown={handleKeyDown}
         className="h-8 w-16 text-center text-sm"
         autoFocus

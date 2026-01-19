@@ -57,16 +57,29 @@ const isPast = (date: Date): boolean => {
   return checkDate < today;
 };
 
+// Helper function to check if user has pending service orders assigned to them
+const hasPendingAssignedServiceOrders = (task: Task, currentUserId?: string): boolean => {
+  if (!currentUserId || !task.serviceOrders) return false;
+  return task.serviceOrders.some(
+    (so) => so.assignedToId === currentUserId && so.status === SERVICE_ORDER_STATUS.PENDING
+  );
+};
+
 // Helper function to render forecast date with indicators (only for preparation route)
-const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: string) => {
+// PRIORITY: Indicators are suppressed when user has pending service orders assigned to them
+const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: string, currentUserId?: string) => {
   if (!date) return <span className="text-muted-foreground">-</span>;
 
   const formatted = formatDate(date);
   const dateTime = formatDateTime(date);
   const forecastDate = new Date(date);
 
-  // Only show indicators for preparation route
-  const showIndicators = navigationRoute === 'preparation';
+  // PRIORITY: If user has pending service orders assigned, don't show forecast indicators
+  // This gives priority to the "assigned to me" count indicator in service order cells
+  const userHasPendingAssigned = hasPendingAssignedServiceOrders(task, currentUserId);
+
+  // Only show indicators for preparation route AND when user doesn't have pending assigned orders
+  const showIndicators = navigationRoute === 'preparation' && !userHasPendingAssigned;
 
   // Blue triangle with check icon when forecast is today
   const showBlueIndicator = showIndicators && isToday(forecastDate);
@@ -132,7 +145,7 @@ const renderDuration = (startedAt: Date | null, finishedAt: Date | null) => {
 
 // Helper to render service list
 const renderServices = (task: Task) => {
-  const services = task.services || [];
+  const services = task.serviceOrders || [];
   if (services.length === 0) return <span className="text-muted-foreground">-</span>;
 
   if (services.length === 1) {
@@ -346,7 +359,7 @@ export const createTaskHistoryColumns = (options?: {
     filterable: true,
     defaultVisible: false,
     width: "120px",
-    formatter: (value: Date | null, row: Task) => renderForecastDate(value, row, navigationRoute),
+    formatter: (value: Date | null, row: Task) => renderForecastDate(value, row, navigationRoute, currentUserId),
   },
   {
     id: "entryDate",
@@ -402,9 +415,9 @@ export const createTaskHistoryColumns = (options?: {
     formatter: (_: any, row: Task) => renderDuration(row.startedAt, row.finishedAt),
   },
   {
-    id: "services",
+    id: "serviceOrders",
     header: "SERVIÇOS",
-    accessorFn: (row) => row.services?.length || 0,
+    accessorFn: (row) => row.serviceOrders?.length || 0,
     sortable: false,
     filterable: false,
     defaultVisible: false,
@@ -425,7 +438,7 @@ export const createTaskHistoryColumns = (options?: {
         </TooltipContent>
       </Tooltip>
     ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.COMMERCIAL).length || 0,
+    accessorFn: (row) => row.serviceOrders?.filter((so) => so.type === SERVICE_ORDER_TYPE.COMMERCIAL).length || 0,
     sortable: true,
     filterable: false,
     defaultVisible: false,
@@ -446,7 +459,7 @@ export const createTaskHistoryColumns = (options?: {
         </TooltipContent>
       </Tooltip>
     ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.LOGISTIC).length || 0,
+    accessorFn: (row) => row.serviceOrders?.filter((so) => so.type === SERVICE_ORDER_TYPE.LOGISTIC).length || 0,
     sortable: true,
     filterable: false,
     defaultVisible: false,
@@ -467,7 +480,7 @@ export const createTaskHistoryColumns = (options?: {
         </TooltipContent>
       </Tooltip>
     ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.ARTWORK).length || 0,
+    accessorFn: (row) => row.serviceOrders?.filter((so) => so.type === SERVICE_ORDER_TYPE.ARTWORK).length || 0,
     sortable: true,
     filterable: false,
     defaultVisible: false,
@@ -488,7 +501,7 @@ export const createTaskHistoryColumns = (options?: {
         </TooltipContent>
       </Tooltip>
     ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.PRODUCTION).length || 0,
+    accessorFn: (row) => row.serviceOrders?.filter((so) => so.type === SERVICE_ORDER_TYPE.PRODUCTION).length || 0,
     sortable: true,
     filterable: false,
     defaultVisible: false,
@@ -509,7 +522,7 @@ export const createTaskHistoryColumns = (options?: {
         </TooltipContent>
       </Tooltip>
     ),
-    accessorFn: (row) => row.services?.filter((so) => so.type === SERVICE_ORDER_TYPE.FINANCIAL).length || 0,
+    accessorFn: (row) => row.serviceOrders?.filter((so) => so.type === SERVICE_ORDER_TYPE.FINANCIAL).length || 0,
     sortable: true,
     filterable: false,
     defaultVisible: false,
@@ -620,7 +633,7 @@ export const createTaskHistoryColumns = (options?: {
   let filteredColumns = allColumns;
 
   // Always remove the old "SERVIÇOS" column (replaced by individual service order type columns)
-  filteredColumns = filteredColumns.filter(col => col.id !== 'services');
+  filteredColumns = filteredColumns.filter(col => col.id !== 'serviceOrders');
 
   // Filter service order columns based on sector privilege
   // Each sector has specific visibility for each service order type:

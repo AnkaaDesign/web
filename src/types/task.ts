@@ -60,7 +60,7 @@ export interface Task extends BaseEntity {
   createdBy?: User;
   artworks?: File[];
   logoPaints?: Paint[];
-  services?: ServiceOrder[];
+  serviceOrders?: ServiceOrder[];
   airbrushing?: Airbrushing[]; // Note: Field name is singular but value is array
   cuts?: Cut[];
   truck?: Truck;
@@ -119,7 +119,7 @@ export interface TaskIncludes {
     | {
         include?: PaintIncludes;
       };
-  services?:
+  serviceOrders?:
     | boolean
     | {
         include?: ServiceOrderIncludes;

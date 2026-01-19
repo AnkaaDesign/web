@@ -53,8 +53,8 @@ export function RelatedServiceOrdersCard({ customer, className }: RelatedService
 
     const orders: ServiceOrder[] = [];
     customer.tasks.forEach((task) => {
-      if (task.services) {
-        orders.push(...task.services);
+      if (task.serviceOrders) {
+        orders.push(...task.serviceOrders);
       }
     });
     return orders;

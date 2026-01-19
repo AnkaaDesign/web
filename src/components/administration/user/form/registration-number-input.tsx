@@ -25,10 +25,10 @@ export function RegistrationNumberInput({ disabled }: RegistrationNumberInputPro
             <Input
               {...field}
               value={field.value || ""}
-              onChange={(e) => {
+              onChange={(value: string) => {
                 // Clean input to only alphanumeric characters and convert to uppercase
-                const value = e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-                field.onChange(value || null);
+                const cleanedValue = value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                field.onChange(cleanedValue || null);
               }}
               placeholder="Ex: EMP001, REG123"
               disabled={disabled}

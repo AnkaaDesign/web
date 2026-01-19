@@ -26,10 +26,10 @@ export function PISInput({ disabled }: PISInputProps) {
             <Input
               {...field}
               value={field.value ? formatPIS(field.value) : ""}
-              onChange={(e) => {
+              onChange={(value: string) => {
                 // Remove non-numeric characters and apply formatting
-                const value = e.target.value.replace(/\D/g, "");
-                field.onChange(value || null);
+                const cleanedValue = value.replace(/\D/g, "");
+                field.onChange(cleanedValue || null);
               }}
               placeholder="Digite o PIS do colaborador"
               disabled={disabled}

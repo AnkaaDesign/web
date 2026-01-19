@@ -213,8 +213,8 @@ export function RelatedTasksCard({
   const getTaskTitle = (task: Task) => {
     if (task.name) return task.name;
     if (task.details) return task.details;
-    if (task.services && task.services.length > 0) {
-      return task.services.map((service: any) => service.description).join(", ");
+    if (task.serviceOrders && task.serviceOrders.length > 0) {
+      return task.serviceOrders.map((service: any) => service.description).join(", ");
     }
     return `Tarefa #${task.id.slice(-8).toUpperCase()}`;
   };

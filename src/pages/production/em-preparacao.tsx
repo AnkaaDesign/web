@@ -15,8 +15,11 @@ export const PreparationPage = () => {
     icon: "clipboard-list",
   });
 
-  // ADMIN and COMMERCIAL can create tasks
-  const canCreateTasks = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN || user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
+  // ADMIN, COMMERCIAL, and LOGISTIC can create tasks
+  const canCreateTasks =
+    user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN ||
+    user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL ||
+    user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC;
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.DESIGNER, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.LOGISTIC, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>

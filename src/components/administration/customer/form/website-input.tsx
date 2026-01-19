@@ -47,9 +47,8 @@ export function WebsiteInput({ disabled }: WebsiteInputProps) {
               {...field}
               type="url"
               value={value || ""}
-              onChange={(e) => {
-                const val = e.target.value;
-                onChange(val === "" ? null : val);
+              onChange={(value: string) => {
+                onChange(value === "" ? null : value);
               }}
               onBlur={(e) => {
                 const val = e.target.value;

@@ -139,13 +139,21 @@ export const OrderCreateForm = () => {
     shouldFocusError: true, // Focus on first error field when validation fails
   });
 
-  // Sync URL state changes back to form (validate only if field was already touched)
+  // Sync URL state changes back to form (validate if touched or has errors to clear stale errors)
   useEffect(() => {
-    const isTouched = form.formState.touchedFields.description;
-    form.setValue("description", description || "", {
-      shouldValidate: isTouched,
-      shouldDirty: true
-    });
+    const currentFormValue = form.getValues("description") || "";
+    const urlValue = description || "";
+
+    // Only sync if URL state differs from form state
+    // This prevents double-updates when user is typing which can cause validation race conditions
+    if (currentFormValue !== urlValue) {
+      const hasError = !!form.formState.errors.description;
+      const isTouched = form.formState.touchedFields.description;
+      form.setValue("description", urlValue, {
+        shouldValidate: hasError || isTouched, // Validate if there's already an error or field was touched
+        shouldDirty: true,
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [description]);
 
@@ -1073,12 +1081,14 @@ export const OrderCreateForm = () => {
                               <Input
                                 placeholder="Nome do pedido (ex: Pedido de materiais de escritório)"
                                 value={form.watch("description") || ""}
-                                onChange={(e) => {
-                                  const stringValue = e.target.value || "";
-                                  // Update form state (validation will happen onBlur or when touched)
+                                onChange={(value) => {
+                                  // Input component passes value directly, not an event
+                                  const stringValue = (value as string) || "";
+                                  // Update form state with validation to clear errors as user types
                                   form.setValue("description", stringValue, {
                                     shouldDirty: true,
                                     shouldTouch: true,
+                                    shouldValidate: true,
                                   });
                                   // Update URL state immediately
                                   updateDescription(stringValue);

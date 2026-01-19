@@ -25,9 +25,9 @@ export function SiteInput({ disabled }: SiteInputProps) {
             <Input
               {...field}
               value={field.value || ""}
-              onChange={(e) => {
-                const value = e.target.value.trim();
-                field.onChange(value || null);
+              onChange={(value: string) => {
+                const trimmedValue = value.trim();
+                field.onChange(trimmedValue || null);
               }}
               placeholder="https://exemplo.com"
               disabled={disabled}

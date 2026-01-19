@@ -93,7 +93,7 @@ export function PaintSelector({ control, disabled, initialPaints }: PaintSelecto
       name="paintIds"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>Tintas do Logo</FormLabel>
+          <FormLabel>Tintas da Logomarca</FormLabel>
           <FormControl>
             <Combobox<Paint>
               value={field.value || []}

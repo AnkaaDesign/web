@@ -478,7 +478,7 @@ export function PpeScheduleForm(props: PpeScheduleFormProps) {
                             min={1}
                             max={31}
                             value={field.value || ""}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
+                            onChange={(value: string) => field.onChange(parseInt(value) || undefined)}
                             placeholder="1-31"
                             className="bg-transparent"
                           />

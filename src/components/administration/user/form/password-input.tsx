@@ -27,7 +27,7 @@ export function PasswordInput({ disabled, required = false }: PasswordInputProps
               <Input
                 {...field}
                 value={field.value || ""}
-                onChange={(e) => field.onChange(e.target.value || undefined)}
+                onChange={(value: string) => field.onChange(value || undefined)}
                 type={showPassword ? "text" : "password"}
                 placeholder={required ? "Digite a senha" : "Deixe em branco para manter a atual"}
                 disabled={disabled}
