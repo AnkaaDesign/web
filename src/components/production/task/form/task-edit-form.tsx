@@ -2472,8 +2472,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                 </Card>
           </AccordionItem>
 
-                {/* Dates Card - Hidden for Warehouse, Logistic, and Commercial users, Disabled for Financial and Designer users */}
-                {!isWarehouseUser && !isLogisticUser && !isCommercialUser && (
+                {/* Dates Card - Hidden for Warehouse users, Disabled for Financial and Designer users */}
+                {!isWarehouseUser && (
           <AccordionItem
             value="dates"
             id="accordion-item-dates"
