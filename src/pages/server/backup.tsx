@@ -60,6 +60,20 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 import { useTableState } from "@/hooks/use-table-state";
 
+// Retention options for auto-delete
+type RetentionPeriod = "1_day" | "3_days" | "1_week" | "2_weeks" | "1_month" | "3_months" | "6_months" | "1_year";
+
+const RETENTION_OPTIONS: Array<{ value: RetentionPeriod; label: string; days: number }> = [
+  { value: "1_day", label: "1 Dia", days: 1 },
+  { value: "3_days", label: "3 Dias", days: 3 },
+  { value: "1_week", label: "1 Semana", days: 7 },
+  { value: "2_weeks", label: "2 Semanas", days: 14 },
+  { value: "1_month", label: "1 Mês", days: 30 },
+  { value: "3_months", label: "3 Meses", days: 90 },
+  { value: "6_months", label: "6 Meses", days: 180 },
+  { value: "1_year", label: "1 Ano", days: 365 },
+];
+
 // Enhanced form interfaces
 interface NewBackupForm {
   name: string;
@@ -72,6 +86,10 @@ interface NewBackupForm {
   usePresetPaths: boolean;
   presetPathType: "critical" | "high" | "medium" | "low";
   sharedFolders: string[];
+  autoDelete: {
+    enabled: boolean;
+    retention: RetentionPeriod;
+  };
 }
 
 interface NewScheduleForm {
@@ -86,6 +104,10 @@ interface NewScheduleForm {
   usePresetPaths: boolean;
   presetPathType: "critical" | "high" | "medium" | "low";
   sharedFolders: string[];
+  autoDelete: {
+    enabled: boolean;
+    retention: RetentionPeriod;
+  };
 }
 
 // Priority options for backups
@@ -370,6 +392,10 @@ const BackupManagementPage = () => {
     usePresetPaths: false,
     presetPathType: "high",
     sharedFolders: [],
+    autoDelete: {
+      enabled: false,
+      retention: "1_week",
+    },
   });
 
   // Custom path input state
@@ -387,6 +413,10 @@ const BackupManagementPage = () => {
     usePresetPaths: false,
     presetPathType: "high",
     sharedFolders: [],
+    autoDelete: {
+      enabled: false,
+      retention: "1_week",
+    },
   });
 
   // Reset usePresetPaths when schedule type changes to files/full
@@ -566,6 +596,7 @@ const BackupManagementPage = () => {
       compressionLevel: newBackup.compressionLevel,
       encrypted: newBackup.encrypted,
       paths: pathsToBackup,
+      autoDelete: newBackup.autoDelete.enabled ? newBackup.autoDelete : undefined,
     });
 
     if (backupId) {
@@ -581,6 +612,10 @@ const BackupManagementPage = () => {
         usePresetPaths: true,
         presetPathType: "high",
         sharedFolders: [],
+        autoDelete: {
+          enabled: false,
+          retention: "1_week",
+        },
       });
       setCustomPathInput("");
     }
@@ -676,6 +711,7 @@ const BackupManagementPage = () => {
         enabled: newSchedule.enabled,
         cron: cronExpression,
         paths: pathsToBackup,
+        autoDelete: newSchedule.autoDelete.enabled ? newSchedule.autoDelete : undefined,
       };
 
       const success = await scheduleBackup(scheduleData);
@@ -694,6 +730,10 @@ const BackupManagementPage = () => {
           usePresetPaths: true,
           presetPathType: "high",
           sharedFolders: [],
+          autoDelete: {
+            enabled: false,
+            retention: "1_week",
+          },
         });
       }
     } catch (error) {
@@ -1336,6 +1376,60 @@ const BackupManagementPage = () => {
                   Criptografar backup (requer senha GPG configurada)
                 </Label>
               </div>
+
+              {/* Auto-Delete / Retention Section */}
+              <div className="space-y-4 border-t pt-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="backup-auto-delete"
+                    checked={newBackup.autoDelete.enabled}
+                    onCheckedChange={(checked) =>
+                      setNewBackup({
+                        ...newBackup,
+                        autoDelete: { ...newBackup.autoDelete, enabled: checked },
+                      })
+                    }
+                  />
+                  <Label htmlFor="backup-auto-delete" className="text-sm font-normal">
+                    <IconCalendar className="h-4 w-4 inline mr-1" />
+                    Excluir automaticamente após período de retenção
+                  </Label>
+                </div>
+
+                {newBackup.autoDelete.enabled && (
+                  <div className="space-y-3 pl-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="backup-retention">Período de Retenção</Label>
+                      <Combobox
+                        value={newBackup.autoDelete.retention}
+                        onValueChange={(value) =>
+                          setNewBackup({
+                            ...newBackup,
+                            autoDelete: { ...newBackup.autoDelete, retention: value as RetentionPeriod },
+                          })
+                        }
+                        options={RETENTION_OPTIONS.map((opt) => ({
+                          value: opt.value,
+                          label: opt.label,
+                        }))}
+                        placeholder="Selecione o período"
+                        searchable={false}
+                        clearable={false}
+                      />
+                    </div>
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
+                      <div className="flex gap-2 text-sm text-amber-800 dark:text-amber-200">
+                        <IconAlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                        <span>
+                          Este backup será excluído automaticamente em{" "}
+                          <strong>{RETENTION_OPTIONS.find((opt) => opt.value === newBackup.autoDelete.retention)?.label}</strong>{" "}
+                          após a criação.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
@@ -1580,6 +1674,60 @@ const BackupManagementPage = () => {
               <div className="space-y-2">
                 <Label htmlFor="schedule-time">Horário de Execução</Label>
                 <DateTimeInput mode="time" value={newSchedule.time} onChange={(value) => setNewSchedule({ ...newSchedule, time: value })} />
+              </div>
+
+              {/* Auto-Delete / Retention Section */}
+              <div className="space-y-4 border-t pt-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="schedule-auto-delete"
+                    checked={newSchedule.autoDelete.enabled}
+                    onCheckedChange={(checked) =>
+                      setNewSchedule({
+                        ...newSchedule,
+                        autoDelete: { ...newSchedule.autoDelete, enabled: checked },
+                      })
+                    }
+                  />
+                  <Label htmlFor="schedule-auto-delete" className="text-sm font-normal">
+                    <IconCalendar className="h-4 w-4 inline mr-1" />
+                    Excluir automaticamente após período de retenção
+                  </Label>
+                </div>
+
+                {newSchedule.autoDelete.enabled && (
+                  <div className="space-y-3 pl-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="schedule-retention">Período de Retenção</Label>
+                      <Combobox
+                        value={newSchedule.autoDelete.retention}
+                        onValueChange={(value) =>
+                          setNewSchedule({
+                            ...newSchedule,
+                            autoDelete: { ...newSchedule.autoDelete, retention: value as RetentionPeriod },
+                          })
+                        }
+                        options={RETENTION_OPTIONS.map((opt) => ({
+                          value: opt.value,
+                          label: opt.label,
+                        }))}
+                        placeholder="Selecione o período"
+                        searchable={false}
+                        clearable={false}
+                      />
+                    </div>
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
+                      <div className="flex gap-2 text-sm text-amber-800 dark:text-amber-200">
+                        <IconAlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                        <span>
+                          Cada backup criado por este agendamento será excluído automaticamente em{" "}
+                          <strong>{RETENTION_OPTIONS.find((opt) => opt.value === newSchedule.autoDelete.retention)?.label}</strong>{" "}
+                          após a criação.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>
