@@ -426,11 +426,13 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
     try {
       const updateData: any = {};
+      // Declare file arrays at function scope so they're accessible later
+      let newArtworkFiles: File[] = [];
 
       switch (operationType) {
         case "arts":
           // Get new artwork files that need to be uploaded
-          const newArtworkFiles = artworkFiles.filter(f => f instanceof File) as File[];
+          newArtworkFiles = artworkFiles.filter(f => f instanceof File) as File[];
 
           // Get filenames that should be kept (from existing files in artworkFiles state)
           // These are the COMMON artworks that the user chose to keep
@@ -444,32 +446,13 @@ export const AdvancedBulkActionsHandler = forwardRef<
             (f: any) => f.originalName || f.name
           );
 
-          // Upload new files FIRST to get their IDs
-          let uploadedFileIds: string[] = [];
-          if (newArtworkFiles.length > 0) {
-            try {
-              const uploadResponse = await fileService.uploadFiles(newArtworkFiles, {
-                fileContext: 'artwork',
-                entityType: 'task',
-              });
-
-              if (uploadResponse.success && uploadResponse.data?.successful) {
-                uploadedFileIds = uploadResponse.data.successful.map(f => f.id);
-              } else {
-                // Some files failed to upload
-                console.error('[BulkArtwork] File upload failed:', uploadResponse);
-                throw new Error(uploadResponse.message || 'Falha ao enviar arquivos');
-              }
-            } catch (uploadError) {
-              console.error('[BulkArtwork] Error uploading files:', uploadError);
-              throw uploadError;
-            }
-          }
+          // NOTE: We no longer upload files separately. Files will be sent WITH the batch update request.
+          // The backend /tasks/batch endpoint now accepts FormData with both JSON data and files.
 
           // For each task, compute the final artworkIds:
           // 1. Keep ALL non-common artworks (unique to this task) - user couldn't remove them
           // 2. Keep common artworks only if user kept them in keptCommonFilenames
-          // 3. ADD newly uploaded file IDs
+          // 3. New files will be uploaded via FormData and backend will add them automatically
           // NOTE: task.artworks are Artwork entities with { id, fileId, status, file?: File }
           const perTaskArtworkIds: Record<string, string[]> = {};
           currentTasks.forEach(task => {
@@ -478,7 +461,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             (task.artworks || []).forEach((artwork: any) => {
               const file = artwork.file || artwork;
               const filename = file.originalName || file.filename;
-              const fileId = artwork.fileId || artwork.file?.id || artwork.id;
+              const fileId = artwork.fileId || artwork.file?.id;
 
               if (!fileId) return;
 
@@ -496,16 +479,15 @@ export const AdvancedBulkActionsHandler = forwardRef<
               }
             });
 
-            // Add newly uploaded file IDs - these go to ALL tasks
-            taskArtworkFileIds.push(...uploadedFileIds);
-
+            // New artwork files will be appended by the backend when processing FormData
             perTaskArtworkIds[task.id] = taskArtworkFileIds;
           });
 
           // Store per-task data - we'll use this when building the batch request
-          // Only set if we have changes (uploaded files or common artworks to manage)
-          if (uploadedFileIds.length > 0 || commonFilenames.length > 0) {
+          // Set if we have changes (new files to upload OR common artworks being managed)
+          if (newArtworkFiles.length > 0 || commonFilenames.length > 0) {
             updateData._perTaskArtworkIds = perTaskArtworkIds;
+            updateData._hasNewArtworkFiles = newArtworkFiles.length > 0;
           }
           break;
 
@@ -664,19 +646,18 @@ export const AdvancedBulkActionsHandler = forwardRef<
           break;
       }
 
-      // Files are now uploaded separately, so we only send JSON
-      // (FormData is no longer used for file uploads in bulk operations)
-
-      // Extract per-task data
+      // Extract per-task data and internal flags
       const perTaskArtworkIds = updateData._perTaskArtworkIds;
       const perTaskBudgetIds = updateData._perTaskBudgetIds;
       const perTaskInvoiceIds = updateData._perTaskInvoiceIds;
       const perTaskReceiptIds = updateData._perTaskReceiptIds;
+      const hasNewArtworkFiles = updateData._hasNewArtworkFiles;
 
       delete updateData._perTaskArtworkIds;
       delete updateData._perTaskBudgetIds;
       delete updateData._perTaskInvoiceIds;
       delete updateData._perTaskReceiptIds;
+      delete updateData._hasNewArtworkFiles;
 
       const hasPerTaskData = perTaskArtworkIds || perTaskBudgetIds || perTaskInvoiceIds || perTaskReceiptIds;
       const hasData = Object.keys(updateData).length > 0 || hasPerTaskData;
@@ -718,8 +699,36 @@ export const AdvancedBulkActionsHandler = forwardRef<
         }),
       };
 
-      // Send as regular JSON (files were uploaded separately)
-      await batchUpdateAsync(batchRequest);
+      // If we have new artwork files, send as FormData with files attached
+      // Otherwise, send as regular JSON
+      if (hasNewArtworkFiles && newArtworkFiles.length > 0) {
+        const formData = new FormData();
+
+        // Add the batch request structure as JSON string
+        formData.append('tasks', JSON.stringify(batchRequest.tasks));
+
+        // Add artwork files
+        newArtworkFiles.forEach((file) => {
+          formData.append('artworks', file);
+        });
+
+        // Get customer name from first task for file organization context
+        const firstTask = currentTasks[0];
+        const customerName = firstTask?.customer?.fantasyName || firstTask?.customer?.corporateName;
+
+        // Add context for file organization
+        if (customerName) {
+          formData.append('_context', JSON.stringify({
+            entityType: 'task',
+            customerName: customerName,
+          }));
+        }
+
+        await batchUpdateAsync(formData);
+      } else {
+        // Send as regular JSON (no files to upload)
+        await batchUpdateAsync(batchRequest);
+      }
 
       handleClose();
       onClearSelection();

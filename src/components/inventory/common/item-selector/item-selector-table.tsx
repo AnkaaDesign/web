@@ -351,11 +351,7 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
   // Handle row click (selection) with shift+click support
   const handleRowClick = useCallback(
     (item: Item, event?: MouseEvent<HTMLElement>) => {
-      // Pass item data (quantity/stock, price, icms, ipi) when selecting via row click
-      const quantity = item.quantity; // Current stock
-      const price = item.prices?.[0]?.value;
-      const icms = item.icms;
-      const ipi = item.ipi;
+      const isAlreadySelected = selectedItems.has(item.id);
 
       // Shift+click: select range of items
       if (event?.shiftKey && lastClickedIdRef.current) {
@@ -378,8 +374,10 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
               idsToSelect.forEach((id) => {
                 const rangeItem = items.find((i) => i.id === id);
                 if (rangeItem) {
+                  // Don't pass quantity - let it use defaultQuantity
+                  // Only pass price, icms, ipi from the item
                   itemData[id] = {
-                    quantity: rangeItem.quantity,
+                    quantity: undefined,
                     price: rangeItem.prices?.[0]?.value,
                     icms: rangeItem.icms,
                     ipi: rangeItem.ipi,
@@ -392,9 +390,11 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
               idsToSelect.forEach((id) => {
                 const rangeItem = items.find((i) => i.id === id);
                 if (rangeItem) {
+                  // Don't pass quantity - let it use defaultQuantity
+                  // Only pass price, icms, ipi from the item
                   onSelectItem(
                     id,
-                    rangeItem.quantity,
+                    undefined,
                     rangeItem.prices?.[0]?.value,
                     rangeItem.icms,
                     rangeItem.ipi
@@ -409,12 +409,22 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
         }
       } else {
         // Regular click: toggle single item
-        onSelectItem(item.id, quantity, price, icms, ipi);
+        if (isAlreadySelected) {
+          // Item is already selected - call without parameters to trigger deselection
+          onSelectItem(item.id);
+        } else {
+          // Item is not selected - pass price, icms, ipi from item data
+          // Don't pass quantity - let it use defaultQuantity
+          const price = item.prices?.[0]?.value;
+          const icms = item.icms;
+          const ipi = item.ipi;
+          onSelectItem(item.id, undefined, price, icms, ipi);
+        }
         // Update last clicked ID for future shift-clicks
         lastClickedIdRef.current = item.id;
       }
     },
-    [onSelectItem, onBatchSelectItems, currentPageItemIds, items, selectedItems, quantities, prices, icmses, ipis]
+    [onSelectItem, onBatchSelectItems, currentPageItemIds, items, selectedItems]
   );
 
   // Handle select all on current page
@@ -423,17 +433,18 @@ export const ItemSelectorTable: React.FC<ItemSelectorTableProps> = ({
 
     const allSelected = items.every((item) => selectedItems.has(item.id));
     if (allSelected) {
-      // Deselect all on current page
+      // Deselect all on current page - call without parameters
       items.forEach((item) => onSelectItem(item.id));
     } else {
-      // Select all on current page - pass quantity (current stock) for each item
+      // Select all on current page
+      // Don't pass quantity - let it use defaultQuantity
+      // Only pass price, icms, ipi from the item
       items.forEach((item) => {
         if (!selectedItems.has(item.id)) {
-          const quantity = item.quantity;
           const price = item.prices?.[0]?.value;
           const icms = item.icms;
           const ipi = item.ipi;
-          onSelectItem(item.id, quantity, price, icms, ipi);
+          onSelectItem(item.id, undefined, price, icms, ipi);
         }
       });
     }

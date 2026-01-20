@@ -647,7 +647,9 @@ export function useOrderFormUrlState(options: UseOrderFormUrlStateOptions = {}) 
       } else {
         // Select new item
         newSelected.add(itemId);
-        newQuantities[itemId] = quantity || quantities[itemId] || defaultQuantity;
+        // Quantity: use provided value or defaultQuantity (don't use previous quantity)
+        newQuantities[itemId] = quantity !== undefined ? quantity : defaultQuantity;
+        // Price, ICMS, IPI: use provided value, or fall back to previous value, or use default
         newPrices[itemId] = price !== undefined ? price : prices[itemId] !== undefined ? prices[itemId] : defaultPrice;
         newIcmses[itemId] = icms !== undefined ? icms : icmses[itemId] !== undefined ? icmses[itemId] : defaultIcms;
         newIpis[itemId] = ipi !== undefined ? ipi : ipis[itemId] !== undefined ? ipis[itemId] : defaultIpi;

@@ -3,6 +3,7 @@ import type { Task } from "../../../../types";
 import type { TaskGetManyFormData } from "../../../../schemas";
 import { useSectors, useCustomers, useUsers, useCurrentUser, useTaskBatchMutations } from "../../../../hooks";
 import { TASK_STATUS, SECTOR_PRIVILEGES } from "../../../../constants";
+import { taskService } from "../../../../api-client/task";
 import { useTableFilters } from "@/hooks/use-table-filters";
 import { useTableState } from "@/hooks/use-table-state";
 import { Card, CardContent } from "@/components/ui/card";
@@ -410,12 +411,62 @@ export function TaskHistoryList({
     }));
   }, []);
 
-  const handleSourceTaskSelected = React.useCallback((sourceTask: Task) => {
-    setCopyFromTaskState((prev) => ({
-      ...prev,
-      step: "confirming",
-      sourceTask,
-    }));
+  const handleSourceTaskSelected = React.useCallback(async (sourceTask: Task) => {
+    console.log('[CopyFromTask] ========== handleSourceTaskSelected CALLED (HISTORY VIEW) ==========');
+    console.log('[CopyFromTask] Source task ID:', sourceTask?.id);
+    console.log('[CopyFromTask] Source task artworks:', sourceTask?.artworks);
+
+    // CRITICAL FIX: Refetch the source task with proper includes to get artwork fileIds
+    // The task from the table doesn't have the file relationship loaded on artworks
+    try {
+      console.log(`[CopyFromTask] Refetching source task ${sourceTask.id} with full artwork details...`);
+
+      const fullSourceTask = await taskService.getTaskById(sourceTask.id, {
+        include: {
+          artworks: { include: { file: true } },  // ✅ Include file relationship
+          budgets: true,
+          invoices: true,
+          receipts: true,
+          pricings: true,  // ✅ Include pricings (many-to-many)
+          logoPaints: true,
+          cuts: true,
+          serviceOrders: true,
+          truck: {
+            include: {
+              leftSideLayout: { include: { layoutSections: true, photo: true } },
+              rightSideLayout: { include: { layoutSections: true, photo: true } },
+              backSideLayout: { include: { layoutSections: true, photo: true } },
+            },
+          },
+        },
+      });
+
+      if (!fullSourceTask.success || !fullSourceTask.data) {
+        throw new Error('Failed to fetch source task details');
+      }
+
+      console.log(
+        `[CopyFromTask] Fetched source task with ${fullSourceTask.data.artworks?.length || 0} artworks`,
+        fullSourceTask.data.artworks
+      );
+
+      // Move to confirming step with fully loaded source task
+      setCopyFromTaskState((prev) => ({
+        ...prev,
+        step: "confirming",
+        sourceTask: fullSourceTask.data,  // Use refetched task
+      }));
+    } catch (error) {
+      console.error('[CopyFromTask] Failed to fetch source task:', error);
+      toast.error('Falha ao carregar detalhes da tarefa de origem');
+      // Reset to idle on error
+      setCopyFromTaskState({
+        step: "idle",
+        targetTasks: [],
+        selectedFields: [],
+        sourceTask: null,
+      });
+    }
   }, []);
 
   const handleCopyFromTaskConfirm = React.useCallback(
@@ -435,11 +486,66 @@ export function TaskHistoryList({
                 updateData.term = sourceTask.term;
                 break;
               case "artworkIds":
-                // artworkIds must be File IDs (artwork.fileId or artwork.file.id), not Artwork entity IDs
-                updateData.artworkIds = sourceTask.artworks?.map((artwork: any) => artwork.fileId || artwork.file?.id || artwork.id) || [];
+                if (!sourceTask.artworks || sourceTask.artworks.length === 0) {
+                  console.warn('[CopyFromTask] Source task has no artworks to copy');
+                  updateData.artworkIds = [];
+                  break;
+                }
+
+                // IMPORTANT: We want to SHARE the same Artwork entities (many-to-many relationship)
+                // So we extract Artwork ENTITY IDs, not File IDs
+                const extractedIds = sourceTask.artworks
+                  .map((artwork: any, index: number) => {
+                    // Backend returns different structures depending on serialization:
+                    // 1. Nested: { id: artworkEntityId, fileId: fileId, file: {...} }
+                    // 2. Flattened: { id: fileId, artworkId: artworkEntityId, filename: ..., ... }
+
+                    let artworkEntityId: string | null = null;
+
+                    // Check for flattened structure (has both 'id' and 'artworkId')
+                    if (artwork.artworkId) {
+                      // Flattened structure: artworkId field contains the Artwork entity ID
+                      artworkEntityId = artwork.artworkId;
+                      console.log(
+                        `[CopyFromTask] Detected flattened structure for artwork ${index}: artworkEntityId=${artworkEntityId}, fileId=${artwork.id}`
+                      );
+                    } else if (artwork.id && !artwork.filename) {
+                      // Nested structure: id field is the Artwork entity ID (no filename = not a File object)
+                      artworkEntityId = artwork.id;
+                      console.log(
+                        `[CopyFromTask] Detected nested structure for artwork ${index}: artworkEntityId=${artworkEntityId}`
+                      );
+                    }
+
+                    if (!artworkEntityId) {
+                      console.error(
+                        `[CopyFromTask] Artwork at index ${index} missing Artwork entity ID. Data:`,
+                        JSON.stringify({ id: artwork.id, artworkId: artwork.artworkId, fileId: artwork.fileId, filename: artwork.filename, status: artwork.status }),
+                      );
+                      return null;
+                    }
+
+                    return artworkEntityId;
+                  })
+                  .filter(Boolean);
+
+                console.log(
+                  `[CopyFromTask] Extracted ${extractedIds.length} Artwork entity IDs to share with target tasks:`,
+                  extractedIds,
+                );
+
+                updateData.artworkIds = extractedIds;
                 break;
               case "budgetIds":
                 updateData.budgetIds = sourceTask.budgets?.map((b: any) => b.id) || [];
+                break;
+              case "pricingIds":
+                // Reference existing pricing IDs (many-to-many: shared pricing)
+                updateData.pricingIds = (sourceTask as any).pricings?.map((p: any) => p.id) || [];
+                console.log(
+                  `[CopyFromTask] Extracted ${updateData.pricingIds.length} Pricing IDs to share with target tasks:`,
+                  updateData.pricingIds,
+                );
                 break;
               case "paintId":
                 updateData.paintId = sourceTask.paintId;

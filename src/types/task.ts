@@ -49,7 +49,7 @@ export interface Task extends BaseEntity {
   customer?: Customer;
   invoiceTo?: Customer;
   budgets?: File[]; // Many-to-many relation (budget files)
-  pricing?: TaskPricing; // Task pricing with status and items
+  pricings?: TaskPricing[]; // Task pricings (many-to-many: shared pricing)
   invoices?: File[]; // Many-to-many relation
   receipts?: File[]; // Many-to-many relation
   reimbursements?: File[]; // Many-to-many relation
@@ -84,7 +84,7 @@ export interface TaskIncludes {
         include?: CustomerIncludes;
       };
   budgets?: boolean; // Many-to-many relation (budget files)
-  pricing?: boolean; // Task pricing with status and items
+  pricings?: boolean | { include?: { items?: boolean; layoutFile?: boolean; customerSignature?: boolean; tasks?: boolean } }; // Task pricings (many-to-many: shared pricing)
   invoices?: boolean; // Many-to-many relation
   receipts?: boolean; // Many-to-many relation
   reimbursements?: boolean; // Many-to-many relation
