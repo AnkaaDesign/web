@@ -28,7 +28,6 @@ export interface TaskPricing extends BaseEntity {
   total: number;
   expiresAt: Date;
   status: TASK_PRICING_STATUS;
-  taskId: string;
 
   // Payment Terms (simplified)
   paymentCondition: PAYMENT_CONDITION | null;
@@ -47,6 +46,6 @@ export interface TaskPricing extends BaseEntity {
   customerSignatureId: string | null;
   customerSignature?: File;
 
-  task?: any;  // Task type
+  tasks?: any[];  // Tasks that share this pricing (one-to-many)
   items?: TaskPricingItem[];
 }

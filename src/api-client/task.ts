@@ -12,6 +12,7 @@ import type {
   TaskBatchDeleteFormData,
   TaskDuplicateFormData,
   TaskQueryFormData,
+  TaskCopyRequest,
 } from "../schemas";
 import type {
   // Interface types (for responses)
@@ -167,6 +168,17 @@ export class TaskService {
     );
     return response.data;
   }
+
+  // =====================
+  // Copy Operations
+  // =====================
+
+  async copyFromTask(destinationTaskId: string, data: TaskCopyRequest, query?: TaskQueryFormData): Promise<TaskUpdateResponse> {
+    const response = await apiClient.put<TaskUpdateResponse>(`${this.basePath}/${destinationTaskId}/copy-from`, data, {
+      params: query,
+    });
+    return response.data;
+  }
 }
 
 // =====================
@@ -217,3 +229,7 @@ export const bulkUpdatePositions = (
 ) => taskService.bulkUpdatePositions(data, query);
 export const swapTaskPositions = (id: string, targetTaskId: string, query?: TaskQueryFormData) =>
   taskService.swapTaskPositions(id, targetTaskId, query);
+
+// Copy operation exports
+export const copyFromTask = (destinationTaskId: string, data: TaskCopyRequest, query?: TaskQueryFormData) =>
+  taskService.copyFromTask(destinationTaskId, data, query);

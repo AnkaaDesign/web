@@ -49,7 +49,8 @@ export interface Task extends BaseEntity {
   customer?: Customer;
   invoiceTo?: Customer;
   budgets?: File[]; // Many-to-many relation (budget files)
-  pricings?: TaskPricing[]; // Task pricings (many-to-many: shared pricing)
+  pricingId?: string | null; // Foreign key to TaskPricing
+  pricing?: TaskPricing; // Task pricing (one-to-many: one pricing can be shared across multiple tasks)
   invoices?: File[]; // Many-to-many relation
   receipts?: File[]; // Many-to-many relation
   reimbursements?: File[]; // Many-to-many relation
@@ -84,7 +85,7 @@ export interface TaskIncludes {
         include?: CustomerIncludes;
       };
   budgets?: boolean; // Many-to-many relation (budget files)
-  pricings?: boolean | { include?: { items?: boolean; layoutFile?: boolean; customerSignature?: boolean; tasks?: boolean } }; // Task pricings (many-to-many: shared pricing)
+  pricing?: boolean | { include?: { items?: boolean; layoutFile?: boolean; customerSignature?: boolean } }; // Task pricing (one-to-many: one pricing can be shared across multiple tasks)
   invoices?: boolean; // Many-to-many relation
   receipts?: boolean; // Many-to-many relation
   reimbursements?: boolean; // Many-to-many relation

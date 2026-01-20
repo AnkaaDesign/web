@@ -21,10 +21,45 @@ interface LayoutsByTruckResponse {
   };
 }
 
+interface LayoutListResponse {
+  success: boolean;
+  message: string;
+  data: Layout[];
+}
+
+interface LayoutUsageResponse {
+  success: boolean;
+  message: string;
+  data: {
+    layoutId: string;
+    trucks: Array<{
+      truckId: string;
+      side: "left" | "right" | "back";
+    }>;
+  };
+}
+
+interface LayoutAssignResponse {
+  success: boolean;
+  message: string;
+  data: Layout;
+}
+
 // Layout Service
 export const layoutService = {
   // Get layout by ID
   getById: (id: string, params?: { include?: any }) => apiClient.get<LayoutGetUniqueResponse>(`/layout/${id}`, { params }),
+
+  // List all layouts
+  listLayouts: (options?: { includeUsage?: boolean; includeSections?: boolean }) =>
+    apiClient.get<LayoutListResponse>("/layout", { params: options }),
+
+  // Get layout usage
+  getLayoutUsage: (layoutId: string) => apiClient.get<LayoutUsageResponse>(`/layout/${layoutId}/usage`),
+
+  // Assign layout to truck
+  assignLayoutToTruck: (layoutId: string, data: { truckId: string; side: "left" | "right" | "back" }) =>
+    apiClient.post<LayoutAssignResponse>(`/layout/${layoutId}/assign-to-truck`, data),
 
   // Get layouts by truck ID
   getByTruckId: (truckId: string) => apiClient.get<LayoutsByTruckResponse>(`/layout/truck/${truckId}`),
@@ -64,4 +99,7 @@ export type {
   LayoutUpdateResponse,
   LayoutDeleteResponse,
   LayoutsByTruckResponse,
+  LayoutListResponse,
+  LayoutUsageResponse,
+  LayoutAssignResponse,
 };

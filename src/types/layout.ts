@@ -19,10 +19,13 @@ export interface Layout extends BaseEntity {
   photoId: string | null;
   photo?: File;
 
-  // Inverse relations (one-to-one with specific sides)
-  truckLeftSide?: Truck;
-  truckRightSide?: Truck;
-  truckBackSide?: Truck;
+  // Inverse relations (one-to-many with specific sides)
+  trucksLeftSide?: Truck[];
+  trucksRightSide?: Truck[];
+  trucksBackSide?: Truck[];
+
+  // UI display fields
+  usageCount?: number;
 }
 
 // =====================
@@ -32,7 +35,7 @@ export interface Layout extends BaseEntity {
 export interface LayoutIncludes {
   photo?: boolean;
   layoutSections?: boolean;
-  truckLeftSide?: boolean;
-  truckRightSide?: boolean;
-  truckBackSide?: boolean;
+  trucksLeftSide?: boolean;
+  trucksRightSide?: boolean;
+  trucksBackSide?: boolean;
 }

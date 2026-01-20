@@ -1,44 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MultiSelect } from "@/components/ui/multi-select";
-import { IconArrowRight, IconCheck, IconClipboardCopy, IconArrowDown } from "@tabler/icons-react";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  IconArrowRight,
+  IconCheck,
+  IconClipboardCopy,
+  IconArrowDown,
+  IconInfoCircle,
+  IconCopy,
+  IconAlertTriangle,
+} from "@tabler/icons-react";
 import type { Task } from "../../../../types";
-import { formatDate } from "../../../../utils";
-
-export type CopyableField =
-  | "details"
-  | "term"
-  | "artworkIds"
-  | "budgetIds"
-  | "pricingIds"
-  | "paintId"
-  | "paintIds"
-  | "serviceOrders"
-  | "cuts"
-  | "layout";
-
-interface FieldCategory {
-  id: CopyableField;
-  label: string;
-  description: string;
-}
-
-const FIELD_CATEGORIES: FieldCategory[] = [
-  { id: "details", label: "Detalhes", description: "Descrição/detalhes da tarefa" },
-  { id: "term", label: "Prazo", description: "Data limite para conclusão" },
-  { id: "artworkIds", label: "Artes", description: "Arquivos de arte anexados" },
-  { id: "budgetIds", label: "Orçamentos", description: "Orçamentos associados" },
-  { id: "pricingIds", label: "Precificação", description: "Precificação compartilhada" },
-  { id: "paintId", label: "Pintura Geral", description: "Cor de pintura geral" },
-  { id: "paintIds", label: "Tintas da Logomarca", description: "Tintas utilizadas na logomarca" },
-  { id: "serviceOrders", label: "Ordens de Serviço", description: "Criar novas ordens de serviço baseadas na origem" },
-  { id: "cuts", label: "Cortes", description: "Criar novos cortes baseados na origem" },
-  { id: "layout", label: "Layout do Caminhão", description: "Layout e seções do caminhão" },
-];
+import { COPYABLE_TASK_FIELDS, COPYABLE_FIELD_METADATA, type CopyableTaskField } from "@/types/task-copy";
+import { cn } from "@/lib/utils";
 
 export interface CopyFromTaskModalProps {
   open: boolean;
@@ -46,8 +26,8 @@ export interface CopyFromTaskModalProps {
   targetTasks: Task[];
   sourceTask: Task | null;
   step: "selecting_fields" | "confirming";
-  onStartSourceSelection: (selectedFields: CopyableField[]) => void;
-  onConfirm: (selectedFields: CopyableField[], sourceTask: Task) => void;
+  onStartSourceSelection: (selectedFields: CopyableTaskField[]) => void;
+  onConfirm: (selectedFields: CopyableTaskField[], sourceTask: Task) => void;
   onCancel: () => void;
   onChangeSource: () => void;
 }
@@ -129,6 +109,55 @@ function TaskMiniTable({
   );
 }
 
+// Field selection item component
+function FieldSelectionItem({
+  field,
+  isSelected,
+  onToggle,
+}: {
+  field: CopyableTaskField;
+  isSelected: boolean;
+  onToggle: (field: CopyableTaskField) => void;
+}) {
+  const metadata = COPYABLE_FIELD_METADATA[field];
+
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer hover:border-primary/50",
+        isSelected ? "border-primary bg-primary/5" : "border-border bg-background"
+      )}
+      onClick={() => onToggle(field)}
+    >
+      <div className="flex items-center pt-0.5">
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={() => onToggle(field)}
+          className="pointer-events-none"
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm font-medium">{metadata.label}</span>
+          {metadata.isShared && (
+            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
+              <IconInfoCircle className="h-3 w-3 mr-1" />
+              Compartilhado
+            </Badge>
+          )}
+          {metadata.createNewInstances && (
+            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800">
+              <IconCopy className="h-3 w-3 mr-1" />
+              Nova instância
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">{metadata.description}</p>
+      </div>
+    </div>
+  );
+}
+
 export function CopyFromTaskModal({
   open,
   onOpenChange,
@@ -140,7 +169,7 @@ export function CopyFromTaskModal({
   onCancel,
   onChangeSource,
 }: CopyFromTaskModalProps) {
-  const [selectedFields, setSelectedFields] = useState<Set<CopyableField>>(new Set());
+  const [selectedFields, setSelectedFields] = useState<Set<CopyableTaskField>>(new Set());
 
   // Reset selected fields when modal opens
   useEffect(() => {
@@ -148,6 +177,61 @@ export function CopyFromTaskModal({
       setSelectedFields(new Set());
     }
   }, [open, step]);
+
+  // Group fields by category
+  const fieldsByCategory = useMemo(() => {
+    const groups: Record<string, CopyableTaskField[]> = {};
+
+    COPYABLE_TASK_FIELDS.forEach((field) => {
+      const metadata = COPYABLE_FIELD_METADATA[field];
+      if (!groups[metadata.category]) {
+        groups[metadata.category] = [];
+      }
+      groups[metadata.category].push(field);
+    });
+
+    return groups;
+  }, []);
+
+  // Get category order
+  const categoryOrder = [
+    'Ações Rápidas',
+    'Básico',
+    'Referências',
+    'Arquivos',
+    'Recursos Compartilhados',
+    'Recursos Individuais',
+    'Observações',
+  ];
+
+  const handleToggleField = (field: CopyableTaskField) => {
+    setSelectedFields((prev) => {
+      const newSet = new Set(prev);
+
+      // If toggling 'all', clear other selections
+      if (field === 'all') {
+        if (newSet.has('all')) {
+          newSet.delete('all');
+        } else {
+          newSet.clear();
+          newSet.add('all');
+        }
+      } else {
+        // If selecting another field, remove 'all'
+        if (newSet.has('all')) {
+          newSet.delete('all');
+        }
+
+        if (newSet.has(field)) {
+          newSet.delete(field);
+        } else {
+          newSet.add(field);
+        }
+      }
+
+      return newSet;
+    });
+  };
 
   const handleStartSelection = () => {
     if (selectedFields.size === 0) return;
@@ -164,88 +248,14 @@ export function CopyFromTaskModal({
     onCancel();
   };
 
-  // Convert FIELD_CATEGORIES to options for MultiSelect
-  const fieldOptions = FIELD_CATEGORIES.map((field) => ({
-    value: field.id,
-    label: field.label,
-  }));
-
-  // Convert selected fields Set to array for MultiSelect
-  const selectedFieldsArray = Array.from(selectedFields);
-
-  const handleFieldsChange = (newSelected: string[]) => {
-    setSelectedFields(new Set(newSelected as CopyableField[]));
-  };
-
-  // Get source task field values for preview
-  const getSourceFieldPreview = (fieldId: CopyableField): string => {
-    if (!sourceTask) return "-";
-    switch (fieldId) {
-      case "details":
-        return sourceTask.details ? `${sourceTask.details.substring(0, 40)}...` : "Sem detalhes";
-      case "term":
-        return sourceTask.term ? formatDate(sourceTask.term) : "Sem prazo";
-      case "artworkIds":
-        return sourceTask.artworks?.length ? `${sourceTask.artworks.length} arquivo(s)` : "Nenhuma arte";
-      case "budgetIds":
-        return sourceTask.budgets?.length ? `${sourceTask.budgets.length} orçamento(s)` : "Sem orçamento";
-      case "pricingIds":
-        return (sourceTask as any).pricings?.length ? `${(sourceTask as any).pricings.length} precificação(ões)` : "Sem precificação";
-      case "paintId":
-        return sourceTask.generalPainting?.name || "Sem pintura";
-      case "paintIds":
-        return sourceTask.logoPaints?.length ? `${sourceTask.logoPaints.length} tinta(s)` : "Nenhuma tinta";
-      case "serviceOrders":
-        return sourceTask.serviceOrders?.length ? `${sourceTask.serviceOrders.length} serviço(s)` : "Nenhum serviço";
-      case "cuts":
-        return sourceTask.cuts?.length ? `${sourceTask.cuts.length} corte(s)` : "Nenhum corte";
-      case "layout":
-        if (sourceTask.truck) {
-          const layoutCount = [
-            sourceTask.truck.leftSideLayout,
-            sourceTask.truck.rightSideLayout,
-            sourceTask.truck.backSideLayout,
-          ].filter(Boolean).length;
-          return layoutCount > 0 ? `${layoutCount} lado(s)` : "Sem layout";
-        }
-        return "Sem caminhão";
-      default:
-        return "-";
-    }
-  };
-
-  // Check if field has content
-  const fieldHasContent = (fieldId: CopyableField): boolean => {
-    if (!sourceTask) return false;
-    switch (fieldId) {
-      case "details":
-        return !!sourceTask.details;
-      case "term":
-        return !!sourceTask.term;
-      case "artworkIds":
-        return (sourceTask.artworks?.length || 0) > 0;
-      case "budgetIds":
-        return (sourceTask.budgets?.length || 0) > 0;
-      case "pricingIds":
-        return ((sourceTask as any).pricings?.length || 0) > 0;
-      case "paintId":
-        return !!sourceTask.paintId;
-      case "paintIds":
-        return (sourceTask.logoPaints?.length || 0) > 0;
-      case "serviceOrders":
-        return (sourceTask.serviceOrders?.length || 0) > 0;
-      case "cuts":
-        return (sourceTask.cuts?.length || 0) > 0;
-      case "layout":
-        return !!(sourceTask.truck?.leftSideLayout || sourceTask.truck?.rightSideLayout || sourceTask.truck?.backSideLayout);
-      default:
-        return false;
-    }
-  };
+  // Check if any shared resources are selected
+  const hasSharedResources = useMemo(() => {
+    return Array.from(selectedFields).some(field => COPYABLE_FIELD_METADATA[field].isShared);
+  }, [selectedFields]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[650px] bg-white dark:bg-card">
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] bg-white dark:bg-card">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <IconClipboardCopy className="h-5 w-5" />
@@ -259,7 +269,7 @@ export function CopyFromTaskModal({
         </DialogHeader>
 
         {step === "selecting_fields" ? (
-          <div className="py-4 space-y-4">
+          <div className="space-y-4">
             {/* Destination Tasks Table */}
             <TaskMiniTable
               tasks={targetTasks}
@@ -267,19 +277,74 @@ export function CopyFromTaskModal({
               variant="destination"
             />
 
-            {/* Fields MultiSelect */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Campos para copiar</Label>
-              <MultiSelect
-                options={fieldOptions}
-                selected={selectedFieldsArray}
-                onChange={handleFieldsChange}
-                placeholder="Selecione os campos..."
-              />
+            <Separator />
+
+            {/* Fields Selection */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Campos para copiar</Label>
+
+              <ScrollArea className="h-[400px] pr-3">
+                <div className="space-y-4">
+                  {categoryOrder.map((category) => {
+                    const fields = fieldsByCategory[category];
+                    if (!fields || fields.length === 0) return null;
+
+                    return (
+                      <div key={category} className="space-y-2">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          {category}
+                        </h4>
+                        <div className="space-y-2">
+                          {fields.map((field) => (
+                            <FieldSelectionItem
+                              key={field}
+                              field={field}
+                              isSelected={selectedFields.has(field)}
+                              onToggle={handleToggleField}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
             </div>
+
+            {/* Warning for shared resources */}
+            {hasSharedResources && (
+              <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900">
+                <IconAlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertDescription className="text-xs text-amber-700 dark:text-amber-400">
+                  <strong>Atenção:</strong> Recursos compartilhados (marcados com badge azul) são referências aos mesmos dados.
+                  Alterações feitas em uma tarefa afetarão todas as tarefas que compartilham esse recurso.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Selection counter */}
+            {selectedFields.size > 0 && (
+              <div className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <span className="text-sm font-medium">
+                  {selectedFields.has('all')
+                    ? 'Todos os campos selecionados'
+                    : `${selectedFields.size} campo${selectedFields.size > 1 ? 's' : ''} selecionado${selectedFields.size > 1 ? 's' : ''}`
+                  }
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedFields(new Set())}
+                  className="h-7 text-xs"
+                >
+                  Limpar
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="py-4 space-y-4">
+          <div className="space-y-4">
             {/* Source Task Table */}
             {sourceTask && (
               <TaskMiniTable
@@ -309,43 +374,60 @@ export function CopyFromTaskModal({
             {/* Fields to copy */}
             <div>
               <p className="text-sm font-medium mb-3">Campos que serão copiados:</p>
-              <ScrollArea className="h-[140px] pr-3">
-                <div className="grid gap-2">
-                  {FIELD_CATEGORIES.filter((f) => selectedFields.has(f.id)).map((field) => {
-                    const hasContent = fieldHasContent(field.id);
-                    return (
-                      <div
-                        key={field.id}
-                        className={`flex items-center justify-between p-2.5 rounded-lg ${
-                          hasContent ? "bg-accent/50" : "bg-muted/30"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <IconCheck className={`h-4 w-4 ${hasContent ? "text-green-600" : "text-muted-foreground"}`} />
-                          <span className="text-sm font-medium">{field.label}</span>
-                        </div>
-                        <span
-                          className={`text-xs truncate max-w-[180px] ${
-                            hasContent ? "text-foreground" : "text-muted-foreground italic"
-                          }`}
-                        >
-                          {getSourceFieldPreview(field.id)}
-                        </span>
+              <ScrollArea className="h-[200px] pr-3">
+                <div className="space-y-2">
+                  {selectedFields.has('all') ? (
+                    <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                      <IconCheck className="h-4 w-4 text-primary flex-shrink-0" />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium">COPIAR TUDO</span>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Todos os campos serão copiados (exceto serialNumber, plate e chassisNumber)
+                        </p>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ) : (
+                    Array.from(selectedFields).map((field) => {
+                      const metadata = COPYABLE_FIELD_METADATA[field];
+                      return (
+                        <div
+                          key={field}
+                          className="flex items-center gap-3 p-2.5 rounded-lg bg-accent/50"
+                        >
+                          <IconCheck className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-medium">{metadata.label}</span>
+                              {metadata.isShared && (
+                                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
+                                  Compartilhado
+                                </Badge>
+                              )}
+                              {metadata.createNewInstances && (
+                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800">
+                                  Nova instância
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{metadata.description}</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </ScrollArea>
             </div>
 
-            {/* Warning for serviceOrders/cuts */}
-            {(selectedFields.has("serviceOrders") || selectedFields.has("cuts")) && (
-              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900">
-                <p className="text-xs text-amber-700 dark:text-amber-400">
-                  <strong>Nota:</strong> Ordens de serviço e cortes serão criados como novas entidades independentes nas
-                  tarefas de destino.
-                </p>
-              </div>
+            {/* Warning for shared resources in confirmation */}
+            {hasSharedResources && (
+              <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900">
+                <IconAlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertDescription className="text-xs text-amber-700 dark:text-amber-400">
+                  <strong>Atenção:</strong> Recursos compartilhados vinculam as mesmas entidades. Mudanças feitas através
+                  de uma tarefa afetarão todas as tarefas vinculadas.
+                </AlertDescription>
+              </Alert>
             )}
           </div>
         )}

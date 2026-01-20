@@ -18,7 +18,8 @@ import { ColumnVisibilityManager } from "./column-visibility-manager";
 import { createTaskHistoryColumns } from "./task-history-columns";
 import { extractActiveFilters, createFilterRemover } from "./filter-utils";
 import { AdvancedBulkActionsHandler } from "../bulk-operations/AdvancedBulkActionsHandler";
-import { CopyFromTaskModal, type CopyableField } from "../schedule/copy-from-task-modal";
+import { CopyFromTaskModal } from "../schedule/copy-from-task-modal";
+import type { CopyableTaskField } from "@/types/task-copy";
 import { IconFilter, IconHandClick, IconX } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useColumnVisibility } from "@/hooks/use-column-visibility";
@@ -30,7 +31,7 @@ import { toast } from "sonner";
 interface CopyFromTaskState {
   step: "idle" | "selecting_fields" | "selecting_source" | "confirming";
   targetTasks: Task[];
-  selectedFields: CopyableField[];
+  selectedFields: CopyableTaskField[];
   sourceTask: Task | null;
 }
 
@@ -403,7 +404,7 @@ export function TaskHistoryList({
     });
   }, []);
 
-  const handleStartSourceSelection = React.useCallback((selectedFields: CopyableField[]) => {
+  const handleStartSourceSelection = React.useCallback((selectedFields: CopyableTaskField[]) => {
     setCopyFromTaskState((prev) => ({
       ...prev,
       step: "selecting_source",
@@ -427,7 +428,7 @@ export function TaskHistoryList({
           budgets: true,
           invoices: true,
           receipts: true,
-          pricings: true,  // ✅ Include pricings (many-to-many)
+          pricing: true,  // ✅ Include pricing (one-to-many: one pricing can be shared across multiple tasks)
           logoPaints: true,
           cuts: true,
           serviceOrders: true,
@@ -470,197 +471,64 @@ export function TaskHistoryList({
   }, []);
 
   const handleCopyFromTaskConfirm = React.useCallback(
-    async (selectedFields: CopyableField[], sourceTask: Task) => {
+    async (selectedFields: CopyableTaskField[], sourceTask: Task) => {
       const { targetTasks } = copyFromTaskState;
 
       try {
-        const updates = targetTasks.map((targetTask) => {
-          const updateData: Record<string, unknown> = {};
+        console.log(`[CopyFromTask] Copying ${selectedFields.length} field(s) from task ${sourceTask.id} to ${targetTasks.length} task(s)`);
+        console.log(`[CopyFromTask] Selected fields:`, selectedFields);
 
-          selectedFields.forEach((field) => {
-            switch (field) {
-              case "details":
-                updateData.details = sourceTask.details;
-                break;
-              case "term":
-                updateData.term = sourceTask.term;
-                break;
-              case "artworkIds":
-                if (!sourceTask.artworks || sourceTask.artworks.length === 0) {
-                  console.warn('[CopyFromTask] Source task has no artworks to copy');
-                  updateData.artworkIds = [];
-                  break;
-                }
-
-                // IMPORTANT: We want to SHARE the same Artwork entities (many-to-many relationship)
-                // So we extract Artwork ENTITY IDs, not File IDs
-                const extractedIds = sourceTask.artworks
-                  .map((artwork: any, index: number) => {
-                    // Backend returns different structures depending on serialization:
-                    // 1. Nested: { id: artworkEntityId, fileId: fileId, file: {...} }
-                    // 2. Flattened: { id: fileId, artworkId: artworkEntityId, filename: ..., ... }
-
-                    let artworkEntityId: string | null = null;
-
-                    // Check for flattened structure (has both 'id' and 'artworkId')
-                    if (artwork.artworkId) {
-                      // Flattened structure: artworkId field contains the Artwork entity ID
-                      artworkEntityId = artwork.artworkId;
-                      console.log(
-                        `[CopyFromTask] Detected flattened structure for artwork ${index}: artworkEntityId=${artworkEntityId}, fileId=${artwork.id}`
-                      );
-                    } else if (artwork.id && !artwork.filename) {
-                      // Nested structure: id field is the Artwork entity ID (no filename = not a File object)
-                      artworkEntityId = artwork.id;
-                      console.log(
-                        `[CopyFromTask] Detected nested structure for artwork ${index}: artworkEntityId=${artworkEntityId}`
-                      );
-                    }
-
-                    if (!artworkEntityId) {
-                      console.error(
-                        `[CopyFromTask] Artwork at index ${index} missing Artwork entity ID. Data:`,
-                        JSON.stringify({ id: artwork.id, artworkId: artwork.artworkId, fileId: artwork.fileId, filename: artwork.filename, status: artwork.status }),
-                      );
-                      return null;
-                    }
-
-                    return artworkEntityId;
-                  })
-                  .filter(Boolean);
-
-                console.log(
-                  `[CopyFromTask] Extracted ${extractedIds.length} Artwork entity IDs to share with target tasks:`,
-                  extractedIds,
-                );
-
-                updateData.artworkIds = extractedIds;
-                break;
-              case "budgetIds":
-                updateData.budgetIds = sourceTask.budgets?.map((b: any) => b.id) || [];
-                break;
-              case "pricingIds":
-                // Reference existing pricing IDs (many-to-many: shared pricing)
-                updateData.pricingIds = (sourceTask as any).pricings?.map((p: any) => p.id) || [];
-                console.log(
-                  `[CopyFromTask] Extracted ${updateData.pricingIds.length} Pricing IDs to share with target tasks:`,
-                  updateData.pricingIds,
-                );
-                break;
-              case "paintId":
-                updateData.paintId = sourceTask.paintId;
-                break;
-              case "paintIds":
-                updateData.paintIds = sourceTask.logoPaints?.map((p) => p.id) || [];
-                break;
-              case "serviceOrders":
-                if (sourceTask.serviceOrders && sourceTask.serviceOrders.length > 0) {
-                  updateData.serviceOrders = sourceTask.serviceOrders.map((service) => ({
-                    status: service.status,
-                    statusOrder: service.statusOrder,
-                    description: service.description,
-                    startedAt: null,
-                    finishedAt: null,
-                  }));
-                }
-                break;
-              case "cuts":
-                if (sourceTask.cuts && sourceTask.cuts.length > 0) {
-                  updateData.cuts = sourceTask.cuts.map((cut) => ({
-                    fileId: cut.fileId,
-                    type: cut.type,
-                    status: cut.status,
-                    statusOrder: cut.statusOrder,
-                    origin: cut.origin,
-                    reason: cut.reason,
-                    startedAt: null,
-                    completedAt: null,
-                  }));
-                }
-                break;
-              case "layout":
-                if (sourceTask.truck) {
-                  const truckData: Record<string, unknown> = {
-                    xPosition: sourceTask.truck.xPosition,
-                    yPosition: sourceTask.truck.yPosition,
-                  };
-
-                  if (sourceTask.truck.leftSideLayout) {
-                    truckData.leftSideLayout = {
-                      height: sourceTask.truck.leftSideLayout.height,
-                      photoId: sourceTask.truck.leftSideLayout.photoId || null,
-                      layoutSections: sourceTask.truck.leftSideLayout.layoutSections?.map((section, index) => ({
-                        width: section.width,
-                        isDoor: section.isDoor,
-                        doorHeight: section.doorHeight,
-                        position: section.position ?? index,
-                      })) || [],
-                    };
-                  }
-
-                  if (sourceTask.truck.rightSideLayout) {
-                    truckData.rightSideLayout = {
-                      height: sourceTask.truck.rightSideLayout.height,
-                      photoId: sourceTask.truck.rightSideLayout.photoId || null,
-                      layoutSections: sourceTask.truck.rightSideLayout.layoutSections?.map((section, index) => ({
-                        width: section.width,
-                        isDoor: section.isDoor,
-                        doorHeight: section.doorHeight,
-                        position: section.position ?? index,
-                      })) || [],
-                    };
-                  }
-
-                  if (sourceTask.truck.backSideLayout) {
-                    truckData.backSideLayout = {
-                      height: sourceTask.truck.backSideLayout.height,
-                      photoId: sourceTask.truck.backSideLayout.photoId || null,
-                      layoutSections: sourceTask.truck.backSideLayout.layoutSections?.map((section, index) => ({
-                        width: section.width,
-                        isDoor: section.isDoor,
-                        doorHeight: section.doorHeight,
-                        position: section.position ?? index,
-                      })) || [],
-                    };
-                  }
-
-                  updateData.truck = truckData;
-                }
-                break;
-            }
-          });
-
-          return {
-            id: targetTask.id,
-            data: updateData,
-          };
-        });
-
-        await batchUpdateAsync({
-          tasks: updates,
-          triggeredBy: "TASK_COPY_FROM_TASK",
-          metadata: {
-            sourceTaskName: sourceTask.name,
-            sourceTaskId: sourceTask.id,
-          },
-        });
-
-        toast.success(
-          `Copiado de outra tarefa`,
-          {
-            description: `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${targetTasks.length} tarefa(s)`,
+        // Call the copy-from endpoint for each target task
+        const copyPromises = targetTasks.map(async (targetTask) => {
+          try {
+            const result = await taskService.copyFromTask(targetTask.id, {
+              sourceTaskId: sourceTask.id,
+              fields: selectedFields,
+            });
+            console.log(`[CopyFromTask] Successfully copied to task ${targetTask.id}:`, result);
+            return { success: true, taskId: targetTask.id, result };
+          } catch (error) {
+            console.error(`[CopyFromTask] Failed to copy to task ${targetTask.id}:`, error);
+            return { success: false, taskId: targetTask.id, error };
           }
-        );
+        });
+
+        const results = await Promise.all(copyPromises);
+        const successCount = results.filter(r => r.success).length;
+        const failureCount = results.length - successCount;
+
+        if (successCount > 0) {
+          toast.success(
+            `Campos copiados com sucesso`,
+            {
+              description: failureCount === 0
+                ? `${selectedFields.length} campo(s) copiado(s) de "${sourceTask.name}" para ${successCount} tarefa(s)`
+                : `${successCount} tarefa(s) atualizada(s), ${failureCount} falhou(ram)`,
+            }
+          );
+        }
+
+        if (failureCount > 0 && successCount === 0) {
+          toast.error("Erro ao copiar campos", {
+            description: `Falha ao copiar para ${failureCount} tarefa(s). Tente novamente.`,
+          });
+        }
 
         setCopyFromTaskState(initialCopyFromTaskState);
         resetSelection();
+
+        // Refresh task list to show updated data
+        if (successCount > 0) {
+          // Note: The refetch will happen automatically via React Query invalidation
+        }
       } catch (error) {
+        console.error('[CopyFromTask] Unexpected error:', error);
         toast.error("Erro ao copiar campos", {
           description: "Não foi possível copiar os campos. Tente novamente.",
         });
       }
     },
-    [copyFromTaskState, batchUpdateAsync, resetSelection]
+    [copyFromTaskState, resetSelection]
   );
 
   const handleCopyFromTaskCancel = React.useCallback(() => {

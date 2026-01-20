@@ -991,6 +991,10 @@ const ChangelogTimelineItem = ({
   }
 
   // UPDATE action (generic)
+  // Check if this is a copy operation (has custom reason with "Campos copiados")
+  const isCopyOperation = firstChange.reason && firstChange.reason.includes("Campos copiados");
+  const displayTitle = isCopyOperation ? firstChange.reason : `${entityTypeLabel} ${actionLabel}`;
+
   return (
     <div className="relative">
       <div className="flex items-start gap-4 group">
@@ -1003,7 +1007,7 @@ const ChangelogTimelineItem = ({
         <div className="flex-1 bg-card-nested rounded-xl p-4 border border-border">
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
-            <div className="text-lg font-semibold">{entityTypeLabel} {actionLabel}</div>
+            <div className="text-lg font-semibold">{displayTitle}</div>
             <div className="text-sm text-muted-foreground">{formatRelativeTime(firstChange.createdAt)}</div>
           </div>
 

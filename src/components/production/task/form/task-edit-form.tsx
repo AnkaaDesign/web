@@ -116,6 +116,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   // Wrap updateAsync for debugging/logging
   const updateAsync = async (params: any) => {
     console.log('[Task Update] 🚀 Submitting with params:', params);
+    console.log('[Task Update] 🚀 Pricing data being sent:', params.data?.pricing ? JSON.stringify(params.data.pricing, null, 2) : 'NO PRICING DATA');
     // NOTE: artworkStatuses is now added in the FormData/JSON preparation sections
     // to avoid duplicates and to properly filter temp IDs vs real UUIDs
     const result = await taskMutations.updateAsync(params);
@@ -752,6 +753,9 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       try {
         setIsSubmitting(true);
 
+        console.log('[TaskEditForm] 📋 ========== FORM SUBMISSION START ==========');
+        console.log('[TaskEditForm] 📋 Raw changedData.pricing BEFORE any processing:', JSON.stringify(changedData.pricing, null, 2));
+
         // Set entry date to 7:30 if provided (since the date picker only allows date selection)
         if (changedData.entryDate) {
           const entryDate = new Date(changedData.entryDate);
@@ -887,11 +891,16 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         // Filter and validate pricing (if it exists in changedData)
         // Empty items (no description) are filtered out
         if (changedData.pricing && changedData.pricing.items && changedData.pricing.items.length > 0) {
+          console.log('[TaskEditForm] 🔍 Pricing items BEFORE filtering:', JSON.stringify(changedData.pricing.items, null, 2));
+
           // Filter out items without description (empty items)
           const validItems = changedData.pricing.items.filter((item: any) => {
             const hasDescription = item.description && item.description.trim() !== "";
+            console.log(`[TaskEditForm] Item "${item.description}" has description? ${hasDescription}`);
             return hasDescription;
           });
+
+          console.log('[TaskEditForm] 🔍 Valid pricing items AFTER filtering:', validItems.length, JSON.stringify(validItems, null, 2));
 
           // Update changedData with filtered items
           if (validItems.length > 0) {
@@ -912,8 +921,12 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             }
           } else {
             // No valid items - remove pricing from changedData entirely
+            console.log('[TaskEditForm] ⚠️ WARNING: All pricing items filtered out - DELETING entire pricing from changedData!');
             delete changedData.pricing;
           }
+        } else if (changedData.pricing) {
+          console.log('[TaskEditForm] ⚠️ WARNING: Pricing exists but has no items or empty items array');
+          console.log('[TaskEditForm] Pricing data:', JSON.stringify(changedData.pricing, null, 2));
         }
 
         // Filter out empty airbrushings (airbrushings with no meaningful data)
@@ -1721,7 +1734,6 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           // Layout photos are uploaded WITH the task update (not separately like cuts)
           // The backend handles them in the transaction at lines 683-728 of task.service.ts
 
-          // DEBUG: Temporarily disable redirect to see logs
           console.log('[Task Update] ✅ SUCCESS - Update completed, response:', result);
           console.log('[Task Update] Artworks in response:', result?.data?.artworks);
 
@@ -1733,6 +1745,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           }
 
           await new Promise(resolve => setTimeout(resolve, 100));
+          // Redirect to task details after successful update
           const redirectUrl = detailsRoute ? detailsRoute(task.id) : `/producao/cronograma/detalhes/${task.id}`;
           window.location.href = redirectUrl;
         }

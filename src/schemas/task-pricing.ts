@@ -200,13 +200,6 @@ export const taskPricingCreateNestedSchema = z
         }
       }
     }
-  })
-  .transform((data) => {
-    // Transform empty pricing to undefined
-    if (!data || !data.items || data.items.length === 0) {
-      return undefined;
-    }
-    return data;
   });
 
 export const taskPricingSchema = z.object({
