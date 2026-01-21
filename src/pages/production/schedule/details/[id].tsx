@@ -1175,12 +1175,17 @@ export const TaskDetailsPage = () => {
 
       await updateServiceOrder({ id: serviceOrderId, data: updateData });
 
-      // If completing a service order, check if there's a next one to start
+      // If completing a service order, check if there's a next one of the SAME TYPE to start
       if (newStatus === SERVICE_ORDER_STATUS.COMPLETED) {
-        const allServiceOrders = task?.serviceOrders?.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        const currentIndex = allServiceOrders?.findIndex((s) => s.id === serviceOrderId) ?? -1;
-        const nextServiceOrder = allServiceOrders?.[currentIndex + 1];
+        // Filter service orders by the same type as the one being completed
+        const sameTypeServiceOrders = task?.serviceOrders
+          ?.filter((so) => so.type === serviceOrder.type)
+          ?.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
+        const currentIndex = sameTypeServiceOrders?.findIndex((s) => s.id === serviceOrderId) ?? -1;
+        const nextServiceOrder = sameTypeServiceOrders?.[currentIndex + 1];
+
+        // Only show prompt if there's a next service order of the same type that's pending
         if (nextServiceOrder && nextServiceOrder.status === SERVICE_ORDER_STATUS.PENDING) {
           setPendingServiceOrder(serviceOrder);
           setNextServiceOrderToStart(nextServiceOrder);

@@ -5,7 +5,7 @@ import { OrderStatusBadge } from "../common/order-status-badge";
 import { OrderTotalBadge } from "../common/order-total-calculator";
 import { IconPackage, IconCalendar, IconCurrencyReal, IconTruck, IconNotes, IconFile, IconFileInvoice, IconReceipt, IconFileText, IconId, IconCreditCard } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { formatDate, formatDateTime, formatCNPJ } from "../../../../utils";
+import { formatDate, formatDateTime, formatCNPJ, formatPixKey } from "../../../../utils";
 import type { Order } from "../../../../types";
 import { PAYMENT_METHOD_LABELS } from "../../../../constants";
 import { FilePreviewCard } from "@/components/common/file";
@@ -170,7 +170,7 @@ export function OrderInfoCard({ order, className }: OrderInfoCardProps) {
                 {order.paymentMethod === "PIX" && order.paymentPix && (
                   <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
                     <span className="text-sm font-medium text-muted-foreground">Chave Pix</span>
-                    <span className="text-sm font-semibold text-foreground font-mono">{order.paymentPix}</span>
+                    <span className="text-sm font-semibold text-foreground font-mono">{formatPixKey(order.paymentPix)}</span>
                   </div>
                 )}
 

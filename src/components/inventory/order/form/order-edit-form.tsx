@@ -26,7 +26,7 @@ import { OrderItemSelector } from "./order-item-selector";
 import { TemporaryItemsInput } from "./temporary-items-input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useOrderFormUrlState } from "@/hooks/use-order-form-url-state";
-import { formatCurrency, formatDate, formatDateTime } from "../../../../utils";
+import { formatCurrency, formatDate, formatDateTime, formatPixKey } from "../../../../utils";
 import { MEASURE_UNIT, MEASURE_UNIT_LABELS } from "../../../../constants";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { useSuppliers } from "../../../../hooks";
@@ -1206,7 +1206,6 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
     <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
       <PageHeader
         className="flex-shrink-0"
-        variant="form"
         title={`Editar Pedido: ${order.description}`}
         icon={IconShoppingCart}
         breadcrumbs={[
@@ -1220,7 +1219,7 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
       />
 
       <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-            <CardContent className="flex-1 flex flex-col p-4 overflow-hidden min-h-0">
+        <CardContent className="flex-1 flex flex-col p-4 overflow-hidden min-h-0">
           <Form {...form}>
             <form className="flex flex-col h-full">
               {/* Step Indicator */}
@@ -1447,6 +1446,13 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
                                     onChange={(value) => {
                                       // Input component passes value directly, not an event
                                       form.setValue("paymentPix", (value as string) || null, { shouldDirty: true });
+                                    }}
+                                    onBlur={() => {
+                                      const currentValue = form.getValues("paymentPix");
+                                      if (currentValue) {
+                                        const formatted = formatPixKey(currentValue);
+                                        form.setValue("paymentPix", formatted, { shouldDirty: true });
+                                      }
                                     }}
                                     transparent
                                     className="h-10 w-full"
@@ -1788,8 +1794,8 @@ export const OrderEditForm = ({ order }: OrderEditFormProps) => {
               </div>
             </form>
           </Form>
-            </CardContent>
-          </Card>
+        </CardContent>
+      </Card>
     </div>
   );
 };

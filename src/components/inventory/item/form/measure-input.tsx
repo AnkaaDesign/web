@@ -4,9 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { IconPlus, IconTrash } from "@tabler/icons-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { IconPlus, IconTrash, IconAlertCircle } from "@tabler/icons-react";
 import { MEASURE_UNIT, MEASURE_TYPE, MEASURE_UNIT_LABELS, MEASURE_TYPE_LABELS } from "../../../../constants";
 import { fractionToDecimal, decimalToFraction } from "../../../../utils/fraction";
+import { canBeUsedInPaintFormula } from "../../../../utils/measure";
 import type { ItemCreateFormData, ItemUpdateFormData } from "../../../../schemas";
 
 interface MeasureInputProps {
@@ -62,6 +64,13 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
     return (formValues.measures || [])
       .map((measure: any) => measure?.measureType)
       .filter(Boolean);
+  }, [fields.length, getValues]);
+
+  // Check if item can be used in paint formulas
+  const paintFormulaValidation = useMemo(() => {
+    const formValues = getValues();
+    const measures = formValues.measures || [];
+    return canBeUsedInPaintFormula(measures);
   }, [fields.length, getValues]);
 
   const addMeasure = () => {
@@ -179,6 +188,14 @@ export function MeasureInput({ fieldArray, disabled }: MeasureInputProps) {
       <CardHeader>
         <CardTitle>Medidas</CardTitle>
         <p className="text-sm text-muted-foreground">Configure as medidas do item (peso, volume, comprimento, etc.)</p>
+        {!paintFormulaValidation.valid && (
+          <Alert variant="warning" className="mt-3">
+            <IconAlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Não pode ser usado em fórmulas de tinta:</strong> {paintFormulaValidation.error}
+            </AlertDescription>
+          </Alert>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Input row for adding new measure */}

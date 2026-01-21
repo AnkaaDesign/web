@@ -1369,14 +1369,18 @@ export const taskUpdateSchema = z
   .transform((data) => {
     // Auto-fill startedAt when status changes to IN_PRODUCTION
     if (data.status === TASK_STATUS.IN_PRODUCTION && !data.startedAt) {
-      data.startedAt = new Date();
+      // If entryDate exists and is in the future, use entryDate, otherwise use current date
+      const now = new Date();
+      data.startedAt = data.entryDate && data.entryDate > now ? data.entryDate : now;
     }
     // Auto-fill finishedAt when status changes to COMPLETED
     if (data.status === TASK_STATUS.COMPLETED && !data.finishedAt) {
-      data.finishedAt = new Date();
+      const now = new Date();
+      data.finishedAt = now;
       // Also auto-fill startedAt if not set (completing without starting)
       if (!data.startedAt) {
-        data.startedAt = new Date();
+        // Use entryDate if it exists and is <= now, otherwise use now
+        data.startedAt = data.entryDate && data.entryDate <= now ? data.entryDate : now;
       }
     }
     return data;

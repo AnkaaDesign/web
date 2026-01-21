@@ -11,6 +11,7 @@ interface NotificationListProps {
   onRemindLater?: (notification: Notification) => void;
   onDismiss?: (notification: Notification) => void;
   maxHeight?: string;
+  currentUserId?: string;
 }
 
 interface GroupedNotifications {
@@ -20,7 +21,16 @@ interface GroupedNotifications {
   older: Notification[];
 }
 
-const groupNotificationsByDate = (notifications: Notification[]): GroupedNotifications => {
+const isNotificationUnread = (notification: Notification, userId?: string): boolean => {
+  if (!userId) return false;
+  return (
+    !notification.seenBy ||
+    notification.seenBy.length === 0 ||
+    !notification.seenBy.some((seen) => seen.userId === userId)
+  );
+};
+
+const groupNotificationsByDate = (notifications: Notification[], currentUserId?: string): GroupedNotifications => {
   const grouped: GroupedNotifications = {
     today: [],
     yesterday: [],
@@ -44,6 +54,25 @@ const groupNotificationsByDate = (notifications: Notification[]): GroupedNotific
     }
   });
 
+  // Sort each group: unseen first, then seen
+  // Within each status, sort by createdAt desc
+  const sortBySeenStatus = (a: Notification, b: Notification) => {
+    const aUnread = isNotificationUnread(a, currentUserId);
+    const bUnread = isNotificationUnread(b, currentUserId);
+
+    // Unseen notifications come first
+    if (aUnread && !bUnread) return -1;
+    if (!aUnread && bUnread) return 1;
+
+    // If both have same seen status, sort by date (newest first)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  };
+
+  grouped.today.sort(sortBySeenStatus);
+  grouped.yesterday.sort(sortBySeenStatus);
+  grouped.thisWeek.sort(sortBySeenStatus);
+  grouped.older.sort(sortBySeenStatus);
+
   return grouped;
 };
 
@@ -53,12 +82,13 @@ export const NotificationList: React.FC<NotificationListProps> = ({
   onRemindLater,
   onDismiss,
   maxHeight = "500px",
+  currentUserId,
 }) => {
   if (notifications.length === 0) {
     return <NotificationEmpty />;
   }
 
-  const grouped = groupNotificationsByDate(notifications);
+  const grouped = groupNotificationsByDate(notifications, currentUserId);
 
   const renderGroup = (title: string, items: Notification[]) => {
     if (items.length === 0) return null;

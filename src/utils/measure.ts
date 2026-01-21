@@ -507,6 +507,52 @@ export function validateDensityMeasures(weightMeasure: MeasureValue, volumeMeasu
 }
 
 /**
+ * Check if an item has the required weight and volume measures for paint formulas
+ * Returns validation status and detailed error message if not valid
+ */
+export function canBeUsedInPaintFormula(
+  measures: Array<{ value: number | null; unit: MEASURE_UNIT | null; measureType: MEASURE_TYPE }>,
+): { valid: boolean; error?: string; missingMeasures?: string[] } {
+  const weightMeasure = measures.find(
+    m => m.measureType === MEASURE_TYPE.WEIGHT && (m.unit === MEASURE_UNIT.GRAM || m.unit === MEASURE_UNIT.KILOGRAM)
+  );
+
+  const volumeMeasure = measures.find(
+    m => m.measureType === MEASURE_TYPE.VOLUME && (m.unit === MEASURE_UNIT.MILLILITER || m.unit === MEASURE_UNIT.LITER)
+  );
+
+  const missing: string[] = [];
+
+  if (!weightMeasure) {
+    missing.push("peso (gramas ou quilogramas)");
+  } else if (!weightMeasure.value || weightMeasure.value <= 0) {
+    return {
+      valid: false,
+      error: "A medida de peso deve ter um valor maior que zero",
+    };
+  }
+
+  if (!volumeMeasure) {
+    missing.push("volume (mililitros ou litros)");
+  } else if (!volumeMeasure.value || volumeMeasure.value <= 0) {
+    return {
+      valid: false,
+      error: "A medida de volume deve ter um valor maior que zero",
+    };
+  }
+
+  if (missing.length > 0) {
+    return {
+      valid: false,
+      error: `Item precisa ter medidas de ${missing.join(" e ")} configuradas para ser usado em fórmulas de tinta`,
+      missingMeasures: missing,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Validate measure combinations for specific use cases
  */
 export function validateMeasureCombination(
@@ -655,6 +701,7 @@ export const measureUtils = {
   validateDensityMeasures,
   validateMeasureCombination,
   validateMeasureRange,
+  canBeUsedInPaintFormula,
 
   // Type checks
   isWeightUnit,

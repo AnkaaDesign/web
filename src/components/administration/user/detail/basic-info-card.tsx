@@ -39,33 +39,33 @@ export function BasicInfoCard({ user, className }: BasicInfoCardProps) {
           <div>
             <h3 className="text-base font-semibold mb-4 text-foreground">Identificação</h3>
             <div className="space-y-4">
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <IconId className="h-4 w-4" />
+              <div className="flex items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2 whitespace-nowrap mr-4">
+                  <IconId className="h-4 w-4 flex-shrink-0" />
                   Nome
                 </span>
-                <span className="text-sm font-semibold text-foreground">{user.name}</span>
+                <span className="text-sm font-semibold text-foreground ml-auto text-right">{user.name}</span>
               </div>
 
               {user.email && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2 whitespace-nowrap">
                     <IconMail className="h-4 w-4" />
                     E-mail
                   </span>
-                  <a href={`mailto:${user.email}`} className="text-sm font-semibold text-primary hover:underline">
+                  <a href={`mailto:${user.email}`} className="text-sm font-semibold text-primary hover:underline text-right break-all">
                     {user.email}
                   </a>
                 </div>
               )}
 
               {user.phone && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2 whitespace-nowrap">
                     <IconPhone className="h-4 w-4" />
                     Telefone
                   </span>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 justify-end">
                     <a href={`tel:${user.phone}`} className="text-sm font-semibold text-green-600 dark:text-green-600 hover:underline font-mono">
                       {formatBrazilianPhone(user.phone)}
                     </a>
@@ -83,23 +83,25 @@ export function BasicInfoCard({ user, className }: BasicInfoCardProps) {
               )}
 
               {user.birth && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <span className="text-sm font-medium text-muted-foreground flex items-center gap-2 whitespace-nowrap">
                     <IconCake className="h-4 w-4" />
                     Data de Nascimento
                   </span>
-                  <span className="text-sm font-semibold text-foreground">
+                  <span className="text-sm font-semibold text-foreground text-right">
                     {formatDate(new Date(user.birth))}
                   </span>
                 </div>
               )}
 
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
-                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <div className="grid grid-cols-[auto_1fr] gap-4 items-center bg-muted/50 rounded-lg px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground flex items-center gap-2 whitespace-nowrap">
                   <IconShieldCheck className="h-4 w-4" />
                   Status
                 </span>
-                <Badge variant={statusVariant}>{getUserStatusBadgeText(user)}</Badge>
+                <div className="flex justify-end">
+                  <Badge variant={statusVariant}>{getUserStatusBadgeText(user)}</Badge>
+                </div>
               </div>
             </div>
           </div>

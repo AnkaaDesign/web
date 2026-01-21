@@ -1,12 +1,19 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { IconBell, IconCheck } from "@tabler/icons-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { NotificationBadge } from "./notification-badge";
 import { NotificationList } from "./notification-list";
 import { useNotificationCenter } from "@/hooks/use-notification-center";
+import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
 import type { Notification } from "@/types";
 import { apiClient } from "@/api-client";
@@ -107,6 +114,7 @@ interface NotificationCenterProps {
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ className }) => {
   const [isOpen, setIsOpen] = React.useState(false);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const {
     notifications,
@@ -245,8 +253,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      <SheetTrigger asChild>
         <button
           className={cn(
             "relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
@@ -259,39 +267,42 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
           <IconBell className="w-5 h-5" strokeWidth={1.5} />
           <NotificationBadge count={unreadCount} />
         </button>
-      </PopoverTrigger>
+      </SheetTrigger>
 
-      <PopoverContent
-        className="w-[420px] p-0"
-        align="end"
-        sideOffset={8}
+      <SheetContent
+        side="right"
+        size="md"
+        className="p-0 flex flex-col"
+        showCloseButton={true}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold">Notificações</h2>
+        <SheetHeader className="px-4 py-4 border-b border-border mb-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <SheetTitle className="text-lg font-semibold">Notificações</SheetTitle>
+              {unreadCount > 0 && (
+                <span className="flex items-center justify-center min-w-5 h-5 px-1.5 text-xs font-medium text-white bg-red-600 rounded-full">
+                  {unreadCount}
+                </span>
+              )}
+            </div>
+
             {unreadCount > 0 && (
-              <span className="flex items-center justify-center min-w-5 h-5 px-1.5 text-xs font-medium text-white bg-red-600 rounded-full">
-                {unreadCount}
-              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleMarkAllAsRead}
+                className="h-8 px-2 text-xs"
+              >
+                <IconCheck className="w-4 h-4 mr-1" />
+                Marcar todas como lidas
+              </Button>
             )}
           </div>
-
-          {unreadCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleMarkAllAsRead}
-              className="h-8 px-2 text-xs"
-            >
-              <IconCheck className="w-4 h-4 mr-1" />
-              Marcar todas como lidas
-            </Button>
-          )}
-        </div>
+        </SheetHeader>
 
         {/* Notification List */}
-        <div className="relative">
+        <div className="flex-1 overflow-hidden">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -305,7 +316,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
               onNotificationClick={handleNotificationClick}
               onRemindLater={handleRemindLater}
               onDismiss={handleDismiss}
-              maxHeight="500px"
+              maxHeight="calc(100vh - 180px)"
+              currentUserId={user?.id}
             />
           )}
         </div>
@@ -314,7 +326,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
         {hasMore && notifications.length > 0 && (
           <>
             <Separator />
-            <div className="p-2">
+            <div className="p-4">
               <Button
                 variant="ghost"
                 size="sm"
@@ -326,7 +338,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
             </div>
           </>
         )}
-      </PopoverContent>
-    </Popover>
+      </SheetContent>
+    </Sheet>
   );
 };

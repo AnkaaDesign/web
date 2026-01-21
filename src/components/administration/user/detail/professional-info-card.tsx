@@ -25,7 +25,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
             <h3 className="text-base font-semibold mb-4 text-foreground">Dados Funcionais</h3>
             <div className="space-y-4">
               {user.payrollNumber && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconHash className="h-4 w-4" />
                     Número da Folha
@@ -35,7 +35,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               )}
 
               {user.position && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconBriefcase className="h-4 w-4" />
                     Cargo
@@ -45,7 +45,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               )}
 
               {user.sector && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconBuilding className="h-4 w-4" />
                     Setor
@@ -55,7 +55,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               )}
 
               {user.managedSector && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconUserCog className="h-4 w-4" />
                     Setor Gerenciado
@@ -65,7 +65,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               )}
 
               {user.exp1StartAt && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarTime className="h-4 w-4" />
                     Início Experiência 1
@@ -75,7 +75,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               )}
 
               {user.exp1EndAt && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarShare className="h-4 w-4" />
                     Fim Experiência 1
@@ -85,7 +85,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               )}
 
               {user.exp2StartAt && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarTime className="h-4 w-4" />
                     Início Experiência 2
@@ -95,7 +95,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               )}
 
               {user.exp2EndAt && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarShare className="h-4 w-4" />
                     Fim Experiência 2
@@ -105,7 +105,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               )}
 
               {user.effectedAt && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarCheck className="h-4 w-4" />
                     Data de Contratação
@@ -115,7 +115,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
               )}
 
               {user.dismissedAt && (
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                   <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <IconCalendarCancel className="h-4 w-4" />
                     Data de Demissão
@@ -130,7 +130,7 @@ export function ProfessionalInfoCard({ user, className }: ProfessionalInfoCardPr
           {user.performanceLevel > 0 && (
             <div className="pt-6 border-t border-border/50">
               <h3 className="text-base font-semibold mb-4 text-foreground">Nível de Desempenho</h3>
-              <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+              <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                 <span className="text-sm font-medium text-muted-foreground">Nível de Desempenho</span>
                 <span className="text-sm font-semibold text-foreground">{user.performanceLevel}</span>
               </div>

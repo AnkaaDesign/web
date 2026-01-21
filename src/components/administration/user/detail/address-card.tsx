@@ -27,7 +27,7 @@ export function AddressCard({ user, className }: AddressCardProps) {
               <h3 className="text-base font-semibold mb-4 text-foreground">Endereço</h3>
               <div className="space-y-4">
                 {user.address && (
-                  <div className="flex justify-between items-start bg-muted/50 rounded-lg px-4 py-3">
+                  <div className="flex justify-between items-start gap-4 bg-muted/50 rounded-lg px-4 py-3">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <IconHome className="h-4 w-4" />
                       Endereço
@@ -43,7 +43,7 @@ export function AddressCard({ user, className }: AddressCardProps) {
                 )}
 
                 {user.neighborhood && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <IconBuildingCommunity className="h-4 w-4" />
                       Bairro
@@ -53,7 +53,7 @@ export function AddressCard({ user, className }: AddressCardProps) {
                 )}
 
                 {(user.city || user.state) && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <IconMap className="h-4 w-4" />
                       Cidade/Estado
@@ -67,7 +67,7 @@ export function AddressCard({ user, className }: AddressCardProps) {
                 )}
 
                 {user.zipCode && (
-                  <div className="flex justify-between items-center bg-muted/50 rounded-lg px-4 py-3">
+                  <div className="flex justify-between items-center gap-4 bg-muted/50 rounded-lg px-4 py-3">
                     <span className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                       <IconMailbox className="h-4 w-4" />
                       CEP

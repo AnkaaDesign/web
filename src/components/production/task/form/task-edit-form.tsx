@@ -878,9 +878,16 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         // =====================
 
         // Filter out empty service orders (service orders with no description)
+        // IMPORTANT: Keep existing service orders (with ID) even if description is short,
+        // because they might have status or other field changes
         if (changedData.serviceOrders && Array.isArray(changedData.serviceOrders)) {
           changedData.serviceOrders = changedData.serviceOrders.filter(
-            (service: any) => service.description && service.description.trim().length >= 3
+            (service: any) => {
+              // Keep if it has an ID (existing record) - might have status/field changes
+              if (service.id) return true;
+              // For new service orders (no ID), require description >= 3 chars
+              return service.description && service.description.trim().length >= 3;
+            }
           );
           // If no valid service orders remain, remove the serviceOrders array entirely
           if (changedData.serviceOrders.length === 0) {
@@ -1751,7 +1758,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         }
       } catch (error) {
         console.error('[TaskEditForm] ❌ Error during form submission:', error);
-        toast.error("Erro ao salvar alterações. Tente novamente.");
+        // API client already shows error toast, no need to show another one
       } finally {
         setIsSubmitting(false);
       }

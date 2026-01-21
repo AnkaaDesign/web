@@ -27,7 +27,7 @@ import { ItemSelectorTable } from "@/components/inventory/common/item-selector";
 import type { ItemGetManyFormData } from "../../../../schemas";
 import { TemporaryItemsInput } from "./temporary-items-input";
 import { useOrderFormUrlState } from "@/hooks/use-order-form-url-state";
-import { formatCurrency, formatDate, formatDateTime, measureUtils } from "../../../../utils";
+import { formatCurrency, formatDate, formatDateTime, measureUtils, formatPixKey } from "../../../../utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { SupplierLogoDisplay } from "@/components/ui/avatar-display";
 
@@ -1046,7 +1046,7 @@ export const OrderCreateForm = () => {
       />
 
       <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
-            <CardContent className="flex-1 flex flex-col p-4 overflow-hidden min-h-0">
+        <CardContent className="flex-1 flex flex-col p-4 overflow-hidden min-h-0">
           <Form {...form}>
             <form
               className="flex flex-col h-full"
@@ -1291,6 +1291,13 @@ export const OrderCreateForm = () => {
                                       onChange={(value) => {
                                         // Input component passes value directly, not an event
                                         form.setValue("paymentPix", (value as string) || null);
+                                      }}
+                                      onBlur={() => {
+                                        const currentValue = form.getValues("paymentPix");
+                                        if (currentValue) {
+                                          const formatted = formatPixKey(currentValue);
+                                          form.setValue("paymentPix", formatted);
+                                        }
                                       }}
                                       transparent
                                       className="h-10 w-full"
@@ -1709,8 +1716,8 @@ export const OrderCreateForm = () => {
               </div>
             </form>
           </Form>
-            </CardContent>
-          </Card>
+        </CardContent>
+      </Card>
     </div>
   );
 };
