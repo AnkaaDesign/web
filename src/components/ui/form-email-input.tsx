@@ -35,9 +35,10 @@ export function FormEmailInput({
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               value={field.value || ""}
               onChange={(value: string) => field.onChange(value || null)}
+              onBlur={field.onBlur}
               type="email"
               placeholder={placeholder}
               disabled={disabled}

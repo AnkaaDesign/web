@@ -364,8 +364,10 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                                 placeholder="1"
                                 disabled={isSubmitting}
                                 className="bg-transparent"
-                                {...field}
+                                ref={field.ref}
+                                value={field.value}
                                 onChange={(value) => field.onChange(typeof value === "number" ? value : parseInt(String(value)) || 1)}
+                                onBlur={field.onBlur}
                               />
                             </FormControl>
                             <FormMessage />
@@ -469,9 +471,10 @@ export function MaintenanceScheduleForm(props: MaintenanceScheduleFormProps) {
                               placeholder="1-31"
                               disabled={isSubmitting}
                               className="bg-transparent"
-                              {...field}
+                              ref={field.ref}
                               value={field.value ?? ""}
                               onChange={(value) => field.onChange(typeof value === "number" ? value : parseInt(String(value)) || undefined)}
+                              onBlur={field.onBlur}
                             />
                           </FormControl>
                           <FormMessage />

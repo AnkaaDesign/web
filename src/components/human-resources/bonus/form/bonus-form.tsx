@@ -254,8 +254,9 @@ export function BonusForm({
                           step="0.01"
                           min="0"
                           placeholder="0,00"
-                          {...field}
+                          ref={field.ref}
                           onChange={(value: string) => field.onChange(Number(value))}
+                          onBlur={field.onBlur}
                           value={field.value || ""}
                         />
                       </FormControl>

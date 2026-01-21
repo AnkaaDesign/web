@@ -194,10 +194,11 @@ export const TemporaryItemsInput = forwardRef<
                     <FormItem>
                       <FormControl>
                         <Input
-                          {...field}
+                          ref={field.ref}
                           type="number"
                           value={field.value ?? 0}
                           onChange={(value: string) => field.onChange(parseFloat(value) || 0)}
+                          onBlur={field.onBlur}
                           min={0}
                           max={100}
                           step={0.01}
@@ -222,10 +223,11 @@ export const TemporaryItemsInput = forwardRef<
                     <FormItem>
                       <FormControl>
                         <Input
-                          {...field}
+                          ref={field.ref}
                           type="number"
                           value={field.value ?? 0}
                           onChange={(value: string) => field.onChange(parseFloat(value) || 0)}
+                          onBlur={field.onBlur}
                           min={0}
                           max={100}
                           step={0.01}

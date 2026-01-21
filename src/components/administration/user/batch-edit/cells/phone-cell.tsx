@@ -17,10 +17,11 @@ export function PhoneCell({ control, index, disabled }: PhoneCellProps) {
         <FormItem>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               type="phone"
               value={field.value || ""}
               onChange={(value) => field.onChange(value || null)}
+              onBlur={field.onBlur}
               disabled={disabled}
               placeholder="(00) 00000-0000"
               className="h-8"

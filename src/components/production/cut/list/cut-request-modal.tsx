@@ -63,7 +63,7 @@ export function CutRequestModal({ open, onOpenChange, onSubmit, cutItem }: CutRe
                 <FormItem>
                   <FormLabel>Quantidade</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="1" {...field} onChange={(value) => field.onChange(typeof value === "number" ? value : 1)} />
+                    <Input type="number" placeholder="1" ref={field.ref} value={field.value} onChange={(value) => field.onChange(typeof value === "number" ? value : 1)} onBlur={field.onBlur} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

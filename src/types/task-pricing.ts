@@ -15,8 +15,10 @@ export type PAYMENT_CONDITION =
 
 export interface TaskPricingItem extends BaseEntity {
   description: string;
+  observation?: string | null;
   amount: number;
   pricingId: string;
+  shouldSync: boolean; // Controls bidirectional sync with ServiceOrder
   pricing?: TaskPricing;
 }
 

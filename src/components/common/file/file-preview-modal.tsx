@@ -103,6 +103,7 @@ export function FilePreviewModal({
   const [pdfNumPages, setPdfNumPages] = React.useState<number>(0);
   const [pdfPageNumber, setPdfPageNumber] = React.useState<number>(1);
   const [pdfScale, setPdfScale] = React.useState<number>(1);
+  const [pdfFitScale, setPdfFitScale] = React.useState<number>(1); // Calculated optimal fit scale
 
   // Refs
   const imageRef = React.useRef<HTMLImageElement>(null);
@@ -136,7 +137,14 @@ export function FilePreviewModal({
     setPdfNumPages(0);
     setPdfPageNumber(1);
     setPdfScale(1);
+    setPdfFitScale(1);
   }, [currentIndex, fitZoom]);
+
+  // Calculate the minimum PDF scale (either fit scale or 0.25, whichever allows full view)
+  const pdfMinScale = React.useMemo(() => {
+    // Allow zooming out to at least the fit scale, or 0.25 minimum
+    return Math.max(Math.min(pdfFitScale, 0.5), 0.1);
+  }, [pdfFitScale]);
 
   // PDF control handlers
   const handlePdfZoomIn = React.useCallback(() => {
@@ -144,12 +152,13 @@ export function FilePreviewModal({
   }, []);
 
   const handlePdfZoomOut = React.useCallback(() => {
-    setPdfScale((prev) => Math.max(prev - 0.25, 0.5));
-  }, []);
+    setPdfScale((prev) => Math.max(prev - 0.25, pdfMinScale));
+  }, [pdfMinScale]);
 
   const handlePdfResetZoom = React.useCallback(() => {
-    setPdfScale(1);
-  }, []);
+    // Reset to fit scale instead of 1
+    setPdfScale(pdfFitScale);
+  }, [pdfFitScale]);
 
   const handlePdfRotate = React.useCallback(() => {
     pdfViewerRef.current?.rotate();
@@ -612,7 +621,7 @@ export function FilePreviewModal({
                     size="icon"
                     className="h-9 w-9 text-white hover:bg-white/20 transition-colors"
                     onClick={handlePdfZoomOut}
-                    disabled={pdfScale <= 0.5}
+                    disabled={pdfScale <= pdfMinScale}
                     title="Diminuir zoom (-)"
                   >
                     <IconZoomOut className="h-4 w-4" />
@@ -739,6 +748,11 @@ export function FilePreviewModal({
                     onLoadError={() => {
                       setImageError(true);
                       setImageLoading(false);
+                    }}
+                    onFitScaleCalculated={(fitScale) => {
+                      setPdfFitScale(fitScale);
+                      // Set initial scale to fit scale so PDF is fully visible on load
+                      setPdfScale(fitScale);
                     }}
                     onDownload={handleDownload}
                     scale={pdfScale}

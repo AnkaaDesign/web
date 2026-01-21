@@ -20,7 +20,7 @@ import type {
   ServiceOrderBatchUpdateResponse,
   ServiceOrderBatchDeleteResponse,
 } from "../types";
-import { serviceOrderKeys, taskKeys, serviceKeys, changeLogKeys } from "./queryKeys";
+import { serviceOrderKeys, taskKeys, changeLogKeys } from "./queryKeys";
 
 // =====================================================
 // Create ServiceOrder Hooks using Factory
@@ -53,7 +53,7 @@ const serviceOrderHooks = createEntityHooks<
     batchUpdate: (data, include) => serviceOrderService.batchUpdateServiceOrders(data, include ? { include } : undefined),
     batchDelete: (data) => serviceOrderService.batchDeleteServiceOrders(data),
   },
-  relatedQueryKeys: [taskKeys, serviceKeys, changeLogKeys],
+  relatedQueryKeys: [taskKeys, changeLogKeys],
 });
 
 // =====================================================

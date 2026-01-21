@@ -23,12 +23,13 @@ export function SiteInput({ disabled }: SiteInputProps) {
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               value={field.value || ""}
               onChange={(value: string) => {
                 const trimmedValue = value.trim();
                 field.onChange(trimmedValue || null);
               }}
+              onBlur={field.onBlur}
               placeholder="https://exemplo.com"
               disabled={disabled}
               type="url"

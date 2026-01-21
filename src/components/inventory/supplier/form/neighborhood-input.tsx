@@ -25,9 +25,10 @@ export function NeighborhoodInput({ disabled }: NeighborhoodInputProps) {
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               value={field.value || ""}
               onChange={(value: string) => field.onChange(value || null)}
+              onBlur={field.onBlur}
               placeholder="Ex: Centro"
               disabled={disabled}
               className="transition-all duration-200"

@@ -1726,7 +1726,33 @@ export const TaskDetailsPage = () => {
                   <tbody className="divide-y divide-border/50 dark:divide-border/30">
                     {task.pricing.items.map((item, index) => (
                   <tr key={item.id || index} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3 text-sm">{item.description}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span>{item.description}</span>
+                        {/* Observation Indicator with HoverCard */}
+                        {item.observation && (
+                          <HoverCard openDelay={100} closeDelay={100}>
+                            <HoverCardTrigger asChild>
+                              <button className="relative flex items-center justify-center h-6 w-6 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors">
+                                <IconNote className="h-4 w-4" />
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                                  !
+                                </span>
+                              </button>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-72 p-3" side="top">
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <IconNote className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-sm font-medium">Observação</span>
+                                </div>
+                                <p className="text-sm text-muted-foreground capitalize">{item.observation}</p>
+                              </div>
+                            </HoverCardContent>
+                          </HoverCard>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-sm text-right font-medium">
                       {formatCurrency(
                         typeof item.amount === 'number' ? item.amount : Number(item.amount) || 0
@@ -1933,7 +1959,7 @@ export const TaskDetailsPage = () => {
                                     <IconNote className="h-4 w-4 text-muted-foreground" />
                                     <span className="text-sm font-medium">Observação</span>
                                   </div>
-                                  <p className="text-sm text-muted-foreground">{serviceOrder.observation}</p>
+                                  <p className="text-sm text-muted-foreground capitalize">{serviceOrder.observation}</p>
                                 </div>
                               </HoverCardContent>
                             </HoverCard>

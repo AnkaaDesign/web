@@ -1150,7 +1150,18 @@ export const NAVIGATION_MENU: MenuItem[] = [
           { id: "aerografia-editar", title: "Editar", icon: "edit", path: "/producao/aerografia/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
         ],
       },
-      { id: "agenda", title: "Agenda", icon: "preparation", path: "/producao/agenda", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.ADMIN] },
+      {
+        id: "agenda",
+        title: "Agenda",
+        icon: "preparation",
+        path: "/producao/agenda",
+        requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.ADMIN],
+        children: [
+          { id: "agenda-cadastrar", title: "Cadastrar", icon: "plus", path: "/producao/agenda/cadastrar", requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
+          { id: "agenda-detalhes", title: "Detalhes", icon: "eye", path: "/producao/agenda/detalhes/:id", isDynamic: true },
+          { id: "agenda-editar", title: "Editar", icon: "edit", path: "/producao/agenda/editar/:id", isDynamic: true, requiredPrivilege: SECTOR_PRIVILEGES.ADMIN },
+        ],
+      },
       { id: "barracoes", title: "Barracões", icon: "warehouse", path: "/producao/barracoes", requiredPrivilege: [SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.ADMIN] }, // LOGISTIC has direct access via flat menu
       {
         id: "cronograma",

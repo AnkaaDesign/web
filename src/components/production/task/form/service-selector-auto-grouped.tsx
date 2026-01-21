@@ -5,12 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { IconPlus, IconTrash, IconNote } from "@tabler/icons-react";
 import { Combobox } from "@/components/ui/combobox";
-import type { Service } from "../../../../types";
 import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { Textarea } from "@/components/ui/textarea";
-import { useServiceMutations } from "../../../../hooks";
-import { serviceService } from "../../../../api-client";
+import { toTitleCase } from "../../../../utils";
 import { AdminUserSelector } from "@/components/administration/user/form/user-selector";
+import { ServiceDescriptionInput } from "./service-description-input";
 import {
   Dialog,
   DialogContent,
@@ -25,17 +24,14 @@ interface ServiceSelectorProps {
   disabled?: boolean;
   currentUserId?: string;
   userPrivilege?: string;
+  onItemDeleted?: (description: string) => void;
 }
 
-export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, userPrivilege }: ServiceSelectorProps) {
-  const [creatingServiceIndex, setCreatingServiceIndex] = useState<number | null>(null);
-
+export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, userPrivilege, onItemDeleted }: ServiceSelectorProps) {
   const { fields, append, prepend, remove } = useFieldArray({
     control,
     name: "serviceOrders",
   });
-
-  const { createAsync: createService } = useServiceMutations();
 
   // Watch all services
   const servicesValues = useWatch({
@@ -90,10 +86,6 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     }
   }, [userPrivilege, currentUserId]);
 
-  // Memoize callbacks
-  const getOptionLabel = useCallback((service: Service) => service.description, []);
-  const getOptionValue = useCallback((service: Service) => service.description, []);
-
   // Group services by type (only complete services with type and description)
   const { groupedServices, ungroupedIndices } = useMemo(() => {
     const groups: Record<SERVICE_ORDER_TYPE, number[]> = {
@@ -108,10 +100,7 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     fields.forEach((field, index) => {
       const service = servicesValues[index];
       // A service is "complete" if it has both type and description (at least 3 chars)
-      // BUT: Don't group services while they're being created (creatingServiceIndex matches)
-      // This prevents the component from unmounting mid-creation
-      const isBeingCreated = creatingServiceIndex === index;
-      const isComplete = service?.type && service?.description && service.description.trim().length >= 3 && !isBeingCreated;
+      const isComplete = service?.type && service?.description && service.description.trim().length >= 3;
 
       if (isComplete) {
         groups[service.type as SERVICE_ORDER_TYPE].push(index);
@@ -121,7 +110,7 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
     });
 
     return { groupedServices: groups, ungroupedIndices: ungrouped };
-  }, [fields, servicesValues, creatingServiceIndex]);
+  }, [fields, servicesValues]);
 
   // Get the default type for the user's sector (the type they work with most)
   const getDefaultTypeForSector = useCallback(() => {
@@ -147,31 +136,20 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
       status: SERVICE_ORDER_STATUS.PENDING,
       statusOrder: 1,
       description: "",
+      observation: null,
       type: getDefaultTypeForSector(),
       assignedToId: null,
     });
   };
 
-  const handleCreateService = async (description: string, type: SERVICE_ORDER_TYPE, serviceIndex: number) => {
-    try {
-      setCreatingServiceIndex(serviceIndex);
-
-      const result = await createService({
-        description,
-        type,
-      });
-
-      if (result && result.success && result.data) {
-        // Don't clear creatingServiceIndex here - let it stay set until after onValueChange completes
-        return result.data;
-      }
-      setCreatingServiceIndex(null); // Clear only on failure
-      return undefined;
-    } catch (error) {
-      setCreatingServiceIndex(null); // Clear on error
-      throw error;
+  // Handler to remove an item and track deletion
+  const handleRemoveItem = useCallback((index: number) => {
+    const item = servicesValues?.[index];
+    if (item?.description && onItemDeleted) {
+      onItemDeleted(item.description);
     }
-  };
+    remove(index);
+  }, [servicesValues, onItemDeleted, remove]);
 
   // Render a service group card
   const renderServiceGroup = (type: SERVICE_ORDER_TYPE) => {
@@ -207,13 +185,8 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
                 index={index}
                 type={type}
                 disabled={isServiceDisabled}
-                isCreating={creatingServiceIndex === index}
-                onRemove={() => remove(index)}
-                onCreateService={handleCreateService}
-                getOptionLabel={getOptionLabel}
-                getOptionValue={getOptionValue}
+                onRemove={() => handleRemoveItem(index)}
                 isGrouped={true}
-                clearCreatingState={() => setCreatingServiceIndex(null)}
                 userPrivilege={userPrivilege}
                 currentUserId={currentUserId}
               />
@@ -266,13 +239,8 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
                   index={index}
                   type={servicesValues[index]?.type || SERVICE_ORDER_TYPE.PRODUCTION}
                   disabled={isServiceDisabled}
-                  isCreating={creatingServiceIndex === index}
-                  onRemove={() => remove(index)}
-                  onCreateService={handleCreateService}
-                  getOptionLabel={getOptionLabel}
-                  getOptionValue={getOptionValue}
+                  onRemove={() => handleRemoveItem(index)}
                   isGrouped={false}
-                  clearCreatingState={() => setCreatingServiceIndex(null)}
                   userPrivilege={userPrivilege}
                   currentUserId={currentUserId}
                 />
@@ -297,13 +265,8 @@ interface ServiceRowProps {
   index: number;
   type: SERVICE_ORDER_TYPE;
   disabled?: boolean;
-  isCreating: boolean;
   onRemove: () => void;
-  onCreateService: (description: string, type: SERVICE_ORDER_TYPE, index: number) => Promise<Service | undefined>;
-  getOptionLabel: (service: Service) => string;
-  getOptionValue: (service: Service) => string;
   isGrouped: boolean; // Whether this service is in a group card or being edited
-  clearCreatingState: () => void;
   userPrivilege?: string;
   currentUserId?: string;
 }
@@ -313,13 +276,8 @@ function ServiceRow({
   index,
   type,
   disabled,
-  isCreating,
   onRemove,
-  onCreateService,
-  getOptionLabel,
-  getOptionValue,
   isGrouped,
-  clearCreatingState,
   userPrivilege,
   currentUserId,
 }: ServiceRowProps) {
@@ -358,13 +316,6 @@ function ServiceRow({
   const { field: observationField } = useController({
     control,
     name: `serviceOrders.${index}.observation`,
-    defaultValue: "",
-  });
-
-  // Extract existing service description for this row
-  const existingDescription = useWatch({
-    control,
-    name: `serviceOrders.${index}.description`,
     defaultValue: "",
   });
 
@@ -451,74 +402,6 @@ function ServiceRow({
   const isNewServiceOrder = useMemo(() => {
     return !serviceOrderId || (typeof serviceOrderId === 'string' && serviceOrderId.startsWith('temp-'));
   }, [serviceOrderId]);
-
-  // Create initial options that include the existing description
-  // This ensures the Combobox can display the selected value even after remounting
-  const initialOptions = useMemo(() => {
-    if (!existingDescription || !existingDescription.trim()) {
-      return [];
-    }
-    return [{
-      id: `existing-${existingDescription}`,
-      description: existingDescription,
-      type: selectedType,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } as Service];
-  }, [existingDescription, selectedType]);
-
-  // Search function for Combobox - filtered by type
-  const searchServices = async (
-    search: string,
-    page: number = 1,
-  ): Promise<{
-    data: Service[];
-    hasMore: boolean;
-  }> => {
-    const params: any = {
-      orderBy: { description: "asc" },
-      page: page,
-      take: 50,
-      type: selectedType,
-    };
-
-    if (search && search.trim()) {
-      params.searchingFor = search.trim();
-    }
-
-    try {
-      const response = await serviceService.getServices(params);
-      const services = response.data || [];
-      const hasMore = response.meta?.hasNextPage || false;
-
-      // If this is the first page and no search, ensure existing description is in the results
-      if (page === 1 && (!search || !search.trim()) && existingDescription && existingDescription.trim()) {
-        const existsInResults = services.some((s) => s.description === existingDescription);
-
-        if (!existsInResults) {
-          const existingService: Service = {
-            id: `temp-${existingDescription}`,
-            description: existingDescription,
-            type: selectedType,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-
-          return {
-            data: [existingService, ...services],
-            hasMore: hasMore,
-          };
-        }
-      }
-
-      return {
-        data: services,
-        hasMore: hasMore,
-      };
-    } catch (error) {
-      return { data: [], hasMore: false };
-    }
-  };
 
   // Determine which service order types the user can CREATE based on their privilege
   // Note: This is separate from what they can UPDATE (handled by canEditServiceOrder)
@@ -612,58 +495,14 @@ function ServiceRow({
             control={control}
             name={`serviceOrders.${index}.description`}
             render={({ field, fieldState }) => (
-              <Combobox<Service>
-                value={field.value}
-                onValueChange={(newValue) => {
-                  // Update the form field
-                  field.onChange(newValue);
-
-                  // CRITICAL: DON'T clear creating state immediately
-                  // Wait for much longer to ensure form value is fully propagated
-                  // and the Combobox is displaying the correct value BEFORE re-grouping
-                  setTimeout(() => {
-                    // Only clear if the field value is actually set
-                    if (field.value && field.value === newValue) {
-                      clearCreatingState();
-                    } else {
-                      // Try again after a delay
-                      setTimeout(() => {
-                        clearCreatingState();
-                      }, 500);
-                    }
-                  }, 1000); // Wait 1 full second
-                }}
-                placeholder="Selecione o serviço..."
-                emptyText="Digite para criar um novo"
-                searchPlaceholder="Buscar serviço..."
-                disabled={disabled || isCreating}
-                async={true}
-                initialOptions={initialOptions}
-                allowCreate={true}
-                createLabel={(value) => `Criar "${value}"`}
-                onCreate={async (value) => {
-                  const newService = await onCreateService(value, selectedType, index);
-
-                  if (newService) {
-                    // Return the full service object
-                    // The Combobox will handle setting the value after caching
-                    return newService;
-                  }
-
-                  return undefined;
-                }}
-                isCreating={isCreating}
-                queryKey={["serviceOrders", "search", index, selectedType]}
-                queryFn={searchServices}
-                getOptionLabel={getOptionLabel}
-                getOptionValue={getOptionValue}
-                renderOption={(service) => <span>{service.description}</span>}
-                loadMoreText="Carregar mais"
-                loadingMoreText="Carregando..."
-                minSearchLength={0}
-                pageSize={50}
-                debounceMs={300}
-                className={`w-full ${fieldState.error ? 'border-destructive ring-destructive' : ''}`}
+              <ServiceDescriptionInput
+                value={field.value || ""}
+                onChange={field.onChange}
+                disabled={disabled}
+                placeholder="Digite o servico..."
+                type={selectedType}
+                hasError={!!fieldState.error}
+                className="w-full"
               />
             )}
           />
@@ -756,10 +595,10 @@ function ServiceRow({
           <div className="py-4">
             <Textarea
               value={tempObservation}
-              onChange={(e) => setTempObservation(e.target.value)}
+              onChange={(e) => setTempObservation(toTitleCase(e.target.value))}
               placeholder="Digite a observação..."
               rows={4}
-              className="resize-none"
+              className="resize-none capitalize"
             />
           </div>
           <DialogFooter>

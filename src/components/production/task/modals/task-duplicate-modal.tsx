@@ -210,11 +210,12 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                           {index === 0 && <FormLabel>Nº Série</FormLabel>}
                           <FormControl>
                             <Input
-                              {...field}
+                              ref={field.ref}
                               value={field.value || ""}
                               placeholder="Ex: ABC-12345"
                               className="uppercase"
                               onChange={(value: string) => field.onChange(value.toUpperCase())}
+                              onBlur={field.onBlur}
                               disabled={isSubmitting}
                               autoFocus={index === 0}
                             />
@@ -233,11 +234,12 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                           {index === 0 && <FormLabel>Placa</FormLabel>}
                           <FormControl>
                             <Input
-                              {...field}
+                              ref={field.ref}
                               value={field.value || ""}
                               placeholder="Ex: ABC1D23"
                               className="uppercase"
                               onChange={(value: string) => field.onChange(value.toUpperCase())}
+                              onBlur={field.onBlur}
                               disabled={isSubmitting}
                             />
                           </FormControl>
@@ -255,11 +257,12 @@ export const TaskDuplicateModal = ({ task, open, onOpenChange, onSuccess }: Task
                           {index === 0 && <FormLabel>Nº Chassi</FormLabel>}
                           <FormControl>
                             <Input
-                              {...field}
+                              ref={field.ref}
                               value={field.value || ""}
                               placeholder="Ex: 9BWZZZ377VT004251"
                               className="uppercase"
                               onChange={(value: string) => field.onChange(value.toUpperCase())}
+                              onBlur={field.onBlur}
                               disabled={isSubmitting}
                             />
                           </FormControl>

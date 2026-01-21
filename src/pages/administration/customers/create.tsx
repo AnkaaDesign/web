@@ -52,7 +52,7 @@ export const CreateCustomerPage = () => {
   ];
 
   return (
-    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL]}>
+    <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.FINANCIAL, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.LOGISTIC]}>
       <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4">
         <div className="container mx-auto max-w-4xl flex-shrink-0">
           <PageHeader

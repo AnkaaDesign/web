@@ -9,11 +9,11 @@ export function canViewPricing(userRole: string): boolean {
 }
 
 export function canCreatePricing(userRole: string): boolean {
-  return [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL].includes(userRole);
+  return [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.FINANCIAL].includes(userRole);
 }
 
 export function canEditPricing(userRole: string): boolean {
-  return [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL].includes(userRole);
+  return [SECTOR_PRIVILEGES.ADMIN, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.FINANCIAL].includes(userRole);
 }
 
 export function canApprovePricing(userRole: string): boolean {

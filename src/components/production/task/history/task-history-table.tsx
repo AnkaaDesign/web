@@ -10,7 +10,7 @@ import { SimplePaginationAdvanced } from "@/components/ui/pagination-advanced";
 import { TaskHistoryContextMenu } from "./task-history-context-menu";
 import { createTaskHistoryColumns } from "./task-history-columns";
 import { cn } from "@/lib/utils";
-import { TASK_STATUS, routes, SERVICE_ORDER_STATUS } from "../../../../constants";
+import { TASK_STATUS, routes } from "../../../../constants";
 import { useTableState, convertSortConfigsToOrderBy } from "@/hooks/use-table-state";
 import { isDateInPast, getHoursBetween } from "../../../../utils";
 import { useScrollbarWidth } from "@/hooks/use-scrollbar-width";
@@ -19,8 +19,6 @@ import { TruncatedTextWithTooltip } from "@/components/ui/truncated-text-with-to
 import { IconChevronUp, IconChevronDown, IconSelector, IconAlertTriangle, IconHistory } from "@tabler/icons-react";
 import { TaskHistoryTableSkeleton } from "./task-history-table-skeleton";
 import { useNavigate } from "react-router-dom";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatDate } from "@/utils";
 
 interface TaskHistoryTableProps {
   visibleColumns: Set<string>;
@@ -33,67 +31,6 @@ interface TaskHistoryTableProps {
   isSelectingSourceTask?: boolean;
   onSourceTaskSelect?: (task: Task) => void;
   disablePagination?: boolean;
-}
-
-/**
- * Get the appropriate indicator type for the commercial service order cell based on:
- * 1. Task's forecastDate proximity (must be within 7 days)
- * 2. Having at least one incomplete commercial service order
- *
- * For agenda (preparation) route only:
- * - null: No forecastDate, > 7 days away, or no incomplete commercial service orders
- * - "yellow": forecastDate is 3-7 days away AND has incomplete commercial service order
- * - "red": forecastDate is ≤ 3 days away (or overdue) AND has incomplete commercial service order
- */
-function getCommercialServiceOrderIndicator(task: Task, navigationRoute?: string): "red" | "yellow" | null {
-  // Only apply indicator logic to preparation (agenda) route
-  if (navigationRoute !== 'preparation') {
-    return null;
-  }
-
-  // Tasks without forecastDate - no indicator
-  if (!task.forecastDate) {
-    return null;
-  }
-
-  // Check if task has at least one incomplete commercial service order
-  const commercialServiceOrders = task.serviceOrders?.filter(
-    (so) => so.type === 'COMMERCIAL'
-  ) || [];
-
-  // No commercial service orders - no indicator
-  if (commercialServiceOrders.length === 0) {
-    return null;
-  }
-
-  // Check if there's at least one incomplete (not COMPLETED or CANCELLED) commercial service order
-  const hasIncompleteCommercial = commercialServiceOrders.some(
-    (so) => so.status !== SERVICE_ORDER_STATUS.COMPLETED && so.status !== SERVICE_ORDER_STATUS.CANCELLED
-  );
-
-  // All commercial service orders are completed - no indicator
-  if (!hasIncompleteCommercial) {
-    return null;
-  }
-
-  // Calculate days remaining until forecastDate
-  const now = new Date();
-  const forecast = new Date(task.forecastDate);
-  const diffMs = forecast.getTime() - now.getTime();
-  const daysRemaining = diffMs / (1000 * 60 * 60 * 24);
-
-  // Red zone: 3 days or less (including overdue) AND has incomplete commercial service order
-  if (daysRemaining <= 3) {
-    return "red";
-  }
-
-  // Yellow zone: between 3 and 7 days AND has incomplete commercial service order
-  if (daysRemaining <= 7) {
-    return "yellow";
-  }
-
-  // Safe zone: more than 7 days - no indicator
-  return null;
 }
 
 export function TaskHistoryTable({
@@ -451,14 +388,6 @@ export function TaskHistoryTable({
               tasks.map((task, index) => {
                 const taskIsSelected = isSelected(task.id);
 
-                // Get indicator type for commercial service order column based on deadline and incomplete status
-                const commercialIndicator = getCommercialServiceOrderIndicator(task, navigationRoute);
-
-                // Calculate days remaining for tooltip
-                const daysRemaining = task.forecastDate
-                  ? Math.ceil((new Date(task.forecastDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-                  : null;
-
                 return (
                   <tr
                     key={task.id}
@@ -527,34 +456,6 @@ export function TaskHistoryTable({
                             : column.accessorFn
                             ? column.accessorFn(task)
                             : task[column.accessorKey as keyof Task]}
-
-                          {/* Corner triangle indicator for commercial service order column */}
-                          {column.id === "serviceOrders.commercial" && commercialIndicator && (
-                            <Tooltip delayDuration={0}>
-                              <TooltipTrigger asChild>
-                                <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent pointer-events-auto cursor-help" style={{
-                                  borderTopColor: commercialIndicator === "red" ? "rgb(239 68 68)" : "rgb(251 191 36)"
-                                }}>
-                                  <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent side="left" className="max-w-xs">
-                                <div className="text-sm">
-                                  <div className={cn("font-medium", commercialIndicator === "red" ? "text-red-500" : "text-amber-500")}>
-                                    {commercialIndicator === "red" ? "Prazo crítico" : "Prazo próximo"}
-                                  </div>
-                                  <div className="text-muted-foreground">
-                                    {daysRemaining !== null && daysRemaining <= 0
-                                      ? `Liberação atrasada (${formatDate(task.forecastDate!)}) e ordem comercial incompleta`
-                                      : daysRemaining === 1
-                                      ? `Falta ${daysRemaining} dia para a liberação e ordem comercial incompleta`
-                                      : `Faltam ${daysRemaining} dias para a liberação e ordem comercial incompleta`
-                                    }
-                                  </div>
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
                         </div>
                       </TableCell>
                     ))}

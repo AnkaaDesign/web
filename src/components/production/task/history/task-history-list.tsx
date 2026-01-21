@@ -329,26 +329,41 @@ export function TaskHistoryList({
     [canViewPrice, currentUser?.id, userSectorPrivilege, navigationRoute]
   );
 
+  // Determine agenda exclusion flags based on user's sector privilege
+  const isFinancialUser = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL);
+  const isLogisticUser = currentUser && hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC);
+
   // Prepare final query filters
   const queryFilters = React.useMemo(() => {
     const { orderBy: _, ...filterWithoutOrderBy } = baseQueryFilters;
-    const result = {
+    const result: Record<string, any> = {
       ...filterWithoutOrderBy,
       status: filterWithoutOrderBy.status || statusFilter,
     };
 
     // Add agenda display filtering for preparation view
-    // This applies the universal agenda logic (not role-based):
-    // - Excludes CANCELLED tasks
-    // - Excludes COMPLETED tasks only if they have all 4 SO types AND all SOs are completed
+    // Role-based behavior:
+    // - FINANCIAL users: Need PRODUCTION, COMMERCIAL, ARTWORK, FINANCIAL (exclude LOGISTIC)
+    // - LOGISTIC users: Need PRODUCTION, COMMERCIAL, ARTWORK, LOGISTIC (exclude FINANCIAL)
+    // - All other users (including ADMIN): Only need PRODUCTION, COMMERCIAL, ARTWORK (exclude both)
     if (navigationRoute === "preparation") {
       result.shouldDisplayInAgenda = true;
+
+      // Only FINANCIAL users see FINANCIAL service order requirements
+      if (!isFinancialUser) {
+        result.agendaExcludeFinancial = true;
+      }
+      // Only LOGISTIC users see LOGISTIC service order requirements
+      if (!isLogisticUser) {
+        result.agendaExcludeLogistic = true;
+      }
+
       // Remove status filter to allow any status (except CANCELLED and fully completed)
       delete result.status;
     }
 
     return result;
-  }, [baseQueryFilters, statusFilter, navigationRoute]);
+  }, [baseQueryFilters, statusFilter, navigationRoute, isFinancialUser, isLogisticUser]);
 
   // Handle filter changes
   const handleFilterChange = React.useCallback(

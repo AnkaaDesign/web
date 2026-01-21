@@ -4,6 +4,7 @@ import type { Customer } from "../../../../types";
 import { cn } from "@/lib/utils";
 import { maskCNPJ, maskCPF } from "../../../../utils";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
+import { REGISTRATION_STATUS_OPTIONS } from "@/constants/enums";
 
 interface BasicInfoCardProps {
   customer: Customer;
@@ -74,7 +75,9 @@ export function BasicInfoCard({ customer, className }: BasicInfoCardProps) {
                     <IconFileDescription className="h-4 w-4" />
                     Situação Cadastral
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{customer.registrationStatus}</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {REGISTRATION_STATUS_OPTIONS.find(opt => opt.value === customer.registrationStatus)?.label ?? customer.registrationStatus}
+                  </span>
                 </div>
               )}
             </div>

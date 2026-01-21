@@ -1,4 +1,4 @@
-import { formatCurrency, formatDate } from "./index";
+import { formatCurrency, formatDate, toTitleCase } from "./index";
 import type { Task } from "../types/task";
 import { generatePaymentText, generateGuaranteeText } from "./pricing-text-generators";
 import { getApiBaseUrl } from "./file";
@@ -210,13 +210,19 @@ function generateBudgetHtml(data: BudgetHtmlData): string {
   );
 
   // Generate services list with numbers
+  // Description + observation shown inline (e.g., "Pintura Geral Azul Firenze")
+  // All text is displayed in Title Case
   const servicesHtml = data.items
     .map((item, index) => {
       const amount = typeof item.amount === "number" ? item.amount : Number(item.amount) || 0;
       const valueDisplay = formatCurrency(amount);
+      // Combine description and observation inline (Title Case)
+      const description = toTitleCase(item.description || "Serviço");
+      const observation = item.observation ? toTitleCase(item.observation) : "";
+      const descriptionWithObs = observation ? `${description} ${observation}` : description;
       return `
         <div class="service-item">
-          <span class="service-desc">${index + 1} - ${escapeHtml(item.description || "Serviço")}</span>
+          <span class="service-desc">${index + 1} - ${escapeHtml(descriptionWithObs)}</span>
           <span class="service-value">${valueDisplay}</span>
         </div>
       `;

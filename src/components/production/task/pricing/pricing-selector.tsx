@@ -7,7 +7,7 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { useFieldArray, useWatch, useFormContext } from "react-hook-form";
+import { useFieldArray, useWatch, useFormContext, useController } from "react-hook-form";
 import {
   FormControl,
   FormField,
@@ -16,13 +16,23 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { IconPlus, IconTrash, IconCalendar, IconCurrencyReal, IconPhoto, IconX } from "@tabler/icons-react";
+import { IconPlus, IconTrash, IconCalendar, IconCurrencyReal, IconPhoto, IconNote } from "@tabler/icons-react";
 import { Input } from "@/components/ui/input";
+import { DateTimeInput } from "@/components/ui/date-time-input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Combobox } from "@/components/ui/combobox";
 import { FileUploadField } from "@/components/common/file/file-upload-field";
-import { formatCurrency } from "../../../../utils";
-import { DISCOUNT_TYPE } from "@/constants/enums";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { formatCurrency, toTitleCase } from "../../../../utils";
+import { DISCOUNT_TYPE, SERVICE_ORDER_TYPE } from "@/constants/enums";
 import { DISCOUNT_TYPE_LABELS } from "@/constants/enum-labels";
 import type { FileWithPreview } from "@/components/common/file/file-uploader";
 import { ServiceAutocomplete } from "../form/service-autocomplete";
@@ -35,6 +45,7 @@ interface PricingSelectorProps {
   onItemCountChange?: (count: number) => void;
   layoutFiles?: FileWithPreview[];
   onLayoutFilesChange?: (files: FileWithPreview[]) => void;
+  onItemDeleted?: (description: string) => void;
 }
 
 export interface PricingSelectorRef {
@@ -66,7 +77,7 @@ const GUARANTEE_OPTIONS = [
 export const PricingSelector = forwardRef<
   PricingSelectorRef,
   PricingSelectorProps
->(({ control, disabled, userRole, readOnly, onItemCountChange, layoutFiles: externalLayoutFiles, onLayoutFilesChange }, ref) => {
+>(({ control, disabled, userRole, readOnly, onItemCountChange, layoutFiles: externalLayoutFiles, onLayoutFilesChange, onItemDeleted }, ref) => {
   const [initialized, setInitialized] = useState(false);
   const [validityPeriod, setValidityPeriod] = useState<number | null>(null);
   const [showCustomPayment, setShowCustomPayment] = useState(false);
@@ -160,15 +171,16 @@ export const PricingSelector = forwardRef<
   }, [subtotal, discountAmount]);
 
   // Check if any pricing item is incomplete
+  // An item is incomplete only if it has amount > 0 but no description
+  // Empty items (no description AND no amount) are allowed and filtered on submit
   const hasIncompletePricing = useMemo(() => {
     if (!pricingItems || pricingItems.length === 0) return false;
-    if (pricingItems.length === 1) {
-      const item = pricingItems[0];
-      const isEmpty = !item.description && (item.amount === null || item.amount === undefined || item.amount === 0);
-      if (isEmpty) return false;
-      return !item.description;
-    }
-    return pricingItems.some((item: any) => !item.description);
+    return pricingItems.some((item: any) => {
+      const hasDescription = item.description && item.description.trim() !== "";
+      const hasAmount = item.amount !== null && item.amount !== undefined && item.amount > 0;
+      // Only incomplete if has amount but no description
+      return hasAmount && !hasDescription;
+    });
   }, [pricingItems]);
 
   // Initialize local state from form data
@@ -228,7 +240,7 @@ export const PricingSelector = forwardRef<
       setValue("pricing.subtotal", 0);
       setValue("pricing.total", 0);
     }
-    append({ description: "", amount: undefined });
+    append({ description: "", observation: null, amount: undefined });
     setTimeout(() => {
       const serviceInput = lastRowRef.current?.querySelector('[role="combobox"]') as HTMLElement;
       serviceInput?.focus();
@@ -315,34 +327,186 @@ export const PricingSelector = forwardRef<
 
   const hasPricingItems = pricingItems && pricingItems.length > 0;
 
+  // Handler to remove an item and track deletion
+  const handleRemoveItem = useCallback((index: number) => {
+    const item = pricingItems?.[index];
+    if (item?.description && onItemDeleted) {
+      onItemDeleted(item.description);
+    }
+    remove(index);
+  }, [pricingItems, onItemDeleted, remove]);
+
   return (
-    <div className="space-y-6">
-      {/* Status and Validity Period - Top Row */}
+    <div className="space-y-4">
+      {/* Services Section */}
+      <div className="space-y-3">
+        {fields.length > 0 && fields.map((field, index) => (
+          <PricingItemRow
+            key={field.id}
+            control={control}
+            index={index}
+            disabled={disabled}
+            readOnly={readOnly}
+            onRemove={() => handleRemoveItem(index)}
+            onAdd={handleAddItem}
+            isFirstRow={index === 0}
+            isLastRow={index === fields.length - 1}
+            ref={index === fields.length - 1 ? lastRowRef : null}
+          />
+        ))}
+        {fields.length === 0 && !readOnly && !disabled && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleAddItem}
+            disabled={disabled}
+          >
+            <IconPlus className="h-4 w-4 mr-2" />
+            Adicionar Serviço
+          </Button>
+        )}
+      </div>
+
+      {/* Discount Section - Right after services */}
       {hasPricingItems && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {canEditStatus && !readOnly ? (
-            <FormField
-              control={control}
-              name="pricing.status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status da Precificação</FormLabel>
-                  <FormControl>
-                    <Combobox
-                      options={statusOptions}
-                      value={field.value || 'DRAFT'}
-                      onValueChange={field.onChange}
-                      placeholder="Selecione o status"
-                      emptyMessage="Nenhum status encontrado"
-                      disabled={disabled}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-          ) : (
-            <div />
-          )}
+          <FormField
+            control={control}
+            name="pricing.discountType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tipo de Desconto</FormLabel>
+                <FormControl>
+                  <Combobox
+                    value={field.value || DISCOUNT_TYPE.NONE}
+                    onValueChange={(newType) => {
+                      const safeType = newType || DISCOUNT_TYPE.NONE;
+                      const previousType = field.value || DISCOUNT_TYPE.NONE;
+                      field.onChange(safeType);
+                      if (safeType === DISCOUNT_TYPE.NONE) {
+                        setValue("pricing.discountValue", null);
+                      } else if (previousType !== safeType && previousType !== DISCOUNT_TYPE.NONE) {
+                        setValue("pricing.discountValue", null);
+                      }
+                    }}
+                    disabled={disabled || readOnly}
+                    options={[
+                      DISCOUNT_TYPE.NONE,
+                      DISCOUNT_TYPE.PERCENTAGE,
+                      DISCOUNT_TYPE.FIXED_VALUE,
+                    ].map((type) => ({
+                      value: type,
+                      label: DISCOUNT_TYPE_LABELS[type],
+                    }))}
+                    placeholder="Selecione o tipo"
+                    emptyMessage="Nenhum tipo encontrado"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={control}
+            name="pricing.discountValue"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="flex items-center gap-2">
+                  Valor do Desconto
+                  {discountType === DISCOUNT_TYPE.PERCENTAGE && (
+                    <span className="text-xs text-muted-foreground">(%)</span>
+                  )}
+                  {discountType === DISCOUNT_TYPE.FIXED_VALUE && (
+                    <span className="text-xs text-muted-foreground">(R$)</span>
+                  )}
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type={discountType === DISCOUNT_TYPE.FIXED_VALUE ? "currency" : "number"}
+                    {...field}
+                    value={field.value ?? ""}
+                    onChange={(value) => {
+                      if (value === null || value === undefined || value === "") {
+                        field.onChange(null);
+                      } else if (typeof value === "number") {
+                        field.onChange(value);
+                      } else {
+                        const num = Number(value);
+                        field.onChange(isNaN(num) ? null : num);
+                      }
+                    }}
+                    disabled={disabled || readOnly || discountType === DISCOUNT_TYPE.NONE}
+                    placeholder={discountType === DISCOUNT_TYPE.NONE ? "-" : discountType === DISCOUNT_TYPE.FIXED_VALUE ? "R$ 0,00" : "0"}
+                    min={discountType === DISCOUNT_TYPE.PERCENTAGE ? "0" : undefined}
+                    max={discountType === DISCOUNT_TYPE.PERCENTAGE ? "100" : undefined}
+                    step={discountType === DISCOUNT_TYPE.PERCENTAGE ? "0.01" : undefined}
+                    className="bg-transparent"
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+      )}
+
+      {/* Totals Section - Right after discount */}
+      {hasPricingItems && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormItem>
+            <FormLabel className="flex items-center gap-2">
+              <IconCurrencyReal className="h-4 w-4" />
+              Subtotal
+            </FormLabel>
+            <FormControl>
+              <Input
+                value={formatCurrency(subtotal)}
+                readOnly
+                className="bg-muted cursor-not-allowed font-medium"
+              />
+            </FormControl>
+          </FormItem>
+
+          <FormItem>
+            <FormLabel className="flex items-center gap-2">
+              <IconCurrencyReal className="h-4 w-4" />
+              Valor Total
+            </FormLabel>
+            <FormControl>
+              <Input
+                value={formatCurrency(calculatedTotal)}
+                readOnly
+                className="bg-transparent font-bold text-lg text-primary cursor-not-allowed border-primary"
+              />
+            </FormControl>
+          </FormItem>
+        </div>
+      )}
+
+      {/* Status and Validity Period */}
+      {hasPricingItems && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border/30">
+          <FormField
+            control={control}
+            name="pricing.status"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Status da Precificação</FormLabel>
+                <FormControl>
+                  <Combobox
+                    options={statusOptions}
+                    value={field.value || 'DRAFT'}
+                    onValueChange={field.onChange}
+                    placeholder="Selecione o status"
+                    emptyMessage="Nenhum status encontrado"
+                    disabled={disabled || !canEditStatus || readOnly}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
 
           <FormField
             control={control}
@@ -371,7 +535,7 @@ export const PricingSelector = forwardRef<
         </div>
       )}
 
-      {/* Payment, Date, and Guarantee - Before Services */}
+      {/* Payment, Date, and Guarantee - 3 column grid */}
       {hasPricingItems && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Payment Condition */}
@@ -397,25 +561,12 @@ export const PricingSelector = forwardRef<
             control={control}
             name="pricing.downPaymentDate"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Data da Entrada</FormLabel>
-                <FormControl>
-                  <Input
-                    type="date"
-                    value={field.value ? new Date(field.value).toISOString().split("T")[0] : ""}
-                    onChange={(value: string | number | null) => {
-                      // Input component passes value directly, not event
-                      // Parse the date string to a Date object, or null if empty
-                      const dateValue = value ? new Date(String(value) + "T12:00:00") : null;
-                      // Call field.onChange to properly update React Hook Form state
-                      field.onChange(dateValue);
-                    }}
-                    onBlur={field.onBlur}
-                    disabled={disabled || readOnly}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
+              <DateTimeInput
+                field={field}
+                mode="date"
+                label="Data da Entrada"
+                disabled={disabled || readOnly}
+              />
             )}
           />
 
@@ -487,222 +638,6 @@ export const PricingSelector = forwardRef<
         />
       )}
 
-      {/* Services List - Main Section */}
-      {fields.length > 0 && (
-        <div className="space-y-3 pt-4 border-t border-border/30">
-          <h4 className="font-medium text-sm text-muted-foreground">Serviços</h4>
-          {fields.map((field, index) => {
-            const isLastRow = index === fields.length - 1;
-            return (
-              <div
-                key={field.id}
-                ref={isLastRow ? lastRowRef : null}
-                className="grid grid-cols-1 sm:grid-cols-[1fr_180px] gap-4 items-end"
-              >
-                <ServiceAutocomplete
-                  control={control}
-                  name={`pricing.items.${index}.description`}
-                  disabled={disabled || readOnly}
-                  label="Serviço"
-                  placeholder="Selecione ou digite um serviço"
-                  showLabel={index === 0}
-                />
-
-                <FormField
-                  control={control}
-                  name={`pricing.items.${index}.amount`}
-                  render={({ field }) => (
-                    <FormItem>
-                      {index === 0 && (
-                        <FormLabel className="flex items-center gap-2">
-                          <IconCurrencyReal className="h-4 w-4" />
-                          Valor
-                        </FormLabel>
-                      )}
-                      <FormControl>
-                        <div className="relative flex items-center gap-1">
-                          <Input
-                            type="currency"
-                            {...field}
-                            placeholder="R$ 0,00"
-                            disabled={disabled || readOnly}
-                            className="pr-20"
-                          />
-                          {!readOnly && !disabled && (
-                            <div className="absolute right-1 flex items-center gap-1">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => remove(index)}
-                                disabled={disabled}
-                                className="text-destructive h-8 w-8"
-                                title="Remover serviço"
-                              >
-                                <IconTrash className="h-4 w-4" />
-                              </Button>
-                              {isLastRow && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={handleAddItem}
-                                  disabled={disabled}
-                                  className="text-primary h-8 w-8"
-                                  title="Adicionar serviço"
-                                >
-                                  <IconPlus className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Discount and Summary Section */}
-      {hasPricingItems && (
-        <div className="space-y-4 pt-4 border-t border-border/30">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField
-              control={control}
-              name="pricing.discountType"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo de Desconto</FormLabel>
-                  <FormControl>
-                    <Combobox
-                      value={field.value || DISCOUNT_TYPE.NONE}
-                      onValueChange={(newType) => {
-                        const safeType = newType || DISCOUNT_TYPE.NONE;
-                        const previousType = field.value || DISCOUNT_TYPE.NONE;
-                        field.onChange(safeType);
-                        if (safeType === DISCOUNT_TYPE.NONE) {
-                          setValue("pricing.discountValue", null);
-                        } else if (previousType !== safeType && previousType !== DISCOUNT_TYPE.NONE) {
-                          setValue("pricing.discountValue", null);
-                        }
-                      }}
-                      disabled={disabled || readOnly}
-                      options={[
-                        DISCOUNT_TYPE.NONE,
-                        DISCOUNT_TYPE.PERCENTAGE,
-                        DISCOUNT_TYPE.FIXED_VALUE,
-                      ].map((type) => ({
-                        value: type,
-                        label: DISCOUNT_TYPE_LABELS[type],
-                      }))}
-                      placeholder="Selecione o tipo"
-                      emptyMessage="Nenhum tipo encontrado"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={control}
-              name="pricing.discountValue"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    Valor do Desconto
-                    {discountType === DISCOUNT_TYPE.PERCENTAGE && (
-                      <span className="text-xs text-muted-foreground">(%)</span>
-                    )}
-                    {discountType === DISCOUNT_TYPE.FIXED_VALUE && (
-                      <span className="text-xs text-muted-foreground">(R$)</span>
-                    )}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type={discountType === DISCOUNT_TYPE.FIXED_VALUE ? "currency" : "number"}
-                      {...field}
-                      value={field.value ?? ""}
-                      onChange={(value) => {
-                        if (value === null || value === undefined || value === "") {
-                          field.onChange(null);
-                        } else if (typeof value === "number") {
-                          field.onChange(value);
-                        } else {
-                          const num = Number(value);
-                          field.onChange(isNaN(num) ? null : num);
-                        }
-                      }}
-                      disabled={disabled || readOnly || discountType === DISCOUNT_TYPE.NONE}
-                      placeholder={discountType === DISCOUNT_TYPE.NONE ? "-" : discountType === DISCOUNT_TYPE.FIXED_VALUE ? "R$ 0,00" : "0"}
-                      min={discountType === DISCOUNT_TYPE.PERCENTAGE ? "0" : undefined}
-                      max={discountType === DISCOUNT_TYPE.PERCENTAGE ? "100" : undefined}
-                      step={discountType === DISCOUNT_TYPE.PERCENTAGE ? "0.01" : undefined}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-
-          {/* Totals */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <FormItem>
-              <FormLabel className="flex items-center gap-2">
-                <IconCurrencyReal className="h-4 w-4" />
-                Subtotal
-              </FormLabel>
-              <FormControl>
-                <Input
-                  value={formatCurrency(subtotal)}
-                  readOnly
-                  className="bg-muted cursor-not-allowed font-medium"
-                />
-              </FormControl>
-            </FormItem>
-
-            {discountAmount > 0 && (
-              <FormItem>
-                <FormLabel className="flex items-center gap-2 text-destructive">
-                  <IconCurrencyReal className="h-4 w-4" />
-                  Desconto
-                  {discountType === DISCOUNT_TYPE.PERCENTAGE && (
-                    <span className="text-xs">({discountValue}%)</span>
-                  )}
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    value={`- ${formatCurrency(discountAmount)}`}
-                    readOnly
-                    className="bg-muted cursor-not-allowed font-medium text-destructive"
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-
-            <FormItem>
-              <FormLabel className="flex items-center gap-2">
-                <IconCurrencyReal className="h-4 w-4" />
-                Valor Total
-              </FormLabel>
-              <FormControl>
-                <Input
-                  value={formatCurrency(calculatedTotal)}
-                  readOnly
-                  className="bg-transparent font-bold text-lg text-primary cursor-not-allowed"
-                />
-              </FormControl>
-            </FormItem>
-          </div>
-        </div>
-      )}
-
       {/* Layout File Upload */}
       {hasPricingItems && (
         <div className="space-y-3 pt-4 border-t border-border/30">
@@ -739,3 +674,188 @@ export const PricingSelector = forwardRef<
 });
 
 PricingSelector.displayName = "PricingSelector";
+
+// Pricing Item Row Component with Observation Support
+interface PricingItemRowProps {
+  control: any;
+  index: number;
+  disabled?: boolean;
+  readOnly?: boolean;
+  onRemove: () => void;
+  onAdd: () => void;
+  isFirstRow: boolean;
+  isLastRow: boolean;
+}
+
+const PricingItemRow = forwardRef<HTMLDivElement, PricingItemRowProps>(
+  ({ control, index, disabled, readOnly, onRemove, onAdd, isFirstRow, isLastRow }, ref) => {
+    // Observation modal state
+    const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
+    const [tempObservation, setTempObservation] = useState("");
+
+    // Watch observation field
+    const currentObservation = useWatch({
+      control,
+      name: `pricing.items.${index}.observation`,
+      defaultValue: "",
+    });
+
+    // Get observation field controller for updating
+    const { field: observationField } = useController({
+      control,
+      name: `pricing.items.${index}.observation`,
+      defaultValue: "",
+    });
+
+    // Handle opening observation modal
+    const handleOpenObservationModal = () => {
+      setTempObservation(currentObservation || "");
+      setIsObservationModalOpen(true);
+    };
+
+    // Handle saving observation
+    const handleSaveObservation = () => {
+      observationField.onChange(tempObservation || null);
+      setIsObservationModalOpen(false);
+    };
+
+    // Handle canceling observation modal
+    const handleCancelObservation = () => {
+      setTempObservation("");
+      setIsObservationModalOpen(false);
+    };
+
+    // Check if observation has content
+    const hasObservation = Boolean(currentObservation && currentObservation.trim());
+
+    return (
+      <>
+        <div
+          ref={ref}
+          className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end"
+        >
+          {/* Service Description - 1/2 width */}
+          <ServiceAutocomplete
+            control={control}
+            name={`pricing.items.${index}.description`}
+            disabled={disabled || readOnly}
+            label="Serviço"
+            placeholder="Selecione ou digite um serviço"
+            showLabel={isFirstRow}
+            type={SERVICE_ORDER_TYPE.PRODUCTION}
+          />
+
+          {/* Value + Buttons - 1/2 width */}
+          <div className="flex items-end gap-2">
+            <FormField
+              control={control}
+              name={`pricing.items.${index}.amount`}
+              render={({ field }) => (
+                <FormItem className="flex-1">
+                  {isFirstRow && (
+                    <FormLabel className="flex items-center gap-2">
+                      <IconCurrencyReal className="h-4 w-4" />
+                      Valor
+                    </FormLabel>
+                  )}
+                  <FormControl>
+                    <Input
+                      type="currency"
+                      {...field}
+                      placeholder="R$ 0,00"
+                      disabled={disabled || readOnly}
+                      className="bg-transparent"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-1">
+              {/* Observation Button */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={handleOpenObservationModal}
+                disabled={disabled || readOnly}
+                className="relative h-9 w-9"
+                title={hasObservation ? "Ver/Editar observação" : "Adicionar observação"}
+              >
+                <IconNote className="h-4 w-4" />
+                {hasObservation && (
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+                    !
+                  </span>
+                )}
+              </Button>
+
+              {/* Remove Button */}
+              {!readOnly && !disabled && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={onRemove}
+                  disabled={disabled}
+                  className="text-destructive h-9 w-9"
+                  title="Remover serviço"
+                >
+                  <IconTrash className="h-4 w-4" />
+                </Button>
+              )}
+
+              {/* Add Button - Only on last row */}
+              {!readOnly && !disabled && isLastRow && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={onAdd}
+                  disabled={disabled}
+                  className="text-primary h-9 w-9"
+                  title="Adicionar serviço"
+                >
+                  <IconPlus className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Observation Modal */}
+        <Dialog open={isObservationModalOpen} onOpenChange={setIsObservationModalOpen}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Observação do Serviço</DialogTitle>
+              <DialogDescription>
+                Adicione notas ou detalhes adicionais para este serviço da precificação.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Textarea
+                value={tempObservation}
+                onChange={(e) => setTempObservation(toTitleCase(e.target.value))}
+                placeholder="Digite a observação..."
+                rows={4}
+                className="resize-none capitalize"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleCancelObservation}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={handleSaveObservation}>
+                Salvar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+);
+
+PricingItemRow.displayName = "PricingItemRow";

@@ -23,6 +23,7 @@ export interface ServiceOrder extends BaseEntity {
   startedAt: Date | null;
   approvedAt: Date | null;
   finishedAt: Date | null;
+  shouldSync: boolean; // Controls bidirectional sync with TaskPricingItem
 
   // Relations
   task?: Task;

@@ -883,6 +883,8 @@ export const taskGetManySchema = z
     hasReceipt: z.boolean().optional(),
     // Agenda display logic filter
     shouldDisplayInAgenda: z.boolean().optional(),
+    agendaExcludeFinancial: z.boolean().optional(), // When true, excludes FINANCIAL SO from agenda completion check
+    agendaExcludeLogistic: z.boolean().optional(), // When true, excludes LOGISTIC SO from agenda completion check
     // Boolean status convenience filters
     isOverdue: z.boolean().optional(),
     isActive: z.boolean().optional(),
@@ -1116,6 +1118,7 @@ const taskServiceOrderCreateSchema = z.object({
   observation: z.string().nullable().optional(), // For rejection notes
   startedAt: nullableDate.optional(),
   finishedAt: nullableDate.optional(),
+  shouldSync: z.boolean().optional().default(true), // Controls bidirectional sync with TaskPricingItem
 });
 
 // ServiceOrders array schema with preprocessing to filter out empty items

@@ -25,9 +25,10 @@ export function CityInput({ disabled }: CityInputProps) {
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               value={field.value || ""}
               onChange={(value: string) => field.onChange(value || null)}
+              onBlur={field.onBlur}
               placeholder="Ex: São Paulo"
               disabled={disabled}
               className="transition-all duration-200"

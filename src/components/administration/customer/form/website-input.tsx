@@ -36,7 +36,7 @@ export function WebsiteInput({ disabled }: WebsiteInputProps) {
     <FormField
       control={form.control}
       name="site"
-      render={({ field: { value, onChange, onBlur, ...field } }) => (
+      render={({ field: { value, onChange, onBlur, ref } }) => (
         <FormItem>
           <FormLabel className="flex items-center gap-2">
             <IconWorld className="h-4 w-4" />
@@ -44,7 +44,7 @@ export function WebsiteInput({ disabled }: WebsiteInputProps) {
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={ref}
               type="url"
               value={value || ""}
               onChange={(value: string) => {

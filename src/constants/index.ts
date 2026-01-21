@@ -8,3 +8,4 @@ export * from "./stock-thresholds";
 export * from "./badge-colors";
 export * from "./deployment-labels";
 export * from "./deployment-sort-orders";
+export * from "./service-descriptions";

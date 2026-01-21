@@ -43,7 +43,6 @@ export * from "./useTask";
 export * from "./useOrder";
 export * from "./useOrderItem";
 export * from "./useOrderSchedule";
-export * from "./useService";
 export * from "./useServiceOrder";
 export * from "./useObservation";
 export * from "./useCut";

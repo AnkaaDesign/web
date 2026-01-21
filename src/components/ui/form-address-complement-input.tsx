@@ -23,11 +23,12 @@ export function AddressComplementInput({ disabled, name = "addressComplement" }:
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               value={field.value ?? ""}
               onChange={(value: string) => {
                 field.onChange(value === "" ? null : value);
               }}
+              onBlur={field.onBlur}
               placeholder="Ex: Apto 101, Bloco A"
               disabled={disabled}
               transparent={true}

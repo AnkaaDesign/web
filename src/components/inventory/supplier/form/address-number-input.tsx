@@ -25,9 +25,10 @@ export function AddressNumberInput({ disabled }: AddressNumberInputProps) {
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               value={field.value || ""}
               onChange={(value: string) => field.onChange(value || null)}
+              onBlur={field.onBlur}
               placeholder="Ex: 123"
               disabled={disabled}
               className="transition-all duration-200"

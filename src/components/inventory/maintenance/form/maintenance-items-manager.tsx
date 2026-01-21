@@ -104,9 +104,10 @@ export function MaintenanceItemsManager({ control, fieldArray, disabled = false 
                           step="1"
                           placeholder="Quantidade"
                           disabled={disabled}
-                          {...field}
+                          ref={field.ref}
                           value={field.value || ""}
                           onChange={(value: string) => field.onChange(Number(value) || 1)}
+                          onBlur={field.onBlur}
                         />
                       </FormControl>
                       <FormMessage />

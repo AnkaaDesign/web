@@ -77,33 +77,6 @@ export * from "./preferences";
 export * from "./secullum";
 export * from "./warning";
 export * from "./sector";
-// Service exports (to avoid naming conflicts with serviceOrder)
-export {
-  serviceIncludeSchema,
-  serviceOrderBySchema,
-  serviceWhereSchema,
-  serviceGetManySchema,
-  serviceGetByIdSchema,
-  serviceCreateSchema,
-  serviceUpdateSchema,
-  serviceBatchCreateSchema,
-  serviceBatchUpdateSchema,
-  serviceBatchDeleteSchema,
-  serviceQuerySchema,
-  mapServiceToFormData,
-  // Types
-  type ServiceGetManyFormData,
-  type ServiceGetByIdFormData,
-  type ServiceQueryFormData,
-  type ServiceCreateFormData,
-  type ServiceUpdateFormData,
-  type ServiceBatchCreateFormData,
-  type ServiceBatchUpdateFormData,
-  type ServiceBatchDeleteFormData,
-  type ServiceInclude,
-  type ServiceOrderBy,
-  type ServiceWhere,
-} from "./service";
 export * from "./serviceOrder";
 export * from "./supplier";
 export * from "./task";

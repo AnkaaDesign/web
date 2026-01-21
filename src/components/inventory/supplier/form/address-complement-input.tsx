@@ -25,9 +25,10 @@ export function AddressComplementInput({ disabled }: AddressComplementInputProps
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               value={field.value || ""}
               onChange={(value: string) => field.onChange(value || null)}
+              onBlur={field.onBlur}
               placeholder="Ex: Sala 10, Bloco A"
               disabled={disabled}
               className="transition-all duration-200"

@@ -272,3 +272,52 @@ export const formatPixKey = (key: string): string => {
   const info = detectPixKeyType(key);
   return info.formatted;
 };
+
+/**
+ * Portuguese prepositions and articles that should remain lowercase in Title Case
+ * These are common connecting words in Brazilian Portuguese
+ */
+const PORTUGUESE_LOWERCASE_WORDS = new Set([
+  "de", "da", "do", "das", "dos",  // of, from
+  "e",                              // and
+  "em", "na", "no", "nas", "nos",  // in, on, at
+  "para", "pra",                   // for, to
+  "por", "pela", "pelo",           // by, through
+  "com",                           // with
+  "sem",                           // without
+  "a", "o", "as", "os",            // the (articles)
+  "um", "uma", "uns", "umas",      // a/an (articles)
+  "ao", "aos", "à", "às",          // contractions
+]);
+
+/**
+ * Convert a string to Title Case (capitalize first letter of each word)
+ * Keeps Portuguese prepositions and articles lowercase (except at the start)
+ * Example: "pintura de cabine" -> "Pintura de Cabine"
+ * Example: "TROCA DA LONA DO CAMINHAO" -> "Troca da Lona do Caminhão"
+ * Example: "AZUL FIRENZE" -> "Azul Firenze"
+ */
+export const toTitleCase = (str: string): string => {
+  if (!str) return "";
+  return str
+    .split(" ")
+    .map((word, index) => {
+      if (word.length === 0) return word;
+
+      const lowerWord = word.toLowerCase();
+
+      // Always capitalize the first word, even if it's a preposition
+      if (index === 0) {
+        return lowerWord.charAt(0).toUpperCase() + lowerWord.slice(1);
+      }
+
+      // Keep Portuguese prepositions/articles lowercase
+      if (PORTUGUESE_LOWERCASE_WORDS.has(lowerWord)) {
+        return lowerWord;
+      }
+
+      // Capitalize other words
+      return lowerWord.charAt(0).toUpperCase() + lowerWord.slice(1);
+    })
+    .join(" ");
+};

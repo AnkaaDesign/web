@@ -23,12 +23,13 @@ export function AddressNumberInput({ disabled, name = "addressNumber" }: Address
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               value={field.value ?? ""}
               onChange={(val) => {
                 // Input component passes value directly, not an event
                 field.onChange(val === "" ? null : val);
               }}
+              onBlur={field.onBlur}
               placeholder="Ex: 123"
               disabled={disabled}
               transparent={true}

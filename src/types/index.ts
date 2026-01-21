@@ -29,7 +29,6 @@ export * from "./position";
 export * from "./preferences";
 export * from "./warning";
 export * from "./sector";
-export * from "./service";
 export * from "./serviceOrder";
 export * from "./summary";
 export * from "./supplier";

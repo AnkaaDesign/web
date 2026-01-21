@@ -25,9 +25,10 @@ export function PasswordInput({ disabled, required = false }: PasswordInputProps
           <FormControl>
             <div className="relative">
               <Input
-                {...field}
+                ref={field.ref}
                 value={field.value || ""}
                 onChange={(value: string) => field.onChange(value || undefined)}
+                onBlur={field.onBlur}
                 type={showPassword ? "text" : "password"}
                 placeholder={required ? "Digite a senha" : "Deixe em branco para manter a atual"}
                 disabled={disabled}

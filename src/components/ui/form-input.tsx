@@ -121,7 +121,7 @@ export function FormInput<T extends Record<string, any>>({
           )}
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               type={type}
               value={field.value ?? ""}
               onChange={(newValue) => {
@@ -130,6 +130,7 @@ export function FormInput<T extends Record<string, any>>({
                 // Explicitly mark as dirty and trigger validation
                 form.setValue(name, newValue, { shouldDirty: true, shouldValidate: true });
               }}
+              onBlur={field.onBlur}
               documentType={documentType}
               disabled={props.disabled}
               onCepLookup={type === "cep" ? handleCepLookup : undefined}

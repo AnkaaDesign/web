@@ -24,13 +24,14 @@ export function PISInput({ disabled }: PISInputProps) {
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               value={field.value ? formatPIS(field.value) : ""}
               onChange={(value: string) => {
                 // Remove non-numeric characters and apply formatting
                 const cleanedValue = value.replace(/\D/g, "");
                 field.onChange(cleanedValue || null);
               }}
+              onBlur={field.onBlur}
               placeholder="Digite o PIS do colaborador"
               disabled={disabled}
               maxLength={14} // 11 digits + 3 formatting chars

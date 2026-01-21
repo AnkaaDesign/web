@@ -6,6 +6,7 @@ import { IconFileText, IconLoader2 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { useTasks } from "@/hooks";
 import { useDebounce } from "@/hooks/use-debounce";
+import { toTitleCase } from "@/utils";
 
 interface TaskNameAutocompleteProps {
   control: any;
@@ -185,7 +186,8 @@ export function TaskNameAutocomplete({ control, disabled }: TaskNameAutocomplete
                 ref={inputRef}
                 value={inputValue}
                 onChange={(value) => {
-                  const newValue = typeof value === "string" ? value : (value as any)?.target?.value || "";
+                  const rawValue = typeof value === "string" ? value : (value as any)?.target?.value || "";
+                  const newValue = toTitleCase(rawValue);
                   setInputValue(newValue);
                   field.onChange(newValue);
 

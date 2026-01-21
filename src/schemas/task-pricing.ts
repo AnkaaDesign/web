@@ -54,15 +54,19 @@ export const GUARANTEE_YEARS_OPTIONS = [5, 10, 15] as const;
 export const taskPricingItemSchema = z.object({
   id: z.string().uuid().optional(),
   description: z.string().min(1, 'Descrição é obrigatória').max(400),
+  observation: z.string().max(2000).optional().nullable(),
   amount: moneySchema,
+  shouldSync: z.boolean().optional().default(true), // Controls bidirectional sync with ServiceOrder
 });
 
 // Lenient item schema for nested creation (allows incomplete items during editing)
 const taskPricingItemCreateSchema = z.object({
   id: z.string().uuid().optional(),
   description: z.string().optional().default(''),
+  observation: z.string().max(2000).optional().nullable(),
   // Amount might come as formatted currency string (e.g., "R$ 520,00")
   amount: z.preprocess(preprocessMoney, z.number().optional().nullable()),
+  shouldSync: z.boolean().optional().default(true), // Controls bidirectional sync with ServiceOrder
 });
 
 // Preprocess items array to filter out empty placeholder items

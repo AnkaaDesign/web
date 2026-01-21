@@ -14,10 +14,8 @@ import {
 } from "@tabler/icons-react";
 import type { TaskCreateFormData } from "../../../../schemas";
 import { taskCreateSchema } from "../../../../schemas";
-import { useTaskMutations, useServiceMutations } from "../../../../hooks";
-import { TASK_STATUS, TRUCK_CATEGORY, IMPLEMENT_TYPE, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE } from "../../../../constants";
-import { serviceService } from "../../../../api-client";
-import type { Service } from "../../../../types";
+import { useTaskMutations } from "../../../../hooks";
+import { TASK_STATUS, TRUCK_CATEGORY, IMPLEMENT_TYPE, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, DEFAULT_TASK_SERVICE_ORDER } from "../../../../constants";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -29,6 +27,7 @@ import { CustomerSelector } from "./customer-selector";
 import { PlateTagsInput } from "./plate-tags-input";
 import { SerialNumberRangeInput } from "./serial-number-range-input";
 import { TaskNameAutocomplete } from "./task-name-autocomplete";
+import { ServiceAutocomplete } from "./service-autocomplete";
 import { toast } from "sonner";
 
 // Extended form schema for the UI
@@ -54,7 +53,6 @@ type TaskCreateFormSchemaType = z.infer<typeof taskCreateFormSchema>;
 
 export const TaskCreateForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCreatingService, setIsCreatingService] = useState(false);
 
   // Initialize form with simple default values
   const form = useForm<TaskCreateFormSchemaType>({
@@ -69,13 +67,12 @@ export const TaskCreateForm = () => {
       category: "",
       implementType: IMPLEMENT_TYPE.CORRUGATED,
       forecastDate: null,
-      serviceOrderDescription: "",
+      serviceOrderDescription: DEFAULT_TASK_SERVICE_ORDER.description,
     },
   });
 
   // Mutations
   const { createAsync } = useTaskMutations();
-  const { createAsync: createServiceAsync } = useServiceMutations();
 
   // Watch form values for task count calculation
   const plates = useWatch({ control: form.control, name: "plates" }) || [];
@@ -310,13 +307,14 @@ export const TaskCreateForm = () => {
                   )}
                 />
 
-                {/* Service Order - Simple combobox */}
-                <ServiceOrderCombobox
+                {/* Service Order - Input with history suggestions */}
+                <ServiceAutocomplete
                   control={form.control}
+                  name="serviceOrderDescription"
                   disabled={isSubmitting}
-                  isCreatingService={isCreatingService}
-                  setIsCreatingService={setIsCreatingService}
-                  createServiceAsync={createServiceAsync}
+                  label="Ordem de Servico"
+                  placeholder="Ex: Enviar Orcamento"
+                  type={SERVICE_ORDER_TYPE.COMMERCIAL}
                 />
 
                 {/* Truck Category and Implement Type - Side by Side */}
@@ -419,114 +417,3 @@ export const TaskCreateForm = () => {
   );
 };
 
-// Simple Service Order Combobox Component
-interface ServiceOrderComboboxProps {
-  control: any;
-  disabled?: boolean;
-  isCreatingService: boolean;
-  setIsCreatingService: (value: boolean) => void;
-  createServiceAsync: (data: { description: string; type: SERVICE_ORDER_TYPE }) => Promise<any>;
-}
-
-function ServiceOrderCombobox({
-  control,
-  disabled,
-  isCreatingService,
-  setIsCreatingService,
-  createServiceAsync,
-}: ServiceOrderComboboxProps) {
-  // Search function for Combobox - always filter by COMMERCIAL type
-  const searchServices = async (
-    search: string,
-    page: number = 1
-  ): Promise<{
-    data: Service[];
-    hasMore: boolean;
-  }> => {
-    const params: any = {
-      orderBy: { description: "asc" },
-      page: page,
-      take: 50,
-      type: SERVICE_ORDER_TYPE.COMMERCIAL,
-    };
-
-    if (search && search.trim()) {
-      params.searchingFor = search.trim();
-    }
-
-    try {
-      const response = await serviceService.getServices(params);
-      const services = response.data || [];
-      const hasMore = response.meta?.hasNextPage || false;
-
-      return {
-        data: services,
-        hasMore: hasMore,
-      };
-    } catch (error) {
-      return { data: [], hasMore: false };
-    }
-  };
-
-  const handleCreateService = async (description: string): Promise<Service | undefined> => {
-    try {
-      setIsCreatingService(true);
-
-      const result = await createServiceAsync({
-        description,
-        type: SERVICE_ORDER_TYPE.COMMERCIAL,
-      });
-
-      if (result && result.success && result.data) {
-        return result.data;
-      }
-      return undefined;
-    } catch (error) {
-      return undefined;
-    } finally {
-      setIsCreatingService(false);
-    }
-  };
-
-  return (
-    <FormField
-      control={control}
-      name="serviceOrderDescription"
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel className="flex items-center gap-2">
-            <IconClipboardList className="h-4 w-4" />
-            Ordem de Serviço
-          </FormLabel>
-          <FormControl>
-            <Combobox<Service>
-              value={field.value}
-              onValueChange={field.onChange}
-              placeholder="Selecione ou crie uma ordem de serviço"
-              emptyText="Digite para criar"
-              searchPlaceholder="Pesquisar..."
-              disabled={disabled || isCreatingService}
-              async={true}
-              allowCreate={true}
-              createLabel={(value) => `Criar "${value}"`}
-              onCreate={handleCreateService}
-              isCreating={isCreatingService}
-              queryKey={["services", "search", SERVICE_ORDER_TYPE.COMMERCIAL]}
-              queryFn={searchServices}
-              getOptionLabel={(service) => service.description}
-              getOptionValue={(service) => service.description}
-              renderOption={(service) => <span>{service.description}</span>}
-              loadMoreText="Carregar mais"
-              loadingMoreText="Carregando..."
-              minSearchLength={0}
-              pageSize={50}
-              debounceMs={300}
-              className="w-full"
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  );
-}

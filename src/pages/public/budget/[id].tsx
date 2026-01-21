@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { taskPricingService } from "@/api-client/task-pricing";
-import { formatCurrency, formatDate } from "@/utils";
+import { formatCurrency, formatDate, toTitleCase } from "@/utils";
 import { getApiBaseUrl } from "@/utils/file";
 import { generatePaymentText, generateGuaranteeText } from "@/utils/pricing-text-generators";
 import { Button } from "@/components/ui/button";
@@ -249,16 +249,23 @@ export function PublicBudgetPage() {
                 Serviços
               </h3>
               <div className="space-y-2 pl-4">
-                {pricing.items?.map((item, index) => (
-                  <div key={item.id} className="flex justify-between items-baseline">
-                    <span className="text-gray-800">
-                      {index + 1} - {item.description}
-                    </span>
-                    <span className="text-gray-800 font-normal ml-4 whitespace-nowrap">
-                      {formatCurrency(Number(item.amount) || 0)}
-                    </span>
-                  </div>
-                ))}
+                {pricing.items?.map((item, index) => {
+                  // Combine description and observation inline (e.g., "Pintura Geral Azul Firenze")
+                  // All text is displayed in Title Case
+                  const description = toTitleCase(item.description || "");
+                  const observation = item.observation ? toTitleCase(item.observation) : "";
+                  const displayText = observation ? `${description} ${observation}` : description;
+                  return (
+                    <div key={item.id} className="flex justify-between items-baseline">
+                      <span className="text-gray-800 capitalize">
+                        {index + 1} - {displayText}
+                      </span>
+                      <span className="text-gray-800 font-normal ml-4 whitespace-nowrap">
+                        {formatCurrency(Number(item.amount) || 0)}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Totals */}

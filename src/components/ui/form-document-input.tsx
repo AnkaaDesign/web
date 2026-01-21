@@ -99,16 +99,17 @@ export function FormDocumentInput<T extends Record<string, any>>({
           <FormField
             control={form.control}
             name={cpfFieldName}
-            render={({ field: { value, onChange, ...field } }) => (
+            render={({ field: { value, onChange, ref, onBlur } }) => (
               <div className="flex-1">
                 <FormControl>
                   <Input
-                    {...field}
+                    ref={ref}
                     type="cpf"
                     value={value ?? ""}
                     onChange={(newValue) => {
                       onChange(newValue);
                     }}
+                    onBlur={onBlur}
                     placeholder="000.000.000-00"
                     disabled={disabled}
                     transparent={true}
@@ -124,16 +125,17 @@ export function FormDocumentInput<T extends Record<string, any>>({
           <FormField
             control={form.control}
             name={cnpjFieldName}
-            render={({ field: { value, onChange, ...field } }) => (
+            render={({ field: { value, onChange, ref, onBlur } }) => (
               <div className="flex-1">
                 <FormControl>
                   <Input
-                    {...field}
+                    ref={ref}
                     type="cnpj"
                     value={value ?? ""}
                     onChange={(newValue) => {
                       onChange(newValue);
                     }}
+                    onBlur={onBlur}
                     placeholder="00.000.000/0000-00"
                     disabled={disabled}
                     transparent={true}

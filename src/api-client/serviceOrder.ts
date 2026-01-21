@@ -40,6 +40,17 @@ export class ServiceOrderService {
     return response.data;
   }
 
+  /**
+   * Get unique service order descriptions for autocomplete
+   * @param type - Filter by service order type (PRODUCTION, ARTWORK, etc.)
+   * @param search - Search term to filter descriptions
+   * @param limit - Maximum number of results (default 50)
+   */
+  async getUniqueDescriptions(params: { type?: string; search?: string; limit?: number } = {}): Promise<{ success: boolean; message: string; data: string[] }> {
+    const response = await apiClient.get<{ success: boolean; message: string; data: string[] }>(`${this.basePath}/descriptions`, { params });
+    return response.data;
+  }
+
   async getServiceOrder(params: ServiceOrderGetByIdFormData): Promise<ServiceOrderGetUniqueResponse> {
     const { id, ...queryParams } = params;
     const response = await apiClient.get<ServiceOrderGetUniqueResponse>(`${this.basePath}/${id}`, {
@@ -104,6 +115,7 @@ export const serviceOrderService = new ServiceOrderService();
 // ServiceOrder exports
 export const getServiceOrders = (params: ServiceOrderGetManyFormData = {}) => serviceOrderService.getServiceOrders(params);
 export const getServiceOrderById = (params: ServiceOrderGetByIdFormData) => serviceOrderService.getServiceOrder(params);
+export const getUniqueDescriptions = (params: { type?: string; search?: string; limit?: number } = {}) => serviceOrderService.getUniqueDescriptions(params);
 export const createServiceOrder = (data: ServiceOrderCreateFormData, query?: ServiceOrderQueryFormData) => serviceOrderService.createServiceOrder(data, query);
 export const updateServiceOrder = (id: string, data: ServiceOrderUpdateFormData, query?: ServiceOrderQueryFormData) => serviceOrderService.updateServiceOrder(id, data, query);
 export const deleteServiceOrder = (id: string) => serviceOrderService.deleteServiceOrder(id);

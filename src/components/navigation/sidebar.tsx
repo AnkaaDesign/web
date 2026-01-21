@@ -584,8 +584,8 @@ export const Sidebar = memo(() => {
     // Reset navigation source after checking
     navigationSourceRef.current = null;
 
-    // Skip auto-expand if navigating from favorite or on first page load
-    if (navSource === "favorite" || navSource === null) {
+    // Skip auto-expand only if navigating from favorite (user wants menu collapsed)
+    if (navSource === "favorite") {
       return;
     }
 

@@ -57,6 +57,80 @@ const isPast = (date: Date): boolean => {
   return checkDate < today;
 };
 
+// Helper function to calculate days until a date
+const getDaysUntil = (date: Date): number => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0);
+  const diffTime = targetDate.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
+
+// Helper function to get detailed status of commercial and artwork service orders
+const getCommercialArtworkOrdersStatus = (task: Task): {
+  hasIssue: boolean;
+  commercialMissing: boolean;
+  commercialIncomplete: boolean;
+  artworkMissing: boolean;
+  artworkIncomplete: boolean;
+  issueDescription: string;
+} => {
+  const incompleteStatuses = [
+    SERVICE_ORDER_STATUS.PENDING,
+    SERVICE_ORDER_STATUS.IN_PROGRESS,
+    SERVICE_ORDER_STATUS.WAITING_APPROVE
+  ];
+
+  // Check commercial service orders
+  const commercialOrders = task.serviceOrders?.filter(so => so.type === SERVICE_ORDER_TYPE.COMMERCIAL) || [];
+  const commercialMissing = commercialOrders.length === 0;
+  const commercialIncomplete = !commercialMissing && commercialOrders.some(so => incompleteStatuses.includes(so.status));
+
+  // Check artwork service orders
+  const artworkOrders = task.serviceOrders?.filter(so => so.type === SERVICE_ORDER_TYPE.ARTWORK) || [];
+  const artworkMissing = artworkOrders.length === 0;
+  const artworkIncomplete = !artworkMissing && artworkOrders.some(so => incompleteStatuses.includes(so.status));
+
+  const hasIssue = commercialMissing || commercialIncomplete || artworkMissing || artworkIncomplete;
+
+  // Build issue description
+  const issues: string[] = [];
+  if (commercialMissing) issues.push('Ordem comercial ausente');
+  if (commercialIncomplete) issues.push('Ordem comercial incompleta');
+  if (artworkMissing) issues.push('Ordem de arte ausente');
+  if (artworkIncomplete) issues.push('Ordem de arte incompleta');
+
+  return {
+    hasIssue,
+    commercialMissing,
+    commercialIncomplete,
+    artworkMissing,
+    artworkIncomplete,
+    issueDescription: issues.join('. ') + (issues.length > 0 ? '.' : ''),
+  };
+};
+
+// Helper function to check if task has incomplete commercial or artwork service orders
+// OR if task is missing commercial/artwork service orders entirely
+const hasIncompleteOrMissingCommercialOrArtworkOrders = (task: Task): boolean => {
+  return getCommercialArtworkOrdersStatus(task).hasIssue;
+};
+
+// Helper function to get urgency color based on days until forecast
+const getUrgencyColor = (daysUntil: number): { color: string; colorClass: string; label: string } | null => {
+  if (daysUntil <= 3) {
+    return { color: 'rgb(239, 68, 68)', colorClass: 'text-red-500', label: '3 dias ou menos' }; // red-500
+  }
+  if (daysUntil <= 7) {
+    return { color: 'rgb(249, 115, 22)', colorClass: 'text-orange-500', label: '7 dias ou menos' }; // orange-500
+  }
+  if (daysUntil <= 10) {
+    return { color: 'rgb(234, 179, 8)', colorClass: 'text-yellow-500', label: '10 dias ou menos' }; // yellow-500
+  }
+  return null;
+};
+
 // Helper function to render forecast date with indicators (only for preparation route)
 const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: string, currentUserId?: string) => {
   if (!date) return <span className="text-muted-foreground">-</span>;
@@ -68,19 +142,93 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
   // Only show indicators for preparation route
   const showIndicators = navigationRoute === 'preparation';
 
-  // Blue triangle with check icon when forecast is today
-  const showBlueIndicator = showIndicators && isToday(forecastDate);
+  // Get detailed status of commercial and artwork service orders
+  const ordersStatus = getCommercialArtworkOrdersStatus(task);
+  const hasIncompleteOrders = ordersStatus.hasIssue;
 
-  // Red triangle with alert icon when forecast is past AND entry date is not filled
-  const showRedIndicator = showIndicators && isPast(forecastDate) && !task.entryDate;
+  // Calculate days until forecast
+  const daysUntil = getDaysUntil(forecastDate);
+
+  // Get urgency color if within threshold and has incomplete orders
+  const urgencyInfo = showIndicators && hasIncompleteOrders ? getUrgencyColor(daysUntil) : null;
+
+  // Blue triangle with check icon when forecast is today
+  const isForecastToday = isToday(forecastDate);
+  const isForecastPast = isPast(forecastDate);
+  const showBlueIndicator = showIndicators && isForecastToday && !hasIncompleteOrders;
+
+  // Red triangle when forecast is today AND has incomplete orders (blue font already indicates "today")
+  const showRedTodayWithIncompleteOrders = showIndicators && isForecastToday && hasIncompleteOrders;
+
+  // Red triangle with alert icon when forecast is past AND has incomplete/missing orders (regardless of entry date)
+  const showRedOverdueWithIncompleteOrders = showIndicators && isForecastPast && !isForecastToday && hasIncompleteOrders;
+
+  // Red triangle with alert icon when forecast is past AND entry date is not filled (no incomplete orders check)
+  const showRedOverdueNoEntryDate = showIndicators && isForecastPast && !task.entryDate && !isForecastToday && !hasIncompleteOrders;
+
+  // Show urgency indicator when approaching forecast with incomplete orders (but not today or past)
+  const showUrgencyIndicator = showIndicators && urgencyInfo && !isForecastToday && !isForecastPast;
 
   return (
     <>
-      <span className="truncate" title={dateTime}>
-        {formatted}
-      </span>
+      {showIndicators && isForecastToday ? (
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <span className="truncate text-blue-500 font-medium cursor-help">
+              {formatted}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            <div className="text-sm">
+              <div className="font-medium text-blue-500">Previsão para hoje</div>
+              <div className="text-muted-foreground">A data de liberação é hoje ({formatted})</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        <span className="truncate" title={dateTime}>
+          {formatted}
+        </span>
+      )}
 
-      {/* Blue indicator for today - positioned flush with cell corner */}
+      {/* Red indicator for today with incomplete/missing orders (blue font already indicates "today") */}
+      {showRedTodayWithIncompleteOrders && (
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
+              <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="left" className="max-w-xs">
+            <div className="text-sm">
+              <div className="font-medium text-red-500">Liberação hoje - Ordens pendentes</div>
+              <div className="text-muted-foreground">A liberação é hoje ({formatted}). {ordersStatus.issueDescription}</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      )}
+
+      {/* Urgency indicator for approaching forecast with incomplete/missing orders */}
+      {showUrgencyIndicator && urgencyInfo && (
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <div
+              className="absolute top-0 right-0 w-0 h-0 border-l-[28px] border-l-transparent pointer-events-auto cursor-help"
+              style={{ borderTop: `28px solid ${urgencyInfo.color}` }}
+            >
+              <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="left" className="max-w-xs">
+            <div className="text-sm">
+              <div className={`font-medium ${urgencyInfo.colorClass}`}>Liberação em {daysUntil} {daysUntil === 1 ? 'dia' : 'dias'}</div>
+              <div className="text-muted-foreground">A liberação ({formatted}) está próxima. {ordersStatus.issueDescription}</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      )}
+
+      {/* Blue indicator for today (without incomplete orders) - positioned flush with cell corner */}
       {showBlueIndicator && (
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
@@ -97,8 +245,25 @@ const renderForecastDate = (date: Date | null, task: Task, navigationRoute?: str
         </Tooltip>
       )}
 
-      {/* Red indicator for overdue without entry date - positioned flush with cell corner */}
-      {showRedIndicator && !showBlueIndicator && (
+      {/* Red indicator for overdue with incomplete/missing orders - positioned flush with cell corner */}
+      {showRedOverdueWithIncompleteOrders && (
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>
+            <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">
+              <IconAlertTriangle className="absolute -top-[25px] right-[2px] h-3 w-3 text-white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }} />
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="left" className="max-w-xs">
+            <div className="text-sm">
+              <div className="font-medium text-red-500">Liberação atrasada - Ordens pendentes</div>
+              <div className="text-muted-foreground">A liberação ({formatted}) já passou. {ordersStatus.issueDescription}</div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      )}
+
+      {/* Red indicator for overdue without entry date (when no incomplete orders) - positioned flush with cell corner */}
+      {showRedOverdueNoEntryDate && (
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>
             <div className="absolute top-0 right-0 w-0 h-0 border-t-[28px] border-l-[28px] border-l-transparent border-t-red-500 pointer-events-auto cursor-help">

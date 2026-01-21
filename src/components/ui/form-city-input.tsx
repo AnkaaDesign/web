@@ -24,11 +24,12 @@ export function CityInput({ disabled, name = "city", required = true }: CityInpu
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               value={field.value ?? ""}
               onChange={(value: string) => {
                 field.onChange(value === "" ? null : value);
               }}
+              onBlur={field.onBlur}
               placeholder="Ex: São Paulo"
               disabled={disabled}
               transparent={true}

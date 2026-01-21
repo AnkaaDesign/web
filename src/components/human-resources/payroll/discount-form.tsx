@@ -291,8 +291,10 @@ export function DiscountForm({
                             min="0"
                             max="100"
                             placeholder="0.00"
-                            {...field}
+                            ref={field.ref}
+                            value={field.value}
                             onChange={(value: string) => field.onChange(parseFloat(value) || undefined)}
+                            onBlur={field.onBlur}
                           />
                           <IconPercentage className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
                         </div>

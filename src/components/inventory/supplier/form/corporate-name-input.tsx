@@ -25,9 +25,10 @@ export function CorporateNameInput({ disabled }: CorporateNameInputProps) {
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               value={field.value || ""}
               onChange={(value: string) => field.onChange(value || null)}
+              onBlur={field.onBlur}
               placeholder="Ex: Fornecedor ABC Comercial Ltda"
               disabled={disabled}
               className="transition-all duration-200"

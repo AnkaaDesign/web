@@ -18,8 +18,8 @@ export const CustomerListPage = () => {
     icon: "users",
   });
 
-  // ADMIN, COMMERCIAL, and FINANCIAL can create customers
-  const canCreate = user && (hasPrivilege(user, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(user, SECTOR_PRIVILEGES.COMMERCIAL) || hasPrivilege(user, SECTOR_PRIVILEGES.FINANCIAL));
+  // ADMIN, COMMERCIAL, FINANCIAL, and LOGISTIC can create customers
+  const canCreate = user && (hasPrivilege(user, SECTOR_PRIVILEGES.ADMIN) || hasPrivilege(user, SECTOR_PRIVILEGES.COMMERCIAL) || hasPrivilege(user, SECTOR_PRIVILEGES.FINANCIAL) || hasPrivilege(user, SECTOR_PRIVILEGES.LOGISTIC));
 
   return (
     <PrivilegeRoute requiredPrivilege={["BASIC", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"]}>

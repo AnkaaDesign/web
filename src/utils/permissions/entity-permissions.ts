@@ -14,13 +14,14 @@ import { hasAnyPrivilege, isTeamLeader } from '@/utils';
 
 /**
  * Can user create tasks?
- * ADMIN, COMMERCIAL, and LOGISTIC can create new tasks
+ * ADMIN, COMMERCIAL, FINANCIAL, and LOGISTIC can create new tasks
  */
 export function canCreateTasks(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
     SECTOR_PRIVILEGES.COMMERCIAL,
+    SECTOR_PRIVILEGES.FINANCIAL,
     SECTOR_PRIVILEGES.LOGISTIC,
   ]);
 }
@@ -168,13 +169,14 @@ export function canRequestCut(user: User | null): boolean {
 
 /**
  * Can user create/edit/delete airbrushings?
- * ADMIN and COMMERCIAL can manage airbrushings
+ * ADMIN, COMMERCIAL, and FINANCIAL can manage airbrushings
  */
 export function canCreateAirbrushings(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
     SECTOR_PRIVILEGES.COMMERCIAL,
+    SECTOR_PRIVILEGES.FINANCIAL,
   ]);
 }
 
@@ -183,6 +185,7 @@ export function canEditAirbrushings(user: User | null): boolean {
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
     SECTOR_PRIVILEGES.COMMERCIAL,
+    SECTOR_PRIVILEGES.FINANCIAL,
   ]);
 }
 
@@ -199,12 +202,16 @@ export function canDeleteAirbrushings(user: User | null): boolean {
 
 /**
  * Can user create/edit/delete observations?
- * Only ADMIN can manage observations
+ * ADMIN, COMMERCIAL, FINANCIAL, PRODUCTION, and WAREHOUSE can create/edit observations
  */
 export function canCreateObservations(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.COMMERCIAL,
+    SECTOR_PRIVILEGES.FINANCIAL,
+    SECTOR_PRIVILEGES.PRODUCTION,
+    SECTOR_PRIVILEGES.WAREHOUSE,
   ]);
 }
 
@@ -212,6 +219,10 @@ export function canEditObservations(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.ADMIN,
+    SECTOR_PRIVILEGES.COMMERCIAL,
+    SECTOR_PRIVILEGES.FINANCIAL,
+    SECTOR_PRIVILEGES.PRODUCTION,
+    SECTOR_PRIVILEGES.WAREHOUSE,
   ]);
 }
 
@@ -315,13 +326,14 @@ export function canDeletePaintFormulas(user: User | null): boolean {
 
 /**
  * Can user edit/delete customers?
- * FINANCIAL, COMMERCIAL, and ADMIN manage customers
+ * FINANCIAL, COMMERCIAL, LOGISTIC, and ADMIN manage customers
  */
 export function canEditCustomers(user: User | null): boolean {
   if (!user) return false;
   return hasAnyPrivilege(user, [
     SECTOR_PRIVILEGES.FINANCIAL,
     SECTOR_PRIVILEGES.COMMERCIAL,
+    SECTOR_PRIVILEGES.LOGISTIC,
     SECTOR_PRIVILEGES.ADMIN,
   ]);
 }

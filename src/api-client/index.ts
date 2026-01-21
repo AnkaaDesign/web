@@ -50,7 +50,6 @@ export * from "./preferences";
 export * from "./profile";
 export * from "./warning";
 export * from "./sector";
-export * from "./service";
 export * from "./serviceOrder";
 export * from "./supplier";
 export * from "./task";

@@ -35,7 +35,6 @@ import type {
   PriceGetManyFormData,
   WarningGetManyFormData,
   ServiceOrderGetManyFormData,
-  ServiceGetManyFormData,
   SupplierGetManyFormData,
   TaskGetManyFormData,
   TruckGetManyFormData,
@@ -643,13 +642,9 @@ export const warningKeys = {
 export const sectorKeys = createQueryKeyStore<SectorGetManyFormData>("sectors");
 
 // =====================================================
-// Service Query Keys
+// ServiceOrder Query Keys
 // =====================================================
 
-export const serviceKeys = {
-  ...createQueryKeyStore<ServiceGetManyFormData>("services"),
-  root: ["services"] as const,
-};
 export const serviceOrderKeys = {
   ...createQueryKeyStore<ServiceOrderGetManyFormData>("serviceOrders"),
   root: ["serviceOrders"] as const,

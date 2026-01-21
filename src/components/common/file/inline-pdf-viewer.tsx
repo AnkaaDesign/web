@@ -23,6 +23,8 @@ export interface InlinePdfViewerProps {
   rotation?: number;
   pageNumber?: number;
   onPageChange?: (page: number) => void;
+  // Callback when fit scale is calculated - provides the optimal scale to fit the PDF in the viewport
+  onFitScaleCalculated?: (fitScale: number, pageWidth: number, pageHeight: number) => void;
 }
 
 export interface InlinePdfViewerRef {
@@ -53,6 +55,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
       rotation: externalRotation,
       pageNumber: externalPageNumber,
       onPageChange,
+      onFitScaleCalculated,
     },
     ref
   ) => {
@@ -155,6 +158,35 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           setNumPages(pdfDoc.numPages);
           setLoading(false);
           onLoadSuccess?.(pdfDoc.numPages);
+
+          // Calculate fit scale based on first page dimensions and container
+          if (onFitScaleCalculated && containerRef.current) {
+            try {
+              const firstPage = await pdfDoc.getPage(1);
+              const viewport = firstPage.getViewport({ scale: 1, rotation: 0 });
+              const pageWidth = viewport.width;
+              const pageHeight = viewport.height;
+
+              // Get container dimensions
+              const container = containerRef.current;
+              const containerWidth = container.clientWidth - 32; // Account for padding
+              const containerHeight = container.clientHeight - 32;
+
+              // Calculate scale factors for both dimensions
+              const scaleX = containerWidth / pageWidth;
+              const scaleY = containerHeight / pageHeight;
+
+              // Use the smaller scale to ensure the page fits entirely
+              const fitScale = Math.min(scaleX, scaleY, 2); // Cap at 2x max
+
+              onFitScaleCalculated(fitScale, pageWidth, pageHeight);
+            } catch (err) {
+              // Fallback if we can't calculate fit scale
+              if (process.env.NODE_ENV !== 'production') {
+                console.warn("[InlinePdfViewer] Could not calculate fit scale:", err);
+              }
+            }
+          }
         } catch (err) {
           if (cancelled) return;
           if (process.env.NODE_ENV !== 'production') {
@@ -174,7 +206,7 @@ export const InlinePdfViewer = React.forwardRef<InlinePdfViewerRef, InlinePdfVie
           renderTaskRef.current.cancel();
         }
       };
-    }, [url]);
+    }, [url, onFitScaleCalculated]);
 
     // Render current page
     React.useEffect(() => {

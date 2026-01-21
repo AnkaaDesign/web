@@ -23,11 +23,12 @@ export function NeighborhoodInput({ disabled, name = "neighborhood" }: Neighborh
           </FormLabel>
           <FormControl>
             <Input
-              {...field}
+              ref={field.ref}
               value={field.value ?? ""}
               onChange={(value: string) => {
                 field.onChange(value === "" ? null : value);
               }}
+              onBlur={field.onBlur}
               placeholder="Ex: Centro"
               disabled={disabled}
               transparent={true}

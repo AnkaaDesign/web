@@ -11,10 +11,10 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/administracao/clientes": ["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "COMMERCIAL"], // BASIC allows all authenticated, but specific access for Financial and Logistic
   [routes.administration.customers.details(":id")]: ["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "COMMERCIAL"], // Customer details using function
   "/administracao/clientes/detalhes/:id": ["BASIC", "ADMIN", "FINANCIAL", "LOGISTIC", "COMMERCIAL"], // Financial and Logistic can view customer details - explicit pattern
-  [routes.administration.customers.edit(":id")]: ["ADMIN", "FINANCIAL", "COMMERCIAL"], // Financial, Commercial, and Admin can edit customers
-  "/administracao/clientes/editar/:id": ["ADMIN", "FINANCIAL", "COMMERCIAL"], // Financial, Commercial, and Admin can edit customers - explicit pattern
-  [routes.administration.customers.create]: ["ADMIN", "FINANCIAL", "COMMERCIAL"], // Financial, Commercial, and Admin can create customers
-  "/administracao/clientes/cadastrar": ["ADMIN", "FINANCIAL", "COMMERCIAL"], // Financial, Commercial, and Admin can create customers - explicit pattern
+  [routes.administration.customers.edit(":id")]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can edit customers
+  "/administracao/clientes/editar/:id": ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can edit customers - explicit pattern
+  [routes.administration.customers.create]: ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can create customers
+  "/administracao/clientes/cadastrar": ["ADMIN", "FINANCIAL", "COMMERCIAL", "LOGISTIC"], // Financial, Commercial, Logistic, and Admin can create customers - explicit pattern
   "/administracao/registros-de-alteracoes": "ADMIN",
   "/administracao/arquivos": "ADMIN",
   "/administracao/notificacoes": "ADMIN",
@@ -138,8 +138,8 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/producao/cronograma/editar/:id": ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // Explicit cronograma edit route
   [routes.production.preparation.root]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL"], // WAREHOUSE excluded from preparation
   "/producao/agenda": ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL"], // Agenda root (preparation)
-  [routes.production.preparation.create]: ["PRODUCTION", "DESIGNER", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Preparation task create - WAREHOUSE and FINANCIAL excluded
-  "/producao/agenda/cadastrar": ["PRODUCTION", "DESIGNER", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Agenda create
+  [routes.production.preparation.create]: ["PRODUCTION", "DESIGNER", "LOGISTIC", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Preparation task create - WAREHOUSE excluded
+  "/producao/agenda/cadastrar": ["PRODUCTION", "DESIGNER", "LOGISTIC", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Agenda create
   [routes.production.preparation.details(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Preparation task detail - WAREHOUSE excluded
   "/producao/agenda/detalhes/:id": ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Agenda details
   [routes.production.preparation.edit(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Preparation task edit - WAREHOUSE excluded
@@ -150,8 +150,8 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/producao/barracoes": ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Explicit barracoes route
   [routes.production.airbrushings.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "COMMERCIAL"], // DESIGNER excluded from airbrushings
   [routes.production.airbrushings.list]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "COMMERCIAL"],
-  [routes.production.airbrushings.create]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "ADMIN"], // DESIGNER excluded (read-only)
-  [routes.production.airbrushings.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "ADMIN"], // DESIGNER excluded (read-only)
+  [routes.production.airbrushings.create]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // DESIGNER excluded (read-only)
+  [routes.production.airbrushings.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // DESIGNER excluded (read-only)
 
   // Cut-related routes - DESIGNER and PLOTTING have read-only access, WAREHOUSE removed
   [routes.production.cutting.root]: ["PRODUCTION", "DESIGNER", "PLOTTING", "ADMIN"],
@@ -163,8 +163,8 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   // DESIGNER and LOGISTIC excluded from observations
   [routes.production.observations.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"],
   [routes.production.observations.details(":id")]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"],
-  [routes.production.observations.create]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "ADMIN"], // Production, warehouse, commercial, and admin can create
-  [routes.production.observations.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "ADMIN"], // Production, warehouse, commercial, and admin can edit
+  [routes.production.observations.create]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Production, warehouse, commercial, financial, and admin can create
+  [routes.production.observations.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Production, warehouse, commercial, financial, and admin can edit
 
   // Registro de Ponto - All authenticated users can access
   "/registro-de-ponto": ["BASIC", "MAINTENANCE", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "ADMIN", "PRODUCTION", "HUMAN_RESOURCES", "EXTERNAL", "PLOTTING", "COMMERCIAL"],
