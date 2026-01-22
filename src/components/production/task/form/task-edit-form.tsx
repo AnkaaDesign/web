@@ -3518,8 +3518,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
                 )}
 
-                {/* Base Files Card (optional) - EDITABLE for Designer and Commercial, Hidden for Warehouse, Financial, and Logistic users */}
-                {!isWarehouseUser && !isFinancialUser && !isLogisticUser && (
+                {/* Base Files Card (optional) - EDITABLE for Designer, Commercial, and Logistic, Hidden for Warehouse and Financial users */}
+                {!isWarehouseUser && !isFinancialUser && (
           <AccordionItem
             value="base-files"
             id="accordion-item-base-files"
@@ -3530,7 +3530,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
                         <IconFile className="h-5 w-5" />
-                        Arquivos Base
+                        Arquivos
                       </CardTitle>
                     </CardHeader>
                   </AccordionTrigger>
@@ -3543,8 +3543,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         showPreview={true}
                         existingFiles={baseFiles}
                         variant="compact"
-                        placeholder="Adicione arquivos base para criação das artes"
-                        label="Arquivos base anexados"
+                        placeholder="Adicione arquivos para a tarefa"
+                        label="Arquivos anexados"
                       />
                     </CardContent>
                   </AccordionContent>

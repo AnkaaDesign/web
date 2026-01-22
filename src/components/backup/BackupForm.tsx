@@ -65,7 +65,6 @@ export function BackupForm({ open, onClose, onSuccess }: BackupFormProps) {
     try {
       const result = await create.mutateAsync({
         ...formData,
-        raidAware: true, // Always use RAID-aware backups
         autoDelete: formData.autoDelete.enabled ? formData.autoDelete : undefined,
       });
 

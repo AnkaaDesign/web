@@ -18,6 +18,7 @@ interface UseBackupProgressOptions {
   onComplete?: (data: BackupProgressData) => void;
   onError?: (error: Error) => void;
   interpolate?: boolean;
+  token?: string; // Authentication token for WebSocket connection
 }
 
 /**
@@ -28,7 +29,7 @@ export function useBackupProgress(
   backupId: string | null,
   options: UseBackupProgressOptions = {}
 ) {
-  const { onComplete, onError, interpolate = true } = options;
+  const { onComplete, onError, interpolate = true, token } = options;
 
   const [progress, setProgress] = useState(0);
   const [displayProgress, setDisplayProgress] = useState(0);
@@ -103,8 +104,9 @@ export function useBackupProgress(
   useEffect(() => {
     if (!backupId) return;
 
-    const socketUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
     const socket = io(`${socketUrl}/backup-progress`, {
+      auth: token ? { token } : undefined,
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 5,
@@ -186,7 +188,7 @@ export function useBackupProgress(
 
       socketRef.current = null;
     };
-  }, [backupId, animateProgress, estimateProgress, interpolate, onComplete, onError]);
+  }, [backupId, animateProgress, estimateProgress, interpolate, onComplete, onError, token]);
 
   // Manual reconnect function
   const reconnect = useCallback(() => {

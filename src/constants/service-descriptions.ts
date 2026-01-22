@@ -9,74 +9,78 @@
 import { SERVICE_ORDER_TYPE } from './enums';
 
 // =====================
-// PRODUCTION - Physical Work Actions (52 items including Outros)
+// PRODUCTION - Physical Work Actions (48 items including Outros)
 // =====================
 export const PRODUCTION_SERVICE_DESCRIPTIONS = [
-  // Pintura de Componentes
-  'Pintura Caixa de Cozinha',
-  'Pintura Caixa de Ferramenta',
-  'Pintura do Parachoque',
-  'Pintura dos Paralamas',
-  'Pintura Pes Mecanico',
-  'Pintura das Rodas',
-  'Pintura dos Cubos das Rodas',
-  'Pintura do Quadro Lateral',
-  'Pintura do Quadro Frontal',
-  'Pintura do Quadro Traseiro',
-  'Pintura do Chassis',
-  'Pintura do Tanque',
-  'Pintura do Estribo',
-  'Pintura da Grade',
-  'Pintura do Reservatorio',
+  // Adesivo
+  'Adesivo Cabine',
+  'Adesivo Portas Traseiras',
+
+  // Aerografia
+  'Aerografia Lateral',
+  'Aerografia Laterais',
+  'Aerografia Parcial',
+  'Aerografia Traseira',
+
+  // Faixa
+  'Faixa Veículo Longo Traseira',
+
   // Logomarca
-  'Logomarca Padrao',
+  'Logomarca Lateral',
+  'Logomarca Laterais',
+  'Logomarca no Teto',
+  'Logomarca Padrão',
   'Logomarca Parcial',
   'Logomarca Plataforma',
   'Logomarca Portas Traseiras',
-  'Logomarca no Teto',
-  // Pintura de Áreas
-  'Pintura Frota no Teto',
-  'Pintura Placa no Teto',
-  'Pintura Laterais',
-  'Pintura Lateral',
-  'Pintura Parcial',
+
+  // Pintura
+  'Pintura Caixa de Cozinha',
+  'Pintura Caixa de Ferramentas',
+  'Pintura Carenagens de Frio',
+  'Pintura Chassi',
+  'Pintura Cubos das Rodas',
   'Pintura Frontal',
+  'Pintura Frota no Teto',
+  'Pintura Lateral',
+  'Pintura Laterais',
+  'Pintura Para-choque',
+  'Pintura Parcial',
+  'Pintura Pés Mecânicos',
+  'Pintura Placa no Teto',
+  'Pintura Quadro Frontal',
+  'Pintura Quadro Lateral',
+  'Pintura Quadro Traseiro',
+  'Pintura Rodas',
+  'Pintura Teto',
   'Pintura Traseira',
-  'Pintura do Teto',
-  'Pintura Geral',
-  'Pintura Cabine',
-  // Adesivo
-  'Adesivo Cabine',
-  'Adesivo Portas Traseira',
-  'Adesivo Lateral',
-  'Adesivo Personalizado',
-  // Aerografia
-  'Aerografia',
-  'Aerografia Parcial',
-  // Carenagens e Frio
-  'Pintura Carenagens Frio',
-  'Reparos Carenagens Frio',
-  // Reparos
-  'Reparos Superficiais',
-  'Reparos Amassados',
-  // Faixas Refletivas
-  'Troca de Faixas Refletivas',
-  'Troca de Faixas Refletivas Parachoque',
-  'Faixa Veiculo Longo Traseira',
-  // Remoção
-  'Remocao Lateral',
-  'Remocao Laterais',
-  'Remocao Parcial',
-  // Verniz
-  'Vedacao Externa',
-  'Verniz Lateral',
-  'Verniz Laterais',
-  'Verniz Frontal',
-  'Verniz Traseira',
-  'Verniz Parcial',
+
   // Plotagem
-  'Plotagem Lateral',
+  'Plotagem Cabine',
   'Plotagem Portas Traseiras',
+
+  // Remoção
+  'Remoção Lateral',
+  'Remoção Laterais',
+  'Remoção Parcial',
+
+  // Reparos
+  'Reparos Carenagens de Frio',
+  'Reparos Superficiais',
+
+  // Troca de Faixas Refletivas
+  'Troca de Faixas Refletivas',
+  'Troca de Faixas Refletivas do Para-choque',
+
+  // Vedação
+  'Vedação Externa',
+
+  // Verniz
+  'Verniz Frontal',
+  'Verniz Laterais',
+  'Verniz Parcial',
+  'Verniz Traseira',
+
   // Outros
   'Outros',
 ] as const;

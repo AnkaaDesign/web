@@ -11,7 +11,6 @@ interface BackupMetadata {
   paths?: string[];
   error?: string;
   priority?: "low" | "medium" | "high" | "critical";
-  raidAware?: boolean;
   compressionLevel?: number;
   encrypted?: boolean;
   progress?: number; // Progress percentage (0-100)
@@ -28,7 +27,6 @@ interface CreateBackupRequest {
   description?: string;
   paths?: string[];
   priority?: "low" | "medium" | "high" | "critical";
-  raidAware?: boolean;
   compressionLevel?: number;
   encrypted?: boolean;
   autoDelete?: {

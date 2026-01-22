@@ -57,28 +57,25 @@ export class CustomerService {
   // =====================
 
   async createCustomer(data: CustomerCreateFormData | FormData, query?: CustomerQueryFormData): Promise<CustomerCreateResponse> {
-    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    // Don't set Content-Type for FormData - let axios handle it automatically
     const response = await apiClient.post<CustomerCreateResponse>(this.basePath, data, {
       params: query,
-      headers,
     });
     return response.data;
   }
 
   async quickCreateCustomer(data: CustomerQuickCreateFormData | FormData, query?: CustomerQueryFormData): Promise<CustomerCreateResponse> {
-    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    // Don't set Content-Type for FormData - let axios handle it automatically
     const response = await apiClient.post<CustomerCreateResponse>(`${this.basePath}/quick`, data, {
       params: query,
-      headers,
     });
     return response.data;
   }
 
   async updateCustomer(id: string, data: CustomerUpdateFormData | FormData, query?: CustomerQueryFormData): Promise<CustomerUpdateResponse> {
-    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    // Don't set Content-Type for FormData - let axios handle it automatically
     const response = await apiClient.put<CustomerUpdateResponse>(`${this.basePath}/${id}`, data, {
       params: query,
-      headers,
     });
     return response.data;
   }

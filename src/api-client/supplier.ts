@@ -65,19 +65,17 @@ export class SupplierService {
   // =====================
 
   async createSupplier(data: SupplierCreateFormData | FormData, query?: SupplierQueryFormData): Promise<SupplierCreateResponse> {
-    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    // Don't set Content-Type for FormData - let axios handle it automatically
     const response = await apiClient.post<SupplierCreateResponse>(this.basePath, data, {
       params: query,
-      headers,
     });
     return response.data;
   }
 
   async updateSupplier(id: string, data: SupplierUpdateFormData | FormData, query?: SupplierQueryFormData): Promise<SupplierUpdateResponse> {
-    const headers = data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : {};
+    // Don't set Content-Type for FormData - let axios handle it automatically
     const response = await apiClient.put<SupplierUpdateResponse>(`${this.basePath}/${id}`, data, {
       params: query,
-      headers,
     });
     return response.data;
   }

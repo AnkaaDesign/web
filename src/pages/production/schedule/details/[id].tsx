@@ -654,10 +654,10 @@ const TASK_SECTIONS: SectionConfig[] = [
   },
   {
     id: "baseFiles",
-    label: "Arquivos Base",
+    label: "Arquivos",
     defaultVisible: true,
     fields: [
-      { id: "baseFileFiles", label: "Arquivos Base", sectionId: "baseFiles" },
+      { id: "baseFileFiles", label: "Arquivos", sectionId: "baseFiles" },
     ],
   },
   {
@@ -2184,7 +2184,7 @@ export const TaskDetailsPage = () => {
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <IconFiles className="h-5 w-5 text-muted-foreground" />
-                        Arquivos Base
+                        Arquivos
                         <Badge variant="secondary" className="ml-2">
                           {task.baseFiles?.length ?? 0}
                         </Badge>

@@ -175,8 +175,8 @@ export const COPYABLE_FIELD_METADATA: Record<CopyableTaskField, CopyableFieldMet
     createNewInstances: false,
   },
   baseFiles: {
-    label: 'Arquivos Base',
-    description: 'Arquivos base para design',
+    label: 'Arquivos',
+    description: 'Arquivos da tarefa',
     category: 'Arquivos',
     isShared: true,
     createNewInstances: false,

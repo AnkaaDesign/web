@@ -57,7 +57,9 @@ import {
   useBackupMutations,
   useBackupUtils,
 } from "@/hooks/useBackup";
+import { useBackupProgress } from "@/hooks/useBackupProgress";
 import { useAuth } from "@/contexts/auth-context";
+import { getLocalStorage } from "@/lib/storage";
 import { useTableState } from "@/hooks/use-table-state";
 
 // Retention options for auto-delete
@@ -202,6 +204,70 @@ const BackupManagementPage = () => {
 
   // Utility functions
   const { formatBytes, generateCronExpression, parseCronToHuman } = useBackupUtils();
+
+  // WebSocket listener for backup events (deleted, completed)
+  // This ensures the UI updates immediately when backups change
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const socketUrl = import.meta.env.VITE_API_URL || "http://localhost:3000";
+    let socket: any = null;
+
+    const connectSocket = async () => {
+      try {
+        const { io } = await import("socket.io-client");
+        socket = io(`${socketUrl}/backup-progress`, {
+          transports: ["websocket", "polling"],
+          reconnection: true,
+          reconnectionAttempts: 3,
+          reconnectionDelay: 2000,
+        });
+
+        socket.on("connect", () => {
+          if (process.env.NODE_ENV !== "production") {
+            console.log("Connected to backup events WebSocket");
+          }
+        });
+
+        // Listen for backup deletion events
+        socket.on("backup-deleted", (data: { backupId: string }) => {
+          if (process.env.NODE_ENV !== "production") {
+            console.log("Backup deleted event:", data);
+          }
+          // Refetch backups to update the list
+          refetchBackups();
+        });
+
+        // Listen for backup completion events
+        socket.on("backup-completed", (data: { backupId: string; size: number }) => {
+          if (process.env.NODE_ENV !== "production") {
+            console.log("Backup completed event:", data);
+          }
+          // Refetch backups to update status
+          refetchBackups();
+          toast.success("Backup concluído com sucesso!");
+        });
+
+        socket.on("disconnect", () => {
+          if (process.env.NODE_ENV !== "production") {
+            console.log("Disconnected from backup events WebSocket");
+          }
+        });
+      } catch (error) {
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Failed to connect to backup WebSocket:", error);
+        }
+      }
+    };
+
+    connectSocket();
+
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
+  }, [isAuthenticated, refetchBackups]);
 
   // Wrapper functions for mutations with proper typing and error handling
   const createBackup = async (data: any) => {
@@ -511,30 +577,63 @@ const BackupManagementPage = () => {
     }
   };
 
-  // Custom hook for simulated progress when backend doesn't provide real progress
-  const useSimulatedProgress = (backupId: string, isInProgress: boolean) => {
+  // Custom hook for simulated progress with WebSocket real-time updates
+  const useSimulatedProgress = (backupId: string, isInProgress: boolean, backupProgress?: number) => {
     const [simulatedProgress, setSimulatedProgress] = useState(15);
+    const [startTimeRef] = useState(() => Date.now());
 
-    // Poll for real status every 3 seconds when backup is in progress
+    // Get auth token for WebSocket connection
+    const token = getLocalStorage("token") || undefined;
+
+    // Use WebSocket-based real-time progress when backup is in progress
+    const {
+      progress: wsProgress,
+      isConnected: wsConnected,
+    } = useBackupProgress(isInProgress ? backupId : null, {
+      token,
+      onComplete: () => {
+        refetchBackups(); // Refetch when backup completes
+      },
+      onError: (error) => {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("WebSocket progress error:", error);
+        }
+      },
+    });
+
+    // Poll for real status as fallback (less frequently when WebSocket is connected)
     useEffect(() => {
       if (!isInProgress) return;
 
+      // Poll less frequently if WebSocket is connected
       const pollInterval = setInterval(() => {
         refetchBackups(); // Check if backup completed
-      }, 3000);
+      }, wsConnected ? 5000 : 2000);
 
       return () => clearInterval(pollInterval);
-    }, [isInProgress, backupId]);
+    }, [isInProgress, backupId, wsConnected]);
 
     useEffect(() => {
+      // Reset progress when backup is no longer in progress
       if (!isInProgress) {
         setSimulatedProgress(15);
         return;
       }
 
-      const startTime = Date.now();
+      // If we have WebSocket progress, use it
+      if (wsProgress && wsProgress > 0) {
+        setSimulatedProgress(wsProgress);
+        return;
+      }
+
+      // If backend provides real progress from polling, use it
+      if (backupProgress && backupProgress > 0) {
+        setSimulatedProgress(backupProgress);
+        return;
+      }
+
       const interval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
+        const elapsed = Date.now() - startTimeRef;
 
         // Simulate realistic progress curve
         let progress = 15;
@@ -554,11 +653,14 @@ const BackupManagementPage = () => {
         }
 
         setSimulatedProgress(Math.round(progress));
-      }, 2000); // Update every 2 seconds
+      }, 1000); // Update every 1 second for smoother animation
 
       return () => clearInterval(interval);
-    }, [isInProgress, backupId]);
+    }, [isInProgress, backupId, backupProgress, wsProgress, startTimeRef]);
 
+    // Priority: WebSocket > Backend polling > Simulated
+    if (wsProgress && wsProgress > 0) return wsProgress;
+    if (backupProgress && backupProgress > 0) return backupProgress;
     return simulatedProgress;
   };
 
@@ -657,11 +759,21 @@ const BackupManagementPage = () => {
         await deleteBackup(backupToDelete[0].id);
       }
 
+      toast.success(
+        isBulk
+          ? `${backupToDelete.length} backups excluídos com sucesso`
+          : "Backup excluído com sucesso"
+      );
       refetchBackups();
       setDeleteDialogOpen(false);
       setBackupToDelete(null);
     } catch (error) {
-      // Error handled by mutation
+      console.error('Failed to delete backup:', error);
+      toast.error(
+        error instanceof Error
+          ? `Erro ao excluir backup: ${error.message}`
+          : "Erro ao excluir backup. Tente novamente."
+      );
     }
   }, [backupToDelete, deleteBackup, resetSelection, refetchBackups]);
 
@@ -705,7 +817,6 @@ const BackupManagementPage = () => {
         type: newSchedule.type,
         description: `Backup agendado ${getFrequencyLabel(newSchedule.frequency).toLowerCase()} às ${timeDisplay}`,
         priority: newSchedule.priority,
-        raidAware: true, // Enable RAID-aware backups for scheduled jobs
         compressionLevel: newSchedule.compressionLevel,
         encrypted: newSchedule.encrypted,
         enabled: newSchedule.enabled,
@@ -866,8 +977,7 @@ const BackupManagementPage = () => {
 
   // BackupTableRow component to use the progress hook
   const BackupTableRow = ({ backup }: { backup: BackupMetadata }) => {
-    const simulatedProgress = useSimulatedProgress(backup.id, backup.status === "in_progress");
-    const actualProgress = backup.progress || simulatedProgress;
+    const actualProgress = useSimulatedProgress(backup.id, backup.status === "in_progress", backup.progress);
     const isBackupSelected = isSelected(backup.id);
 
     const TypeIcon = getBackupTypeIcon(backup.type) === "IconDatabase" ? IconDatabase : getBackupTypeIcon(backup.type) === "IconFolder" ? IconFolder : IconServer;
@@ -1059,7 +1169,7 @@ const BackupManagementPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
+              <div className="rounded-md border dark:border-border/40">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1108,7 +1218,7 @@ const BackupManagementPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="rounded-md border">
+              <div className="rounded-md border dark:border-border/40">
                 <Table>
                   <TableHeader>
                     <TableRow>
