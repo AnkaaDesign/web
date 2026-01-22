@@ -213,11 +213,11 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
     );
   }
 
-  // Two column layout when files exist
+  // Two column layout when files exist (1/3 - 2/3 split)
   return (
-    <div className={cn("grid grid-cols-1 lg:grid-cols-2 gap-6", className)}>
-      {/* Basic Information Card */}
-      <Card className="shadow-sm border border-border">
+    <div className={cn("grid grid-cols-1 lg:grid-cols-3 gap-6", className)}>
+      {/* Basic Information Card - Takes 1/3 width */}
+      <Card className="shadow-sm border border-border lg:col-span-1">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/20">
@@ -336,8 +336,8 @@ export function ObservationInfoCard({ observation, className }: ObservationInfoC
         </CardContent>
       </Card>
 
-      {/* Files Card */}
-      <Card className="shadow-sm border border-border">
+      {/* Files Card - Takes 2/3 width */}
+      <Card className="shadow-sm border border-border lg:col-span-2">
         <CardHeader className="pb-4">
           <CardTitle className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">

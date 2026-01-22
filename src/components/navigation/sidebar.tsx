@@ -492,10 +492,10 @@ export const Sidebar = memo(() => {
         ...item,
         children: item.children
           ?.map((child) => {
-            // Special handling for catalogo
-            if (child.id === "catalogo" && formulaMatch) {
-              const paintId = formulaMatch[1];
-              const formulaId = formulaMatch[2];
+            // Special handling for catalogo (all variants)
+            if (child.id === "catalogo" || child.id === "catalogo-commercial" || child.id === "catalogo-designer") {
+              const paintId = formulaMatch?.[1];
+              const formulaId = formulaMatch?.[2];
 
               const catalogoChildren = [...(child.children || [])];
 
@@ -523,7 +523,7 @@ export const Sidebar = memo(() => {
                 catalogoChildren[detalhesIndex] = {
                   ...catalogoChildren[detalhesIndex],
                   path: `/pintura/catalogo/detalhes/${paintId}`,
-                  children: formulaMatch[0].includes("/formulas")
+                  children: formulaMatch && formulaMatch[0].includes("/formulas")
                     ? [
                         {
                           id: "catalogo-formulas",
@@ -544,7 +544,7 @@ export const Sidebar = memo(() => {
                       ]
                     : [],
                 } as MenuItem;
-              } else if (detalhesIndex !== -1 && !currentPath.includes("/detalhes/")) {
+              } else if (detalhesIndex !== -1 && !currentPath.includes("/pintura/catalogo/detalhes/")) {
                 catalogoChildren.splice(detalhesIndex, 1);
               }
 

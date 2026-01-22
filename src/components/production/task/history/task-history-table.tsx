@@ -55,10 +55,12 @@ export function TaskHistoryTable({
   // Use URL state management for pagination and selection
   const tableState = useTableState({
     defaultPageSize: 40,
-    defaultSort: [{
-      column: navigationRoute === 'preparation' ? 'forecastDate' : 'finishedAt',
-      direction: navigationRoute === 'preparation' ? 'asc' : 'desc'
-    }],
+    defaultSort: navigationRoute === 'preparation'
+      ? [
+          { column: 'forecastDate', direction: 'asc' },
+          { column: 'identificador', direction: 'asc' },
+        ]
+      : [{ column: 'finishedAt', direction: 'desc' }],
     resetSelectionOnPageChange: false,
   });
 

@@ -28,14 +28,14 @@ export function PaintFormulaDetail({ formula }: PaintFormulaDetailProps) {
   const ratioMismatch = Math.abs(totalRatio - 100) > 0.1;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Formula Header */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-4">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <IconFlask className="h-5 w-5" />
+              <CardTitle className="text-base flex items-center gap-2">
+                <IconFlask className="h-4 w-4" />
                 Fórmula da Tinta
               </CardTitle>
               <CardDescription>{formula.description}</CardDescription>
@@ -55,20 +55,20 @@ export function PaintFormulaDetail({ formula }: PaintFormulaDetailProps) {
 
       {/* Components List */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <IconPackage className="h-5 w-5" />
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <IconPackage className="h-4 w-4" />
             Componentes ({components.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {components.map((component, index) => (
               <div key={component.id || index}>
-                <div className="flex items-center justify-between p-4 border-2 border-border rounded-lg hover:border-red-500 transition-all duration-200 cursor-pointer">
+                <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
                   <div className="flex-1">
-                    <h4 className="font-medium">{component.item?.name || `Componente ${index + 1}`}</h4>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                    <div className="font-medium text-sm">{component.item?.name || `Componente ${index + 1}`}</div>
+                    <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
                       {/* Ratio Display */}
                       <div className="flex items-center gap-1">
                         <IconCalculator className="h-3 w-3" />
@@ -109,7 +109,7 @@ export function PaintFormulaDetail({ formula }: PaintFormulaDetailProps) {
 
                     {/* Item Details */}
                     {component.item && (
-                      <div className="mt-2 text-xs text-muted-foreground">
+                      <div className="mt-1 text-xs text-muted-foreground">
                         Estoque: {component.item.quantity} {component.item.measures?.[0]?.unit || "un"}
                         {showPrices && component.item.prices?.[0] && (
                           <span className="ml-2">
@@ -122,38 +122,37 @@ export function PaintFormulaDetail({ formula }: PaintFormulaDetailProps) {
 
                   <div className="text-right">
                     {/* Ratio percentage */}
-                    <div className="text-lg font-semibold text-primary">{(component.ratio || 0).toFixed(1)}%</div>
+                    <div className="text-base font-semibold text-primary">{(component.ratio || 0).toFixed(1)}%</div>
                     <div className="text-xs text-muted-foreground">da fórmula</div>
                   </div>
                 </div>
-
-                {index < components.length - 1 && <Separator className="my-2" />}
               </div>
             ))}
           </div>
 
           {/* Formula Summary */}
-          <Separator className="my-4" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-3 bg-muted rounded-lg">
-              <div className="text-sm text-muted-foreground">Total de Componentes</div>
-              <div className="text-xl font-bold">{components.length}</div>
-            </div>
+          <div className="mt-4 pt-4 border-t">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="text-center p-3 bg-muted rounded-lg">
+                <div className="text-sm text-muted-foreground">Total de Componentes</div>
+                <div className="text-xl font-bold">{components.length}</div>
+              </div>
 
-            <div className="text-center p-3 bg-muted rounded-lg">
-              <div className="text-sm text-muted-foreground">Soma das Proporções</div>
-              <div className="text-xl font-bold">{totalRatio.toFixed(1)}%</div>
-              {ratioMismatch && (
-                <div className="text-xs text-destructive mt-1">
-                  <IconAlertTriangle className="h-3 w-3 inline mr-1" />
-                  Deve somar 100%
-                </div>
-              )}
-            </div>
+              <div className="text-center p-3 bg-muted rounded-lg">
+                <div className="text-sm text-muted-foreground">Soma das Proporções</div>
+                <div className="text-xl font-bold">{totalRatio.toFixed(1)}%</div>
+                {ratioMismatch && (
+                  <div className="text-xs text-destructive mt-1">
+                    <IconAlertTriangle className="h-3 w-3 inline mr-1" />
+                    Deve somar 100%
+                  </div>
+                )}
+              </div>
 
-            <div className="text-center p-3 bg-muted rounded-lg">
-              <div className="text-sm text-muted-foreground">Densidade da Fórmula</div>
-              <div className="text-xl font-bold">{Number(formula.density).toFixed(3)} g/ml</div>
+              <div className="text-center p-3 bg-muted rounded-lg">
+                <div className="text-sm text-muted-foreground">Densidade da Fórmula</div>
+                <div className="text-xl font-bold">{Number(formula.density).toFixed(3)} g/ml</div>
+              </div>
             </div>
           </div>
         </CardContent>

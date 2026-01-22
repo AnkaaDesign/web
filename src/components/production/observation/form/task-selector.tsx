@@ -147,13 +147,14 @@ export const TaskSelector = ({
   // Debounce search term with longer delay
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  // Build query parameters for tasks - only show finished tasks
+  // Build query parameters for tasks - only show completed tasks
+  // Note: Observations are created for completed tasks (different from cronograma which shows WAITING_PRODUCTION and IN_PRODUCTION)
   const taskQuery = useMemo(() => {
     const query: any = {
       searchingFor: debouncedSearchTerm || undefined,
       page: currentPage,
       limit: currentPageSize,
-      status: [TASK_STATUS.COMPLETED], // Only show completed tasks
+      status: [TASK_STATUS.COMPLETED], // Only show completed tasks for observations
       include: {
         sector: true,
         customer: true,

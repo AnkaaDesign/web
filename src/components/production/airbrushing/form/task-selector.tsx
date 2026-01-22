@@ -134,14 +134,15 @@ export const TaskSelector = ({
   // Debounce search term with longer delay
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
-  // Build query parameters for tasks - show only unfinished tasks for airbrushing
+  // Build query parameters for tasks - show only tasks that should display in agenda (same as preparation page)
   const taskQuery = useMemo(() => {
     const query: any = {
       searchingFor: debouncedSearchTerm || undefined,
       page: page - 1, // Convert from 1-based (UI) to 0-based (API)
       limit: currentPageSize,
-      // Only show tasks that are not completed or cancelled
-      status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION, TASK_STATUS.IN_PRODUCTION],
+      // Use the same logic as preparation page: shouldDisplayInAgenda flag
+      shouldDisplayInAgenda: true,
+      // Note: status filter is intentionally not set, matching preparation page behavior
       include: {
         sector: true,
         customer: true,

@@ -1,3 +1,4 @@
+import { useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PrivilegeRoute } from "@/components/navigation/privilege-route";
 import { ObservationForm } from "@/components/production/observation/form";
@@ -5,11 +6,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { routes, SECTOR_PRIVILEGES } from "../../../constants";
 import { usePageTracker } from "@/hooks/use-page-tracker";
 import type { Observation } from "../../../types";
-import { IconCheck, IconNotebook } from "@tabler/icons-react";
+import { IconCheck, IconNotebook, IconArrowRight, IconArrowLeft } from "@tabler/icons-react";
 
 export const ObservationCreate = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [currentStep, setCurrentStep] = useState(1);
+  const navigationHandlersRef = useRef<{ handleNext: () => void; handlePrev: () => void }>();
 
   // Get task ID from URL params if provided
   const taskId = searchParams.get("taskId");
@@ -25,21 +28,82 @@ export const ObservationCreate = () => {
     navigate(routes.production.observations.root);
   };
 
-  const actions = [
-    {
-      key: "cancel",
-      label: "Cancelar",
-      onClick: handleCancel,
-      variant: "outline" as const,
-    },
-    {
-      key: "submit",
-      label: "Cadastrar",
-      icon: IconCheck,
-      onClick: () => document.getElementById("observation-form-submit")?.click(),
-      variant: "default" as const,
-    },
-  ];
+  const handleNavigationReady = useCallback((handlers: { handleNext: () => void; handlePrev: () => void }) => {
+    navigationHandlersRef.current = handlers;
+  }, []);
+
+  const handleNextStep = () => {
+    navigationHandlersRef.current?.handleNext();
+  };
+
+  const handlePrevStep = () => {
+    navigationHandlersRef.current?.handlePrev();
+  };
+
+  // Dynamic actions based on current step
+  const getActions = () => {
+    const actions = [
+      {
+        key: "cancel",
+        label: "Cancelar",
+        onClick: handleCancel,
+        variant: "outline" as const,
+      },
+    ];
+
+    // Step 1: Only show Next button
+    if (currentStep === 1) {
+      actions.push({
+        key: "next",
+        label: "Próximo",
+        icon: IconArrowRight,
+        onClick: handleNextStep,
+        variant: "default" as const,
+      });
+    }
+    // Step 2: Show Previous and Next buttons
+    else if (currentStep === 2) {
+      actions.push(
+        {
+          key: "previous",
+          label: "Anterior",
+          icon: IconArrowLeft,
+          onClick: handlePrevStep,
+          variant: "outline" as const,
+        },
+        {
+          key: "next",
+          label: "Próximo",
+          icon: IconArrowRight,
+          onClick: handleNextStep,
+          variant: "default" as const,
+        }
+      );
+    }
+    // Step 3: Show Previous and Submit buttons
+    else if (currentStep === 3) {
+      actions.push(
+        {
+          key: "previous",
+          label: "Anterior",
+          icon: IconArrowLeft,
+          onClick: handlePrevStep,
+          variant: "outline" as const,
+        },
+        {
+          key: "submit",
+          label: "Cadastrar",
+          icon: IconCheck,
+          onClick: () => document.getElementById("observation-form-submit")?.click(),
+          variant: "default" as const,
+        }
+      );
+    }
+
+    return actions;
+  };
+
+  const actions = getActions();
 
   return (
     <PrivilegeRoute requiredPrivilege={[SECTOR_PRIVILEGES.PRODUCTION, SECTOR_PRIVILEGES.WAREHOUSE, SECTOR_PRIVILEGES.COMMERCIAL, SECTOR_PRIVILEGES.ADMIN]}>
@@ -61,6 +125,8 @@ export const ObservationCreate = () => {
             initialTaskId={taskId || undefined}
             onSuccess={handleSuccess}
             onCancel={handleCancel}
+            onStepChange={setCurrentStep}
+            onNavigationReady={handleNavigationReady}
           />
         </div>
       </div>

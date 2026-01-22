@@ -768,6 +768,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
     icon: "palette",
     path: "/pintura/catalogo-basico",
     requiredPrivilege: SECTOR_PRIVILEGES.DESIGNER,
+    children: [{ id: "catalogo-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/catalogo/detalhes/:id", isDynamic: true }],
   },
   {
     id: "cronograma-designer",
@@ -902,6 +903,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
     icon: "palette",
     path: "/pintura/catalogo-basico",
     requiredPrivilege: SECTOR_PRIVILEGES.COMMERCIAL,
+    children: [{ id: "catalogo-detalhes", title: "Detalhes", icon: "eye", path: "/pintura/catalogo/detalhes/:id", isDynamic: true }],
   },
   {
     id: "clientes-commercial",

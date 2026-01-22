@@ -131,24 +131,20 @@ export const ObservationDetailsPage = () => {
           className="flex-shrink-0"
         />
         <div className="flex-1 overflow-y-auto pb-6">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <ObservationInfoCard
-                observation={{
-                  ...observation,
-                  files: observation.files?.map((file) => {
-                    const urls = generateFileUrls(file);
-                    return {
-                      ...file,
-                      fileUrl: urls.serve,
-                      thumbnailUrl: file.thumbnailUrl || urls.thumbnail || undefined,
-                      mimeType: file.mimetype, // Map mimetype to mimeType
-                    };
-                  }),
-                }}
-              />
-            </div>
-          </div>
+          <ObservationInfoCard
+            observation={{
+              ...observation,
+              files: observation.files?.map((file) => {
+                const urls = generateFileUrls(file);
+                return {
+                  ...file,
+                  fileUrl: urls.serve,
+                  thumbnailUrl: file.thumbnailUrl || urls.thumbnail || undefined,
+                  mimeType: file.mimetype, // Map mimetype to mimeType
+                };
+              }),
+            }}
+          />
         </div>
 
         {/* Delete Dialog */}

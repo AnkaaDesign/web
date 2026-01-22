@@ -86,7 +86,21 @@ export function convertSortConfigsToOrderBy(sortConfigs: Array<{ column: string;
       // Special case: identificador is a computed field (serialNumber || truck.plate)
       // Sort by serialNumber as the primary identifier
       if (fieldPath[0] === "identificador") {
-        return { serialNumber: config.direction };
+        return {
+          serialNumber: {
+            sort: config.direction,
+            nulls: "last" as const
+          }
+        };
+      }
+      // Handle null values for forecastDate - put nulls at the end
+      if (fieldPath[0] === "forecastDate") {
+        return {
+          forecastDate: {
+            sort: config.direction,
+            nulls: "last" as const
+          }
+        };
       }
       return { [fieldPath[0]]: config.direction };
     } else if (fieldPath.length === 2) {

@@ -19,7 +19,7 @@ import { TaskSelector } from "./task-selector";
 import { FormSteps } from "@/components/ui/form-steps";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { IconAlertCircle, IconX, IconFile, IconUser, IconBuildingFactory, IconHash } from "@tabler/icons-react";
+import { IconAlertCircle, IconX, IconFile, IconUser, IconBuildingFactory, IconHash, IconCheck } from "@tabler/icons-react";
 import { CustomerLogoDisplay } from "@/components/ui/avatar-display";
 import { cn, backendFileToFileWithPreview } from "@/lib/utils";
 import { toast } from "sonner";
@@ -74,9 +74,11 @@ interface ObservationFormProps {
   onSuccess?: (observation: any) => void;
   onCancel?: () => void;
   className?: string;
+  onStepChange?: (step: number) => void;
+  onNavigationReady?: (handlers: { handleNext: () => void; handlePrev: () => void }) => void;
 }
 
-export function ObservationForm({ observationId, mode, initialTaskId, onSuccess, onCancel, className }: ObservationFormProps) {
+export function ObservationForm({ observationId, mode, initialTaskId, onSuccess, onCancel, className, onStepChange, onNavigationReady }: ObservationFormProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -195,16 +197,18 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       const newStep = currentStep + 1;
       setCurrentStep(newStep);
       setSearchParams(setStepInUrl(searchParams, newStep), { replace: true });
+      onStepChange?.(newStep);
     }
-  }, [mode, currentStep, searchParams, setSearchParams]);
+  }, [mode, currentStep, searchParams, setSearchParams, onStepChange]);
 
   const prevStep = useCallback(() => {
     if (mode === "create" && currentStep > 1) {
       const newStep = currentStep - 1;
       setCurrentStep(newStep);
       setSearchParams(setStepInUrl(searchParams, newStep), { replace: true });
+      onStepChange?.(newStep);
     }
-  }, [mode, currentStep, searchParams, setSearchParams]);
+  }, [mode, currentStep, searchParams, setSearchParams, onStepChange]);
 
   // Step validation
   const validateCurrentStep = useCallback((): boolean => {
@@ -229,9 +233,11 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       case 2:
         // Validate task selection
         if (selectedTasks.size === 0) {
+          form.setError("taskId", { message: "Uma tarefa deve ser selecionada" });
           toast.error("Uma tarefa deve ser selecionada");
           return false;
         }
+        form.clearErrors("taskId");
         return true;
 
       case 3:
@@ -264,6 +270,8 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       // Select task (only one can be selected)
       setSelectedTasks(new Set([taskId]));
       form.setValue("taskId", taskId, { shouldDirty: true, shouldTouch: true, shouldValidate: true });
+      // Clear task error when a task is selected
+      form.clearErrors("taskId");
     }
     // Trigger form revalidation to update button state
     form.trigger();
@@ -315,7 +323,6 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
         description: data.description,
         taskId: data.taskId,
         fileIds: existingFileIds,
-        ...(mode === "create" ? { reason: "Observação" } : {}),
       };
 
       let result;
@@ -372,8 +379,23 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
     }
   }, [validateCurrentStep, nextStep]);
 
+  // Handle previous button click
+  const handlePrev = useCallback(() => {
+    prevStep();
+  }, [prevStep]);
+
   const isLastStep = currentStep === steps.length;
   const isFirstStep = currentStep === 1;
+
+  // Expose navigation functions to parent
+  useEffect(() => {
+    if (onNavigationReady) {
+      onNavigationReady({ handleNext, handlePrev });
+    }
+    if (onStepChange) {
+      onStepChange(currentStep);
+    }
+  }, [handleNext, handlePrev, currentStep, onNavigationReady, onStepChange]);
 
   // Loading state
   if (mode === "edit" && isLoadingObservation) {
@@ -389,7 +411,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
     // For edit mode, show all fields on one page (no steps)
     if (mode === "edit") {
       return (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Task Display for Edit Mode */}
           {observation?.task && (
             <div className="border border-border/40 rounded-lg p-4 bg-muted/30">
@@ -561,7 +583,7 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       case 1:
         // Step 1: Observation Details and Files
         return (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -686,15 +708,19 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
       case 2:
         // Step 2: Task Selection
         return (
-          <div className="flex-1 flex flex-col min-h-0">
-            <div className="flex-1 rounded-lg overflow-hidden">
-              <TaskSelector
-                selectedTasks={selectedTasks}
-                onSelectTask={handleTaskSelection}
-                onSelectAll={handleSelectAll}
-                className="h-full"
-              />
-            </div>
+          <div className="flex flex-col h-full space-y-4">
+            {/* Task selection error message */}
+            {form.formState.errors.taskId && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-md px-4 py-3 flex-shrink-0">
+                <p className="text-sm text-destructive">{form.formState.errors.taskId.message}</p>
+              </div>
+            )}
+            <TaskSelector
+              selectedTasks={selectedTasks}
+              onSelectTask={handleTaskSelection}
+              onSelectAll={handleSelectAll}
+              className="flex-1 min-h-0"
+            />
           </div>
         );
 
@@ -786,47 +812,29 @@ export function ObservationForm({ observationId, mode, initialTaskId, onSuccess,
   };
 
   return (
-    <Form {...form}>
-      <form
-        id="observation-form"
-        onSubmit={form.handleSubmit(handleSubmit)}
-        className={cn(
-          mode === "create" && currentStep === 2 ? "h-full flex flex-col" : ""
-        )}
-      >
-        {/* Hidden submit button */}
-        <button id="observation-form-submit" type="submit" className="hidden" disabled={form.formState.isSubmitting}>
-          Submit
-        </button>
+    <Card className={cn("flex flex-col h-full shadow-sm border border-border", className)}>
+      <CardContent className="flex-1 flex flex-col overflow-hidden p-4">
+        <Form {...form}>
+          <form id="observation-form" onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col h-full">
+            {/* Hidden submit button */}
+            <button id="observation-form-submit" type="submit" className="hidden" disabled={form.formState.isSubmitting}>
+              Submit
+            </button>
 
-        <div className="space-y-4">
-          {/* Form Steps Indicator (only show in create mode) */}
-          {mode === "create" && (
-            <Card>
-              <CardContent className="pt-6">
+            {/* Form Steps Indicator (only show in create mode) */}
+            {mode === "create" && (
+              <div className="flex-shrink-0 mb-6">
                 <FormSteps steps={steps} currentStep={currentStep} />
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            )}
 
-          {/* Wrap edit mode content in Card */}
-          {mode === "edit" ? (
-            <Card>
-              <CardContent className="p-6 space-y-6">
-                {renderStepContent()}
-              </CardContent>
-            </Card>
-          ) : (
-            <div
-              className={cn(
-                currentStep === 2 ? "flex-1 flex flex-col min-h-0" : ""
-              )}
-            >
+            {/* Step Content */}
+            <div className={cn("flex-1 min-h-0", currentStep === 2 && mode === "create" ? "flex flex-col overflow-hidden" : "overflow-y-auto")}>
               {renderStepContent()}
             </div>
-          )}
-        </div>
-      </form>
-    </Form>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
   );
 }

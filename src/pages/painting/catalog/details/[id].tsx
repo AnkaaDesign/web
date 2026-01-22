@@ -177,7 +177,7 @@ export default function PaintDetailsPage() {
       ]}
         className="flex-shrink-0"
       />
-      <div className="flex-1 overflow-y-auto pb-6">
+      <div className="flex-1 overflow-y-auto pb-6 space-y-4">
         {/* Row 1: Specifications + (Formulas + Fundos Recomendados) */}
         <div className="animate-in fade-in-50 duration-500 transition-all">
           {/* Mobile: Single column */}
