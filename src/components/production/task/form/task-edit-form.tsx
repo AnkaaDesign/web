@@ -35,6 +35,7 @@ import { cutService } from "../../../../api-client/cut";
 import { TASK_STATUS, TASK_STATUS_LABELS, CUT_TYPE, CUT_ORIGIN, SECTOR_PRIVILEGES, COMMISSION_STATUS, COMMISSION_STATUS_LABELS, TRUCK_CATEGORY, TRUCK_CATEGORY_LABELS, IMPLEMENT_TYPE, IMPLEMENT_TYPE_LABELS, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, AIRBRUSHING_STATUS } from "../../../../constants";
 import { createFormDataWithContext } from "@/utils/form-data-helper";
 import { useAuth } from "../../../../contexts/auth-context";
+import { useAccordionScroll } from "@/lib/scroll-utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -372,33 +373,16 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     }
   }, [truckId, task.id]);
 
+  // Initialize accordion scroll hook with proper timing and offset calculation
+  const { scrollToAccordion } = useAccordionScroll();
+
   // Scroll to the opened accordion item
   useEffect(() => {
     if (openAccordion) {
-      // Use setTimeout to wait for accordion animation to start
-      setTimeout(() => {
-        // Find the accordion item by ID
-        const element = document.getElementById(`accordion-item-${openAccordion}`);
-        if (!element) {
-          console.log('Element not found for:', openAccordion);
-          return;
-        }
-
-        // Get the element's position
-        const rect = element.getBoundingClientRect();
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-
-        // Calculate position with offset (add 100px space from top for header)
-        const targetPosition = rect.top + scrollTop - 100;
-
-        // Smooth scroll to the calculated position
-        window.scrollTo({
-          top: targetPosition,
-          behavior: 'smooth'
-        });
-      }, 150); // Increased timeout to ensure accordion animation completes
+      // Scroll to accordion with proper timing (250ms to wait for 200ms accordion animation + 50ms buffer)
+      scrollToAccordion(openAccordion);
     }
-  }, [openAccordion]);
+  }, [openAccordion, scrollToAccordion]);
 
   const { data: layoutsData } = useLayoutsByTruck(truckId || "", !!truckId);
 

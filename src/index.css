@@ -545,6 +545,26 @@ input[type="time"]::-moz-calendar-picker-indicator {
     min-width: 40px !important;
     max-width: 40px !important;
   }
+
+  /* Smooth scroll behavior with accessibility support */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
+  /* Accordion scroll positioning - ensures accordion items scroll to proper position below header */
+  [id^="accordion-item-"] {
+    scroll-margin-top: 0px; /* Positioned exactly at the top edge of scrollable area (just below header) */
+    scroll-snap-margin-top: 0px; /* Safari fallback */
+  }
+
+  /* Adjust for different screen sizes if needed */
+  @media (max-width: 640px) {
+    [id^="accordion-item-"] {
+      scroll-margin-top: 0px;
+    }
+  }
 }
 
 /* Print styles for borrow receipts and general printing */
