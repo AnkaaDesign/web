@@ -1480,6 +1480,38 @@ export type TaskBatchCreateFormData = z.infer<typeof taskBatchCreateSchema>;
 export type TaskBatchUpdateFormData = z.infer<typeof taskBatchUpdateSchema>;
 export type TaskBatchDeleteFormData = z.infer<typeof taskBatchDeleteSchema>;
 
+// Task Copy Schema
+export const COPYABLE_TASK_FIELDS_SCHEMA = [
+  'all',
+  'name',
+  'details',
+  'term',
+  'entryDate',
+  'forecastDate',
+  'commission',
+  'negotiatingWith',
+  'customerId',
+  'invoiceToId',
+  'pricingId',
+  'paintId',
+  'artworkIds',
+  'baseFileIds',
+  'logoPaintIds',
+  'cuts',
+  'airbrushings',
+  'serviceOrders',
+  'truck',
+  'layouts',
+  'observation',
+] as const;
+
+export const taskCopyRequestSchema = z.object({
+  sourceTaskId: z.string().uuid(),
+  fields: z.array(z.enum(COPYABLE_TASK_FIELDS_SCHEMA)).min(1),
+});
+
+export type TaskCopyRequest = z.infer<typeof taskCopyRequestSchema>;
+
 export type TaskInclude = z.infer<typeof taskIncludeSchema>;
 export type TaskOrderBy = z.infer<typeof taskOrderBySchema>;
 export type TaskWhere = z.infer<typeof taskWhereSchema>;
