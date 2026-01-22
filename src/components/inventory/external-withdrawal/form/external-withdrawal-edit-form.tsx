@@ -817,33 +817,24 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
   }
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Fixed Header - stays at top */}
-      <div className="flex-shrink-0 bg-background border-b border-border">
-        <div className="max-w-5xl mx-auto px-4 py-4">
-          <PageHeader
-            title="Editar Retirada Externa"
-            icon={IconPackageExport}
-            variant="form"
-            breadcrumbs={[
-              { label: "Início", href: "/" },
-              { label: "Estoque", href: "/estoque" },
-              { label: "Retiradas Externas", href: routes.inventory.externalWithdrawals?.list || "/inventory/external-withdrawals" },
-              { label: "Editar" },
-            ]}
-            actions={navigationActions}
-          />
-        </div>
-      </div>
+    <div className="h-full flex flex-col gap-4 bg-background px-4 pt-4 pb-4">
+      <PageHeader
+        className="flex-shrink-0"
+        title="Editar Retirada Externa"
+        icon={IconPackageExport}
+        breadcrumbs={[
+          { label: "Início", href: "/" },
+          { label: "Estoque", href: "/estoque" },
+          { label: "Retiradas Externas", href: routes.inventory.externalWithdrawals?.list || "/inventory/external-withdrawals" },
+          { label: "Editar" },
+        ]}
+        actions={navigationActions}
+      />
 
-      {/* Scrollable Content Area - only this scrolls */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-4 py-6">
-          <div className="pb-6">
-          <Card className="shadow-sm border border-border">
-            <CardContent className="p-4">
+      <Card className="flex-1 min-h-0 flex flex-col shadow-sm border border-border">
+        <CardContent className="flex-1 flex flex-col p-4 overflow-hidden min-h-0">
           <Form {...form}>
-            <form className="flex flex-col h-full">
+            <form className="flex flex-col h-full" onSubmit={(e) => e.preventDefault()}>
               {/* Step Indicator */}
               <div className="flex-shrink-0 mb-6">
                 <FormSteps steps={steps} currentStep={currentStep} />
@@ -1079,7 +1070,7 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="rounded-md border overflow-hidden">
+                        <div className="rounded-md border overflow-hidden dark:border-border/40">
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -1144,11 +1135,8 @@ export const ExternalWithdrawalEditForm = ({ withdrawal }: ExternalWithdrawalEdi
               </div>
             </form>
           </Form>
-            </CardContent>
-          </Card>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

@@ -178,6 +178,9 @@ export function FilePreviewModal({
 
   // Check if image is already loaded (handles race condition where onLoad fires before React attaches handler)
   React.useEffect(() => {
+    // Only run when modal is open
+    if (!open) return;
+
     // Use a small timeout to ensure the img element is rendered and ref is attached
     const checkImageLoaded = setTimeout(() => {
       if (imageRef.current && imageRef.current.complete && imageRef.current.naturalHeight !== 0) {
@@ -187,7 +190,7 @@ export function FilePreviewModal({
     }, 100);
 
     return () => clearTimeout(checkImageLoaded);
-  }, [currentIndex]);
+  }, [currentIndex, open]);
 
   // Initialize current index
   React.useEffect(() => {

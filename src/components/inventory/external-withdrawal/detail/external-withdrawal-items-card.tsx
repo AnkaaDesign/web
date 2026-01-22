@@ -336,7 +336,7 @@ export function ExternalWithdrawalItemsCard({ withdrawal, className, onWithdrawa
         )}
 
         {/* Items Table */}
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-lg overflow-hidden dark:border-border/40">
           <Table>
             <TableHeader className="[&_tr]:border-b-0 [&_tr]:hover:bg-muted">
               <TableRow className="bg-muted hover:bg-muted even:bg-muted">
