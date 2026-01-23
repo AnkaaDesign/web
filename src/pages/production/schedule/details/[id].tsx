@@ -741,6 +741,9 @@ export const TaskDetailsPage = () => {
   // Check if user is from Warehouse sector (should hide documents, budgets, and changelog)
   const isWarehouseSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
 
+  // Check if user is from Production sector (for changelog visibility)
+  const isProductionSector = currentUser?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION;
+
   // Check if user can view base files (ADMIN, COMMERCIAL, LOGISTIC, DESIGNER only)
   const canViewBaseFiles = currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
@@ -786,13 +789,21 @@ export const TaskDetailsPage = () => {
   // Filter sections based on user privileges
   const filteredSections = useMemo(() => {
     return TASK_SECTIONS.filter(section => {
-      // Hide pricing section for users without permission
+      // Hide pricing section for users without permission (ADMIN, FINANCIAL, COMMERCIAL only)
       if (section.id === 'pricing' && !canViewPricingSection) return false;
-      // Hide documents section for users without permission
+      // Hide documents section for users without permission (ADMIN, FINANCIAL, COMMERCIAL only)
       if (section.id === 'documents' && !canViewDocumentsSection) return false;
+      // Hide baseFiles section for users without permission (ADMIN, COMMERCIAL, LOGISTIC, DESIGNER only)
+      if (section.id === 'baseFiles' && !canViewBaseFiles) return false;
+      // Hide cuts section for financial users
+      if (section.id === 'cuts' && isFinancialSector) return false;
+      // Hide artworks section for users who can't view ARTWORK service orders
+      if (section.id === 'artworks' && !canViewServiceOrderType(userSectorPrivilege, SERVICE_ORDER_TYPE.ARTWORK)) return false;
+      // Hide changelog section for warehouse users and production users (except team leaders)
+      if (section.id === 'changelog' && (isWarehouseSector || (isProductionSector && !isTeamLeader(currentUser)))) return false;
       return true;
     });
-  }, [canViewPricingSection, canViewDocumentsSection]);
+  }, [canViewPricingSection, canViewDocumentsSection, canViewBaseFiles, isWarehouseSector, isProductionSector, currentUser, userSectorPrivilege]);
 
   // Initialize section visibility hook with filtered sections
   const sectionVisibility = useSectionVisibility(
@@ -863,7 +874,11 @@ export const TaskDetailsPage = () => {
     enabled: !!id,
     include: {
       sector: true,
-      customer: true,
+      customer: {
+        include: {
+          logo: true,
+        },
+      },
       invoiceTo: {
         include: {
           logo: true,
@@ -1329,7 +1344,7 @@ export const TaskDetailsPage = () => {
                 key: "section-visibility",
                 label: (
                   <SectionVisibilityManager
-                    sections={TASK_SECTIONS}
+                    sections={filteredSections}
                     visibilityState={sectionVisibility.visibilityState}
                     onToggleSection={sectionVisibility.toggleSection}
                     onToggleField={sectionVisibility.toggleField}
@@ -2903,8 +2918,8 @@ export const TaskDetailsPage = () => {
               )}
             </div>
 
-            {/* Changelog History - Hidden for Financial and Warehouse sector users */}
-            {sectionVisibility.isSectionVisible("changelog") && !isFinancialSector && !isWarehouseSector && (
+            {/* Changelog History - Hidden for Warehouse and Production (except team leaders) */}
+            {sectionVisibility.isSectionVisible("changelog") && !isWarehouseSector && (!isProductionSector || isTeamLeader(currentUser)) && (
               <TaskWithServiceOrdersChangelog
                 taskId={task.id}
                 taskName={taskDisplayName}

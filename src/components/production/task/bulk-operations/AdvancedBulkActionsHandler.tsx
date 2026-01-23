@@ -3,10 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { FileUploadField, type FileWithPreview } from "@/components/common/file";
 import { GeneralPaintingSelector } from "../form/general-painting-selector";
 import { LogoPaintsSelector } from "../form/logo-paints-selector";
@@ -14,14 +14,17 @@ import { MultiCutSelector, type MultiCutSelectorRef } from "../form/multi-cut-se
 import { useTaskBatchMutations } from "../../../../hooks";
 import { taskService } from "../../../../api-client/task";
 import { fileService } from "../../../../api-client/file";
-import { IconPhoto, IconFileText, IconPalette, IconCut, IconLoader2, IconAlertTriangle, IconPlus, IconFile, IconFileInvoice, IconReceipt } from "@tabler/icons-react";
-import { CUT_TYPE, CUT_ORIGIN } from "../../../../constants";
+import { IconPhoto, IconFileText, IconPalette, IconCut, IconLoader2, IconAlertTriangle, IconPlus, IconFileInvoice, IconLayout } from "@tabler/icons-react";
+import { CUT_TYPE, CUT_ORIGIN, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE_LABELS } from "../../../../constants";
+import { Textarea } from "@/components/ui/textarea";
+import { serviceOrderService } from "../../../../api-client/serviceOrder";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { LayoutForm } from "@/components/production/layout/layout-form";
 
 // Type definitions for the operations
-type BulkOperationType = "arts" | "documents" | "paints" | "cuttingPlans";
+type BulkOperationType = "arts" | "baseFiles" | "paints" | "cuttingPlans" | "layout" | "serviceOrder";
 
 // Schema for form validation
 const bulkOperationSchema = z.object({
@@ -59,10 +62,20 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
   // States for file uploads (new files, like task form)
   const [artworkFiles, setArtworkFiles] = useState<FileWithPreview[]>([]);
-  const [budgetFiles, setBudgetFiles] = useState<FileWithPreview[]>([]);
-  const [invoiceFiles, setInvoiceFiles] = useState<FileWithPreview[]>([]);
-  const [receiptFiles, setReceiptFiles] = useState<FileWithPreview[]>([]);
+  const [baseFiles, setBaseFiles] = useState<FileWithPreview[]>([]);
   const [cutsCount, setCutsCount] = useState(0);
+
+  // States for layout editing - visual editor like task edit form
+  const [selectedLayoutSide, setSelectedLayoutSide] = useState<"left" | "right" | "back">("left");
+  const [layoutStates, setLayoutStates] = useState<{
+    left: any | null;
+    right: any | null;
+    back: any | null;
+  }>({ left: null, right: null, back: null });
+
+  // States for service order form
+  const [serviceOrderType, setServiceOrderType] = useState<SERVICE_ORDER_TYPE>(SERVICE_ORDER_TYPE.PRODUCTION);
+  const [serviceOrderDescription, setServiceOrderDescription] = useState<string>("");
 
   // States for tracking common values across selected tasks
   const [commonValues, setCommonValues] = useState<{
@@ -71,9 +84,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
     paintIds: string[];
     logoPaints: any[];
     artworkFiles: Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string; thumbnailUrl?: string | null }>;
-    budgetFiles: Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string }>;
-    invoiceFiles: Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string }>;
-    receiptFiles: Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string }>;
+    baseFiles: Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string }>;
     cuts: Array<any>;
   }>({
     paintId: null,
@@ -81,9 +92,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
     paintIds: [],
     logoPaints: [],
     artworkFiles: [],
-    budgetFiles: [],
-    invoiceFiles: [],
-    receiptFiles: [],
+    baseFiles: [],
     cuts: [],
   });
 
@@ -105,10 +114,16 @@ export const AdvancedBulkActionsHandler = forwardRef<
   const resetForm = (type: BulkOperationType) => {
     // Reset all file states
     setArtworkFiles([]);
-    setBudgetFiles([]);
-    setInvoiceFiles([]);
-    setReceiptFiles([]);
+    setBaseFiles([]);
     setCutsCount(0);
+
+    // Reset layout states
+    setSelectedLayoutSide("left");
+    setLayoutStates({ left: null, right: null, back: null });
+
+    // Reset service order states
+    setServiceOrderType(SERVICE_ORDER_TYPE.PRODUCTION);
+    setServiceOrderDescription("");
 
     // Reset common values
     setCommonValues({
@@ -117,9 +132,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
       paintIds: [],
       logoPaints: [],
       artworkFiles: [],
-      budgetFiles: [],
-      invoiceFiles: [],
-      receiptFiles: [],
+      baseFiles: [],
       cuts: [],
     });
 
@@ -148,12 +161,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
             },
             include: {
               artworks: { include: { file: true } },
-              budgets: true,
-              invoices: true,
-              receipts: true,
+              baseFiles: true,
               cuts: { include: { file: true } },
               logoPaints: true,
               generalPainting: true,
+              truck: true,
             },
           });
 
@@ -167,9 +179,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
             paintIds: [] as string[],
             logoPaints: [] as any[],
             artworkFiles: [] as Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string; thumbnailUrl?: string | null }>,
-            budgetFiles: [] as Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string }>,
-            invoiceFiles: [] as Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string }>,
-            receiptFiles: [] as Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string }>,
+            baseFiles: [] as Array<{ id: string; name: string; originalName: string; size: number; type: string; lastModified: number; uploaded: boolean; uploadProgress: number; uploadedFileId: string }>,
             cuts: [] as Array<any>,
           };
 
@@ -245,101 +255,36 @@ export const AdvancedBulkActionsHandler = forwardRef<
             }
           }
 
-          // Find budgets that ALL tasks have in common (by filename)
+          // Find baseFiles that ALL tasks have in common (by filename)
+          // Base files are files used as base for artwork design (shared like artwork)
           if (tasks.length > 0) {
-            const allBudgetFilenames = new Set<string>();
+            const allBaseFileFilenames = new Set<string>();
             tasks.forEach(task => {
-              (task.budgets || []).forEach((b: any) => {
-                const filename = b.originalName || b.filename;
-                if (filename) allBudgetFilenames.add(filename);
+              (task.baseFiles || []).forEach((f: any) => {
+                const filename = f.originalName || f.filename;
+                if (filename) allBaseFileFilenames.add(filename);
               });
             });
 
-            const commonBudgetFilenames = Array.from(allBudgetFilenames).filter(filename =>
-              tasks.every(task => (task.budgets || []).some((b: any) => (b.originalName || b.filename) === filename))
+            const commonBaseFileFilenames = Array.from(allBaseFileFilenames).filter(filename =>
+              tasks.every(task => (task.baseFiles || []).some((f: any) => (f.originalName || f.filename) === filename))
             );
 
-            const taskWithBudgets = tasks.find(t => t.budgets && t.budgets.length > 0);
-            if (taskWithBudgets && commonBudgetFilenames.length > 0) {
-              const commonBudgets = taskWithBudgets.budgets.filter((b: any) =>
-                commonBudgetFilenames.includes(b.originalName || b.filename)
+            const taskWithBaseFiles = tasks.find(t => t.baseFiles && t.baseFiles.length > 0);
+            if (taskWithBaseFiles && commonBaseFileFilenames.length > 0) {
+              const commonBaseFiles = taskWithBaseFiles.baseFiles.filter((f: any) =>
+                commonBaseFileFilenames.includes(f.originalName || f.filename)
               );
-              computed.budgetFiles = commonBudgets.map((b: any) => ({
-                id: b.id,
-                name: b.filename || b.originalName || 'budget',
-                originalName: b.originalName,
-                size: b.size || 0,
-                type: b.mimetype || 'application/octet-stream',
-                lastModified: b.createdAt ? new Date(b.createdAt).getTime() : Date.now(),
+              computed.baseFiles = commonBaseFiles.map((f: any) => ({
+                id: f.id,
+                name: f.filename || f.originalName || 'base-file',
+                originalName: f.originalName,
+                size: f.size || 0,
+                type: f.mimetype || 'application/octet-stream',
+                lastModified: f.createdAt ? new Date(f.createdAt).getTime() : Date.now(),
                 uploaded: true,
                 uploadProgress: 100,
-                uploadedFileId: b.id,
-              }));
-            }
-          }
-
-          // Find invoices that ALL tasks have in common (by filename)
-          if (tasks.length > 0) {
-            const allInvoiceFilenames = new Set<string>();
-            tasks.forEach(task => {
-              (task.invoices || []).forEach((i: any) => {
-                const filename = i.originalName || i.filename;
-                if (filename) allInvoiceFilenames.add(filename);
-              });
-            });
-
-            const commonInvoiceFilenames = Array.from(allInvoiceFilenames).filter(filename =>
-              tasks.every(task => (task.invoices || []).some((i: any) => (i.originalName || i.filename) === filename))
-            );
-
-            const taskWithInvoices = tasks.find(t => t.invoices && t.invoices.length > 0);
-            if (taskWithInvoices && commonInvoiceFilenames.length > 0) {
-              const commonInvoices = taskWithInvoices.invoices.filter((i: any) =>
-                commonInvoiceFilenames.includes(i.originalName || i.filename)
-              );
-              computed.invoiceFiles = commonInvoices.map((i: any) => ({
-                id: i.id,
-                name: i.filename || i.originalName || 'invoice',
-                originalName: i.originalName,
-                size: i.size || 0,
-                type: i.mimetype || 'application/octet-stream',
-                lastModified: i.createdAt ? new Date(i.createdAt).getTime() : Date.now(),
-                uploaded: true,
-                uploadProgress: 100,
-                uploadedFileId: i.id,
-              }));
-            }
-          }
-
-          // Find receipts that ALL tasks have in common (by filename)
-          if (tasks.length > 0) {
-            const allReceiptFilenames = new Set<string>();
-            tasks.forEach(task => {
-              (task.receipts || []).forEach((r: any) => {
-                const filename = r.originalName || r.filename;
-                if (filename) allReceiptFilenames.add(filename);
-              });
-            });
-
-            const commonReceiptFilenames = Array.from(allReceiptFilenames).filter(filename =>
-              tasks.every(task => (task.receipts || []).some((r: any) => (r.originalName || r.filename) === filename))
-            );
-
-            const taskWithReceipts = tasks.find(t => t.receipts && t.receipts.length > 0);
-            if (taskWithReceipts && commonReceiptFilenames.length > 0) {
-              const commonReceipts = taskWithReceipts.receipts.filter((r: any) =>
-                commonReceiptFilenames.includes(r.originalName || r.filename)
-              );
-              computed.receiptFiles = commonReceipts.map((r: any) => ({
-                id: r.id,
-                name: r.filename || r.originalName || 'receipt',
-                originalName: r.originalName,
-                size: r.size || 0,
-                type: r.mimetype || 'application/octet-stream',
-                lastModified: r.createdAt ? new Date(r.createdAt).getTime() : Date.now(),
-                uploaded: true,
-                uploadProgress: 100,
-                uploadedFileId: r.id,
+                uploadedFileId: f.id,
               }));
             }
           }
@@ -385,10 +330,8 @@ export const AdvancedBulkActionsHandler = forwardRef<
           // Pre-fill existing files for display
           if (type === 'arts') {
             setArtworkFiles(computed.artworkFiles as any);
-          } else if (type === 'documents') {
-            setBudgetFiles(computed.budgetFiles as any);
-            setInvoiceFiles(computed.invoiceFiles as any);
-            setReceiptFiles(computed.receiptFiles as any);
+          } else if (type === 'baseFiles') {
+            setBaseFiles(computed.baseFiles as any);
           } else if (type === 'cuttingPlans') {
             // Cuts are handled by form.reset above
             setCutsCount(computed.cuts.length);
@@ -491,89 +434,72 @@ export const AdvancedBulkActionsHandler = forwardRef<
           }
           break;
 
-        case "documents":
-          // Get new document files
-          const newBudgets = budgetFiles.filter(f => f instanceof File) as File[];
-          const newInvoices = invoiceFiles.filter(f => f instanceof File) as File[];
-          const newReceipts = receiptFiles.filter(f => f instanceof File) as File[];
+        case "baseFiles":
+          // Get new base files that need to be uploaded
+          const newBaseFiles = baseFiles.filter(f => f instanceof File) as File[];
 
-          // Upload new files FIRST to get their IDs
-          let uploadedBudgetIds: string[] = [];
-          let uploadedInvoiceIds: string[] = [];
-          let uploadedReceiptIds: string[] = [];
-
-          if (newBudgets.length > 0) {
-            const uploadResponse = await fileService.uploadFiles(newBudgets, {
-              fileContext: 'budget',
-              entityType: 'task',
-            });
-            if (uploadResponse.success && uploadResponse.data?.successful) {
-              uploadedBudgetIds = uploadResponse.data.successful.map(f => f.id);
-            }
-          }
-
-          if (newInvoices.length > 0) {
-            const uploadResponse = await fileService.uploadFiles(newInvoices, {
-              fileContext: 'invoice',
-              entityType: 'task',
-            });
-            if (uploadResponse.success && uploadResponse.data?.successful) {
-              uploadedInvoiceIds = uploadResponse.data.successful.map(f => f.id);
-            }
-          }
-
-          if (newReceipts.length > 0) {
-            const uploadResponse = await fileService.uploadFiles(newReceipts, {
-              fileContext: 'receipt',
-              entityType: 'task',
-            });
-            if (uploadResponse.success && uploadResponse.data?.successful) {
-              uploadedReceiptIds = uploadResponse.data.successful.map(f => f.id);
-            }
-          }
-
-          // Get filenames that should be kept (from existing files)
-          const keptBudgetFilenames = budgetFiles
-            .filter(f => !(f instanceof File))
-            .map((f: any) => f.originalName || f.name);
-          const keptInvoiceFilenames = invoiceFiles
-            .filter(f => !(f instanceof File))
-            .map((f: any) => f.originalName || f.name);
-          const keptReceiptFilenames = receiptFiles
+          // Get filenames that should be kept (from existing files in baseFiles state)
+          // These are the COMMON base files that the user chose to keep
+          const keptBaseFileFilenames = baseFiles
             .filter(f => !(f instanceof File))
             .map((f: any) => f.originalName || f.name);
 
-          // For each task, compute final file IDs (existing + newly uploaded)
-          const perTaskBudgetIds: Record<string, string[]> = {};
-          const perTaskInvoiceIds: Record<string, string[]> = {};
-          const perTaskReceiptIds: Record<string, string[]> = {};
+          // Get filenames of COMMON base files (files that were shown in the UI)
+          // These were pre-populated from commonValues.baseFiles
+          const commonBaseFilenames = commonValues.baseFiles.map(
+            (f: any) => f.originalName || f.name
+          );
 
+          // Upload new base files FIRST to get their IDs
+          let uploadedBaseFileIds: string[] = [];
+          if (newBaseFiles.length > 0) {
+            const uploadResponse = await fileService.uploadFiles(newBaseFiles, {
+              fileContext: 'baseFile',
+              entityType: 'task',
+            });
+            if (uploadResponse.success && uploadResponse.data?.successful) {
+              uploadedBaseFileIds = uploadResponse.data.successful.map(f => f.id);
+            }
+          }
+
+          // For each task, compute the final baseFileIds:
+          // 1. Keep ALL non-common base files (unique to this task) - user couldn't remove them
+          // 2. Keep common base files only if user kept them in keptBaseFileFilenames
+          // 3. Add newly uploaded files to all tasks (shared)
+          const perTaskBaseFileIds: Record<string, string[]> = {};
           currentTasks.forEach(task => {
-            // Keep existing files that match kept filenames + add uploaded files
-            perTaskBudgetIds[task.id] = [
-              ...(task.budgets || [])
-                .filter((b: any) => keptBudgetFilenames.includes(b.originalName || b.filename))
-                .map((b: any) => b.id),
-              ...uploadedBudgetIds,
-            ];
-            perTaskInvoiceIds[task.id] = [
-              ...(task.invoices || [])
-                .filter((i: any) => keptInvoiceFilenames.includes(i.originalName || i.filename))
-                .map((i: any) => i.id),
-              ...uploadedInvoiceIds,
-            ];
-            perTaskReceiptIds[task.id] = [
-              ...(task.receipts || [])
-                .filter((r: any) => keptReceiptFilenames.includes(r.originalName || r.filename))
-                .map((r: any) => r.id),
-              ...uploadedReceiptIds,
-            ];
+            const taskBaseFileIds: string[] = [];
+
+            (task.baseFiles || []).forEach((file: any) => {
+              const filename = file.originalName || file.filename;
+              const fileId = file.id;
+
+              if (!fileId) return;
+
+              // Check if this is a common base file (was shown in UI)
+              const isCommon = commonBaseFilenames.includes(filename);
+
+              if (isCommon) {
+                // Only keep if user kept it in the UI
+                if (keptBaseFileFilenames.includes(filename)) {
+                  taskBaseFileIds.push(fileId);
+                }
+              } else {
+                // Non-common base file - always keep (user couldn't modify it)
+                taskBaseFileIds.push(fileId);
+              }
+            });
+
+            // Add newly uploaded files (shared across all tasks)
+            taskBaseFileIds.push(...uploadedBaseFileIds);
+
+            perTaskBaseFileIds[task.id] = taskBaseFileIds;
           });
 
           // Store per-task data
-          updateData._perTaskBudgetIds = perTaskBudgetIds;
-          updateData._perTaskInvoiceIds = perTaskInvoiceIds;
-          updateData._perTaskReceiptIds = perTaskReceiptIds;
+          if (newBaseFiles.length > 0 || commonBaseFilenames.length > 0) {
+            updateData._perTaskBaseFileIds = perTaskBaseFileIds;
+          }
           break;
 
         case "paints":
@@ -644,22 +570,135 @@ export const AdvancedBulkActionsHandler = forwardRef<
             }
           }
           break;
+
+        case "layout":
+          // Pass layout data embedded in truck object for ALL tasks
+          // This works for both:
+          // - Tasks WITH trucks: truck is updated with new layouts
+          // - Tasks WITHOUT trucks: truck is created with embedded layouts
+          const hasAnyLayoutState =
+            (layoutStates.left?.layoutSections?.length > 0) ||
+            (layoutStates.right?.layoutSections?.length > 0) ||
+            (layoutStates.back?.layoutSections?.length > 0);
+
+          if (hasAnyLayoutState) {
+            // Build truck object with embedded layout data (following taskTruckCreateSchema)
+            const truckWithLayouts: any = {};
+            // Collect layout photo files for upload
+            const layoutPhotoFiles: Array<{ side: string; file: File }> = [];
+
+            // Left side layout data
+            if (layoutStates.left?.layoutSections?.length > 0) {
+              truckWithLayouts.leftSideLayout = {
+                height: layoutStates.left.height,
+                layoutSections: layoutStates.left.layoutSections.map((s: any, idx: number) => ({
+                  width: s.width,
+                  isDoor: s.isDoor || false,
+                  doorHeight: s.doorHeight,
+                  position: idx,
+                })),
+                photoId: layoutStates.left.photoId || null,
+              };
+              // Collect photo file if present
+              if (layoutStates.left.photoFile instanceof File) {
+                layoutPhotoFiles.push({ side: 'leftSide', file: layoutStates.left.photoFile });
+              }
+            }
+
+            // Right side layout data
+            if (layoutStates.right?.layoutSections?.length > 0) {
+              truckWithLayouts.rightSideLayout = {
+                height: layoutStates.right.height,
+                layoutSections: layoutStates.right.layoutSections.map((s: any, idx: number) => ({
+                  width: s.width,
+                  isDoor: s.isDoor || false,
+                  doorHeight: s.doorHeight,
+                  position: idx,
+                })),
+                photoId: layoutStates.right.photoId || null,
+              };
+              // Collect photo file if present
+              if (layoutStates.right.photoFile instanceof File) {
+                layoutPhotoFiles.push({ side: 'rightSide', file: layoutStates.right.photoFile });
+              }
+            }
+
+            // Back side layout data
+            if (layoutStates.back?.layoutSections?.length > 0) {
+              truckWithLayouts.backSideLayout = {
+                height: layoutStates.back.height,
+                layoutSections: layoutStates.back.layoutSections.map((s: any, idx: number) => ({
+                  width: s.width,
+                  isDoor: s.isDoor || false,
+                  doorHeight: s.doorHeight,
+                  position: idx,
+                })),
+                photoId: layoutStates.back.photoId || null,
+              };
+              // Collect photo file if present
+              if (layoutStates.back.photoFile instanceof File) {
+                layoutPhotoFiles.push({ side: 'backSide', file: layoutStates.back.photoFile });
+              }
+            }
+
+            // Set truck data for ALL tasks - this will create truck if missing
+            // or update existing truck with new layout data
+            if (Object.keys(truckWithLayouts).length > 0) {
+              const truckLayoutUpdates: Record<string, any> = {};
+
+              currentTasks.forEach(task => {
+                // Pass the same layout data to all tasks
+                // Backend will handle creating/updating trucks and layouts
+                truckLayoutUpdates[task.id] = truckWithLayouts;
+              });
+
+              updateData._perTaskTruckUpdates = truckLayoutUpdates;
+
+              // Store layout photo files for later use in FormData
+              if (layoutPhotoFiles.length > 0) {
+                updateData._layoutPhotoFiles = layoutPhotoFiles;
+              }
+            }
+          }
+          break;
+
+        case "serviceOrder":
+          // Create a NEW service order for EACH selected task
+          if (serviceOrderDescription.trim()) {
+            const serviceOrdersToCreate = currentTaskIds.map(taskId => ({
+              taskId,
+              type: serviceOrderType,
+              status: SERVICE_ORDER_STATUS.PENDING,
+              description: serviceOrderDescription.trim(),
+            }));
+
+            // Use batch create to create all service orders at once
+            await serviceOrderService.batchCreateServiceOrders({
+              serviceOrders: serviceOrdersToCreate,
+            });
+
+            // Close and clear after successful creation
+            handleClose();
+            onClearSelection();
+            return; // Exit early - no need for batch task update
+          }
+          break;
       }
 
       // Extract per-task data and internal flags
       const perTaskArtworkIds = updateData._perTaskArtworkIds;
-      const perTaskBudgetIds = updateData._perTaskBudgetIds;
-      const perTaskInvoiceIds = updateData._perTaskInvoiceIds;
-      const perTaskReceiptIds = updateData._perTaskReceiptIds;
+      const perTaskBaseFileIds = updateData._perTaskBaseFileIds;
+      const perTaskTruckUpdates = updateData._perTaskTruckUpdates;
       const hasNewArtworkFiles = updateData._hasNewArtworkFiles;
+      const layoutPhotoFiles = updateData._layoutPhotoFiles as Array<{ side: string; file: File }> | undefined;
 
       delete updateData._perTaskArtworkIds;
-      delete updateData._perTaskBudgetIds;
-      delete updateData._perTaskInvoiceIds;
-      delete updateData._perTaskReceiptIds;
+      delete updateData._perTaskBaseFileIds;
+      delete updateData._perTaskTruckUpdates;
       delete updateData._hasNewArtworkFiles;
+      delete updateData._layoutPhotoFiles;
 
-      const hasPerTaskData = perTaskArtworkIds || perTaskBudgetIds || perTaskInvoiceIds || perTaskReceiptIds;
+      const hasPerTaskData = perTaskArtworkIds || perTaskBaseFileIds || perTaskTruckUpdates;
       const hasData = Object.keys(updateData).length > 0 || hasPerTaskData;
 
       if (!hasData) {
@@ -681,15 +720,14 @@ export const AdvancedBulkActionsHandler = forwardRef<
             taskData.artworkIds = ids;
           }
 
-          // Add per-task document IDs if available
-          if (perTaskBudgetIds) {
-            taskData.budgetIds = perTaskBudgetIds[id] || [];
+          // Add per-task baseFileIds if available
+          if (perTaskBaseFileIds) {
+            taskData.baseFileIds = perTaskBaseFileIds[id] || [];
           }
-          if (perTaskInvoiceIds) {
-            taskData.invoiceIds = perTaskInvoiceIds[id] || [];
-          }
-          if (perTaskReceiptIds) {
-            taskData.receiptIds = perTaskReceiptIds[id] || [];
+
+          // Add per-task truck layout updates if available
+          if (perTaskTruckUpdates && perTaskTruckUpdates[id]) {
+            taskData.truck = perTaskTruckUpdates[id];
           }
 
           return {
@@ -699,18 +737,31 @@ export const AdvancedBulkActionsHandler = forwardRef<
         }),
       };
 
-      // If we have new artwork files, send as FormData with files attached
-      // Otherwise, send as regular JSON
-      if (hasNewArtworkFiles && newArtworkFiles.length > 0) {
+      // Check if we need to send as FormData (files present)
+      const hasArtworkFilesToUpload = hasNewArtworkFiles && newArtworkFiles.length > 0;
+      const hasLayoutPhotoFiles = layoutPhotoFiles && layoutPhotoFiles.length > 0;
+      const needsFormData = hasArtworkFilesToUpload || hasLayoutPhotoFiles;
+
+      if (needsFormData) {
         const formData = new FormData();
 
         // Add the batch request structure as JSON string
         formData.append('tasks', JSON.stringify(batchRequest.tasks));
 
-        // Add artwork files
-        newArtworkFiles.forEach((file) => {
-          formData.append('artworks', file);
-        });
+        // Add artwork files if present
+        if (hasArtworkFilesToUpload) {
+          newArtworkFiles.forEach((file) => {
+            formData.append('artworks', file);
+          });
+        }
+
+        // Add layout photo files if present
+        // Backend expects: layoutPhotos.leftSide, layoutPhotos.rightSide, layoutPhotos.backSide
+        if (hasLayoutPhotoFiles) {
+          layoutPhotoFiles.forEach(({ side, file }) => {
+            formData.append(`layoutPhotos.${side}`, file);
+          });
+        }
 
         // Get customer name from first task for file organization context
         const firstTask = currentTasks[0];
@@ -746,9 +797,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
     if (!operationType) return "";
     const titles: Record<BulkOperationType, string> = {
       arts: "Adicionar Artes",
-      documents: "Adicionar Documentos",
+      baseFiles: "Arquivos Base",
       paints: "Adicionar Tintas",
       cuttingPlans: "Adicionar Plano de Corte",
+      layout: "Aplicar Layout",
+      serviceOrder: "Ordem de Servico",
     };
     return titles[operationType];
   };
@@ -757,9 +810,11 @@ export const AdvancedBulkActionsHandler = forwardRef<
     if (!operationType) return null;
     const icons: Record<BulkOperationType, React.ReactNode> = {
       arts: <IconPhoto className="h-5 w-5" />,
-      documents: <IconFileText className="h-5 w-5" />,
+      baseFiles: <IconFileText className="h-5 w-5" />,
       paints: <IconPalette className="h-5 w-5" />,
       cuttingPlans: <IconCut className="h-5 w-5" />,
+      layout: <IconLayout className="h-5 w-5" />,
+      serviceOrder: <IconFileInvoice className="h-5 w-5" />,
     };
     return icons[operationType];
   };
@@ -784,64 +839,24 @@ export const AdvancedBulkActionsHandler = forwardRef<
           </div>
         );
 
-      case "documents":
+      case "baseFiles":
         return (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Budget File */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <IconFileInvoice className="h-4 w-4 text-muted-foreground" />
-                  Orçamento
-                </label>
-                <FileUploadField
-                  onFilesChange={setBudgetFiles}
-                  maxFiles={5}
-                  disabled={isSubmitting}
-                  showPreview={false}
-                  existingFiles={budgetFiles}
-                  variant="compact"
-                  placeholder="Orçamentos"
-                  label=""
-                />
-              </div>
-
-              {/* Invoice File */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <IconFile className="h-4 w-4 text-muted-foreground" />
-                  Nota Fiscal
-                </label>
-                <FileUploadField
-                  onFilesChange={setInvoiceFiles}
-                  maxFiles={5}
-                  disabled={isSubmitting}
-                  showPreview={false}
-                  existingFiles={invoiceFiles}
-                  variant="compact"
-                  placeholder="Notas Fiscais"
-                  label=""
-                />
-              </div>
-
-              {/* Receipt File */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-2">
-                  <IconReceipt className="h-4 w-4 text-muted-foreground" />
-                  Recibo
-                </label>
-                <FileUploadField
-                  onFilesChange={setReceiptFiles}
-                  maxFiles={5}
-                  disabled={isSubmitting}
-                  showPreview={false}
-                  existingFiles={receiptFiles}
-                  variant="compact"
-                  placeholder="Recibos"
-                  label=""
-                />
-              </div>
-            </div>
+            <FileUploadField
+              onFilesChange={setBaseFiles}
+              maxFiles={10}
+              disabled={isSubmitting}
+              showPreview={true}
+              existingFiles={baseFiles}
+              variant="compact"
+              placeholder="Selecione arquivos base para as tarefas"
+              label="Arquivos Base"
+            />
+            <Alert>
+              <AlertDescription>
+                Arquivos base são usados como referência para criação das artes. Eles serão compartilhados entre todas as {currentTaskIds.length} tarefas selecionadas.
+              </AlertDescription>
+            </Alert>
           </div>
         );
 
@@ -898,6 +913,143 @@ export const AdvancedBulkActionsHandler = forwardRef<
           </FormProvider>
         );
 
+      case "layout":
+        // Calculate total length for the current side
+        const currentLayoutState = layoutStates[selectedLayoutSide];
+        const totalLength = currentLayoutState?.layoutSections?.reduce(
+          (sum: number, s: any) => sum + (s.width || 0), 0
+        ) || 0;
+
+        return (
+          <div className="space-y-4">
+            {/* Layout Side Selector with Total Length - exactly like task edit form */}
+            <div className="flex flex-wrap justify-between items-center gap-3">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant={selectedLayoutSide === "left" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedLayoutSide("left")}
+                  disabled={isSubmitting}
+                >
+                  Motorista
+                  {layoutStates.left?.layoutSections?.length > 0 && (
+                    <Badge variant="success" className="ml-2">
+                      Configurado
+                    </Badge>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant={selectedLayoutSide === "right" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedLayoutSide("right")}
+                  disabled={isSubmitting}
+                >
+                  Sapo
+                  {layoutStates.right?.layoutSections?.length > 0 && (
+                    <Badge variant="success" className="ml-2">
+                      Configurado
+                    </Badge>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant={selectedLayoutSide === "back" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedLayoutSide("back")}
+                  disabled={isSubmitting}
+                >
+                  Traseira
+                  {layoutStates.back?.layoutSections?.length > 0 && (
+                    <Badge variant="success" className="ml-2">
+                      Configurado
+                    </Badge>
+                  )}
+                </Button>
+              </div>
+
+              {/* Total Length Display - exactly like task edit form */}
+              <div className="px-3 py-1 bg-primary/10 rounded-md">
+                <span className="text-sm text-muted-foreground">Comprimento Total: </span>
+                <span className="text-sm font-semibold text-foreground">
+                  {totalLength.toFixed(2).replace(".", ",")}m
+                </span>
+              </div>
+            </div>
+
+            {/* Visual Layout Editor - exactly like task edit form */}
+            <LayoutForm
+              selectedSide={selectedLayoutSide}
+              layout={currentLayoutState}
+              disabled={isSubmitting}
+              onChange={(side, layoutData) => {
+                setLayoutStates(prev => ({
+                  ...prev,
+                  [side]: layoutData,
+                }));
+              }}
+            />
+
+            {/* Info alert */}
+            {(layoutStates.left?.layoutSections?.length > 0 ||
+              layoutStates.right?.layoutSections?.length > 0 ||
+              layoutStates.back?.layoutSections?.length > 0) && (
+              <Alert className="mt-2">
+                <IconLayout className="h-4 w-4" />
+                <AlertDescription>
+                  O layout configurado sera aplicado a todos os caminhoes das {currentTaskIds.length} tarefas selecionadas.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        );
+
+      case "serviceOrder":
+        return (
+          <div className="space-y-4">
+            {/* Service Type Selector */}
+            <div className="space-y-2">
+              <Label>Tipo de Servico</Label>
+              <Select
+                value={serviceOrderType}
+                onValueChange={(value) => setServiceOrderType(value as SERVICE_ORDER_TYPE)}
+                disabled={isSubmitting}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(SERVICE_ORDER_TYPE).map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {SERVICE_ORDER_TYPE_LABELS[type]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Description Field */}
+            <div className="space-y-2">
+              <Label>Descricao</Label>
+              <Textarea
+                value={serviceOrderDescription}
+                onChange={(e) => setServiceOrderDescription(e.target.value)}
+                placeholder="Descreva o servico a ser realizado..."
+                disabled={isSubmitting}
+                rows={4}
+              />
+            </div>
+
+            {/* Info about creating separate service orders */}
+            <Alert>
+              <AlertDescription>
+                Sera criada uma ordem de servico separada para cada tarefa selecionada ({currentTaskIds.length} {currentTaskIds.length === 1 ? "tarefa" : "tarefas"}).
+              </AlertDescription>
+            </Alert>
+          </div>
+        );
+
       default:
         return null;
     }
@@ -912,7 +1064,7 @@ export const AdvancedBulkActionsHandler = forwardRef<
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className={`${operationType === "layout" ? "sm:max-w-4xl" : "sm:max-w-2xl"} max-h-[85vh] flex flex-col`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getModalIcon()}

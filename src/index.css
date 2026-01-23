@@ -704,7 +704,7 @@ input[type="time"]::-moz-calendar-picker-indicator {
   }
 }
 
-/* Toast positioning - positioned to the left of the sidebar */
+/* Toast positioning - aligned with sidebar */
 [data-sonner-toaster][data-x-position="right"] {
-  right: var(--toast-right-offset, 80px) !important;
+  right: 8px !important;
 }

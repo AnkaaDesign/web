@@ -87,21 +87,22 @@ const Toaster = ({ ...props }: ToasterProps) => {
   const { isOpen: isSidebarOpen } = useSidebar();
 
   // Sidebar widths: 288px (w-72) when open, 64px (w-16) when minimized
-  // Add 16px padding from sidebar edge
-  const rightOffset = isSidebarOpen ? 304 : 80;
+  const toastWidth = isSidebarOpen ? 288 : 64;
 
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
-      position="top-right"
+      position="bottom-right"
       visibleToasts={1}
       expand={true}
       richColors={true}
       closeButton={true}
       duration={5000}
+      offset={8}
       style={{
-        '--toast-right-offset': `${rightOffset}px`,
+        '--width': `${toastWidth}px`,
+        right: 0,
       } as React.CSSProperties}
       toastOptions={{
         classNames: {
@@ -117,6 +118,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         },
         style: {
           zIndex: 9999,
+          width: `${toastWidth}px`,
         },
       }}
       {...props}

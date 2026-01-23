@@ -293,9 +293,13 @@ const PORTUGUESE_LOWERCASE_WORDS = new Set([
 /**
  * Convert a string to Title Case (capitalize first letter of each word)
  * Keeps Portuguese prepositions and articles lowercase (except at the start)
+ * Words with 2-3 characters become entirely uppercase (except prepositions)
  * Example: "pintura de cabine" -> "Pintura de Cabine"
  * Example: "TROCA DA LONA DO CAMINHAO" -> "Troca da Lona do Caminhão"
  * Example: "AZUL FIRENZE" -> "Azul Firenze"
+ * Example: "Tp Transportes" -> "TP Transportes"
+ * Example: "Tmr Transportes" -> "TMR Transportes"
+ * Example: "TRF Logistic" -> "TRF Logistic"
  */
 export const toTitleCase = (str: string): string => {
   if (!str) return "";
@@ -306,17 +310,17 @@ export const toTitleCase = (str: string): string => {
 
       const lowerWord = word.toLowerCase();
 
-      // Always capitalize the first word, even if it's a preposition
-      if (index === 0) {
-        return lowerWord.charAt(0).toUpperCase() + lowerWord.slice(1);
-      }
-
-      // Keep Portuguese prepositions/articles lowercase
-      if (PORTUGUESE_LOWERCASE_WORDS.has(lowerWord)) {
+      // Keep Portuguese prepositions/articles lowercase (except first word)
+      if (index > 0 && PORTUGUESE_LOWERCASE_WORDS.has(lowerWord)) {
         return lowerWord;
       }
 
-      // Capitalize other words
+      // Words with 2-3 characters become entirely uppercase (likely acronyms/abbreviations)
+      if (word.length >= 2 && word.length <= 3) {
+        return word.toUpperCase();
+      }
+
+      // Capitalize first letter, lowercase the rest
       return lowerWord.charAt(0).toUpperCase() + lowerWord.slice(1);
     })
     .join(" ");

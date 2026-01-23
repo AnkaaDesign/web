@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
-import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck } from "@tabler/icons-react";
+import { IconEye, IconEdit, IconFileInvoice, IconTrash, IconBuildingFactory2, IconPlayerPlay, IconCheck, IconCopy, IconSettings2, IconPhoto, IconFileText, IconPalette, IconCut, IconClipboardCopy, IconCalendarCheck, IconLayout } from "@tabler/icons-react";
 import { useTaskMutations, useTaskBatchMutations } from "../../../../hooks";
 import { routes, TASK_STATUS, SECTOR_PRIVILEGES, SERVICE_ORDER_TYPE, SERVICE_ORDER_STATUS } from "../../../../constants";
 import type { Task } from "../../../../types";
@@ -85,6 +85,13 @@ export function TaskHistoryContextMenu({
   const canLiberar = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN ||
                      user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC ||
                      user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
+
+  // LOGISTIC and COMMERCIAL users can see limited context menu options (Visualizar, Editar, Liberar)
+  const isLogisticOrCommercial = user?.sector?.privileges === SECTOR_PRIVILEGES.LOGISTIC ||
+                                  user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
+
+  // Users who can access advanced menu options: ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC
+  const canAccessAdvancedMenu = isAdmin || isFinancialUser || isLogisticOrCommercial;
 
   // Check if we're on the preparation/agenda route (to hide Definir Setor)
   const isPreparationRoute = navigationRoute === 'preparation';
@@ -480,9 +487,23 @@ export function TaskHistoryContextMenu({
     setDropdownOpen(false);
   };
 
-  const handleBulkDocuments = () => {
+  const handleBulkBaseFiles = () => {
     if (advancedActionsRef?.current) {
-      advancedActionsRef.current.openModal("documents", taskIds);
+      advancedActionsRef.current.openModal("baseFiles", taskIds);
+    }
+    setDropdownOpen(false);
+  };
+
+  const handleBulkServiceOrder = () => {
+    if (advancedActionsRef?.current) {
+      advancedActionsRef.current.openModal("serviceOrder", taskIds);
+    }
+    setDropdownOpen(false);
+  };
+
+  const handleBulkLayout = () => {
+    if (advancedActionsRef?.current) {
+      advancedActionsRef.current.openModal("layout", taskIds);
     }
     setDropdownOpen(false);
   };
@@ -627,10 +648,10 @@ export function TaskHistoryContextMenu({
             </DropdownMenuItem>
           )}
 
-          {/* Advanced bulk operations - ADMIN only */}
-          {isAdmin && <DropdownMenuSeparator />}
+          {/* Advanced bulk operations - ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC */}
+          {canAccessAdvancedMenu && <DropdownMenuSeparator />}
 
-          {isAdmin && (
+          {canAccessAdvancedMenu && (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="data-[state=open]:bg-accent data-[state=open]:text-accent-foreground">
                 <IconSettings2 className="mr-2 h-4 w-4" />
@@ -641,9 +662,9 @@ export function TaskHistoryContextMenu({
                   <IconPhoto className="mr-2 h-4 w-4" />
                   Adicionar Artes
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleBulkDocuments}>
+                <DropdownMenuItem onClick={handleBulkBaseFiles}>
                   <IconFileText className="mr-2 h-4 w-4" />
-                  Adicionar Documentos
+                  Arquivos Base
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleBulkPaints}>
                   <IconPalette className="mr-2 h-4 w-4" />
@@ -652,6 +673,14 @@ export function TaskHistoryContextMenu({
                 <DropdownMenuItem onClick={handleBulkCuttingPlans}>
                   <IconCut className="mr-2 h-4 w-4" />
                   Adicionar Plano de Corte
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleBulkServiceOrder}>
+                  <IconFileInvoice className="mr-2 h-4 w-4" />
+                  Ordem de Servico
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleBulkLayout}>
+                  <IconLayout className="mr-2 h-4 w-4" />
+                  Layout
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleCopyFromTask}>

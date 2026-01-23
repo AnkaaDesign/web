@@ -572,6 +572,7 @@ export function TaskScheduleContent({ className }: TaskScheduleContentProps) {
           onConfirm={handleCopyFromTaskConfirm}
           onCancel={handleCopyFromTaskCancel}
           onChangeSource={handleChangeSource}
+          userPrivilege={userSectorPrivilege}
         />
       </CardContent>
     </Card>

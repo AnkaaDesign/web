@@ -320,7 +320,7 @@ const renderPaintsCards = (paints: any[]) => {
   return (
     <div className="space-y-2 mt-2">
       {paints.map((paint: any, index: number) => (
-        <div key={paint.id || index} className="border rounded-lg px-2.5 py-1.5 bg-card">
+        <div key={paint.id || index} className="border dark:border-border/40 rounded-lg px-2.5 py-1.5 bg-card">
           <div className="flex items-start gap-3">
             <div className="relative flex-shrink-0">
               <div className="w-10 h-10 rounded-md ring-1 ring-border shadow-sm overflow-hidden">
@@ -601,11 +601,13 @@ const ChangelogTimelineItem = ({
   changelogGroup,
   entityType,
   entityDetails,
+  userSectorPrivilege,
 }: {
   changelogGroup: ChangeLog[];
   isLast: boolean;
   entityType: CHANGE_LOG_ENTITY_TYPE;
   entityDetails: any;
+  userSectorPrivilege?: SECTOR_PRIVILEGES;
 }) => {
   const firstChange = changelogGroup[0];
   const config = actionConfig[firstChange.action] || {
@@ -1019,6 +1021,13 @@ const ChangelogTimelineItem = ({
                 if (changelog.field === "statusOrder") return false;
                 if (changelog.field === "colorOrder") return false;
 
+                // Filter out financial fields for non-FINANCIAL/ADMIN users
+                const financialFields = ["pricingId", "budgetIds", "invoiceIds", "receiptIds", "price", "cost", "value", "totalPrice", "totalCost", "discount", "profit"];
+                const canViewFinancialFields = userSectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL || userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN;
+                if (!canViewFinancialFields && changelog.field && financialFields.some(f => changelog.field?.toLowerCase().includes(f.toLowerCase()))) {
+                  return false;
+                }
+
                 // For services field, only show if there's a meaningful change (count changed)
                 if (changelog.field === "services") {
                   const parseValue = (val: any) => {
@@ -1193,7 +1202,7 @@ const ChangelogTimelineItem = ({
                                 </>
                               );
                             })()
-                          ) : changelog.field === "logoPaints" || changelog.field === "paints" || changelog.field === "paintGrounds" || changelog.field === "groundPaints" ? (
+                          ) : changelog.field === "logoPaints" || changelog.field === "logoPaintIds" || changelog.field === "paints" || changelog.field === "paintGrounds" || changelog.field === "groundPaints" ? (
                             (() => {
                               const parseValue = (val: any) => {
                                 if (!val) return val;
@@ -1236,7 +1245,7 @@ const ChangelogTimelineItem = ({
                                 </>
                               );
                             })()
-                          ) : changelog.field === "artworks" || changelog.field === "budgets" || changelog.field === "invoices" || changelog.field === "receipts" ? (
+                          ) : changelog.field === "artworks" || changelog.field === "artworkIds" || changelog.field === "baseFileIds" || changelog.field === "budgets" || changelog.field === "invoices" || changelog.field === "receipts" ? (
                             <>
                               <div className="text-sm">
                                 <span className="text-muted-foreground">Antes: </span>
@@ -1261,7 +1270,20 @@ const ChangelogTimelineItem = ({
                                   return (
                                     <div className="flex flex-wrap gap-2 mt-1">
                                       {files.map((file: any, idx: number) => {
-                                        const fileId = typeof file === 'string' ? file : file.id;
+                                        // Handle different data structures:
+                                        // - For artworks: { id: artworkId, fileId: fileId, file: { id, thumbnailUrl } }
+                                        // - For baseFiles/budgets/etc: { id: fileId, filename, thumbnailUrl }
+                                        // - For legacy: just a string ID
+                                        const isArtworkField = changelog.field === "artworks" || changelog.field === "artworkIds";
+                                        let fileId: string;
+                                        if (typeof file === 'string') {
+                                          fileId = file;
+                                        } else if (isArtworkField) {
+                                          // For artworks, use fileId or file.id (the actual file ID)
+                                          fileId = file.fileId || file.file?.id || file.id;
+                                        } else {
+                                          fileId = file.id;
+                                        }
                                         return <LogoDisplay key={idx} logoId={fileId} size="w-12 h-12" useThumbnail />;
                                       })}
                                       <span className="text-sm text-muted-foreground self-center">({files.length} arquivo{files.length > 1 ? 's' : ''})</span>
@@ -1292,7 +1314,16 @@ const ChangelogTimelineItem = ({
                                   return (
                                     <div className="flex flex-wrap gap-2 mt-1">
                                       {files.map((file: any, idx: number) => {
-                                        const fileId = typeof file === 'string' ? file : file.id;
+                                        // Handle different data structures (same as above)
+                                        const isArtworkField = changelog.field === "artworks" || changelog.field === "artworkIds";
+                                        let fileId: string;
+                                        if (typeof file === 'string') {
+                                          fileId = file;
+                                        } else if (isArtworkField) {
+                                          fileId = file.fileId || file.file?.id || file.id;
+                                        } else {
+                                          fileId = file.id;
+                                        }
                                         return <LogoDisplay key={idx} logoId={fileId} size="w-12 h-12" useThumbnail />;
                                       })}
                                       <span className="text-sm text-muted-foreground self-center">({files.length} arquivo{files.length > 1 ? 's' : ''})</span>
@@ -1320,6 +1351,236 @@ const ChangelogTimelineItem = ({
                                 )}
                               </div>
                             </>
+                          ) : changelog.field === "layouts" ? (
+                            // Special handling for layouts field from copy operation
+                            (() => {
+                              const parseValue = (val: any) => {
+                                if (val === null || val === undefined) return null;
+                                if (typeof val === "object" && !Array.isArray(val)) return val;
+                                if (typeof val === "string") {
+                                  try {
+                                    return JSON.parse(val);
+                                  } catch {
+                                    return null;
+                                  }
+                                }
+                                return null;
+                              };
+
+                              const oldLayouts = parseValue(changelog.oldValue);
+                              const newLayouts = parseValue(changelog.newValue);
+
+                              const renderLayoutBadges = (layouts: any, isOld: boolean) => {
+                                if (!layouts) {
+                                  return <span className={isOld ? "text-red-600 dark:text-red-400 font-medium" : "text-green-600 dark:text-green-400 font-medium"}>Nenhum</span>;
+                                }
+
+                                const layoutConfigs = [
+                                  { key: 'leftSideLayoutId', dimKey: 'leftSideDimensions', label: 'Lado Motorista' },
+                                  { key: 'rightSideLayoutId', dimKey: 'rightSideDimensions', label: 'Lado Sapo' },
+                                  { key: 'backSideLayoutId', dimKey: 'backSideDimensions', label: 'Traseira' },
+                                ];
+
+                                const configuredLayouts = layoutConfigs.filter(l => layouts[l.key]);
+                                if (configuredLayouts.length === 0) {
+                                  return <span className={isOld ? "text-red-600 dark:text-red-400 font-medium" : "text-green-600 dark:text-green-400 font-medium"}>Nenhum</span>;
+                                }
+
+                                return (
+                                  <div className="flex flex-col gap-2 mt-1">
+                                    {configuredLayouts.map(({ key, dimKey, label }) => {
+                                      const dimensions = layouts[dimKey];
+                                      const dimensionStr = dimensions && dimensions.width && dimensions.height
+                                        ? `${dimensions.width}cm × ${dimensions.height}cm`
+                                        : null;
+
+                                      return (
+                                        <div key={key} className="border dark:border-border/40 rounded-lg px-2.5 py-1.5 bg-muted/30 inline-flex items-center gap-2 w-fit">
+                                          <span className="text-xs font-medium">{label}</span>
+                                          {dimensionStr && (
+                                            <span className="text-xs text-muted-foreground">{dimensionStr}</span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              };
+
+                              return (
+                                <>
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">Antes:</span>
+                                    {renderLayoutBadges(oldLayouts, true)}
+                                  </div>
+                                  <div className="text-sm mt-3">
+                                    <span className="text-muted-foreground">Depois:</span>
+                                    {renderLayoutBadges(newLayouts, false)}
+                                  </div>
+                                </>
+                              );
+                            })()
+                          ) : changelog.field === "serviceOrders" ? (
+                            // Special handling for serviceOrders from copy operation - show list
+                            (() => {
+                              const parseValue = (val: any) => {
+                                if (val === null || val === undefined) return null;
+                                if (typeof val === "number") return { count: val };
+                                if (typeof val === "object" && !Array.isArray(val)) return val;
+                                if (typeof val === "string") {
+                                  try {
+                                    const parsed = JSON.parse(val);
+                                    if (typeof parsed === "number") return { count: parsed };
+                                    return parsed;
+                                  } catch {
+                                    return null;
+                                  }
+                                }
+                                return null;
+                              };
+
+                              const oldValue = parseValue(changelog.oldValue);
+                              const newValue = parseValue(changelog.newValue);
+
+                              const getCount = (val: any) => {
+                                if (!val) return 0;
+                                if (typeof val === "number") return val;
+                                if (val.count !== undefined) return val.count;
+                                if (Array.isArray(val.ids)) return val.ids.length;
+                                if (Array.isArray(val.items)) return val.items.length;
+                                return 0;
+                              };
+
+                              const oldCount = getCount(oldValue);
+                              const newCount = getCount(newValue);
+
+                              // Get items with descriptions/types if available
+                              const newItems = newValue?.items || [];
+
+                              return (
+                                <>
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">Antes: </span>
+                                    <span className="text-red-600 dark:text-red-400 font-medium">
+                                      {oldCount === 0 ? "Nenhuma" : `${oldCount} ordem${oldCount > 1 ? 's' : ''} de serviço`}
+                                    </span>
+                                  </div>
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">Depois: </span>
+                                    {newCount === 0 ? (
+                                      <span className="text-green-600 dark:text-green-400 font-medium">Nenhuma</span>
+                                    ) : newItems.length > 0 ? (
+                                      <div className="flex flex-col gap-1.5 mt-1">
+                                        {newItems.map((item: any, idx: number) => {
+                                          const typeLabel = item.type ? SERVICE_ORDER_TYPE_LABELS[item.type as keyof typeof SERVICE_ORDER_TYPE_LABELS] || item.type : null;
+                                          return (
+                                            <div key={idx} className="border dark:border-border/40 rounded-lg px-2.5 py-1.5 bg-muted/30 inline-flex items-center gap-2 w-fit">
+                                              {typeLabel && <span className="text-xs font-semibold text-primary">{typeLabel}</span>}
+                                              {item.description && (
+                                                <span className="text-xs text-muted-foreground">{item.description}</span>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : (
+                                      <span className="text-green-600 dark:text-green-400 font-medium">
+                                        {`${newCount} ordem${newCount > 1 ? 's' : ''} de serviço`}
+                                      </span>
+                                    )}
+                                  </div>
+                                </>
+                              );
+                            })()
+                          ) : changelog.field === "pricingId" ? (
+                            // Special handling for pricingId - show pricing info elegantly with items
+                            (() => {
+                              const parseValue = (val: any) => {
+                                if (val === null || val === undefined) return null;
+                                if (typeof val === "object" && val.id) return val;
+                                if (typeof val === "string") {
+                                  try {
+                                    const parsed = JSON.parse(val);
+                                    if (parsed && typeof parsed === "object" && parsed.id) return parsed;
+                                    // If it's just a UUID string, return it as id
+                                    return { id: val, budgetNumber: null, total: null, items: null };
+                                  } catch {
+                                    // It's a raw UUID string
+                                    return { id: val, budgetNumber: null, total: null, items: null };
+                                  }
+                                }
+                                return null;
+                              };
+
+                              const formatCurrency = (value: number | null) => {
+                                if (value === null || value === undefined) return null;
+                                return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+                              };
+
+                              const oldPricing = parseValue(changelog.oldValue);
+                              const newPricing = parseValue(changelog.newValue);
+
+                              const renderPricingValue = (pricing: any, isOld: boolean) => {
+                                if (!pricing || !pricing.id) {
+                                  return <span className={isOld ? "text-red-600 dark:text-red-400 font-medium" : "text-green-600 dark:text-green-400 font-medium"}>Nenhum</span>;
+                                }
+
+                                const hasBudgetInfo = pricing.budgetNumber || pricing.total;
+                                const items = pricing.items || [];
+
+                                return (
+                                  <div className="flex flex-col gap-2 mt-1">
+                                    {hasBudgetInfo ? (
+                                      <div className="border dark:border-border/40 rounded-lg px-3 py-2 bg-muted/30">
+                                        <div className="flex items-center gap-2">
+                                          {pricing.budgetNumber && (
+                                            <span className={`text-sm font-semibold ${isOld ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                                              Orçamento #{pricing.budgetNumber}
+                                            </span>
+                                          )}
+                                          {pricing.total !== null && pricing.total !== undefined && (
+                                            <span className="text-sm font-medium text-muted-foreground">
+                                              {formatCurrency(pricing.total)}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {items.length > 0 && (
+                                          <div className="mt-2 pt-2 border-t dark:border-border/40">
+                                            <span className="text-xs text-muted-foreground font-medium">Itens:</span>
+                                            <div className="flex flex-col gap-1 mt-1">
+                                              {items.map((item: any, idx: number) => (
+                                                <div key={idx} className="flex items-center justify-between text-xs">
+                                                  <span className="text-foreground">{item.description}</span>
+                                                  <span className="text-muted-foreground font-medium">{formatCurrency(item.amount)}</span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      // Fallback to showing just the ID if no budget info
+                                      <span className={`font-mono text-xs ${isOld ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                                        {pricing.id}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              };
+
+                              return (
+                                <>
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">Antes: </span>
+                                    {renderPricingValue(oldPricing, true)}
+                                  </div>
+                                  <div className="text-sm mt-2">
+                                    <span className="text-muted-foreground">Depois: </span>
+                                    {renderPricingValue(newPricing, false)}
+                                  </div>
+                                </>
+                              );
+                            })()
                           ) : (
                             // Default rendering for other fields
                             <>
@@ -1841,6 +2102,7 @@ export function TaskWithServiceOrdersChangelog({
                               isLast={isLastChange}
                               entityType={entityType}
                               entityDetails={entityDetails}
+                              userSectorPrivilege={userSectorPrivilege}
                             />
                           </div>
                         );

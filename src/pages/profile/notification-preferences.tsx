@@ -947,7 +947,7 @@ export function NotificationPreferencesPage() {
                 <AccordionItem
                   key={section.id}
                   value={section.id}
-                  className="border rounded-lg px-4 bg-card"
+                  className="border border-border/40 rounded-lg px-4 bg-card"
                 >
                   <AccordionTrigger className="hover:no-underline py-4">
                     <div className="flex items-center gap-3">

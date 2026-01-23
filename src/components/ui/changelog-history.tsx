@@ -454,7 +454,7 @@ const renderPaintsCards = (paints: any[]) => {
   return (
     <div className="space-y-2 mt-2">
       {paints.map((paint: any, index: number) => (
-        <div key={paint.id || index} className="border rounded-lg px-2.5 py-1.5 bg-card">
+        <div key={paint.id || index} className="border dark:border-border/40 rounded-lg px-2.5 py-1.5 bg-card">
           <div className="flex items-start gap-3">
             {/* Paint preview - prefer colorPreview image */}
             <div className="relative flex-shrink-0">
@@ -1204,7 +1204,7 @@ const ChangelogTimelineItem = ({
                               </>
                             );
                           })()
-                        ) : changelog.field === "logoPaints" || changelog.field === "paints" || changelog.field === "paintGrounds" || changelog.field === "groundPaints" ? (
+                        ) : changelog.field === "logoPaints" || changelog.field === "logoPaintIds" || changelog.field === "paints" || changelog.field === "paintGrounds" || changelog.field === "groundPaints" ? (
                           // Special handling for paints, paintGrounds, and groundPaints - render as cards (handles all cases: add, remove, update)
                           (() => {
                             const parseValue = (val: any) => {
@@ -1392,7 +1392,7 @@ const ChangelogTimelineItem = ({
                               )}
                             </div>
                           </>
-                        ) : changelog.field === "artworks" || changelog.field === "budgets" || changelog.field === "invoices" || changelog.field === "receipts" ? (
+                        ) : changelog.field === "artworks" || changelog.field === "artworkIds" || changelog.field === "baseFileIds" || changelog.field === "budgets" || changelog.field === "invoices" || changelog.field === "receipts" ? (
                           // Special handling for file fields - show thumbnail previews
                           <>
                             <div className="text-sm">
@@ -1460,6 +1460,119 @@ const ChangelogTimelineItem = ({
                               })()}
                             </div>
                           </>
+                        ) : changelog.field === "layouts" ? (
+                          // Special handling for layouts field from copy operation - show layout IDs or SVG
+                          (() => {
+                            const parseValue = (val: any) => {
+                              if (val === null || val === undefined) return null;
+                              if (typeof val === "object" && !Array.isArray(val)) return val;
+                              if (typeof val === "string") {
+                                try {
+                                  return JSON.parse(val);
+                                } catch {
+                                  return null;
+                                }
+                              }
+                              return null;
+                            };
+
+                            const oldLayouts = parseValue(changelog.oldValue);
+                            const newLayouts = parseValue(changelog.newValue);
+
+                            const renderLayoutIds = (layouts: any, isOld: boolean) => {
+                              if (!layouts) {
+                                return <span className={isOld ? "text-red-600 dark:text-red-400 font-medium" : "text-green-600 dark:text-green-400 font-medium"}>Nenhum</span>;
+                              }
+
+                              const layoutNames = [
+                                { key: 'leftSideLayoutId', label: 'Lado Motorista' },
+                                { key: 'rightSideLayoutId', label: 'Lado Sapo' },
+                                { key: 'backSideLayoutId', label: 'Traseira' },
+                              ];
+
+                              const hasLayouts = layoutNames.some(l => layouts[l.key]);
+                              if (!hasLayouts) {
+                                return <span className={isOld ? "text-red-600 dark:text-red-400 font-medium" : "text-green-600 dark:text-green-400 font-medium"}>Nenhum</span>;
+                              }
+
+                              const configuredLayouts = layoutNames.filter(l => layouts[l.key]);
+                              return (
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                  {configuredLayouts.map(({ key, label }) => (
+                                    <div key={key} className="border dark:border-border/40 rounded-lg px-2.5 py-1.5 bg-muted/30">
+                                      <span className="text-xs font-medium">{label}</span>
+                                    </div>
+                                  ))}
+                                  <span className="text-sm text-muted-foreground self-center">
+                                    ({configuredLayouts.length} layout{configuredLayouts.length > 1 ? 's' : ''})
+                                  </span>
+                                </div>
+                              );
+                            };
+
+                            return (
+                              <>
+                                <div className="text-sm">
+                                  <span className="text-muted-foreground">Antes:</span>
+                                  {renderLayoutIds(oldLayouts, true)}
+                                </div>
+                                <div className="text-sm mt-3">
+                                  <span className="text-muted-foreground">Depois:</span>
+                                  {renderLayoutIds(newLayouts, false)}
+                                </div>
+                              </>
+                            );
+                          })()
+                        ) : changelog.field === "serviceOrders" ? (
+                          // Special handling for serviceOrders from copy operation - show count
+                          (() => {
+                            const parseValue = (val: any) => {
+                              if (val === null || val === undefined) return null;
+                              if (typeof val === "number") return { count: val };
+                              if (typeof val === "object" && !Array.isArray(val)) return val;
+                              if (typeof val === "string") {
+                                try {
+                                  const parsed = JSON.parse(val);
+                                  if (typeof parsed === "number") return { count: parsed };
+                                  return parsed;
+                                } catch {
+                                  return null;
+                                }
+                              }
+                              return null;
+                            };
+
+                            const oldValue = parseValue(changelog.oldValue);
+                            const newValue = parseValue(changelog.newValue);
+
+                            const getCount = (val: any) => {
+                              if (!val) return 0;
+                              if (typeof val === "number") return val;
+                              if (val.count !== undefined) return val.count;
+                              if (Array.isArray(val.ids)) return val.ids.length;
+                              return 0;
+                            };
+
+                            const oldCount = getCount(oldValue);
+                            const newCount = getCount(newValue);
+
+                            return (
+                              <>
+                                <div className="text-sm">
+                                  <span className="text-muted-foreground">Antes: </span>
+                                  <span className="text-red-600 dark:text-red-400 font-medium">
+                                    {oldCount === 0 ? "Nenhuma" : `${oldCount} ordem${oldCount > 1 ? 's' : ''} de serviço`}
+                                  </span>
+                                </div>
+                                <div className="text-sm">
+                                  <span className="text-muted-foreground">Depois: </span>
+                                  <span className="text-green-600 dark:text-green-400 font-medium">
+                                    {newCount === 0 ? "Nenhuma" : `${newCount} ordem${newCount > 1 ? 's' : ''} de serviço`}
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          })()
                         ) : (
                           // Field updated - always show both "Antes:" and "Depois:" lines
                           <>
@@ -1566,7 +1679,7 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
     const sensitiveFields = ["sessionToken", "verificationCode", "verificationExpiresAt", "verificationType", "password", "token", "apiKey", "secret"];
 
     // Define financial/document fields that should only be visible to FINANCIAL and ADMIN
-    const financialFields = ["budgetIds", "invoiceIds", "receiptIds", "price", "cost", "value", "totalPrice", "totalCost", "discount", "profit", "commission"];
+    const financialFields = ["budgetIds", "invoiceIds", "receiptIds", "price", "cost", "value", "totalPrice", "totalCost", "discount", "profit", "commission", "pricingId"];
 
     // Filter out sensitive field changes and financial fields for non-privileged users
     const filteredLogs = logs.filter((log) => {
@@ -1670,7 +1783,7 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
       } else if (changelog.field === "paintId") {
         if (changelog.oldValue && typeof changelog.oldValue === "string") paintIds.add(changelog.oldValue);
         if (changelog.newValue && typeof changelog.newValue === "string") paintIds.add(changelog.newValue);
-      } else if (changelog.field === "logoPaints" || changelog.field === "paints" || changelog.field === "groundPaints" || changelog.field === "paintGrounds") {
+      } else if (changelog.field === "logoPaints" || changelog.field === "logoPaintIds" || changelog.field === "paints" || changelog.field === "groundPaints" || changelog.field === "paintGrounds") {
         // Extract paint IDs from arrays
         const extractPaintIds = (val: any) => {
           if (!val) return;

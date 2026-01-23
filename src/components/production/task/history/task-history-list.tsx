@@ -83,10 +83,13 @@ export function TaskHistoryList({
   );
 
   // Get table state for selected tasks functionality
-  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds, resetSelection } = useTableState({
+  const { selectionCount, showSelectedOnly, toggleShowSelectedOnly, selectedIds, resetSelection, selectRange } = useTableState({
     defaultPageSize: 40,
     resetSelectionOnPageChange: false,
   });
+
+  // Track the last clicked task ID for cross-table shift+click selection
+  const lastClickedTaskIdRef = React.useRef<string | null>(null);
 
   // Advanced actions ref
   const advancedActionsRef = React.useRef<{ openModal: (type: string, taskIds: string[]) => void } | null>(null);
@@ -304,11 +307,27 @@ export function TaskHistoryList({
   // Filter modal state
   const [showFilterModal, setShowFilterModal] = React.useState(false);
 
-  // Table data for export
+  // Table data for export and cross-table selection
   const [tableData, setTableData] = React.useState<{ items: Task[]; totalRecords: number }>({
     items: [],
     totalRecords: 0,
   });
+
+  // Aggregate table data from all three tables for agenda view (for cross-table shift selection)
+  const [preparationTableData, setPreparationTableData] = React.useState<Task[]>([]);
+  const [productionTableData, setProductionTableData] = React.useState<Task[]>([]);
+  const [completedTableData, setCompletedTableData] = React.useState<Task[]>([]);
+
+  // Combined ordered task IDs for cross-table shift+click selection (agenda view only)
+  const allAgendaTaskIds = React.useMemo(() => {
+    if (navigationRoute !== 'preparation') return [];
+    // Order: Preparation/Waiting -> In Production -> Completed
+    return [
+      ...preparationTableData.map(t => t.id),
+      ...productionTableData.map(t => t.id),
+      ...completedTableData.map(t => t.id),
+    ];
+  }, [navigationRoute, preparationTableData, productionTableData, completedTableData]);
 
   // Get all columns for visibility manager
   // Columns are filtered based on user's sector privilege:
@@ -407,6 +426,35 @@ export function TaskHistoryList({
   // Handle table data changes
   const handleTableDataChange = React.useCallback((data: { items: Task[]; totalRecords: number }) => {
     setTableData(data);
+  }, []);
+
+  // Handlers for cross-table data collection (agenda view)
+  const handlePreparationTableDataChange = React.useCallback((data: { items: Task[]; totalRecords: number }) => {
+    setPreparationTableData(data.items);
+    // Also update main table data for export (use preparation table as primary)
+    setTableData(data);
+  }, []);
+
+  const handleProductionTableDataChange = React.useCallback((data: { items: Task[]; totalRecords: number }) => {
+    setProductionTableData(data.items);
+  }, []);
+
+  const handleCompletedTableDataChange = React.useCallback((data: { items: Task[]; totalRecords: number }) => {
+    setCompletedTableData(data.items);
+  }, []);
+
+  // Handler for shift+click selection across all agenda tables
+  const handleShiftClickSelect = React.useCallback((taskId: string) => {
+    // If there's a last clicked task, select the range
+    if (lastClickedTaskIdRef.current && allAgendaTaskIds.length > 0) {
+      selectRange(allAgendaTaskIds, lastClickedTaskIdRef.current, taskId);
+    }
+    lastClickedTaskIdRef.current = taskId;
+  }, [allAgendaTaskIds, selectRange]);
+
+  // Handler to update last clicked task ID for cross-table shift+click
+  const handleSingleClickSelect = React.useCallback((taskId: string) => {
+    lastClickedTaskIdRef.current = taskId;
   }, []);
 
   // Copy from task handlers
@@ -631,13 +679,15 @@ export function TaskHistoryList({
                     status: [TASK_STATUS.PREPARATION, TASK_STATUS.WAITING_PRODUCTION],
                   }}
                   visibleColumns={visibleColumns}
-                  onDataChange={handleTableDataChange}
+                  onDataChange={handlePreparationTableDataChange}
                   navigationRoute={navigationRoute}
                   advancedActionsRef={advancedActionsRef}
                   onStartCopyFromTask={handleStartCopyFromTask}
                   isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
                   onSourceTaskSelect={handleSourceTaskSelected}
                   disablePagination={true}
+                  onShiftClickSelect={handleShiftClickSelect}
+                  onSingleClickSelect={handleSingleClickSelect}
                 />
               </div>
 
@@ -649,12 +699,15 @@ export function TaskHistoryList({
                     status: [TASK_STATUS.IN_PRODUCTION],
                   }}
                   visibleColumns={visibleColumns}
+                  onDataChange={handleProductionTableDataChange}
                   navigationRoute={navigationRoute}
                   advancedActionsRef={advancedActionsRef}
                   onStartCopyFromTask={handleStartCopyFromTask}
                   isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
                   onSourceTaskSelect={handleSourceTaskSelected}
                   disablePagination={true}
+                  onShiftClickSelect={handleShiftClickSelect}
+                  onSingleClickSelect={handleSingleClickSelect}
                 />
               </div>
 
@@ -666,12 +719,15 @@ export function TaskHistoryList({
                     status: [TASK_STATUS.COMPLETED],
                   }}
                   visibleColumns={visibleColumns}
+                  onDataChange={handleCompletedTableDataChange}
                   navigationRoute={navigationRoute}
                   advancedActionsRef={advancedActionsRef}
                   onStartCopyFromTask={handleStartCopyFromTask}
                   isSelectingSourceTask={copyFromTaskState.step === "selecting_source"}
                   onSourceTaskSelect={handleSourceTaskSelected}
                   disablePagination={true}
+                  onShiftClickSelect={handleShiftClickSelect}
+                  onSingleClickSelect={handleSingleClickSelect}
                 />
               </div>
             </div>
@@ -719,6 +775,7 @@ export function TaskHistoryList({
           onConfirm={handleCopyFromTaskConfirm}
           onCancel={handleCopyFromTaskCancel}
           onChangeSource={handleChangeSource}
+          userPrivilege={userSectorPrivilege}
         />
       </CardContent>
     </Card>

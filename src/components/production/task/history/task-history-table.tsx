@@ -31,6 +31,10 @@ interface TaskHistoryTableProps {
   isSelectingSourceTask?: boolean;
   onSourceTaskSelect?: (task: Task) => void;
   disablePagination?: boolean;
+  /** Handler for shift+click selection across tables */
+  onShiftClickSelect?: (taskId: string) => void;
+  /** Handler to update last clicked task for cross-table shift+click */
+  onSingleClickSelect?: (taskId: string) => void;
 }
 
 export function TaskHistoryTable({
@@ -44,6 +48,8 @@ export function TaskHistoryTable({
   isSelectingSourceTask,
   onSourceTaskSelect,
   disablePagination = false,
+  onShiftClickSelect,
+  onSingleClickSelect,
 }: TaskHistoryTableProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -406,8 +412,8 @@ export function TaskHistoryTable({
                       isSelectingSourceTask && "hover:outline hover:outline-2 hover:-outline-offset-2 hover:outline-primary",
                     )}
                     onClick={(e) => {
-                      // Don't navigate if clicking checkbox
-                      if ((e.target as HTMLElement).closest("[data-checkbox]")) {
+                      // Don't navigate if clicking checkbox or if it's a context menu click
+                      if ((e.target as HTMLElement).closest("[data-checkbox]") || e.button === 2) {
                         return;
                       }
 
@@ -417,22 +423,54 @@ export function TaskHistoryTable({
                         return;
                       }
 
-                      const detailRoute =
-                        navigationRoute === 'preparation' ? routes.production.preparation.details(task.id) :
-                        navigationRoute === 'schedule' ? routes.production.schedule.details(task.id) :
-                        routes.production.history.details(task.id);
+                      // Handle selection with Ctrl/Cmd or Shift
+                      if (e.ctrlKey || e.metaKey) {
+                        if (process.env.NODE_ENV !== 'production') {
+                          console.log('[TaskHistoryTable] Ctrl/Cmd click - toggling selection');
+                        }
+                        toggleSelection(task.id);
+                        // Update last clicked task for cross-table shift+click
+                        onSingleClickSelect?.(task.id);
+                      } else if (e.shiftKey) {
+                        // Shift+click - use cross-table selection if available
+                        if (onShiftClickSelect) {
+                          onShiftClickSelect(task.id);
+                        } else {
+                          // Fallback: Implement shift-click range selection within this table only
+                          handleSelectItem(task.id, e);
+                        }
+                      } else {
+                        // Normal click - navigate
+                        const detailRoute =
+                          navigationRoute === 'preparation' ? routes.production.preparation.details(task.id) :
+                          navigationRoute === 'schedule' ? routes.production.schedule.details(task.id) :
+                          routes.production.history.details(task.id);
 
-                      if (process.env.NODE_ENV !== 'production') {
-                        console.log('Task history row clicked, navigating to:', detailRoute);
+                        if (process.env.NODE_ENV !== 'production') {
+                          console.log('Task history row clicked, navigating to:', detailRoute);
+                        }
+                        navigate(detailRoute);
                       }
-                      navigate(detailRoute);
                     }}
                     onContextMenu={canEdit ? (e) => handleContextMenu(e, task) : undefined}
                   >
                     {/* Selection checkbox - only show for users who can edit */}
                     {canEdit && (
                       <TableCell className={cn(TABLE_LAYOUT.checkbox.className, "p-0 !border-r-0")}>
-                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => { e.stopPropagation(); handleSelectItem(task.id, e); }}>
+                        <div className="flex items-center justify-center h-full w-full px-2 py-2" onClick={(e) => {
+                          e.stopPropagation();
+                          if (e.shiftKey && onShiftClickSelect) {
+                            // Use cross-table shift+click selection
+                            onShiftClickSelect(task.id);
+                          } else {
+                            // Regular selection or fallback shift+click
+                            handleSelectItem(task.id, e);
+                            // Update last clicked task for cross-table shift+click
+                            if (!e.shiftKey) {
+                              onSingleClickSelect?.(task.id);
+                            }
+                          }
+                        }}>
                           <Checkbox checked={taskIsSelected} onCheckedChange={() => handleSelectItem(task.id)} aria-label={`Select ${task.name}`} data-checkbox />
                         </div>
                       </TableCell>

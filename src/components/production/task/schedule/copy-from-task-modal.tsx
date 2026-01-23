@@ -5,7 +5,6 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   IconArrowRight,
@@ -14,10 +13,15 @@ import {
   IconArrowDown,
   IconInfoCircle,
   IconCopy,
-  IconAlertTriangle,
 } from "@tabler/icons-react";
 import type { Task } from "../../../../types";
-import { COPYABLE_TASK_FIELDS, COPYABLE_FIELD_METADATA, type CopyableTaskField } from "@/types/task-copy";
+import {
+  COPYABLE_TASK_FIELDS,
+  COPYABLE_FIELD_METADATA,
+  type CopyableTaskField,
+  getFieldsUserCanCopy,
+  expandAllFieldsForUser,
+} from "@/types/task-copy";
 import { cn } from "@/lib/utils";
 
 export interface CopyFromTaskModalProps {
@@ -30,9 +34,12 @@ export interface CopyFromTaskModalProps {
   onConfirm: (selectedFields: CopyableTaskField[], sourceTask: Task) => void;
   onCancel: () => void;
   onChangeSource: () => void;
+  /** User's sector privilege - used to filter which fields they can copy */
+  userPrivilege?: string;
 }
 
-// Mini table component for displaying tasks
+// Compact task display component - shows first task, "+X Tarefas..." count, and last task
+// Designed to never overflow the modal and match the task table row design
 function TaskMiniTable({
   tasks,
   title,
@@ -53,9 +60,40 @@ function TaskMiniTable({
   const headerBgClass = variant === "source"
     ? "bg-green-100/50 dark:bg-green-900/30"
     : "bg-blue-100/50 dark:bg-blue-900/30";
+  const rowBgClass = variant === "source"
+    ? "bg-green-50/50 dark:bg-green-950/20"
+    : "bg-blue-50/50 dark:bg-blue-950/20";
+
+  // Calculate which tasks to show
+  const firstTask = tasks[0];
+  const lastTask = tasks.length > 1 ? tasks[tasks.length - 1] : null;
+  const middleCount = tasks.length > 2 ? tasks.length - 2 : 0;
+
+  // Render a single task row matching the task table design
+  const renderTaskRow = (task: Task, isLast: boolean) => (
+    <div
+      key={task.id}
+      className={cn(
+        "grid grid-cols-[1fr_80px_100px] gap-2 px-3 py-2 text-sm",
+        !isLast && "border-b border-inherit",
+        rowBgClass
+      )}
+    >
+      <div className="font-medium truncate" title={task.name}>
+        {task.name || "-"}
+      </div>
+      <div className="text-muted-foreground truncate text-center">
+        {task.serialNumber || task.truck?.plate || "-"}
+      </div>
+      <div className="text-muted-foreground truncate text-right">
+        {task.sector?.name || "-"}
+      </div>
+    </div>
+  );
 
   return (
     <div className={`rounded-lg border ${bgClass} overflow-hidden`}>
+      {/* Header */}
       <div className={`px-3 py-2 ${headerBgClass} flex items-center justify-between`}>
         <p className={`text-xs font-semibold uppercase tracking-wide ${headerClass}`}>
           {title}
@@ -72,38 +110,31 @@ function TaskMiniTable({
           </Button>
         )}
       </div>
-      <div className="overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className={`${headerBgClass} border-b border-inherit`}>
-              <th className="px-3 py-1.5 text-left text-xs font-medium text-muted-foreground">Nome</th>
-              <th className="px-3 py-1.5 text-left text-xs font-medium text-muted-foreground">Nº Série</th>
-              <th className="px-3 py-1.5 text-left text-xs font-medium text-muted-foreground">Setor</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white/50 dark:bg-black/10">
-            {tasks.slice(0, 5).map((task, index) => (
-              <tr key={task.id} className={index !== Math.min(tasks.length - 1, 4) ? "border-b border-inherit" : ""}>
-                <td className="px-3 py-2 font-medium truncate max-w-[140px]" title={task.name}>
-                  {task.name}
-                </td>
-                <td className="px-3 py-2 text-muted-foreground truncate max-w-[100px]">
-                  {task.serialNumber || task.truck?.plate || "-"}
-                </td>
-                <td className="px-3 py-2 text-muted-foreground truncate max-w-[100px]">
-                  {task.sector?.name || "-"}
-                </td>
-              </tr>
-            ))}
-            {tasks.length > 5 && (
-              <tr className="border-t border-inherit">
-                <td colSpan={3} className="px-3 py-2 text-center text-xs text-muted-foreground">
-                  + {tasks.length - 5} mais tarefa{tasks.length - 5 > 1 ? "s" : ""}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+
+      {/* Column headers */}
+      <div className={`grid grid-cols-[1fr_80px_100px] gap-2 px-3 py-1.5 ${headerBgClass} border-b border-inherit`}>
+        <span className="text-xs font-medium text-muted-foreground">Nome</span>
+        <span className="text-xs font-medium text-muted-foreground text-center">Nº Série</span>
+        <span className="text-xs font-medium text-muted-foreground text-right">Setor</span>
+      </div>
+
+      {/* Task rows - max 2 tasks with count in between */}
+      <div className="bg-white/50 dark:bg-black/10">
+        {/* First task */}
+        {firstTask && renderTaskRow(firstTask, !lastTask && middleCount === 0)}
+
+        {/* Middle count indicator */}
+        {middleCount > 0 && (
+          <div className={cn(
+            "grid grid-cols-[1fr_80px_100px] gap-2 px-3 py-2 text-sm text-muted-foreground border-b border-inherit",
+            rowBgClass
+          )}>
+            <span>+ {middleCount} Tarefa{middleCount > 1 ? "s" : ""}...</span>
+          </div>
+        )}
+
+        {/* Last task (only if different from first) */}
+        {lastTask && renderTaskRow(lastTask, true)}
       </div>
     </div>
   );
@@ -124,35 +155,32 @@ function FieldSelectionItem({
   return (
     <div
       className={cn(
-        "flex items-start gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer hover:border-primary/50",
+        "flex items-center justify-between gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer hover:border-primary/50",
         isSelected ? "border-primary bg-primary/5" : "border-border bg-background"
       )}
       onClick={() => onToggle(field)}
     >
-      <div className="flex items-center pt-0.5">
+      <div className="flex items-center gap-3">
         <Checkbox
           checked={isSelected}
           onCheckedChange={() => onToggle(field)}
           className="pointer-events-none"
         />
+        <span className="text-sm font-medium">{metadata.label}</span>
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-medium">{metadata.label}</span>
-          {metadata.isShared && (
-            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
-              <IconInfoCircle className="h-3 w-3 mr-1" />
-              Compartilhado
-            </Badge>
-          )}
-          {metadata.createNewInstances && (
-            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800">
-              <IconCopy className="h-3 w-3 mr-1" />
-              Nova instância
-            </Badge>
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground">{metadata.description}</p>
+      <div className="flex items-center gap-2">
+        {metadata.isShared && (
+          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
+            <IconInfoCircle className="h-3 w-3 mr-1" />
+            Compartilhado
+          </Badge>
+        )}
+        {metadata.createNewInstances && (
+          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800">
+            <IconCopy className="h-3 w-3 mr-1" />
+            Nova instância
+          </Badge>
+        )}
       </div>
     </div>
   );
@@ -168,8 +196,15 @@ export function CopyFromTaskModal({
   onConfirm,
   onCancel,
   onChangeSource,
+  userPrivilege,
 }: CopyFromTaskModalProps) {
   const [selectedFields, setSelectedFields] = useState<Set<CopyableTaskField>>(new Set());
+
+  // Get fields the user is allowed to copy based on their privilege
+  const allowedFields = useMemo(
+    () => getFieldsUserCanCopy(userPrivilege),
+    [userPrivilege]
+  );
 
   // Reset selected fields when modal opens
   useEffect(() => {
@@ -178,11 +213,12 @@ export function CopyFromTaskModal({
     }
   }, [open, step]);
 
-  // Group fields by category
+  // Group fields by category - only include fields user has permission to copy
   const fieldsByCategory = useMemo(() => {
     const groups: Record<string, CopyableTaskField[]> = {};
 
-    COPYABLE_TASK_FIELDS.forEach((field) => {
+    // Only show fields that user has permission to copy
+    allowedFields.forEach((field) => {
       const metadata = COPYABLE_FIELD_METADATA[field];
       if (!groups[metadata.category]) {
         groups[metadata.category] = [];
@@ -191,7 +227,7 @@ export function CopyFromTaskModal({
     });
 
     return groups;
-  }, []);
+  }, [allowedFields]);
 
   // Get category order
   const categoryOrder = [
@@ -201,6 +237,7 @@ export function CopyFromTaskModal({
     'Arquivos',
     'Recursos Compartilhados',
     'Recursos Individuais',
+    'Veículo',
     'Observações',
   ];
 
@@ -240,7 +277,9 @@ export function CopyFromTaskModal({
 
   const handleConfirm = () => {
     if (!sourceTask || selectedFields.size === 0) return;
-    onConfirm(Array.from(selectedFields), sourceTask);
+    // Expand 'all' to only the fields user has permission to copy
+    const fieldsToSubmit = expandAllFieldsForUser(Array.from(selectedFields), userPrivilege);
+    onConfirm(fieldsToSubmit, sourceTask);
   };
 
   const handleCancel = () => {
@@ -248,14 +287,9 @@ export function CopyFromTaskModal({
     onCancel();
   };
 
-  // Check if any shared resources are selected
-  const hasSharedResources = useMemo(() => {
-    return Array.from(selectedFields).some(field => COPYABLE_FIELD_METADATA[field].isShared);
-  }, [selectedFields]);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] bg-white dark:bg-card">
+      <DialogContent className="sm:max-w-[700px] bg-white dark:bg-card">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <IconClipboardCopy className="h-5 w-5" />
@@ -283,7 +317,7 @@ export function CopyFromTaskModal({
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Campos para copiar</Label>
 
-              <ScrollArea className="h-[400px] pr-3">
+              <ScrollArea className="h-[300px] pr-3">
                 <div className="space-y-4">
                   {categoryOrder.map((category) => {
                     const fields = fieldsByCategory[category];
@@ -310,17 +344,6 @@ export function CopyFromTaskModal({
                 </div>
               </ScrollArea>
             </div>
-
-            {/* Warning for shared resources */}
-            {hasSharedResources && (
-              <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900">
-                <IconAlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <AlertDescription className="text-xs text-amber-700 dark:text-amber-400">
-                  <strong>Atenção:</strong> Recursos compartilhados (marcados com badge azul) são referências aos mesmos dados.
-                  Alterações feitas em uma tarefa afetarão todas as tarefas que compartilham esse recurso.
-                </AlertDescription>
-              </Alert>
-            )}
 
             {/* Selection counter */}
             {selectedFields.size > 0 && (
@@ -374,17 +397,12 @@ export function CopyFromTaskModal({
             {/* Fields to copy */}
             <div>
               <p className="text-sm font-medium mb-3">Campos que serão copiados:</p>
-              <ScrollArea className="h-[200px] pr-3">
+              <ScrollArea className="h-[150px] pr-3">
                 <div className="space-y-2">
                   {selectedFields.has('all') ? (
                     <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
                       <IconCheck className="h-4 w-4 text-primary flex-shrink-0" />
-                      <div className="flex-1">
-                        <span className="text-sm font-medium">COPIAR TUDO</span>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Todos os campos serão copiados (exceto serialNumber, plate e chassisNumber)
-                        </p>
-                      </div>
+                      <span className="text-sm font-medium">COPIAR TUDO</span>
                     </div>
                   ) : (
                     Array.from(selectedFields).map((field) => {
@@ -392,24 +410,23 @@ export function CopyFromTaskModal({
                       return (
                         <div
                           key={field}
-                          className="flex items-center gap-3 p-2.5 rounded-lg bg-accent/50"
+                          className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-accent/50"
                         >
-                          <IconCheck className="h-4 w-4 text-green-600 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-medium">{metadata.label}</span>
-                              {metadata.isShared && (
-                                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
-                                  Compartilhado
-                                </Badge>
-                              )}
-                              {metadata.createNewInstances && (
-                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800">
-                                  Nova instância
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">{metadata.description}</p>
+                          <div className="flex items-center gap-3">
+                            <IconCheck className="h-4 w-4 text-green-600 flex-shrink-0" />
+                            <span className="text-sm font-medium">{metadata.label}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {metadata.isShared && (
+                              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800">
+                                Compartilhado
+                              </Badge>
+                            )}
+                            {metadata.createNewInstances && (
+                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300 dark:bg-green-950/30 dark:text-green-400 dark:border-green-800">
+                                Nova instância
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       );
@@ -419,16 +436,6 @@ export function CopyFromTaskModal({
               </ScrollArea>
             </div>
 
-            {/* Warning for shared resources in confirmation */}
-            {hasSharedResources && (
-              <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900">
-                <IconAlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                <AlertDescription className="text-xs text-amber-700 dark:text-amber-400">
-                  <strong>Atenção:</strong> Recursos compartilhados vinculam as mesmas entidades. Mudanças feitas através
-                  de uma tarefa afetarão todas as tarefas vinculadas.
-                </AlertDescription>
-              </Alert>
-            )}
           </div>
         )}
 

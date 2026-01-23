@@ -282,13 +282,18 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     truck: "Caminhão",
     createdBy: "Criado por",
     artworks: "Artes",
+    artworkIds: "Artes",
     baseFiles: "Arquivos Base",
-    logoPaints: "Tintas da logomarca",
+    baseFileIds: "Arquivos Base",
+    logoPaints: "Tintas da Logomarca",
+    logoPaintIds: "Tintas da Logomarca",
     paints: "Tintas da logomarca",
     groundPaints: "Fundos da Tinta",
+    layouts: "Layouts do Veículo",
     commissions: "Comissões",
     services: "Serviços", // Legacy - for historical changelog records
     serviceOrders: "Ordens de Serviço",
+    pricingId: "Orçamento",
     airbrushings: "Aerografias",
     cuts: "Recortes",
     cutRequest: "Solicitações de Corte",
@@ -1941,6 +1946,16 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
 
   // Handle objects
   if (typeof value === "object") {
+    // Special handling for negotiatingWith field in TASK
+    if (field === "negotiatingWith" && entityType === CHANGE_LOG_ENTITY_TYPE.TASK) {
+      const data = value as { name?: string; phone?: string | null };
+      if (!data.name && !data.phone) return "Nenhum";
+      if (data.name && data.phone) {
+        return `${data.name} (${formatBrazilianPhone(data.phone)})`;
+      }
+      return data.name || "Nenhum";
+    }
+
     // Special handling for componentImpact field in PAINT_PRODUCTION
     if (field === "componentImpact" && entityType === CHANGE_LOG_ENTITY_TYPE.PAINT_PRODUCTION) {
       if ((value as any).action === "ADD_COMPONENT") {
