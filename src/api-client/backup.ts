@@ -95,75 +95,95 @@ interface SystemHealthSummary {
   recommendations: string[];
 }
 
+// Standard API response interface
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message: string;
+}
+
+// Helper to validate API responses and throw errors when success is false
+function validateResponse<T>(response: ApiResponse<T>, fallbackMessage: string): T {
+  if (!response.success) {
+    throw new Error(response.message || fallbackMessage);
+  }
+  return response.data;
+}
+
 class BackupApiClient {
   private api = apiClient;
 
   // Get all backups with optional filtering
   async getBackups(params?: BackupQueryParams): Promise<BackupMetadata[]> {
-    const response = await this.api.get<{ success: boolean; data: BackupMetadata[]; message: string }>("/backups", {
+    const response = await this.api.get<ApiResponse<BackupMetadata[]>>("/backups", {
       params,
     });
-    return response.data.data || [];
+    return validateResponse(response.data, "Falha ao buscar backups") || [];
   }
 
   // Get backup by ID
   async getBackupById(id: string): Promise<BackupMetadata> {
-    const response = await this.api.get<{ success: boolean; data: BackupMetadata; message: string }>(`/backups/${id}`);
-    return response.data.data;
+    const response = await this.api.get<ApiResponse<BackupMetadata>>(`/backups/${id}`);
+    return validateResponse(response.data, "Falha ao buscar backup");
   }
 
   // Create a new backup
   async createBackup(data: CreateBackupRequest): Promise<{ id: string; message: string }> {
-    const response = await this.api.post<{ success: boolean; data: { id: string }; message: string }>("/backups", data);
-    return { id: response.data.data.id, message: response.data.message };
+    const response = await this.api.post<ApiResponse<{ id: string }>>("/backups", data);
+    const result = validateResponse(response.data, "Falha ao criar backup");
+    return { id: result.id, message: response.data.message };
   }
 
   // Restore a backup
   async restoreBackup(id: string, targetPath?: string): Promise<{ message: string }> {
-    const response = await this.api.post<{ message: string }>(`/backups/${id}/restore`, { targetPath });
-    return response.data;
+    const response = await this.api.post<ApiResponse<{ message: string }>>(`/backups/${id}/restore`, { targetPath });
+    validateResponse(response.data, "Falha ao restaurar backup");
+    return { message: response.data.message };
   }
 
   // Delete a backup
   async deleteBackup(id: string): Promise<null> {
-    const response = await this.api.delete<null>(`/backups/${id}`);
-    return response.data;
+    const response = await this.api.delete<ApiResponse<null>>(`/backups/${id}`);
+    validateResponse(response.data, "Falha ao excluir backup");
+    return null;
   }
 
   // Get scheduled backups
   async getScheduledBackups(): Promise<ScheduledBackupJob[]> {
-    const response = await this.api.get<{ success: boolean; data: ScheduledBackupJob[]; message: string }>("/backups/scheduled/list");
-    return response.data.data || [];
+    const response = await this.api.get<ApiResponse<ScheduledBackupJob[]>>("/backups/scheduled/list");
+    return validateResponse(response.data, "Falha ao buscar backups agendados") || [];
   }
 
   // Schedule a new backup
   async scheduleBackup(data: ScheduleBackupRequest): Promise<{ message: string }> {
-    const response = await this.api.post<{ message: string }>("/backups/scheduled", data);
-    return response.data;
+    const response = await this.api.post<ApiResponse<{ message: string }>>("/backups/scheduled", data);
+    validateResponse(response.data, "Falha ao agendar backup");
+    return { message: response.data.message };
   }
 
   // Remove a scheduled backup
   async removeScheduledBackup(id: string): Promise<null> {
-    const response = await this.api.delete<null>(`/backups/scheduled/${id}`);
-    return response.data;
+    const response = await this.api.delete<ApiResponse<null>>(`/backups/scheduled/${id}`);
+    validateResponse(response.data, "Falha ao remover backup agendado");
+    return null;
   }
 
   // Get system health status
   async getSystemHealth(): Promise<BackupSystemHealth> {
-    const response = await this.api.get<{ success: boolean; data: BackupSystemHealth; message: string }>("/backups/system/health");
-    return response.data.data;
+    const response = await this.api.get<ApiResponse<BackupSystemHealth>>("/backups/system/health");
+    return validateResponse(response.data, "Falha ao buscar status do sistema");
   }
 
   // Verify backup integrity
   async verifyBackup(id: string): Promise<BackupVerification> {
-    const response = await this.api.post<BackupVerification>(`/backups/system/verify/${id}`);
-    return response.data;
+    const response = await this.api.post<ApiResponse<BackupVerification>>(`/backups/system/verify/${id}`);
+    return validateResponse(response.data, "Falha ao verificar integridade do backup");
   }
 
   // Get comprehensive system health summary
   async getSystemHealthSummary(): Promise<SystemHealthSummary> {
-    const response = await this.api.get<{ success: boolean; data: SystemHealthSummary; message: string }>("/backups/system/health/summary");
-    return response.data.data;
+    const response = await this.api.get<ApiResponse<SystemHealthSummary>>("/backups/system/health/summary");
+    return validateResponse(response.data, "Falha ao buscar resumo de saúde do sistema");
   }
 
   // Get backup priority paths
@@ -278,8 +298,19 @@ class BackupApiClient {
 
   // Get list of storage folders available for backup
   async getStorageFolders(): Promise<string[]> {
-    const response = await this.api.get<{ success: boolean; data: string[]; message: string }>("/backups/storage-folders");
-    return response.data.data || [];
+    const response = await this.api.get<ApiResponse<string[]>>("/backups/storage-folders");
+    return validateResponse(response.data, "Falha ao buscar pastas de armazenamento") || [];
+  }
+
+  // Get backup history (deleted backups)
+  async getBackupHistory(): Promise<BackupMetadata[]> {
+    const response = await this.api.get<ApiResponse<BackupMetadata[]>>("/backups/history");
+    return validateResponse(response.data, "Falha ao buscar histórico de backups") || [];
+  }
+
+  // Permanently delete a backup (hard delete)
+  async hardDeleteBackup(id: string): Promise<void> {
+    await this.api.delete<ApiResponse<void>>(`/backups/${id}/hard`);
   }
 }
 

@@ -1120,7 +1120,7 @@ const BackupManagementPage = () => {
         <div className="flex-1 overflow-y-auto pb-6 space-y-6 mt-4">
           {/* Summary Statistics */}
           {systemHealth && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center space-x-2">
@@ -1137,6 +1137,24 @@ const BackupManagementPage = () => {
                     <div className="text-2xl font-bold">{systemHealth.backupStats.completed}</div>
                   </div>
                   <p className="text-xs text-muted-foreground">Concluídos</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <IconActivity className="h-4 w-4 text-yellow-500" />
+                    <div className="text-2xl font-bold">{systemHealth.backupStats.inProgress}</div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Em Progresso</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <IconX className="h-4 w-4 text-red-500" />
+                    <div className="text-2xl font-bold">{systemHealth.backupStats.failed}</div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Falhou</p>
                 </CardContent>
               </Card>
               <Card>

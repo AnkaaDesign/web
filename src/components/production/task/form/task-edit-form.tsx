@@ -298,6 +298,34 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   );
   const [baseFileIds, setBaseFileIds] = useState<string[]>(task.baseFiles?.map((f) => f.id) || []);
 
+  // Track if base files have been modified by the user
+  const [hasBaseFileChanges, setHasBaseFileChanges] = useState(false);
+
+  // Sync baseFiles when task.baseFiles changes (after successful update or initial load)
+  useEffect(() => {
+    // Skip sync if user has made changes that haven't been submitted yet
+    if (hasBaseFileChanges) {
+      return;
+    }
+
+    if (task.baseFiles) {
+      const newBaseFiles = task.baseFiles.map(file => ({
+        id: file.id,
+        name: file.filename || file.name || 'base file',
+        size: file.size || 0,
+        type: file.mimetype || file.type || 'application/octet-stream',
+        lastModified: file.createdAt ? new Date(file.createdAt).getTime() : Date.now(),
+        uploaded: true,
+        uploadProgress: 100,
+        uploadedFileId: file.id,
+        thumbnailUrl: file.thumbnailUrl,
+      } as FileWithPreview));
+
+      setBaseFiles(newBaseFiles);
+      setBaseFileIds(task.baseFiles.map((f) => f.id));
+    }
+  }, [task.baseFiles, task.id, hasBaseFileChanges]);
+
   // Initialize document files from existing task data
   // Handle both singular and plural field names for backward compatibility
   const [budgetFile, setBudgetFile] = useState<FileWithPreview[]>(
@@ -1802,6 +1830,11 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
             setHasArtworkFileChanges(false);
           }
 
+          // Reset base file changes flag after successful submission
+          if (hasBaseFileChanges) {
+            setHasBaseFileChanges(false);
+          }
+
           await new Promise(resolve => setTimeout(resolve, 100));
           // Redirect to task details after successful update
           const redirectUrl = detailsRoute ? detailsRoute(task.id) : `/producao/cronograma/detalhes/${task.id}`;
@@ -1820,7 +1853,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
         }, 100);
       }
     },
-    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, budgetFile, nfeFile, receiptFile, uploadedFiles, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
+    [updateAsync, task.id, hasLayoutChanges, hasFileChanges, hasArtworkStatusChanges, hasBaseFileChanges, budgetFile, nfeFile, receiptFile, uploadedFiles, observationFiles, pricingLayoutFiles, layoutWidthError, modifiedLayoutSides, currentLayoutStates]
   );
 
   // Use the edit form hook with change detection
@@ -1913,6 +1946,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const handleBaseFilesChange = (files: FileWithPreview[]) => {
     setBaseFiles(files);
     setHasFileChanges(true);
+    setHasBaseFileChanges(true);
     // Files will be submitted with the form, not uploaded separately
   };
 
