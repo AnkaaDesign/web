@@ -824,6 +824,38 @@ export const createTaskHistoryColumns = (options?: {
     filteredColumns = filteredColumns.filter(col => col.id !== 'price');
   }
 
+  // Define privileged sectors that can view restricted fields (invoiceTo, negotiatingWith, forecastDate)
+  const canViewRestrictedFields = sectorPrivilege && (
+    sectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+    sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
+    sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
+    sectorPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
+    sectorPrivilege === SECTOR_PRIVILEGES.DESIGNER
+  );
+
+  // Define sectors that can view commission field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
+  const canViewCommissionField = sectorPrivilege && (
+    sectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+    sectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
+    sectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
+    sectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION
+  );
+
+  // Filter out restricted columns for users without permission
+  // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, and DESIGNER can see these columns
+  if (!canViewRestrictedFields) {
+    filteredColumns = filteredColumns.filter(col =>
+      col.id !== 'invoiceTo.fantasyName' &&
+      col.id !== 'negotiatingWith.name' &&
+      col.id !== 'forecastDate'
+    );
+  }
+
+  // Filter out commission column for users without permission (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only)
+  if (!canViewCommissionField) {
+    filteredColumns = filteredColumns.filter(col => col.id !== 'commission');
+  }
+
   // Filter out observation column from agenda (preparation) page
   if (navigationRoute === 'preparation') {
     filteredColumns = filteredColumns.filter(col => col.id !== 'observation');

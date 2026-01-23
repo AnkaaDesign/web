@@ -7,11 +7,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { PositionedDropdownMenuContent } from "@/components/ui/positioned-dropdown-menu";
 import { formatHexColor, getContrastingTextColor } from "./color-utils";
-import { routes, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, TRUCK_MANUFACTURER, PAINT_FINISH } from "../../../../constants";
+import { routes, PAINT_FINISH_LABELS, TRUCK_MANUFACTURER_LABELS, TRUCK_MANUFACTURER, PAINT_FINISH, SECTOR_PRIVILEGES } from "../../../../constants";
 import { IconFlask, IconEdit, IconTrash, IconCheck, IconX, IconGitMerge, IconEye, IconClipboardList } from "@tabler/icons-react";
 import { usePaintMutations } from "../../../../hooks";
 import type { PaintGetManyFormData } from "../../../../schemas";
 import { usePaintSelection } from "./paint-selection-context";
+import { useAuth } from "../../../../contexts/auth-context";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -39,11 +40,23 @@ interface PaintCardProps {
 
 export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: PaintCardProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { delete: deletePaint } = usePaintMutations();
   const { isSelected, toggleSelection, selectedCount } = usePaintSelection();
   const backgroundColor = formatHexColor(paint.hex);
   const textColor = getContrastingTextColor(paint.hex);
   const selected = isSelected(paint.id);
+
+  // Check if user can navigate to paint catalogue detail page
+  // Allowed roles: ADMIN, LOGISTIC, COMMERCIAL, FINANCIAL, WAREHOUSE, and PRODUCTION team leaders
+  const isTeamLeader = Boolean(user?.managedSector?.id);
+  const userPrivilege = user?.sector?.privileges;
+  const canViewPaintDetails = userPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+    userPrivilege === SECTOR_PRIVILEGES.LOGISTIC ||
+    userPrivilege === SECTOR_PRIVILEGES.COMMERCIAL ||
+    userPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
+    userPrivilege === SECTOR_PRIVILEGES.WAREHOUSE ||
+    (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION && isTeamLeader);
 
   // Context menu state
   const [contextMenu, setContextMenu] = React.useState<{
@@ -169,7 +182,9 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
   // Handle view details
   const handleViewDetails = (e?: React.MouseEvent) => {
     e?.stopPropagation();
-    navigate(routes.painting.catalog.details(paint.id));
+    if (canViewPaintDetails) {
+      navigate(routes.painting.catalog.details(paint.id));
+    }
     setContextMenu(null);
   };
 
@@ -205,17 +220,19 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
       <Card
         id={`paint-card-${paint.id}`}
         className={cn(
-          "overflow-hidden hover:shadow-sm transition-all duration-200 cursor-pointer h-full flex flex-col",
+          "overflow-hidden hover:shadow-sm transition-all duration-200 h-full flex flex-col",
+          canViewPaintDetails || selectedCount > 0 ? "cursor-pointer" : "cursor-default",
           selected && "border-2 border-primary shadow-sm"
         )}
         onClick={() => {
           // If in selection mode (any paints selected), toggle selection
-          // Otherwise, navigate to details
+          // Otherwise, navigate to details only if user has permission
           if (selectedCount > 0) {
             toggleSelection(paint.id);
-          } else {
+          } else if (canViewPaintDetails) {
             navigate(routes.painting.catalog.details(paint.id));
           }
+          // If user doesn't have permission, clicking does nothing (they can still view the card info)
         }}
         onContextMenu={handleContextMenu}
       >
@@ -354,10 +371,12 @@ export function PaintCard({ paint, onFilterChange, currentFilters, onMerge }: Pa
             {selected ? "Desselecionar" : "Selecionar"}
           </DropdownMenuItem>
 
-          <DropdownMenuItem onClick={handleViewDetails}>
-            <IconEye className="mr-2 h-4 w-4" />
-            Detalhes
-          </DropdownMenuItem>
+          {canViewPaintDetails && (
+            <DropdownMenuItem onClick={handleViewDetails}>
+              <IconEye className="mr-2 h-4 w-4" />
+              Detalhes
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuItem onClick={handleEdit}>
             <IconEdit className="mr-2 h-4 w-4" />

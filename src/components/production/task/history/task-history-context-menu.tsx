@@ -249,43 +249,11 @@ export function TaskHistoryContextMenu({
   };
 
   // Status action handlers
+  // Note: Artwork validation removed for manual status changes
+  // Automatic sync still works - when artwork SO becomes COMPLETED, task auto-transitions
   const handleStart = async () => {
     try {
-      // First, validate ALL tasks before making any updates
-      for (const t of tasks) {
-        if (t.status === TASK_STATUS.PREPARATION) {
-          const taskName = t.name || t.serialNumber || t.plate || 'Tarefa';
-
-          // Get all ARTWORK service orders for this task
-          const artworkServiceOrders = t.serviceOrders?.filter(
-            (service) => service && service.type === SERVICE_ORDER_TYPE.ARTWORK
-          ) || [];
-
-          // REQUIREMENT 1: Task MUST have at least one artwork service order
-          if (artworkServiceOrders.length === 0) {
-            toast.error("Não é possível iniciar", {
-              description: `${taskName}: A tarefa deve ter pelo menos uma ordem de serviço de arte antes de mover para o cronograma.`,
-            });
-            setDropdownOpen(false);
-            return;
-          }
-
-          // REQUIREMENT 2: ALL artwork service orders must be COMPLETED
-          const hasIncompleteArtwork = artworkServiceOrders.some(
-            (service) => !service.status || service.status !== SERVICE_ORDER_STATUS.COMPLETED
-          );
-
-          if (hasIncompleteArtwork) {
-            toast.error("Não é possível iniciar", {
-              description: `${taskName}: Todas as ordens de serviço de arte devem estar concluídas antes de mover para o cronograma.`,
-            });
-            setDropdownOpen(false);
-            return;
-          }
-        }
-      }
-
-      // If validation passed for all tasks, proceed with updates
+      // Proceed with updates for all tasks (no artwork validation for manual changes)
       for (const t of tasks) {
         // PREPARATION tasks go to WAITING_PRODUCTION (cronograma)
         if (t.status === TASK_STATUS.PREPARATION) {

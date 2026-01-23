@@ -135,7 +135,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
     return result;
   };
 
-  // Check if the current user is from the Financial, Warehouse, Designer, Logistic, Plotting, or Commercial sector
+  // Check if the current user is from the Financial, Warehouse, Designer, Logistic, Plotting, Production, or Commercial sector
   const isFinancialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.FINANCIAL;
   const isWarehouseUser = user?.sector?.privileges === SECTOR_PRIVILEGES.WAREHOUSE;
   const isDesignerUser = user?.sector?.privileges === SECTOR_PRIVILEGES.DESIGNER;
@@ -143,12 +143,21 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
   const isPlottingUser = user?.sector?.privileges === SECTOR_PRIVILEGES.PLOTTING;
   const isCommercialUser = user?.sector?.privileges === SECTOR_PRIVILEGES.COMMERCIAL;
   const isAdminUser = user?.sector?.privileges === SECTOR_PRIVILEGES.ADMIN;
+  const isProductionUser = user?.sector?.privileges === SECTOR_PRIVILEGES.PRODUCTION;
+  // Check if user is a team leader (manages a sector)
+  const isTeamLeader = Boolean(user?.managedSector?.id);
 
   // Financial sections should only be visible to ADMIN and FINANCIAL users (not Commercial)
   const canViewFinancialSections = isAdminUser || isFinancialUser;
 
   // Pricing sections should be visible to ADMIN, FINANCIAL, and COMMERCIAL users
   const canViewPricingSections = isAdminUser || isFinancialUser || isCommercialUser;
+
+  // Restricted fields (forecastDate, negotiatingWith, invoiceTo) visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER only
+  const canViewRestrictedFields = isAdminUser || isFinancialUser || isCommercialUser || isLogisticUser || isDesignerUser;
+
+  // Commission field visible to ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION
+  const canViewCommissionField = isAdminUser || isFinancialUser || isCommercialUser || isProductionUser;
 
   // Fetch cuts separately using useCutsByTask hook (same approach as detail page)
   const { data: cutsData } = useCutsByTask({
@@ -663,16 +672,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
       nfeId: taskData.nfeId || null,
       receiptId: taskData.receiptId || null,
       // Initialize serviceOrders with default row - part of initial state
-      // PRE-SORT by type to avoid auto-sort triggering dirty state on mount
+      // Maintain creation order (sorted by createdAt ASC) to preserve user's intended order
       serviceOrders: (() => {
-        const typeOrder: Record<string, number> = {
-          [SERVICE_ORDER_TYPE.PRODUCTION]: 0,
-          [SERVICE_ORDER_TYPE.FINANCIAL]: 1,
-          [SERVICE_ORDER_TYPE.COMMERCIAL]: 2,
-          [SERVICE_ORDER_TYPE.LOGISTIC]: 3,
-          [SERVICE_ORDER_TYPE.ARTWORK]: 4,
-        };
-
         if (taskData.serviceOrders && taskData.serviceOrders.length > 0) {
           return taskData.serviceOrders
             .map((so) => ({
@@ -686,11 +687,13 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
               startedAt: so.startedAt ? new Date(so.startedAt) : null,
               finishedAt: so.finishedAt ? new Date(so.finishedAt) : null,
               shouldSync: (so as any).shouldSync !== false, // Include shouldSync flag (default true)
+              createdAt: so.createdAt, // Keep createdAt for ordering
             }))
+            // Sort by createdAt to maintain creation order (oldest first)
             .sort((a, b) => {
-              const typeCompare = (typeOrder[a.type] || 0) - (typeOrder[b.type] || 0);
-              if (typeCompare !== 0) return typeCompare;
-              return (a.description || '').localeCompare(b.description || '');
+              const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+              const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+              return aTime - bTime;
             });
         }
         return [{
@@ -2577,17 +2580,20 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                       <CustomerSelector control={form.control} disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser} initialCustomer={task.customer} />
                     </div>
 
-                    {/* Invoice To - Customer Selector */}
-                    <CustomerSelector
-                      control={form.control}
-                      name="invoiceToId"
-                      label="Faturar Para"
-                      placeholder="Selecione o cliente para faturamento"
-                      disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isLogisticUser}
-                      initialCustomer={task.invoiceTo}
-                    />
+                    {/* Invoice To - Customer Selector (only visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER) */}
+                    {canViewRestrictedFields && (
+                      <CustomerSelector
+                        control={form.control}
+                        name="invoiceToId"
+                        label="Faturar Para"
+                        placeholder="Selecione o cliente para faturamento"
+                        disabled={isSubmitting || isFinancialUser || isWarehouseUser || isDesignerUser || isLogisticUser}
+                        initialCustomer={task.invoiceTo}
+                      />
+                    )}
 
-                    {/* Negotiating With - Name and Phone */}
+                    {/* Negotiating With - Name and Phone (only visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER) */}
+                    {canViewRestrictedFields && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Contact Name */}
                       <FormField
@@ -2638,6 +2644,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         )}
                       />
                     </div>
+                    )}
 
                     {/* Truck Category and Implement Type - Side by Side */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2866,7 +2873,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         )}
                       />
 
-                      {/* Commission Status */}
+                      {/* Commission Status (only visible to ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION) */}
+                      {canViewCommissionField && (
                       <FormField
                         control={form.control}
                         name="commission"
@@ -2896,6 +2904,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                           </FormItem>
                         )}
                       />
+                      )}
                     </div>
 
                     {/* Details */}
@@ -2938,7 +2947,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                   </AccordionTrigger>
                   <AccordionContent>
                     <CardContent className="space-y-4 pt-0">
-                    {/* First Row: Forecast Date */}
+                    {/* First Row: Forecast Date (only visible to ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER) */}
+                    {canViewRestrictedFields && (
                     <FormField
                       control={form.control}
                       name="forecastDate"
@@ -2953,6 +2963,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         />
                       )}
                     />
+                    )}
 
                     {/* Second Row: Entry Date and Deadline */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3048,6 +3059,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                             disabled={isSubmitting || isWarehouseUser}
                             currentUserId={user?.id}
                             userPrivilege={user?.sector?.privileges}
+                            isTeamLeader={isTeamLeader}
                             onItemDeleted={handleServiceOrderDeleted}
                           />
                           <FormMessage />
@@ -3101,8 +3113,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
           </AccordionItem>
                 )}
 
-                {/* Layout Section - Hidden for Warehouse, Financial, Designer, and Commercial users, EDITABLE for Logistic users */}
-                {!isWarehouseUser && !isFinancialUser && !isDesignerUser && !isCommercialUser && (
+                {/* Layout Section - Only visible to ADMIN, LOGISTIC, and PRODUCTION team leaders */}
+                {(isAdminUser || isLogisticUser || (isProductionUser && isTeamLeader)) && (
           <AccordionItem
             value="layout"
             id="accordion-item-layout"

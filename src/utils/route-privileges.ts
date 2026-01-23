@@ -136,8 +136,8 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   "/producao/cronograma/detalhes/:id": ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // Explicit cronograma details route
   [routes.production.schedule.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // DESIGNER, FINANCIAL, LOGISTIC, PLOTTING can edit with restrictions
   "/producao/cronograma/editar/:id": ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // Explicit cronograma edit route
-  [routes.production.preparation.root]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL"], // WAREHOUSE excluded from preparation
-  "/producao/agenda": ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL"], // Agenda root (preparation)
+  [routes.production.preparation.root]: ["DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // PRODUCTION and WAREHOUSE excluded from preparation
+  "/producao/agenda": ["DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Agenda root (preparation) - PRODUCTION excluded
   [routes.production.preparation.create]: ["PRODUCTION", "DESIGNER", "LOGISTIC", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Preparation task create - WAREHOUSE excluded
   "/producao/agenda/cadastrar": ["PRODUCTION", "DESIGNER", "LOGISTIC", "COMMERCIAL", "FINANCIAL", "ADMIN"], // Agenda create
   [routes.production.preparation.details(":id")]: ["PRODUCTION", "DESIGNER", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Preparation task detail - WAREHOUSE excluded
@@ -148,10 +148,10 @@ export const ROUTE_PRIVILEGES: Record<string, keyof typeof SECTOR_PRIVILEGES | (
   [routes.production.history.details(":id")]: ["PRODUCTION", "WAREHOUSE", "DESIGNER", "FINANCIAL", "LOGISTIC", "PLOTTING", "COMMERCIAL", "ADMIN"], // History detail page
   [routes.production.garages.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Garages/Barracões - LOGISTIC can edit layouts
   "/producao/barracoes": ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "LOGISTIC", "COMMERCIAL", "ADMIN"], // Explicit barracoes route
-  [routes.production.airbrushings.root]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "COMMERCIAL"], // DESIGNER excluded from airbrushings
-  [routes.production.airbrushings.list]: ["PRODUCTION", "WAREHOUSE", "FINANCIAL", "COMMERCIAL"],
-  [routes.production.airbrushings.create]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // DESIGNER excluded (read-only)
-  [routes.production.airbrushings.edit(":id")]: ["PRODUCTION", "WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // DESIGNER excluded (read-only)
+  [routes.production.airbrushings.root]: ["WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"], // PRODUCTION and DESIGNER excluded from airbrushings
+  [routes.production.airbrushings.list]: ["WAREHOUSE", "FINANCIAL", "COMMERCIAL", "ADMIN"],
+  [routes.production.airbrushings.create]: ["WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // PRODUCTION and DESIGNER excluded
+  [routes.production.airbrushings.edit(":id")]: ["WAREHOUSE", "COMMERCIAL", "FINANCIAL", "ADMIN"], // PRODUCTION and DESIGNER excluded
 
   // Cut-related routes - DESIGNER and PLOTTING have read-only access, WAREHOUSE removed
   [routes.production.cutting.root]: ["PRODUCTION", "DESIGNER", "PLOTTING", "ADMIN"],

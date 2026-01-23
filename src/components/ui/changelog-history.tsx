@@ -1669,19 +1669,40 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
   const changelogs = useMemo(() => {
     const logs = changelogsResponse?.data || [];
 
-    // Check if user can view financial fields
+    // Check if user can view financial fields (price, budgets, invoices, receipts, etc.)
     const canViewFinancialFields = user && hasAnyPrivilege(user, [
       SECTOR_PRIVILEGES.FINANCIAL,
       SECTOR_PRIVILEGES.ADMIN,
+    ]);
+
+    // Check if user can view commission field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
+    const canViewCommissionField = user && hasAnyPrivilege(user, [
+      SECTOR_PRIVILEGES.ADMIN,
+      SECTOR_PRIVILEGES.FINANCIAL,
+      SECTOR_PRIVILEGES.COMMERCIAL,
+      SECTOR_PRIVILEGES.PRODUCTION,
+    ]);
+
+    // Check if user can view restricted fields (forecastDate, negotiatingWith, invoiceTo)
+    // Only ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER can see these
+    const canViewRestrictedFields = user && hasAnyPrivilege(user, [
+      SECTOR_PRIVILEGES.ADMIN,
+      SECTOR_PRIVILEGES.FINANCIAL,
+      SECTOR_PRIVILEGES.COMMERCIAL,
+      SECTOR_PRIVILEGES.LOGISTIC,
+      SECTOR_PRIVILEGES.DESIGNER,
     ]);
 
     // Define sensitive fields that should not be displayed
     const sensitiveFields = ["sessionToken", "verificationCode", "verificationExpiresAt", "verificationType", "password", "token", "apiKey", "secret"];
 
     // Define financial/document fields that should only be visible to FINANCIAL and ADMIN
-    const financialFields = ["budgetIds", "invoiceIds", "receiptIds", "price", "cost", "value", "totalPrice", "totalCost", "discount", "profit", "commission", "pricingId"];
+    const financialFields = ["budgetIds", "invoiceIds", "receiptIds", "price", "cost", "value", "totalPrice", "totalCost", "discount", "profit", "pricingId"];
 
-    // Filter out sensitive field changes and financial fields for non-privileged users
+    // Define restricted fields that should only be visible to privileged users (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER)
+    const restrictedFields = ["forecastDate", "negotiatingWith", "invoiceTo"];
+
+    // Filter out sensitive field changes and restricted fields for non-privileged users
     const filteredLogs = logs.filter((log) => {
       if (!log.field) return true;
 
@@ -1695,6 +1716,16 @@ export function ChangelogHistory({ entityType, entityId, entityName, entityCreat
 
       // Filter out financial fields for non-FINANCIAL/ADMIN users
       if (!canViewFinancialFields && financialFields.some((financial) => fieldLower.includes(financial.toLowerCase()))) {
+        return false;
+      }
+
+      // Filter out commission field for users without permission
+      if (!canViewCommissionField && fieldLower.includes("commission")) {
+        return false;
+      }
+
+      // Filter out restricted fields (forecastDate, negotiatingWith, invoiceTo) for non-privileged users
+      if (!canViewRestrictedFields && restrictedFields.some((restricted) => fieldLower.includes(restricted.toLowerCase()))) {
         return false;
       }
 

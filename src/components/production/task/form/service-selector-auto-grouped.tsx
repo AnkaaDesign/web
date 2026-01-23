@@ -3,11 +3,12 @@ import { useFieldArray, useWatch, useController } from "react-hook-form";
 import { FormField, FormLabel } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { IconPlus, IconTrash, IconNote } from "@tabler/icons-react";
 import { Combobox } from "@/components/ui/combobox";
 import { SERVICE_ORDER_STATUS, SERVICE_ORDER_TYPE, SERVICE_ORDER_TYPE_LABELS, SERVICE_ORDER_STATUS_LABELS, SECTOR_PRIVILEGES } from "../../../../constants";
 import { Textarea } from "@/components/ui/textarea";
-import { toTitleCase } from "../../../../utils";
+import { toTitleCase, getServiceOrderStatusColor } from "../../../../utils";
 import { AdminUserSelector } from "@/components/administration/user/form/user-selector";
 import { ServiceDescriptionInput } from "./service-description-input";
 import {
@@ -24,10 +25,11 @@ interface ServiceSelectorProps {
   disabled?: boolean;
   currentUserId?: string;
   userPrivilege?: string;
+  isTeamLeader?: boolean;
   onItemDeleted?: (description: string) => void;
 }
 
-export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, userPrivilege, onItemDeleted }: ServiceSelectorProps) {
+export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, userPrivilege, isTeamLeader = false, onItemDeleted }: ServiceSelectorProps) {
   const { fields, append, prepend, remove } = useFieldArray({
     control,
     name: "serviceOrders",
@@ -189,6 +191,7 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
                 isGrouped={true}
                 userPrivilege={userPrivilege}
                 currentUserId={currentUserId}
+                isTeamLeader={isTeamLeader}
               />
             );
           })}
@@ -243,6 +246,7 @@ export function ServiceSelectorAutoGrouped({ control, disabled, currentUserId, u
                   isGrouped={false}
                   userPrivilege={userPrivilege}
                   currentUserId={currentUserId}
+                  isTeamLeader={isTeamLeader}
                 />
               );
             })}
@@ -269,6 +273,7 @@ interface ServiceRowProps {
   isGrouped: boolean; // Whether this service is in a group card or being edited
   userPrivilege?: string;
   currentUserId?: string;
+  isTeamLeader?: boolean;
 }
 
 function ServiceRow({
@@ -280,6 +285,7 @@ function ServiceRow({
   isGrouped,
   userPrivilege,
   currentUserId,
+  isTeamLeader = false,
 }: ServiceRowProps) {
   // Observation modal state
   const [isObservationModalOpen, setIsObservationModalOpen] = useState(false);
@@ -393,10 +399,19 @@ function ServiceRow({
     ];
   }, [serviceOrderId, userPrivilege, selectedType]);
 
-  // Determine if status field should be shown (for all grouped service orders)
+  // Determine if status field should be shown as combobox (editable) or badge (read-only)
+  // For PRODUCTION sector users who are NOT team leaders: show as badge (read-only)
+  // For team leaders and other sectors with edit permissions: show as combobox
   const showStatusField = useMemo(() => {
-    return isGrouped; // Show for all grouped service orders (new ones will only have PENDING option)
-  }, [isGrouped]);
+    if (!isGrouped) return false; // Never show status for ungrouped (new) service orders
+
+    // If user is PRODUCTION sector but NOT a team leader, show as badge instead of combobox
+    if (userPrivilege === SECTOR_PRIVILEGES.PRODUCTION && !isTeamLeader) {
+      return false; // Will show badge instead
+    }
+
+    return true; // Show combobox for team leaders and other sectors
+  }, [isGrouped, userPrivilege, isTeamLeader]);
 
   // Determine if this is a new service order (for observation button visibility)
   const isNewServiceOrder = useMemo(() => {
@@ -520,7 +535,7 @@ function ServiceRow({
           />
         </div>
 
-        {/* Status Field - Only show for existing grouped service orders */}
+        {/* Status Field - Show combobox for team leaders/editors, badge for read-only users */}
         {showStatusField ? (
           <div className="min-w-0">
             <FormField
@@ -537,14 +552,22 @@ function ServiceRow({
                   }))}
                   placeholder="Status"
                   searchable={false}
+                  clearable={false}
                   className="w-full"
                 />
               )}
             />
           </div>
+        ) : isGrouped ? (
+          // Show read-only badge for PRODUCTION users who are not team leaders
+          <div className="min-w-0 flex items-center">
+            <Badge variant={getServiceOrderStatusColor(currentStatus)} className="whitespace-nowrap">
+              {SERVICE_ORDER_STATUS_LABELS[currentStatus] || currentStatus}
+            </Badge>
+          </div>
         ) : (
-          // Placeholder for grouped items without status to maintain grid structure
-          isGrouped && <div className="min-w-0" />
+          // Placeholder for ungrouped items to maintain grid structure
+          <div className="min-w-0" />
         )}
 
         {/* Action Buttons - fixed width */}

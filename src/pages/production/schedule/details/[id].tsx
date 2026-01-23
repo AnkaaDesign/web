@@ -752,13 +752,17 @@ export const TaskDetailsPage = () => {
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER)
   );
 
-  // Check if user can view artwork badges and non-approved artworks (ADMIN, COMMERCIAL, LOGISTIC, DESIGNER only)
+  // Check if user can view artwork badges and non-approved artworks (ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER only)
   const canViewArtworkBadges = currentUser && (
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
     hasPrivilege(currentUser, SECTOR_PRIVILEGES.DESIGNER)
   );
+
+  // Check if user can view restricted fields (forecastDate, negotiatingWith) - ADMIN, COMMERCIAL, FINANCIAL, LOGISTIC, DESIGNER only
+  const canViewRestrictedFields = canViewArtworkBadges;
 
   // Get visible service order types based on user's sector privilege
   const visibleServiceOrderTypes = useMemo(
@@ -786,24 +790,67 @@ export const TaskDetailsPage = () => {
   const canViewPricingSection = canViewPricing(currentUser?.sector?.privileges || '');
   const canViewDocumentsSection = canViewPricing(currentUser?.sector?.privileges || ''); // Same permissions as pricing
 
-  // Filter sections based on user privileges
+  // Check if user can view commission field - ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only
+  // (Production users receive commission, so they need to see it)
+  const canViewCommissionField = currentUser && (
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.FINANCIAL) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.COMMERCIAL) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.PRODUCTION)
+  );
+
+  // Fields that should only be visible to users who can view commission (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION)
+  const COMMISSION_RESTRICTED_FIELDS = ['commission'];
+
+  // Fields that should only be visible to privileged users (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER only)
+  // Includes: forecastDate, negotiatingWith (name/phone), invoiceTo
+  const PRIVILEGED_RESTRICTED_FIELDS = ['negotiatingWithName', 'negotiatingWithPhone', 'forecast', 'invoiceTo'];
+
+  // Check if user can view layout section (ADMIN, LOGISTIC, or PRODUCTION team leaders only)
+  const canViewLayoutSection = currentUser && (
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.ADMIN) ||
+    hasPrivilege(currentUser, SECTOR_PRIVILEGES.LOGISTIC) ||
+    (isProductionSector && isTeamLeader(currentUser))
+  );
+
+  // Filter sections and fields based on user privileges
   const filteredSections = useMemo(() => {
-    return TASK_SECTIONS.filter(section => {
-      // Hide pricing section for users without permission (ADMIN, FINANCIAL, COMMERCIAL only)
-      if (section.id === 'pricing' && !canViewPricingSection) return false;
-      // Hide documents section for users without permission (ADMIN, FINANCIAL, COMMERCIAL only)
-      if (section.id === 'documents' && !canViewDocumentsSection) return false;
-      // Hide baseFiles section for users without permission (ADMIN, COMMERCIAL, LOGISTIC, DESIGNER only)
-      if (section.id === 'baseFiles' && !canViewBaseFiles) return false;
-      // Hide cuts section for financial users
-      if (section.id === 'cuts' && isFinancialSector) return false;
-      // Hide artworks section for users who can't view ARTWORK service orders
-      if (section.id === 'artworks' && !canViewServiceOrderType(userSectorPrivilege, SERVICE_ORDER_TYPE.ARTWORK)) return false;
-      // Hide changelog section for warehouse users and production users (except team leaders)
-      if (section.id === 'changelog' && (isWarehouseSector || (isProductionSector && !isTeamLeader(currentUser)))) return false;
-      return true;
-    });
-  }, [canViewPricingSection, canViewDocumentsSection, canViewBaseFiles, isWarehouseSector, isProductionSector, currentUser, userSectorPrivilege]);
+    return TASK_SECTIONS
+      .filter(section => {
+        // Hide pricing section for users without permission (ADMIN, FINANCIAL, COMMERCIAL only)
+        if (section.id === 'pricing' && !canViewPricingSection) return false;
+        // Hide documents section for users without permission (ADMIN, FINANCIAL, COMMERCIAL only)
+        if (section.id === 'documents' && !canViewDocumentsSection) return false;
+        // Hide baseFiles section for users without permission (ADMIN, COMMERCIAL, LOGISTIC, DESIGNER only)
+        if (section.id === 'baseFiles' && !canViewBaseFiles) return false;
+        // Hide cuts section for financial users
+        if (section.id === 'cuts' && isFinancialSector) return false;
+        // Hide layout section for users without permission (ADMIN, LOGISTIC, PRODUCTION team leaders only)
+        if (section.id === 'layout' && !canViewLayoutSection) return false;
+        // Artworks section is visible to ALL users (content is filtered by approval status)
+        // Hide changelog section for warehouse users and production users (except team leaders)
+        if (section.id === 'changelog' && (isWarehouseSector || (isProductionSector && !isTeamLeader(currentUser)))) return false;
+        return true;
+      })
+      .map(section => {
+        let filteredFields = section.fields;
+
+        // Filter commission field (ADMIN, FINANCIAL, COMMERCIAL, PRODUCTION only)
+        if (!canViewCommissionField) {
+          filteredFields = filteredFields.filter(field => !COMMISSION_RESTRICTED_FIELDS.includes(field.id));
+        }
+
+        // Filter privileged restricted fields (ADMIN, FINANCIAL, COMMERCIAL, LOGISTIC, DESIGNER only)
+        if (!canViewRestrictedFields) {
+          filteredFields = filteredFields.filter(field => !PRIVILEGED_RESTRICTED_FIELDS.includes(field.id));
+        }
+
+        if (filteredFields.length !== section.fields.length) {
+          return { ...section, fields: filteredFields };
+        }
+        return section;
+      });
+  }, [canViewPricingSection, canViewDocumentsSection, canViewBaseFiles, canViewLayoutSection, isWarehouseSector, isProductionSector, currentUser, canViewCommissionField, canViewRestrictedFields]);
 
   // Initialize section visibility hook with filtered sections
   const sectionVisibility = useSectionVisibility(
@@ -953,6 +1000,15 @@ export const TaskDetailsPage = () => {
 
   const task = response?.data;
 
+  // Filter artworks based on user permissions - only show approved artworks to non-privileged users
+  const filteredArtworks = useMemo(() => {
+    if (!task?.artworks) return [];
+    return task.artworks.filter(artwork => {
+      const hasFileData = artwork.file || (artwork as any).filename || (artwork as any).path;
+      return hasFileData && (canViewArtworkBadges || artwork.status === 'APPROVED');
+    });
+  }, [task?.artworks, canViewArtworkBadges]);
+
   // Fetch cuts related to this task
   const { data: cutsResponse } = useCutsByTask(
     {
@@ -1015,25 +1071,31 @@ export const TaskDetailsPage = () => {
   }, [layouts]);
 
   // Filter service orders by:
-  // 1. Status: only PENDING, IN_PROGRESS, WAITING_APPROVE, and COMPLETED (not CANCELLED)
-  // 2. Type: only types the user has permission to view based on sector privilege
+  // 1. Type: only types the user has permission to view based on sector privilege
+  // 2. Status: Show canceled orders to appropriate users, but hide canceled PRODUCTION orders from PRODUCTION/WAREHOUSE users
   const filteredServiceOrders = useMemo(() => {
     if (!task?.serviceOrders) return [];
     return task.serviceOrders
       .filter((service) => {
-        // Filter by status - exclude only CANCELLED
-        const hasValidStatus = service.status === SERVICE_ORDER_STATUS.PENDING ||
-          service.status === SERVICE_ORDER_STATUS.IN_PROGRESS ||
-          service.status === SERVICE_ORDER_STATUS.WAITING_APPROVE ||
-          service.status === SERVICE_ORDER_STATUS.COMPLETED;
-        if (!hasValidStatus) return false;
-
         // Filter by type based on user's sector privilege
         const serviceType = service.type as SERVICE_ORDER_TYPE;
-        return visibleServiceOrderTypes.includes(serviceType);
+        if (!visibleServiceOrderTypes.includes(serviceType)) return false;
+
+        // Handle canceled service orders visibility
+        if (service.status === SERVICE_ORDER_STATUS.CANCELLED) {
+          // Hide canceled PRODUCTION service orders from PRODUCTION and WAREHOUSE users
+          if (serviceType === SERVICE_ORDER_TYPE.PRODUCTION) {
+            if (userSectorPrivilege === SECTOR_PRIVILEGES.PRODUCTION ||
+                userSectorPrivilege === SECTOR_PRIVILEGES.WAREHOUSE) {
+              return false;
+            }
+          }
+        }
+
+        return true;
       })
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [task?.serviceOrders, visibleServiceOrderTypes]);
+  }, [task?.serviceOrders, visibleServiceOrderTypes, userSectorPrivilege]);
 
   // Determine the source section from the URL path
   // /producao/cronograma/detalhes/123 → 'cronograma'
@@ -1137,38 +1199,12 @@ export const TaskDetailsPage = () => {
     }
   };
 
-  // Handle "Disponibilizar para Produção" with artwork service order validation
+  // Handle "Disponibilizar para Produção" - manually release task to production
+  // Note: Automatic sync still works - when artwork SO becomes COMPLETED, task auto-transitions
   const handleReleaseToProduction = () => {
     if (!task) return;
 
-    const taskName = task.name || task.serialNumber || task.plate || 'Tarefa';
-
-    // Get all ARTWORK service orders for this task
-    const artworkServiceOrders = task.serviceOrders?.filter(
-      (service) => service && service.type === SERVICE_ORDER_TYPE.ARTWORK
-    ) || [];
-
-    // REQUIREMENT 1: Task MUST have at least one artwork service order
-    if (artworkServiceOrders.length === 0) {
-      toast.error("Não é possível iniciar", {
-        description: `${taskName}: A tarefa deve ter pelo menos uma ordem de serviço de arte antes de mover para o cronograma.`,
-      });
-      return;
-    }
-
-    // REQUIREMENT 2: ALL artwork service orders must be COMPLETED
-    const hasIncompleteArtwork = artworkServiceOrders.some(
-      (service) => !service.status || service.status !== SERVICE_ORDER_STATUS.COMPLETED
-    );
-
-    if (hasIncompleteArtwork) {
-      toast.error("Não é possível iniciar", {
-        description: `${taskName}: Todas as ordens de serviço de arte devem estar concluídas antes de mover para o cronograma.`,
-      });
-      return;
-    }
-
-    // Validation passed, proceed with status change to WAITING_PRODUCTION
+    // Proceed with status change to WAITING_PRODUCTION (no artwork validation for manual changes)
     handleStatusChange(TASK_STATUS.WAITING_PRODUCTION);
   };
 
@@ -2096,6 +2132,7 @@ export const TaskDetailsPage = () => {
                               options={statusOptions}
                               placeholder="Selecione o status"
                               searchable={false}
+                              clearable={false}
                               disabled={false}
                               className="w-[200px] h-8 rounded-md"
                               triggerClassName={cn(
@@ -2266,8 +2303,8 @@ export const TaskDetailsPage = () => {
                 </Card>
               )}
 
-              {/* Artworks Card - 1/2 width - Visibility based on sector privilege for ARTWORK type */}
-              {sectionVisibility.isSectionVisible("artworks") && canViewServiceOrderType(userSectorPrivilege, SERVICE_ORDER_TYPE.ARTWORK) && task.artworks && task.artworks.length > 0 && (
+              {/* Artworks Card - 1/2 width - Visible to ALL users, content filtered by approval status */}
+              {sectionVisibility.isSectionVisible("artworks") && filteredArtworks.length > 0 && (
                 <Card className="border flex flex-col animate-in fade-in-50 duration-1000 lg:col-span-1">
                   <CardHeader className="pb-6">
                     <div className="flex items-center justify-between">
@@ -2275,25 +2312,25 @@ export const TaskDetailsPage = () => {
                         <IconFiles className="h-5 w-5 text-muted-foreground" />
                         Artes
                         <Badge variant="secondary" className="ml-2">
-                          {task.artworks?.length ?? 0}
+                          {filteredArtworks.length}
                         </Badge>
                       </CardTitle>
                       <div className="flex items-center gap-2">
-                        {(task.artworks?.length ?? 0) > 1 && (
+                        {filteredArtworks.length > 1 && (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={async () => {
                               const apiUrl = (window as any).__ANKAA_API_URL__ || (import.meta as any).env?.VITE_API_URL || "http://localhost:3030";
-                              for (let i = 0; i < (task.artworks?.length ?? 0); i++) {
-                                const artwork = task.artworks?.[i];
+                              for (let i = 0; i < filteredArtworks.length; i++) {
+                                const artwork = filteredArtworks[i];
                                 // File data can be nested in .file or directly on artwork
                                 const fileId = artwork?.file?.id || artwork?.id;
                                 if (fileId) {
                                   const downloadUrl = `${apiUrl}/files/${fileId}/download`;
                                   window.open(downloadUrl, "_blank");
                                 }
-                                if (i < (task.artworks?.length ?? 0) - 1) {
+                                if (i < filteredArtworks.length - 1) {
                                   await new Promise((resolve) => setTimeout(resolve, 200));
                                 }
                               }
@@ -2326,50 +2363,33 @@ export const TaskDetailsPage = () => {
                     </div>
                   </CardHeader>
               <CardContent className="pt-0 flex-1">
-                {(() => {
-                  // Filter artworks: show all if user can view badges, otherwise only approved
-                  // Note: artwork can have file data nested in .file OR directly on artwork object
-                  const filteredArtworks = task.artworks?.filter(artwork => {
-                    const hasFileData = artwork.file || (artwork as any).filename || (artwork as any).path;
-                    return hasFileData && (canViewArtworkBadges || artwork.status === 'APPROVED');
-                  }) || [];
-
-                  return filteredArtworks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                      <IconFiles className="h-12 w-12 mb-2 opacity-50" />
-                      <p className="text-sm">Nenhuma arte disponível no momento</p>
-                      <p className="text-xs mt-1">As artes podem estar sendo processadas</p>
-                    </div>
-                  ) : (
-                    <div className={cn(artworksViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
-                      {filteredArtworks.map((artwork) => {
-                        // File data can be nested in .file or directly on artwork
-                        const fileData = artwork.file || artwork;
-                        return (
-                        <div key={artwork.id} className="relative">
-                          <FileItem
-                            file={fileData as any}
-                            viewMode={artworksViewMode}
-                            onPreview={handleArtworkFileClick}
-                            onDownload={handleDownload}
-                            showActions
-                          />
-                          {canViewArtworkBadges && artwork.status && (
-                            <div className="absolute top-2 right-2">
-                              <Badge
-                                variant={artwork.status === 'APPROVED' ? 'approved' : artwork.status === 'REJECTED' ? 'rejected' : 'secondary'}
-                                className="text-xs"
-                              >
-                                {artwork.status === 'APPROVED' ? 'Aprovado' : artwork.status === 'REJECTED' ? 'Reprovado' : 'Rascunho'}
-                              </Badge>
-                            </div>
-                          )}
+                <div className={cn(artworksViewMode === "grid" ? "flex flex-wrap gap-3" : "grid grid-cols-1 gap-2")}>
+                  {filteredArtworks.map((artwork) => {
+                    // File data can be nested in .file or directly on artwork
+                    const fileData = artwork.file || artwork;
+                    return (
+                    <div key={artwork.id} className="relative">
+                      <FileItem
+                        file={fileData as any}
+                        viewMode={artworksViewMode}
+                        onPreview={handleArtworkFileClick}
+                        onDownload={handleDownload}
+                        showActions
+                      />
+                      {canViewArtworkBadges && artwork.status && (
+                        <div className="absolute top-2 right-2">
+                          <Badge
+                            variant={artwork.status === 'APPROVED' ? 'approved' : artwork.status === 'REPROVED' ? 'rejected' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {artwork.status === 'APPROVED' ? 'Aprovado' : artwork.status === 'REPROVED' ? 'Reprovado' : 'Rascunho'}
+                          </Badge>
                         </div>
-                        );
-                      })}
+                      )}
                     </div>
-                  );
-                })()}
+                    );
+                  })}
+                </div>
               </CardContent>
                 </Card>
               )}

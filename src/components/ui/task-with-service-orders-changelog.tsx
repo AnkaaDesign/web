@@ -1028,6 +1028,14 @@ const ChangelogTimelineItem = ({
                   return false;
                 }
 
+                // Filter out invoiceToId field for users who can't view it (only ADMIN, FINANCIAL, COMMERCIAL can see)
+                const canViewInvoiceToField = userSectorPrivilege === SECTOR_PRIVILEGES.ADMIN ||
+                  userSectorPrivilege === SECTOR_PRIVILEGES.FINANCIAL ||
+                  userSectorPrivilege === SECTOR_PRIVILEGES.COMMERCIAL;
+                if (!canViewInvoiceToField && changelog.field === "invoiceToId") {
+                  return false;
+                }
+
                 // For services field, only show if there's a meaningful change (count changed)
                 if (changelog.field === "services") {
                   const parseValue = (val: any) => {

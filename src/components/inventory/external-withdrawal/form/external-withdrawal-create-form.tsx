@@ -1103,7 +1103,7 @@ export const ExternalWithdrawalCreateForm = () => {
                           <Textarea
                             placeholder="Observações sobre a retirada (opcional)"
                             value={notes}
-                            onChange={(value) => updateNotes(typeof value === "string" ? value : "")}
+                            onChange={(e) => updateNotes(e.target.value)}
                             className="min-h-20 max-h-32"
                             rows={3}
                             maxLength={500}
