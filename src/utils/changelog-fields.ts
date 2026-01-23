@@ -282,6 +282,7 @@ const entitySpecificFields: Partial<Record<CHANGE_LOG_ENTITY_TYPE, Record<string
     truck: "Caminhão",
     createdBy: "Criado por",
     artworks: "Artes",
+    baseFiles: "Arquivos Base",
     logoPaints: "Tintas da logomarca",
     paints: "Tintas da logomarca",
     groundPaints: "Fundos da Tinta",
@@ -993,6 +994,9 @@ export function formatFieldValue(value: ComplexFieldValue, field?: string | null
     if (entityType === CHANGE_LOG_ENTITY_TYPE.TASK) {
       if (field === "artworks") {
         return `${value.length} ${value.length === 1 ? "arte" : "artes"}`;
+      }
+      if (field === "baseFiles") {
+        return `${value.length} ${value.length === 1 ? "arquivo base" : "arquivos base"}`;
       }
       // Don't format logoPaints/paints/groundPaints as strings - they will be rendered as special cards in the UI
       if (field === "logoPaints" || field === "paints" || field === "groundPaints") {

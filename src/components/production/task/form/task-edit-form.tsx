@@ -3564,7 +3564,7 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                     <CardHeader className="flex-1 py-4">
                       <CardTitle className="flex items-center gap-2">
                         <IconFile className="h-5 w-5" />
-                        Arquivos
+                        Arquivos Base
                       </CardTitle>
                     </CardHeader>
                   </AccordionTrigger>
@@ -3577,8 +3577,8 @@ export const TaskEditForm = ({ task, onFormStateChange, detailsRoute }: TaskEdit
                         showPreview={true}
                         existingFiles={baseFiles}
                         variant="compact"
-                        placeholder="Adicione arquivos para a tarefa"
-                        label="Arquivos anexados"
+                        placeholder="Adicione arquivos base para a tarefa"
+                        label="Arquivos base anexados"
                       />
                     </CardContent>
                   </AccordionContent>
